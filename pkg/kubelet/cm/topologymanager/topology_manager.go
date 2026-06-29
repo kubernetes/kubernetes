@@ -88,7 +88,7 @@ type Manager interface {
 	// wants to be consulted with when making topology hints
 	AddHintProvider(logger klog.Logger, h HintProvider)
 	// AddContainer adds pod to Manager for tracking
-	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
+	AddContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
 	RemoveContainer(logger klog.Logger, containerID string) error
 	// Store is the interface for storing pod topology hints
@@ -125,7 +125,7 @@ type HintProvider interface {
 
 // Store interface is to allow Hint Providers to retrieve pod affinity
 type Store interface {
-	GetAffinity(podUID string, containerName string) TopologyHint
+	GetAffinity(logger klog.Logger, podUID string, containerName string) TopologyHint
 	GetPolicy() Policy
 	Name() string
 }
@@ -235,8 +235,8 @@ func (m *manager) initializeMetrics() {
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
 }
 
-func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint {
-	return m.scope.GetAffinity(podUID, containerName)
+func (m *manager) GetAffinity(logger klog.Logger, podUID string, containerName string) TopologyHint {
+	return m.scope.GetAffinity(logger, podUID, containerName)
 }
 
 func (m *manager) GetPolicy() Policy {
@@ -247,11 +247,11 @@ func (m *manager) Name() string {
 	return m.scope.Name()
 }
 
-func (m *manager) AddHintProvider(_ klog.Logger, h HintProvider) {
-	m.scope.AddHintProvider(h)
+func (m *manager) AddHintProvider(logger klog.Logger, h HintProvider) {
+	m.scope.AddHintProvider(logger, h)
 }
 
-func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+func (m *manager) AddContainer(_ klog.Logger, pod *v1.Pod, container *v1.Container, containerID string) {
 	m.scope.AddContainer(pod, container, containerID)
 }
 

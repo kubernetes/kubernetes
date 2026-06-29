@@ -366,7 +366,7 @@ func TestCPUManagerAdd(t *testing.T) {
 		},
 		0,
 		cpuset.New(),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(logger),
 		nil)
 	testCases := []struct {
 		description        string
@@ -622,7 +622,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 
 	for _, testCase := range testCases {
 		logger, ctx := ktesting.NewTestContext(t)
-		policy, _ := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 
 		mockState := &mockState{
 			assignments:   testCase.stAssignments,
@@ -786,7 +786,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			defer os.RemoveAll(sDir)
 
 			logger, _ := ktesting.NewTestContext(t)
-			mgr, err := NewManager(logger, testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			mgr, err := NewManager(logger, testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger))
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -879,7 +879,7 @@ func TestReconcileState(t *testing.T) {
 		},
 		0,
 		cpuset.New(),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(logger),
 		nil)
 
 	testCases := []struct {
@@ -1404,7 +1404,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		},
 		1,
 		cpuset.New(0),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(logger),
 		nil)
 	testCases := []struct {
 		description        string
@@ -1522,7 +1522,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			defer os.RemoveAll(sDir)
 
 			logger, _ := ktesting.NewTestContext(t)
-			_, err = NewManager(logger, testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			_, err = NewManager(logger, testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger))
 			if err == nil {
 				t.Errorf("Expected error, but NewManager succeeded")
 			}
@@ -1556,7 +1556,7 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 		},
 		1,
 		cpuset.New(0),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(logger),
 		nil)
 
 	testCases := []struct {

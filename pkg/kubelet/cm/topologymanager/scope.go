@@ -45,7 +45,7 @@ type Scope interface {
 	Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consoluted with when making topology hints
-	AddHintProvider(h HintProvider)
+	AddHintProvider(logger klog.Logger, h HintProvider)
 	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
@@ -88,7 +88,7 @@ func (s *scope) setTopologyHints(podUID string, containerName string, th Topolog
 	s.podTopologyHints[podUID][containerName] = th
 }
 
-func (s *scope) GetAffinity(podUID string, containerName string) TopologyHint {
+func (s *scope) GetAffinity(_ klog.Logger, podUID string, containerName string) TopologyHint {
 	return s.getTopologyHints(podUID, containerName)
 }
 
@@ -96,7 +96,7 @@ func (s *scope) GetPolicy() Policy {
 	return s.policy
 }
 
-func (s *scope) AddHintProvider(h HintProvider) {
+func (s *scope) AddHintProvider(_ klog.Logger, h HintProvider) {
 	s.hintProviders = append(s.hintProviders, h)
 }
 

@@ -23,6 +23,7 @@ package testing
 import (
 	mock "github.com/stretchr/testify/mock"
 	v10 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
@@ -670,16 +671,16 @@ func (_m *MockDynamicResourcesProvider) EXPECT() *MockDynamicResourcesProvider_E
 }
 
 // GetDynamicResources provides a mock function for the type MockDynamicResourcesProvider
-func (_mock *MockDynamicResourcesProvider) GetDynamicResources(pod *v10.Pod, container *v10.Container) []*v1.DynamicResource {
-	ret := _mock.Called(pod, container)
+func (_mock *MockDynamicResourcesProvider) GetDynamicResources(logger klog.Logger, pod *v10.Pod, container *v10.Container) []*v1.DynamicResource {
+	ret := _mock.Called(logger, pod, container)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetDynamicResources")
 	}
 
 	var r0 []*v1.DynamicResource
-	if returnFunc, ok := ret.Get(0).(func(*v10.Pod, *v10.Container) []*v1.DynamicResource); ok {
-		r0 = returnFunc(pod, container)
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, *v10.Pod, *v10.Container) []*v1.DynamicResource); ok {
+		r0 = returnFunc(logger, pod, container)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*v1.DynamicResource)
@@ -694,25 +695,31 @@ type MockDynamicResourcesProvider_GetDynamicResources_Call struct {
 }
 
 // GetDynamicResources is a helper method to define mock.On call
+//   - logger klog.Logger
 //   - pod *v10.Pod
 //   - container *v10.Container
-func (_e *MockDynamicResourcesProvider_Expecter) GetDynamicResources(pod interface{}, container interface{}) *MockDynamicResourcesProvider_GetDynamicResources_Call {
-	return &MockDynamicResourcesProvider_GetDynamicResources_Call{Call: _e.mock.On("GetDynamicResources", pod, container)}
+func (_e *MockDynamicResourcesProvider_Expecter) GetDynamicResources(logger interface{}, pod interface{}, container interface{}) *MockDynamicResourcesProvider_GetDynamicResources_Call {
+	return &MockDynamicResourcesProvider_GetDynamicResources_Call{Call: _e.mock.On("GetDynamicResources", logger, pod, container)}
 }
 
-func (_c *MockDynamicResourcesProvider_GetDynamicResources_Call) Run(run func(pod *v10.Pod, container *v10.Container)) *MockDynamicResourcesProvider_GetDynamicResources_Call {
+func (_c *MockDynamicResourcesProvider_GetDynamicResources_Call) Run(run func(logger klog.Logger, pod *v10.Pod, container *v10.Container)) *MockDynamicResourcesProvider_GetDynamicResources_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *v10.Pod
+		var arg0 klog.Logger
 		if args[0] != nil {
-			arg0 = args[0].(*v10.Pod)
+			arg0 = args[0].(klog.Logger)
 		}
-		var arg1 *v10.Container
+		var arg1 *v10.Pod
 		if args[1] != nil {
-			arg1 = args[1].(*v10.Container)
+			arg1 = args[1].(*v10.Pod)
+		}
+		var arg2 *v10.Container
+		if args[2] != nil {
+			arg2 = args[2].(*v10.Container)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -723,7 +730,7 @@ func (_c *MockDynamicResourcesProvider_GetDynamicResources_Call) Return(dynamicR
 	return _c
 }
 
-func (_c *MockDynamicResourcesProvider_GetDynamicResources_Call) RunAndReturn(run func(pod *v10.Pod, container *v10.Container) []*v1.DynamicResource) *MockDynamicResourcesProvider_GetDynamicResources_Call {
+func (_c *MockDynamicResourcesProvider_GetDynamicResources_Call) RunAndReturn(run func(logger klog.Logger, pod *v10.Pod, container *v10.Container) []*v1.DynamicResource) *MockDynamicResourcesProvider_GetDynamicResources_Call {
 	_c.Call.Return(run)
 	return _c
 }

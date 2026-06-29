@@ -47,7 +47,7 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(logger klog.Logger, p
 		i.memoryManager.AddContainer(logger, pod, container, containerID)
 	}
 
-	i.topologyManager.AddContainer(pod, container, containerID)
+	i.topologyManager.AddContainer(logger, pod, container, containerID)
 
 	return nil
 }

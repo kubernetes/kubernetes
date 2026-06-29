@@ -122,7 +122,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				cpuset.New(),
 				v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
 				sDir,
-				topologymanager.NewFakeManager(),
+				topologymanager.NewFakeManager(logger),
 			)
 			if err != nil {
 				t.Fatalf("could not create manager: %v", err)
@@ -197,7 +197,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				cpuset.New(),
 				v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
 				sDir,
-				topologymanager.NewFakeManager(),
+				topologymanager.NewFakeManager(logger),
 			)
 			if err != nil {
 				t.Fatalf("could not create manager 2: %v", err)
