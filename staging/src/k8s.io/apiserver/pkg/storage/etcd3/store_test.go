@@ -50,6 +50,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -329,8 +330,50 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	ctx, store, client := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, compactStorage(store, client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+	for _, rangeStream := range []bool{false, true} {
+		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
+			resetFeatureSupportCheckerDuringTest(t)
+
+			ctx, store, client := testSetup(t)
+			storagetesting.RunTestList(ctx, t, store, compactStorage(store, client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+		})
+	}
+}
+
+// TestGetListStreamFallsBackToPaginated verifies that a GetList against a server without
+// RangeStream support marks the feature unsupported and serves from the paginated path.
+func TestGetListStreamFallsBackToPaginated(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, true)
+	resetFeatureSupportCheckerDuringTest(t)
+
+	ctx, store, _ := testSetup(t)
+	initList, err := initStoreData(ctx, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvWrapper := newEtcdClientKVWrapper(store.client.KV)
+	kvWrapper.streamUnimplemented = true
+	store.client.KV = kvWrapper
+
+	out := &example.PodList{}
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, out); err != nil {
+		t.Fatalf("GetList failed: %v", err)
+	}
+
+	if kvWrapper.getStreamCallCounter != 1 {
+		t.Errorf("expected GetStream to be called once, got %d", kvWrapper.getStreamCallCounter)
+	}
+	if kvWrapper.getCallCounter == 0 {
+		t.Error("expected the paginated Get path to serve the list after fallback")
+	}
+	if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RangeStream) {
+		t.Error("expected RangeStream to be marked unsupported after the Unimplemented fallback")
+	}
+	if len(out.Items) != len(initList) {
+		t.Errorf("returned %d items, want %d", len(out.Items), len(initList))
+	}
 }
 
 func TestListMetrics(t *testing.T) {
