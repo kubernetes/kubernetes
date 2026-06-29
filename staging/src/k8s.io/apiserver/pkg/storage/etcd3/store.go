@@ -853,23 +853,21 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 	}
 
-	if err := aggregator.Err(); err != nil {
-		return err
-	}
-
-	if v.IsNil() {
-		// Ensure that we never return a nil Items pointer in the result for consistency.
-		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
-	}
-
 	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, getResp.Count, hasMore, opts)
 	if err != nil {
 		return err
 	}
-	return s.finalizeList(listObj, opts.Predicate, uint64(withRev), continueValue, remainingItemCount)
+	return s.finalizeList(listObj, opts.Predicate, uint64(withRev), continueValue, remainingItemCount, aggregator, v)
 }
 
-func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64) error {
+func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator ListErrorAggregator, v reflect.Value) error {
+	if err := aggregator.Err(); err != nil {
+		return err
+	}
+	if v.IsNil() {
+		// Ensure that we never return a nil Items pointer in the result for consistency.
+		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
+	}
 	if err := s.versioner.UpdateList(listObj, rev, continueValue, remainingItemCount); err != nil {
 		return err
 	}
