@@ -3,6 +3,7 @@ kind: Pod
 metadata:
   name: pod-gang-{{.Index}}
 spec:
+  priority: {{if .priority}}{{AddInt 0 .priority}}{{else}}8888888{{end}}
   schedulingGroup:
     podGroupName: gang-{{DivideInt .Index .podsPerGroup}}
   affinity:
@@ -11,7 +12,7 @@ spec:
       - labelSelector:
           matchLabels:
             app: blue
-            # Adding more lables to increase scheduler load while calculating affinity
+            # Adding more labels to increase scheduler load while calculating affinity
             label1: value1
             label2: value2
             label3: value3
@@ -27,5 +28,8 @@ spec:
         cpu: 3970m
         memory: 500Mi
       requests:
+        # 3970m is chosen because nodes typically have 4000m CPU capacity.
+        # Requesting 3970m ensures it can fit on a node, but only if all
+        # low-priority pods (which request 40m) are preempted.
         cpu: 3970m
         memory: 500Mi
