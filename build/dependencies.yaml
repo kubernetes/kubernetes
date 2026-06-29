@@ -110,7 +110,7 @@ dependencies:
 
   # sample-device-plugin - E2E test image
   - name: "sample-device-plugin"
-    version: "1.7"
+    version: "1.8.0"
     refPaths:
     - path: test/e2e/testing-manifests/sample-device-plugin/sample-device-plugin.yaml
       match: registry.k8s.io/e2e-test-images/sample-device-plugin:\d+\.\d+
