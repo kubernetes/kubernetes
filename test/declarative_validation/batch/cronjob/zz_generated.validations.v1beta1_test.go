@@ -30,6 +30,13 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "batch", Version: "v1beta1", Kind: "CronJob"},
 		coverage.FieldRules{
+			"metadata.generation": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"metadata.managedFields[*].operation": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.jobTemplate.spec.backoffLimitPerIndex": {
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
 			},

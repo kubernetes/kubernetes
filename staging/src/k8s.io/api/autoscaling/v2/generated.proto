@@ -348,7 +348,7 @@ message MetricSpec {
   // (for example, hits-per-second on an Ingress object).
   // +optional
   // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:opaqueType
+  // +k8s:opaqueType
   optional ObjectMetricSource object = 2;
 
   // pods refers to a metric describing each pod in the current scale target
@@ -392,7 +392,7 @@ message MetricStatus {
   // (for example, hits-per-second on an Ingress object).
   // +optional
   // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:opaqueType
+  // +k8s:opaqueType
   optional ObjectMetricStatus object = 2;
 
   // pods refers to a metric describing each pod in the current scale target

@@ -30,6 +30,8 @@ import (
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -109,7 +111,28 @@ func Validate_ClusterRole(
 	obj, oldObj *rbacv1.ClusterRole) (errs field.ErrorList) {
 
 	// field rbacv1.ClusterRole.TypeMeta has no validation
-	// field rbacv1.ClusterRole.ObjectMeta has no validation
+
+	{ // field rbacv1.ClusterRole.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1.ClusterRole) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field rbacv1.ClusterRole.Rules
 		fn := func(
@@ -154,7 +177,28 @@ func Validate_ClusterRoleBinding(
 	obj, oldObj *rbacv1.ClusterRoleBinding) (errs field.ErrorList) {
 
 	// field rbacv1.ClusterRoleBinding.TypeMeta has no validation
-	// field rbacv1.ClusterRoleBinding.ObjectMeta has no validation
+
+	{ // field rbacv1.ClusterRoleBinding.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1.ClusterRoleBinding) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field rbacv1.ClusterRoleBinding.Subjects
 		fn := func(
@@ -262,7 +306,28 @@ func Validate_Role(
 	obj, oldObj *rbacv1.Role) (errs field.ErrorList) {
 
 	// field rbacv1.Role.TypeMeta has no validation
-	// field rbacv1.Role.ObjectMeta has no validation
+
+	{ // field rbacv1.Role.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1.Role) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field rbacv1.Role.Rules
 		fn := func(
@@ -306,7 +371,28 @@ func Validate_RoleBinding(
 	obj, oldObj *rbacv1.RoleBinding) (errs field.ErrorList) {
 
 	// field rbacv1.RoleBinding.TypeMeta has no validation
-	// field rbacv1.RoleBinding.ObjectMeta has no validation
+
+	{ // field rbacv1.RoleBinding.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1.RoleBinding) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field rbacv1.RoleBinding.Subjects
 		fn := func(

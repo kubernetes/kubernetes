@@ -26,9 +26,12 @@ import (
 	fmt "fmt"
 
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -63,7 +66,28 @@ func Validate_ClusterTrustBundle(
 	obj, oldObj *certificatesv1alpha1.ClusterTrustBundle) (errs field.ErrorList) {
 
 	// field certificatesv1alpha1.ClusterTrustBundle.TypeMeta has no validation
-	// field certificatesv1alpha1.ClusterTrustBundle.ObjectMeta has no validation
+
+	{ // field certificatesv1alpha1.ClusterTrustBundle.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1alpha1.ClusterTrustBundle) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field certificatesv1alpha1.ClusterTrustBundle.Spec
 		fn := func(

@@ -25,15 +25,17 @@ import (
 	context "context"
 	fmt "fmt"
 
-	batchv1 "k8s.io/api/batch/v1"
+	apibatchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
-	v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -66,7 +68,28 @@ func Validate_CronJob(
 	obj, oldObj *batchv1beta1.CronJob) (errs field.ErrorList) {
 
 	// field batchv1beta1.CronJob.TypeMeta has no validation
-	// field batchv1beta1.CronJob.ObjectMeta has no validation
+
+	{ // field batchv1beta1.CronJob.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1beta1.CronJob) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field batchv1beta1.CronJob.Spec
 		fn := func(
@@ -172,7 +195,7 @@ func Validate_JobTemplateSpec(
 	{ // field batchv1beta1.JobTemplateSpec.Spec
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *batchv1.JobSpec,
+			obj, oldObj *apibatchv1.JobSpec,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -181,11 +204,11 @@ func Validate_JobTemplateSpec(
 				}
 			}
 			// call the type's validation function
-			errs = append(errs, v1.Validate_JobSpec(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, batchv1.Validate_JobSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *batchv1beta1.JobTemplateSpec) *batchv1.JobSpec {
+			func(oldObj *batchv1beta1.JobTemplateSpec) *apibatchv1.JobSpec {
 				return &oldObj.Spec
 			})
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)

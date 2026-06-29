@@ -96,7 +96,29 @@ func Validate_CertificateSigningRequest(
 	obj, oldObj *certificatesv1beta1.CertificateSigningRequest) (errs field.ErrorList) {
 
 	// field certificatesv1beta1.CertificateSigningRequest.TypeMeta has no validation
-	// field certificatesv1beta1.CertificateSigningRequest.ObjectMeta has no validation
+
+	{ // field certificatesv1beta1.CertificateSigningRequest.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1beta1.CertificateSigningRequest) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
 	// field certificatesv1beta1.CertificateSigningRequest.Spec has no validation
 
 	{ // field certificatesv1beta1.CertificateSigningRequest.Status
@@ -191,7 +213,28 @@ func Validate_ClusterTrustBundle(
 	obj, oldObj *certificatesv1beta1.ClusterTrustBundle) (errs field.ErrorList) {
 
 	// field certificatesv1beta1.ClusterTrustBundle.TypeMeta has no validation
-	// field certificatesv1beta1.ClusterTrustBundle.ObjectMeta has no validation
+
+	{ // field certificatesv1beta1.ClusterTrustBundle.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1beta1.ClusterTrustBundle) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field certificatesv1beta1.ClusterTrustBundle.Spec
 		fn := func(
@@ -267,7 +310,29 @@ func Validate_PodCertificateRequest(
 	obj, oldObj *certificatesv1beta1.PodCertificateRequest) (errs field.ErrorList) {
 
 	// field certificatesv1beta1.PodCertificateRequest.TypeMeta has no validation
-	// field certificatesv1beta1.PodCertificateRequest.ObjectMeta has no validation
+
+	{ // field certificatesv1beta1.PodCertificateRequest.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1beta1.PodCertificateRequest) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
 	// field certificatesv1beta1.PodCertificateRequest.Spec has no validation
 
 	{ // field certificatesv1beta1.PodCertificateRequest.Status
