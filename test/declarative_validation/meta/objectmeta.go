@@ -109,7 +109,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				meta.SetGeneration(-1)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkFromImperative(),
+				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
 		{
@@ -227,7 +227,18 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("managedFields").Index(0).Child("operation"), "", "must be `Apply` or `Update`").MarkFromImperative(),
+				field.NotSupported(fldPath.Child("managedFields").Index(0).Child("operation"), metav1.ManagedFieldsOperationType("Invalid"), []metav1.ManagedFieldsOperationType{metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate}).MarkAlpha(),
+			},
+		},
+		{
+			Name: "managedFields: empty operation",
+			Modify: func(meta metav1.Object) {
+				meta.SetManagedFields([]metav1.ManagedFieldsEntry{
+					mkManagedFieldsEntry(tweakOperation("")),
+				})
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("managedFields").Index(0).Child("operation"), "").MarkAlpha(),
 			},
 		},
 		{
