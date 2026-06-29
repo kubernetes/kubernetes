@@ -468,8 +468,27 @@ message CapacityRequirements {
 message Counter {
   // Value defines how much of a certain device counter is available.
   //
-  // +required
+  // When used in sharedCounters, this is the total amount available.
+  // When used in consumesCounters, this is the statically consumed amount.
+  //
+  // Either Value or ValueFrom must be specified in consumesCounters.
+  //
+  // +optional
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
+
+  // RequestPolicy defines how this Counter must be consumed when used
+  // as a shared counter and referenced through ValueFrom.
+  //
+  // +optional
+  // +featureGate=DRASharedConsumableCapacity
+  optional CapacityRequestPolicy requestPolicy = 2;
+
+  // ValueFrom maps a capacity.requests key from a ResourceClaim to this
+  // counter, making device counter consumption request-driven.
+  //
+  // +optional
+  // +featureGate=DRASharedConsumableCapacity
+  optional CounterValueFrom valueFrom = 3;
 }
 
 // CounterSet defines a named set of counters
@@ -498,6 +517,15 @@ message CounterSet {
   // +k8s:alpha(since: "1.36")=+k8s:required
   // +k8s:alpha(since: "1.36")=+k8s:eachKey=+k8s:format=k8s-short-name
   map<string, Counter> counters = 2;
+}
+
+// CounterValueFrom maps a ResourceClaim capacity request to a counter.
+message CounterValueFrom {
+  // CapacityKey is the capacity.requests key from the ResourceClaim
+  // that feeds into this counter.
+  //
+  // +required
+  optional string capacityKey = 1;
 }
 
 // Device represents one individual hardware instance that can be selected based

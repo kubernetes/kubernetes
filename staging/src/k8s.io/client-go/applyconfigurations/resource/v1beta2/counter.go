@@ -28,7 +28,18 @@ import (
 // Counter describes a quantity associated with a device.
 type CounterApplyConfiguration struct {
 	// Value defines how much of a certain device counter is available.
+	//
+	// When used in sharedCounters, this is the total amount available.
+	// When used in consumesCounters, this is the statically consumed amount.
+	//
+	// Either Value or ValueFrom must be specified in consumesCounters.
 	Value *resource.Quantity `json:"value,omitempty"`
+	// RequestPolicy defines how this Counter must be consumed when used
+	// as a shared counter and referenced through ValueFrom.
+	RequestPolicy *CapacityRequestPolicyApplyConfiguration `json:"requestPolicy,omitempty"`
+	// ValueFrom maps a capacity.requests key from a ResourceClaim to this
+	// counter, making device counter consumption request-driven.
+	ValueFrom *CounterValueFromApplyConfiguration `json:"valueFrom,omitempty"`
 }
 
 // CounterApplyConfiguration constructs a declarative configuration of the Counter type for use with
@@ -42,5 +53,21 @@ func Counter() *CounterApplyConfiguration {
 // If called multiple times, the Value field is set to the value of the last call.
 func (b *CounterApplyConfiguration) WithValue(value resource.Quantity) *CounterApplyConfiguration {
 	b.Value = &value
+	return b
+}
+
+// WithRequestPolicy sets the RequestPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RequestPolicy field is set to the value of the last call.
+func (b *CounterApplyConfiguration) WithRequestPolicy(value *CapacityRequestPolicyApplyConfiguration) *CounterApplyConfiguration {
+	b.RequestPolicy = value
+	return b
+}
+
+// WithValueFrom sets the ValueFrom field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ValueFrom field is set to the value of the last call.
+func (b *CounterApplyConfiguration) WithValueFrom(value *CounterValueFromApplyConfiguration) *CounterApplyConfiguration {
+	b.ValueFrom = value
 	return b
 }
