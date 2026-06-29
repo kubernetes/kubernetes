@@ -261,6 +261,56 @@ func TestSetAuthorizerPublicAPI(t *testing.T) {
 	}
 }
 
+func TestSetNamespacePublicAPI(t *testing.T) {
+	evaluator, err := celtest.NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy, err := celtest.NewFromValidatingAdmissionPolicy(&admissionregistrationv1.ValidatingAdmissionPolicy{
+		Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
+			Validations: []admissionregistrationv1.Validation{{
+				Expression: "namespaceObject.metadata.labels['env'] == 'prod'",
+				Message:    "namespace must be labeled env=prod",
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewFromValidatingAdmissionPolicy() error: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		env     string
+		allowed bool
+	}{
+		{name: "namespace label matches", env: "prod", allowed: true},
+		{name: "namespace label does not match", env: "staging", allowed: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := celtest.NewAdmissionInput().
+				SetObject(&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "sample", Namespace: "team-a"},
+				}).
+				SetNamespace(&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "team-a",
+						Labels: map[string]string{"env": tt.env},
+					},
+				})
+
+			result, err := evaluator.EvalValidations(policy, input)
+			if err != nil {
+				t.Fatalf("EvalValidations() error: %v", err)
+			}
+			if result.Allowed != tt.allowed {
+				t.Fatalf("Allowed = %v, want %v; violations: %s", result.Allowed, tt.allowed, result.FormatViolations())
+			}
+		})
+	}
+}
+
 func TestMutatingAdmissionPolicyPublicAPI(t *testing.T) {
 	evaluator, err := celtest.NewEvaluator()
 	if err != nil {
