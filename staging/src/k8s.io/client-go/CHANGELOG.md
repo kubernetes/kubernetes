@@ -4,6 +4,23 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### mutation cache: support informer events
+
+Calling OnAddOrUpdate and OnDelete from event handlers is optional. Calling
+them has the advantage that the mutation cache is updated sooner. It also fixes
+incorrectly reporting a locally updated item when a) using "include adds" and
+b) the updated item got deleted in the apiserver and informer cache.
+
+Although formally a Go API break because the MutationCache interface gets
+extended, in practice that interface is expected to have only the single
+implementation in client-go itself, so no-one should be affected by this.
+
+```
+- ./tools/cache.MutationCache.OnAddOrUpdate: added
+- ./tools/cache.MutationCache.OnDelete: added
+- ./tools/cache.MutationCache.internal: added unexported method
+```
+
 ### restmapper + discovery: add context-aware APIs
 
 See [PR #129109](https://github.com/kubernetes/kubernetes/pull/129109).

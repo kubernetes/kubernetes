@@ -46,6 +46,11 @@ type MutationCache interface {
 	Mutation(interface{})
 	OnAddOrUpdate(obj runtime.Object)
 	OnDelete(obj runtime.Object)
+
+	// This interface is not meant to be implemented elsewhere.
+	// Marking it as internal enables future changes without
+	// triggering apidiff.
+	internal()
 }
 
 // ResourceVersionComparator is able to compare object versions.
@@ -355,6 +360,8 @@ func (c *mutationCache) OnDelete(obj runtime.Object) {
 	}
 	c.mutationCache.Add(key, t, c.ttl)
 }
+
+func (c *mutationCache) internal() {}
 
 // etcdObjectVersioner implements versioning and extracting etcd node information
 // for objects that have an embedded ObjectMeta or ListMeta field.
