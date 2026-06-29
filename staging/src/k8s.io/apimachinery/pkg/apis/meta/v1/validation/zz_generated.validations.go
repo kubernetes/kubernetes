@@ -174,3 +174,152 @@ func Validate_ConditionStatus(
 
 	return errs
 }
+
+// Validate_ManagedFieldsEntry validates an instance of ManagedFieldsEntry according
+// to declarative validation rules in the API schema.
+func Validate_ManagedFieldsEntry(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *v1.ManagedFieldsEntry) (errs field.ErrorList) {
+
+	// field v1.ManagedFieldsEntry.Manager has no validation
+
+	{ // field v1.ManagedFieldsEntry.Operation
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ManagedFieldsOperationType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ManagedFieldsOperationType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *v1.ManagedFieldsEntry) *v1.ManagedFieldsOperationType {
+				return &oldObj.Operation
+			})
+		errs = append(errs, fn(fldPath.Child("operation"), &obj.Operation, oldVal, oldObj != nil)...)
+	}
+
+	// field v1.ManagedFieldsEntry.APIVersion has no validation
+	// field v1.ManagedFieldsEntry.Time has no validation
+	// field v1.ManagedFieldsEntry.FieldsType has no validation
+	// field v1.ManagedFieldsEntry.FieldsV1 has no validation
+	// field v1.ManagedFieldsEntry.Subresource has no validation
+	return errs
+}
+
+var symbolsForManagedFieldsOperationType = sets.New(v1.ManagedFieldsOperationApply, v1.ManagedFieldsOperationUpdate)
+
+// Validate_ManagedFieldsOperationType validates an instance of ManagedFieldsOperationType according
+// to declarative validation rules in the API schema.
+func Validate_ManagedFieldsOperationType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *v1.ManagedFieldsOperationType) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForManagedFieldsOperationType, nil).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_ObjectMeta validates an instance of ObjectMeta according
+// to declarative validation rules in the API schema.
+func Validate_ObjectMeta(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *v1.ObjectMeta) (errs field.ErrorList) {
+
+	// field v1.ObjectMeta.Name has no validation
+	// field v1.ObjectMeta.GenerateName has no validation
+	// field v1.ObjectMeta.Namespace has no validation
+	// field v1.ObjectMeta.SelfLink has no validation
+	// field v1.ObjectMeta.UID has no validation
+	// field v1.ObjectMeta.ResourceVersion has no validation
+
+	{ // field v1.ObjectMeta.Generation
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int64,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *v1.ObjectMeta) *int64 {
+				return &oldObj.Generation
+			})
+		errs = append(errs, fn(fldPath.Child("generation"), &obj.Generation, oldVal, oldObj != nil)...)
+	}
+
+	// field v1.ObjectMeta.CreationTimestamp has no validation
+	// field v1.ObjectMeta.DeletionTimestamp has no validation
+	// field v1.ObjectMeta.DeletionGracePeriodSeconds has no validation
+	// field v1.ObjectMeta.Labels has no validation
+	// field v1.ObjectMeta.Annotations has no validation
+	// field v1.ObjectMeta.OwnerReferences has no validation
+	// field v1.ObjectMeta.Finalizers has no validation
+
+	{ // field v1.ObjectMeta.ManagedFields
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []v1.ManagedFieldsEntry,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ManagedFieldsEntry); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *v1.ObjectMeta) []v1.ManagedFieldsEntry {
+				return oldObj.ManagedFields
+			})
+		errs = append(errs, fn(fldPath.Child("managedFields"), obj.ManagedFields, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
