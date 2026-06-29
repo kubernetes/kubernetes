@@ -417,7 +417,7 @@ func (p *staticPolicy) AllocatePod(logger logr.Logger, s state.State, pod *v1.Po
 	}
 
 	// 4. Allocate the entire CPU "bubble" for the pod using the hint from the Topology Manager.
-	hint := p.affinity.GetAffinity(podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
+	hint := p.affinity.GetAffinity(logger, podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
 	podAllocation, err := p.allocateCPUs(logger, s, totalPodCPUs, hint.NUMANodeAffinity, cpuset.New())
 	if err != nil {
 		logger.Error(err, "Unable to allocate CPUs for pod", "totalPodCPUs", totalPodCPUs)
@@ -603,7 +603,7 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 	}
 
 	// Call Topology Manager to get the aligned socket affinity across all hint providers.
-	hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
+	hint := p.affinity.GetAffinity(logger, string(pod.UID), container.Name)
 	logger.Info("Topology Affinity", "affinity", hint)
 
 	// Allocate CPUs according to the NUMA affinity contained in the hint.

@@ -125,7 +125,7 @@ func (cm *FakeContainerManager) GetNodeAllocatableReservation() v1.ResourceList 
 	return nil
 }
 
-func (cm *FakeContainerManager) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+func (cm *FakeContainerManager) GetCapacity(_ klog.Logger, localStorageCapacityIsolation bool) v1.ResourceList {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetCapacity")
@@ -154,7 +154,7 @@ func (cm *FakeContainerManager) GetHealthCheckers() []healthz.HealthChecker {
 	return []healthz.HealthChecker{}
 }
 
-func (cm *FakeContainerManager) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
+func (cm *FakeContainerManager) GetDevicePluginResourceCapacity(_ klog.Logger) (v1.ResourceList, v1.ResourceList, []string) {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetDevicePluginResourceCapacity")
@@ -182,11 +182,11 @@ func (cm *FakeContainerManager) UpdatePluginResources(*schedulerframework.NodeIn
 	return nil
 }
 
-func (cm *FakeContainerManager) InternalContainerLifecycle() InternalContainerLifecycle {
+func (cm *FakeContainerManager) InternalContainerLifecycle(logger klog.Logger) InternalContainerLifecycle {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "InternalContainerLifecycle")
-	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, topologymanager.NewFakeManager(logger)}
 }
 
 func (cm *FakeContainerManager) GetPodCgroupRoot() string {
@@ -217,11 +217,11 @@ func (cm *FakeContainerManager) ShouldResetExtendedResourceCapacity() bool {
 	return cm.shouldResetExtendedResourceCapacity
 }
 
-func (cm *FakeContainerManager) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+func (cm *FakeContainerManager) GetAllocateResourcesPodAdmitHandler(logger klog.Logger) lifecycle.PodAdmitHandler {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocateResourcesPodAdmitHandler")
-	return topologymanager.NewFakeManager()
+	return topologymanager.NewFakeManager(logger)
 }
 
 func (cm *FakeContainerManager) UpdateAllocatedDevices() {
@@ -257,7 +257,7 @@ func (cm *FakeContainerManager) GetAllocatableMemory() []*podresourcesapi.Contai
 	return nil
 }
 
-func (cm *FakeContainerManager) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+func (cm *FakeContainerManager) GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
 	return nil
 }
 
@@ -288,10 +288,10 @@ func (cm *FakeContainerManager) Updates() <-chan resourceupdates.Update {
 	return nil
 }
 
-func (cm *FakeContainerManager) PodHasExclusiveCPUs(pod *v1.Pod) bool {
+func (cm *FakeContainerManager) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod) bool {
 	return false
 }
 
-func (cm *FakeContainerManager) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
+func (cm *FakeContainerManager) ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool {
 	return false
 }

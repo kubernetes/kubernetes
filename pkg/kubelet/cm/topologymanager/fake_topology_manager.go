@@ -32,9 +32,7 @@ type fakeManager struct {
 }
 
 // NewFakeManager returns an instance of FakeManager
-func NewFakeManager() Manager {
-	// Use klog.TODO() because changing NewManager requires changes in too many other components
-	logger := klog.TODO()
+func NewFakeManager(logger klog.Logger) Manager {
 	logger.Info("NewFakeManager")
 	return &fakeManager{}
 }
@@ -47,9 +45,7 @@ func NewFakeManagerWithScope(scope string) Manager {
 }
 
 // NewFakeManagerWithHint returns an instance of fake topology manager with specified topology hints
-func NewFakeManagerWithHint(hint *TopologyHint) Manager {
-	// Use klog.TODO() because changing NewManager requires changes in too many other components
-	logger := klog.TODO()
+func NewFakeManagerWithHint(logger klog.Logger, hint *TopologyHint) Manager {
 	logger.Info("NewFakeManagerWithHint")
 	return &fakeManager{
 		hint:   hint,
@@ -58,20 +54,14 @@ func NewFakeManagerWithHint(hint *TopologyHint) Manager {
 }
 
 // NewFakeManagerWithPolicy returns an instance of fake topology manager with specified policy
-func NewFakeManagerWithPolicy(policy Policy) Manager {
-	// Use klog.TODO() because changing NewManager requires changes in too many other components
-	logger := klog.TODO()
+func NewFakeManagerWithPolicy(logger klog.Logger, policy Policy) Manager {
 	logger.Info("NewFakeManagerWithPolicy", "policy", policy.Name())
 	return &fakeManager{
 		policy: policy,
 	}
 }
 
-func (m *fakeManager) GetAffinity(podUID string, containerName string) TopologyHint {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	ctx := context.TODO()
-	logger := klog.FromContext(ctx)
+func (m *fakeManager) GetAffinity(logger klog.Logger, podUID string, containerName string) TopologyHint {
 	logger.Info("GetAffinity", "podUID", podUID, "containerName", containerName)
 	if m.hint == nil {
 		return TopologyHint{}
@@ -92,11 +82,7 @@ func (m *fakeManager) AddHintProvider(logger klog.Logger, h HintProvider) {
 	logger.Info("AddHintProvider", "hintProvider", h)
 }
 
-func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	ctx := context.TODO()
-	logger := klog.FromContext(ctx)
+func (m *fakeManager) AddContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerID string) {
 	logger.Info("AddContainer", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 

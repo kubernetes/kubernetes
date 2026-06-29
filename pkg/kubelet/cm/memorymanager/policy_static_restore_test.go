@@ -117,7 +117,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 					},
 				},
 			}
-			affinity := topologymanager.NewFakeManager()
+			affinity := topologymanager.NewFakeManager(logger)
 
 			// Create new manager
 			sDir := t.TempDir()

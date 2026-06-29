@@ -19,6 +19,7 @@ package podresources
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
@@ -56,7 +57,7 @@ type MemoryProvider interface {
 
 type DynamicResourcesProvider interface {
 	// GetDynamicResources returns information about dynamic resources assigned to pods and containers
-	GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource
+	GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource
 }
 
 type PodResourcesProviders struct {

@@ -83,7 +83,7 @@ type Manager interface {
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetTopologyHints(logger logr.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
 
 	// GetExclusiveCPUs implements the podresources.CPUsProvider interface to provide
 	// exclusively allocated cpus for the container
@@ -95,7 +95,7 @@ type Manager interface {
 	GetPodTopologyHints(logger logr.Logger, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
 	// AllocatePod is called to trigger the allocation of CPUs to a pod.
-	AllocatePod(logger logr.Logger, pod *v1.Pod) error
+	AllocatePod(logger klog.Logger, pod *v1.Pod) error
 
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs() cpuset.CPUSet
@@ -285,7 +285,7 @@ func (m *manager) Allocate(ctx context.Context, p *v1.Pod, c *v1.Container) erro
 	return nil
 }
 
-func (m *manager) AllocatePod(logger logr.Logger, pod *v1.Pod) error {
+func (m *manager) AllocatePod(logger klog.Logger, pod *v1.Pod) error {
 	// Garbage collect any stranded resources before allocating CPUs.
 	m.removeStaleState(logger)
 
@@ -352,7 +352,7 @@ func (m *manager) State() state.Reader {
 	return m.state
 }
 
-func (m *manager) GetTopologyHints(logger logr.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
 	// Delegate to active policy

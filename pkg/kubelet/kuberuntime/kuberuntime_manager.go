@@ -273,7 +273,7 @@ func NewKubeGenericRuntimeManager(
 		runtimeService:               runtimeService,
 		imageService:                 imageService,
 		containerManager:             containerManager,
-		internalLifecycle:            containerManager.InternalContainerLifecycle(),
+		internalLifecycle:            containerManager.InternalContainerLifecycle(logger),
 		logManager:                   logManager,
 		runtimeClassManager:          runtimeClassManager,
 		logReduction:                 logreduction.NewLogReduction(identicalErrorDelay),
@@ -829,7 +829,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	pcm := m.containerManager.NewPodContainerManager()
 	//TODO(vinaykul,InPlacePodVerticalScaling): Figure out best way to get enforceMemoryQoS value (parameter #4 below) in platform-agnostic way
 	enforceCPULimits := m.cpuCFSQuota
-	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(logger, pod) {
 		enforceCPULimits = false
 		logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
 	}

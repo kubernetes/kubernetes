@@ -919,10 +919,10 @@ func TestMachineInfo(t *testing.T) {
 			machineInfoFunc := func() (*cadvisorapi.MachineInfo, error) {
 				return tc.machineInfo, tc.machineInfoError
 			}
-			capacityFunc := func(localStorageCapacityIsolation bool) v1.ResourceList {
+			capacityFunc := func(_ klog.Logger, localStorageCapacityIsolation bool) v1.ResourceList {
 				return tc.capacity
 			}
-			devicePluginResourceCapacityFunc := func() (v1.ResourceList, v1.ResourceList, []string) {
+			devicePluginResourceCapacityFunc := func(_ klog.Logger) (v1.ResourceList, v1.ResourceList, []string) {
 				c := tc.devicePluginResourceCapacity
 				return c.capacity, c.allocatable, c.inactive
 			}

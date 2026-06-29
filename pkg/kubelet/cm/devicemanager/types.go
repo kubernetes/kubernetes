@@ -61,7 +61,7 @@ type Manager interface {
 
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.
-	GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
+	GetCapacity(logger klog.Logger) (v1.ResourceList, v1.ResourceList, []string)
 
 	// GetWatcherHandler returns the plugin handler for the device manager.
 	GetWatcherHandler() cache.PluginHandler
