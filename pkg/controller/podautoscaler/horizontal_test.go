@@ -1198,11 +1198,20 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 	}
 
 	if tc.expectedReconciliationCount > 0 {
-		v, err := metricstestutil.GetCounterMetricValue(monitor.ReconciliationsTotal.WithLabelValues(actionStr, errorStr))
-		if err != nil {
-			t.Fatalf("error getting reconciliations total metric: %v", err)
+		var v float64
+		var lastErr error
+		if err := wait.PollUntilContextTimeout(ctx, 20*time.Millisecond, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+			v, lastErr = metricstestutil.GetCounterMetricValue(monitor.ReconciliationsTotal.WithLabelValues(actionStr, errorStr))
+			if lastErr != nil {
+				return false, nil
+			}
+			return int(v) >= tc.expectedReconciliationCount, nil
+		}); err != nil {
+			if lastErr != nil {
+				t.Fatalf("error getting reconciliations total metric: %v", lastErr)
+			}
+			assert.GreaterOrEqual(t, int(v), tc.expectedReconciliationCount, "reconciliation count should be at least %d", tc.expectedReconciliationCount)
 		}
-		assert.GreaterOrEqual(t, int(v), tc.expectedReconciliationCount, "reconciliation count should be at least %d", tc.expectedReconciliationCount)
 
 		for metricType, expectedAction := range tc.expectedReportedMetricComputationActionLabels {
 			expectedError := tc.expectedReportedMetricComputationErrorLabels[metricType]
