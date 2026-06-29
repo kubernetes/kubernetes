@@ -2905,21 +2905,19 @@ func TestConfigurableTolerance(t *testing.T) {
 	ninetyPercentQuantity := resource.MustParse("0.9")
 
 	testCases := []struct {
-		name                      string
-		configurableToleranceGate bool
-		replicas                  int32
-		scaleUpRules              *autoscalingv2.HPAScalingRules
-		scaleDownRules            *autoscalingv2.HPAScalingRules
-		reportedLevels            []uint64
-		reportedCPURequests       []resource.Quantity
-		expectedDesiredReplicas   int32
-		expectedConditionReason   string
-		expectedActionLabel       monitor.ActionLabel
+		name                    string
+		replicas                int32
+		scaleUpRules            *autoscalingv2.HPAScalingRules
+		scaleDownRules          *autoscalingv2.HPAScalingRules
+		reportedLevels          []uint64
+		reportedCPURequests     []resource.Quantity
+		expectedDesiredReplicas int32
+		expectedConditionReason string
+		expectedActionLabel     monitor.ActionLabel
 	}{
 		{
-			name:                      "Scaling up because of a 1% configurable tolerance",
-			configurableToleranceGate: true,
-			replicas:                  3,
+			name:     "Scaling up because of a 1% configurable tolerance",
+			replicas: 3,
 			scaleUpRules: &autoscalingv2.HPAScalingRules{
 				Tolerance: &onePercentQuantity,
 			},
@@ -2930,9 +2928,8 @@ func TestConfigurableTolerance(t *testing.T) {
 			expectedActionLabel:     monitor.ActionLabelScaleUp,
 		},
 		{
-			name:                      "No scale-down because of a 90% configurable tolerance",
-			configurableToleranceGate: true,
-			replicas:                  3,
+			name:     "No scale-down because of a 90% configurable tolerance",
+			replicas: 3,
 			scaleDownRules: &autoscalingv2.HPAScalingRules{
 				Tolerance: &ninetyPercentQuantity,
 			},
@@ -2943,22 +2940,8 @@ func TestConfigurableTolerance(t *testing.T) {
 			expectedActionLabel:     monitor.ActionLabelNone,
 		},
 		{
-			name:                      "No scaling because of the large default tolerance",
-			configurableToleranceGate: true,
-			replicas:                  3,
-			reportedLevels:            []uint64{1010, 1030, 1020},
-			reportedCPURequests:       []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
-			expectedDesiredReplicas:   3,
-			expectedConditionReason:   "ReadyForNewScale",
-			expectedActionLabel:       monitor.ActionLabelNone,
-		},
-		{
-			name:                      "No scaling because the configurable tolerance is ignored as the feature gate is disabled",
-			configurableToleranceGate: false,
-			replicas:                  3,
-			scaleUpRules: &autoscalingv2.HPAScalingRules{
-				Tolerance: &onePercentQuantity,
-			},
+			name:                    "No scaling because of the large default tolerance",
+			replicas:                3,
 			reportedLevels:          []uint64{1010, 1030, 1020},
 			reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
 			expectedDesiredReplicas: 3,
@@ -2969,7 +2952,6 @@ func TestConfigurableTolerance(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, tc.configurableToleranceGate)
 			expectedConditions := statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 				Type:   autoscalingv2.AbleToScale,
 				Status: v1.ConditionTrue,
