@@ -141,10 +141,22 @@ func UnsafeGuessKindToResource(kind schema.GroupVersionKind) ( /*plural*/ schema
 	case "s":
 		return kind.GroupVersion().WithResource(singularName + "es"), singular
 	case "y":
+		if len(singularName) > 1 && isVowel(singularName[len(singularName)-2]) {
+			return kind.GroupVersion().WithResource(singularName + "s"), singular
+		}
 		return kind.GroupVersion().WithResource(strings.TrimSuffix(singularName, "y") + "ies"), singular
 	}
 
 	return kind.GroupVersion().WithResource(singularName + "s"), singular
+}
+
+func isVowel(ch byte) bool {
+	switch ch {
+	case 'a', 'e', 'i', 'o', 'u':
+		return true
+	default:
+		return false
+	}
 }
 
 // ResourceSingularizer implements RESTMapper
