@@ -2052,6 +2052,7 @@ type ResourceClaimTemplateSpec struct {
 	// when creating it. No other fields are allowed and will be rejected during
 	// validation.
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec for the ResourceClaim. The entire content is copied unchanged
