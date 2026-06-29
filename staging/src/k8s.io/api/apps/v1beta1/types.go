@@ -71,6 +71,7 @@ type Scale struct {
 	metav1.TypeMeta `json:""`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
@@ -272,6 +273,7 @@ type StatefulSetSpec struct {
 	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	// +k8s:alpha(since: "1.37")=+k8s:optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" protobuf:"bytes,4,rep,name=volumeClaimTemplates"`
 
 	// serviceName is the name of the service that governs this StatefulSet.

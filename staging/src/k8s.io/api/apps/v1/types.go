@@ -225,6 +225,7 @@ type StatefulSetSpec struct {
 	// +optional
 	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
 	// +listType=atomic
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" protobuf:"bytes,4,rep,name=volumeClaimTemplates"`
 
