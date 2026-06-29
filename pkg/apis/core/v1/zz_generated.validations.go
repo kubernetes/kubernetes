@@ -106,7 +106,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		(*corev1.Namespace)(nil),
 		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 			switch op.Request.SubresourcePath() {
-			case "/", "/status":
+			case "/", "/finalize", "/status":
 				return Validate_Namespace(
 					ctx, op, nil, /* fldPath */
 					obj.(*corev1.Namespace),
