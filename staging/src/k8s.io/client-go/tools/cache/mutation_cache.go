@@ -35,11 +35,14 @@ import (
 // that can be used to provide a more current view of a requested object.  It requires interpreting
 // resourceVersions for comparisons.
 // Implementations must be thread-safe.
-// TODO find a way to layer this into an informer/lister
+// OnAddOrupdate and OnDelete should be called from informer event handlers to increase
+// the accuracy of the cache.
 type MutationCache interface {
 	GetByKey(key string) (interface{}, bool, error)
 	ByIndex(indexName, indexKey string) ([]interface{}, error)
 	Mutation(interface{})
+	OnAddOrUpdate(obj runtime.Object)
+	OnDelete(obj runtime.Object)
 }
 
 // ResourceVersionComparator is able to compare object versions.
@@ -60,6 +63,21 @@ type ResourceVersionComparator interface {
 // If includeAdds is true, objects in the mutation cache will be returned even if they don't exist
 // in the underlying store. This is only safe if your use of the cache can handle mutation entries
 // remaining in the cache for up to ttl when mutations and deletes occur very closely in time.
+//
+// Note that this also applies to objects updated by the caller, not just
+// objects added by it.  That's because the MutationCache may hold an updated
+// object at a time when the underlying store already removed it because it was
+// deleted in the apiserver after the update. To address this, the caller
+// can call OnAddOrUpdate and OnDelete from informer event handlers.
+//
+// This informs the MutationCache about all changes observed by the store
+// and enables it to remove a locally added or updated object immediately once
+// it appears in the store, which prevents the "stale updated object" problem.
+//
+// This does not solve the "stale added object" problem reliably because
+// the informer might never see the added object when the add is followed
+// quickly by a delete. The caller has to handle stale added objects by
+// checking whether they still exist once the TTL is over.
 func NewIntegerResourceVersionMutationCache(logger klog.Logger, backingCache Store, indexer Indexer, ttl time.Duration, includeAdds bool) MutationCache {
 	return &mutationCache{
 		backingCache:  backingCache,
@@ -220,6 +238,73 @@ func (c *mutationCache) Mutation(obj interface{}) {
 		}
 	}
 	c.mutationCache.Add(key, obj, c.ttl)
+}
+
+// OnAddOrUpdate can be called to informer the cache about an object added to
+// the store or updated in in. If the object is as recent as the cached object
+// and has the same UID, the cached object gets removed because it is no longer
+// needed. This keeps the cache smaller.
+func (c *mutationCache) OnAddOrUpdate(obj runtime.Object) {
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return
+	}
+
+	key, err := DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if err != nil {
+		// this is a "nice to have", so failures shouldn't do anything weird
+		utilruntime.HandleErrorWithLogger(c.logger, err, "DeletionHandlingMetaNamespaceKeyFunc")
+		return
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if mutatedObj, exists := c.mutationCache.Get(key); exists {
+		if mutatedObj, ok := mutatedObj.(runtime.Object); ok {
+			mutatedObjMeta, err := meta.Accessor(mutatedObj)
+			if err != nil {
+				return
+			}
+			if mutatedObjMeta.GetUID() == objMeta.GetUID() &&
+				c.comparator.CompareResourceVersion(obj, mutatedObj) >= 0 {
+				c.mutationCache.Remove(key)
+			}
+		}
+	}
+}
+
+// OnDelete can be called to informer the cache about an object deleted in the store.
+// If there is a cached object with the same UID, it gets removed.
+func (c *mutationCache) OnDelete(obj runtime.Object) {
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return
+	}
+
+	key, err := DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if err != nil {
+		// this is a "nice to have", so failures shouldn't do anything weird
+		utilruntime.HandleErrorWithLogger(c.logger, err, "DeletionHandlingMetaNamespaceKeyFunc")
+		return
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if mutatedObj, exists := c.mutationCache.Get(key); exists {
+		if mutatedObj, ok := mutatedObj.(runtime.Object); ok {
+			mutatedObjMeta, err := meta.Accessor(mutatedObj)
+			if err != nil {
+				return
+			}
+			// Here we don't compare the resource version because the deleted object
+			// might be a tombstone object, i.e. not the latest one.
+			if mutatedObjMeta.GetUID() == objMeta.GetUID() {
+				c.mutationCache.Remove(key)
+			}
+		}
+	}
 }
 
 // etcdObjectVersioner implements versioning and extracting etcd node information
