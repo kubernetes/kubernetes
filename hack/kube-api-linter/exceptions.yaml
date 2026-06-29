@@ -82,8 +82,7 @@
   path: "staging/src/k8s.io/api/core/v1/types.go"
 - text: "type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
   path: "staging/src/k8s.io/api/core/v1/types.go"
-- text: "field NodeAllocatableResourceClaimStatus.Resources should not use a map type, use a list type with a unique name/identifier instead"
-  path: "staging/src/k8s.io/api/core/v1/types.go"
+
 
 ## For the Secret.Data and ConfigMap.BinaryData fields in the core API.
 - text: "field (Secret.Data|ConfigMap.BinaryData) should not use a map type, use a list type with a unique name/identifier instead"
