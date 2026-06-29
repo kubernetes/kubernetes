@@ -717,6 +717,7 @@ func TestPlacementFeasible(t *testing.T) {
 				namespace:       namespace,
 				name:            pgName,
 				unscheduledPods: tc.unscheduledPods,
+				podGroup:        pg,
 			}
 
 			cycleState := schedulerframework.NewCycleState()
@@ -740,8 +741,10 @@ type testPodGroupInfo struct {
 	namespace       string
 	name            string
 	unscheduledPods []*v1.Pod
+	podGroup        *schedulingapi.PodGroup
 }
 
-func (t *testPodGroupInfo) GetNamespace() string          { return t.namespace }
-func (t *testPodGroupInfo) GetName() string               { return t.name }
-func (t *testPodGroupInfo) GetUnscheduledPods() []*v1.Pod { return t.unscheduledPods }
+func (t *testPodGroupInfo) GetNamespace() string                 { return t.namespace }
+func (t *testPodGroupInfo) GetName() string                      { return t.name }
+func (t *testPodGroupInfo) GetUnscheduledPods() []*v1.Pod        { return t.unscheduledPods }
+func (t *testPodGroupInfo) GetPodGroup() *schedulingapi.PodGroup { return t.podGroup }
