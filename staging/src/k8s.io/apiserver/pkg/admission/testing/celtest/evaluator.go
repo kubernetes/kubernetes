@@ -26,6 +26,11 @@ limitations under the License.
 // request would have been admitted by the policy's match conditions before its
 // rules ran. EvalMutation returns evaluated patch values; it does not apply
 // patches to objects or run the full apiserver patch application path.
+//
+// The package is scoped to CEL compilation and evaluation. It does not run API
+// server decoding, OpenAPI schema validation, conversion, or defaulting before
+// evaluation. Tests should pass objects in the shape the API server would expose
+// to admission CEL after those earlier admission pipeline phases have completed.
 package celtest
 
 import (
@@ -198,7 +203,8 @@ type PatchResult struct {
 // Use SetObject, SetOldObject, SetParams, or their unstructured variants to set
 // CEL object values. Typed values are converted to unstructured objects
 // internally. GVK is inferred from the object, oldObject, or request kind when
-// provided via SetRequest.
+// provided via SetRequest. Values are evaluated as provided; no OpenAPI schema
+// validation or defaulting is applied.
 type AdmissionInput struct {
 	object     interface{}
 	oldObject  interface{}
@@ -262,6 +268,13 @@ func (i *AdmissionInput) SetNamespace(namespace *corev1.Namespace) *AdmissionInp
 }
 
 // SetAuthorizer sets the authorizer exposed to CEL authorizer variables.
+//
+// Set this when a policy expression references the authorizer variable to make
+// an admission decision based on the requesting user's permissions, for example
+// authorizer.requestResource.check('get').allowed(). The provided authorizer is
+// consulted during evaluation to resolve those checks, so tests can supply a
+// fake authorizer to simulate allow or deny outcomes. The authorizer is not
+// exposed to messageExpression.
 func (i *AdmissionInput) SetAuthorizer(authz authorizer.Authorizer) *AdmissionInput {
 	i.authorizer = authz
 	return i
@@ -622,11 +635,7 @@ func (e *Evaluator) evalAuditAnnotationsWithInputs(compiler *admissioncel.Compos
 		switch typed := value.(type) {
 		case string:
 			annotationResult.Value = strings.TrimSpace(typed)
-		case nil:
-			annotationResult.Value = nil
-		case celtypes.Null:
-			annotationResult.Value = nil
-		case structpb.NullValue:
+		case nil, celtypes.Null, structpb.NullValue:
 			annotationResult.Value = nil
 		default:
 			annotationResult.Error = fmt.Errorf("valueExpression %q resulted in unsupported return type: %T", annotation.ValueExpression, value)
@@ -847,7 +856,8 @@ func ParseAdmissionPolicyFile(path string) (*AdmissionPolicy, error) {
 // ParseAdmissionInput parses a YAML string into an AdmissionInput. The YAML may
 // include object, oldObject, params, request, namespace, and namespaceObject
 // fields. Params are passed to CEL as the top-level params object exactly as
-// provided.
+// provided. Object values are evaluated as provided; no OpenAPI schema
+// validation or defaulting is applied.
 func ParseAdmissionInput(yamlContent string) (*AdmissionInput, error) {
 	return parseAdmissionInput([]byte(yamlContent))
 }

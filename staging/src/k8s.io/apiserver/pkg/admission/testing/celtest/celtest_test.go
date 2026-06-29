@@ -17,6 +17,7 @@ limitations under the License.
 package celtest_test
 
 import (
+	"context"
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -24,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission/testing/celtest"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 func TestPublicAdmissionAPI(t *testing.T) {
@@ -104,10 +106,9 @@ func TestValidatingAdmissionPolicyPublicAPI(t *testing.T) {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
-	policyYAML := `{"apiVersion":"admissionregistration.k8s.io/v1","kind":"ValidatingAdmissionPolicy","spec":{"paramKind":{"apiVersion":"v1","kind":"ConfigMap"},"matchConditions":[{"name":"enabled","expression":"params.data.enabled == 'true'"}],"validations":[{"expression":"true"}],"auditAnnotations":[{"key":"pod-name","valueExpression":"string(object.metadata.name)"}]}}`
-	policy, err := celtest.ParseAdmissionPolicy(policyYAML)
+	policy, err := celtest.ParseAdmissionPolicyFile("testdata/validating-admission-policy.yaml")
 	if err != nil {
-		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
+		t.Fatalf("ParseAdmissionPolicyFile() error: %v", err)
 	}
 
 	input := celtest.NewAdmissionInput().
@@ -197,16 +198,78 @@ func TestTypedPolicyAndInputTable(t *testing.T) {
 	}
 }
 
+func TestSetAuthorizerPublicAPI(t *testing.T) {
+	evaluator, err := celtest.NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy, err := celtest.NewFromValidatingAdmissionPolicy(&admissionregistrationv1.ValidatingAdmissionPolicy{
+		Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
+			Validations: []admissionregistrationv1.Validation{{
+				Expression: "authorizer.requestResource.check('get').allowed()",
+				Message:    "user must be allowed to get the request resource",
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewFromValidatingAdmissionPolicy() error: %v", err)
+	}
+
+	called := false
+	allowPodGet := authorizer.AuthorizerFunc(func(_ context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+		called = true
+		if !attrs.IsResourceRequest() {
+			t.Error("authorizer request should be a resource request")
+		}
+		if attrs.GetVerb() != "get" {
+			t.Errorf("authorizer verb = %q, want get", attrs.GetVerb())
+		}
+		if attrs.GetResource() != "pods" {
+			t.Errorf("authorizer resource = %q, want pods", attrs.GetResource())
+		}
+		if attrs.GetNamespace() != "default" {
+			t.Errorf("authorizer namespace = %q, want default", attrs.GetNamespace())
+		}
+		if attrs.GetName() != "authz-pod" {
+			t.Errorf("authorizer name = %q, want authz-pod", attrs.GetName())
+		}
+		return authorizer.DecisionAllow, "", nil
+	})
+
+	input := celtest.NewAdmissionInput().
+		SetObject(&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "authz-pod", Namespace: "default"},
+		}).
+		SetRequest(&admissionv1.AdmissionRequest{
+			Name:      "authz-pod",
+			Namespace: "default",
+			Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
+			Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
+		}).
+		SetAuthorizer(allowPodGet)
+
+	result, err := evaluator.EvalValidations(policy, input)
+	if err != nil {
+		t.Fatalf("EvalValidations() error: %v", err)
+	}
+	if !called {
+		t.Fatal("authorizer was not called")
+	}
+	if !result.Allowed {
+		t.Fatalf("expected Allowed=true, got violations: %s", result.FormatViolations())
+	}
+}
+
 func TestMutatingAdmissionPolicyPublicAPI(t *testing.T) {
 	evaluator, err := celtest.NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
-	policyYAML := `{"apiVersion":"admissionregistration.k8s.io/v1","kind":"MutatingAdmissionPolicy","spec":{"matchConditions":[{"name":"only-pods","expression":"object.kind == 'Pod'"}],"mutations":[{"patchType":"ApplyConfiguration","applyConfiguration":{"expression":"Object{metadata: Object.metadata{labels: {'mutated': 'true'}}}"}}]}}`
-	policy, err := celtest.ParseAdmissionPolicy(policyYAML)
+	policy, err := celtest.ParseAdmissionPolicyFile("testdata/mutating-admission-policy.yaml")
 	if err != nil {
-		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
+		t.Fatalf("ParseAdmissionPolicyFile() error: %v", err)
 	}
 	verifyMutatedLabelPatch := func(t *testing.T, result *celtest.MutationResult) {
 		t.Helper()
@@ -289,18 +352,9 @@ func TestValidatingWebhookConfigurationPublicAPI(t *testing.T) {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
-	yaml := `
-apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingWebhookConfiguration
-webhooks:
-  - name: validate.example.com
-    matchConditions:
-      - name: only-pods
-        expression: "request.resource.resource == 'pods'"
-`
-	policy, err := celtest.ParseAdmissionPolicy(yaml)
+	policy, err := celtest.ParseAdmissionPolicyFile("testdata/validating-webhook-configuration.yaml")
 	if err != nil {
-		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
+		t.Fatalf("ParseAdmissionPolicyFile() error: %v", err)
 	}
 
 	input := celtest.NewAdmissionInput().

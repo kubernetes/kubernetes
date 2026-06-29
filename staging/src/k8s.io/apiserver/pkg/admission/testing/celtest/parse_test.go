@@ -226,27 +226,18 @@ func TestParseAdmissionPolicyFile(t *testing.T) {
 	dir := t.TempDir()
 
 	t.Run("valid file", func(t *testing.T) {
-		path := filepath.Join(dir, "policy.yaml")
-		content := []byte(`
-variables:
-  - name: podName
-    expression: "object.metadata.name"
-validations:
-  - expression: "variables.podName != 'bad'"
-    message: "name must not be bad"
-`)
-		if err := os.WriteFile(path, content, 0644); err != nil {
-			t.Fatalf("writing test file: %v", err)
-		}
-		policy, err := ParseAdmissionPolicyFile(path)
+		policy, err := ParseAdmissionPolicyFile(filepath.Join("testdata", "validating-admission-policy.yaml"))
 		if err != nil {
 			t.Fatalf("ParseAdmissionPolicyFile() error: %v", err)
 		}
-		if len(policy.variables) != 1 {
-			t.Errorf("got %d variables, want 1", len(policy.variables))
+		if len(policy.matchConditions) != 1 {
+			t.Errorf("got %d matchConditions, want 1", len(policy.matchConditions))
 		}
 		if len(policy.validations) != 1 {
 			t.Errorf("got %d validations, want 1", len(policy.validations))
+		}
+		if len(policy.auditAnnotations) != 1 {
+			t.Errorf("got %d auditAnnotations, want 1", len(policy.auditAnnotations))
 		}
 	})
 
@@ -265,6 +256,49 @@ validations:
 		_, err := ParseAdmissionPolicyFile(path)
 		if err == nil {
 			t.Error("expected error for empty policy file")
+		}
+	})
+}
+
+func TestParseAdmissionInputFile(t *testing.T) {
+	dir := t.TempDir()
+
+	t.Run("valid file", func(t *testing.T) {
+		input, err := ParseAdmissionInputFile(filepath.Join("testdata", "admission-input.yaml"))
+		if err != nil {
+			t.Fatalf("ParseAdmissionInputFile() error: %v", err)
+		}
+		object := input.object.(map[string]interface{})
+		if object["kind"] != "Pod" {
+			t.Errorf("object.kind = %v, want Pod", object["kind"])
+		}
+		params := input.params.(map[string]interface{})
+		if params["kind"] != "ConfigMap" {
+			t.Errorf("params.kind = %v, want ConfigMap", params["kind"])
+		}
+		if input.request == nil || input.request.Operation != admissionv1.Create {
+			t.Fatalf("request.operation = %v, want CREATE", input.request)
+		}
+		if input.namespace == nil || input.namespace.Name != "default" {
+			t.Fatalf("namespace.name = %v, want default", input.namespace)
+		}
+	})
+
+	t.Run("missing file", func(t *testing.T) {
+		_, err := ParseAdmissionInputFile(filepath.Join(dir, "nonexistent.yaml"))
+		if err == nil {
+			t.Error("expected error for missing file")
+		}
+	})
+
+	t.Run("invalid content", func(t *testing.T) {
+		path := filepath.Join(dir, "invalid-input.yaml")
+		if err := os.WriteFile(path, []byte("object: ["), 0644); err != nil {
+			t.Fatalf("writing test file: %v", err)
+		}
+		_, err := ParseAdmissionInputFile(path)
+		if err == nil {
+			t.Error("expected error for invalid input file")
 		}
 	})
 }

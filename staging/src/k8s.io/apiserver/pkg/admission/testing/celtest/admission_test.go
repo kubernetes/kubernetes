@@ -40,116 +40,284 @@ func (o *unconvertibleRuntimeObject) DeepCopyObject() runtime.Object {
 	return &out
 }
 
-func TestEvalValidations_Allowed(t *testing.T) {
-	e, err := NewEvaluator()
-	if err != nil {
-		t.Fatalf("NewEvaluator() error: %v", err)
-	}
-
-	policy := &AdmissionPolicy{
-		validations: []validation{
-			{Path: "validations[0]", Expression: "object.metadata.name == 'allowed-name'"},
-		},
-	}
-	input := &AdmissionInput{
-		object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Pod",
-			"metadata":   map[string]interface{}{"name": "allowed-name"},
-		},
-	}
-
-	result, err := e.EvalValidations(policy, input)
-	if err != nil {
-		t.Fatalf("EvalValidations() error: %v", err)
-	}
-	if !result.Allowed {
-		t.Errorf("EvalValidations() Allowed = false, want true; violations: %s", result.FormatViolations())
-	}
-	if result.Cost <= 0 {
-		t.Errorf("EvalValidations() Cost = %d, want > 0", result.Cost)
-	}
-}
-
-func TestEvalValidations_TypedAdmissionInput(t *testing.T) {
-	e, err := NewEvaluator()
-	if err != nil {
-		t.Fatalf("NewEvaluator() error: %v", err)
-	}
-
-	policy := &AdmissionPolicy{
-		validations: []validation{
-			{Path: "validations[0]", Expression: "object.kind == 'Pod'"},
-			{Path: "validations[1]", Expression: "request.kind.kind == 'Pod'"},
-			{Path: "validations[2]", Expression: "request.resource.resource == 'pods'"},
-			{Path: "validations[3]", Expression: "object.metadata.name == 'typed-pod'"},
-			{Path: "validations[4]", Expression: "object.metadata.namespace == 'default'"},
-			{Path: "validations[5]", Expression: "params.kind == 'ConfigMap'"},
-			{Path: "validations[6]", Expression: "params.data.requiredTeam == object.metadata.labels.team"},
-		},
-	}
-	policy.setHasParams(true)
-
-	input := &AdmissionInput{
-		object: &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "typed-pod",
-				Namespace: "default",
-				Labels:    map[string]string{"team": "platform"},
+func TestEvalValidations(t *testing.T) {
+	tests := []struct {
+		name           string
+		policy         *AdmissionPolicy
+		input          *AdmissionInput
+		checkCost      bool
+		wantAllowed    bool
+		wantViolations []string
+	}{
+		{
+			name: "unstructured object allowed",
+			policy: &AdmissionPolicy{
+				validations: []validation{
+					{Path: "validations[0]", Expression: "object.metadata.name == 'allowed-name'"},
+				},
 			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "app", Image: "registry.k8s.io/pause:3.10"}},
+			input: &AdmissionInput{
+				object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "allowed-name"},
+				},
 			},
+			checkCost:   true,
+			wantAllowed: true,
 		},
-		params: &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: "policy-config"},
-			Data:       map[string]string{"requiredTeam": "platform"},
-		},
-	}
-
-	result, err := e.EvalValidations(policy, input)
-	if err != nil {
-		t.Fatalf("EvalValidations() error: %v", err)
-	}
-	if !result.Allowed {
-		t.Fatalf("expected Allowed=true for typed input, got violations: %s", result.FormatViolations())
-	}
-}
-
-func TestEvalValidations_TypedOldObject(t *testing.T) {
-	e, err := NewEvaluator()
-	if err != nil {
-		t.Fatalf("NewEvaluator() error: %v", err)
-	}
-
-	policy := &AdmissionPolicy{
-		validations: []validation{
-			{Path: "validations[0]", Expression: "request.operation == 'UPDATE'"},
-			{Path: "validations[1]", Expression: "oldObject.metadata.labels.version == 'old'"},
-			{Path: "validations[2]", Expression: "object.metadata.labels.version == 'new'"},
-		},
-	}
-	input := &AdmissionInput{
-		object: &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "typed-pod",
-				Labels: map[string]string{"version": "new"},
+		{
+			name: "typed object and params allowed",
+			policy: func() *AdmissionPolicy {
+				policy := &AdmissionPolicy{
+					validations: []validation{
+						{Path: "validations[0]", Expression: "object.kind == 'Pod'"},
+						{Path: "validations[1]", Expression: "request.kind.kind == 'Pod'"},
+						{Path: "validations[2]", Expression: "request.resource.resource == 'pods'"},
+						{Path: "validations[3]", Expression: "object.metadata.name == 'typed-pod'"},
+						{Path: "validations[4]", Expression: "object.metadata.namespace == 'default'"},
+						{Path: "validations[5]", Expression: "params.kind == 'ConfigMap'"},
+						{Path: "validations[6]", Expression: "params.data.requiredTeam == object.metadata.labels.team"},
+					},
+				}
+				policy.setHasParams(true)
+				return policy
+			}(),
+			input: &AdmissionInput{
+				object: &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "typed-pod",
+						Namespace: "default",
+						Labels:    map[string]string{"team": "platform"},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "app", Image: "registry.k8s.io/pause:3.10"}},
+					},
+				},
+				params: &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: "policy-config"},
+					Data:       map[string]string{"requiredTeam": "platform"},
+				},
 			},
+			wantAllowed: true,
 		},
-		oldObject: &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "typed-pod",
-				Labels: map[string]string{"version": "old"},
+		{
+			name: "typed old object allowed",
+			policy: &AdmissionPolicy{
+				validations: []validation{
+					{Path: "validations[0]", Expression: "request.operation == 'UPDATE'"},
+					{Path: "validations[1]", Expression: "oldObject.metadata.labels.version == 'old'"},
+					{Path: "validations[2]", Expression: "object.metadata.labels.version == 'new'"},
+				},
 			},
+			input: &AdmissionInput{
+				object: &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "typed-pod",
+						Labels: map[string]string{"version": "new"},
+					},
+				},
+				oldObject: &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "typed-pod",
+						Labels: map[string]string{"version": "old"},
+					},
+				},
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "request fields allowed",
+			policy: &AdmissionPolicy{
+				validations: []validation{
+					{Path: "validations[0]", Expression: "request.operation == 'CREATE'"},
+				},
+			},
+			input: &AdmissionInput{
+				object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "test"},
+				},
+				request: &admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
+					Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
+				},
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "old object names differ allowed",
+			policy: &AdmissionPolicy{
+				validations: []validation{
+					{
+						Path:       "validations[0]",
+						Expression: "object.metadata.name != oldObject.metadata.name",
+						Message:    "name must change on update",
+					},
+				},
+			},
+			input: &AdmissionInput{
+				object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "new-name"},
+				},
+				oldObject: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "old-name"},
+				},
+				request: &admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
+					Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
+				},
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "inferred update operation allowed",
+			policy: &AdmissionPolicy{
+				validations: []validation{
+					{Path: "validations[0]", Expression: "request.operation == 'UPDATE'"},
+				},
+			},
+			input: &AdmissionInput{
+				object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "new-name"},
+				},
+				oldObject: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "old-name"},
+				},
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "denied with message",
+			policy: &AdmissionPolicy{
+				validations: []validation{
+					{
+						Path:       "validations[0]",
+						Expression: "object.metadata.name != 'bad-name'",
+						Message:    "name must not be bad-name",
+					},
+				},
+			},
+			input: &AdmissionInput{
+				object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "bad-name"},
+				},
+			},
+			wantAllowed:    false,
+			wantViolations: []string{"name must not be bad-name"},
+		},
+		{
+			name: "old object names same denied",
+			policy: &AdmissionPolicy{
+				validations: []validation{
+					{
+						Path:       "validations[0]",
+						Expression: "object.metadata.name != oldObject.metadata.name",
+						Message:    "name must change on update",
+					},
+				},
+			},
+			input: &AdmissionInput{
+				object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "same-name"},
+				},
+				oldObject: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "same-name"},
+				},
+				request: &admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
+					Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
+				},
+			},
+			wantAllowed:    false,
+			wantViolations: []string{"name must change on update"},
+		},
+		{
+			name: "validations evaluated independently of match conditions",
+			policy: &AdmissionPolicy{
+				matchConditions: []matchCondition{{Path: "spec.matchConditions[0]", Name: "not-system", Expression: "false"}},
+				validations:     []validation{{Path: "spec.validations[0]", Expression: "false", Message: "validation still evaluated"}},
+			},
+			input: &AdmissionInput{
+				object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]interface{}{
+						"name":      "test-pod",
+						"namespace": "kube-system",
+					},
+				},
+			},
+			wantAllowed:    false,
+			wantViolations: []string{"validation still evaluated"},
+		},
+		{
+			name: "multiple validations one fails",
+			policy: &AdmissionPolicy{
+				validations: []validation{
+					{Path: "validations[0]", Expression: "true"},
+					{Path: "validations[1]", Expression: "false", Message: "always fails"},
+					{Path: "validations[2]", Expression: "true"},
+				},
+			},
+			input: &AdmissionInput{
+				object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "test"},
+				},
+			},
+			wantAllowed:    false,
+			wantViolations: []string{"always fails"},
 		},
 	}
 
-	result, err := e.EvalValidations(policy, input)
-	if err != nil {
-		t.Fatalf("EvalValidations() error: %v", err)
-	}
-	if !result.Allowed {
-		t.Fatalf("expected typed oldObject update to allow, got violations: %s", result.FormatViolations())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, err := NewEvaluator()
+			if err != nil {
+				t.Fatalf("NewEvaluator() error: %v", err)
+			}
+
+			result, err := e.EvalValidations(tt.policy, tt.input)
+			if err != nil {
+				t.Fatalf("EvalValidations() error: %v", err)
+			}
+			if result.Allowed != tt.wantAllowed {
+				t.Fatalf("EvalValidations() Allowed = %v, want %v; violations: %s", result.Allowed, tt.wantAllowed, result.FormatViolations())
+			}
+			if !tt.wantAllowed {
+				if len(result.Violations) != len(tt.wantViolations) {
+					t.Fatalf("got %d violations, want %d; violations: %s", len(result.Violations), len(tt.wantViolations), result.FormatViolations())
+				}
+				for i, want := range tt.wantViolations {
+					if result.Violations[i].Message != want {
+						t.Errorf("violation[%d] message = %q, want %q", i, result.Violations[i].Message, want)
+					}
+				}
+			}
+			if tt.checkCost && result.Cost <= 0 {
+				t.Errorf("EvalValidations() Cost = %d, want > 0", result.Cost)
+			}
+		})
 	}
 }
 
@@ -196,44 +364,6 @@ func TestEvalValidations_TypedAdmissionInputConversionErrors(t *testing.T) {
 				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.want)
 			}
 		})
-	}
-}
-
-func TestEvalValidations_Denied(t *testing.T) {
-	e, err := NewEvaluator()
-	if err != nil {
-		t.Fatalf("NewEvaluator() error: %v", err)
-	}
-
-	policy := &AdmissionPolicy{
-		validations: []validation{
-			{
-				Path:       "validations[0]",
-				Expression: "object.metadata.name != 'bad-name'",
-				Message:    "name must not be bad-name",
-			},
-		},
-	}
-	input := &AdmissionInput{
-		object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Pod",
-			"metadata":   map[string]interface{}{"name": "bad-name"},
-		},
-	}
-
-	result, err := e.EvalValidations(policy, input)
-	if err != nil {
-		t.Fatalf("EvalValidations() error: %v", err)
-	}
-	if result.Allowed {
-		t.Error("EvalValidations() Allowed = true, want false")
-	}
-	if len(result.Violations) != 1 {
-		t.Fatalf("EvalValidations() got %d violations, want 1", len(result.Violations))
-	}
-	if result.Violations[0].Message != "name must not be bad-name" {
-		t.Errorf("violation message = %q, want %q", result.Violations[0].Message, "name must not be bad-name")
 	}
 }
 
@@ -506,73 +636,6 @@ func TestEvalVariable(t *testing.T) {
 	})
 }
 
-func TestEvalValidations_EvaluatesValidationsIndependentlyOfMatchConditions(t *testing.T) {
-	e, err := NewEvaluator()
-	if err != nil {
-		t.Fatalf("NewEvaluator() error: %v", err)
-	}
-
-	policy := &AdmissionPolicy{
-		matchConditions: []matchCondition{{Path: "spec.matchConditions[0]", Name: "not-system", Expression: "false"}},
-		validations:     []validation{{Path: "spec.validations[0]", Expression: "false", Message: "validation still evaluated"}},
-	}
-
-	input := &AdmissionInput{
-		object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Pod",
-			"metadata": map[string]interface{}{
-				"name":      "test-pod",
-				"namespace": "kube-system",
-			},
-		},
-	}
-
-	result, err := e.EvalValidations(policy, input)
-	if err != nil {
-		t.Fatalf("EvalValidations() error: %v", err)
-	}
-	if result.Allowed {
-		t.Fatal("expected validation to be evaluated and deny")
-	}
-	if len(result.Violations) != 1 {
-		t.Fatalf("got %d violations, want 1", len(result.Violations))
-	}
-}
-
-func TestEvalValidations_RequestFields(t *testing.T) {
-	e, err := NewEvaluator()
-	if err != nil {
-		t.Fatalf("NewEvaluator() error: %v", err)
-	}
-
-	policy := &AdmissionPolicy{
-		validations: []validation{
-			{Path: "validations[0]", Expression: "request.operation == 'CREATE'"},
-		},
-	}
-	input := &AdmissionInput{
-		object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Pod",
-			"metadata":   map[string]interface{}{"name": "test"},
-		},
-		request: &admissionv1.AdmissionRequest{
-			Operation: admissionv1.Create,
-			Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
-			Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
-		},
-	}
-
-	result, err := e.EvalValidations(policy, input)
-	if err != nil {
-		t.Fatalf("EvalValidations() error: %v", err)
-	}
-	if !result.Allowed {
-		t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
-	}
-}
-
 func TestEvalValidations_CompilationError(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
@@ -617,45 +680,6 @@ func TestEvalValidations_RejectsPatchTypes(t *testing.T) {
 
 	if _, err := e.EvalValidations(policy, input); err == nil {
 		t.Fatal("expected validation evaluation to reject mutation patch types")
-	}
-}
-
-func TestEvalValidations_MultipleValidations(t *testing.T) {
-	e, err := NewEvaluator()
-	if err != nil {
-		t.Fatalf("NewEvaluator() error: %v", err)
-	}
-
-	policy := &AdmissionPolicy{
-		validations: []validation{
-			{Path: "validations[0]", Expression: "true"},
-			{Path: "validations[1]", Expression: "false", Message: "always fails"},
-			{Path: "validations[2]", Expression: "true"},
-		},
-	}
-	input := &AdmissionInput{
-		object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Pod",
-			"metadata":   map[string]interface{}{"name": "test"},
-		},
-	}
-
-	result, err := e.EvalValidations(policy, input)
-	if err != nil {
-		t.Fatalf("EvalValidations() error: %v", err)
-	}
-	if result.Allowed {
-		t.Error("expected Allowed=false when one validation fails")
-	}
-	if len(result.Violations) != 1 {
-		t.Fatalf("got %d violations, want 1", len(result.Violations))
-	}
-	if result.Violations[0].Expression != "false" {
-		t.Errorf("violation expression = %q, want false", result.Violations[0].Expression)
-	}
-	if result.Violations[0].Message != "always fails" {
-		t.Errorf("violation message = %q, want %q", result.Violations[0].Message, "always fails")
 	}
 }
 
@@ -769,115 +793,6 @@ func TestSetHasParams(t *testing.T) {
 		}
 		if !result.Allowed {
 			t.Errorf("expected Allowed=true with default params, got violations: %s", result.FormatViolations())
-		}
-	})
-}
-
-func TestEvalValidations_OldObject(t *testing.T) {
-	e, err := NewEvaluator()
-	if err != nil {
-		t.Fatalf("NewEvaluator() error: %v", err)
-	}
-
-	policy := &AdmissionPolicy{
-		validations: []validation{
-			{
-				Path:       "validations[0]",
-				Expression: "object.metadata.name != oldObject.metadata.name",
-				Message:    "name must change on update",
-			},
-		},
-	}
-
-	t.Run("names differ", func(t *testing.T) {
-		input := &AdmissionInput{
-			object: map[string]interface{}{
-				"apiVersion": "v1",
-				"kind":       "Pod",
-				"metadata":   map[string]interface{}{"name": "new-name"},
-			},
-			oldObject: map[string]interface{}{
-				"apiVersion": "v1",
-				"kind":       "Pod",
-				"metadata":   map[string]interface{}{"name": "old-name"},
-			},
-			request: &admissionv1.AdmissionRequest{
-				Operation: admissionv1.Update,
-				Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
-				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
-			},
-		}
-
-		result, err := e.EvalValidations(policy, input)
-		if err != nil {
-			t.Fatalf("EvalValidations() error: %v", err)
-		}
-		if !result.Allowed {
-			t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
-		}
-	})
-
-	t.Run("names same", func(t *testing.T) {
-		input := &AdmissionInput{
-			object: map[string]interface{}{
-				"apiVersion": "v1",
-				"kind":       "Pod",
-				"metadata":   map[string]interface{}{"name": "same-name"},
-			},
-			oldObject: map[string]interface{}{
-				"apiVersion": "v1",
-				"kind":       "Pod",
-				"metadata":   map[string]interface{}{"name": "same-name"},
-			},
-			request: &admissionv1.AdmissionRequest{
-				Operation: admissionv1.Update,
-				Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
-				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
-			},
-		}
-
-		result, err := e.EvalValidations(policy, input)
-		if err != nil {
-			t.Fatalf("EvalValidations() error: %v", err)
-		}
-		if result.Allowed {
-			t.Error("expected Allowed=false when names are the same")
-		}
-		if len(result.Violations) != 1 {
-			t.Fatalf("got %d violations, want 1", len(result.Violations))
-		}
-		if result.Violations[0].Message != "name must change on update" {
-			t.Errorf("violation message = %q, want %q", result.Violations[0].Message, "name must change on update")
-		}
-	})
-
-	t.Run("inferred update operation", func(t *testing.T) {
-		// When both object and oldObject are set without explicit request, operation should be inferred as UPDATE.
-		input := &AdmissionInput{
-			object: map[string]interface{}{
-				"apiVersion": "v1",
-				"kind":       "Pod",
-				"metadata":   map[string]interface{}{"name": "new-name"},
-			},
-			oldObject: map[string]interface{}{
-				"apiVersion": "v1",
-				"kind":       "Pod",
-				"metadata":   map[string]interface{}{"name": "old-name"},
-			},
-		}
-
-		policyOp := &AdmissionPolicy{
-			validations: []validation{
-				{Path: "validations[0]", Expression: "request.operation == 'UPDATE'"},
-			},
-		}
-
-		result, err := e.EvalValidations(policyOp, input)
-		if err != nil {
-			t.Fatalf("EvalValidations() error: %v", err)
-		}
-		if !result.Allowed {
-			t.Errorf("expected inferred UPDATE operation, got violations: %s", result.FormatViolations())
 		}
 	})
 }
