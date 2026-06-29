@@ -19,7 +19,7 @@ package kubeletplugin
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -56,13 +56,13 @@ const (
 	unixPathMax = 108
 
 	// rollingUpdateUIDHashBytes is how much of the SHA-256 digest of a pod UID
-	// is hex-encoded when the full UID does not fit in the registration socket
+	// is base64-encoded when the full UID does not fit in the registration socket
 	// path. 8 bytes (64 bits) is ample for node-local uniqueness during rolling
 	// updates.
 	rollingUpdateUIDHashBytes = 8
 
 	// rollingUpdateRegistrarSocketHashBytes is how much of the SHA-256 digest
-	// of (driver name, pod UID) is hex-encoded into the shortest rolling-update
+	// of (driver name, pod UID) is base64-encoded into the shortest rolling-update
 	// registration socket basename. 16 bytes (128 bits) is ample for
 	// node-local uniqueness while keeping AF_UNIX paths under typical limits.
 	rollingUpdateRegistrarSocketHashBytes = 16
@@ -74,16 +74,16 @@ const (
 //
 // The basename is chosen in order of preference:
 //  1. <driver name>-<pod UID>-reg.sock
-//  2. <driver name>-<hex(SHA-256(pod UID))>-reg.sock
-//  3. dra-<hex(SHA-256(driver name, NUL, pod UID))>-reg.sock
+//  2. <driver name>-<base64(SHA-256(pod UID)[:8])>-reg.sock
+//  3. dra-<base64(SHA-256(driver name, NUL, pod UID)[:16])>-reg.sock
 func RollingUpdateRegistrarSocketFile(registryDir, driverName string, podUID types.UID) string {
 	uid := string(podUID)
 	uidHash := sha256Sum(uid)
 	driverUIDHash := sha256Sum(driverName + "\x00" + uid)
 	candidates := []string{
 		driverName + "-" + uid + "-reg.sock",
-		driverName + "-" + hex.EncodeToString(uidHash[:rollingUpdateUIDHashBytes]) + "-reg.sock",
-		"dra-" + hex.EncodeToString(driverUIDHash[:rollingUpdateRegistrarSocketHashBytes]) + "-reg.sock",
+		driverName + "-" + base64.RawURLEncoding.EncodeToString(uidHash[:rollingUpdateUIDHashBytes]) + "-reg.sock",
+		"dra-" + base64.RawURLEncoding.EncodeToString(driverUIDHash[:rollingUpdateRegistrarSocketHashBytes]) + "-reg.sock",
 	}
 	for _, basename := range candidates {
 		if len(path.Join(registryDir, basename)) <= unixPathMax {
