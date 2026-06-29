@@ -183,32 +183,42 @@ func (mp *fakePlacementFeasiblePlugin) Permit(ctx context.Context, state fwk.Cyc
 	return fwk.NewStatus(fwk.Error, "unexpected call to permit"), 0
 }
 
-func TestFrameworkForPodGroup(t *testing.T) {
-	p1 := st.MakePod().Name("p1").PodGroupName("pg").SchedulerName("sched1").Obj()
-	p2 := st.MakePod().Name("p2").PodGroupName("pg").SchedulerName("sched1").Obj()
-	p3 := st.MakePod().Name("p3").PodGroupName("pg").SchedulerName("sched2").Obj()
-
-	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
-	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
-	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}}
-
+func TestValidatePodGroup(t *testing.T) {
 	tests := []struct {
 		name        string
-		pods        []*framework.QueuedPodInfo
+		podGroup    *schedulingv1alpha3.PodGroup
+		pods        []*v1.Pod
 		profiles    profile.Map
 		expectError bool
 	}{
 		{
-			name: "success for same scheduler name",
-			pods: []*framework.QueuedPodInfo{qInfo1, qInfo2},
+			name:     "failure when no pods to evaluate",
+			podGroup: st.MakePodGroup().Name("pg").Obj(),
+			pods:     []*v1.Pod{},
+			profiles: profile.Map{
+				"sched1": nil,
+			},
+			expectError: true,
+		},
+		{
+			name:     "success for same scheduler name",
+			podGroup: st.MakePodGroup().Name("pg").Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").SchedulerName("sched1").Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").SchedulerName("sched1").Obj(),
+			},
 			profiles: profile.Map{
 				"sched1": nil,
 			},
 			expectError: false,
 		},
 		{
-			name: "failure for different scheduler names",
-			pods: []*framework.QueuedPodInfo{qInfo1, qInfo3},
+			name:     "failure for different scheduler names",
+			podGroup: st.MakePodGroup().Name("pg").Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").SchedulerName("sched1").Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").SchedulerName("sched2").Obj(),
+			},
 			profiles: profile.Map{
 				"sched1": nil,
 				"sched2": nil,
@@ -216,10 +226,50 @@ func TestFrameworkForPodGroup(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "failure when profile not found",
-			pods: []*framework.QueuedPodInfo{qInfo1},
+			name:     "failure when profile not found",
+			podGroup: st.MakePodGroup().Name("pg").Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").SchedulerName("sched1").Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").SchedulerName("sched1").Obj(),
+			},
 			profiles: profile.Map{
 				"other": nil,
+			},
+			expectError: true,
+		},
+		{
+			name:     "success when priorities match",
+			podGroup: st.MakePodGroup().Name("pg").Priority(10).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").Priority(10).Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").Priority(10).Obj(),
+			},
+			profiles: profile.Map{
+				"": nil,
+			},
+			expectError: false,
+		},
+		{
+			name:     "failure when different priorities across pods",
+			podGroup: st.MakePodGroup().Name("pg").Priority(10).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").Priority(9).Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").Priority(10).Obj(),
+			},
+			profiles: profile.Map{
+				"": nil,
+			},
+			expectError: true,
+		},
+		{
+			name:     "failure when different priorities across pods and pod group",
+			podGroup: st.MakePodGroup().Name("pg").Priority(9).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").Priority(10).Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").Priority(10).Obj(),
+			},
+			profiles: profile.Map{
+				"": nil,
 			},
 			expectError: true,
 		},
@@ -227,9 +277,27 @@ func TestFrameworkForPodGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sched := &Scheduler{Profiles: tt.profiles}
-			podGroupInfo := &framework.QueuedPodGroupInfo{QueuedPodInfos: tt.pods}
-			_, err := sched.frameworkForPodGroup(podGroupInfo)
+			overrides := featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: true,
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
+			_, ctx := ktesting.NewTestContext(t)
+			testPodGroupInfo := &framework.PodGroupInfo{Name: tt.podGroup.Name, Namespace: tt.podGroup.Namespace}
+			client := clientsetfake.NewClientset(tt.podGroup)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+			sched := &Scheduler{Profiles: tt.profiles, podGroupLister: podGroupLister}
+			podGroupInfo := &framework.QueuedPodGroupInfo{
+				PodGroupInfo: testPodGroupInfo,
+			}
+			for _, pod := range tt.pods {
+				podGroupInfo.UnscheduledPods = append(podGroupInfo.UnscheduledPods, pod)
+				podGroupInfo.QueuedPodInfos = append(podGroupInfo.QueuedPodInfos,
+					&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}})
+			}
+			err := sched.validatePodGroup(podGroupInfo)
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error, but got nil")
