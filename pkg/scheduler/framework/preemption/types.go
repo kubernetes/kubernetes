@@ -25,7 +25,6 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -95,12 +94,12 @@ type domain struct {
 }
 
 // getPodGroup checks if a pod specifies a scheduling group and returns the corresponding PodGroup object if found.
-func getPodGroup(p *v1.Pod, pgLister schedulinglisters.PodGroupLister) *schedulingapi.PodGroup {
+func getPodGroup(p *v1.Pod, podGroupSnapshot fwk.PodGroupLister) *schedulingapi.PodGroup {
 	if p.Spec.SchedulingGroup == nil {
 		return nil
 	}
 	pgName := p.Spec.SchedulingGroup.PodGroupName
-	pg, err := pgLister.PodGroups(p.Namespace).Get(*pgName)
+	pg, err := podGroupSnapshot.Get(p.Namespace, *pgName)
 	if err != nil {
 		return nil
 	}
@@ -119,14 +118,11 @@ func isDisruptionModeAll(pg *schedulingapi.PodGroup) bool {
 // together into a single victim. Otherwise, they are treated as individual victims.
 // In both cases, the priority of the victim is determined by the PodGroup priority
 // if the pod belongs to a PodGroup.
-func newDomainForWorkloadPreemption(nodes []fwk.NodeInfo, pgLister schedulinglisters.PodGroupLister, name string) *domain {
+func newDomainForWorkloadPreemption(nodes []fwk.NodeInfo, podGroupSnapshot fwk.PodGroupLister, name string) *domain {
 	victimMap := map[types.UID]*victim{}
 	for _, node := range nodes {
 		for _, p := range node.GetPods() {
-			// TODO: Calling the lister here is not ideal given we do this
-			// for every pod in the cluster. Instead, we should be getting
-			// this information from the snapshot.
-			pg := getPodGroup(p.GetPod(), pgLister)
+			pg := getPodGroup(p.GetPod(), podGroupSnapshot)
 			if pg == nil {
 				victimMap[p.GetPod().UID] = newVictim([]fwk.PodInfo{p}, corev1helpers.PodPriority(p.GetPod()), []fwk.NodeInfo{node})
 				continue

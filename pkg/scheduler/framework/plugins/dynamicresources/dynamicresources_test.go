@@ -4029,6 +4029,10 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 			tc.podGroupManager.AddPodGroupMember(pod)
 		}
 	}
+	for _, podGroup := range podGroups {
+		tc.podGroupManager.AddPodGroup(podGroup)
+	}
+	snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nil, podGroups)
 
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
@@ -4036,6 +4040,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		runtime.WithEventRecorder(&events.FakeRecorder{}),
 		runtime.WithSharedDRAManager(tc.draManager),
 		runtime.WithPodGroupManager(tc.podGroupManager),
+		runtime.WithSnapshotSharedLister(snapshot),
 	}
 	fh, err := runtime.NewFramework(tCtx, nil, nil, opts...)
 	tCtx.ExpectNoError(err, "create scheduler framework")

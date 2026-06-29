@@ -50,7 +50,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	clienttesting "k8s.io/client-go/testing"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
@@ -1030,8 +1029,8 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		var gotBinding *v1.Binding
 		var gotNominatingInfo *fwk.NominatingInfo
 
-		var podGroupLister schedulinglisters.PodGroupLister
 		var clientObjs []runtime.Object
+		var podGroup *schedulingv1alpha3.PodGroup
 		if scheduleAsPodGroup {
 			group := &v1.PodSchedulingGroup{
 				PodGroupName: new("pg"),
@@ -1046,10 +1045,10 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				item.expectPodInUnschedulable = nil
 			}
 
-			testPG := &schedulingv1alpha3.PodGroup{
+			podGroup = &schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: item.sendPod.Namespace},
 			}
-			clientObjs = []runtime.Object{item.sendPod, testPG}
+			clientObjs = []runtime.Object{item.sendPod, podGroup}
 		} else {
 			clientObjs = []runtime.Object{item.sendPod}
 		}
@@ -1073,8 +1072,8 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		internalCache := internalcache.New(ctx, apiDispatcher, scheduleAsPodGroup)
 
 		if scheduleAsPodGroup {
-			podGroupLister = informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 			internalCache.AddPodGroupMember(item.sendPod)
+			internalCache.AddPodGroup(podGroup)
 		}
 		cache := &fakecache.Cache{
 			Cache: internalCache,
@@ -1151,9 +1150,11 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			SchedulingQueue:                        queue,
 			Profiles:                               profile.Map{testSchedulerName: schedFramework},
 			APIDispatcher:                          apiDispatcher,
-			podGroupLister:                         podGroupLister,
 			nominatedNodeNameForExpectationEnabled: features.nominatedNodeNameForExpectationEnabled,
 		}
+		informerFactory.Start(ctx.Done())
+		informerFactory.WaitForCacheSync(ctx.Done())
+
 		queue.Add(ctx, item.sendPod)
 
 		sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
@@ -1177,8 +1178,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		informerFactory.Start(ctx.Done())
-		informerFactory.WaitForCacheSync(ctx.Done())
 		sched.nodeInfoSnapshot = internalcache.NewEmptySnapshot()
 		sched.ScheduleOne(ctx)
 

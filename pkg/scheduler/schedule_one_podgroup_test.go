@@ -431,7 +431,6 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 
 	client := clientsetfake.NewClientset(testPodGroup)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
 
@@ -441,7 +440,6 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 		SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 		Cache:           cache,
 		client:          client,
-		podGroupLister:  podGroupLister,
 		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 			failureHandlerCalled = true
 			if updateSnapshotErr.Error() != status.AsError().Error() {
@@ -450,7 +448,7 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 		},
 	}
 
-	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo)
+	sched.scheduleOnePodGroup(ctx, podGroupInfo)
 
 	if !failureHandlerCalled {
 		t.Errorf("Expected FailureHandler to be called after UpdateSnapshot failed")
@@ -506,7 +504,6 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 
 	client := clientsetfake.NewSimpleClientset(testPodGroup, testNode)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
@@ -536,7 +533,6 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 		SchedulingQueue:  internalqueue.NewTestQueue(ctx, nil),
 		Cache:            cache,
 		client:           client,
-		podGroupLister:   podGroupLister,
 		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
 		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 			lock.Lock()
@@ -556,7 +552,7 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 	}
 
 	// Run the scheduling cycle and check that all pods are handled.
-	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo)
+	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, time.Now())
 
 	lock.Lock()
 	defer lock.Unlock()
@@ -685,7 +681,6 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 
 			client := clientsetfake.NewSimpleClientset(testPodGroup, testNode)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
@@ -712,7 +707,6 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 				SchedulingQueue:        internalqueue.NewTestQueue(ctx, nil),
 				Cache:                  cache,
 				client:                 client,
-				podGroupLister:         podGroupLister,
 				nodeInfoSnapshot:       internalcache.NewEmptySnapshot(),
 				genericWorkloadEnabled: tt.genericWorkloadEnabled,
 				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
@@ -720,7 +714,7 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			}
 
 			sched.SchedulePod = sched.schedulePod
-			sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo)
+			sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, time.Now())
 
 			if fakePlugin.podGroupPostFilterCalled != tt.expectedPodGroupPostFilterCalled {
 				t.Errorf("Expected workload aware preemption (PodGroupPostFilter) to be %v, but got %v", tt.expectedPodGroupPostFilterCalled, fakePlugin.podGroupPostFilterCalled)
@@ -1681,13 +1675,11 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			cache.AddNode(klog.FromContext(ctx), testNode)
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			sched := &Scheduler{
 				client:          client,
-				podGroupLister:  podGroupLister,
 				Cache:           cache,
 				Profiles:        profile.Map{"test-scheduler": schedFwk},
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
@@ -2071,10 +2063,9 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 			}
 			client := clientsetfake.NewClientset(objects...)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
-			sched := &Scheduler{client: client, podGroupLister: podGroupLister}
+			sched := &Scheduler{client: client}
 
 			var existingLTT metav1.Time
 			if existing := apimeta.FindStatusCondition(tt.existingPodGroup.Status.Conditions, schedulingapi.PodGroupInitiallyScheduled); existing != nil {
@@ -2950,8 +2941,6 @@ func TestRunWorkloadAwarePreemption(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 
-			podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
-
 			if tt.pluginsRegistered {
 				informerFactory.Start(ctx.Done())
 				informerFactory.WaitForCacheSync(ctx.Done())
@@ -2961,7 +2950,6 @@ func TestRunWorkloadAwarePreemption(t *testing.T) {
 			sched := &Scheduler{
 				Cache:            cache,
 				nodeInfoSnapshot: internalcache.NewEmptySnapshot(), // Need empty snapshot to avoid nil pointer issues
-				podGroupLister:   podGroupLister,
 			}
 
 			// Just inject logger explicitly in context to avoid panic
@@ -3044,8 +3032,6 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 
 	client := clientsetfake.NewSimpleClientset(testPodGroup)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
-
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
 
@@ -3063,7 +3049,6 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 		Profiles:         profile.Map{"test-scheduler": schedFwk},
 		Cache:            cache,
 		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
-		podGroupLister:   podGroupLister,
 		client:           client,
 		SchedulingQueue:  internalqueue.NewTestQueue(ctx, nil),
 	}
@@ -3092,7 +3077,7 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	ctx = klog.NewContext(ctx, logger)
 
-	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo)
+	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, time.Now())
 
 	if len(capturedFailureHandler) == 0 {
 		t.Fatalf("expected FailureHandler to be called")
@@ -3146,7 +3131,6 @@ func TestScheduleOnePodGroup_PodGroupNotFound(t *testing.T) {
 
 	client := clientsetfake.NewSimpleClientset(p1, p2)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 		frameworkruntime.WithInformerFactory(informerFactory),
@@ -3164,8 +3148,8 @@ func TestScheduleOnePodGroup_PodGroupNotFound(t *testing.T) {
 
 	sched := &Scheduler{
 		Profiles:               profile.Map{"test-scheduler": schedFwk},
-		podGroupLister:         podGroupLister,
 		SchedulingQueue:        queue,
+		nodeInfoSnapshot:       internalcache.NewEmptySnapshot(),
 		Cache:                  cache,
 		client:                 client,
 		genericWorkloadEnabled: true,

@@ -385,11 +385,12 @@ func TestGangSchedulingFlow(t *testing.T) {
 			}
 
 			// Populate informers and manager state for the test case.
-			for _, wl := range tt.initialPodGroups {
-				err := podGroupInformer.Informer().GetStore().Add(wl)
+			for _, pg := range tt.initialPodGroups {
+				err := podGroupInformer.Informer().GetStore().Add(pg)
 				if err != nil {
-					t.Fatalf("Failed to add podGroup %s to store: %v", wl.Name, err)
+					t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
 				}
+				cache.AddPodGroup(pg)
 			}
 
 			for _, p := range tt.initialPods {
@@ -410,6 +411,10 @@ func TestGangSchedulingFlow(t *testing.T) {
 			if !gotPreEnqueueStatus.IsSuccess() {
 				// Pod is rejected.
 				return
+			}
+
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
 			}
 
 			// Simulate that other pods have already hit Permit and are now waiting.
@@ -454,6 +459,9 @@ func TestGangSchedulingFlow(t *testing.T) {
 				// Assume pod in the cache, as in a pod-by-pod scheduling cycle, where Permit reads from cache.
 				if err := cache.AssumePod(logger, pod); err != nil {
 					t.Fatalf("Failed to assume pod %q in cache: %v", pod.Name, err)
+				}
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("Failed to update snapshot: %v", err)
 				}
 			}
 

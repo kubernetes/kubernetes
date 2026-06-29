@@ -48,8 +48,17 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	// https://github.com/kubernetes/kubernetes/issues/111672
 	logger = klog.LoggerWithValues(logger, "podGroup", klog.KObj(podGroupInfo))
 	ctx = klog.NewContext(ctx, logger)
+	start := time.Now()
 
-	podGroup, err := sched.podGroupLister.PodGroups(podGroupInfo.Namespace).Get(podGroupInfo.Name)
+	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
+		logger.Error(err, "Error updating snapshot", "podGroup", klog.KObj(podGroupInfo))
+		sched.handlePodGroupFailureBeforeScheduling(ctx, podGroupInfo, err)
+		return
+	}
+
+	// PodGroupInfo popped from the queue can have older PodGroup object.
+	// Override it here with the snapshotted version to ensure consistency throughout the cycle.
+	podGroup, err := sched.nodeInfoSnapshot.PodGroups().Get(podGroupInfo.Namespace, podGroupInfo.Name)
 	if err != nil {
 		// It can happen that the pod group was popped from the scheduling queue before it observed the PodGroup deletion.
 		// PodGroup should come back to the scheduling queue.
@@ -74,7 +83,7 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 
 	logger.V(3).Info("Attempting to schedule pod group", "podGroup", klog.KObj(podGroupInfo))
 
-	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo)
+	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, start)
 }
 
 // handlePodGroupFailureBeforeScheduling handles the failure of a pod group that occurred before scheduling.
@@ -200,23 +209,9 @@ func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, placementCycleSt
 	}
 }
 
-// podGroupCycle runs a pod group scheduling cycle for the given pod group in a single cluster snapshot.
-func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo) {
-	// Synchronously attempt to find a fit for the pod group.
-	start := time.Now()
-
-	logger := klog.FromContext(ctx)
-	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
-		logger.Error(err, "Error updating snapshot", "podGroup", klog.KObj(podGroupInfo))
-		result := podGroupAlgorithmResult{
-			status: fwk.AsStatus(err),
-		}
-		// Ensure podResults has an entry for each pod in the pod group with Error status.
-		result = completePodGroupAlgorithmResult(ctx, podGroupInfo, podGroupCycleState, runAllPostFilters, result)
-		sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, podGroupInfo, result, start)
-		return
-	}
-
+// podGroupCycle runs a pod group scheduling cycle for the given pod group.
+// Cluster state should be snapshotted before calling this method.
+func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo, start time.Time) {
 	result := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runAllPostFilters)
 
 	// Ensure podResults has an entry for each pod in the pod group with a status.

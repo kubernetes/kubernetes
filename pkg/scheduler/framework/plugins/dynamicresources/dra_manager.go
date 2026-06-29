@@ -27,15 +27,12 @@ import (
 	"github.com/go-logr/logr"
 
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -55,7 +52,6 @@ type DefaultDRAManager struct {
 	resourceClaimTracker  *claimTracker
 	resourceSliceLister   *resourceSliceLister
 	deviceClassLister     *deviceClassLister
-	podGroupLister        *podGroupLister
 	extendedResourceCache *extendedresourcecache.ExtendedResourceCache
 }
 
@@ -76,12 +72,6 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 		manager.extendedResourceCache = extendedresourcecache.NewExtendedResourceCache(logger)
 	}
 
-	pgLister := &podGroupLister{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
-		pgLister.podGroupLister = informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
-	}
-	manager.podGroupLister = pgLister
-
 	// Reacting to events is more efficient than iterating over the list
 	// repeatedly in PreFilter.
 	manager.resourceClaimTracker.cache.AddEventHandler(manager.resourceClaimTracker.allocatedDevices.handlers())
@@ -99,10 +89,6 @@ func (s *DefaultDRAManager) ResourceSlices() fwk.ResourceSliceLister {
 
 func (s *DefaultDRAManager) DeviceClasses() fwk.DeviceClassLister {
 	return s.deviceClassLister
-}
-
-func (s *DefaultDRAManager) PodGroups() fwk.PodGroupLister {
-	return s.podGroupLister
 }
 
 // DeviceClassResolver will always return a valid interface implementation. It
@@ -137,21 +123,6 @@ func (l *deviceClassLister) Get(className string) (*resourceapi.DeviceClass, err
 
 func (l *deviceClassLister) List() ([]*resourceapi.DeviceClass, error) {
 	return l.classLister.List(labels.Everything())
-}
-
-var _ fwk.PodGroupLister = &podGroupLister{}
-
-type podGroupLister struct {
-	podGroupLister schedulinglisters.PodGroupLister
-}
-
-// Get implements [fwk.PodGroupLister]. When the inner podGroupLister is nil,
-// Get always returns a new BadRequest error.
-func (l *podGroupLister) Get(namespace, podGroupName string) (*schedulingapi.PodGroup, error) {
-	if l.podGroupLister == nil {
-		return nil, apierrors.NewBadRequest("listing podgroups is disabled")
-	}
-	return l.podGroupLister.PodGroups(namespace).Get(podGroupName)
 }
 
 var _ fwk.ResourceClaimTracker = &claimTracker{}

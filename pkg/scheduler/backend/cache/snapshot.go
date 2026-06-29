@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -87,6 +88,7 @@ func NewEmptySnapshot() *Snapshot {
 }
 
 // NewSnapshot initializes a Snapshot struct and returns it.
+// It should be used only in the tests.
 func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	nodeInfoMap := createNodeInfoMap(pods, nodes)
 	nodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
@@ -112,6 +114,22 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 		s.podGroupStates = createPodGroupStates(pods)
 	}
 
+	return s
+}
+
+// NewTestSnapshotWithPodGroups initializes a Snapshot struct with pod groups and returns it.
+// It should be used only in the tests.
+func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1alpha3.PodGroup) *Snapshot {
+	s := NewSnapshot(pods, nodes)
+	for _, podGroup := range podGroups {
+		key := newPodGroupKey(podGroup.Namespace, podGroup.Name)
+		pgs, ok := s.podGroupStates[key]
+		if !ok {
+			pgs = &podGroupStateSnapshot{podGroupStateData: newPodGroupStateData()}
+			s.podGroupStates[key] = pgs
+		}
+		pgs.podGroup = podGroup
+	}
 	return s
 }
 
@@ -268,6 +286,31 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 // PodGroupStates returns a PodGroupStateLister.
 func (s *Snapshot) PodGroupStates() fwk.PodGroupStateLister {
 	return &podGroupStateSnapshotLister{podGroupStates: s.podGroupStates}
+}
+
+// PodGroups returns a PodGroupLister.
+func (s *Snapshot) PodGroups() fwk.PodGroupLister {
+	return &podGroupSnapshotListerImpl{snapshot: s}
+}
+
+type podGroupSnapshotListerImpl struct {
+	snapshot *Snapshot
+}
+
+func (l *podGroupSnapshotListerImpl) Get(namespace, name string) (*schedulingv1alpha3.PodGroup, error) {
+	if !l.snapshot.genericWorkloadEnabled {
+		return nil, fmt.Errorf("generic workload feature gate is disabled")
+	}
+	key := newPodGroupKey(namespace, name)
+	pgs, exists := l.snapshot.podGroupStates[key]
+	if !exists {
+		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
+	}
+	pg := pgs.podGroup
+	if pg == nil {
+		return nil, fmt.Errorf("pod group object not found for pod group %s", key)
+	}
+	return pg, nil
 }
 
 var _ fwk.PodGroupStateLister = &podGroupStateSnapshotLister{}
