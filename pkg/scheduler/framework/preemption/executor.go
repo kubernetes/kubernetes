@@ -34,7 +34,6 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
-	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
@@ -164,12 +163,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 
 // actuatePodPreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of
 // victims to be evicted.
-func (e *Executor) actuatePodPreemption(ctx context.Context, targetNode string, victims *extenderv1.Victims, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
-	candidate := &candidate{
-		victims: victims,
-		name:    targetNode,
-	}
-
+func (e *Executor) actuatePodPreemption(ctx context.Context, candidate Candidate, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
 	podPreemptor := &podExecutorPreemptor{Pod: preemptorPod}
 	if e.fts.EnableAsyncPreemption {
 		e.prepareCandidateAsync(candidate, podPreemptor, pluginName)
@@ -179,12 +173,7 @@ func (e *Executor) actuatePodPreemption(ctx context.Context, targetNode string, 
 }
 
 // actuatePodGroupPreemption actuates the preemption given preemptor pods, pod group and a list of victims to be evicted.
-func (e *Executor) actuatePodGroupPreemption(ctx context.Context, victims *extenderv1.Victims, preemptorPods []*v1.Pod, preemptor *schedulingapi.PodGroup, pluginName string) *fwk.Status {
-	candidate := &candidate{
-		victims: victims,
-		name:    "cluster",
-	}
-
+func (e *Executor) actuatePodGroupPreemption(ctx context.Context, candidate Candidate, preemptorPods []*v1.Pod, preemptor *schedulingapi.PodGroup, pluginName string) *fwk.Status {
 	podGroupPreemptor := &podGroupExecutorPreemptor{pg: preemptor, pods: preemptorPods}
 	if e.fts.EnableAsyncPreemption {
 		e.prepareCandidateAsync(candidate, podGroupPreemptor, pluginName)
@@ -201,6 +190,7 @@ func (e *Executor) actuatePodGroupPreemption(ctx context.Context, victims *exten
 //
 // See http://kep.k8s.io/4832 for how the async preemption works.
 func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreemptor, pluginName string) {
+	observeVictims(preemptor, c)
 	// Intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
 	// because this process could continue even after this scheduling cycle finishes.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -220,8 +210,6 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 		return
 	}
 
-	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
-
 	errCh := parallelize.NewResultChannel[error]()
 	preemptPod := func(index int) {
 		victim := victimPods[index]
@@ -238,8 +226,15 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 		logger := klog.FromContext(ctx)
 		startTime := time.Now()
 		result := metrics.GoroutineResultSuccess
-		defer metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
-		defer metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
+		defer func() {
+			metrics.PreemptionExecutionDuration.WithLabelValues(preemptor.Type(), result, "async").Observe(metrics.SinceInSeconds(startTime))
+		}()
+		defer func() {
+			metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
+		}()
+		defer func() {
+			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
+		}()
 		defer func() {
 			if result == metrics.GoroutineResultError {
 				// When API call isn't successful, the preemptor's Pods may get stuck in the unschedulable pod pool in the worst case.
@@ -309,7 +304,12 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 // - Reject the victim pods if they are in waitingPod map
 // - Clear the low-priority pods' nominatedNodeName status if needed
 func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, pluginName string) *fwk.Status {
-	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
+	observeVictims(preemptor, c)
+	startTime := time.Now()
+	metricsResult := metrics.GoroutineResultSuccess
+	defer func() {
+		metrics.PreemptionExecutionDuration.WithLabelValues(preemptor.Type(), metricsResult, "sync").Observe(metrics.SinceInSeconds(startTime))
+	}()
 
 	fh := e.fh
 	cs := e.fh.ClientSet()
@@ -330,6 +330,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 		}
 	}, pluginName)
 	if err := errCh.Receive(); err != nil {
+		metricsResult = metrics.GoroutineResultError
 		return fwk.AsStatus(err)
 	}
 
@@ -344,6 +345,25 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 	}
 
 	return nil
+}
+
+func observeVictims(preemptor ExecutorPreemptor, candidate Candidate) {
+	numVictims := float64(len(candidate.Victims().Pods))
+	if preemptor.Type() == "podgroup" {
+		metrics.WorkloadPreemptionVictims.Observe(numVictims)
+	} else {
+		metrics.PreemptionVictims.Observe(numVictims)
+	}
+
+	workloadDisruptions := float64(candidate.NumPodGroupDisruptions())
+	if workloadDisruptions > 0 {
+		metrics.PreemptionWorkloadDisruptions.WithLabelValues(preemptor.Type()).Observe(workloadDisruptions)
+	}
+
+	numPDBViolations := float64(candidate.Victims().NumPDBViolations)
+	if numPDBViolations > 0 {
+		metrics.PreemptionPDBViolations.WithLabelValues(preemptor.Type()).Add(numPDBViolations)
+	}
 }
 
 // IsPodRunningPreemption returns true if the pod is currently triggering preemption asynchronously.

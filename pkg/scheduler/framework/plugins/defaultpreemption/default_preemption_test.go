@@ -44,6 +44,8 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
+	componentmetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -2685,4 +2687,76 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 	if gotMsg != expectedMsg {
 		t.Errorf("Expected wrapped error message %q, got %q", expectedMsg, gotMsg)
 	}
+}
+
+type mockPodGroupEvaluator struct {
+	status *fwk.Status
+}
+
+func (m *mockPodGroupEvaluator) Preempt(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
+	return nil, m.status
+}
+
+func TestDefaultPreemption_PodGroupPostFilter_WorkloadPreemptionAttempts(t *testing.T) {
+	tests := []struct {
+		name   string
+		status *fwk.Status
+	}{
+		{
+			name:   "preemption success",
+			status: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:   "preemption unschedulable",
+			status: fwk.NewStatus(fwk.Unschedulable),
+		},
+		{
+			name:   "preemption error",
+			status: fwk.NewStatus(fwk.Error),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			testRegistry := componentmetrics.NewKubeRegistry()
+			testRegistry.MustRegister(metrics.WorkloadPreemptionAttempts)
+
+			pl := &DefaultPreemption{
+				podGroupEvaluator: &mockPodGroupEvaluator{status: tt.status},
+			}
+
+			expectedStatus := tt.status.Code().String()
+			stateBefore := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus)
+
+			pl.PodGroupPostFilter(ctx, nil, nil, nil)
+
+			stateAfter := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus)
+
+			diff := stateAfter.count - stateBefore.count
+			if diff != 1 {
+				t.Errorf("Expected %s count delta to be 1, got %d", expectedStatus, diff)
+			}
+		})
+	}
+}
+
+type workloadPreemptionAttemptsState struct {
+	count uint64
+}
+
+func captureWorkloadPreemptionAttempts(g componentmetrics.Gatherer, status string) workloadPreemptionAttemptsState {
+	state := workloadPreemptionAttemptsState{}
+	if count, err := getCounterFromGatherer(g, "scheduler_workload_preemption_attempts_total", status); err == nil {
+		state.count = count
+	}
+	return state
+}
+
+func getCounterFromGatherer(g componentmetrics.Gatherer, name string, resultLabelValue string) (uint64, error) {
+	vals, err := testutil.GetCounterValuesFromGatherer(g, name, nil, "result")
+	if err != nil {
+		return 0, err
+	}
+	return uint64(vals[resultLabelValue]), nil
 }

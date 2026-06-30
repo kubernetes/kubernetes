@@ -230,11 +230,15 @@ type Candidate interface {
 	Victims() *extenderv1.Victims
 	// Name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
 	Name() string
+	// NumPodGroupDisruptions returns the number of preemption units that affect pod groups.
+	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
+	NumPodGroupDisruptions() int
 }
 
 type candidate struct {
-	victims *extenderv1.Victims
-	name    string
+	victims                *extenderv1.Victims
+	numPodGroupDisruptions int
+	name                   string
 }
 
 // Victims returns s.victims.
@@ -245,6 +249,11 @@ func (s *candidate) Victims() *extenderv1.Victims {
 // Name returns s.name.
 func (s *candidate) Name() string {
 	return s.name
+}
+
+// NumPodGroupDisruptions returns s.numPodGroupDisruptions.
+func (s *candidate) NumPodGroupDisruptions() int {
+	return s.numPodGroupDisruptions
 }
 
 type candidateList struct {

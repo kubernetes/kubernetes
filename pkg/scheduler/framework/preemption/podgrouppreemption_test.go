@@ -29,9 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
+	componentmetrics "k8s.io/component-base/metrics"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -68,16 +71,18 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                     string
-		nodeNames                []string
-		initPods                 []*v1.Pod
-		initPodGroups            []*schedulingapi.PodGroup
-		preemptor                *podGroupPreemptor
-		pdbs                     []*policy.PodDisruptionBudget
-		blockingRules            []blockingRule
-		customMockSchedulingFunc func(ctx context.Context, domainNodes []fwk.NodeInfo) (*fwk.PodGroupAssignments, *fwk.Status)
-		expectedPods             []string
-		expectedStatus           *fwk.Status
+		name                           string
+		nodeNames                      []string
+		initPods                       []*v1.Pod
+		initPodGroups                  []*schedulingapi.PodGroup
+		preemptor                      *podGroupPreemptor
+		pdbs                           []*policy.PodDisruptionBudget
+		blockingRules                  []blockingRule
+		customMockSchedulingFunc       func(ctx context.Context, domainNodes []fwk.NodeInfo) (*fwk.PodGroupAssignments, *fwk.Status)
+		expectedPods                   []string
+		expectedStatus                 *fwk.Status
+		expectedNumPodGroupDisruptions int
+		expectedNumPDBViolations       int
 	}{
 		{
 			name:      "Mix of no-group and single-pod-groups",
@@ -123,8 +128,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("p2")},
 				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("p3")},
 			},
-			expectedPods:   []string{"p1"}, // p1 is less important than p2 because of later StartTime
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"p1"}, // p1 is less important than p2 because of later StartTime
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name:      "Shared Group: Preempt separately",
@@ -144,8 +150,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
 				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("p2")},
 			},
-			expectedPods:   []string{"p1"}, // p1 is less important than p2
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"p1"}, // p1 is less important than p2
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name:      "Complex Mixed: Shared, different, and no groups",
@@ -177,8 +184,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				{nodeName: "node4", capacity: 1, blockingVictims: sets.New("p4")},
 				{nodeName: "node5", capacity: 1, blockingVictims: sets.New("p5")},
 			},
-			expectedPods:   []string{"p1", "p2", "p3"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"p1", "p2", "p3"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 3,
 		},
 		{
 			name:      "PDB: Mixed groups",
@@ -201,8 +209,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("victim-pdb")},
 				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("victim-no-pdb")},
 			},
-			expectedPods:   []string{"victim-no-pdb"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"victim-no-pdb"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name:      "PodGroup with PreemptNever does not perform preemption",
@@ -479,8 +488,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				{nodeName: "node1", blockingVictims: sets.New("p1"), capacity: 1},
 				{nodeName: "node1", blockingVictims: sets.New("p2"), capacity: 1},
 			},
-			expectedPods:   []string{"p1"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:             []string{"p1"},
+			expectedStatus:           fwk.NewStatus(fwk.Success),
+			expectedNumPDBViolations: 1,
 		},
 		{
 			name:      "PodGroup: Preempt group as a whole",
@@ -499,8 +509,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			blockingRules: []blockingRule{
 				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
 			},
-			expectedPods:   []string{"p1", "p2"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"p1", "p2"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name:      "PodGroup: Prefer single pod over podGroup for preemption candidate",
@@ -542,8 +553,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			blockingRules: []blockingRule{
 				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("g1-1")}, // Only g1-1 is blocking
 			},
-			expectedPods:   []string{"g1-1", "g1-2"}, // Both must be preempted
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"g1-1", "g1-2"}, // Both must be preempted
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name:      "PDB: Unit violation if any member violates",
@@ -640,8 +652,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			blockingRules: []blockingRule{
 				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
 			},
-			expectedPods:   []string{"p1", "p2"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"p1", "p2"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name:      "Priority divergence: candidate victim PodGroup has higher priority than the Pods from that group",
@@ -680,8 +693,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			blockingRules: []blockingRule{
 				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
 			},
-			expectedPods:   []string{"p1", "p2"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"p1", "p2"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name:      "Priority divergence: preemptor PodGroup has lower priority than the Pod from preemptor PodGroup",
@@ -813,8 +827,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("v2")},
 				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("v3")},
 			},
-			expectedPods:   []string{"v1", "v2", "v3"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"v1", "v2", "v3"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name:      "Gang scheduling: preempt a pod group victim but do not schedule full pod group",
@@ -843,8 +858,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("v3")},
 				{nodeName: "node4", capacity: 1, blockingVictims: sets.New("v4")},
 			},
-			expectedPods:   []string{"v1", "v2"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"v1", "v2"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name:      "Basic scheduling: do not reprieve if it reduces scheduled pods below max possible",
@@ -1041,8 +1057,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("v2")},
 				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("v3")},
 			},
-			expectedPods:   []string{"v1", "v2", "v3"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"v1", "v2", "v3"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name:      "Basic scheduling: preempt a pod group victim but do not schedule full pod group",
@@ -1071,8 +1088,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("v3")},
 				{nodeName: "node4", capacity: 1, blockingVictims: sets.New("v4")},
 			},
-			expectedPods:   []string{"v1", "v2"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
+			expectedPods:                   []string{"v1", "v2"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 	}
 
@@ -1193,6 +1211,12 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			wantNames := sets.New(tt.expectedPods...)
 			if diff := cmp.Diff(wantNames, gotNames); diff != "" {
 				t.Errorf("Victims mismatch (-want +got):\n%s", diff)
+			}
+			if res.numPodGroupDisruptions != tt.expectedNumPodGroupDisruptions {
+				t.Errorf("numPodGroupDisruptions mismatch. Want %d, Got %d", tt.expectedNumPodGroupDisruptions, res.numPodGroupDisruptions)
+			}
+			if res.victims.NumPDBViolations != int64(tt.expectedNumPDBViolations) {
+				t.Errorf("NumPDBViolations mismatch. Want %d, Got %d", tt.expectedNumPDBViolations, res.victims.NumPDBViolations)
 			}
 		})
 	}
@@ -1398,5 +1422,85 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 
 	if info, ok := result.nominatedNodeNames[p1]; !ok || info.NominatedNodeName != "node1" {
 		t.Errorf("Expected p1 to be nominated for node1, got %v", info)
+	}
+}
+
+type fakeHandle struct {
+	fwk.Handle
+	sharedLister fwk.SharedLister
+}
+
+func (f *fakeHandle) SnapshotSharedLister() fwk.SharedLister {
+	return f.sharedLister
+}
+
+func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
+	nodeName := "node1"
+	preemptorPod := st.MakePod().Name("p1").UID("p1").Obj()
+	preemptor := newPodGroupPreemptor(
+		st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+		[]*v1.Pod{preemptorPod},
+	)
+
+	tests := []struct {
+		name             string
+		evaluationStatus *fwk.Status
+	}{
+		{
+			name:             "scheduling success",
+			evaluationStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:             "scheduling error",
+			evaluationStatus: fwk.NewStatus(fwk.Error, "failed to schedule"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testRegistry := componentmetrics.NewKubeRegistry()
+			testRegistry.MustRegister(metrics.PreemptionEvaluationDuration)
+
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			node := st.MakeNode().Name(nodeName).Obj()
+			victimPod := st.MakePod().Name("p2").UID("p2").Node(nodeName).Priority(lowPriority).Obj()
+
+			snapshot := internalcache.NewSnapshot([]*v1.Pod{victimPod}, []*v1.Node{node})
+			fh := &fakeHandle{sharedLister: snapshot}
+
+			pgLister := &mockPodGroupLister{podGroups: make(map[string]*schedulingapi.PodGroup)}
+
+			pl := &PodGroupEvaluator{
+				Handle:         fh,
+				podGroupLister: pgLister,
+				pdbLister:      nil,
+			}
+
+			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+				if tt.evaluationStatus.IsSuccess() {
+					return &fwk.PodGroupAssignments{
+						ProposedAssignments: []fwk.ProposedAssignment{
+							&testProposedAssignment{pod: preemptorPod, nodeName: nodeName},
+						},
+					}, tt.evaluationStatus
+				}
+				return nil, tt.evaluationStatus
+			}
+
+			expectedStatus := tt.evaluationStatus.Code().String()
+			stateBefore := captureEvaluationDurationMetric(testRegistry, "podgroup", expectedStatus)
+
+			pl.evaluate(ctx, preemptor, mockSchedulingFunc)
+
+			stateAfter := captureEvaluationDurationMetric(testRegistry, "podgroup", expectedStatus)
+
+			diff := stateAfter.count - stateBefore.count
+			if diff != 1 {
+				t.Errorf("Expected %s count delta to be 1, got %d", expectedStatus, diff)
+			}
+		})
 	}
 }
