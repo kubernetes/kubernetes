@@ -83,6 +83,9 @@ func (*podGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, o
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
 		opts = append(opts, string(features.DRAWorkloadResourceClaims))
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
+		opts = append(opts, string(features.PodGroupPreemptionPolicy))
+	}
 	return rest.DeclarativeValidationConfig{Options: opts}
 }
 
@@ -173,6 +176,7 @@ func dropDisabledPodGroupFields(podGroup, oldPodGroup *scheduling.PodGroup) {
 func dropDisabledPodGroupSpecFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
 	dropDisabledSchedulingConstraintsFields(podGroupSpec, oldPodGroupSpec)
 	dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec)
+	dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec)
 }
 
 func dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
@@ -208,10 +212,24 @@ func dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec *
 	podGroupSpec.ResourceClaims = nil
 }
 
+// dropDisabledPreemptionPolicyField removes the PreemptionPolicy field unless it is
+// already used in the old PodGroup spec.
+func dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	podGroupSpec.PreemptionPolicy = nil
+}
+
 func schedulingConstraintsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
 	return podGroupSpec != nil && podGroupSpec.SchedulingConstraints != nil
 }
 
 func draWorkloadResourceClaimsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
 	return podGroupSpec != nil && len(podGroupSpec.ResourceClaims) > 0
+}
+
+func preemptionPolicyInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.PreemptionPolicy != nil
 }

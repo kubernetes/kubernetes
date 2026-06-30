@@ -68,6 +68,58 @@ func TestGetPodGroup(t *testing.T) {
 	}
 }
 
+func TestNewPodGroupPreemptorResolvesPreemptionPolicy(t *testing.T) {
+	preemptNeverPod := st.MakePod().Name("p-never").PreemptionPolicy(v1.PreemptNever).Obj()
+	preemptLowerPriorityPod := st.MakePod().Name("p-lower").PreemptionPolicy(v1.PreemptLowerPriority).Obj()
+	noPolicyPod := st.MakePod().Name("p-nil").Obj()
+
+	tests := []struct {
+		name                           string
+		pg                             *schedulingapi.PodGroup
+		pods                           []*v1.Pod
+		enablePodGroupPreemptionPolicy bool
+		wantPolicy                     schedulingapi.PreemptionPolicy
+	}{
+		{
+			name:                           "PreemptionPolicy PreemptNever is resolved from PodGroup, ignoring policy in pod, with PodGroupPreemptionPolicy enabled",
+			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingapi.PreemptNever).Obj(),
+			pods:                           []*v1.Pod{preemptLowerPriorityPod},
+			enablePodGroupPreemptionPolicy: true,
+			wantPolicy:                     schedulingapi.PreemptNever,
+		},
+		{
+			name:                           "PreemptionPolicy PreemptLowerPriority is resolved from PodGroup, ignoring different policies in pods, with PodGroupPreemptionPolicy enabled",
+			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingapi.PreemptLowerPriority).Obj(),
+			pods:                           []*v1.Pod{preemptLowerPriorityPod, noPolicyPod},
+			enablePodGroupPreemptionPolicy: true,
+			wantPolicy:                     schedulingapi.PreemptLowerPriority,
+		},
+		{
+			name:                           "PreemptionPolicy is resolved from pods with PodGroupPreemptionPolicy disabled",
+			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingapi.PreemptNever).Obj(),
+			pods:                           []*v1.Pod{preemptLowerPriorityPod},
+			enablePodGroupPreemptionPolicy: false,
+			wantPolicy:                     schedulingapi.PreemptLowerPriority,
+		},
+		{
+			name:                           "PreemptionPolicy is resolved from pods when multiple pods have different policies, with PodGroupPreemptionPolicy disabled",
+			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingapi.PreemptLowerPriority).Obj(),
+			pods:                           []*v1.Pod{preemptNeverPod, preemptLowerPriorityPod, noPolicyPod},
+			enablePodGroupPreemptionPolicy: false,
+			wantPolicy:                     schedulingapi.PreemptNever,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			preemptor := newPodGroupPreemptor(tt.pg, tt.pods, tt.enablePodGroupPreemptionPolicy)
+			if preemptor.preemptionPolicy != tt.wantPolicy {
+				t.Errorf("expected preemption policy %q, got %q", tt.wantPolicy, preemptor.preemptionPolicy)
+			}
+		})
+	}
+}
+
 func TestIsDisruptionModeAll(t *testing.T) {
 	tests := []struct {
 		name        string

@@ -115,7 +115,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 
 	if pl.fts.EnableGenericWorkload {
 		pl.pgLister = fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister()
-		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor)
+		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor, pl.fts.EnablePodGroupPreemptionPolicy)
 	}
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim pod

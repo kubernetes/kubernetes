@@ -37,22 +37,33 @@ type podGroupPreemptor struct {
 	priority         int32
 	pods             []*v1.Pod
 	podGroup         *schedulingapi.PodGroup
-	preemptionPolicy v1.PreemptionPolicy
+	preemptionPolicy schedulingapi.PreemptionPolicy
 }
 
-func newPodGroupPreemptor(pg *schedulingapi.PodGroup, pods []*v1.Pod) *podGroupPreemptor {
-	preemptionPolicy := v1.PreemptLowerPriority
-	for _, pod := range pods {
-		if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
-			preemptionPolicy = *p
-		}
-	}
+func newPodGroupPreemptor(pg *schedulingapi.PodGroup, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) *podGroupPreemptor {
 	return &podGroupPreemptor{
 		priority:         util.PodGroupPriority(pg),
 		pods:             pods,
 		podGroup:         pg,
-		preemptionPolicy: preemptionPolicy,
+		preemptionPolicy: resolvePreemptionPolicy(pg, pods, enablePodGroupPreemptionPolicy),
 	}
+}
+
+func resolvePreemptionPolicy(pg *schedulingapi.PodGroup, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) schedulingapi.PreemptionPolicy {
+	if enablePodGroupPreemptionPolicy {
+		// If the PodGroup was created with PodGroupPreemptionPolicy feature disabled, the PreemptionPolicy field will be nil.
+		// In this case the default policy value should be returned.
+		if pg.Spec.PreemptionPolicy != nil {
+			return *pg.Spec.PreemptionPolicy
+		}
+	} else {
+		for _, pod := range pods {
+			if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
+				return schedulingapi.PreemptNever
+			}
+		}
+	}
+	return schedulingapi.PreemptLowerPriority
 }
 
 // Priority returns the scheduling priority of the preemptor.
@@ -72,7 +83,7 @@ func (p *podGroupPreemptor) PodGroup() *schedulingapi.PodGroup {
 }
 
 // PreemptionPolicy returns a preemption policy of this preemptor.
-func (p *podGroupPreemptor) PreemptionPolicy() v1.PreemptionPolicy {
+func (p *podGroupPreemptor) PreemptionPolicy() schedulingapi.PreemptionPolicy {
 	return p.preemptionPolicy
 }
 

@@ -481,6 +481,7 @@ func autoConvert_v1alpha3_PodGroupSpec_To_scheduling_PodGroupSpec(in *scheduling
 	out.DisruptionMode = (*scheduling.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
 	out.PriorityClassName = in.PriorityClassName
 	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
+	out.PreemptionPolicy = (*scheduling.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	return nil
 }
 
@@ -499,6 +500,7 @@ func autoConvert_scheduling_PodGroupSpec_To_v1alpha3_PodGroupSpec(in *scheduling
 	out.DisruptionMode = (*schedulingv1alpha3.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
 	out.PriorityClassName = in.PriorityClassName
 	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
+	out.PreemptionPolicy = (*schedulingv1alpha3.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	return nil
 }
 

@@ -316,6 +316,20 @@ message PodGroupSpec {
   // +k8s:immutable
   // +k8s:maximum=1000000000 # HighestUserDefinablePriority
   optional int32 priority = 7;
+
+  // PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+  // One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.
+  // When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
+  // and defaults to PreemptLowerPriority if value is unset in PriorityClass.
+  // This field is immutable.
+  // This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+  //
+  // +featureGate=PodGroupPreemptionPolicy
+  // +optional
+  // +k8s:immutable
+  // +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
+  // +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
+  optional string preemptionPolicy = 8;
 }
 
 // PodGroupStatus represents information about the status of a pod group.
