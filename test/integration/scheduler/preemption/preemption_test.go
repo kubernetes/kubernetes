@@ -405,16 +405,18 @@ func TestPreemption(t *testing.T) {
 	}
 	nodeObject := st.MakeNode().Name("node1").Capacity(nodeRes).Label("node", "node1").Obj()
 
-	for _, asyncPreemptionEnabled := range []bool{true, false} {
-		for _, asyncAPICallsEnabled := range []bool{true, false} {
-			for _, clearingNominatedNodeNameAfterBinding := range []bool{true, false} {
-				for _, test := range tests {
-					t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, Async API calls enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, asyncAPICallsEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
-						featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-							features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
-							features.SchedulerAsyncAPICalls:                asyncAPICallsEnabled,
-							features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
-						})
+	for _, fastPathEnabled := range []bool{true, false} {
+		for _, asyncPreemptionEnabled := range []bool{true, false} {
+			for _, asyncAPICallsEnabled := range []bool{true, false} {
+				for _, clearingNominatedNodeNameAfterBinding := range []bool{true, false} {
+					for _, test := range tests {
+						t.Run(fmt.Sprintf("%s (fastPathEnabled: %v, Async preemption enabled: %v, Async API calls enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, fastPathEnabled, asyncPreemptionEnabled, asyncAPICallsEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
+							featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+								features.InterPodAffinityHostnameFastPath:      fastPathEnabled,
+								features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+								features.SchedulerAsyncAPICalls:                asyncAPICallsEnabled,
+								features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
+							})
 
 						testCtx := testutils.InitTestSchedulerWithOptions(t,
 							testutils.InitTestAPIServer(t, "preemption", nil),
@@ -478,6 +480,7 @@ func TestPreemption(t *testing.T) {
 						pods = append(pods, preemptor)
 						testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
 					})
+					}
 				}
 			}
 		}
@@ -1275,10 +1278,14 @@ func TestAsyncPreemption(t *testing.T) {
 
 	// All test cases have the same node.
 	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
-	for _, asyncAPICallsEnabled := range []bool{true} {
-		for _, test := range tests {
-			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", test.name, asyncAPICallsEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
+	for _, fastPathEnabled := range []bool{true, false} {
+		for _, asyncAPICallsEnabled := range []bool{true} {
+			for _, test := range tests {
+				t.Run(fmt.Sprintf("%s (fastPathEnabled: %v, Async API calls enabled: %v)", test.name, fastPathEnabled, asyncAPICallsEnabled), func(t *testing.T) {
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+						features.InterPodAffinityHostnameFastPath: fastPathEnabled,
+						features.SchedulerAsyncAPICalls:           asyncAPICallsEnabled,
+					})
 
 				// We need to use a custom preemption plugin to test async preemption behavior
 				delayedPreemptionPluginName := "delay-preemption"
@@ -1562,6 +1569,7 @@ func TestAsyncPreemption(t *testing.T) {
 				}
 			})
 		}
+	}
 	}
 }
 

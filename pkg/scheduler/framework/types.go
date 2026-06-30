@@ -382,7 +382,7 @@ func (n *NodeInfo) AddPodInfo(podInfo fwk.PodInfo) {
 	if podWithRequiredAntiAffinity(podInfo.GetPod()) {
 		n.PodsWithRequiredAntiAffinity = append(n.PodsWithRequiredAntiAffinity, podInfo)
 	}
-	if podWithRequiredNonHostScopedAntiAffinity(podInfo.GetPod()) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InterPodAffinityHostnameFastPath) && podWithRequiredNonHostScopedAntiAffinity(podInfo.GetPod()) {
 		n.PodsWithRequiredNonHostScopedAntiAffinity = append(n.PodsWithRequiredNonHostScopedAntiAffinity, podInfo)
 	}
 	n.update(podInfo, 1)
@@ -456,7 +456,7 @@ func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 	if podWithRequiredAntiAffinity(pod) {
 		n.PodsWithRequiredAntiAffinity, _ = removeFromSlice(logger, n.PodsWithRequiredAntiAffinity, k)
 	}
-	if podWithRequiredNonHostScopedAntiAffinity(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InterPodAffinityHostnameFastPath) && podWithRequiredNonHostScopedAntiAffinity(pod) {
 		n.PodsWithRequiredNonHostScopedAntiAffinity, _ = removeFromSlice(logger, n.PodsWithRequiredNonHostScopedAntiAffinity, k)
 	}
 

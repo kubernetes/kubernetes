@@ -733,8 +733,11 @@ func TestPodAffinityScoring(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, fastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fastPathEnabled=%v", fastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
 			if !tt.enableMatchLabelKeysInAffinity {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
@@ -769,6 +772,8 @@ func TestPodAffinityScoring(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error while trying to wait for a pod to be scheduled: %v", err)
 			}
+		})
+	}
 		})
 	}
 }

@@ -19,6 +19,7 @@ package interpodaffinity
 import (
 	"context"
 	"testing"
+	"fmt"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -28,6 +29,9 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -69,6 +73,10 @@ func createPodWithAffinityTerms(namespace, nodeName string, labels map[string]st
 }
 
 func TestRequiredAffinitySingleNode(t *testing.T) {
+	for _, fastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fastPathEnabled=%v", fastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
+
 	podLabel := map[string]string{"service": "securityscan"}
 	pod := st.MakePod().Labels(podLabel).Node("node1").Obj()
 
@@ -573,9 +581,16 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			}
 		})
 	}
+
+		})
+	}
 }
 
 func TestRequiredAffinityMultipleNodes(t *testing.T) {
+	for _, fastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fastPathEnabled=%v", fastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
+
 	podLabelA := map[string]string{
 		"foo": "bar",
 	}
@@ -960,6 +975,42 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			},
 			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satisfied on the same pod",
 		},
+		{
+			pod: st.MakePod().Namespace(defaultNamespace).PodAffinityExists("foo", v1.LabelHostname, st.PodAffinityWithRequiredReq).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Labels(map[string]string{"foo": ""}).Node("nodeA").Obj(),
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{v1.LabelHostname: "nodeB"}}},
+			},
+			wantFilterStatuses: []*fwk.Status{
+				nil,
+				fwk.NewStatus(
+					fwk.UnschedulableAndUnresolvable,
+					ErrReasonAffinityRulesNotMatch,
+				),
+			},
+			name: "Test incoming pod's host-scoped affinity (fast path)",
+		},
+		{
+			pod: st.MakePod().Namespace(defaultNamespace).PodAntiAffinityExists("foo", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Labels(map[string]string{"foo": ""}).Node("nodeA").Obj(),
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{v1.LabelHostname: "nodeB"}}},
+			},
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
+					ErrReasonAntiAffinityRulesNotMatch,
+				),
+				nil,
+			},
+			name: "Test incoming pod's host-scoped anti-affinity (fast path)",
+		},
 	}
 
 	for indexTest, test := range tests {
@@ -993,6 +1044,9 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			}
 		})
 	}
+
+		})
+	}
 }
 
 func TestPreFilterDisabled(t *testing.T) {
@@ -1013,6 +1067,10 @@ func TestPreFilterDisabled(t *testing.T) {
 }
 
 func TestPreFilterStateAddRemovePod(t *testing.T) {
+	for _, fastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fastPathEnabled=%v", fastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
+
 	var label1 = map[string]string{
 		"region": "r1",
 		"zone":   "z11",
@@ -1308,6 +1366,9 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 			}
 		})
 	}
+
+		})
+	}
 }
 
 func TestPreFilterStateClone(t *testing.T) {
@@ -1338,6 +1399,10 @@ func TestPreFilterStateClone(t *testing.T) {
 // TestGetTPMapMatchingIncomingAffinityAntiAffinity tests against method getTPMapMatchingIncomingAffinityAntiAffinity
 // on Anti Affinity cases
 func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
+	for _, fastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fastPathEnabled=%v", fastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
+
 	newPod := func(labels ...string) *v1.Pod {
 		pod := st.MakePod().Name("normal").Node("nodeA")
 		for _, l := range labels {
@@ -1348,7 +1413,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	normalPodA := newPod("aaa")
 	normalPodB := newPod("bbb")
 	normalPodAB := newPod("aaa", "bbb")
-	nodeA := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"hostname": "nodeA"}}}
+	nodeA := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}}
 
 	tests := []struct {
 		name                    string
@@ -1377,8 +1442,8 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			name:         "no pod has label that violates incoming pod's affinity and anti-affinity",
 			existingPods: []*v1.Pod{normalPodB},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("aaa-anti").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("aaa-anti").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap:     make(topologyToMatchedTermCount),
 			wantAntiAffinityPodsMap: make(topologyToMatchedTermCount),
 		},
@@ -1386,65 +1451,65 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			name:         "existing pod matches incoming pod's affinity and anti-affinity - single term case",
 			existingPods: []*v1.Pod{normalPodA},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 			wantAntiAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 		},
 		{
 			name:         "existing pod matches incoming pod's affinity and anti-affinity - multiple terms case",
 			existingPods: []*v1.Pod{normalPodAB},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAffinityExists("bbb", "hostname", st.PodAffinityWithRequiredReq).PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAffinityExists("bbb", v1.LabelHostname, st.PodAffinityWithRequiredReq).PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 2, // 2 one for each term.
+				{key: v1.LabelHostname, value: "nodeA"}: 2, // 2 one for each term.
 			},
 			wantAntiAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 		},
 		{
 			name:         "existing pod not match incoming pod's affinity but matches anti-affinity",
 			existingPods: []*v1.Pod{normalPodA},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAffinityExists("bbb", "hostname", st.PodAffinityWithRequiredReq).
-				PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).
-				PodAntiAffinityExists("bbb", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAffinityExists("bbb", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).
+				PodAntiAffinityExists("bbb", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap: make(topologyToMatchedTermCount),
 			wantAntiAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 		},
 		{
 			name:         "incoming pod's anti-affinity has more than one term - existing pod violates partial term - case 1",
 			existingPods: []*v1.Pod{normalPodAB},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("anaffi-antiaffiti").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAffinityExists("ccc", "hostname", st.PodAffinityWithRequiredReq).
-				PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).
-				PodAntiAffinityExists("ccc", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("anaffi-antiaffiti").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAffinityExists("ccc", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).
+				PodAntiAffinityExists("ccc", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap: make(topologyToMatchedTermCount),
 			wantAntiAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 		},
 		{
 			name:         "incoming pod's anti-affinity has more than one term - existing pod violates partial term - case 2",
 			existingPods: []*v1.Pod{normalPodB},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAffinityExists("bbb", "hostname", st.PodAffinityWithRequiredReq).
-				PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).
-				PodAntiAffinityExists("bbb", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAffinityExists("bbb", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).
+				PodAntiAffinityExists("bbb", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap: make(topologyToMatchedTermCount),
 			wantAntiAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 		},
 	}
@@ -1464,6 +1529,9 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			if diff := cmp.Diff(tt.wantAntiAffinityPodsMap, gotAntiAffinityPodsMap); diff != "" {
 				t.Errorf("Unexpected getTPMapMatchingIncomingAffinityAntiAffinity() (-want,+got):\n%s", diff)
 			}
+		})
+	}
+
 		})
 	}
 }

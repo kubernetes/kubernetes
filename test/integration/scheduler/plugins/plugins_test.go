@@ -55,6 +55,9 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // imported from testutils
@@ -2865,9 +2868,11 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			expectedScheduled := tt.expectedScheduled
+	for _, fastPathEnabled := range []bool{true, false} {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s (fastPathEnabled: %v)", tt.name, fastPathEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
+				expectedScheduled := tt.expectedScheduled
 
 			testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
 			// use new plugin every time to clear counts
@@ -3000,5 +3005,6 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 				return
 			}
 		})
+		}
 	}
 }

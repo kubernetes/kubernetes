@@ -778,7 +778,7 @@ func TestInterPodAffinity(t *testing.T) {
 			fits: true,
 		},
 		{
-			name: "nodes[0] and nodes[1] have same topologyKey and label value. nodes[0] has an existing pod that matches the inter pod affinity rule. The new pod can not be scheduled onto either of the two nodes.",
+			name: "same topology label, existing pod matches affinity, fits=false",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "fake-name2"},
 				Spec: v1.PodSpec{
@@ -1073,18 +1073,120 @@ func TestInterPodAffinity(t *testing.T) {
 			enableMatchLabelKeysInAffinity: true,
 			fits:                           false,
 		},
+		{
+			name: "validates that InterPodAffinity is respected with hostname topology key (fast path)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "fakename",
+					Labels: podLabel2,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"securityscan"},
+											},
+										},
+									},
+									TopologyKey: "kubernetes.io/hostname",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "fakename2",
+						Labels: podLabel,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+						NodeName:   "testnode-0",
+					},
+				},
+			},
+			fits: true,
+		},
+		{
+			name: "validates that InterPodAntiAffinity is respected with hostname topology key (fast path)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "fakename",
+					Labels: podLabel2,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"securityscan"},
+											},
+										},
+									},
+									TopologyKey: "kubernetes.io/hostname",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "fakename2",
+						Labels: podLabel,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+						NodeName:   "testnode-0",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "fakename3",
+						Labels: podLabel,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+						NodeName:   "anothernode-0",
+					},
+				},
+			},
+			fits: false,
+		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if !test.enableMatchLabelKeysInAffinity {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
-			}
-			testCtx := initTest(t, "")
+	for _, fastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fp=%t", fastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
+			for _, v := range []string{"1.32", "1.37"} {
+				t.Run(fmt.Sprintf("v=%s", v), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(v))
+					for _, test := range tests {
+						t.Run(test.name, func(t *testing.T) {
+					if !test.enableMatchLabelKeysInAffinity {
+						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
+					}
+					testCtx := initTest(t, "")
 			cs := testCtx.ClientSet
 
-			if _, err := createNode(cs, st.MakeNode().Name("testnode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n1").Capacity(
+			if _, err := createNode(cs, st.MakeNode().Name("testnode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n1").Label(v1.LabelHostname, "testnode-0").Capacity(
 				map[v1.ResourceName]string{
 					v1.ResourceMemory: "1G",
 				},
@@ -1093,7 +1195,7 @@ func TestInterPodAffinity(t *testing.T) {
 			}
 
 			// another test node has the same "region" and "zone" labels as testnode, but has a different "node" label.
-			if _, err := createNode(cs, st.MakeNode().Name("anothernode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n2").Capacity(
+			if _, err := createNode(cs, st.MakeNode().Name("anothernode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n2").Label(v1.LabelHostname, "anothernode-0").Capacity(
 				map[v1.ResourceName]string{
 					v1.ResourceMemory: "1G",
 				},
@@ -1165,6 +1267,10 @@ func TestInterPodAffinity(t *testing.T) {
 					t.Errorf("Error while waiting for pod to get deleted: %v", err)
 				}
 			}
+		})
+	}
+		})
+	}
 		})
 	}
 }
@@ -1279,9 +1385,15 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			testCtx := initTest(t, "")
+	for _, fastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fp=%t", fastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
+			for _, v := range []string{"1.32", "1.37"} {
+				t.Run(fmt.Sprintf("v=%s", v), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(v))
+					for _, test := range tests {
+						t.Run(test.name, func(t *testing.T) {
+					testCtx := initTest(t, "")
 
 			// Add a few nodes with labels
 			nodes, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Label("region", "r1").Label("zone", "z11"), 2)
@@ -1349,6 +1461,10 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error while waiting for pod to get deleted: %v", err)
 			}
+		})
+	}
+		})
+	}
 		})
 	}
 }

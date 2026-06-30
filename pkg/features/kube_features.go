@@ -474,6 +474,11 @@ const (
 	// Allow in-place pod resize of running non-sidecar init containers.
 	InPlacePodVerticalScalingInitContainers featuregate.Feature = "InPlacePodVerticalScalingInitContainers"
 
+	// owner: @tetianakh
+	//
+	// Enables the fast path for inter-pod affinity calculations when the topology key is kubernetes.io/hostname.
+	InterPodAffinityHostnameFastPath featuregate.Feature = "InterPodAffinityHostnameFastPath"
+
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/4368
 	//
@@ -1495,6 +1500,12 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	InterPodAffinityHostnameFastPath: {
+		// 1.31 history added to allow toggling this gate in integration tests that emulate version 1.32.
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	JobManagedBy: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
@@ -2377,6 +2388,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling},
 
 	InPlacePodVerticalScalingInitContainers: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
+
+	InterPodAffinityHostnameFastPath: {},
 
 	JobManagedBy: {},
 

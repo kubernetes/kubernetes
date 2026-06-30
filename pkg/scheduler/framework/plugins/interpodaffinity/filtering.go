@@ -25,7 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 const (
@@ -105,6 +107,15 @@ func (s *preFilterState) Clone() fwk.StateData {
 // updateWithPod updates the preFilterState counters with the (anti)affinity matches for the given podInfo.
 func (s *preFilterState) updateWithPod(pInfo fwk.PodInfo, node *v1.Node, multiplier int64) {
 	if s == nil {
+		return
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InterPodAffinityHostnameFastPath) {
+		s.existingAntiAffinityCounts.updateWithAntiAffinityTerms(pInfo.GetRequiredAntiAffinityTerms(), s.podInfo.GetPod(), s.namespaceLabels, node, multiplier)
+		s.affinityCounts.updateWithAffinityTerms(s.podInfo.GetRequiredAffinityTerms(), pInfo.GetPod(), node, multiplier)
+		// The incoming pod's terms have the namespaceSelector merged into the namespaces, and so
+		// here we don't lookup the updated pod's namespace labels, hence passing nil for nsLabels.
+		s.antiAffinityCounts.updateWithAntiAffinityTerms(s.podInfo.GetRequiredAntiAffinityTerms(), pInfo.GetPod(), nil, node, multiplier)
 		return
 	}
 
@@ -365,6 +376,43 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 // hostname-scoped terms (which allow fast-path local checks) from wider topology checks.
 // Host-scoped terms have a TopologyKey of v1.LabelHostname.
 func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, allNodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InterPodAffinityHostnameFastPath) {
+		var nodesWithRequiredAntiAffinityPods []fwk.NodeInfo
+		var err error
+		if nodesWithRequiredAntiAffinityPods, err = pl.sharedLister.NodeInfos().HavePodsWithRequiredAntiAffinityList(); err != nil {
+			return nil, fwk.AsStatus(fmt.Errorf("failed to list NodeInfos with pods with affinity: %w", err))
+		}
+
+		s := &preFilterState{}
+
+		if s.podInfo, err = framework.NewPodInfo(pod); err != nil {
+			return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("parsing pod: %+v", err))
+		}
+
+		for i := range s.podInfo.GetRequiredAffinityTerms() {
+			if err := pl.mergeAffinityTermNamespacesIfNotEmpty(s.podInfo.GetRequiredAffinityTerms()[i]); err != nil {
+				return nil, fwk.AsStatus(err)
+			}
+		}
+		for i := range s.podInfo.GetRequiredAntiAffinityTerms() {
+			if err := pl.mergeAffinityTermNamespacesIfNotEmpty(s.podInfo.GetRequiredAntiAffinityTerms()[i]); err != nil {
+				return nil, fwk.AsStatus(err)
+			}
+		}
+		logger := klog.FromContext(ctx)
+		s.namespaceLabels = GetNamespaceLabelsSnapshot(logger, pod.Namespace, pl.nsLister)
+
+		s.existingAntiAffinityCounts = pl.getExistingAntiAffinityCountsLegacy(ctx, pod, s.namespaceLabels, nodesWithRequiredAntiAffinityPods)
+		s.affinityCounts, s.antiAffinityCounts = pl.getIncomingAffinityAntiAffinityCountsLegacy(ctx, s.podInfo, allNodes)
+
+		if len(s.existingAntiAffinityCounts) == 0 && len(s.podInfo.GetRequiredAffinityTerms()) == 0 && len(s.podInfo.GetRequiredAntiAffinityTerms()) == 0 {
+			return nil, fwk.NewStatus(fwk.Skip)
+		}
+
+		cycleState.Write(preFilterStateKey, s)
+		return nil, nil
+	}
+
 	var nodesWithNonHostScopedAntiAffinityPods []fwk.NodeInfo
 	var nodesWithAnyRequiredAntiAffinityPods []fwk.NodeInfo
 	var err error
@@ -593,6 +641,116 @@ func satisfiesSelfAffinityCheck(state *preFilterState, nodeInfo fwk.NodeInfo) bo
 	return false
 }
 
+func (pl *InterPodAffinity) getExistingAntiAffinityCountsLegacy(ctx context.Context, pod *v1.Pod, nsLabels labels.Set, nodes []fwk.NodeInfo) topologyToMatchedTermCount {
+	antiAffinityCountsList := make([]topologyToMatchedTermCountList, len(nodes))
+	index := int32(-1)
+	processNode := func(i int) {
+		nodeInfo := nodes[i]
+		node := nodeInfo.Node()
+
+		antiAffinityCounts := make(topologyToMatchedTermCountList, 0)
+		for _, existingPod := range nodeInfo.GetPodsWithRequiredAntiAffinity() {
+			antiAffinityCounts.appendWithAntiAffinityTerms(existingPod.GetRequiredAntiAffinityTerms(), pod, nsLabels, node, 1)
+		}
+		if len(antiAffinityCounts) != 0 {
+			antiAffinityCountsList[atomic.AddInt32(&index, 1)] = antiAffinityCounts
+		}
+	}
+	pl.parallelizer.Until(ctx, len(nodes), processNode, pl.Name())
+
+	result := make(topologyToMatchedTermCount)
+	for i := 0; i <= int(index); i++ {
+		result.mergeWithList(antiAffinityCountsList[i])
+	}
+
+	return result
+}
+
+func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCountsLegacy(ctx context.Context, podInfo fwk.PodInfo, allNodes []fwk.NodeInfo) (topologyToMatchedTermCount, topologyToMatchedTermCount) {
+	affinityCounts := make(topologyToMatchedTermCount)
+	antiAffinityCounts := make(topologyToMatchedTermCount)
+	if len(podInfo.GetRequiredAffinityTerms()) == 0 && len(podInfo.GetRequiredAntiAffinityTerms()) == 0 {
+		return affinityCounts, antiAffinityCounts
+	}
+
+	affinityCountsList := make([]topologyToMatchedTermCountList, len(allNodes))
+	antiAffinityCountsList := make([]topologyToMatchedTermCountList, len(allNodes))
+	index := int32(-1)
+	processNode := func(i int) {
+		nodeInfo := allNodes[i]
+		node := nodeInfo.Node()
+
+		affinity := make(topologyToMatchedTermCountList, 0)
+		antiAffinity := make(topologyToMatchedTermCountList, 0)
+		for _, existingPod := range nodeInfo.GetPods() {
+			affinity.appendWithAffinityTerms(podInfo.GetRequiredAffinityTerms(), existingPod.GetPod(), node, 1)
+			antiAffinity.appendWithAntiAffinityTerms(podInfo.GetRequiredAntiAffinityTerms(), existingPod.GetPod(), nil, node, 1)
+		}
+
+		if len(affinity) > 0 || len(antiAffinity) > 0 {
+			k := atomic.AddInt32(&index, 1)
+			affinityCountsList[k] = affinity
+			antiAffinityCountsList[k] = antiAffinity
+		}
+	}
+	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
+
+	for i := 0; i <= int(index); i++ {
+		affinityCounts.mergeWithList(affinityCountsList[i])
+		antiAffinityCounts.mergeWithList(antiAffinityCountsList[i])
+	}
+
+	return affinityCounts, antiAffinityCounts
+}
+
+func satisfyExistingPodsAntiAffinityLegacy(state *preFilterState, nodeInfo fwk.NodeInfo) bool {
+	if len(state.existingAntiAffinityCounts) > 0 {
+		for topologyKey, topologyValue := range nodeInfo.Node().Labels {
+			tp := topologyPair{key: topologyKey, value: topologyValue}
+			if state.existingAntiAffinityCounts[tp] > 0 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func satisfyPodAntiAffinityLegacy(state *preFilterState, nodeInfo fwk.NodeInfo) bool {
+	if len(state.antiAffinityCounts) > 0 {
+		for _, term := range state.podInfo.GetRequiredAntiAffinityTerms() {
+			if topologyValue, ok := nodeInfo.Node().Labels[term.TopologyKey]; ok {
+				tp := topologyPair{key: term.TopologyKey, value: topologyValue}
+				if state.antiAffinityCounts[tp] > 0 {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+func satisfyPodAffinityLegacy(state *preFilterState, nodeInfo fwk.NodeInfo) bool {
+	podsExist := true
+	for _, term := range state.podInfo.GetRequiredAffinityTerms() {
+		if topologyValue, ok := nodeInfo.Node().Labels[term.TopologyKey]; ok {
+			tp := topologyPair{key: term.TopologyKey, value: topologyValue}
+			if state.affinityCounts[tp] <= 0 {
+				podsExist = false
+			}
+		} else {
+			return false
+		}
+	}
+
+	if !podsExist {
+		if len(state.affinityCounts) == 0 && podMatchesAllAffinityTerms(state.podInfo.GetRequiredAffinityTerms(), state.podInfo.GetPod()) {
+			return true
+		}
+		return false
+	}
+	return true
+}
+
 // Filter invoked at the filter extension point.
 // It checks if a pod can be scheduled on the specified node with pod affinity/anti-affinity configuration.
 func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
@@ -600,6 +758,22 @@ func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState fwk.CycleStat
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InterPodAffinityHostnameFastPath) {
+		if !satisfyPodAffinityLegacy(state, nodeInfo) {
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonAffinityRulesNotMatch)
+		}
+	
+		if !satisfyPodAntiAffinityLegacy(state, nodeInfo) {
+			return fwk.NewStatus(fwk.Unschedulable, ErrReasonAntiAffinityRulesNotMatch)
+		}
+	
+		if !satisfyExistingPodsAntiAffinityLegacy(state, nodeInfo) {
+			return fwk.NewStatus(fwk.Unschedulable, ErrReasonExistingAntiAffinityRulesNotMatch)
+		}
+	
+		return nil
 	}
 
 	if len(state.hostScopedAffinityTerms) > 0 {
