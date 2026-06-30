@@ -1670,6 +1670,96 @@ func (_c *MockRuntime_SyncPod_Call) RunAndReturn(run func(ctx context.Context, p
 	return _c
 }
 
+// SyncTerminatingPod provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) SyncTerminatingPod(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret, backOff *flowcontrol.Backoff, deadline time.Time) (bool, error) {
+	ret := _mock.Called(ctx, pod, podStatus, pullSecrets, backOff, deadline)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SyncTerminatingPod")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v10.Pod, *container.PodStatus, []v10.Secret, *flowcontrol.Backoff, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, pod, podStatus, pullSecrets, backOff, deadline)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v10.Pod, *container.PodStatus, []v10.Secret, *flowcontrol.Backoff, time.Time) bool); ok {
+		r0 = returnFunc(ctx, pod, podStatus, pullSecrets, backOff, deadline)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *v10.Pod, *container.PodStatus, []v10.Secret, *flowcontrol.Backoff, time.Time) error); ok {
+		r1 = returnFunc(ctx, pod, podStatus, pullSecrets, backOff, deadline)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRuntime_SyncTerminatingPod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SyncTerminatingPod'
+type MockRuntime_SyncTerminatingPod_Call struct {
+	*mock.Call
+}
+
+// SyncTerminatingPod is a helper method to define mock.On call
+//   - ctx context.Context
+//   - pod *v10.Pod
+//   - podStatus *container.PodStatus
+//   - pullSecrets []v10.Secret
+//   - backOff *flowcontrol.Backoff
+//   - deadline time.Time
+func (_e *MockRuntime_Expecter) SyncTerminatingPod(ctx interface{}, pod interface{}, podStatus interface{}, pullSecrets interface{}, backOff interface{}, deadline interface{}) *MockRuntime_SyncTerminatingPod_Call {
+	return &MockRuntime_SyncTerminatingPod_Call{Call: _e.mock.On("SyncTerminatingPod", ctx, pod, podStatus, pullSecrets, backOff, deadline)}
+}
+
+func (_c *MockRuntime_SyncTerminatingPod_Call) Run(run func(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret, backOff *flowcontrol.Backoff, deadline time.Time)) *MockRuntime_SyncTerminatingPod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v10.Pod
+		if args[1] != nil {
+			arg1 = args[1].(*v10.Pod)
+		}
+		var arg2 *container.PodStatus
+		if args[2] != nil {
+			arg2 = args[2].(*container.PodStatus)
+		}
+		var arg3 []v10.Secret
+		if args[3] != nil {
+			arg3 = args[3].([]v10.Secret)
+		}
+		var arg4 *flowcontrol.Backoff
+		if args[4] != nil {
+			arg4 = args[4].(*flowcontrol.Backoff)
+		}
+		var arg5 time.Time
+		if args[5] != nil {
+			arg5 = args[5].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_SyncTerminatingPod_Call) Return(b bool, err error) *MockRuntime_SyncTerminatingPod_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockRuntime_SyncTerminatingPod_Call) RunAndReturn(run func(ctx context.Context, pod *v10.Pod, podStatus *container.PodStatus, pullSecrets []v10.Secret, backOff *flowcontrol.Backoff, deadline time.Time) (bool, error)) *MockRuntime_SyncTerminatingPod_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Type provides a mock function for the type MockRuntime
 func (_mock *MockRuntime) Type() string {
 	ret := _mock.Called()
