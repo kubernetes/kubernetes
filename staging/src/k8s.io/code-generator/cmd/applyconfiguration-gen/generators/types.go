@@ -20,6 +20,7 @@ import "k8s.io/gengo/v2/types"
 
 var (
 	fmtSprintf             = types.Ref("fmt", "Sprintf")
+	jsonUnmarshal          = types.Ref("encoding/json", "Unmarshal")
 	syncOnce               = types.Ref("sync", "Once")
 	applyConfiguration     = types.Ref("k8s.io/apimachinery/pkg/runtime", "ApplyConfiguration")
 	groupVersionKind       = types.Ref("k8s.io/apimachinery/pkg/runtime/schema", "GroupVersionKind")
@@ -31,7 +32,6 @@ var (
 	typeConverter          = types.Ref("k8s.io/apimachinery/pkg/util/managedfields", "TypeConverter")
 	newSchemeTypeConverter = types.Ref("k8s.io/apimachinery/pkg/util/managedfields", "NewSchemeTypeConverter")
 	runtimeScheme          = types.Ref("k8s.io/apimachinery/pkg/runtime", "Scheme")
-	smdNewParser           = types.Ref("sigs.k8s.io/structured-merge-diff/v6/typed", "NewParser")
 	smdParser              = types.Ref("sigs.k8s.io/structured-merge-diff/v6/typed", "Parser")
-	yamlObject             = types.Ref("sigs.k8s.io/structured-merge-diff/v6/typed", "YAMLObject")
+	smdSchema              = types.Ref("sigs.k8s.io/structured-merge-diff/v6/schema", "Schema")
 )
