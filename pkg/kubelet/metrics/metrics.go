@@ -1226,7 +1226,7 @@ var (
 			Help:           "Number of pending resizes for pods.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"reason"},
+		[]string{"reason", "priority_bucket"},
 	)
 
 	// PodInfeasibleResizes tracks the number of infeasible resizes for pods.
