@@ -78,17 +78,10 @@ func requestsContainNonExistCapacity(deviceRequestCapacity *resourceapi.Capacity
 // calculateConsumedCapacity returns valid capacity to be consumed regarding the requested capacity and device capacity policy.
 //
 // If no requestPolicy, return capacity.Value.
-// If no requestVal, fill the quantity by fillEmptyRequest function
+// If no requestVal, fill the quantity by fillEmptyRequestQuantity.
 // Otherwise, use requestPolicy to calculate the consumed capacity from request if applicable.
 func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity resourceapi.DeviceCapacity) resource.Quantity {
 	return calculateConsumedQuantity(requestedVal, capacity.Value, capacity.RequestPolicy)
-}
-
-// fillEmptyRequest
-// return requestPolicy.default if defined.
-// Otherwise, return capacity value.
-func fillEmptyRequest(capacity resourceapi.DeviceCapacity) resource.Quantity {
-	return fillEmptyRequestQuantity(capacity.Value, capacity.RequestPolicy)
 }
 
 // calculateConsumedCounter returns the consumed amount for a shared counter.

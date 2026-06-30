@@ -165,12 +165,14 @@ var sliceWithPartitionableDevicesSharedCounters = &resource.ResourceSlice{
 
 var sliceWithSharedConsumableSharedCounters = func() *resource.ResourceSlice {
 	obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+	defaultVal := k8sresource.MustParse("1Gi")
+	minVal := k8sresource.MustParse("1Gi")
 	obj.Spec.SharedCounters[0].Counters["memory"] = resource.Counter{
 		Value: k8sresource.MustParse("40Gi"),
 		RequestPolicy: &resource.CapacityRequestPolicy{
-			Default: ptr.To(k8sresource.MustParse("1Gi")),
+			Default: &defaultVal,
 			ValidRange: &resource.CapacityRequestPolicyRange{
-				Min: ptr.To(k8sresource.MustParse("1Gi")),
+				Min: &minVal,
 			},
 		},
 	}

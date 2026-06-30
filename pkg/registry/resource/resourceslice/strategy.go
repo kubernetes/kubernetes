@@ -351,6 +351,7 @@ func dropDisabledDRASharedConsumableCapacityFields(newSlice, oldSlice *resource.
 		}
 	}
 	for i := range newSlice.Spec.Devices {
+		filtered := newSlice.Spec.Devices[i].ConsumesCounters[:0]
 		for j := range newSlice.Spec.Devices[i].ConsumesCounters {
 			for name, counter := range newSlice.Spec.Devices[i].ConsumesCounters[j].Counters {
 				counter.ValueFrom = nil
@@ -360,11 +361,11 @@ func dropDisabledDRASharedConsumableCapacityFields(newSlice, oldSlice *resource.
 				}
 				newSlice.Spec.Devices[i].ConsumesCounters[j].Counters[name] = counter
 			}
-			if len(newSlice.Spec.Devices[i].ConsumesCounters[j].Counters) == 0 {
-				newSlice.Spec.Devices[i].ConsumesCounters = append(newSlice.Spec.Devices[i].ConsumesCounters[:j], newSlice.Spec.Devices[i].ConsumesCounters[j+1:]...)
-				j--
+			if len(newSlice.Spec.Devices[i].ConsumesCounters[j].Counters) > 0 {
+				filtered = append(filtered, newSlice.Spec.Devices[i].ConsumesCounters[j])
 			}
 		}
+		newSlice.Spec.Devices[i].ConsumesCounters = filtered
 	}
 }
 

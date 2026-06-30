@@ -109,6 +109,10 @@ var (
 	two   = *resource.NewQuantity(2, resource.BinarySI)
 	three = *resource.NewQuantity(3, resource.BinarySI)
 	four  = *resource.NewQuantity(4, resource.BinarySI)
+
+	onePtr   = resource.NewQuantity(1, resource.BinarySI)
+	twoPtr   = resource.NewQuantity(2, resource.BinarySI)
+	threePtr = resource.NewQuantity(3, resource.BinarySI)
 )
 
 func init() {
@@ -5614,7 +5618,7 @@ func TestAllocator(t *testing.T,
 				SharedConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(
-				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(one))),
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(onePtr)),
 			),
 			classes: objects(class(classA, driverA)),
 			slices: func() []*resourceapi.ResourceSlice {
@@ -5656,11 +5660,11 @@ func TestAllocator(t *testing.T,
 				).obj()
 				counter := counterSlice.Spec.SharedCounters[0].Counters[capacity0]
 				counter.RequestPolicy = &resourceapi.CapacityRequestPolicy{
-					Default: ptr.To(one),
+					Default: onePtr,
 					ValidRange: &resourceapi.CapacityRequestPolicyRange{
-						Min:  ptr.To(one),
-						Max:  ptr.To(two),
-						Step: ptr.To(one),
+						Min:  onePtr,
+						Max:  twoPtr,
+						Step: onePtr,
 					},
 				}
 				counterSlice.Spec.SharedCounters[0].Counters[capacity0] = counter
@@ -5691,14 +5695,14 @@ func TestAllocator(t *testing.T,
 				SharedConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(
-				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(one))),
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(onePtr)),
 			),
 			allocatedDevices: []DeviceID{
 				MakeDeviceID(driverA, pool1, device1),
 			},
 			allocatedClaims: func() []*resourceapi.ResourceClaim {
 				allocatedClaim := claim("allocated-claim").withRequests(
-					deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(two)),
+					deviceRequest(req0, classA, 1).withCapacityRequest(twoPtr),
 				).obj().DeepCopy()
 				allocatedClaim.Status.Allocation = &resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
@@ -5741,7 +5745,7 @@ func TestAllocator(t *testing.T,
 				SharedConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(
-				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(three))),
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(threePtr)),
 			),
 			classes: objects(class(classA, driverA)),
 			slices: func() []*resourceapi.ResourceSlice {
@@ -5752,7 +5756,7 @@ func TestAllocator(t *testing.T,
 				).obj()
 				counter := counterSlice.Spec.SharedCounters[0].Counters[capacity0]
 				counter.RequestPolicy = &resourceapi.CapacityRequestPolicy{
-					Default:     ptr.To(one),
+					Default:     onePtr,
 					ValidValues: []resource.Quantity{one, two, four},
 				}
 				counterSlice.Spec.SharedCounters[0].Counters[capacity0] = counter
@@ -5775,7 +5779,7 @@ func TestAllocator(t *testing.T,
 				SharedConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(
-				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(two))),
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(twoPtr)),
 			),
 			allocatedDevices: []DeviceID{
 				MakeDeviceID(driverA, pool1, device1),
@@ -5827,7 +5831,7 @@ func TestAllocator(t *testing.T,
 				SharedConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(
-				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(three))),
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(threePtr)),
 			),
 			allocatedDevices: []DeviceID{
 				MakeDeviceID(driverA, pool1, device1),

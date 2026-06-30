@@ -2231,66 +2231,76 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						Counters: map[string]resourceapi.Counter{
 							"bandwidth": {
 								Value: resource.MustParse("2"),
-								RequestPolicy: &resourceapi.CapacityRequestPolicy{
-									Default: ptr.To(resource.MustParse("1")),
-									ValidRange: &resourceapi.CapacityRequestPolicyRange{
-										Min:  ptr.To(resource.MustParse("1")),
-										Max:  ptr.To(resource.MustParse("2")),
-										Step: ptr.To(resource.MustParse("1")),
-									},
-								},
+								RequestPolicy: func() *resourceapi.CapacityRequestPolicy {
+									defaultVal := resource.MustParse("1")
+									minVal := resource.MustParse("1")
+									maxVal := resource.MustParse("2")
+									stepVal := resource.MustParse("1")
+									return &resourceapi.CapacityRequestPolicy{
+										Default: &defaultVal,
+										ValidRange: &resourceapi.CapacityRequestPolicyRange{
+											Min:  &minVal,
+											Max:  &maxVal,
+											Step: &stepVal,
+										},
+									}
+								}(),
 							},
 						},
 					},
 				},
-				[]resourceapi.Device{
-					{
-						Name: "vf-0",
-						Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-							"role": {StringValue: ptr.To("dynamic")},
-						},
-						ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
-							CounterSet: "shared-bandwidth",
-							Counters: map[string]resourceapi.Counter{
-								"bandwidth": {
-									ValueFrom: &resourceapi.CounterValueFrom{
-										CapacityKey: capacityKey,
+				func() []resourceapi.Device {
+					dynamicRole := "dynamic"
+					staticRole := "static"
+					return []resourceapi.Device{
+						{
+							Name: "vf-0",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"role": {StringValue: &dynamicRole},
+							},
+							ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+								CounterSet: "shared-bandwidth",
+								Counters: map[string]resourceapi.Counter{
+									"bandwidth": {
+										ValueFrom: &resourceapi.CounterValueFrom{
+											CapacityKey: capacityKey,
+										},
 									},
 								},
-							},
-						}},
-					},
-					{
-						Name: "vf-1",
-						Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-							"role": {StringValue: ptr.To("dynamic")},
+							}},
 						},
-						ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
-							CounterSet: "shared-bandwidth",
-							Counters: map[string]resourceapi.Counter{
-								"bandwidth": {
-									ValueFrom: &resourceapi.CounterValueFrom{
-										CapacityKey: capacityKey,
+						{
+							Name: "vf-1",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"role": {StringValue: &dynamicRole},
+							},
+							ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+								CounterSet: "shared-bandwidth",
+								Counters: map[string]resourceapi.Counter{
+									"bandwidth": {
+										ValueFrom: &resourceapi.CounterValueFrom{
+											CapacityKey: capacityKey,
+										},
 									},
 								},
-							},
-						}},
-					},
-					{
-						Name: "vf-static",
-						Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-							"role": {StringValue: ptr.To("static")},
+							}},
 						},
-						ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
-							CounterSet: "shared-bandwidth",
-							Counters: map[string]resourceapi.Counter{
-								"bandwidth": {
-									Value: resource.MustParse("1"),
-								},
+						{
+							Name: "vf-static",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"role": {StringValue: &staticRole},
 							},
-						}},
-					},
-				}...,
+							ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+								CounterSet: "shared-bandwidth",
+								Counters: map[string]resourceapi.Counter{
+									"bandwidth": {
+										Value: resource.MustParse("1"),
+									},
+								},
+							}},
+						},
+					}
+				}()...,
 			),
 			func(driverResources map[string]resourceslice.DriverResources) {
 				roleKey := resourceapi.QualifiedName(driver.Name + "/role")

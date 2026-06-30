@@ -197,13 +197,6 @@ const (
 	// DRAConsumableCapacity
 	DRAConsumableCapacity featuregate.Feature = "DRAConsumableCapacity"
 
-	// owner: @SchSeba
-	// kep: http://kep.k8s.io/5941
-	//
-	// DRASharedConsumableCapacity: Enables support for request-driven consumption of shared counters
-	// across related devices during DRA allocation.
-	DRASharedConsumableCapacity featuregate.Feature = "DRASharedConsumableCapacity"
-
 	// owner: @KobayashiD27
 	// kep: http://kep.k8s.io/5007
 	// alpha: v1.34
@@ -295,6 +288,13 @@ const (
 	// a certain time (10 seconds by default, configurable in the DynamicResources
 	// scheduler plugin configuration).
 	DRASchedulerFilterTimeout featuregate.Feature = "DRASchedulerFilterTimeout"
+
+	// owner: @SchSeba
+	// kep: http://kep.k8s.io/5941
+	//
+	// DRASharedConsumableCapacity: Enables support for request-driven consumption of shared counters
+	// across related devices during DRA allocation.
+	DRASharedConsumableCapacity featuregate.Feature = "DRASharedConsumableCapacity"
 
 	// owner: @nojnhuh
 	// kep: https://kep.k8s.io/5729
@@ -1302,10 +1302,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	DRASharedConsumableCapacity: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
 	DRADeviceBindingConditions: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -1361,6 +1357,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DRASchedulerFilterTimeout: {
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	DRASharedConsumableCapacity: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DRAWorkloadResourceClaims: {
@@ -2309,8 +2309,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DRAConsumableCapacity: {DynamicResourceAllocation},
 
-	DRASharedConsumableCapacity: {DynamicResourceAllocation, DRAPartitionableDevices, DRAConsumableCapacity},
-
 	DRADeviceBindingConditions: {DynamicResourceAllocation, DRAResourceClaimDeviceStatus},
 
 	DRADeviceTaintRules: {DRADeviceTaints}, // DynamicResourceAllocation is indirect.
@@ -2334,6 +2332,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRAResourcePoolStatus: {DynamicResourceAllocation},
 
 	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
+
+	DRASharedConsumableCapacity: {DynamicResourceAllocation, DRAPartitionableDevices, DRAConsumableCapacity},
 
 	DRAWorkloadResourceClaims: {DynamicResourceAllocation, GenericWorkload},
 
