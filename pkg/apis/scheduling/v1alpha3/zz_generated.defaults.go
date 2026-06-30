@@ -38,6 +38,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_PodGroup(in *schedulingv1alpha3.PodGroup) {
+	SetDefaults_PodGroup(in)
 	if in.Spec.DisruptionMode == nil {
 		if err := json.Unmarshal([]byte(`{"single": {}}`), &in.Spec.DisruptionMode); err != nil {
 			panic(err)

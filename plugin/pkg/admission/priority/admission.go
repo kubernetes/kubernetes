@@ -203,7 +203,7 @@ func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
 		return errors.NewBadRequest("resource was marked with kind PodGroup but was unable to be converted")
 	}
 
-	priorityClassName, priority, _, err := p.establishPriority(attributes, &pg.Spec.PriorityClassName)
+	priorityClassName, priority, preemptionPolicy, err := p.establishPriority(attributes, &pg.Spec.PriorityClassName)
 	if err != nil {
 		return err
 	}
@@ -213,6 +213,22 @@ func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
 	}
 	pg.Spec.Priority = &priority
 	pg.Spec.PriorityClassName = priorityClassName
+
+	var schedulingPreemptionPolicy scheduling.PreemptionPolicy
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) && preemptionPolicy != nil {
+		switch *preemptionPolicy {
+		case apiv1.PreemptLowerPriority:
+			schedulingPreemptionPolicy = scheduling.PreemptLowerPriority
+		case apiv1.PreemptNever:
+			schedulingPreemptionPolicy = scheduling.PreemptNever
+		default:
+			return admission.NewForbidden(attributes, fmt.Errorf("preemptionPolicy set in the PriorityClass object (%v) must match one of the allowed values of PreemptionPolicy type in pod group", *preemptionPolicy))
+		}
+		if pg.Spec.PreemptionPolicy != nil && *pg.Spec.PreemptionPolicy != schedulingPreemptionPolicy {
+			return admission.NewForbidden(attributes, fmt.Errorf("the string value of PreemptionPolicy (%s) must not be provided in pod group spec; priority admission controller computed %s from the given PriorityClass name", *pg.Spec.PreemptionPolicy, schedulingPreemptionPolicy))
+		}
+		pg.Spec.PreemptionPolicy = &schedulingPreemptionPolicy
+	}
 	return nil
 }
 

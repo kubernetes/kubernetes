@@ -18,6 +18,12 @@ package priority
 
 import (
 	"context"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -55,8 +61,10 @@ func addPriorityClasses(ctrl *Plugin, priorityClasses []*scheduling.PriorityClas
 }
 
 var (
-	preemptNever         = api.PreemptNever
-	preemptLowerPriority = api.PreemptLowerPriority
+	preemptNever                   = api.PreemptNever
+	preemptLowerPriority           = api.PreemptLowerPriority
+	schedulingPreemptNever         = scheduling.PreemptNever
+	schedulingPreemptLowerPriority = scheduling.PreemptLowerPriority
 )
 
 var defaultClass1 = &scheduling.PriorityClass{
@@ -789,6 +797,12 @@ func TestAdmitPodGroup(t *testing.T) {
 		return pg
 	}
 
+	podGroupWithPreemptionPolicy := func(priorityClassName string, policy *scheduling.PreemptionPolicy) *scheduling.PodGroup {
+		pg := podGroup(priorityClassName)
+		pg.Spec.PreemptionPolicy = policy
+		return pg
+	}
+
 	attributes := func(podGroup *scheduling.PodGroup, operation admission.Operation) admission.Attributes {
 		var oldPodGroup runtime.Object
 		var options runtime.Object = &metav1.CreateOptions{}
@@ -812,14 +826,16 @@ func TestAdmitPodGroup(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                  string
-		priorityClasses       []*scheduling.PriorityClass
-		preparePodGroup       *scheduling.PodGroup
-		operation             admission.Operation
-		expectedPriorityClass string
-		expectedPriority      int32
-		enableGenericWorkload bool
-		expectError           bool
+		name                           string
+		priorityClasses                []*scheduling.PriorityClass
+		preparePodGroup                *scheduling.PodGroup
+		operation                      admission.Operation
+		expectedPriorityClass          string
+		expectedPriority               int32
+		enableGenericWorkload          bool
+		enablePodGroupPreemptionPolicy bool
+		expectError                    bool
+		expectedPreemptionPolicy       *scheduling.PreemptionPolicy
 	}{
 		{
 			name:                  "pod group with empty priorityClassName, accepted and set to global default",
@@ -886,12 +902,53 @@ func TestAdmitPodGroup(t *testing.T) {
 			operation:             admission.Update,
 			enableGenericWorkload: true,
 		},
+		{
+			name:                  "pod group with any preemptionPolicy but PodGroupPreemptionPolicy gate disabled, skips validation",
+			priorityClasses:       []*scheduling.PriorityClass{preemptionPolicyClass},
+			preparePodGroup:       podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptNever),
+			operation:             admission.Create,
+			expectedPriorityClass: "nopreemptionpolicy",
+			expectedPriority:      preemptionPolicyClass.Value,
+			enableGenericWorkload: true,
+		},
+		{
+			name:                           "pod group with nil preemption policy",
+			priorityClasses:                []*scheduling.PriorityClass{preemptionPolicyClass},
+			preparePodGroup:                podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, nil),
+			operation:                      admission.Create,
+			expectedPriorityClass:          "nopreemptionpolicy",
+			expectedPriority:               preemptionPolicyClass.Value,
+			enableGenericWorkload:          true,
+			enablePodGroupPreemptionPolicy: true,
+			expectedPreemptionPolicy:       &schedulingPreemptLowerPriority,
+		},
+		{
+			name:                           "pod group with preemption policy that matches preemption policy resolved from priority class",
+			priorityClasses:                []*scheduling.PriorityClass{preemptionPolicyClass},
+			preparePodGroup:                podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptLowerPriority),
+			operation:                      admission.Create,
+			expectedPriorityClass:          "nopreemptionpolicy",
+			expectedPriority:               preemptionPolicyClass.Value,
+			enableGenericWorkload:          true,
+			enablePodGroupPreemptionPolicy: true,
+			expectedPreemptionPolicy:       &schedulingPreemptLowerPriority,
+		},
+		{
+			name:                           "pod group with preemption policy that doesn't match preemption policy resolved from priority class",
+			priorityClasses:                []*scheduling.PriorityClass{preemptionPolicyClass},
+			preparePodGroup:                podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &schedulingPreemptNever),
+			operation:                      admission.Create,
+			enableGenericWorkload:          true,
+			enablePodGroupPreemptionPolicy: true,
+			expectError:                    true,
+		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: tt.enableGenericWorkload,
+				features.GenericWorkload:          tt.enableGenericWorkload,
+				features.PodGroupPreemptionPolicy: tt.enablePodGroupPreemptionPolicy,
 			})
 
 			admissionPlugin := NewPlugin()
@@ -912,6 +969,11 @@ func TestAdmitPodGroup(t *testing.T) {
 				if *tt.preparePodGroup.Spec.Priority != tt.expectedPriority {
 					t.Errorf("PodGroup Admit(), Priority = %v, want = %v", *tt.preparePodGroup.Spec.Priority, tt.expectedPriority)
 				}
+				if tt.expectedPreemptionPolicy != nil {
+					if tt.preparePodGroup.Spec.PreemptionPolicy == nil || *tt.preparePodGroup.Spec.PreemptionPolicy != *tt.expectedPreemptionPolicy {
+						t.Errorf("PodGroup Admit(), PreemptionPolicy = %v, want = %v", tt.preparePodGroup.Spec.PreemptionPolicy, tt.expectedPreemptionPolicy)
+					}
+				}
 			}
 			if tt.operation != admission.Create {
 				if diff := cmp.Diff(tt.preparePodGroup, podGroupCopy); len(diff) > 0 {
@@ -919,5 +981,94 @@ func TestAdmitPodGroup(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestPreemptionPolicyValuesAreUnchanged verifies that the set of PreemptionPolicy values defined in api/core/v1 package remains
+// unchanged. If it is modified, an update is needed in admitPodGroup() to make sure it covers all possible values
+// of v1.PreemptionPolicy.
+// This test finds all const declarations in the api/core/v1 package, identifies the ones with type PreemptionPolicy, and compares
+// them against a hard-coded set of expected values.
+func TestPreemptionPolicyValuesAreUnchanged(t *testing.T) {
+	// Locate staging/src/k8s.io/api/core/v1 directory relative to the package directory.
+	// admission_test.go is in plugin/pkg/admission/priority, which is 4 levels deep from the workspace root.
+	dir := "../../../../staging/src/k8s.io/api/core/v1"
+
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("failed to read api/core/v1 directory: %v", err)
+	}
+
+	fileSet := token.NewFileSet()
+	var preemptionPolicyValuesFound []string
+	for _, file := range files {
+		// Only read *.go files within the api/core/v1 directory.
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".go") || strings.HasSuffix(file.Name(), "_test.go") {
+			continue
+		}
+
+		filePath := filepath.Join(dir, file.Name())
+		parsedFile, err := parser.ParseFile(fileSet, filePath, nil, parser.AllErrors)
+		if err != nil {
+			t.Fatalf("failed to parse file %q: %v", file.Name(), err)
+		}
+
+		// Read all declared entities within the file that is currently being parsed.
+		for _, decl := range parsedFile.Decls {
+			// Look for declarations of const.
+			genericDeclaration, ok := decl.(*ast.GenDecl)
+			if !ok || genericDeclaration.Tok != token.CONST {
+				continue
+			}
+
+			// A const declaration may consist of multiple ValueSpecs. Inside each ValueSpec find the type.
+			// If it's PreemptionPolicy, extract the constant identifier. Note that since constants can be
+			// defined in blocks, there is a chance that a constant spec won't have a type set - in that we
+			// assume that the type for this constant is the same as in the preceding constant. For example:
+			// const (
+			// 	 P PreemptionPolicy = "P"
+			//   R                  = "R" // type is omitted here
+			// )
+			var lastType string
+			for _, spec := range genericDeclaration.Specs {
+				vspec, ok := spec.(*ast.ValueSpec)
+				if !ok {
+					t.Fatalf("unexpected spec type %T in const declaration", spec)
+				}
+
+				if vspec.Type != nil {
+					if ident, ok := vspec.Type.(*ast.Ident); ok {
+						// If the Type is a simple named identifier, record the name.
+						lastType = ident.Name
+					} else {
+						// Otherwise the type may be a pointer, or package-qualified type name, or something else
+						// that we're not interested in.
+						lastType = ""
+					}
+				}
+
+				if lastType == "PreemptionPolicy" {
+					for _, name := range vspec.Names {
+						preemptionPolicyValuesFound = append(preemptionPolicyValuesFound, name.Name)
+					}
+				}
+			}
+		}
+	}
+
+	expectedPreemptionPolicyValues := map[string]bool{
+		"PreemptLowerPriority": true,
+		"PreemptNever":         true,
+	}
+
+	for _, name := range preemptionPolicyValuesFound {
+		if !expectedPreemptionPolicyValues[name] {
+			t.Errorf("Unexpected PreemptionPolicy constant %q found in api/core/v1. Please verify if it needs to be handled in admitPodGroup in plugin/pkg/admission/priority/admission.go, and update this test.", name)
+		}
+		delete(expectedPreemptionPolicyValues, name)
+	}
+
+	for name := range expectedPreemptionPolicyValues {
+		t.Errorf("Expected PreemptionPolicy constant %q not found in api/core/v1. Was it removed? If so, clean up the switch in admitPodGroup and update this test.", name)
 	}
 }

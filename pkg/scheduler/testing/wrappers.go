@@ -1672,6 +1672,12 @@ func (wrapper *PodGroupWrapper) Priority(priority int32) *PodGroupWrapper {
 	return wrapper
 }
 
+// PreemptionPolicy sets the preemption policy of the inner PodGroup.
+func (wrapper *PodGroupWrapper) PreemptionPolicy(policy schedulingapi.PreemptionPolicy) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.PreemptionPolicy = &policy
+	return wrapper
+}
+
 // WorkloadWrapper wraps a Workload inside.
 type WorkloadWrapper struct{ schedulingapi.Workload }
 

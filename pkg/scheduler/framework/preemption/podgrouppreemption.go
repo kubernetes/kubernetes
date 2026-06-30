@@ -41,20 +41,21 @@ import (
 // PodGroupEvaluator is a preemption evaluator that knows how to run
 // preemption where a preemptor is a pod group and the domain is the whole cluster.
 type PodGroupEvaluator struct {
-	Handle         fwk.Handle
-	pdbLister      policylisters.PodDisruptionBudgetLister
-	podGroupLister schedulinglisters.PodGroupLister
+	Handle                         fwk.Handle
+	pdbLister                      policylisters.PodDisruptionBudgetLister
+	podGroupLister                 schedulinglisters.PodGroupLister
+	enablePodGroupPreemptionPolicy bool
 
 	Executor *Executor
 }
 
-// NewPodGroupEvaluator creates a new PodGroupEvaluator.
-func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor) *PodGroupEvaluator {
+func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor, enablePodGroupPreemptionPolicy bool) *PodGroupEvaluator {
 	return &PodGroupEvaluator{
-		Handle:         fh,
-		pdbLister:      fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
-		podGroupLister: fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister(),
-		Executor:       executor,
+		Handle:                         fh,
+		pdbLister:                      fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
+		podGroupLister:                 fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister(),
+		enablePodGroupPreemptionPolicy: enablePodGroupPreemptionPolicy,
+		Executor:                       executor,
 	}
 }
 
@@ -77,7 +78,7 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodG
 		return nil, fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err))
 	}
 	domain := newDomainForWorkloadPreemption(allNodes, ev.podGroupLister, "cluster-domain")
-	preemptor := newPodGroupPreemptor(pg, pods)
+	preemptor := newPodGroupPreemptor(pg, pods, ev.enablePodGroupPreemptionPolicy)
 	pdbs, err := getPodDisruptionBudgets(ev.pdbLister)
 	if err != nil {
 		return nil, fwk.AsStatus(fmt.Errorf("failed to get pod disruption budgets: %w", err))
@@ -279,7 +280,7 @@ func (ev *PodGroupEvaluator) isPreemptionAllowed(victim *victim, preemptor *podG
 // indicates whether this preemptor should be considered for preempting other pods or
 // not. The string includes the reason if this preemptor isn't eligible.
 func (ev *PodGroupEvaluator) preemptorEligibleToPreemptOthers(_ context.Context, preemptor *podGroupPreemptor, nameToNode map[string]fwk.NodeInfo) (bool, string) {
-	if preemptor.PreemptionPolicy() == v1.PreemptNever {
+	if preemptor.PreemptionPolicy() == schedulingapi.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
 
