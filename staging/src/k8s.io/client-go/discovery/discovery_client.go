@@ -610,6 +610,10 @@ func (d *DiscoveryClient) GroupsAndMaybeResourcesWithContext(ctx context.Context
 	map[schema.GroupVersion]*metav1.APIResourceList,
 	map[schema.GroupVersion]error,
 	error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, nil, err
+	}
+
 	// Legacy group ordered first (there is only one -- core/v1 group). Returned groups must
 	// be non-nil, but it could be empty. Returned resources, apiResources map could be nil.
 	groups, resources, failedGVs, err := d.downloadLegacy(ctx)
@@ -904,6 +908,10 @@ func ServerGroupsAndResources(d DiscoveryInterface) ([]*metav1.APIGroup, []*meta
 }
 
 func ServerGroupsAndResourcesWithContext(ctx context.Context, d DiscoveryInterfaceWithContext) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+
 	var sgs *metav1.APIGroupList
 	var resources []*metav1.APIResourceList
 	var failedGVs map[schema.GroupVersion]error
@@ -977,6 +985,10 @@ func ServerPreferredResources(d DiscoveryInterface) ([]*metav1.APIResourceList, 
 
 // ServerPreferredResourcesWithContext uses the provided discovery interface to look up preferred resources
 func ServerPreferredResourcesWithContext(ctx context.Context, d DiscoveryInterfaceWithContext) ([]*metav1.APIResourceList, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	var serverGroupList *metav1.APIGroupList
 	var failedGroups map[schema.GroupVersion]error
 	var groupVersionResources map[schema.GroupVersion]*metav1.APIResourceList

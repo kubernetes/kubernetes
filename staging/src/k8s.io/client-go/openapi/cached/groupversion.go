@@ -55,6 +55,10 @@ func (g *groupversion) Schema(contentType string) ([]byte, error) {
 }
 
 func (g *groupversion) SchemaWithContext(ctx context.Context, contentType string) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	g.lock.Lock()
 	defer g.lock.Unlock()
 

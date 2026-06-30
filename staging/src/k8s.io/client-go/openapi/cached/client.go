@@ -70,6 +70,10 @@ func (c *Client) Paths() (map[string]openapi.GroupVersion, error) {
 }
 
 func (c *Client) PathsWithContext(ctx context.Context) (map[string]openapi.GroupVersionWithContext, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	c.once.Do(func() {
 		uncached, err := c.delegate.PathsWithContext(ctx)
 		if err != nil {

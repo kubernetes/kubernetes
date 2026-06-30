@@ -169,6 +169,10 @@ func (d *memCacheClient) GroupsAndMaybeResources() (*metav1.APIGroupList, map[sc
 // to resources. The returned groups will never be nil, but the resources map can be nil
 // if there are no cached resources.
 func (d *memCacheClient) GroupsAndMaybeResourcesWithContext(ctx context.Context) (*metav1.APIGroupList, map[schema.GroupVersion]*metav1.APIResourceList, map[schema.GroupVersion]error, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, nil, err
+	}
+
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
