@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -115,6 +116,42 @@ func (o *terminationOrdering) waitForTurn(name string, gracePeriod int64) float6
 	}
 
 	return time.Since(start).Seconds()
+}
+
+// allPrereqsMet returns true if all prereq channels for the named container are
+// already closed, meaning its SIGTERM turn has arrived. Non-blocking.
+// Safe without locking: o.prereqs is immutable after construction.
+func (o *terminationOrdering) allPrereqsMet(name string) bool {
+	for _, c := range o.prereqs[name] {
+		select {
+		case <-c:
+			// channel is closed, prereq met
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// waitTurn returns a channel that is closed once every prerequisite of the named
+// container has terminated (its ordered SIGTERM turn has arrived), or ctx is
+// cancelled. It is the event-driven counterpart to allPrereqsMet, so callers can
+// select on it instead of polling. o.prereqs is immutable after construction, so
+// no locking is needed to read it.
+func (o *terminationOrdering) waitTurn(ctx context.Context, name string) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for _, c := range o.prereqs[name] {
+			select {
+			case <-c:
+				// prereq terminated
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return done
 }
 
 // containerTerminated should be called once the container with the specified name has exited.
