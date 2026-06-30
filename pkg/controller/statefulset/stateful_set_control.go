@@ -655,7 +655,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 
 	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
-			return &status, fmt.Errorf("Statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+			return &status, fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
 		}
 
 		allOldPodsTerminated, err := ssc.recreateDeleteAndWait(ctx, set, updateRevision, replicas, condemned, &status)
@@ -717,7 +717,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 	// For the Recreate strategy we return before rolling update deletion process
 	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
-			return &status, fmt.Errorf("Statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+			return &status, fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
 		}
 		return &status, nil
 	}
