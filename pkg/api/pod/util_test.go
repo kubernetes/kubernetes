@@ -6150,7 +6150,6 @@ func TestValidateRestartAllContainersOption(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.ContainerRestartRules:                tc.featureEnabled,
-				features.NodeDeclaredFeatures:                 tc.featureEnabled,
 				features.RestartAllContainersOnContainerExits: tc.featureEnabled,
 			})
 			// The new pod doesn't impact the outcome.
