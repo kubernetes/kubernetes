@@ -47,7 +47,7 @@ func (m *podContainerManagerStub) ReduceCPULimits(_ klog.Logger, _ CgroupName) e
 	return nil
 }
 
-func (m *podContainerManagerStub) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+func (m *podContainerManagerStub) GetAllPodsFromCgroups(_ klog.Logger) (map[types.UID]CgroupName, error) {
 	return nil, nil
 }
 

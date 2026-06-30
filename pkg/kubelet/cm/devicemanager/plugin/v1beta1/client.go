@@ -81,9 +81,7 @@ func (c *client) Connect(ctx context.Context) error {
 // Run is for running the device plugin gRPC client.
 func (c *client) Run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
-	// FIXME: passing real context to ListAndWatch results in
-	// failing TestDevicePluginReRegistration with "context cancelled" error
-	stream, err := c.client.ListAndWatch(context.TODO(), &api.Empty{})
+	stream, err := c.client.ListAndWatch(ctx, &api.Empty{})
 	if err != nil {
 		logger.Error(err, "ListAndWatch ended unexpectedly for device plugin", "resource", c.resource)
 		return
