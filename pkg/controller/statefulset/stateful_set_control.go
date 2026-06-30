@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sort"
 	"sync"
@@ -652,7 +653,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 
 	monotonic := !allowsBurst(set)
 
-	if isRecreateStrategyEnabled(set) {
+	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
+			return &status, fmt.Errorf("Statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+		}
+
 		allOldPodsTerminated, err := ssc.recreateDeleteAndWait(ctx, set, updateRevision, replicas, condemned, &status)
 		if err != nil {
 			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
@@ -710,20 +715,16 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 	updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
 
 	// For the Recreate strategy we return before rolling update deletion process
-	if isRecreateStrategyEnabled(set) {
+	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
+			return &status, fmt.Errorf("Statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+		}
 		return &status, nil
 	}
 
 	// for the OnDelete strategy we short circuit. Pods will be updated when they are manually deleted.
 	if set.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
-		// we add the Progressing condition to on delete if the feature gate is enabled
-		setProgressingCondition(&status, OnDeleteUpdatePendingReason, "Waiting for pods to be manually deleted to complete the update")
 		return &status, nil
-	}
-
-	// we add the Progressing condition for rolling update
-	if set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType && currentRevision.Name != updateRevision.Name {
-		setProgressingCondition(&status, RollingUpdateInProgressReason, "Pods are being updated via rolling update")
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
@@ -777,37 +778,39 @@ func (ssc *defaultStatefulSetControl) recreateDeleteAndWait(ctx context.Context,
 	logger := klog.FromContext(ctx)
 
 	allPods := slices.Concat(replicas, condemned)
-	var deletedPods, terminatingPods bool
-	for _, pod := range allPods {
-		if pod == nil || !isCreated(pod) {
-			continue
+
+	recreateInProgress := make([]bool, len(allPods))
+	// process pods in non monotonic mode
+	processRecreateFn := func(i int) (bool, error) {
+		if allPods[i] == nil || !isCreated(allPods[i]) {
+			return false, nil
 		}
+		if getPodRevision(allPods[i]) != updateRevision.Name {
+			// as long as there are pods still with old updateRevision then recreate has not yet completed
+			recreateInProgress[i] = true
 
-		if getPodRevision(pod) != updateRevision.Name {
-			if isTerminating(pod) {
-				terminatingPods = true
-				continue
+			if isTerminating(allPods[i]) {
+				return false, nil
 			}
-
-			logger.V(2).Info("Recreate: deleting old revision pod", "statefulSet", klog.KObj(set), "pod", klog.KObj(pod))
-			if err := ssc.podControl.DeleteStatefulPod(set, pod); err != nil {
+			logger.V(2).Info("Recreate: deleting old revision pod", "statefulSet", klog.KObj(set), "pod", klog.KObj(allPods[i]))
+			if err := ssc.podControl.DeleteStatefulPod(set, allPods[i]); err != nil {
 				if !apierrors.IsNotFound(err) {
 					return false, err
 				}
 			}
-			deletedPods = true
 		}
+		return true, nil
 	}
 
-	if deletedPods {
-		setProgressingCondition(status, RecreateInProgressReason, "Deleting old-revision pods")
-		return false, nil
+	if _, err := runForAll(allPods, processRecreateFn, false); err != nil {
+		return false, err
 	}
 
-	// if no deletion happens but pods are still terminating we still wait with different message to the condition
-	if terminatingPods {
-		setProgressingCondition(status, RecreateInProgressReason, "Waiting for old-revision pods to terminate")
-		return false, nil
+	for _, inProgress := range recreateInProgress {
+		if inProgress {
+			setProgressingCondition(status, RecreateInProgressReason, "Deleting old revision pods")
+			return false, nil
+		}
 	}
 
 	return true, nil

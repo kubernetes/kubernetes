@@ -656,13 +656,9 @@ func completeUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
 		status.CurrentRevision = status.UpdateRevision
 
 		// Update statefulset progressing condition upon completion
-		if GetStatefulSetCondition(*status, apps.StatefulSetProgressing) != nil {
-			switch set.Spec.UpdateStrategy.Type {
-			case apps.RollingUpdateStatefulSetStrategyType:
-				setProgressingCondition(status, RollingUpdateCompletedReason, "All pods have been updated")
-			case apps.RecreateStatefulSetStrategyType:
-				setProgressingCondition(status, RecreateCompletedReason, "All pods recreated successfully")
-			}
+		if getStatefulSetCondition(*status, apps.StatefulSetProgressing) != nil &&
+			set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
+			setProgressingCondition(status, RecreateCompletedReason, "All pods recreated successfully")
 		}
 	}
 }
@@ -719,22 +715,17 @@ func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, replicaCou
 	return maxUnavailableNum, nil
 }
 
-func isRecreateStrategyEnabled(set *apps.StatefulSet) bool {
-	return set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType &&
-		utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy)
-}
-
 // setProgressingCondition sets the Progressing condition on the status.
 func setProgressingCondition(status *apps.StatefulSetStatus, reason, message string) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
 		return
 	}
-	condition := NewStatefulSetCondition(apps.StatefulSetProgressing, v1.ConditionTrue, reason, message)
-	SetStatefulSetCondition(status, *condition)
+	condition := newStatefulSetCondition(apps.StatefulSetProgressing, v1.ConditionTrue, reason, message)
+	setStatefulSetCondition(status, *condition)
 }
 
-// NewStatefulSetCondition creates a new statefulset condition.
-func NewStatefulSetCondition(condType apps.StatefulSetConditionType, status v1.ConditionStatus, reason, message string) *apps.StatefulSetCondition {
+// newStatefulSetCondition creates a new statefulset condition.
+func newStatefulSetCondition(condType apps.StatefulSetConditionType, status v1.ConditionStatus, reason, message string) *apps.StatefulSetCondition {
 	return &apps.StatefulSetCondition{
 		Type:               condType,
 		Status:             status,
@@ -744,8 +735,8 @@ func NewStatefulSetCondition(condType apps.StatefulSetConditionType, status v1.C
 	}
 }
 
-// GetStatefulSetCondition returns the condition with the provided type.
-func GetStatefulSetCondition(status apps.StatefulSetStatus, condType apps.StatefulSetConditionType) *apps.StatefulSetCondition {
+// getStatefulSetCondition returns the condition with the provided type.
+func getStatefulSetCondition(status apps.StatefulSetStatus, condType apps.StatefulSetConditionType) *apps.StatefulSetCondition {
 	for i := range status.Conditions {
 		c := status.Conditions[i]
 		if c.Type == condType {
@@ -755,10 +746,10 @@ func GetStatefulSetCondition(status apps.StatefulSetStatus, condType apps.Statef
 	return nil
 }
 
-// SetStatefulSetCondition updates the statefulset to include the provided condition. If the condition that
+// setStatefulSetCondition updates the statefulset to include the provided condition. If the condition that
 // we are about to add already exists and has the same status, reason, and message then we are not going to update.
-func SetStatefulSetCondition(status *apps.StatefulSetStatus, condition apps.StatefulSetCondition) {
-	currentCond := GetStatefulSetCondition(*status, condition.Type)
+func setStatefulSetCondition(status *apps.StatefulSetStatus, condition apps.StatefulSetCondition) {
+	currentCond := getStatefulSetCondition(*status, condition.Type)
 	if currentCond == nil {
 		status.Conditions = append(status.Conditions, condition)
 		return

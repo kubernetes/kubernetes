@@ -92,14 +92,6 @@ func maxUnavailableInUse(statefulset *apps.StatefulSet) bool {
 	return statefulset.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable != nil
 }
 
-// recreateStrategyInUse returns true if StatefulSet's recreate update strategy set(used)
-func recreateStrategyInUse(statefulset *apps.StatefulSet) bool {
-	if statefulset == nil {
-		return false
-	}
-	return statefulset.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType
-}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newStatefulSet := obj.(*apps.StatefulSet)
@@ -129,13 +121,6 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) && !maxUnavailableInUse(oldSS) {
 		if newSS.Spec.UpdateStrategy.RollingUpdate != nil {
 			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
-		}
-	}
-	// Drop Recreate strategy type when the feature gate is disabled and
-	// the old object does not already use it.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) && !recreateStrategyInUse(oldSS) {
-		if newSS.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
-			newSS.Spec.UpdateStrategy.Type = ""
 		}
 	}
 }
