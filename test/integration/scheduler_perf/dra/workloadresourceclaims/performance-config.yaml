@@ -1,0 +1,144 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime.
+# It basically covers all test cases but with their smallest workload.
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds)
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
+# SharedPodGroupResourceClaim schedules PodGroups whose member Pods all share
+# the same ResourceClaim. Exactly one ResourceClaim exists for each PodGroup.
+- name: SharedPodGroupResourceClaim
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAWorkloadResourceClaims: true
+    GenericWorkload: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-podgroup.yaml
+    countParam: $podGroups
+  - opcode: createAny
+    templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaim.yaml
+    countParam: $podGroups
+    namespace: test
+  - opcode: createPodGroups
+    templatePath: ../templates/podgroup-with-claim-ref.yaml
+    namespace: test
+    countParam: $podGroups
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-in-podgroup-with-claim-ref.yaml
+    templateParams:
+      PodGroupCount: $podGroups
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 0
+      podGroups: 10
+      measurePods: 10
+  - name: 1podgroup_1000pods
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 10
+      nodesWithoutDRA: 0
+      podGroups: 1
+      measurePods: 1000
+  - name: 100podgroups_5000pods
+    labels: [performance]
+    params:
+      nodesWithDRA: 50
+      nodesWithoutDRA: 0
+      podGroups: 100
+      measurePods: 5000
+
+# SharedPodGroupResourceClaimTemplate schedules PodGroups whose member Pods all share
+# the same ResourceClaim generated from a ResourceClaimTemplate.
+- name: SharedPodGroupResourceClaimTemplate
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAWorkloadResourceClaims: true
+    GenericWorkload: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-podgroup.yaml
+    countParam: $podGroups
+  - opcode: createAny
+    templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: allocResourceClaims
+    namespace: init
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: createPodGroups
+    templatePath: ../templates/podgroup-with-claim-template.yaml
+    namespace: test
+    countParam: $podGroups
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-in-podgroup-with-claim-template.yaml
+    templateParams:
+      PodGroupCount: $podGroups
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 0
+      podGroups: 10
+      measurePods: 10
+  - name: 1podgroup_1000pods
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 10
+      nodesWithoutDRA: 0
+      podGroups: 1
+      measurePods: 1000
+  - name: 100podgroups_5000pods
+    labels: [performance]
+    params:
+      nodesWithDRA: 50
+      nodesWithoutDRA: 0
+      podGroups: 100
+      measurePods: 5000

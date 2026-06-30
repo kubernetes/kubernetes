@@ -1,0 +1,10 @@
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: PodGroup
+metadata:
+  name: test-dra-{{.Index}}
+spec:
+  resourceClaims:
+  - name: resource
+    resourceClaimName: test-claim-{{.Index}}
+  schedulingPolicy:
+    basic: {}
