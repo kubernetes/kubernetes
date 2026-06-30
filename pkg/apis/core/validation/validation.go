@@ -55,6 +55,7 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	resourcehelper "k8s.io/component-helpers/resource"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 
@@ -6074,8 +6075,8 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.OS)...)
 	allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"), newPod.Spec.OS)...)
 
-	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), newPod.Spec.Containers)...)
-	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.InitContainers)...)
+	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), newPod.Spec.Containers, &newPod.Status)...)
+	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.InitContainers, &newPod.Status)...)
 	// ephemeral containers are not allowed to have resources allocated
 	allErrs = append(allErrs, validateContainerStatusNoAllocatedResourcesStatus(newPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"))...)
 
@@ -9541,7 +9542,7 @@ func validateContainerStatusNoAllocatedResourcesStatus(containerStatuses []core.
 // validateContainerStatusAllocatedResourcesStatus iterate the allocated resources health and validate:
 // - resourceName matches one of resources in container's resource requirements
 // - resourceID is not empty and unique
-func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.ContainerStatus, fldPath *field.Path, containers []core.Container) field.ErrorList {
+func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.ContainerStatus, fldPath *field.Path, containers []core.Container, podStatus *core.PodStatus) field.ErrorList {
 	allErrors := field.ErrorList{}
 
 	for i, containerStatus := range containerStatuses {
@@ -9570,20 +9571,18 @@ func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.Co
 				if strings.HasPrefix(string(allocatedResource.Name), "claim:") {
 					// assume it is a claim name
 
-					errorStr = "must match one of the container's resource claims in a format 'claim:<claimName>/<request>' or 'claim:<claimName>' if request is empty"
+					errorStr = "must match one of the container's resource claims as 'claim:<claimName>/<requestName>' when container.resources.claims[*].request is set or 'claim:<claimName>' when it is empty"
 
 					for _, c := range container.Resources.Claims {
-						name := "claim:" + c.Name
-						if c.Request != "" {
-							name += "/" + c.Request
-						}
-
-						if name == string(allocatedResource.Name) {
+						if core.ResourceName(resourceclaim.ResourceStatusName(c.Name, c.Request)) == allocatedResource.Name {
 							found = true
 							break
 						}
 					}
 
+					if !found {
+						found = matchesExtendedResourceClaimStatus(allocatedResource.Name, container, podStatus.ExtendedResourceClaimStatus)
+					}
 				} else {
 					// assume it is a resource name
 
@@ -9632,6 +9631,29 @@ func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.Co
 	}
 
 	return allErrors
+}
+
+func matchesExtendedResourceClaimStatus(resourceStatusName core.ResourceName, container core.Container, extendedResourceClaimStatus *core.PodExtendedResourceClaimStatus) bool {
+	if extendedResourceClaimStatus == nil {
+		return false
+	}
+
+	claimName, requestName, found := resourceclaim.ParseResourceStatusName(string(resourceStatusName))
+	if !found || requestName == "" || claimName != extendedResourceClaimStatus.ResourceClaimName {
+		return false
+	}
+
+	for _, mapping := range extendedResourceClaimStatus.RequestMappings {
+		if mapping.ContainerName != container.Name || mapping.RequestName != requestName {
+			continue
+		}
+		quantity, found := container.Resources.Requests[core.ResourceName(mapping.ResourceName)]
+		if found && !quantity.IsZero() {
+			return true
+		}
+	}
+
+	return false
 }
 
 func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fldPath *field.Path) field.ErrorList {
