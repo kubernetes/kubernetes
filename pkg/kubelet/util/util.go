@@ -21,6 +21,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 )
 
@@ -108,4 +110,15 @@ func GetLimits(res *ResourceOpts) v1.ResourceList {
 		containerLimits[v1.ResourceMemory] = podLevelLimits[v1.ResourceMemory].DeepCopy()
 	}
 	return containerLimits
+}
+
+// IsNodeResizePreemptionDisabled returns true if the node preemption policy disables resize preemption.
+func IsNodeResizePreemptionDisabled(node *v1.Node) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		return false
+	}
+	if node == nil {
+		return false
+	}
+	return node.Spec.PodPreemptionPolicy != nil && len(node.Spec.PodPreemptionPolicy.DisableResizePreemption) > 0
 }

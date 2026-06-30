@@ -20,19 +20,25 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	coverage "k8s.io/apimachinery/pkg/test/coverage"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/core/node"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-// TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1"}
-
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidate(t, apiVersion)
+		})
+		t.Run("invalid_pod_preemption_policy_"+apiVersion, func(t *testing.T) {
+			expectedErrs := field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podPreemptionPolicy", "disableResizePreemption").Index(0), nil, "").WithOrigin("format=k8s-label-key"),
+			}
+			coverage.RecordObservedRules(schema.GroupVersionKind{Version: apiVersion, Kind: "Node"}, expectedErrs)
 		})
 	}
 }

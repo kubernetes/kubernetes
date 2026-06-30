@@ -103,6 +103,9 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, executor *Execu
 func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
+	state.Write(framework.PreemptionTriggeredKey, &framework.PreemptionTriggeredState{Triggered: true})
+	defer state.Delete(framework.PreemptionTriggeredKey)
+
 	// 0) Fetch the latest version of <pod>.
 	// It's safe to directly fetch pod here. Because the informer cache has already been
 	// initialized when creating the Scheduler obj.

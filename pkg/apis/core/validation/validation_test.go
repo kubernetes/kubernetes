@@ -31014,7 +31014,6 @@ func TestValidatePodSchedulingGroup(t *testing.T) {
 		}
 	}
 }
-
 func TestValidatePodBinding(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -31147,6 +31146,162 @@ func TestValidatePodBinding(t *testing.T) {
 				if len(errs) != 0 {
 					t.Errorf("Expected no error but got %v", errs)
 				}
+			}
+		})
+	}
+}
+
+func TestValidateNodePreemptionPolicyFeatureGate(t *testing.T) {
+	nodeWithPolicy := &core.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "abc",
+			ResourceVersion: "1",
+		},
+		Spec: core.NodeSpec{
+			PodPreemptionPolicy: &core.NodePodPreemptionPolicy{
+				DisableResizePreemption: []string{"o1"},
+			},
+		},
+	}
+	nodeWithoutPolicy := &core.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "abc",
+			ResourceVersion: "1",
+		},
+		Spec: core.NodeSpec{},
+	}
+	nodeWithMutatedPolicy := &core.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "abc",
+			ResourceVersion: "1",
+		},
+		Spec: core.NodeSpec{
+			PodPreemptionPolicy: &core.NodePodPreemptionPolicy{
+				DisableResizePreemption: []string{"o2"},
+			},
+		},
+	}
+	nodeWithTooManyPolicies := &core.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "abc",
+			ResourceVersion: "1",
+		},
+		Spec: core.NodeSpec{
+			PodPreemptionPolicy: &core.NodePodPreemptionPolicy{
+				DisableResizePreemption: []string{
+					"o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9", "o10",
+					"o11", "o12", "o13", "o14", "o15", "o16", "o17", "o18", "o19", "o20", "o21",
+				},
+			},
+		},
+	}
+	nodeWithInvalidLabel := &core.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "abc",
+			ResourceVersion: "1",
+		},
+		Spec: core.NodeSpec{
+			PodPreemptionPolicy: &core.NodePodPreemptionPolicy{
+				DisableResizePreemption: []string{"NoUppercaseOrSpecialCharsLike=Equals"},
+			},
+		},
+	}
+
+	invalidLabelErrs := field.ErrorList{}
+	for _, err := range validation.IsQualifiedName(nodeWithInvalidLabel.Spec.PodPreemptionPolicy.DisableResizePreemption[0]) {
+		invalidLabelErrs = append(invalidLabelErrs, field.Invalid(field.NewPath("spec", "podPreemptionPolicy", "disableResizePreemption").Index(0), nodeWithInvalidLabel.Spec.PodPreemptionPolicy.DisableResizePreemption[0], err).WithOrigin("format=k8s-label-key"))
+	}
+
+	tests := []struct {
+		name      string
+		fgEnabled bool
+		validate  func() field.ErrorList
+		expectErr field.ErrorList
+	}{
+		{
+			name:      "create, feature gate disabled",
+			fgEnabled: false,
+			validate:  func() field.ErrorList { return ValidateNode(nodeWithPolicy) },
+			expectErr: field.ErrorList{field.Forbidden(field.NewPath("spec", "podPreemptionPolicy"), "disabled when InPlacePodVerticalScalingSchedulerPreemption feature gate is disabled")},
+		},
+		{
+			name:      "create, feature gate enabled",
+			fgEnabled: true,
+			validate:  func() field.ErrorList { return ValidateNode(nodeWithPolicy) },
+		},
+		{
+			name:      "update adding policy, feature gate disabled",
+			fgEnabled: false,
+			validate:  func() field.ErrorList { return ValidateNodeUpdate(nodeWithPolicy, nodeWithoutPolicy) },
+			expectErr: field.ErrorList{field.Forbidden(field.NewPath("spec", "podPreemptionPolicy"), "update is forbidden when InPlacePodVerticalScalingSchedulerPreemption feature gate is disabled")},
+		},
+		{
+			name:      "update removing policy, feature gate disabled",
+			fgEnabled: false,
+			validate:  func() field.ErrorList { return ValidateNodeUpdate(nodeWithoutPolicy, nodeWithPolicy) },
+			expectErr: field.ErrorList{field.Forbidden(field.NewPath("spec", "podPreemptionPolicy"), "update is forbidden when InPlacePodVerticalScalingSchedulerPreemption feature gate is disabled")},
+		},
+		{
+			name:      "update mutating policy, feature gate disabled",
+			fgEnabled: false,
+			validate:  func() field.ErrorList { return ValidateNodeUpdate(nodeWithMutatedPolicy, nodeWithPolicy) },
+			expectErr: field.ErrorList{field.Forbidden(field.NewPath("spec", "podPreemptionPolicy"), "update is forbidden when InPlacePodVerticalScalingSchedulerPreemption feature gate is disabled")},
+		},
+		{
+			name:      "update unchanged policy, feature gate disabled",
+			fgEnabled: false,
+			validate:  func() field.ErrorList { return ValidateNodeUpdate(nodeWithPolicy, nodeWithPolicy) },
+		},
+		{
+			name:      "update unchanged policy create validation with options, feature gate disabled",
+			fgEnabled: false,
+			validate: func() field.ErrorList {
+				opts := ValidationOptionsForNode(nodeWithPolicy, nodeWithPolicy)
+				return ValidateNodeWithOptions(nodeWithPolicy, opts)
+			},
+		},
+		{
+			name:      "update, feature gate enabled",
+			fgEnabled: true,
+			validate:  func() field.ErrorList { return ValidateNodeUpdate(nodeWithPolicy, nodeWithoutPolicy) },
+		},
+		{
+			name:      "too many preemption policies create, feature gate enabled",
+			fgEnabled: true,
+			validate:  func() field.ErrorList { return ValidateNode(nodeWithTooManyPolicies) },
+			expectErr: field.ErrorList{field.TooMany(field.NewPath("spec", "podPreemptionPolicy", "disableResizePreemption"), 21, 20)},
+		},
+		{
+			name:      "too many preemption policies update, feature gate enabled",
+			fgEnabled: true,
+			validate: func() field.ErrorList {
+				return append(ValidateNode(nodeWithTooManyPolicies), ValidateNodeUpdate(nodeWithTooManyPolicies, nodeWithoutPolicy)...)
+			},
+			expectErr: field.ErrorList{field.TooMany(field.NewPath("spec", "podPreemptionPolicy", "disableResizePreemption"), 21, 20)},
+		},
+		{
+			name:      "invalid preemption policy label create, feature gate enabled",
+			fgEnabled: true,
+			validate:  func() field.ErrorList { return ValidateNode(nodeWithInvalidLabel) },
+			expectErr: invalidLabelErrs,
+		},
+		{
+			name:      "invalid preemption policy label update, feature gate enabled",
+			fgEnabled: true,
+			validate: func() field.ErrorList {
+				return append(ValidateNode(nodeWithInvalidLabel), ValidateNodeUpdate(nodeWithInvalidLabel, nodeWithoutPolicy)...)
+			},
+			expectErr: invalidLabelErrs,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tc.fgEnabled)
+			errs := tc.validate()
+
+			if diff := cmp.Diff(tc.expectErr, errs, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("unexpected errors (-want, +got):\n%s", diff)
 			}
 		})
 	}

@@ -717,6 +717,7 @@ func NewMainKubelet(ctx context.Context,
 		klet.syncPodNow,
 		klet.GetActivePods,
 		klet.podManager.GetPodByUID,
+		klet.isResizePreemptionDisabled,
 		klet.sourcesReady,
 		kubeDeps.Recorder,
 		logger,
@@ -1188,6 +1189,8 @@ func NewMainKubelet(ctx context.Context,
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
+
+	klet.registerNodePreemptionPolicyHandler(ctx, nodeInformer)
 
 	// Generating the status funcs should be the last thing we do,
 	// since this relies on the rest of the Kubelet having been constructed.

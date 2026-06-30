@@ -39,15 +39,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -2475,6 +2478,23 @@ func TestPodResizeConditions(t *testing.T) {
 			},
 		},
 		{
+			name: "set pod resize preemption condition directly on non-deferred pod -> returns false",
+			updateFunc: func(podUID types.UID) bool {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+				return m.SetPodResizePreemptionCondition(podUID)
+			},
+			expectedUpdateFuncReturnVal: false,
+			expected: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             v1.ConditionTrue,
+					Reason:             "some-reason",
+					Message:            "some-message",
+					ObservedGeneration: 1,
+				},
+			},
+		},
+		{
 			name: "set pod resize in progress condition without reason and message",
 			updateFunc: func(podUID types.UID) bool {
 				_, b := m.SetPodResizeInProgressCondition(podUID, "", "", 1)
@@ -2528,7 +2548,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize pending condition to deferred with message",
 			updateFunc: func(podUID types.UID) bool {
-				return m.SetPodResizePendingCondition(podUID, "some-reason", "some-message", 1)
+				return m.SetPodResizePendingCondition(podUID, "some-reason", "some-message", false, 1)
 			},
 			expectedUpdateFuncReturnVal: true,
 			expected: []*v1.PodCondition{
@@ -2550,7 +2570,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "change the deferred message",
 			updateFunc: func(podUID types.UID) bool {
-				return m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "some-other-message", 1)
+				return m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "some-other-message", false, 1)
 			},
 			expectedUpdateFuncReturnVal: false,
 			expected: []*v1.PodCondition{
@@ -2572,7 +2592,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize pending condition to infeasible with message",
 			updateFunc: func(podUID types.UID) bool {
-				return m.SetPodResizePendingCondition(podUID, v1.PodReasonInfeasible, "some-message", 3)
+				return m.SetPodResizePendingCondition(podUID, v1.PodReasonInfeasible, "some-message", false, 3)
 			},
 			expectedUpdateFuncReturnVal: true,
 			expected: []*v1.PodCondition{
@@ -2611,6 +2631,135 @@ func TestPodResizeConditions(t *testing.T) {
 		},
 		{
 			name: "clear pod resize pending condition",
+			updateFunc: func(podUID types.UID) bool {
+				m.ClearPodResizePendingCondition(podUID)
+				return false
+			},
+			expected: nil,
+		},
+		{
+			name: "set pod resize pending condition to deferred with preemption disabled",
+			updateFunc: func(podUID types.UID) bool {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+				return m.SetPodResizePendingCondition(podUID, "some-reason", "some-message", true, 1)
+			},
+			expectedUpdateFuncReturnVal: true,
+			expected: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonDeferred,
+					Message:            "some-message",
+					ObservedGeneration: 1,
+				},
+				{
+					Type:               v1.PodResizePreemptionDisabled,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonPreemptionDisabledByNodePolicy,
+					Message:            "Preemption is disabled by node policy",
+					ObservedGeneration: 1,
+				},
+			},
+			expectedIsPodResizeDeferred: true,
+		},
+		{
+			name: "update preemption disabled on already deferred pod",
+			updateFunc: func(podUID types.UID) bool {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+				return m.SetPodResizePendingCondition(podUID, "some-reason", "some-message", false, 1)
+			},
+			expectedUpdateFuncReturnVal: false,
+			expected: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonDeferred,
+					Message:            "some-message",
+					ObservedGeneration: 1,
+				},
+			},
+			expectedIsPodResizeDeferred: true,
+		},
+		{
+			name: "set pod resize preemption condition directly on deferred pod",
+			updateFunc: func(podUID types.UID) bool {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+				return m.SetPodResizePreemptionCondition(podUID)
+			},
+			expectedUpdateFuncReturnVal: true,
+			expected: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonDeferred,
+					Message:            "some-message",
+					ObservedGeneration: 1,
+				},
+				{
+					Type:               v1.PodResizePreemptionDisabled,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonPreemptionDisabledByNodePolicy,
+					Message:            "Preemption is disabled by node policy",
+					ObservedGeneration: 1,
+				},
+			},
+			expectedIsPodResizeDeferred: true,
+		},
+		{
+			name: "clear pod resize preemption condition directly on deferred pod",
+			updateFunc: func(podUID types.UID) bool {
+				return m.ClearPodResizePreemptionCondition(podUID)
+			},
+			expectedUpdateFuncReturnVal: true,
+			expected: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonDeferred,
+					Message:            "some-message",
+					ObservedGeneration: 1,
+				},
+			},
+			expectedIsPodResizeDeferred: true,
+		},
+		{
+			name: "set pod resize pending condition to deferred with preemption disabled but feature gate disabled",
+			updateFunc: func(podUID types.UID) bool {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, false)
+				return m.SetPodResizePendingCondition(podUID, "some-reason", "some-message", true, 1)
+			},
+			expectedUpdateFuncReturnVal: false,
+			expected: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonDeferred,
+					Message:            "some-message",
+					ObservedGeneration: 1,
+				},
+			},
+			expectedIsPodResizeDeferred: true,
+		},
+		{
+			name: "set pod resize preemption condition directly on deferred pod with feature gate disabled",
+			updateFunc: func(podUID types.UID) bool {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, false)
+				return m.SetPodResizePreemptionCondition(podUID)
+			},
+			expectedUpdateFuncReturnVal: false,
+			expected: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonDeferred,
+					Message:            "some-message",
+					ObservedGeneration: 1,
+				},
+			},
+			expectedIsPodResizeDeferred: true,
+		},
+		{
+			name: "clear pod resize pending condition with preemption disabled",
 			updateFunc: func(podUID types.UID) bool {
 				m.ClearPodResizePendingCondition(podUID)
 				return false
@@ -2886,6 +3035,7 @@ func TestRecordPendingResizesCount(t *testing.T) {
 }
 
 func TestBackfillPodResizeConditions(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
 	metrics.Register()
 
 	pods := []*v1.Pod{
@@ -2958,6 +3108,57 @@ func TestBackfillPodResizeConditions(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
+				UID: "pod-preemption-disabled",
+			},
+			Status: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:               v1.PodResizePending,
+						Status:             v1.ConditionTrue,
+						ObservedGeneration: 1,
+						Reason:             v1.PodReasonDeferred,
+						Message:            "error-message",
+					},
+					{
+						Type:               v1.PodResizePreemptionDisabled,
+						Status:             v1.ConditionTrue,
+						ObservedGeneration: 1,
+						Reason:             v1.PodReasonPreemptionDisabledByNodePolicy,
+						Message:            "Preemption is disabled by node policy",
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: "pod-in-progress-pending-and-preemption-disabled",
+			},
+			Status: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:               v1.PodResizeInProgress,
+						Status:             v1.ConditionTrue,
+						ObservedGeneration: 1,
+					},
+					{
+						Type:               v1.PodResizePending,
+						Status:             v1.ConditionTrue,
+						ObservedGeneration: 1,
+						Reason:             v1.PodReasonDeferred,
+						Message:            "error-message",
+					},
+					{
+						Type:               v1.PodResizePreemptionDisabled,
+						Status:             v1.ConditionTrue,
+						ObservedGeneration: 1,
+						Reason:             v1.PodReasonPreemptionDisabledByNodePolicy,
+						Message:            "Preemption is disabled by node policy",
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
 				UID: "pod-no-resize-conditions",
 			},
 			Status: v1.PodStatus{
@@ -3014,6 +3215,43 @@ func TestBackfillPodResizeConditions(t *testing.T) {
 				Message:            "error-message",
 			},
 		},
+		"pod-preemption-disabled": {
+			PodResizePending: &v1.PodCondition{
+				Type:               v1.PodResizePending,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+				Reason:             v1.PodReasonDeferred,
+				Message:            "error-message",
+			},
+			PodResizePreemptionDisabled: &v1.PodCondition{
+				Type:               v1.PodResizePreemptionDisabled,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+				Reason:             v1.PodReasonPreemptionDisabledByNodePolicy,
+				Message:            "Preemption is disabled by node policy",
+			},
+		},
+		"pod-in-progress-pending-and-preemption-disabled": {
+			PodResizeInProgress: &v1.PodCondition{
+				Type:               v1.PodResizeInProgress,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+			},
+			PodResizePending: &v1.PodCondition{
+				Type:               v1.PodResizePending,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+				Reason:             v1.PodReasonDeferred,
+				Message:            "error-message",
+			},
+			PodResizePreemptionDisabled: &v1.PodCondition{
+				Type:               v1.PodResizePreemptionDisabled,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+				Reason:             v1.PodReasonPreemptionDisabledByNodePolicy,
+				Message:            "Preemption is disabled by node policy",
+			},
+		},
 	}
 
 	for _, c := range actualResizeConditions {
@@ -3026,6 +3264,10 @@ func TestBackfillPodResizeConditions(t *testing.T) {
 			c.PodResizePending.LastProbeTime = metav1.Time{}
 			c.PodResizePending.LastTransitionTime = metav1.Time{}
 		}
+		if c.PodResizePreemptionDisabled != nil {
+			c.PodResizePreemptionDisabled.LastProbeTime = metav1.Time{}
+			c.PodResizePreemptionDisabled.LastTransitionTime = metav1.Time{}
+		}
 	}
 
 	require.Equal(t, expectedResizeConditions, actualResizeConditions)
@@ -3033,7 +3275,7 @@ func TestBackfillPodResizeConditions(t *testing.T) {
 	expectedMetrics := `
 		# HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
 		# TYPE kubelet_pod_pending_resizes gauge
-		kubelet_pod_pending_resizes{reason="deferred"} 1
+		kubelet_pod_pending_resizes{reason="deferred"} 3
 		kubelet_pod_pending_resizes{reason="infeasible"} 1
 	`
 	require.NoError(t, testutil.GatherAndCompare(
@@ -3043,12 +3285,11 @@ func TestBackfillPodResizeConditions(t *testing.T) {
 	expectedMetrics = `
 		# HELP kubelet_pod_in_progress_resizes [ALPHA] Number of in-progress resizes for pods.
 		# TYPE kubelet_pod_in_progress_resizes gauge
-		kubelet_pod_in_progress_resizes 3
+		kubelet_pod_in_progress_resizes 4
 	`
 	require.NoError(t, testutil.GatherAndCompare(
 		legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_in_progress_resizes",
 	))
-
 }
 
 func statusEqual(left, right v1.PodStatus) bool {

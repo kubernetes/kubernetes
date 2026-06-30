@@ -1182,6 +1182,106 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 	})
 }
 
+func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
+	ginkgo.It("preempt a lower-priority pod to satisfy a deferred resize", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+		framework.ExpectNoError(err, "failed to get running nodes")
+		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
+
+		node := nodes.Items[0]
+		_, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
+		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+
+		// Conceptual 10 parts of available CPU
+		onePartCPU := nodeAvailableCPU.MilliValue() / 10
+		framework.Logf("Node '%s' available CPU = %dm (1 part = %dm)", node.Name, nodeAvailableCPU.MilliValue(), onePartCPU)
+
+		// Pod A (victim): 6 parts CPU, low priority
+		podACPU := resource.NewMilliQuantity(onePartCPU*6, resource.DecimalSI)
+		// Pod B (preemptor): 3 parts CPU, high priority
+		podBCPU := resource.NewMilliQuantity(onePartCPU*3, resource.DecimalSI)
+
+		cA := []podresize.ResizableContainerInfo{
+			{Name: "ca", Resources: &cgroups.ContainerResources{CPUReq: podACPU.String(), CPULim: podACPU.String()}},
+		}
+		cB := []podresize.ResizableContainerInfo{
+			{Name: "cb", Resources: &cgroups.ContainerResources{CPUReq: podBCPU.String(), CPULim: podBCPU.String()}},
+		}
+
+		tStamp := strconv.Itoa(time.Now().Nanosecond())
+		podA := podresize.MakePodWithResizableContainers(f.Namespace.Name, "victim-pod", tStamp, cA, nil)
+		podA = e2epod.MustMixinRestrictedPodSecurity(podA)
+		e2epod.SetNodeAffinity(&podA.Spec, node.Name)
+
+		podB := podresize.MakePodWithResizableContainers(f.Namespace.Name, "preemptor-pod", tStamp, cB, nil)
+		podB = e2epod.MustMixinRestrictedPodSecurity(podB)
+		e2epod.SetNodeAffinity(&podB.Spec, node.Name)
+
+		// Create Priority Classes
+		pcHigh, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{
+			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("preemptor-priority-%s", f.Namespace.Name)},
+			Value:      1000,
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		defer func() {
+			_ = f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pcHigh.Name, metav1.DeleteOptions{})
+		}()
+
+		pcLow, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{
+			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("victim-priority-%s", f.Namespace.Name)},
+			Value:      100,
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		defer func() {
+			_ = f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pcLow.Name, metav1.DeleteOptions{})
+		}()
+
+		podA.Spec.PriorityClassName = pcLow.Name
+		podB.Spec.PriorityClassName = pcHigh.Name
+
+		ginkgo.By(fmt.Sprintf("Create low-priority victim pod '%s' (6 parts CPU)", podA.Name))
+		podA = podClient.CreateSync(ctx, podA)
+		gomega.Expect(podA.Status.Phase).To(gomega.Equal(v1.PodRunning))
+
+		ginkgo.By(fmt.Sprintf("Create high-priority preemptor pod '%s' (3 parts CPU)", podB.Name))
+		podB = podClient.CreateSync(ctx, podB)
+		gomega.Expect(podB.Status.Phase).To(gomega.Equal(v1.PodRunning))
+
+		// Resize Pod B to 6 parts CPU (needs 3 parts more, only 1 part remains free on node)
+		podBResizedCPU := resource.NewMilliQuantity(onePartCPU*6, resource.DecimalSI)
+		patchPodBToDeferred := fmt.Sprintf(`{
+			"spec": {
+				"containers": [
+					{
+						"name":      "cb",
+						"resources": {"requests": {"cpu": "%dm"},"limits": {"cpu": "%dm"}}
+					}
+				]
+			}
+		}`, podBResizedCPU.MilliValue(), podBResizedCPU.MilliValue())
+
+		ginkgo.By(fmt.Sprintf("Resize high-priority pod '%s' to 6 parts CPU (exceeds node capacity, should defer)", podB.Name))
+		podB, err = f.ClientSet.CoreV1().Pods(podB.Namespace).Patch(ctx,
+			podB.Name, types.StrategicMergePatchType, []byte(patchPodBToDeferred), metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(err, "failed to patch pod for resize")
+
+		ginkgo.By(fmt.Sprintf("Verify that low-priority victim pod '%s' gets preempted/evicted", podA.Name))
+		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podA.Name, podA.Namespace, 5*time.Minute)
+		framework.ExpectNoError(err, "victim pod was not deleted/preempted within timeout")
+
+		ginkgo.By("Verify that high-priority pod B's resize is successfully actuated after preemption")
+		expected := []podresize.ResizableContainerInfo{
+			{
+				Name:      "cb",
+				Resources: &cgroups.ContainerResources{CPUReq: podBResizedCPU.String(), CPULim: podBResizedCPU.String()},
+			},
+		}
+		resizedPodB := podresize.WaitForPodResizeActuation(ctx, f, podClient, podB, expected)
+		podresize.ExpectPodResized(ctx, f, resizedPodB, expected)
+	})
+}
+
 var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (scheduler-focused)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-scheduler-tests")
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -1231,6 +1331,22 @@ var _ = SIGDescribe("Pod InPlace Resize Container (limit-ranger)", framework.Wit
 	})
 	doPodResizeLimitRangerTests(f)
 })
+
+var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (deferred-resize-preemption)",
+	framework.WithFeatureGate(features.InPlacePodVerticalScaling),
+	framework.WithFeatureGate(features.InPlacePodVerticalScalingSchedulerPreemption),
+	func() {
+		f := framework.NewDefaultFramework("pod-resize-deferred-preemption-tests")
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+			framework.ExpectNoError(err)
+			if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
+				e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
+			}
+		})
+		doPodResizeDeferredPreemptionTests(f)
+	},
+)
 
 func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string) error {
 	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (v1.ResourceList, error) {

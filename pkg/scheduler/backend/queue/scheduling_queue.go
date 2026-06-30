@@ -42,6 +42,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	listersv1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -479,6 +480,11 @@ func (p *PriorityQueue) isEventOfInterest(logger klog.Logger, event fwk.ClusterE
 
 // isPodGroupMember returns true if the pod is a member of a pod group.
 func (p *PriorityQueue) isPodGroupMember(pod *v1.Pod) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		if resource.IsPodResizeDeferred(pod) {
+			return false
+		}
+	}
 	return p.isGenericWorkloadEnabled && pod.Spec.SchedulingGroup != nil
 }
 

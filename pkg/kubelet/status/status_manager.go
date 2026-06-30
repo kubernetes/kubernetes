@@ -84,8 +84,9 @@ type manager struct {
 }
 
 type podResizeConditions struct {
-	PodResizePending    *v1.PodCondition
-	PodResizeInProgress *v1.PodCondition
+	PodResizePending            *v1.PodCondition
+	PodResizeInProgress         *v1.PodCondition
+	PodResizePreemptionDisabled *v1.PodCondition
 }
 
 func (prc podResizeConditions) List() []*v1.PodCondition {
@@ -95,6 +96,11 @@ func (prc podResizeConditions) List() []*v1.PodCondition {
 	}
 	if prc.PodResizeInProgress != nil {
 		conditions = append(conditions, prc.PodResizeInProgress)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		if prc.PodResizePreemptionDisabled != nil {
+			conditions = append(conditions, prc.PodResizePreemptionDisabled)
+		}
 	}
 	return conditions
 }
@@ -178,7 +184,15 @@ type Manager interface {
 
 	// SetPodResizePendingCondition caches the last PodResizePending condition for the pod.
 	// It returns true if the condition reason or observedGeneration is modified as a result of this call.
-	SetPodResizePendingCondition(podUID types.UID, reason, message string, observedGeneration int64) bool
+	SetPodResizePendingCondition(podUID types.UID, reason, message string, preemptionDisabled bool, observedGeneration int64) bool
+
+	// SetPodResizePreemptionCondition sets the PodResizePreemptionDisabled condition on a deferred pod.
+	// It returns true if the condition was modified.
+	SetPodResizePreemptionCondition(podUID types.UID) bool
+
+	// ClearPodResizePreemptionCondition clears the PodResizePreemptionDisabled condition from the pod cache.
+	// It returns true if the condition was cleared.
+	ClearPodResizePreemptionCondition(podUID types.UID) bool
 
 	// SetPodResizeInProgressCondition caches the last PodResizeInProgress condition for the pod.
 	// This function does not update observedGeneration if the condition already exists, nor does
@@ -309,28 +323,60 @@ func (m *manager) GetPodResizeConditions(podUID types.UID) []*v1.PodCondition {
 
 // SetPodResizePendingCondition caches the last PodResizePending condition for the pod.
 // It returns true if the condition reason or observedGeneration is modified as a result of this call.
-func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message string, observedGeneration int64) bool {
+func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message string, preemptionDisabled bool, observedGeneration int64) bool {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	previousCondition := m.podResizeConditions[podUID].PodResizePending
+	conds := m.podResizeConditions[podUID]
+	previousCondition := conds.PodResizePending
+	previousPreemption := conds.PodResizePreemptionDisabled
 
 	if reason != v1.PodReasonInfeasible {
 		// For all other "pending" reasons, we set the reason to "Deferred".
 		reason = v1.PodReasonDeferred
 	}
 
-	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizePending:    updatedPodResizeCondition(v1.PodResizePending, m.podResizeConditions[podUID].PodResizePending, reason, message, observedGeneration),
-		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
+	var newPreemption *v1.PodCondition
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		if reason == v1.PodReasonDeferred && preemptionDisabled {
+			newPreemption = newPodResizePreemptionCondition(previousPreemption, observedGeneration)
+		}
 	}
+
+	conds.PodResizePending = updatedPodResizeCondition(v1.PodResizePending, previousCondition, reason, message, observedGeneration)
+	conds.PodResizePreemptionDisabled = newPreemption
+	m.storeOrDeleteResizeConditions(podUID, conds)
 
 	if previousCondition == nil {
 		m.recordPendingResizeCount()
 		return true
-	} else {
-		return previousCondition.Reason != reason || previousCondition.ObservedGeneration != observedGeneration
 	}
+
+	return previousCondition.Reason != reason || previousCondition.ObservedGeneration != observedGeneration
+}
+
+// SetPodResizePreemptionCondition sets the PodResizePreemptionDisabled condition on a deferred pod.
+// It returns true if the condition was modified.
+func (m *manager) SetPodResizePreemptionCondition(podUID types.UID) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		return false
+	}
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	conds, exists := m.podResizeConditions[podUID]
+	if !exists || conds.PodResizePending == nil || conds.PodResizePending.Reason != v1.PodReasonDeferred {
+		// Pod is not deferred so nothing to do.
+		return false
+	}
+	// If the condition is already present and its observed generation matches the deferred condition,
+	// the condition is already up to date.
+	if conds.PodResizePreemptionDisabled != nil && conds.PodResizePreemptionDisabled.ObservedGeneration == conds.PodResizePending.ObservedGeneration {
+		return false
+	}
+	conds.PodResizePreemptionDisabled = newPodResizePreemptionCondition(conds.PodResizePreemptionDisabled, conds.PodResizePending.ObservedGeneration)
+	m.storeOrDeleteResizeConditions(podUID, conds)
+	return true
 }
 
 // This function does not update observedGeneration if the condition already exists, nor does
@@ -341,8 +387,9 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	previousCondition := m.podResizeConditions[podUID].PodResizeInProgress
-	if c := m.podResizeConditions[podUID].PodResizeInProgress; c != nil {
+	conds := m.podResizeConditions[podUID]
+	previousCondition := conds.PodResizeInProgress
+	if c := conds.PodResizeInProgress; c != nil {
 		// Preserve the old reason, message if they exist.
 		if reason == "" && message == "" {
 			reason = c.Reason
@@ -353,20 +400,18 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 		observedGeneration = c.ObservedGeneration
 	}
 
-	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message, observedGeneration),
-		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
-	}
+	conds.PodResizeInProgress = updatedPodResizeCondition(v1.PodResizeInProgress, conds.PodResizeInProgress, reason, message, observedGeneration)
+	m.storeOrDeleteResizeConditions(podUID, conds)
 
 	if previousCondition == nil {
 		m.recordInProgressResizeCount()
 	} else {
 		// Ignore lastProbeTime when comparing conditions.
-		previousCondition.LastProbeTime = m.podResizeConditions[podUID].PodResizeInProgress.LastProbeTime
-		previousCondition.LastTransitionTime = m.podResizeConditions[podUID].PodResizeInProgress.LastTransitionTime
+		previousCondition.LastProbeTime = conds.PodResizeInProgress.LastProbeTime
+		previousCondition.LastTransitionTime = conds.PodResizeInProgress.LastTransitionTime
 	}
 
-	return observedGeneration, !reflect.DeepEqual(previousCondition, m.podResizeConditions[podUID].PodResizeInProgress)
+	return observedGeneration, !reflect.DeepEqual(previousCondition, conds.PodResizeInProgress)
 }
 
 // ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
@@ -374,15 +419,14 @@ func (m *manager) ClearPodResizePendingCondition(podUID types.UID) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	if m.podResizeConditions[podUID].PodResizePending == nil {
+	conds, exists := m.podResizeConditions[podUID]
+	if !exists || (conds.PodResizePending == nil && conds.PodResizePreemptionDisabled == nil) {
 		return
 	}
 
-	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
-		PodResizePending:    nil,
-	}
-
+	conds.PodResizePending = nil
+	conds.PodResizePreemptionDisabled = nil
+	m.storeOrDeleteResizeConditions(podUID, conds)
 	m.recordPendingResizeCount()
 }
 
@@ -393,18 +437,30 @@ func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID) (int64, bo
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	if m.podResizeConditions[podUID].PodResizeInProgress == nil {
+	conds, exists := m.podResizeConditions[podUID]
+	if !exists || conds.PodResizeInProgress == nil {
 		return 0, false
 	}
 
-	generation := m.podResizeConditions[podUID].PodResizeInProgress.ObservedGeneration
-	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
-		PodResizeInProgress: nil,
-	}
+	generation := conds.PodResizeInProgress.ObservedGeneration
+	conds.PodResizeInProgress = nil
+	m.storeOrDeleteResizeConditions(podUID, conds)
 
 	m.recordInProgressResizeCount()
 	return generation, true
+}
+
+func (m *manager) ClearPodResizePreemptionCondition(podUID types.UID) bool {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	conds, exists := m.podResizeConditions[podUID]
+	if !exists || conds.PodResizePreemptionDisabled == nil {
+		return false
+	}
+	conds.PodResizePreemptionDisabled = nil
+	m.storeOrDeleteResizeConditions(podUID, conds)
+	return true
 }
 
 func (m *manager) BackfillPodResizeConditions(pods []*v1.Pod) {
@@ -412,27 +468,20 @@ func (m *manager) BackfillPodResizeConditions(pods []*v1.Pod) {
 	defer m.podStatusesLock.Unlock()
 
 	for _, pod := range pods {
+		conds := m.podResizeConditions[pod.UID]
 		for _, c := range pod.Status.Conditions {
 			switch c.Type {
 			case v1.PodResizePending:
-				newCondition := updatedPodResizeCondition(v1.PodResizePending, nil, c.Reason, c.Message, c.ObservedGeneration)
-				oldConditions := m.podResizeConditions[pod.UID]
-
-				m.podResizeConditions[pod.UID] = podResizeConditions{
-					PodResizePending:    newCondition,
-					PodResizeInProgress: oldConditions.PodResizeInProgress,
-				}
-
+				conds.PodResizePending = updatedPodResizeCondition(v1.PodResizePending, nil, c.Reason, c.Message, c.ObservedGeneration)
 			case v1.PodResizeInProgress:
-				newCondition := updatedPodResizeCondition(v1.PodResizeInProgress, nil, c.Reason, c.Message, c.ObservedGeneration)
-				oldConditions := m.podResizeConditions[pod.UID]
-
-				m.podResizeConditions[pod.UID] = podResizeConditions{
-					PodResizeInProgress: newCondition,
-					PodResizePending:    oldConditions.PodResizePending,
+				conds.PodResizeInProgress = updatedPodResizeCondition(v1.PodResizeInProgress, nil, c.Reason, c.Message, c.ObservedGeneration)
+			case v1.PodResizePreemptionDisabled:
+				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+					conds.PodResizePreemptionDisabled = newPodResizePreemptionCondition(nil, c.ObservedGeneration)
 				}
 			}
 		}
+		m.storeOrDeleteResizeConditions(pod.UID, conds)
 	}
 	m.recordPendingResizeCount()
 	m.recordInProgressResizeCount()
@@ -1467,6 +1516,10 @@ func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *
 	}
 }
 
+func newPodResizePreemptionCondition(oldCondition *v1.PodCondition, observedGeneration int64) *v1.PodCondition {
+	return updatedPodResizeCondition(v1.PodResizePreemptionDisabled, oldCondition, v1.PodReasonPreemptionDisabledByNodePolicy, "Preemption is disabled by node policy", observedGeneration)
+}
+
 // recordPendingResizeCount sets the pending resize metric.
 func (m *manager) recordPendingResizeCount() {
 	pendingResizeCount := make(map[string]int)
@@ -1491,4 +1544,12 @@ func (m *manager) recordInProgressResizeCount() {
 		}
 	}
 	metrics.PodInProgressResizes.Set(float64(inProgressResizeCount))
+}
+
+func (m *manager) storeOrDeleteResizeConditions(podUID types.UID, conds podResizeConditions) {
+	if conds.PodResizePending == nil && conds.PodResizeInProgress == nil && conds.PodResizePreemptionDisabled == nil {
+		delete(m.podResizeConditions, podUID)
+	} else {
+		m.podResizeConditions[podUID] = conds
+	}
 }

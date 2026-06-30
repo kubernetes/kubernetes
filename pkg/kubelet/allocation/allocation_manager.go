@@ -114,10 +114,11 @@ type manager struct {
 	statusManager status.Manager
 	sourcesReady  config.SourcesReady
 
-	ticker         *time.Ticker
-	triggerPodSync func(context.Context, *v1.Pod)
-	getActivePods  func() []*v1.Pod
-	getPodByUID    func(types.UID) (*v1.Pod, bool)
+	ticker                     *time.Ticker
+	triggerPodSync             func(context.Context, *v1.Pod)
+	getActivePods              func() []*v1.Pod
+	getPodByUID                func(types.UID) (*v1.Pod, bool)
+	isResizePreemptionDisabled func() bool
 
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
@@ -130,6 +131,7 @@ func NewManager(checkpointDirectory string,
 	triggerPodSync func(context.Context, *v1.Pod),
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
+	isResizePreemptionDisabled func() bool,
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorderLogger,
 	logger klog.Logger,
@@ -141,11 +143,12 @@ func NewManager(checkpointDirectory string,
 		admitHandlers: lifecycle.PodAdmitHandlers{},
 		sourcesReady:  sourcesReady,
 
-		ticker:         time.NewTicker(initialRetryDelay),
-		triggerPodSync: triggerPodSync,
-		getActivePods:  getActivePods,
-		getPodByUID:    getPodByUID,
-		recorder:       recorder,
+		ticker:                     time.NewTicker(initialRetryDelay),
+		triggerPodSync:             triggerPodSync,
+		getActivePods:              getActivePods,
+		getPodByUID:                getPodByUID,
+		isResizePreemptionDisabled: isResizePreemptionDisabled,
+		recorder:                   recorder,
 	}
 }
 
@@ -173,6 +176,7 @@ func NewInMemoryManager(
 	triggerPodSync func(context.Context, *v1.Pod),
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
+	isResizePreemptionDisabled func() bool,
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorderLogger,
 ) Manager {
@@ -183,11 +187,12 @@ func NewInMemoryManager(
 		admitHandlers: lifecycle.PodAdmitHandlers{},
 		sourcesReady:  sourcesReady,
 
-		ticker:         time.NewTicker(initialRetryDelay),
-		triggerPodSync: triggerPodSync,
-		getActivePods:  getActivePods,
-		getPodByUID:    getPodByUID,
-		recorder:       recorder,
+		ticker:                     time.NewTicker(initialRetryDelay),
+		triggerPodSync:             triggerPodSync,
+		getActivePods:              getActivePods,
+		getPodByUID:                getPodByUID,
+		isResizePreemptionDisabled: isResizePreemptionDisabled,
+		recorder:                   recorder,
 	}
 }
 
@@ -565,7 +570,11 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	}
 
 	if reason != "" {
-		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
+		preemptionDisabled := false
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+			preemptionDisabled = m.isResizePreemptionDisabled()
+		}
+		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, preemptionDisabled, pod.Generation) {
 			eventType := events.ResizeDeferred
 			if reason == v1.PodReasonInfeasible {
 				eventType = events.ResizeInfeasible
