@@ -52,6 +52,7 @@ type A struct {
 	A int    `json:"aa,omitempty"`
 	B string `json:"ab,omitempty"`
 	C bool   `json:"ac,omitempty"`
+	D uint   `json:"ad,omitempty"`
 }
 
 type B struct {
@@ -206,6 +207,14 @@ func doRoundTrip(t *testing.T, item interface{}) {
 		return
 	}
 
+	copiedNewUnstr := runtime.DeepCopyJSONValue(newUnstr)
+	if value, ok := copiedNewUnstr.(map[string]interface{}); ok {
+		newUnstr = value
+	} else {
+		t.Errorf("DeepCopyJSONValue return unexpected type %T", copiedNewUnstr)
+		return
+	}
+
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
 	err = runtime.NewTestUnstructuredConverter(simpleEquality).FromUnstructured(newUnstr, newObj)
 	if err != nil {
@@ -329,6 +338,12 @@ func TestRoundTrip(t *testing.T) {
 			// Test slice of interface{} with different values.
 			obj: &D{
 				A: []interface{}{float64(3.5), int64(4), "3.0", nil},
+			},
+		},
+		{
+			// Test uint values.
+			obj: &A{
+				D: 1,
 			},
 		},
 	}

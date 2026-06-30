@@ -683,11 +683,11 @@ func toUnstructured(sv, dv reflect.Value) error {
 		dv.Set(reflect.ValueOf(sv.Int()))
 		return nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		uVal := sv.Uint()
-		if uVal > math.MaxInt64 {
-			return fmt.Errorf("unsigned value %d does not fit into int64 (overflow)", uVal)
+		val, err := uintToUnstructuredHelper(sv.Uint())
+		if err != nil {
+			return err
 		}
-		dv.Set(reflect.ValueOf(int64(uVal)))
+		dv.Set(reflect.ValueOf(val))
 		return nil
 	case reflect.Float32, reflect.Float64:
 		dv.Set(reflect.ValueOf(sv.Float()))
@@ -849,7 +849,11 @@ func structToUnstructured(sv, dv reflect.Value) error {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			realMap[fieldInfo.name] = fv.Int()
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			realMap[fieldInfo.name] = fv.Uint()
+			val, err := uintToUnstructuredHelper(fv.Uint())
+			if err != nil {
+				return err
+			}
+			realMap[fieldInfo.name] = val
 		case reflect.Float32, reflect.Float64:
 			realMap[fieldInfo.name] = fv.Float()
 		default:
@@ -869,4 +873,11 @@ func interfaceToUnstructured(sv, dv reflect.Value) error {
 		return nil
 	}
 	return toUnstructured(sv.Elem(), dv)
+}
+
+func uintToUnstructuredHelper(uVal uint64) (int64, error) {
+	if uVal > math.MaxInt64 {
+		return 0, fmt.Errorf("unsigned value %d does not fit into int64 (overflow)", uVal)
+	}
+	return int64(uVal), nil
 }
