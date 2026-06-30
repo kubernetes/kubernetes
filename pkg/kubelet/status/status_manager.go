@@ -326,7 +326,7 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 	}
 
 	if previousCondition == nil {
-		m.recordPendingResizeCount()
+		m.observePendingResizeCount()
 		return true
 	} else {
 		return previousCondition.Reason != reason || previousCondition.ObservedGeneration != observedGeneration
@@ -383,7 +383,7 @@ func (m *manager) ClearPodResizePendingCondition(podUID types.UID) {
 		PodResizePending:    nil,
 	}
 
-	m.recordPendingResizeCount()
+	m.observePendingResizeCount()
 }
 
 // ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
@@ -434,7 +434,7 @@ func (m *manager) BackfillPodResizeConditions(pods []*v1.Pod) {
 			}
 		}
 	}
-	m.recordPendingResizeCount()
+	m.observePendingResizeCount()
 	m.recordInProgressResizeCount()
 }
 
@@ -1046,7 +1046,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 		if _, exists := m.podResizeConditions[uid]; exists {
 			delete(m.podResizeConditions, uid)
 			m.recordInProgressResizeCount()
-			m.recordPendingResizeCount()
+			m.observePendingResizeCount()
 		}
 	}
 }
@@ -1063,7 +1063,7 @@ func (m *manager) RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.U
 				if _, exists := m.podResizeConditions[key]; exists {
 					delete(m.podResizeConditions, key)
 					m.recordInProgressResizeCount()
-					m.recordPendingResizeCount()
+					m.observePendingResizeCount()
 				}
 			}
 		}
@@ -1467,18 +1467,28 @@ func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *
 	}
 }
 
-// recordPendingResizeCount sets the pending resize metric.
-func (m *manager) recordPendingResizeCount() {
-	pendingResizeCount := make(map[string]int)
-	for _, conditions := range m.podResizeConditions {
+// observePendingResizeCount sets the pending resize metric.
+func (m *manager) observePendingResizeCount() {
+	type pendingKey struct {
+		reason         string
+		priorityBucket metrics.PriorityBucket
+	}
+	pendingResizeCount := make(map[pendingKey]int)
+	for uid, conditions := range m.podResizeConditions {
 		if conditions.PodResizePending != nil {
-			pendingResizeCount[strings.ToLower(conditions.PodResizePending.Reason)]++
+			pod, ok := m.podManager.GetPodByUID(uid)
+			if !ok {
+				continue
+			}
+			reason := strings.ToLower(conditions.PodResizePending.Reason)
+			priorityBucket := metrics.GetPriorityBucketLabel(pod)
+			pendingResizeCount[pendingKey{reason: reason, priorityBucket: priorityBucket}]++
 		}
 	}
 
 	metrics.PodPendingResizes.Reset()
-	for reason, count := range pendingResizeCount {
-		metrics.PodPendingResizes.WithLabelValues(reason).Set(float64(count))
+	for k, count := range pendingResizeCount {
+		metrics.PodPendingResizes.WithLabelValues(k.reason, string(k.priorityBucket)).Set(float64(count))
 	}
 }
 

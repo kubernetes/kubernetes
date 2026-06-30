@@ -2773,9 +2773,11 @@ func TestRecordInProgressResizeCount(t *testing.T) {
 
 func TestRecordPendingResizesCount(t *testing.T) {
 	metrics.Register()
+	int32Ptr := func(val int32) *int32 { return &val }
 
 	for _, tc := range []struct {
 		name               string
+		existingPods       []*v1.Pod
 		existingConditions map[types.UID]podResizeConditions
 		expected           string
 	}{
@@ -2799,6 +2801,9 @@ func TestRecordPendingResizesCount(t *testing.T) {
 		},
 		{
 			name: "one pod deferred",
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", UID: "test-pod"}},
+			},
 			existingConditions: map[types.UID]podResizeConditions{
 				"test-pod": {
 					PodResizePending: &v1.PodCondition{
@@ -2810,13 +2815,17 @@ func TestRecordPendingResizesCount(t *testing.T) {
 				},
 			},
 			expected: `
-			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
 				# TYPE kubelet_pod_pending_resizes gauge
-				kubelet_pod_pending_resizes{reason="deferred"} 1
+				kubelet_pod_pending_resizes{priority_bucket="normal",reason="deferred"} 1
 			`,
 		},
 		{
 			name: "2 pods infeasible, each with a different reason",
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", UID: "test-pod-1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2", UID: "test-pod-2"}},
+			},
 			existingConditions: map[types.UID]podResizeConditions{
 				"test-pod-1": {
 					PodResizePending: &v1.PodCondition{
@@ -2836,13 +2845,17 @@ func TestRecordPendingResizesCount(t *testing.T) {
 				},
 			},
 			expected: `
-			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
 				# TYPE kubelet_pod_pending_resizes gauge
-				kubelet_pod_pending_resizes{reason="infeasible"} 2
+				kubelet_pod_pending_resizes{priority_bucket="normal",reason="infeasible"} 2
 			`,
 		},
 		{
 			name: "one deferred, one infeasible",
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", UID: "test-pod-1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2", UID: "test-pod-2"}},
+			},
 			existingConditions: map[types.UID]podResizeConditions{
 				"test-pod-1": {
 					PodResizePending: &v1.PodCondition{
@@ -2862,10 +2875,81 @@ func TestRecordPendingResizesCount(t *testing.T) {
 				},
 			},
 			expected: `
-			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
 				# TYPE kubelet_pod_pending_resizes gauge
-				kubelet_pod_pending_resizes{reason="deferred"} 1
-				kubelet_pod_pending_resizes{reason="infeasible"} 1
+				kubelet_pod_pending_resizes{priority_bucket="normal",reason="deferred"} 1
+				kubelet_pod_pending_resizes{priority_bucket="normal",reason="infeasible"} 1
+			`,
+		},
+		{
+			name: "multiple pods with different priority classes",
+			existingPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-sys", UID: "sys-uid"},
+					Spec:       v1.PodSpec{Priority: int32Ptr(2000000000)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-high", UID: "high-uid"},
+					Spec:       v1.PodSpec{Priority: int32Ptr(100000)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-med", UID: "med-uid"},
+					Spec:       v1.PodSpec{Priority: int32Ptr(5000)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-low", UID: "low-uid"},
+					Spec:       v1.PodSpec{Priority: int32Ptr(-500)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-vlow", UID: "vlow-uid"},
+					Spec:       v1.PodSpec{Priority: int32Ptr(-1500)},
+				},
+			},
+			existingConditions: map[types.UID]podResizeConditions{
+				"sys-uid": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+						Reason: v1.PodReasonDeferred,
+					},
+				},
+				"high-uid": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+						Reason: v1.PodReasonDeferred,
+					},
+				},
+				"med-uid": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+						Reason: v1.PodReasonInfeasible,
+					},
+				},
+				"low-uid": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+						Reason: v1.PodReasonDeferred,
+					},
+				},
+				"vlow-uid": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+						Reason: v1.PodReasonInfeasible,
+					},
+				},
+			},
+			expected: `
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
+				# TYPE kubelet_pod_pending_resizes gauge
+				kubelet_pod_pending_resizes{priority_bucket="high",reason="deferred"} 1
+				kubelet_pod_pending_resizes{priority_bucket="low",reason="deferred"} 1
+				kubelet_pod_pending_resizes{priority_bucket="medium",reason="infeasible"} 1
+				kubelet_pod_pending_resizes{priority_bucket="system-critical",reason="deferred"} 1
+				kubelet_pod_pending_resizes{priority_bucket="very-low",reason="infeasible"} 1
 			`,
 		},
 		{
@@ -2875,8 +2959,11 @@ func TestRecordPendingResizesCount(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			manager := newTestManager(&fake.Clientset{})
+			for _, p := range tc.existingPods {
+				manager.podManager.(mutablePodManager).AddPod(p)
+			}
 			manager.podResizeConditions = tc.existingConditions
-			manager.recordPendingResizeCount()
+			manager.observePendingResizeCount()
 
 			require.NoError(t, testutil.GatherAndCompare(
 				legacyregistry.DefaultGatherer, strings.NewReader(tc.expected), "kubelet_pod_pending_resizes",
@@ -2972,6 +3059,9 @@ func TestBackfillPodResizeConditions(t *testing.T) {
 	}
 
 	manager := newTestManager(&fake.Clientset{})
+	for _, p := range pods {
+		manager.podManager.(mutablePodManager).AddPod(p)
+	}
 	manager.BackfillPodResizeConditions(pods)
 	actualResizeConditions := manager.podResizeConditions
 	expectedResizeConditions := map[types.UID]podResizeConditions{
@@ -3031,10 +3121,10 @@ func TestBackfillPodResizeConditions(t *testing.T) {
 	require.Equal(t, expectedResizeConditions, actualResizeConditions)
 
 	expectedMetrics := `
-		# HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+		# HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
 		# TYPE kubelet_pod_pending_resizes gauge
-		kubelet_pod_pending_resizes{reason="deferred"} 1
-		kubelet_pod_pending_resizes{reason="infeasible"} 1
+		kubelet_pod_pending_resizes{priority_bucket="normal",reason="deferred"} 1
+		kubelet_pod_pending_resizes{priority_bucket="normal",reason="infeasible"} 1
 	`
 	require.NoError(t, testutil.GatherAndCompare(
 		legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_pending_resizes",
