@@ -29,9 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
-
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
@@ -474,5 +476,88 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 				t.Errorf("events not sorted by key: %v", got)
 			}
 		})
+	}
+}
+
+// TestCacheIntervalSourceSelection verifies that getIntervalFromStoreLocked builds the
+// interval from the lazy snapshot source when snapshotting is enabled and falls back to the
+// eager snapshot source when it is disabled.
+func TestCacheIntervalSourceSelection(t *testing.T) {
+	cases := []struct {
+		name             string
+		snapshottingOn   bool
+		wantLazySnapshot bool
+	}{
+		{
+			name:             "snapshotting enabled serves from lazy snapshot",
+			snapshottingOn:   true,
+			wantLazySnapshot: true,
+		},
+		{
+			name:             "snapshotting disabled falls back to eager snapshot",
+			snapshottingOn:   false,
+			wantLazySnapshot: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, tc.snapshottingOn)
+			wc := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
+			defer wc.Stop()
+			if err := wc.Add(makeTestPod("pod1", 100)); err != nil {
+				t.Fatal(err)
+			}
+
+			wc.Lock()
+			wci, err := wc.getIntervalFromStoreLocked("", false)
+			wc.Unlock()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tc.wantLazySnapshot {
+				if _, ok := wci.source.(*lazySnapshotCacheIntervalSource); !ok {
+					t.Errorf("expected *lazySnapshotCacheIntervalSource, got %T", wci.source)
+				}
+			} else {
+				if _, ok := wci.source.(*snapshotCacheIntervalSource); !ok {
+					t.Errorf("expected *snapshotCacheIntervalSource, got %T", wci.source)
+				}
+			}
+		})
+	}
+}
+
+type countingSnapshot struct {
+	items                  []interface{}
+	orderedListPrefixCalls int
+}
+
+func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
+	return nil, false, nil
+}
+
+func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error) {
+	s.orderedListPrefixCalls++
+	return s.items, nil
+}
+
+// TestLazySnapshotCacheIntervalSourceEmpty checks that on an empty snapshot Next() returns
+// no events, and that repeated calls still read the snapshot only once.
+func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
+	snap := &countingSnapshot{}
+	wci := newCacheIntervalFromLazySnapshot(100, snap)
+
+	for range 2 {
+		event, err := wci.Next()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if event != nil {
+			t.Errorf("expected nil event from empty snapshot, got %v", *event)
+		}
+	}
+	if snap.orderedListPrefixCalls != 1 {
+		t.Errorf("expected OrderedListPrefix to be called once, got %d", snap.orderedListPrefixCalls)
 	}
 }

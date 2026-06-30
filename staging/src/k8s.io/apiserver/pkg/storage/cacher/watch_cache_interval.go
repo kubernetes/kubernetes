@@ -107,6 +107,19 @@ func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key 
 	return ci, nil
 }
 
+// newCacheIntervalFromLazySnapshot builds an interval backed by an immutable store snapshot
+// Unlike newCacheIntervalFromStore, it captures snapshot reference which takes O(1) under watch-cache RLock
+// and defers O(N) traversal to first Next() call post lock release
+func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot) *watchCacheInterval {
+	return &watchCacheInterval{
+		source: &lazySnapshotCacheIntervalSource{
+			snapshot:        snap,
+			resourceVersion: resourceVersion,
+		},
+		resourceVersion: resourceVersion,
+	}
+}
+
 func storeElementToWatchCacheEvent(elem *store.Element, resourceVersion uint64) *watchCacheEvent {
 	return &watchCacheEvent{
 		Type:            watch.Added,
@@ -243,6 +256,43 @@ func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 		return nil, nil
 	}
 	return event, nil
+}
+
+// lazySnapshotCacheIntervalSource serves events from an immutable snapshot.
+// The snapshot reference is captured under the watchCache lock, but the O(N)
+// traversal that materializes the events is deferred until the first Next()
+// call so that it runs off the watchCache lock.
+type lazySnapshotCacheIntervalSource struct {
+	// snapshot is an immutable point-in-time copy of the store.
+	snapshot store.Snapshot
+	// resourceVersion is assigned to every watchCacheEvent produced by this source.
+	resourceVersion uint64
+	// loaded indicates whether items has been materialized from the snapshot.
+	loaded bool
+	// items holds the result of OrderedListPrefix, populated on the first Next() call
+	items []interface{}
+	// currentIndex tracks the current position within items.
+	currentIndex int
+}
+
+func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
+	if !s.loaded {
+		items, err := s.snapshot.OrderedListPrefix("", "")
+		if err != nil {
+			return nil, err
+		}
+		s.items = items
+		s.loaded = true
+	}
+	if s.currentIndex >= len(s.items) {
+		return nil, nil
+	}
+	elem, ok := s.items[s.currentIndex].(*store.Element)
+	if !ok {
+		return nil, fmt.Errorf("not a storeElement: %v", s.items[s.currentIndex])
+	}
+	s.currentIndex++
+	return storeElementToWatchCacheEvent(elem, s.resourceVersion), nil
 }
 
 const bufferSize = 100
