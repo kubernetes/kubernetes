@@ -40,6 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/version"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -1242,8 +1243,8 @@ func TestReadyCondition(t *testing.T) {
 		{
 			desc:                      "new, not ready: shutdown active",
 			node:                      withCapacity.DeepCopy(),
-			nodeShutdownManagerErrors: errors.New("node is shutting down"),
-			expectConditions:          []v1.NodeCondition{*makeReadyCondition(false, "node is shutting down", now, now)},
+			nodeShutdownManagerErrors: errors.New(nodeutil.NodeShutdownMessage),
+			expectConditions:          []v1.NodeCondition{*makeReadyCondition(false, nodeutil.NodeShutdownMessage, now, now)},
 		},
 		{
 			desc:             "new, not ready: runtime and network errors",

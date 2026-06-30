@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	nodeutil "k8s.io/component-helpers/node/util"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -47,6 +48,8 @@ const (
 	ErrReasonUnknownCondition = "node(s) had unknown conditions"
 	// ErrReasonUnschedulable is used for NodeUnschedulable predicate error.
 	ErrReasonUnschedulable = "node(s) were unschedulable"
+	// ErrReasonNodeShutdown is used for shutting down Node predicate error.
+	ErrReasonNodeShutdown = "node(s) were shutting down"
 )
 
 // EventsToRegister returns the possible events that may make a Pod
@@ -54,7 +57,7 @@ const (
 func (pl *NodeUnschedulable) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return []fwk.ClusterEventWithHint{
 		// When QueueingHint is enabled, we don't use preCheck and we don't need to register UpdateNodeLabel event.
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeCondition}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 		// When the QueueingHint feature is enabled,
 		// the scheduling queue uses Pod/Update Queueing Hint
 		// to determine whether a Pod's update makes the Pod schedulable or not.
@@ -98,9 +101,11 @@ func (pl *NodeUnschedulable) isSchedulableAfterNodeChange(logger klog.Logger, po
 
 	// We queue this Pod when -
 	// 1. the node is updated from unschedulable to schedulable.
-	// 2. the node is added and is schedulable.
+	// 2. the node is updated from shutting down to not shutting down.
+	// 3. the node is added and is schedulable.
 	if (originalNode != nil && originalNode.Spec.Unschedulable && !modifiedNode.Spec.Unschedulable) ||
-		(originalNode == nil && !modifiedNode.Spec.Unschedulable) {
+		(originalNode != nil && nodeutil.IsNodeInGracefulShutdown(originalNode) && !nodeutil.IsNodeInGracefulShutdown(modifiedNode)) ||
+		(originalNode == nil && !modifiedNode.Spec.Unschedulable && !nodeutil.IsNodeInGracefulShutdown(modifiedNode)) {
 		logger.V(5).Info("node was created or updated, pod may be schedulable now", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return fwk.Queue, nil
 	}
@@ -124,6 +129,9 @@ func (pl *NodeUnschedulable) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Si
 // Filter invoked at the filter extension point.
 func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	node := nodeInfo.Node()
+	if nodeutil.IsNodeInGracefulShutdown(node) {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonNodeShutdown)
+	}
 
 	if !node.Spec.Unschedulable {
 		return nil
