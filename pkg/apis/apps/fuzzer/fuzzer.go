@@ -26,7 +26,6 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/utils/ptr"
 )
 
 // Funcs returns the fuzzer functions for the apps api group.
@@ -91,7 +90,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 
 			if s.RollingUpdate != nil && s.RollingUpdate.MaxUnavailable == nil {
-				s.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(1))
+				s.RollingUpdate.MaxUnavailable = new(intstr.FromInt32(1))
 			}
 		},
 		func(j *apps.Deployment, c randfill.Continue) {
