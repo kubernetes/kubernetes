@@ -2612,7 +2612,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "clear pod resize pending condition",
 			updateFunc: func(podUID types.UID) bool {
-				m.ClearPodResizePendingCondition(podUID)
+				m.ClearPodResizePendingCondition(podUID, "accepted")
 				return false
 			},
 			expected: nil,
@@ -3183,5 +3183,132 @@ func getPodStatus() v1.PodStatus {
 			},
 		},
 		Message: "Message",
+	}
+}
+
+func TestPodDeferredResizeDurationSeconds(t *testing.T) {
+	metrics.Register()
+	int32Ptr := func(val int32) *int32 { return &val }
+
+	testCases := []struct {
+		name               string
+		podUID             types.UID
+		priority           *int32
+		conditionReason    string
+		action             string // "clear", "delete", "orphan"
+		resolution         string
+		expectedResolution string
+		expectedPriority   string
+		expectedCount      int
+	}{
+		{
+			name:               "no condition present - no metric emitted",
+			podUID:             "pod-no-cond",
+			priority:           int32Ptr(0),
+			conditionReason:    "",
+			action:             "clear",
+			resolution:         "accepted",
+			expectedResolution: "accepted",
+			expectedPriority:   "normal",
+			expectedCount:      0,
+		},
+		{
+			name:               "infeasible condition - no metric emitted",
+			podUID:             "pod-infeasible",
+			priority:           int32Ptr(0),
+			conditionReason:    v1.PodReasonInfeasible,
+			action:             "clear",
+			resolution:         "accepted",
+			expectedResolution: "accepted",
+			expectedPriority:   "normal",
+			expectedCount:      0,
+		},
+		{
+			name:               "deferred condition cleared as accepted",
+			podUID:             "pod-accepted",
+			priority:           int32Ptr(100000),
+			conditionReason:    v1.PodReasonDeferred,
+			action:             "clear",
+			resolution:         "accepted",
+			expectedResolution: "accepted",
+			expectedPriority:   "high",
+			expectedCount:      1,
+		},
+		{
+			name:               "deferred condition cleared as reverted",
+			podUID:             "pod-reverted",
+			priority:           int32Ptr(-500),
+			conditionReason:    v1.PodReasonDeferred,
+			action:             "clear",
+			resolution:         "reverted",
+			expectedResolution: "reverted",
+			expectedPriority:   "low",
+			expectedCount:      1,
+		},
+		{
+			name:               "deferred condition removed via DeletePodStatus as terminated",
+			podUID:             "pod-deleted",
+			priority:           int32Ptr(2000000000),
+			conditionReason:    v1.PodReasonDeferred,
+			action:             "delete",
+			expectedResolution: "terminated",
+			expectedPriority:   "system-critical",
+			expectedCount:      1,
+		},
+		{
+			name:               "deferred condition removed via RemoveOrphanedStatuses as terminated",
+			podUID:             "pod-orphaned",
+			priority:           int32Ptr(-1500),
+			conditionReason:    v1.PodReasonDeferred,
+			action:             "orphan",
+			expectedResolution: "terminated",
+			expectedPriority:   "very-low",
+			expectedCount:      1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics.PodDeferredResizeDurationSeconds.Reset()
+			manager := newTestManager(&fake.Clientset{})
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: string(tc.podUID), UID: tc.podUID},
+				Spec:       v1.PodSpec{Priority: tc.priority},
+			}
+			manager.podManager.(mutablePodManager).AddPod(pod)
+
+			if tc.conditionReason != "" {
+				manager.podResizeConditions[tc.podUID] = podResizeConditions{
+					PodResizePending: &v1.PodCondition{
+						Type:               v1.PodResizePending,
+						Status:             v1.ConditionTrue,
+						Reason:             tc.conditionReason,
+						LastTransitionTime: metav1.Time{Time: time.Now().Add(-30 * time.Second)},
+					},
+				}
+			}
+			if tc.action == "delete" || tc.action == "orphan" {
+				manager.podStatuses[tc.podUID] = versionedPodStatus{
+					status: v1.PodStatus{Phase: v1.PodRunning},
+				}
+			}
+
+			switch tc.action {
+			case "clear":
+				manager.ClearPodResizePendingCondition(tc.podUID, tc.resolution)
+			case "delete":
+				manager.deletePodStatus(tc.podUID)
+			case "orphan":
+				manager.RemoveOrphanedStatuses(klog.Background(), map[types.UID]bool{})
+			}
+
+			count, err := testutil.GetHistogramMetricCount(
+				metrics.PodDeferredResizeDurationSeconds.WithLabelValues(tc.expectedResolution, tc.expectedPriority),
+			)
+			if tc.expectedCount == 0 && err != nil {
+				count = 0
+			}
+			require.Equal(t, uint64(tc.expectedCount), count)
+		})
 	}
 }
