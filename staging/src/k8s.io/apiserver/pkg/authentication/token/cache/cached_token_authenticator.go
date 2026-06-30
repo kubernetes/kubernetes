@@ -127,6 +127,7 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 
 // AuthenticateToken implements authenticator.Token
 func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	registerMetrics()
 	record := a.doAuthenticateToken(ctx, token)
 	if !record.ok || record.err != nil {
 		return nil, false, record.err

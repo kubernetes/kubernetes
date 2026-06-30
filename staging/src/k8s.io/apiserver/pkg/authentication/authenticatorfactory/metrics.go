@@ -18,6 +18,7 @@ package authenticatorfactory
 
 import (
 	"context"
+	"sync"
 
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -25,11 +26,17 @@ import (
 
 type registerables []compbasemetrics.Registerable
 
-// init registers all metrics.
-func init() {
-	for _, metric := range metrics {
-		legacyregistry.MustRegister(metric)
-	}
+var registerMetricsOnce sync.Once
+
+// registerMetrics registers the delegated authentication metrics with the legacy
+// registry on first use, rather than from an init() function,
+// so that the gates are honored when the histogram metric is created.
+func registerMetrics() {
+	registerMetricsOnce.Do(func() {
+		for _, metric := range metrics {
+			legacyregistry.MustRegister(metric)
+		}
+	})
 }
 
 var (
@@ -60,10 +67,12 @@ var (
 
 // RecordRequestTotal increments the total number of requests for the delegated authentication.
 func RecordRequestTotal(ctx context.Context, code string) {
+	registerMetrics()
 	requestTotal.WithContext(ctx).WithLabelValues(code).Inc()
 }
 
 // RecordRequestLatency measures request latency in seconds for the delegated authentication. Broken down by status code.
 func RecordRequestLatency(ctx context.Context, code string, latency float64) {
+	registerMetrics()
 	requestLatency.WithContext(ctx).WithLabelValues(code).Observe(latency)
 }

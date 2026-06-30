@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	asn1util "k8s.io/apimachinery/pkg/apis/asn1"
@@ -72,8 +73,15 @@ var clientCertificateExpirationHistogram = metrics.NewHistogram(
 	},
 )
 
-func init() {
-	legacyregistry.MustRegister(clientCertificateExpirationHistogram)
+var registerMetricsOnce sync.Once
+
+// registerMetrics registers the x509 authentication metrics with the legacy
+// registry on first use, rather than from an init() function,
+// so that the gates are honored when the histogram metric is created.
+func registerMetrics() {
+	registerMetricsOnce.Do(func() {
+		legacyregistry.MustRegister(clientCertificateExpirationHistogram)
+	})
 }
 
 // UserConversion defines an interface for extracting user info from a client certificate chain
@@ -180,6 +188,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 					- for the step 3, see: staging/src/k8s.io/client-go/transport/transport.go
 	*/
 
+	registerMetrics()
 	remaining := req.TLS.PeerCertificates[0].NotAfter.Sub(time.Now())
 	clientCertificateExpirationHistogram.WithContext(req.Context()).Observe(remaining.Seconds())
 	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)
