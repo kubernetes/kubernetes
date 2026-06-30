@@ -524,6 +524,11 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			if podGroupState != nil && podGroupState.pendingAllocations.Has(claim.UID) {
 				if pendingAllocation := pl.draManager.ResourceClaims().GetPendingAllocation(claim.UID); pendingAllocation != nil {
 					s.informationsForClaim[index].allocation = pendingAllocation
+					nodeSelector, err := nodeaffinity.NewNodeSelector(pendingAllocation.NodeSelector)
+					if err != nil {
+						return nil, statusError(logger, err)
+					}
+					s.informationsForClaim[index].availableOnNodes = nodeSelector
 					logger.V(5).Info("reusing pending allocation", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim), "uid", claim.UID, "allocation", klog.Format(pendingAllocation))
 					continue
 				}

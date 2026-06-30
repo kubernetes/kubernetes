@@ -139,4 +139,50 @@ func testPodGroup(tCtx ktesting.TContext) {
 			}
 		})
 	}
+
+	tCtx.Run("incompatible-node-selectors", func(tCtx ktesting.TContext) {
+		tCtx.Parallel()
+
+		namespace := createTestNamespace(tCtx, nil)
+		startScheduler(tCtx)
+
+		class, driverName := createTestClass(tCtx, namespace)
+
+		slice0 := st.MakeResourceSlice("worker-0", driverName).Devices("device-0")
+		createSlice(tCtx, slice0.Obj())
+
+		claimObj := createClaim(tCtx, namespace, "", class, claim)
+
+		podGroup := &schedulingapi.PodGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podGroupName,
+			},
+			Spec: schedulingapi.PodGroupSpec{
+				SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+					Gang: &schedulingapi.GangSchedulingPolicy{
+						MinCount: 2,
+					},
+				},
+			},
+		}
+		podGroup, err := tCtx.Client().SchedulingV1alpha3().PodGroups(namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create PodGroup")
+
+		schedGroup := &v1.PodSchedulingGroup{
+			PodGroupName: &podGroup.Name,
+		}
+
+		pod0 := podWithClaimName.DeepCopy()
+		pod0.Spec.SchedulingGroup = schedGroup
+		pod0.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": "worker-0"}
+		pod0 = createPod(tCtx, namespace, "-0", pod0, claimObj)
+
+		pod1 := podWithClaimName.DeepCopy()
+		pod1.Spec.SchedulingGroup = schedGroup
+		pod1.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": "worker-1"}
+		pod1 = createPod(tCtx, namespace, "-1", pod1, claimObj)
+
+		expectPodUnschedulable(tCtx, pod0, "pod group is unschedulable, minCount (2) cannot be satisfied")
+		expectPodUnschedulable(tCtx, pod1, "1 resourceclaim not available on the node")
+	})
 }
