@@ -31,6 +31,8 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.opentelemetry.io/otel/attribute"
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -776,6 +778,20 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	}()
 
 	aggregator := s.listErrAggrFactory()
+
+	shouldUseStream := opts.Recursive && opts.Predicate.Limit == 0 && len(opts.Predicate.Continue) == 0 && withRev == 0 &&
+		utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) &&
+		etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RangeStream)
+
+	if shouldUseStream {
+		handled, streamFetched, streamEvaluated, streamErr := s.streamList(ctx, keyPrefix, listObj, opts, newItemFunc, aggregator, v)
+		numFetched += streamFetched
+		numEvald += streamEvaluated
+		if handled {
+			return streamErr
+		}
+	}
+
 	for {
 		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
 			Revision: withRev,
@@ -807,30 +823,16 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			withRev = getResp.Revision
 		}
 
-		// avoid small allocations for the result slice, since this can be called in many
-		// different contexts and we don't know how significantly the result will be filtered
-		if opts.Predicate.Empty() {
-			growSlice(v, len(getResp.Kvs))
-		} else {
-			growSlice(v, 2048, len(getResp.Kvs))
+		chunkLastKey, chunkEvaluated, chunkHasMore, err := s.appendChunk(ctx, getResp.Kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
+		if err != nil {
+			return err
 		}
-
-		// take items from the response until the bucket is full, filtering as we go
-		for i, kv := range getResp.Kvs {
-			if paging && int64(v.Len()) >= opts.Predicate.Limit {
-				hasMore = true
-				break
-			}
-			lastKey = kv.Key
-			evaluated, err := s.processListItem(ctx, kv, opts.Predicate, newItemFunc, aggregator, v)
-			if err != nil {
-				return err
-			}
-			if evaluated {
-				numEvald++
-			}
-			// free kv early. Long lists can take O(seconds) to decode.
-			getResp.Kvs[i] = nil
+		numEvald += chunkEvaluated
+		if chunkHasMore {
+			hasMore = true
+		}
+		if chunkLastKey != nil {
+			lastKey = chunkLastKey
 		}
 		continueKey = string(lastKey) + "\x00"
 
@@ -853,23 +855,21 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 	}
 
-	if err := aggregator.Err(); err != nil {
-		return err
-	}
-
-	if v.IsNil() {
-		// Ensure that we never return a nil Items pointer in the result for consistency.
-		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
-	}
-
 	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, getResp.Count, hasMore, opts)
 	if err != nil {
 		return err
 	}
-	return s.finalizeList(listObj, opts.Predicate, uint64(withRev), continueValue, remainingItemCount)
+	return s.finalizeList(listObj, opts.Predicate, uint64(withRev), continueValue, remainingItemCount, aggregator, v)
 }
 
-func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64) error {
+func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator ListErrorAggregator, v reflect.Value) error {
+	if err := aggregator.Err(); err != nil {
+		return err
+	}
+	if v.IsNil() {
+		// Ensure that we never return a nil Items pointer in the result for consistency.
+		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
+	}
 	if err := s.versioner.UpdateList(listObj, rev, continueValue, remainingItemCount); err != nil {
 		return err
 	}
@@ -911,6 +911,83 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 	}
 
 	return true, nil
+}
+
+// appendChunk appends the kvs matching pred to v.
+func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value, paging bool) (lastKey []byte, evaluated int, hasMore bool, err error) {
+	// avoid small allocations for the result slice, since this can be called in many
+	// different contexts and we don't know how significantly the result will be filtered
+	if pred.Empty() {
+		growSlice(v, len(kvs))
+	} else {
+		growSlice(v, 2048, len(kvs))
+	}
+	for i, kv := range kvs {
+		if paging && int64(v.Len()) >= pred.Limit {
+			return lastKey, evaluated, true, nil
+		}
+		lastKey = kv.Key
+		ok, err := s.processListItem(ctx, kv, pred, newItemFunc, aggregator, v)
+		if err != nil {
+			return lastKey, evaluated, false, err
+		}
+		if ok {
+			evaluated++
+		}
+		// free kv early. Long lists can take O(seconds) to decode.
+		kvs[i] = nil
+	}
+	return lastKey, evaluated, false, nil
+}
+
+// streamList serves an unbounded recursive list via etcd RangeStream. handled is false only when the server doesn't support RangeStream.
+func (s *store) streamList(ctx context.Context, keyPrefix string, listObj runtime.Object, opts storage.ListOptions, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value) (handled bool, numFetched, numEvald int, err error) {
+	startTime := time.Now()
+	stream, err := s.client.KV.GetStream(ctx, keyPrefix, clientv3.WithRange(clientv3.GetPrefixRangeEnd(keyPrefix)))
+	if err != nil {
+		if grpcstatus.Code(err) == grpccodes.Unimplemented {
+			etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
+			klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", s.groupResource)
+			return false, 0, 0, nil
+		}
+		return true, 0, 0, err
+	}
+	estimator := s.getResourceSizeEstimator()
+	defer func() {
+		metrics.RecordEtcdRequest("listStream", s.groupResource, err, startTime)
+	}()
+
+	var rev int64
+	var chunkEvaluated int
+	for resp := range stream {
+		if err = resp.Err(); err != nil {
+			// paging=false: a compaction mid-stream can't be resumed with a
+			// continue token, so surface it as ResourceExpired for a relist.
+			return true, numFetched, numEvald, interpretListError(err, false, "", keyPrefix)
+		}
+		rangeResp := resp.RangeResponse
+		numFetched += len(rangeResp.Kvs)
+		if estimator != nil {
+			estimator.Update(rangeResp.Kvs)
+		}
+		_, chunkEvaluated, _, err = s.appendChunk(ctx, rangeResp.Kvs, opts.Predicate, newItemFunc, aggregator, v, false)
+		if err != nil {
+			return true, numFetched, numEvald, err
+		}
+		numEvald += chunkEvaluated
+		if rev == 0 && rangeResp.Header != nil {
+			rev = rangeResp.Header.Revision
+		}
+	}
+	if rev == 0 {
+		return true, numFetched, numEvald, fmt.Errorf("rangeStream for %q completed without a revision", keyPrefix)
+	}
+
+	if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(rev)); err != nil {
+		return true, numFetched, numEvald, err
+	}
+	// an unbounded stream has no continue token or remaining item count, so pass "" and nil.
+	return true, numFetched, numEvald, s.finalizeList(listObj, opts.Predicate, uint64(rev), "", nil, aggregator, v)
 }
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
