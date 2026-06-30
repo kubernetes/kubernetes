@@ -73,6 +73,14 @@ const (
 	serviceIPsMap       = "service-ips"
 	serviceNodePortsMap = "service-nodeports"
 
+	// shared load-balancing for eligible (plain ClusterIP, non-affinity,
+	// cluster-policy) services: per-protocol endpoints maps keyed by
+	// "clusterIP . port . slot", looked up from per-endpoint-count
+	// "lb-N-endpoints" bucket chains. This lets many services share a handful
+	// of chains instead of one bespoke chain each. There is one map per
+	// protocol (see endpointsMapName).
+	endpointsMapPrefix = "endpoints-"
+
 	// set of IPs that accept NodePort traffic
 	nodePortIPsSet = "nodeport-ips"
 
@@ -193,6 +201,9 @@ type Proxier struct {
 	noEndpointNodePorts *nftElementStorage
 	serviceNodePorts    *nftElementStorage
 	hairpinConnections  *nftElementStorage
+	// endpoints holds the per-protocol shared endpoints maps, keyed by the
+	// lowercase protocol name (see bucketProtocols / endpointsMapName).
+	endpoints map[string]*nftElementStorage
 }
 
 // Proxier implements proxy.Provider
@@ -263,6 +274,7 @@ func NewProxier(ctx context.Context,
 		noEndpointNodePorts: newNFTElementStorage("map", noEndpointNodePortsMap),
 		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
 		hairpinConnections:  newNFTElementStorage("set", hairpinConnectionsSet),
+		endpoints:           newEndpointsStorage(),
 	}
 
 	logger.V(2).Info("NFTables sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "maxSyncPeriod", proxyutil.FullSyncPeriod)
@@ -626,6 +638,32 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Comment: ptr.To("NodePort traffic"),
 	})
 
+	// Per-protocol endpoints maps shared by all eligible (plain ClusterIP,
+	// non-affinity, cluster-policy) services. Each is keyed by the service tuple
+	// plus a slot index ("clusterIP . port . slot"); the value is the endpoint
+	// "ip . port". The lb-N-endpoints bucket chains generate the slot.
+	//
+	// The key/value are declared with "typeof" rather than "type" because the
+	// slot is produced by "numgen", whose datatype is a variable-sized integer
+	// that nftables refuses to put in a concatenation via a plain "type"
+	// declaration. "typeof" captures numgen's concrete fixed-width type. The
+	// "mod 2" is arbitrary; it only defines the slot field's type, not its
+	// range (any modulus yields the same type, and slots scale to large values).
+	//
+	// There is one map per protocol, each pinning a concrete "<proto> dport",
+	// rather than a single map keyed by the generic "meta l4proto . th dport".
+	// A generic key resolves fine when the map and its referencing rule are in
+	// the same transaction, but once the map is committed a bucket rule added in
+	// a later sync transaction fails with "conflicting protocols specified: tcp
+	// vs. th". Pinning the protocol bakes a definite type into the committed map.
+	for _, protocol := range bucketProtocols {
+		tx.Add(&knftables.Map{
+			Name:    endpointsMapName(protocol),
+			TypeOf:  ipX + " daddr . " + protocol + " dport . numgen random mod 2 : " + ipX + " daddr . " + protocol + " dport",
+			Comment: new("endpoints for " + protocol + " services using shared load-balancing buckets"),
+		})
+	}
+
 	if proxier.masqueradeAll {
 		tx.Add(&knftables.Rule{
 			Chain: servicesChain,
@@ -688,6 +726,9 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	proxier.noEndpointNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.serviceNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.hairpinConnections.readOrReset(tx, proxier.nftables, proxier.logger)
+	for _, protocol := range bucketProtocols {
+		proxier.endpoints[protocol].readOrReset(tx, proxier.nftables, proxier.logger)
+	}
 }
 
 // Sync is called to synchronize the proxier state to nftables as soon as possible.
@@ -838,7 +879,46 @@ const (
 	servicePortEndpointChainNamePrefix      = "endpoint-"
 	servicePortEndpointAffinityNamePrefix   = "affinity-"
 	servicePortFirewallChainNamePrefix      = "firewall-"
+	// lbBucketChainNamePrefix is the prefix for the shared per-endpoint-count
+	// bucket chains, e.g. "lb-3-endpoints".
+	lbBucketChainNamePrefix = "lb-"
 )
+
+// lbBucketChainName returns the name of the shared bucket chain for services
+// with the given number of endpoints, e.g. "lb-3-endpoints".
+func lbBucketChainName(numEndpoints int) string {
+	return fmt.Sprintf("%s%d-endpoints", lbBucketChainNamePrefix, numEndpoints)
+}
+
+func isBucketChainName(chainString string) bool {
+	return strings.HasPrefix(chainString, lbBucketChainNamePrefix)
+}
+
+// bucketProtocols are the transport protocols that have a dedicated endpoints
+// map. There is a separate map per protocol because nftables bakes a concrete
+// transport protocol into a "typeof ... <proto> dport ..." map's committed key
+// type. A generic "meta l4proto . th dport" key works when the map and its
+// referencing rule are created in the same transaction, but once the map is
+// committed, a rule added in a later transaction (the normal incremental sync
+// case) fails to resolve the generic transport-header protocol context with
+// "conflicting protocols specified: tcp vs. th". Pinning the protocol avoids
+// that. The values are the lowercase v1.Protocol names.
+var bucketProtocols = []string{"tcp", "udp", "sctp"}
+
+// endpointsMapName returns the name of the shared endpoints map for the given
+// (lowercase) protocol, e.g. "endpoints-tcp".
+func endpointsMapName(protocol string) string {
+	return endpointsMapPrefix + protocol
+}
+
+// newEndpointsStorage builds the per-protocol endpoints element storage.
+func newEndpointsStorage() map[string]*nftElementStorage {
+	storage := make(map[string]*nftElementStorage, len(bucketProtocols))
+	for _, protocol := range bucketProtocols {
+		storage[protocol] = newNFTElementStorage("map", endpointsMapName(protocol))
+	}
+	return storage
+}
 
 // hashAndTruncate prefixes name with a hash of itself and then truncates to
 // chainNameBaseLengthMax. The hash ensures that (a) the name is still unique if we have
@@ -1246,6 +1326,20 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		// clusterPolicyChain contains the endpoints used with "Cluster" traffic policy
 		clusterPolicyChain := svcInfo.clusterPolicyChainName
 		usesClusterPolicyChain := len(clusterEndpoints) > 0 && svcInfo.UsesClusterEndpoints()
+
+		// Eligible services are load-balanced through a shared
+		// "lb-N-endpoints" bucket chain and the global endpoints map instead of
+		// a bespoke per-service chain. A service is eligible when its internal
+		// (ClusterIP) traffic uses the cluster policy, it has no session
+		// affinity, and it has no external access (NodePort/ExternalIP/LB).
+		// Those restrictions guarantee that the bucket's "ip daddr"-keyed lookup
+		// always resolves to the right service.
+		useBucket := usesClusterPolicyChain && !serviceUsesAffinity &&
+			!svcInfo.InternalPolicyLocal() && !svcInfo.ExternallyAccessible()
+		if useBucket {
+			// The bucket chain replaces the per-service cluster policy chain.
+			usesClusterPolicyChain = false
+		}
 		if usesClusterPolicyChain {
 			ensureChain(clusterPolicyChain, tx, activeChains, skipServiceUpdate)
 		}
@@ -1272,6 +1366,11 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			}
 		}
 		internalTrafficChain := internalPolicyChain
+		if useBucket {
+			// Route internal traffic to the shared bucket chain for this
+			// service's endpoint count instead of a per-service chain.
+			internalTrafficChain = proxier.ensureBucketChain(tx, len(clusterEndpoints), activeChains, existingChains, doFullSync)
+		}
 
 		// Similarly, externalPolicyChain is the chain containing the endpoints
 		// for "external" (NodePort, LoadBalancer, and ExternalIP) traffic.
@@ -1343,6 +1442,11 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					fmt.Sprintf("goto %s", internalTrafficChain),
 				},
 			})
+			if useBucket {
+				// Populate the global endpoints map with this service's
+				// endpoints; the bucket chain selects one by slot at runtime.
+				proxier.ensureBucketEndpoints(tx, svcInfo, protocol, clusterEndpoints)
+			}
 		} else {
 			// No endpoints.
 			proxier.noEndpointServices.ensureElem(tx, &knftables.Element{
@@ -1682,7 +1786,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	// now, and record the time that they become stale in staleChains so they can be
 	// deleted later.
 	for chain := range existingChains {
-		if isServiceChainName(chain) {
+		if isServiceChainName(chain) || isBucketChainName(chain) {
 			if !activeChains.Has(chain) {
 				tx.Flush(&knftables.Chain{
 					Name: chain,
@@ -1710,6 +1814,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.noEndpointNodePorts.cleanupLeftoverKeys(tx)
 	proxier.serviceNodePorts.cleanupLeftoverKeys(tx)
 	proxier.hairpinConnections.cleanupLeftoverKeys(tx)
+	for _, protocol := range bucketProtocols {
+		proxier.endpoints[protocol].cleanupLeftoverKeys(tx)
+	}
 
 	// Sync rules.
 	proxier.logger.V(2).Info("Reloading service nftables data",
@@ -1766,6 +1873,93 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap)
 	}
 	return
+}
+
+// ensureBucketChain ensures that the shared "lb-N-endpoints" bucket chain for
+// services with numEndpoints endpoints exists and contains its single
+// endpoints-map lookup rule, and returns its name. Multiple eligible services
+// with the same endpoint count share one bucket chain. The chain is tracked in
+// activeChains like other dynamic chains so it can be garbage-collected once no
+// service references it. When numEndpoints is new this sync, every service at
+// that count has changed (so skipCreation is false for the first caller), which
+// guarantees the rule is written whenever the chain is (re)created.
+func (proxier *Proxier) ensureBucketChain(tx *knftables.Transaction, numEndpoints int, activeChains, existingChains sets.Set[string], doFullSync bool) string {
+	chain := lbBucketChainName(numEndpoints)
+	if activeChains.Has(chain) {
+		return chain
+	}
+	activeChains.Insert(chain)
+
+	// A bucket chain's rule is fully determined by numEndpoints (encoded in the
+	// chain name), so it never needs rewriting once created. Skip recreation
+	// unless this is a full resync, the chain doesn't exist yet, or it was
+	// flushed (i.e. is stale) and needs its rule restored. Gating on chain
+	// existence rather than per-service dirtiness keeps the transaction
+	// deterministic regardless of service processing order.
+	_, isStale := proxier.staleChains[chain]
+	if !doFullSync && existingChains.Has(chain) && !isStale {
+		return chain
+	}
+
+	ipX := "ip"
+	if proxier.ipFamily == v1.IPv6Protocol {
+		ipX = "ip6"
+	}
+
+	tx.Add(&knftables.Chain{Name: chain})
+	tx.Flush(&knftables.Chain{Name: chain})
+
+	// One DNAT rule per protocol, each pinning its concrete protocol and looking
+	// up the matching per-protocol endpoints map (see bucketProtocols for why
+	// the maps are split by protocol). Only the rule matching the packet's
+	// protocol fires; the others are no-ops for that packet.
+	//
+	// slot selects which endpoint to use, generated at runtime. We always use
+	// "numgen random mod N" (even for N==1, which always yields 0): a bare
+	// integer literal has no type in a rule concatenation and nftables rejects
+	// it, whereas numgen provides the concrete integer type the map expects.
+	for _, protocol := range bucketProtocols {
+		tx.Add(&knftables.Rule{
+			Chain: chain,
+			Rule: knftables.Concat(
+				"meta l4proto", protocol,
+				"dnat", ipX, "addr . port to",
+				ipX, "daddr", ".", protocol+" dport", ".",
+				"numgen", "random", "mod", strconv.Itoa(numEndpoints),
+				"map", "@", endpointsMapName(protocol),
+			),
+		})
+	}
+	return chain
+}
+
+// ensureBucketEndpoints adds this service's endpoints to the per-protocol
+// endpoints map, keyed by "clusterIP . port . slot". The bucket chain for
+// len(endpoints) generates the slot at runtime to select one of them.
+func (proxier *Proxier) ensureBucketEndpoints(tx *knftables.Transaction, svcInfo *servicePortInfo, protocol string, endpoints []proxy.Endpoint) {
+	clusterIP := svcInfo.ClusterIP().String()
+	port := strconv.Itoa(svcInfo.Port())
+	storage := proxier.endpoints[protocol]
+	mapName := endpointsMapName(protocol)
+	for i, ep := range endpoints {
+		epInfo, ok := ep.(*endpointInfo)
+		if !ok {
+			proxier.logger.Error(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
+			continue
+		}
+		storage.ensureElem(tx, &knftables.Element{
+			Map: mapName,
+			Key: []string{
+				clusterIP,
+				port,
+				strconv.Itoa(i),
+			},
+			Value: []string{
+				epInfo.IP(),
+				strconv.Itoa(epInfo.Port()),
+			},
+		})
+	}
 }
 
 func (proxier *Proxier) writeServiceToEndpointDNATs(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
