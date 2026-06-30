@@ -71,10 +71,10 @@ type Manager interface {
 	GetDevices(podUID, containerName string) ResourceDeviceInstances
 
 	// UpdateAllocatedResourcesStatus updates the status of allocated resources for the pod.
-	UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus)
+	UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, status *v1.PodStatus)
 
 	// GetAllocatableDevices returns information about all the devices known to the manager
-	GetAllocatableDevices() ResourceDeviceInstances
+	GetAllocatableDevices(logger klog.Logger) ResourceDeviceInstances
 
 	// ShouldResetExtendedResourceCapacity returns whether the extended resources should be reset or not,
 	// depending on the checkpoint file availability. Absence of the checkpoint file strongly indicates
@@ -93,7 +93,7 @@ type Manager interface {
 	AllocatePod(logger klog.Logger, pod *v1.Pod) error
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
-	UpdateAllocatedDevices()
+	UpdateAllocatedDevices(logger klog.Logger)
 
 	// Updates returns a channel that receives an Update when the device changed its status.
 	Updates() <-chan resourceupdates.Update

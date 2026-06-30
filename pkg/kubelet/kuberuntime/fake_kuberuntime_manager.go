@@ -106,7 +106,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		startupManager:         proberesults.NewManager(),
 		machineInfo:            machineInfo,
 		osInterface:            osInterface,
-		containerManager:       cm.NewFakeContainerManager(),
+		containerManager:       cm.NewFakeContainerManager(logger),
 		runtimeHelper:          runtimeHelper,
 		runtimeService:         runtimeService,
 		imageService:           imageService,

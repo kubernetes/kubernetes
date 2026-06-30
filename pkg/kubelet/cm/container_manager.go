@@ -150,7 +150,7 @@ type ContainerManager interface {
 	PodMightNeedToUnprepareResources(UID types.UID) bool
 
 	// UpdateAllocatedResourcesStatus updates the status of allocated resources for the pod.
-	UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus)
+	UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, status *v1.PodStatus)
 
 	// Updates returns a channel that receives an Update when the device changed its status.
 	Updates() <-chan resourceupdates.Update

@@ -91,10 +91,10 @@ type Manager interface {
 	GetMemoryNUMANodes(logger klog.Logger, pod *v1.Pod, container *v1.Container) sets.Set[int]
 
 	// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
-	GetAllocatableMemory() []state.Block
+	GetAllocatableMemory(logger klog.Logger) []state.Block
 
 	// GetMemory returns the memory allocated by a container from NUMA nodes
-	GetMemory(podUID, containerName string) []state.Block
+	GetMemory(logger klog.Logger, podUID, containerName string) []state.Block
 }
 
 type manager struct {
@@ -481,11 +481,11 @@ func getSystemReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatab
 }
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
-func (m *manager) GetAllocatableMemory() []state.Block {
+func (m *manager) GetAllocatableMemory(_ klog.Logger) []state.Block {
 	return m.allocatableMemory
 }
 
 // GetMemory returns the memory allocated by a container from NUMA nodes
-func (m *manager) GetMemory(podUID, containerName string) []state.Block {
+func (m *manager) GetMemory(_ klog.Logger, podUID, containerName string) []state.Block {
 	return m.state.GetMemoryBlocks(podUID, containerName)
 }

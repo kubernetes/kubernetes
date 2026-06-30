@@ -131,10 +131,7 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func NewManagerImpl(logger klog.Logger, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
 	socketPath := pluginapi.KubeletSocket
 	if runtime.GOOS == "windows" {
 		socketPath = os.Getenv("SYSTEMDRIVE") + pluginapi.KubeletSocketWindows
@@ -577,10 +574,7 @@ func (m *ManagerImpl) getCheckpoint() (checkpoint.DeviceManagerCheckpoint, error
 }
 
 // UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
-func (m *ManagerImpl) UpdateAllocatedDevices() {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *ManagerImpl) UpdateAllocatedDevices(logger klog.Logger) {
 	activePods := m.activePods()
 	if !m.sourcesReady.AllReady() {
 		return
@@ -884,7 +878,7 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		// Updates allocatedDevices to garbage collect any stranded resources
 		// before doing the device plugin allocation.
 		if !allocatedDevicesUpdated {
-			m.UpdateAllocatedDevices()
+			m.UpdateAllocatedDevices(logger)
 			allocatedDevicesUpdated = true
 		}
 		allocDevices, err := m.devicesToAllocate(ctx, podUID, contName, resource, needed, devicesToReuse[resource])
@@ -1134,10 +1128,7 @@ func isDRAExtendedResource(pod *v1.Pod, containerName, resourceName string) bool
 }
 
 // GetAllocatableDevices returns information about all the healthy devices known to the manager
-func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *ManagerImpl) GetAllocatableDevices(logger klog.Logger) ResourceDeviceInstances {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	resp := m.allDevices.Filter(m.healthyDevices)
@@ -1156,7 +1147,7 @@ func (m *ManagerImpl) GetDevices(podUID, containerName string) ResourceDeviceIns
 	return m.podDevices.getContainerDevices(podUID, containerName)
 }
 
-func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+func (m *ManagerImpl) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, status *v1.PodStatus) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

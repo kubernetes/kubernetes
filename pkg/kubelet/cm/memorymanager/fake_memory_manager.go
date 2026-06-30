@@ -84,15 +84,14 @@ func (m *fakeManager) State() state.Reader {
 }
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
-func (m *fakeManager) GetAllocatableMemory() []state.Block {
-	logger := klog.TODO()
+func (m *fakeManager) GetAllocatableMemory(logger klog.Logger) []state.Block {
 	logger.Info("Get Allocatable Memory")
 	return []state.Block{}
 }
 
 // GetMemory returns the memory allocated by a container from NUMA nodes
-func (m *fakeManager) GetMemory(podUID, containerName string) []state.Block {
-	logger := klog.LoggerWithValues(klog.TODO(), "podUID", podUID, "containerName", containerName)
+func (m *fakeManager) GetMemory(logger klog.Logger, podUID, containerName string) []state.Block {
+	logger = klog.LoggerWithValues(logger, "podUID", podUID, "containerName", containerName)
 	logger.Info("Get Memory")
 	return []state.Block{}
 }
