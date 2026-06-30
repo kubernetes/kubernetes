@@ -74,7 +74,7 @@ func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 }
 
 func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	if !p.genericWorkloadEnabled {
+	if !p.genericWorkloadEnabled && !p.workloadWithJobEnabled {
 		return
 	}
 	pgInformer := f.Scheduling().V1alpha3().PodGroups()
@@ -87,7 +87,7 @@ func (p *Plugin) ValidateInitialization() error {
 	if !p.inspectedFeatureGates {
 		return fmt.Errorf("%s has not inspected feature gates", PluginName)
 	}
-	if p.genericWorkloadEnabled && p.pgLister == nil {
+	if (p.genericWorkloadEnabled || p.workloadWithJobEnabled) && p.pgLister == nil {
 		return fmt.Errorf("missing PodGroup lister")
 	}
 	return nil
@@ -130,8 +130,12 @@ func (p *Plugin) validateParallelismChange(a admission.Attributes, job, oldJob *
 	}
 
 	// When SchedulingGroup is set in the template, look up that PodGroup directly.
+	// This path only applies when GenericWorkload is enabled.
 	sg := oldJob.Spec.Template.Spec.SchedulingGroup
 	if sg != nil && sg.PodGroupName != nil {
+		if !p.genericWorkloadEnabled {
+			return nil
+		}
 		pg, err := p.pgLister.PodGroups(oldJob.Namespace).Get(*sg.PodGroupName)
 		if err != nil {
 			return nil
@@ -144,6 +148,10 @@ func (p *Plugin) validateParallelismChange(a admission.Attributes, job, oldJob *
 	}
 
 	// When SchedulingGroup is not in the template, scan PodGroups in the namespace owned by this Job.
+	// This path only applies when WorkloadWithJob is enabled.
+	if !p.workloadWithJobEnabled {
+		return nil
+	}
 	pgs, err := p.pgLister.PodGroups(oldJob.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil

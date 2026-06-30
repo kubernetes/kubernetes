@@ -32,7 +32,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/ptr"
 )
 
 func TestGangSchedulingParallelism(t *testing.T) {
@@ -73,8 +72,8 @@ func TestGangSchedulingParallelism(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				CompletionMode: &indexedMode,
-				Completions:    ptr.To[int32](4),
-				Parallelism:    ptr.To[int32](4),
+				Completions:    new(int32(4)),
+				Parallelism:    new(int32(4)),
 			},
 		}
 		if sgName != nil {
@@ -86,72 +85,40 @@ func TestGangSchedulingParallelism(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		enableFeatureGate bool
-		oldJob            *batch.Job
-		newJob            *batch.Job
-		podGroups         []*schedulingv1alpha3.PodGroup
-		wantErr           bool
+		enableGenericWorkload bool
+		enableWorkloadWithJob bool
+		oldJob                *batch.Job
+		newJob                *batch.Job
+		podGroups             []*schedulingv1alpha3.PodGroup
+		wantErr               bool
 	}{
-		"feature gate disabled: allows parallelism change": {
-			oldJob: baseJob(ptr.To("gang-pg")),
+		"both gates disabled: allows parallelism change": {
+			oldJob: baseJob(new("gang-pg")),
 			newJob: func() *batch.Job {
-				j := baseJob(ptr.To("gang-pg"))
-				j.Spec.Parallelism = ptr.To[int32](2)
+				j := baseJob(new("gang-pg"))
+				j.Spec.Parallelism = new(int32(2))
 				return j
 			}(),
 			podGroups: []*schedulingv1alpha3.PodGroup{gangPG},
 		},
-		"no schedulingGroup: skips check (handled by validation)": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(nil),
+		"only WorkloadWithJob disabled, schedulingGroup path: rejects": {
+			enableGenericWorkload: true,
+			oldJob:                baseJob(new("gang-pg")),
 			newJob: func() *batch.Job {
-				j := baseJob(nil)
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-		},
-		"parallelism unchanged: allows": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(ptr.To("gang-pg")),
-			newJob:            baseJob(ptr.To("gang-pg")),
-			podGroups:         []*schedulingv1alpha3.PodGroup{gangPG},
-		},
-		"gang PodGroup: rejects parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(ptr.To("gang-pg")),
-			newJob: func() *batch.Job {
-				j := baseJob(ptr.To("gang-pg"))
-				j.Spec.Parallelism = ptr.To[int32](2)
+				j := baseJob(new("gang-pg"))
+				j.Spec.Parallelism = new(int32(2))
 				return j
 			}(),
 			podGroups: []*schedulingv1alpha3.PodGroup{gangPG},
 			wantErr:   true,
 		},
-		"basic PodGroup: allows parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(ptr.To("basic-pg")),
-			newJob: func() *batch.Job {
-				j := baseJob(ptr.To("basic-pg"))
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-			podGroups: []*schedulingv1alpha3.PodGroup{basicPG},
-		},
-		"PodGroup not found: allows parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(ptr.To("missing-pg")),
-			newJob: func() *batch.Job {
-				j := baseJob(ptr.To("missing-pg"))
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-		},
-		"controller-created gang PodGroup - rejects parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(nil),
+
+		"only WorkloadWithJob disabled, owner-ref path: allows": {
+			enableGenericWorkload: true,
+			oldJob:                baseJob(nil),
 			newJob: func() *batch.Job {
 				j := baseJob(nil)
-				j.Spec.Parallelism = ptr.To[int32](2)
+				j.Spec.Parallelism = new(int32(2))
 				return j
 			}(),
 			podGroups: []*schedulingv1alpha3.PodGroup{
@@ -165,7 +132,89 @@ func TestGangSchedulingParallelism(t *testing.T) {
 								Kind:       "Job",
 								Name:       "test-job",
 								UID:        types.UID("test-job-uid"),
-								Controller: ptr.To(true),
+								Controller: new(true),
+							},
+						},
+					},
+					Spec: schedulingv1alpha3.PodGroupSpec{
+						SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
+							Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4},
+						},
+					},
+				},
+			},
+		},
+		"no schedulingGroup: skips check (handled by validation)": {
+			enableGenericWorkload: true,
+			enableWorkloadWithJob: true,
+			oldJob:                baseJob(nil),
+			newJob: func() *batch.Job {
+				j := baseJob(nil)
+				j.Spec.Parallelism = new(int32(2))
+				return j
+			}(),
+		},
+		"parallelism unchanged: allows": {
+			enableGenericWorkload: true,
+			enableWorkloadWithJob: true,
+			oldJob:                baseJob(new("gang-pg")),
+			newJob:                baseJob(new("gang-pg")),
+			podGroups:             []*schedulingv1alpha3.PodGroup{gangPG},
+		},
+		"gang PodGroup: rejects parallelism change": {
+			enableGenericWorkload: true,
+			enableWorkloadWithJob: true,
+			oldJob:                baseJob(new("gang-pg")),
+			newJob: func() *batch.Job {
+				j := baseJob(new("gang-pg"))
+				j.Spec.Parallelism = new(int32(2))
+				return j
+			}(),
+			podGroups: []*schedulingv1alpha3.PodGroup{gangPG},
+			wantErr:   true,
+		},
+		"basic PodGroup: allows parallelism change": {
+			enableGenericWorkload: true,
+			enableWorkloadWithJob: true,
+			oldJob:                baseJob(new("basic-pg")),
+			newJob: func() *batch.Job {
+				j := baseJob(new("basic-pg"))
+				j.Spec.Parallelism = new(int32(2))
+				return j
+			}(),
+			podGroups: []*schedulingv1alpha3.PodGroup{basicPG},
+		},
+		"PodGroup not found: allows parallelism change": {
+			enableGenericWorkload: true,
+			enableWorkloadWithJob: true,
+			oldJob:                baseJob(new("missing-pg")),
+			newJob: func() *batch.Job {
+				j := baseJob(new("missing-pg"))
+				j.Spec.Parallelism = new(int32(2))
+				return j
+			}(),
+		},
+		"controller-created gang PodGroup - rejects parallelism change": {
+			enableGenericWorkload: true,
+			enableWorkloadWithJob: true,
+			oldJob:                baseJob(nil),
+			newJob: func() *batch.Job {
+				j := baseJob(nil)
+				j.Spec.Parallelism = new(int32(2))
+				return j
+			}(),
+			podGroups: []*schedulingv1alpha3.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "controller-created-pg",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "batch/v1",
+								Kind:       "Job",
+								Name:       "test-job",
+								UID:        types.UID("test-job-uid"),
+								Controller: new(true),
 							},
 						},
 					},
@@ -179,11 +228,12 @@ func TestGangSchedulingParallelism(t *testing.T) {
 			wantErr: true,
 		},
 		"controller-created basic PodGroup - allows parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(nil),
+			enableGenericWorkload: true,
+			enableWorkloadWithJob: true,
+			oldJob:                baseJob(nil),
 			newJob: func() *batch.Job {
 				j := baseJob(nil)
-				j.Spec.Parallelism = ptr.To[int32](2)
+				j.Spec.Parallelism = new(int32(2))
 				return j
 			}(),
 			podGroups: []*schedulingv1alpha3.PodGroup{
@@ -197,7 +247,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 								Kind:       "Job",
 								Name:       "test-job",
 								UID:        types.UID("test-job-uid"),
-								Controller: ptr.To(true),
+								Controller: new(true),
 							},
 						},
 					},
@@ -210,11 +260,12 @@ func TestGangSchedulingParallelism(t *testing.T) {
 			},
 		},
 		"gang PodGroup owned by different Job - allows parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(nil),
+			enableGenericWorkload: true,
+			enableWorkloadWithJob: true,
+			oldJob:                baseJob(nil),
 			newJob: func() *batch.Job {
 				j := baseJob(nil)
-				j.Spec.Parallelism = ptr.To[int32](2)
+				j.Spec.Parallelism = new(int32(2))
 				return j
 			}(),
 			podGroups: []*schedulingv1alpha3.PodGroup{
@@ -228,7 +279,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 								Kind:       "Job",
 								Name:       "other-job",
 								UID:        types.UID("other-job-uid"),
-								Controller: ptr.To(true),
+								Controller: new(true),
 							},
 						},
 					},
@@ -246,8 +297,8 @@ func TestGangSchedulingParallelism(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t,
 				utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload: tc.enableFeatureGate,
-					features.WorkloadWithJob: tc.enableFeatureGate,
+					features.GenericWorkload: tc.enableGenericWorkload,
+					features.WorkloadWithJob: tc.enableWorkloadWithJob,
 				})
 
 			p := NewPlugin()
