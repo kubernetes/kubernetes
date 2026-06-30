@@ -514,6 +514,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.DownwardAPIVolumeFile{}.OpenAPIModelName():                                                               schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref),
 		corev1.DownwardAPIVolumeSource{}.OpenAPIModelName():                                                             schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref),
 		corev1.EmptyDirVolumeSource{}.OpenAPIModelName():                                                                schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref),
+		corev1.EmptyDirVolumeStatus{}.OpenAPIModelName():                                                                schema_k8sio_api_core_v1_EmptyDirVolumeStatus(ref),
 		corev1.EndpointAddress{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_EndpointAddress(ref),
 		corev1.EndpointPort{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_EndpointPort(ref),
 		corev1.EndpointSubset{}.OpenAPIModelName():                                                                      schema_k8sio_api_core_v1_EndpointSubset(ref),
@@ -21647,6 +21648,27 @@ func schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref common.ReferenceCallback)
 	}
 }
 
+func schema_k8sio_api_core_v1_EmptyDirVolumeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EmptyDirVolumeStatus represents the status of an emptyDir volume.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"sizeLimit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "sizeLimit represents the actual mounted capacity of the emptyDir volume. This is only populated for memory-backed emptyDir volumes.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_core_v1_EndpointAddress(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -32969,11 +32991,17 @@ func schema_k8sio_api_core_v1_VolumeStatus(ref common.ReferenceCallback) common.
 							Ref:         ref(corev1.ImageVolumeStatus{}.OpenAPIModelName()),
 						},
 					},
+					"emptyDir": {
+						SchemaProps: spec.SchemaProps{
+							Description: "emptyDir represents the status of an emptyDir volume. This is only populated for memory-backed emptyDir volumes.",
+							Ref:         ref(corev1.EmptyDirVolumeStatus{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.ImageVolumeStatus{}.OpenAPIModelName()},
+			corev1.EmptyDirVolumeStatus{}.OpenAPIModelName(), corev1.ImageVolumeStatus{}.OpenAPIModelName()},
 	}
 }
 

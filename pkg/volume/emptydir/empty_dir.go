@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
@@ -61,15 +62,15 @@ type emptyDirPlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &emptyDirPlugin{}
+var _ volume.ResizableEphemeralVolumePlugin = &emptyDirPlugin{}
 
 const (
-	emptyDirPluginName           = "kubernetes.io/empty-dir"
+	EmptyDirPluginName           = "kubernetes.io/empty-dir"
 	hugePagesPageSizeMountOption = "pagesize"
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(emptyDirPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(EmptyDirPluginName), volName)
 }
 
 func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
@@ -79,7 +80,7 @@ func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
 }
 
 func (plugin *emptyDirPlugin) GetPluginName() string {
-	return emptyDirPluginName
+	return EmptyDirPluginName
 }
 
 func (plugin *emptyDirPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
@@ -97,6 +98,8 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *emptyDirPlugin) RequiresRemount(spec *volume.Spec) bool {
+	// The kuberuntime_manager is responsible for resizing memory-backed emptyDir volumes,
+	// so we never remount them from within the volume plugin.
 	return false
 }
 
@@ -153,6 +156,13 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 			sizeLimit = calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 		}
 	}
+	var metricsProvider volume.MetricsProvider
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && medium == v1.StorageMediumMemory {
+		metricsProvider = volume.NewMetricsStatFS(getPath(pod.UID, spec.Name(), plugin.host))
+	} else {
+		metricsProvider = volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))
+	}
+
 	return &emptyDir{
 		pod:             pod,
 		volName:         spec.Name(),
@@ -161,7 +171,7 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 		mounter:         mounter,
 		mountDetector:   mountDetector,
 		plugin:          plugin,
-		MetricsProvider: volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host)),
+		MetricsProvider: metricsProvider,
 	}, nil
 }
 
@@ -193,6 +203,103 @@ func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (vo
 	return volume.ReconstructedVolume{
 		Spec: volume.NewSpecFromVolume(emptyDirVolume),
 	}, nil
+}
+
+// ResizeEphemeralVolume resizes the volume on the node.
+func (plugin *emptyDirPlugin) ResizeEphemeralVolume(spec *volume.Spec, pod *v1.Pod, newSize *resource.Quantity) error {
+	if spec.Volume == nil || spec.Volume.EmptyDir == nil {
+		return fmt.Errorf("spec does not reference an emptyDir volume type")
+	}
+	if spec.Volume.EmptyDir.Medium != v1.StorageMediumMemory {
+		return fmt.Errorf("only memory-backed emptyDir volumes support direct resize")
+	}
+	if newSize == nil || newSize.Value() == 0 {
+		return fmt.Errorf("addition or removal of size limit is not supported")
+	}
+
+	dir := getPath(pod.UID, spec.Name(), plugin.host)
+	mounter := plugin.host.GetMounter()
+
+	var isNotMnt bool
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		isNotMnt = true
+	} else {
+		var err error
+		isNotMnt, err = mounter.IsLikelyNotMountPoint(dir)
+		if err != nil {
+			return err
+		}
+	}
+
+	if isNotMnt {
+		return fmt.Errorf("volume %s is not yet mounted; deferring resize", spec.Name())
+	}
+
+	// The mount exists, so we need to resize it.
+	currentSize, err := getMountSize(mounter, dir)
+	if err != nil {
+		return err
+	}
+	if currentSize == nil || currentSize.Value() == 0 {
+		return fmt.Errorf("failed to get current size of memory-backed emptyDir volume")
+	}
+
+	// Compare current size with new size.
+	if currentSize.Equal(*newSize) {
+		klog.V(4).InfoS("Skipping resize, current size matches new size", "pod", klog.KObj(pod), "volume", spec.Name(), "size", newSize)
+		return nil
+	}
+
+	options := []string{"remount", fmt.Sprintf("size=%d", newSize.Value())}
+
+	klog.V(2).InfoS("Resizing emptyDir volume", "pod", klog.KObj(pod), "volume", spec.Name(), "newSize", newSize)
+	return mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)
+}
+
+// GetVolumeSize returns the current size of the specified volume.
+func (plugin *emptyDirPlugin) GetVolumeSize(spec *volume.Spec, pod *v1.Pod) (*resource.Quantity, error) {
+	if spec.Volume == nil || spec.Volume.EmptyDir == nil {
+		return nil, fmt.Errorf("spec does not reference an emptyDir volume type")
+	}
+	if spec.Volume.EmptyDir.Medium != v1.StorageMediumMemory {
+		return nil, fmt.Errorf("only memory-backed emptyDir volumes support direct resize")
+	}
+
+	dir := getPath(pod.UID, spec.Name(), plugin.host)
+	mounter := plugin.host.GetMounter()
+
+	return getMountSize(mounter, dir)
+}
+
+// getMountSize obtains the size of the mounted volume from mount options.
+func getMountSize(mounter mount.Interface, dir string) (*resource.Quantity, error) {
+	mountPoints, err := mounter.List()
+	if err != nil {
+		return nil, fmt.Errorf("error listing mount points: %w", err)
+	}
+	var mountPoint *mount.MountPoint
+	for i := len(mountPoints) - 1; i >= 0; i-- {
+		if mountPoints[i].Path == dir {
+			mountPoint = &mountPoints[i]
+			break
+		}
+	}
+	if mountPoint == nil {
+		return nil, fmt.Errorf("mount point for %s not found", dir)
+	}
+
+	for _, opt := range mountPoint.Opts {
+		opt = strings.TrimSpace(opt)
+		sizeStr, hasPrefix := strings.CutPrefix(opt, "size=")
+		if hasPrefix {
+			qty, err := resource.ParseQuantity(sizeStr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse current size limit %s: %w", sizeStr, err)
+			}
+			return &qty, nil
+		}
+	}
+	return nil, nil // Default size
 }
 
 // mountDetector abstracts how to find what kind of mount a path is backed by.
@@ -334,7 +441,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(ed.mounter, ed.plugin.host.GetPluginDir(emptyDirPluginName)))
+	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(ed.mounter, ed.plugin.host.GetPluginDir(EmptyDirPluginName)))
 
 	klog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
 	return ed.mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)
@@ -556,7 +663,7 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return filepath.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilstrings.EscapeQualifiedName(emptyDirPluginName)), ed.volName)
+	return filepath.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilstrings.EscapeQualifiedName(EmptyDirPluginName)), ed.volName)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {

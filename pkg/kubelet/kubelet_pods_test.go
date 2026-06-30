@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -7170,6 +7171,192 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 		cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, nil, false, false, false)
 
 		assert.Equal(t, tc.expectedContainerStatus, cStatuses)
+	}
+}
+
+type mockVolumeManagerForStatus struct {
+	volumemanager.VolumeManager
+	volumeSizes map[string]*resource.Quantity
+	sizeErr     error
+}
+
+func (m *mockVolumeManagerForStatus) GetVolumeSize(_ *v1.Pod, volumeName string) (*resource.Quantity, error) {
+	if m.sizeErr != nil {
+		return nil, m.sizeErr
+	}
+	if size, ok := m.volumeSizes[volumeName]; ok {
+		return size, nil
+	}
+	return nil, nil
+}
+
+func TestConvertToAPIContainerStatuses_VolumeStatus(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	nowTime := time.Now()
+	testContainerName := "ctr0"
+	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
+
+	for _, tc := range []struct {
+		testName           string
+		enableGate         bool
+		specLimit          *resource.Quantity
+		reportedSize       *resource.Quantity
+		reportErr          error
+		initialMountStatus []v1.VolumeMountStatus
+		expectMountStatus  []v1.VolumeMountStatus
+	}{
+		{
+			testName:          "Gate disabled; ignored",
+			enableGate:        false,
+			specLimit:         resource.NewQuantity(100, resource.BinarySI),
+			reportedSize:      resource.NewQuantity(100, resource.BinarySI),
+			expectMountStatus: nil,
+		},
+		{
+			testName:     "Gate enabled; dynamic mount status created and populated",
+			enableGate:   true,
+			specLimit:    resource.NewQuantity(100, resource.BinarySI),
+			reportedSize: resource.NewQuantity(100, resource.BinarySI),
+			expectMountStatus: []v1.VolumeMountStatus{
+				{
+					Name:      "mem-vol",
+					MountPath: "/mnt/mem",
+					ReadOnly:  false,
+					VolumeStatus: &v1.VolumeStatus{
+						EmptyDir: &v1.EmptyDirVolumeStatus{
+							SizeLimit: resource.NewQuantity(100, resource.BinarySI),
+						},
+					},
+				},
+			},
+		},
+		{
+			testName:     "Gate enabled; existing mount status updated",
+			enableGate:   true,
+			specLimit:    resource.NewQuantity(100, resource.BinarySI),
+			reportedSize: resource.NewQuantity(200, resource.BinarySI),
+			initialMountStatus: []v1.VolumeMountStatus{
+				{
+					Name:      "mem-vol",
+					MountPath: "/mnt/mem",
+					ReadOnly:  false,
+				},
+			},
+			expectMountStatus: []v1.VolumeMountStatus{
+				{
+					Name:      "mem-vol",
+					MountPath: "/mnt/mem",
+					ReadOnly:  false,
+					VolumeStatus: &v1.VolumeStatus{
+						EmptyDir: &v1.EmptyDirVolumeStatus{
+							SizeLimit: resource.NewQuantity(200, resource.BinarySI),
+						},
+					},
+				},
+			},
+		},
+		{
+			testName:          "Gate enabled; manager returns nil size",
+			enableGate:        true,
+			specLimit:         resource.NewQuantity(100, resource.BinarySI),
+			reportedSize:      nil,
+			expectMountStatus: nil,
+		},
+		{
+			testName:          "Gate enabled; manager returns error",
+			enableGate:        true,
+			specLimit:         resource.NewQuantity(100, resource.BinarySI),
+			reportedSize:      resource.NewQuantity(100, resource.BinarySI),
+			reportErr:         fmt.Errorf("get volume size error"),
+			expectMountStatus: nil,
+		},
+	} {
+		t.Run(tc.testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, tc.enableGate)
+
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+
+			volumeSizes := make(map[string]*resource.Quantity)
+			if tc.reportedSize != nil {
+				volumeSizes["mem-vol"] = tc.reportedSize
+			}
+			kubelet.volumeManager = &mockVolumeManagerForStatus{
+				volumeSizes: volumeSizes,
+				sizeErr:     tc.reportErr,
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "123456",
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: tc.specLimit,
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  testContainerName,
+							Image: "img",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "mem-vol",
+									MountPath: "/mnt/mem",
+									ReadOnly:  false,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			criStatus := &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						Name:      testContainerName,
+						ID:        testContainerID,
+						Image:     "img",
+						State:     kubecontainer.ContainerStateRunning,
+						StartedAt: nowTime,
+					},
+				},
+			}
+
+			var previousStatus []v1.ContainerStatus
+			if tc.initialMountStatus != nil {
+				previousStatus = []v1.ContainerStatus{
+					{
+						Name:         testContainerName,
+						VolumeMounts: tc.initialMountStatus,
+					},
+				}
+			}
+
+			cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, pod, criStatus, previousStatus, pod.Spec.Containers, nil, false, false, false)
+			require.Len(t, cStatuses, 1)
+
+			actualMountStatus := cStatuses[0].VolumeMounts
+			diff := cmp.Diff(tc.expectMountStatus, actualMountStatus, cmp.Comparer(func(x, y resource.Quantity) bool {
+				return x.Equal(y)
+			}))
+			if diff != "" {
+				t.Errorf("Unexpected VolumeMounts status (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
 

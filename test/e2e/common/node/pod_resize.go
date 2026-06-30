@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -854,6 +855,280 @@ func doPodResizeReadAndReplaceTests(f *framework.Framework) {
 	})
 }
 
+func doPodResizeMemoryVolumeTests(f *framework.Framework) {
+	// Tests the behavior when resizing memory-backed emptyDir volume limits:
+	// 1. Create a pod with memory-backed emptyDir volume of size origSizeLimit.
+	// 2. Resize the volume size limit up to desiredSizeLimit - should succeed without pod restart.
+	// 3. Rollback the volume size limit down to origSizeLimit - should succeed without pod restart.
+	// TODO: When InPlacePodVerticalScalingMemoryBackedVolumes is GA, move these tests to the InPlacePodVerticalScaling table as an
+	// as an additional parameter to test it with memory-backed emptyDir volumes.
+	ginkgo.DescribeTable("memory-backed emptyDir volume resize", feature.InPlacePodVerticalScaling,
+		func(ctx context.Context, origCPU, desiredCPU, origMem, desiredMem, origSizeLimit, desiredSizeLimit string) {
+			podClient := e2epod.NewPodClient(f)
+
+			originalContainers := []podresize.ResizableContainerInfo{{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: origCPU, CPULim: origCPU,
+					MemReq: origMem, MemLim: origMem,
+				},
+			}}
+			desiredContainers := []podresize.ResizableContainerInfo{{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: desiredCPU, CPULim: desiredCPU,
+					MemReq: desiredMem, MemLim: desiredMem,
+				},
+			}}
+
+			ginkgo.By("creating and verifying pod with memory-backed emptyDir volume")
+			tStamp := strconv.Itoa(time.Now().Nanosecond())
+			testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, originalContainers, nil)
+			testPod.GenerateName = "resize-memory-vol-test-"
+
+			origQty := resource.MustParse(origSizeLimit)
+			testPod.Spec.Volumes = []v1.Volume{
+				{
+					Name: "mem-vol",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &origQty,
+						},
+					},
+				},
+			}
+			testPod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{
+					Name:      "mem-vol",
+					MountPath: "/cache",
+				},
+			}
+			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+			newPod := podClient.CreateSync(ctx, testPod)
+			podresize.VerifyPodResources(newPod, originalContainers, nil)
+
+			ginkgo.By("verifying initial emptyDir volume status sizeLimit")
+			podresize.VerifyVolumeStatusSizeLimit(ctx, f, newPod, "mem-vol", (origQty.Value()/1024)*1000)
+
+			ginkgo.By("verifying initial volume mount size via df inside the container")
+			stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache")
+			framework.ExpectNoError(err, "failed to run df inside container")
+			origMB := origQty.Value() / (1024 * 1024)
+			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(origMB, 10)))
+
+			ginkgo.By("patching pod spec's emptyDir sizeLimit and container resources")
+			containerPatchBytes := podresize.MakeResizePatch(originalContainers, desiredContainers, nil, nil)
+			var patchMap map[string]interface{}
+			err = json.Unmarshal(containerPatchBytes, &patchMap)
+			framework.ExpectNoError(err, "failed to unmarshal container patch")
+
+			if patchMap == nil {
+				patchMap = make(map[string]interface{})
+			}
+			specMap, ok := patchMap["spec"].(map[string]interface{})
+			if !ok {
+				specMap = make(map[string]interface{})
+				patchMap["spec"] = specMap
+			}
+			specMap["volumes"] = []interface{}{
+				map[string]interface{}{
+					"name": "mem-vol",
+					"emptyDir": map[string]interface{}{
+						"sizeLimit": desiredSizeLimit,
+					},
+				},
+			}
+
+			patchBytes, err := json.Marshal(patchMap)
+			framework.ExpectNoError(err, "failed to marshal combined patch")
+
+			patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+				types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "resize")
+			framework.ExpectNoError(pErr, "failed to patch pod spec")
+
+			ginkgo.By("waiting for resize actuation to complete")
+			expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, desiredContainers)
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod, expected)
+			podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+
+			ginkgo.By("verifying the status field contains the updated sizeLimit")
+			desiredQty := resource.MustParse(desiredSizeLimit)
+			podresize.VerifyVolumeStatusSizeLimit(ctx, f, resizedPod, "mem-vol", (desiredQty.Value()/1024)*1000)
+
+			ginkgo.By("verifying new volume mount size via df inside the container")
+			stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, resizedPod.Name, "c1", "df", "-m", "/cache")
+			framework.ExpectNoError(err, "failed to run df inside container after resize")
+			desiredMB := desiredQty.Value() / (1024 * 1024)
+			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(desiredMB, 10)))
+
+			ginkgo.By("rolling back to original state")
+			rollbackContainerPatchBytes := podresize.MakeResizePatch(desiredContainers, originalContainers, nil, nil)
+			var rollbackPatchMap map[string]interface{}
+			err = json.Unmarshal(rollbackContainerPatchBytes, &rollbackPatchMap)
+			framework.ExpectNoError(err, "failed to unmarshal rollback container patch")
+
+			if rollbackPatchMap == nil {
+				rollbackPatchMap = make(map[string]interface{})
+			}
+			rollbackSpecMap, ok := rollbackPatchMap["spec"].(map[string]interface{})
+			if !ok {
+				rollbackSpecMap = make(map[string]interface{})
+				rollbackPatchMap["spec"] = rollbackSpecMap
+			}
+			rollbackSpecMap["volumes"] = []interface{}{
+				map[string]interface{}{
+					"name": "mem-vol",
+					"emptyDir": map[string]interface{}{
+						"sizeLimit": origSizeLimit,
+					},
+				},
+			}
+
+			rollbackPatchBytes, err := json.Marshal(rollbackPatchMap)
+			framework.ExpectNoError(err, "failed to marshal rollback patch")
+
+			rolledBackPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+				types.StrategicMergePatchType, rollbackPatchBytes, metav1.PatchOptions{}, "resize")
+			framework.ExpectNoError(pErr, "failed to patch pod for rollback")
+
+			expectedRollback := podresize.UpdateExpectedContainerRestarts(ctx, rolledBackPod, originalContainers)
+			finalPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, rolledBackPod, expectedRollback)
+			podresize.ExpectPodResized(ctx, f, finalPod, expectedRollback)
+
+			ginkgo.By("verifying sizeLimit and mount reverted to original")
+			podresize.VerifyVolumeStatusSizeLimit(ctx, f, finalPod, "mem-vol", (origQty.Value()/1024)*1000)
+			stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, finalPod.Name, "c1", "df", "-m", "/cache")
+			framework.ExpectNoError(err, "failed to run df after rollback")
+			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(origMB, 10)))
+
+			ginkgo.By("deleting pod")
+			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+		},
+		ginkgo.Entry("volume resize (upsize then downsize)",
+			originalCPU, originalCPU, "200Mi", "200Mi", "64Mi", "128Mi",
+		),
+		ginkgo.Entry("volume resize + container resize (upsize then downsize)",
+			originalCPU, increasedCPU, "200Mi", "250Mi", "64Mi", "128Mi",
+		),
+	)
+}
+
+func doPodResizeMemoryVolumeSizeLimitDecreaseTest(f *framework.Framework) {
+	// Tests the behavior when shrinking memory-backed emptyDir volume sizeLimit below active usage:
+	// 1. Create a pod with memory-backed emptyDir volume of size 128Mi.
+	// 2. Write 100Mi of data to the volume.
+	// 3. Resize the volume size limit down to 50Mi - should fail and report error in condition.
+	// 4. Verify volume mount size is not shrunk and container did not restart.
+	ginkgo.It("should fail to shrink sizeLimit of a memory-backed volume below active usage", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		original := []podresize.ResizableContainerInfo{{
+			Name: "c1",
+			Resources: &cgroups.ContainerResources{
+				CPUReq: originalCPU, CPULim: originalCPU,
+				MemReq: "200Mi", MemLim: "200Mi",
+			},
+		}}
+
+		ginkgo.By("creating and verifying pod with memory-backed emptyDir volume")
+		tStamp := strconv.Itoa(time.Now().Nanosecond())
+		testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, original, nil)
+		testPod.GenerateName = "resize-memory-vol-fail-"
+		testPod.Spec.Volumes = []v1.Volume{
+			{
+				Name: "mem-vol",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    v1.StorageMediumMemory,
+						SizeLimit: resource.NewQuantity(128*1024*1024, resource.BinarySI), // 128Mi
+					},
+				},
+			},
+		}
+		testPod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+			{
+				Name:      "mem-vol",
+				MountPath: "/cache",
+			},
+		}
+		testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+		newPod := podClient.CreateSync(ctx, testPod)
+		podresize.VerifyPodResources(newPod, original, nil)
+
+		ginkgo.By("verifying initial emptyDir volume status is populated with 128Mi limit")
+		podresize.VerifyVolumeStatusSizeLimit(ctx, f, newPod, "mem-vol", 128*1024*1000)
+
+		ginkgo.By("verifying new volume mount size via df inside the container")
+		stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache")
+		framework.ExpectNoError(err, "failed to run df inside container")
+		gomega.Expect(stdout).To(gomega.ContainSubstring("128"))
+
+		ginkgo.By("writing a 100Mi file to the volume to ensure active usage")
+		_, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "dd", "if=/dev/zero", "of=/cache/largefile", "bs=1M", "count=100")
+		framework.ExpectNoError(err, "failed to write large file inside container")
+
+		ginkgo.By("patching pod spec's emptyDir sizeLimit down to 50Mi")
+		patchBytes := []byte(`{
+			"spec": {
+				"volumes": [
+					{
+						"name": "mem-vol",
+						"emptyDir": {
+							"sizeLimit": "50Mi"
+						}
+					}
+				]
+			}
+		}`)
+		patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+			types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(pErr, "failed to patch emptyDir sizeLimit")
+
+		ginkgo.By("waiting for resize actuation to fail and report error in condition")
+		framework.ExpectNoError(framework.Gomega().
+			Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(patchedPod.Namespace).Get, patchedPod.Name, metav1.GetOptions{}))).
+			WithTimeout(f.Timeouts.PodStart).
+			Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+				var inProgressCondition *v1.PodCondition
+				for i, condition := range pod.Status.Conditions {
+					if condition.Type == v1.PodResizeInProgress {
+						inProgressCondition = &pod.Status.Conditions[i]
+						break
+					}
+				}
+				if inProgressCondition == nil {
+					return func() string { return "resize is not in progress" }, nil
+				}
+				if inProgressCondition.Reason != v1.PodReasonError {
+					return func() string {
+						return fmt.Sprintf("expected reason %s, got %s", v1.PodReasonError, inProgressCondition.Reason)
+					}, nil
+				}
+				if len(inProgressCondition.Message) == 0 {
+					return func() string { return "expected a non-empty error message in PodResizeInProgress condition" }, nil
+				}
+				return nil, nil
+			})),
+		)
+
+		ginkgo.By("verifying the volume still holds the original size and c1 didn't restart")
+		podresize.VerifyVolumeStatusSizeLimit(ctx, f, newPod, "mem-vol", 128*1024*1000)
+		stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache")
+		framework.ExpectNoError(err, "failed to run df inside container")
+		gomega.Expect(stdout).To(gomega.ContainSubstring("128"))
+
+		gotPod, getErr := podClient.Get(ctx, newPod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(getErr)
+		expected := podresize.UpdateExpectedContainerRestarts(ctx, gotPod, original)
+		gomega.Expect(gotPod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(expected[0].RestartCount))
+
+		ginkgo.By("deleting pod")
+		podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+	})
+}
+
 // NOTE: Pod resize scheduler, resource quota, limit ranger, deferred resize tests are out of scope in e2e_node tests,
 //
 //	because in e2e_node tests
@@ -891,6 +1166,21 @@ var _ = SIGDescribe("Pod InPlace Resize Init Container", framework.WithNodeConfo
 	})
 
 	doPodResizeInitContainerResizeTest(f)
+})
+
+var _ = SIGDescribe("Pod InPlace Resize Memory-Backed Volume", framework.WithFeatureGate(features.InPlacePodVerticalScalingMemoryBackedVolumes), func() {
+	f := framework.NewDefaultFramework("pod-resize-memory-volumes")
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+		if framework.NodeOSDistroIs("windows") {
+			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
+		}
+	})
+
+	doPodResizeMemoryVolumeTests(f)
+	doPodResizeMemoryVolumeSizeLimitDecreaseTest(f)
 })
 
 func doPatchAndRollback(ctx context.Context, f *framework.Framework, originalContainers, expectedContainers []podresize.ResizableContainerInfo, originalPodResources, expectedPodResources *v1.ResourceRequirements, doRollback bool, mountPodCgroup bool) {

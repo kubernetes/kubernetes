@@ -7034,3 +7034,86 @@ func TestHasRestartContainerForNonSidecarInitContainer(t *testing.T) {
 		})
 	}
 }
+
+func TestDropDisabledPodStatusFields_VolumeStatus(t *testing.T) {
+	// Helper to create a pod status with volume status fields
+	createPodStatus := func(hasImage, hasEmptyDir bool) *api.PodStatus {
+		status := &api.PodStatus{
+			ContainerStatuses: []api.ContainerStatus{
+				{
+					Name: "c1",
+					VolumeMounts: []api.VolumeMountStatus{
+						{
+							Name: "v1",
+						},
+					},
+				},
+			},
+		}
+		if hasImage || hasEmptyDir {
+			status.ContainerStatuses[0].VolumeMounts[0].VolumeStatus = &api.VolumeStatus{}
+			if hasImage {
+				status.ContainerStatuses[0].VolumeMounts[0].VolumeStatus.Image = &api.ImageVolumeStatus{
+					ImageRef: "test-image@sha256:123",
+				}
+			}
+			if hasEmptyDir {
+				status.ContainerStatuses[0].VolumeMounts[0].VolumeStatus.EmptyDir = &api.EmptyDirVolumeStatus{
+					SizeLimit: resource.NewQuantity(1024, resource.BinarySI),
+				}
+			}
+		}
+		return status
+	}
+
+	// Define all 4 possible combinations of customizable feature gate states
+	featureGates := []struct {
+		imageVolumeFGSet bool // ImageVolumeWithDigest feature gate
+		emptyDirFGSet    bool // InPlacePodVerticalScalingMemoryBackedVolumes feature gate
+	}{
+		{false, false}, // both disabled
+		{true, false},  // imageVolume enabled
+		{false, true},  // emptyDir enabled
+		{true, true},   // both enabled
+	}
+
+	for _, fg := range featureGates {
+		t.Run(fmt.Sprintf("FG_Image=%t_EmptyDir=%t", fg.imageVolumeFGSet, fg.emptyDirFGSet), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolumeWithDigest, fg.imageVolumeFGSet)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, fg.emptyDirFGSet)
+
+			// We will test combination of present/absent fields in old state vs new state
+			for _, oldImagePresent := range []bool{false, true} {
+				for _, oldEmptyDirPresent := range []bool{false, true} {
+					for _, newImagePresent := range []bool{false, true} {
+						for _, newEmptyDirPresent := range []bool{false, true} {
+							oldStatus := createPodStatus(oldImagePresent, oldEmptyDirPresent)
+							newStatus := createPodStatus(newImagePresent, newEmptyDirPresent)
+
+							dropDisabledPodStatusFields(newStatus, oldStatus, &api.PodSpec{}, &api.PodSpec{})
+
+							// Determine expected fields in newStatus:
+							wantImage := newImagePresent && (fg.imageVolumeFGSet || oldImagePresent)
+							wantEmptyDir := newEmptyDirPresent && (fg.emptyDirFGSet || oldEmptyDirPresent)
+
+							vm := newStatus.ContainerStatuses[0].VolumeMounts
+							if assert.NotEmpty(t, vm) {
+								var gotImage bool
+								var gotEmptyDir bool
+								if vm[0].VolumeStatus != nil {
+									gotImage = vm[0].VolumeStatus.Image != nil
+									gotEmptyDir = vm[0].VolumeStatus.EmptyDir != nil
+								}
+								assert.Equal(t, wantImage, gotImage)
+								assert.Equal(t, wantEmptyDir, gotEmptyDir)
+								if !wantImage && !wantEmptyDir {
+									assert.Nil(t, vm[0].VolumeStatus)
+								}
+							}
+						}
+					}
+				}
+			}
+		})
+	}
+}

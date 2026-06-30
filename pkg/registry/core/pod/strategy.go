@@ -370,6 +370,28 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	// Preserve the incoming pod-level resource from the new pod object.
 	newPodResources := newPod.Spec.Resources
 
+	newVolumes := oldPod.Spec.Volumes
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		if len(newPod.Spec.Volumes) != len(oldPod.Spec.Volumes) {
+			newVolumes = newPod.Spec.Volumes
+		} else {
+			oldCopyWithMergedVolumes := make([]api.Volume, len(oldPod.Spec.Volumes))
+			copy(oldCopyWithMergedVolumes, oldPod.Spec.Volumes)
+			for i, vol := range newPod.Spec.Volumes {
+				if oldCopyWithMergedVolumes[i].Name != vol.Name {
+					oldCopyWithMergedVolumes = newPod.Spec.Volumes
+					break
+				}
+				if vol.EmptyDir != nil && oldCopyWithMergedVolumes[i].EmptyDir != nil {
+					oldDir := oldCopyWithMergedVolumes[i].EmptyDir.DeepCopy()
+					oldDir.SizeLimit = vol.EmptyDir.SizeLimit
+					oldCopyWithMergedVolumes[i].EmptyDir = oldDir
+				}
+			}
+			newVolumes = oldCopyWithMergedVolumes
+		}
+	}
+
 	containers := dropNonResizeUpdatesForContainers(newPod.Spec.Containers, oldPod.Spec.Containers)
 	initContainers := dropNonResizeUpdatesForContainers(newPod.Spec.InitContainers, oldPod.Spec.InitContainers)
 
@@ -385,6 +407,9 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 
 	newPod.Spec.Containers = containers
 	newPod.Spec.InitContainers = initContainers
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		newPod.Spec.Volumes = newVolumes
+	}
 
 	return newPod
 }

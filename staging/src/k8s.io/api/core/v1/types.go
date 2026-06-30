@@ -3652,6 +3652,21 @@ type VolumeStatus struct {
 	// +featureGate=ImageVolumeWithDigest
 	// +optional
 	Image *ImageVolumeStatus `json:"image,omitempty" protobuf:"bytes,1,opt,name=image"`
+
+	// emptyDir represents the status of an emptyDir volume.
+	// This is only populated for memory-backed emptyDir volumes.
+	// +featureGate=InPlacePodVerticalScalingMemoryBackedVolumes
+	// +optional
+	EmptyDir *EmptyDirVolumeStatus `json:"emptyDir,omitempty" protobuf:"bytes,3,opt,name=emptyDir"`
+}
+
+// EmptyDirVolumeStatus represents the status of an emptyDir volume.
+type EmptyDirVolumeStatus struct {
+	// sizeLimit represents the actual mounted capacity of the emptyDir volume.
+	// This is only populated for memory-backed emptyDir volumes.
+	// +featureGate=InPlacePodVerticalScalingMemoryBackedVolumes
+	// +optional
+	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty" protobuf:"bytes,1,opt,name=sizeLimit"`
 }
 
 // ImageVolumeStatus represents the image-based volume status.
