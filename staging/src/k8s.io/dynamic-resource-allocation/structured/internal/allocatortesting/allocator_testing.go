@@ -6188,8 +6188,7 @@ func TestAllocator(t *testing.T,
 			)),
 			node: node(node1, region1),
 
-			expectResults: []any{},
-			expectError:   gomega.MatchError(gomega.ContainSubstring("unsupported attribute value")),
+			expectResults: nil,
 		},
 		"list-attributes-distinct-constraint-scalar-string-values-all-distinct": {
 			features: Features{
@@ -6482,8 +6481,7 @@ func TestAllocator(t *testing.T,
 			)),
 			node: node(node1, region1),
 
-			expectResults: []any{},
-			expectError:   gomega.MatchError(gomega.ContainSubstring("unsupported attribute value")),
+			expectResults: nil,
 		},
 
 		"allocation-mode-all-with-multi-host-resource-pool": {
