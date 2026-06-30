@@ -1466,13 +1466,15 @@ func TestPeter(t *testing.T) {
 		}
 		warningHandler.assertEqual(t, nil)
 
-		// checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		// checkPayload(t, treq.Status.Token, `["api"]`, "aud")
-		// checkPayload(t, treq.Status.Token, `"test-pod"`, "kubernetes.io", "pod", "name")
-		// checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "secret")
-		// checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
-		// checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
-		// checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "node")
+		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
+		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "pod")
+		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "secret")
+		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "node")
+		checkPayload(t, treq.Status.Token, `"test-validating-webhook"`, "kubernetes.io", "validatingWebhookConfiguration", "name")
+		checkPayload(t, treq.Status.Token, `["authentication.engelbert.dev"]`, "kubernetes.io", "attestationClaims", authenticationv1.ClaimAllowedAPIGroup)
+		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
+		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
 
 		info := doTokenReview(t, cs, treq, false)
 		// we are not testing the credential-id feature, so delete this value from the returned extra info map
@@ -1496,7 +1498,8 @@ func doTokenReview(t *testing.T, cs clientset.Interface, treq *authenticationv1.
 	for {
 		trev, err := cs.AuthenticationV1().TokenReviews().Create(context.TODO(), &authenticationv1.TokenReview{
 			Spec: authenticationv1.TokenReviewSpec{
-				Token: treq.Status.Token,
+				Token:     treq.Status.Token,
+				Audiences: treq.Spec.Audiences,
 			},
 		}, metav1.CreateOptions{})
 		if err != nil {
