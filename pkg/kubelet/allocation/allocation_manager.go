@@ -541,7 +541,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	_, updated := m.UpdatePodFromAllocation(pod)
 	if !updated {
 		// Desired resources == allocated resources. Pod allocation does not need to be updated.
-		m.statusManager.ClearPodResizePendingCondition(pod.UID)
+		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 		return false, nil
 	}
 
@@ -552,7 +552,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			return false, err
 		}
-		m.statusManager.ClearPodResizePendingCondition(pod.UID)
+		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
 
 		// Clear any errors that may have been surfaced from a previous resize and update the
 		// generation of the resize in-progress condition.
