@@ -654,12 +654,16 @@ func (d fakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*met
 	return d.gvResources[groupVersion], d.err
 }
 
+func (d fakeDiscovery) ServerResourcesForGroupVersionWithContext(ctx context.Context, groupVersion string) (*metav1.APIResourceList, error) {
+	return d.gvResources[groupVersion], d.err
+}
+
 type fakeDiscoveryClientSet struct {
 	*fake.Clientset
 	DiscoveryObj *fakeDiscovery
 }
 
-func (c *fakeDiscoveryClientSet) Discovery() discovery.DiscoveryInterface {
+func (c *fakeDiscoveryClientSet) Discovery() discovery.DiscoveryInterfaces {
 	return c.DiscoveryObj
 }
 
