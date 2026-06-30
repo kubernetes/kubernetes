@@ -82,9 +82,6 @@ func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
 						&tc.input,
 						registry.Strategy,
 						tc.expectedErrs,
-						// extensions/v1beta1 is unserved and no longer carries
-						// declarative validation; skip it in the version sweep.
-						apitesting.WithSkipGroupVersions("extensions/v1beta1"),
 					)
 				})
 			}
@@ -155,9 +152,6 @@ func TestDeclarativeValidateIPBlockCIDRUpdate(t *testing.T) {
 						&tc.oldObj,
 						registry.Strategy,
 						tc.expectedErrs,
-						// extensions/v1beta1 is unserved and no longer carries
-						// declarative validation; skip it in the version sweep.
-						apitesting.WithSkipGroupVersions("extensions/v1beta1"),
 					)
 				})
 			}

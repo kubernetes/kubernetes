@@ -61,7 +61,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				t.Run(k, func(t *testing.T) {
 					tc.old.ResourceVersion = "1"
 					tc.update.ResourceVersion = "1"
-					apitesting.VerifyUpdateValidationEquivalenceFunc(t, ctx, &tc.update, &tc.old, validateScale, tc.expectedErrs, apitesting.WithSubResources("scale"), apitesting.WithSkipGroupVersions("extensions/v1beta1"))
+					apitesting.VerifyUpdateValidationEquivalenceFunc(t, ctx, &tc.update, &tc.old, validateScale, tc.expectedErrs, apitesting.WithSubResources("scale"))
 				})
 			}
 		})
