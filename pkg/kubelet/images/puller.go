@@ -57,8 +57,17 @@ func newParallelImagePuller(imageService kubecontainer.ImageService, maxParallel
 
 func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
 	if pip.tokens != nil {
-		pip.tokens <- struct{}{}
+		select {
+		case pip.tokens <- struct{}{}:
+		case <-ctx.Done():
+			pullChan <- pullResult{err: ctx.Err()}
+			return
+		}
 		defer func() { <-pip.tokens }()
+	}
+	if ctx.Err() != nil {
+		pullChan <- pullResult{err: ctx.Err()}
+		return
 	}
 	startTime := time.Now()
 	imageRef, creds, err := pip.imageService.PullImage(ctx, spec, credentials, podSandboxConfig)
@@ -116,12 +125,16 @@ type imagePullRequest struct {
 }
 
 func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
-	sip.pullRequests <- &imagePullRequest{
+	select {
+	case sip.pullRequests <- &imagePullRequest{
 		ctx:              ctx,
 		spec:             spec,
 		credentials:      credentials,
 		pullChan:         pullChan,
 		podSandboxConfig: podSandboxConfig,
+	}:
+	case <-ctx.Done():
+		pullChan <- pullResult{err: ctx.Err()}
 	}
 }
 
@@ -158,6 +171,10 @@ func (sip *serialImagePuller) processImagePullRequests() {
 	for pullRequest := range sip.pullRequests {
 		if pullRequest.pull != nil {
 			pullRequest.pull()
+			continue
+		}
+		if pullRequest.ctx.Err() != nil {
+			pullRequest.pullChan <- pullResult{err: pullRequest.ctx.Err()}
 			continue
 		}
 		startTime := time.Now()

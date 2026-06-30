@@ -334,18 +334,16 @@ func (m *imageManager) makeLookupPullCredentialsFunc(image string, pod *v1.Pod, 
 
 func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *v1.ObjectReference, podUID types.UID, image string, imgSpec kubecontainer.ImageSpec, pullCredentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (imageRef, message string, err error) {
 	logger := klog.FromContext(ctx)
-	var pullSucceeded bool
-	var finalPullCredentials *credentialprovider.TrackedAuthConfig
+	pullStarted := false
+	trackPull := utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+	if trackPull {
 		if err := m.imagePullManager.RecordPullIntent(logger, image); err != nil {
 			return "", fmt.Sprintf("Failed to record image pull intent for container image %q: %v", image, err), err
 		}
 
 		defer func() {
-			if pullSucceeded {
-				m.imagePullManager.RecordImagePulled(ctx, image, imageRef, trackedToImagePullCreds(finalPullCredentials))
-			} else {
+			if !pullStarted {
 				m.imagePullManager.RecordImagePullFailed(ctx, image)
 			}
 		}()
@@ -373,9 +371,34 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 	m.logIt(logger, objRef, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", image))
 	startTime := time.Now()
 
-	pullChan := make(chan pullResult)
-	go m.puller.pullImage(ctx, imgSpec, pullCredentials, pullChan, podSandboxConfig)
-	imagePullResult := <-pullChan
+	// A canceled caller must not leave the puller blocked sending a late result.
+	pullChan := make(chan pullResult, 1)
+	pullStarted = true
+	go func() {
+		resultChan := make(chan pullResult, 1)
+		m.puller.pullImage(ctx, imgSpec, pullCredentials, resultChan, podSandboxConfig)
+		result := <-resultChan
+		if trackPull {
+			// Keep the intent until the actual result is known. A late success must
+			// not be mistaken for a preloaded image after the caller cancels.
+			recordCtx := context.WithoutCancel(ctx)
+			if result.err == nil {
+				m.imagePullManager.RecordImagePulled(recordCtx, image, result.imageRef, trackedToImagePullCreds(result.credentialsUsed))
+			} else {
+				m.imagePullManager.RecordImagePullFailed(recordCtx, image)
+			}
+		}
+		pullChan <- result
+	}()
+	var imagePullResult pullResult
+	select {
+	case imagePullResult = <-pullChan:
+	case <-ctx.Done():
+		return "", ctx.Err().Error(), ctx.Err()
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err.Error(), err
+	}
 	if imagePullResult.err != nil {
 		m.logIt(logger, objRef, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", image, imagePullResult.err))
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
@@ -393,9 +416,6 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 		image, imagePullResult.pullDuration.Truncate(time.Millisecond), imagePullDuration, imagePullResult.imageSize))
 	metrics.ImagePullDuration.WithLabelValues(metrics.GetImageSizeBucket(imagePullResult.imageSize)).Observe(imagePullDuration.Seconds())
 	m.backOff.GC()
-	finalPullCredentials = imagePullResult.credentialsUsed
-	pullSucceeded = true
-
 	return imagePullResult.imageRef, "", nil
 }
 

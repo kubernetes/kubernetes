@@ -738,6 +738,53 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	}
 }
 
+func TestRunHandlerHTTPStalledServerCancellation(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		close(started)
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	t.Cleanup(func() {
+		close(release)
+		srv.Close()
+	})
+	host, port, err := net.SplitHostPort(srv.Listener.Addr().String())
+	require.NoError(t, err)
+	portNumber, err := strconv.Atoi(port)
+	require.NoError(t, err)
+
+	handler := &v1.LifecycleHandler{HTTPGet: &v1.HTTPGetAction{
+		Host: host,
+		Port: intstr.FromInt32(int32(portNumber)),
+	}}
+	runner := NewHandlerRunner(srv.Client(), nil, nil, nil)
+	result := make(chan error, 1)
+	go func() {
+		_, err := runner.Run(ctx, kubecontainer.ContainerID{}, &v1.Pod{}, &v1.Container{}, handler)
+		result <- err
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("HTTP lifecycle hook did not reach the server")
+	}
+	cancel()
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("HTTP lifecycle hook did not return after context cancellation")
+	}
+}
+
 func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 	_, tCtx := ktesting.NewTestContext(t)
 
