@@ -1408,7 +1408,7 @@ func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinRep
 	minimumAllowedReplicas = hpaMinReplicas
 
 	// Do not scaleup too much to prevent incorrect rapid increase of the number of master replicas caused by
-	// bogus CPU usage report from heapster/kubelet (like in issue #32304).
+	// bogus CPU usage report from kubelet (like in issue #32304).
 	scaleUpLimit := calculateScaleUpLimit(currentReplicas)
 
 	if hpaMaxReplicas > scaleUpLimit {
