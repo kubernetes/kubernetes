@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -178,6 +179,9 @@ type kubeGenericRuntimeManager struct {
 
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
+
+	terminationLock sync.Mutex
+	terminations    map[kubetypes.UID]*podTerminationOperations
 
 	// PodState provider instance
 	podStateProvider podStateProvider
