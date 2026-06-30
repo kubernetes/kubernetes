@@ -90,14 +90,15 @@ func NewResourceVersionController(
 		),
 	}
 
-	_, _ = svmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := svmInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			rvController.addSVM(logger, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			rvController.updateSVM(logger, oldObj, newObj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	return rvController
 }
