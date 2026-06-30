@@ -807,30 +807,16 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			withRev = getResp.Revision
 		}
 
-		// avoid small allocations for the result slice, since this can be called in many
-		// different contexts and we don't know how significantly the result will be filtered
-		if opts.Predicate.Empty() {
-			growSlice(v, len(getResp.Kvs))
-		} else {
-			growSlice(v, 2048, len(getResp.Kvs))
+		chunkLastKey, chunkEvaluated, chunkHasMore, err := s.appendChunk(ctx, getResp.Kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
+		if err != nil {
+			return err
 		}
-
-		// take items from the response until the bucket is full, filtering as we go
-		for i, kv := range getResp.Kvs {
-			if paging && int64(v.Len()) >= opts.Predicate.Limit {
-				hasMore = true
-				break
-			}
-			lastKey = kv.Key
-			evaluated, err := s.processListItem(ctx, kv, opts.Predicate, newItemFunc, aggregator, v)
-			if err != nil {
-				return err
-			}
-			if evaluated {
-				numEvald++
-			}
-			// free kv early. Long lists can take O(seconds) to decode.
-			getResp.Kvs[i] = nil
+		numEvald += chunkEvaluated
+		if chunkHasMore {
+			hasMore = true
+		}
+		if chunkLastKey != nil {
+			lastKey = chunkLastKey
 		}
 		continueKey = string(lastKey) + "\x00"
 
@@ -909,6 +895,33 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 	}
 
 	return true, nil
+}
+
+// appendChunk appends the kvs matching pred to v.
+func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value, paging bool) (lastKey []byte, evaluated int, hasMore bool, err error) {
+	// avoid small allocations for the result slice, since this can be called in many
+	// different contexts and we don't know how significantly the result will be filtered
+	if pred.Empty() {
+		growSlice(v, len(kvs))
+	} else {
+		growSlice(v, 2048, len(kvs))
+	}
+	for i, kv := range kvs {
+		if paging && int64(v.Len()) >= pred.Limit {
+			return lastKey, evaluated, true, nil
+		}
+		lastKey = kv.Key
+		ok, err := s.processListItem(ctx, kv, pred, newItemFunc, aggregator, v)
+		if err != nil {
+			return lastKey, evaluated, false, err
+		}
+		if ok {
+			evaluated++
+		}
+		// free kv early. Long lists can take O(seconds) to decode.
+		kvs[i] = nil
+	}
+	return lastKey, evaluated, false, nil
 }
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
