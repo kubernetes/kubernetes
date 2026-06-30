@@ -50,7 +50,7 @@ type Controller struct {
 }
 
 // NewPVProtectionController returns a new *Controller.
-func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) *Controller {
+func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) (*Controller, error) {
 	e := &Controller{
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -69,9 +69,11 @@ func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.Pers
 			e.pvAddedUpdated(logger, new)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
-	utilruntime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add PV event handler: %w", err)
+	}
 
-	return e
+	return e, nil
 }
 
 // Run runs the controller goroutines.

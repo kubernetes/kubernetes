@@ -749,11 +749,14 @@ func newPersistentVolumeProtectionController(ctx context.Context, controllerCont
 		return nil, err
 	}
 
-	pvpc := pvprotection.NewPVProtectionController(
+	pvpc, err := pvprotection.NewPVProtectionController(
 		klog.FromContext(ctx),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		client,
 	)
+	if err != nil {
+		return nil, err
+	}
 	return newControllerLoop(func(ctx context.Context) {
 		pvpc.Run(ctx, 1)
 	}, controllerName), nil

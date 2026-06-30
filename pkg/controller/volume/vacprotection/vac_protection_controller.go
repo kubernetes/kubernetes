@@ -121,7 +121,9 @@ func NewVACProtectionController(logger klog.Logger,
 			c.vacAddedUpdated(logger, new)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
-	utilruntime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add event handler to VAC informer: %w", err)
+	}
 
 	err = pvInformer.Informer().AddIndexers(cache.Indexers{vacNameKeyIndex: func(obj interface{}) ([]string, error) {
 		pv, ok := obj.(*v1.PersistentVolume)
@@ -187,7 +189,9 @@ func NewVACProtectionController(logger klog.Logger,
 			c.pvcDeleted(logger, obj)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
-	utilruntime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add event handler to PVC informer: %w", err)
+	}
 
 	_, err = pvInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(old, new interface{}) {
@@ -197,7 +201,9 @@ func NewVACProtectionController(logger klog.Logger,
 			c.pvDeleted(logger, obj)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
-	utilruntime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add event handler to PV informer: %w", err)
+	}
 	return c, nil
 }
 

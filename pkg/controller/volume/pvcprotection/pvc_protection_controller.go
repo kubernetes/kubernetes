@@ -142,7 +142,9 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 			e.pvcAddedUpdated(logger, new)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
-	utilruntime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add PVC event handler: %w", err)
+	}
 
 	e.podLister = podInformer.Lister()
 	e.podListerSynced = podInformer.Informer().HasSynced
@@ -161,7 +163,9 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 			e.podAddedDeletedUpdated(logger, old, new, false)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
-	utilruntime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add Pod event handler: %w", err)
+	}
 
 	return e, nil
 }
