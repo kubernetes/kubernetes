@@ -807,12 +807,12 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			withRev = getResp.Revision
 		}
 
-		chunkLastKey, evaluated, reachedLimit, err := s.appendChunk(ctx, getResp.Kvs, opts.Predicate, newItemFunc, aggregator, v, opts.Predicate.Limit)
+		chunkLastKey, chunkEvaluated, chunkHasMore, err := s.appendChunk(ctx, getResp.Kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
 		if err != nil {
 			return err
 		}
-		numEvald += evaluated
-		if reachedLimit {
+		numEvald += chunkEvaluated
+		if chunkHasMore {
 			hasMore = true
 		}
 		if chunkLastKey != nil {
@@ -900,7 +900,7 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 }
 
 // appendChunk appends the kvs matching pred to v.
-func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value, limit int64) (lastKey []byte, numEvald int, hasMore bool, err error) {
+func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value, paging bool) (lastKey []byte, evaluated int, hasMore bool, err error) {
 	// avoid small allocations for the result slice, since this can be called in many
 	// different contexts and we don't know how significantly the result will be filtered
 	if pred.Empty() {
@@ -909,21 +909,21 @@ func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred st
 		growSlice(v, 2048, len(kvs))
 	}
 	for i, kv := range kvs {
-		if limit > 0 && int64(v.Len()) >= limit {
-			return lastKey, numEvald, true, nil
+		if paging && int64(v.Len()) >= pred.Limit {
+			return lastKey, evaluated, true, nil
 		}
 		lastKey = kv.Key
-		evaluated, err := s.processListItem(ctx, kv, pred, newItemFunc, aggregator, v)
+		ok, err := s.processListItem(ctx, kv, pred, newItemFunc, aggregator, v)
 		if err != nil {
-			return lastKey, numEvald, false, err
+			return lastKey, evaluated, false, err
 		}
-		if evaluated {
-			numEvald++
+		if ok {
+			evaluated++
 		}
 		// free kv early. Long lists can take O(seconds) to decode.
 		kvs[i] = nil
 	}
-	return lastKey, numEvald, false, nil
+	return lastKey, evaluated, false, nil
 }
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
