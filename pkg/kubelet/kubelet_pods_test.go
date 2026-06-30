@@ -8402,12 +8402,12 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 			syncFuncs := newPodSyncerFuncs(originalPodSyncer)
 			podWorkers.podSyncer = &syncFuncs
 			if tt.terminatingErr != nil {
-				syncFuncs.syncTerminatingPod = func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+				syncFuncs.syncTerminatingPod = func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, deadline time.Time, podStatusFn func(*v1.PodStatus)) (bool, error) {
 					t.Logf("called syncTerminatingPod")
-					if err := originalPodSyncer.SyncTerminatingPod(ctx, pod, podStatus, gracePeriod, podStatusFn); err != nil {
+					if _, err := originalPodSyncer.SyncTerminatingPod(ctx, pod, podStatus, gracePeriod, deadline, podStatusFn); err != nil {
 						t.Fatalf("unexpected error in syncTerminatingPodFn: %v", err)
 					}
-					return tt.terminatingErr
+					return false, tt.terminatingErr
 				}
 				syncFuncs.syncTerminatingRuntimePod = func(ctx context.Context, runningPod *kubecontainer.Pod) error {
 					if err := originalPodSyncer.SyncTerminatingRuntimePod(ctx, runningPod); err != nil {

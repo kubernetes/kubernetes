@@ -2331,20 +2331,20 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	return false, postSync, err
 }
 
-// SyncTerminatingPod is expected to terminate all running containers in a pod. Once this method
-// returns without error, the pod is considered to be terminated and it will be safe to clean up any
-// pod state that is tied to the lifetime of running containers. The next method invoked will be
-// SyncTerminatedPod. This method is expected to return with the grace period provided and the
-// provided context may be cancelled if the duration is exceeded. The method may also be interrupted
-// with a context cancellation if the grace period is shortened by the user or the kubelet (such as
-// during eviction). This method is not guaranteed to be called if a pod is force deleted from the
-// configuration and the kubelet is restarted - SyncTerminatingRuntimePod handles those orphaned
-// pods.
-func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) (err error) {
+// SyncTerminatingPod stops containers and records their final status. With
+// SidecarsRestartableDuringPodTermination enabled, it reconciles sidecars against
+// the runtime status and absolute deadline, returning false while work remains.
+// Only a true result permits SyncTerminatedPod and resource cleanup. The worker
+// retries pending work on PLEG events, updates, or its timer; failures use backoff.
+// Runtime-only pods after force deletion are handled by SyncTerminatingRuntimePod.
+func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, deadline time.Time, podStatusFn func(*v1.PodStatus)) (complete bool, err error) {
 	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
 	// Currently, using that context causes test failures.
 	logger := klog.FromContext(ctx)
-	ctx = klog.NewContext(context.TODO(), logger)
+	reconcile := utilfeature.DefaultFeatureGate.Enabled(features.SidecarsRestartableDuringPodTermination) && kubetypes.HasRestartableInitContainer(pod)
+	if !reconcile {
+		ctx = klog.NewContext(context.TODO(), logger)
+	}
 	logger.V(4).Info("SyncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	ctx, otelSpan := kl.tracer.Start(ctx, "syncTerminatingPod", trace.WithAttributes(
@@ -2376,11 +2376,30 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 
 	kl.probeManager.StopLivenessAndStartup(pod)
 
+	if reconcile {
+		// After kubelet restart, terminating pods have not passed through SyncPod
+		// to register configuration used by a replacement sidecar.
+		if kl.secretManager != nil {
+			kl.secretManager.RegisterPod(pod)
+		}
+		if kl.configMapManager != nil {
+			kl.configMapManager.RegisterPod(pod)
+		}
+		pullSecrets, _ := kl.getPullSecretsForPod(logger, pod)
+		done, err := kl.containerRuntime.SyncTerminatingPod(ctx, pod, podStatus, pullSecrets, kl.crashLoopBackOff, deadline)
+		if err != nil || !done {
+			// Request a fresh observation even when a runtime operation partially
+			// succeeded. The worker will also retry if no PLEG event is produced.
+			kl.RequestPodRelist(logger, pod.UID)
+			return false, err
+		}
+	}
+
 	p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 	if err := kl.killPod(ctx, pod, p, gracePeriod); err != nil {
 		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
 		// there was an error killing the pod, so we return that error directly
-		return fmt.Errorf("error killing terminating pod: %w", err)
+		return false, fmt.Errorf("error killing terminating pod: %w", err)
 	}
 
 	// Once the containers are stopped, we can stop probing for liveness and readiness.
@@ -2405,12 +2424,12 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 				Timestamp: kl.clock.Now(),
 			}
 		} else {
-			return fmt.Errorf("unable to get pod prior to final pod termination: %w", err)
+			return false, fmt.Errorf("unable to get pod prior to final pod termination: %w", err)
 		}
 	}
 	stoppedPodStatus, err := kl.containerRuntime.GetPodStatus(ctx, runtimePod)
 	if err != nil {
-		return fmt.Errorf("unable to read pod status prior to final pod termination: %w", err)
+		return false, fmt.Errorf("unable to read pod status prior to final pod termination: %w", err)
 	}
 	preserveDataFromBeforeStopping(stoppedPodStatus, podStatus)
 	var runningContainers []string
@@ -2436,7 +2455,7 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		logger.V(4).Info("Post-termination container state", "pod", klog.KObj(pod), "podUID", pod.UID, "containers", containers)
 	}
 	if len(runningContainers) > 0 {
-		return fmt.Errorf("detected running containers after a successful KillPod, CRI violation: %v", runningContainers)
+		return false, fmt.Errorf("detected running containers after a successful KillPod, CRI violation: %v", runningContainers)
 	}
 
 	// NOTE: resources must be unprepared AFTER all containers have stopped
@@ -2444,7 +2463,7 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	// to avoid race conditions with the resource deallocation code in kubernetes core.
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		if err := kl.UnprepareDynamicResources(ctx, pod); err != nil {
-			return err
+			return false, err
 		}
 	}
 
@@ -2458,7 +2477,7 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	// we have successfully stopped all containers, the pod is terminating, our status is "done"
 	logger.V(4).Info("Pod termination stopped all running containers", "pod", klog.KObj(pod), "podUID", pod.UID)
 
-	return nil
+	return true, nil
 }
 
 // preserveDataFromBeforeStopping preserves data, like IPs, which are expected
