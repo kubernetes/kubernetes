@@ -34,6 +34,7 @@ import (
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
+	"k8s.io/kubernetes/test/e2e/environment"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -45,7 +46,7 @@ import (
 
 // TODO(ndixita): de-dup tests and common helpers from test/e2e/common/node/pod_resize.go
 func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
-	ginkgo.DescribeTableSubtree("PLR guaranteed qos - 1 container with resize policy", func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy, resizeInitCtrs bool) {
+	ginkgo.DescribeTableSubtree("PLR guaranteed qos - 1 container with resize policy", environment.NotInUserNS, func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy, resizeInitCtrs bool) {
 		ginkgo.DescribeTable("resizing", func(ctx context.Context, desiredCtrCPU, desiredCtrMem, desiredPodCPU, desiredPodMem string) {
 
 			// The tests for guaranteed pods include extended resources.
@@ -127,7 +128,7 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 
 	// All tests will perform the requested resize, and once completed, will roll back the change.
 	// This results in coverage of both the operation as described, and its reverse.
-	ginkgo.Describe("pod-level guaranteed pods with multiple containers", func() {
+	ginkgo.Describe("pod-level guaranteed pods with multiple containers", environment.NotInUserNS, func() {
 		/*
 			Release: v1.35
 			Testname: In-place Pod Resize, guaranteed pods with multiple containers, net increase
