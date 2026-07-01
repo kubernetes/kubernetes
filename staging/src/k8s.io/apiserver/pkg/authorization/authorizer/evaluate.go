@@ -234,49 +234,27 @@ func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDe
 	case unevaluatedDecision.IsUnion():
 		var newDecisionChain ConditionsAwareDecisionUnion
 		// Recursively walk through the decision DAG in a depth-first manner.
+		// The logic in this function should be the same as in the union authorizer's ConditionsAwareAuthorize.
 
-		collectAndShortcircuitOnly := false
 		for authorizerName, unevaluatedSubDecision := range unevaluatedDecision.UnionedDecisions() {
-			// If collectAndShortcircuitOnly == true, a conditional decision that couldn't
-			// be evaluated to Allow/Deny/NoOpinion was encountered during a previous
-			// loop iteration. Then all latter decisions stay unevaluated.
-			if collectAndShortcircuitOnly {
-				newDecisionChain.Add(authorizerName, unevaluatedSubDecision)
-				continue
+			// Try evaluating or refining the leaf ConditionsMaps in this tree of decisions. However,
+			// do not try to evaluate unevaluatedSubDecision when newDecisionChain is already conditional,
+			// as this might be wasted work. Just add the unevaluatedSubDecision as-is to newDecisionChain to
+			// copy the tail of the chain.
+			possiblyEvaluatedSubDecision := unevaluatedSubDecision
+			if newDecisionChainConditional := newDecisionChain.PossibleDecisions().Len() > 1; !newDecisionChainConditional {
+				possiblyEvaluatedSubDecision = PartiallyEvaluateConditionsAwareDecision(ctx, unevaluatedSubDecision, data, evaluateConditionFn)
 			}
-
-			// When !collectAndShortcircuitOnly: All decisions so far in newDecisionChain are NoOpinions.
-
-			// Try evaluating or refining the leaf ConditionsMaps in this tree of decisions.
-			possiblyEvaluatedSubDecision := PartiallyEvaluateConditionsAwareDecision(ctx, unevaluatedSubDecision, data, evaluateConditionFn)
-
 			// Always preserve the ordering of the decisions, even for NoOpinions, as we might use their reasons/errors
 			newDecisionChain.Add(authorizerName, possiblyEvaluatedSubDecision)
 
-			switch {
-			case possiblyEvaluatedSubDecision.IsDeny(), possiblyEvaluatedSubDecision.IsAllow():
-				// We successfully evaluated to something, and because all previously-seen
-				// decisions were NoOpinions, we can simplify to Allow/Deny here.
-				return possiblyEvaluatedSubDecision
-			case possiblyEvaluatedSubDecision.IsNoOpinion():
-				continue
-			case possiblyEvaluatedSubDecision.IsConditionsMap(), possiblyEvaluatedSubDecision.IsUnion():
-				// This means that there is no chance of evaluating to an unconditional decision using builtinConditionsEvaluator.
-				// Thus, instead of continuing to try to evaluate later ConditionsMaps in-process,
-				// whose computation might be wasted if previous authorizer's ConditionsMaps indeed
-				// turn out to be Allow/Deny (and not NoOpinion), just short-circuit and delegate to the authorizer to evaluate.
-				//
-				// collectAndShortcircuitOnly is used to preserve the tail of the union, without
-				// evaluating the suffix.
-				collectAndShortcircuitOnly = true
-				continue
-			default:
-				// Fail closed with the FailureDecision of the whole unevaluatedDecision
-				return ConditionsAwareDecisionFromParts(unevaluatedDecision.FailureDecision(), "failed closed", fmt.Errorf("unknown ConditionsAwareDecision variant: %s", unevaluatedSubDecision))
+			// If there is any Allow/Deny decision leaf, no need to walk the chain further.
+			if possiblyEvaluatedSubDecision.ContainsUnconditionalAllowOrDeny() {
+				return newDecisionChain.ToDecision()
 			}
 		}
-		// If we got here, the first not-NoOpinion decision was Union or ConditionsMap, which means
-		// we cannot simplify it. Return a possibly refined decision chain to delegate to the authorizer.
+		// If we reached here, all leaf decisions were either of NoOpinion or ConditionsMap type.
+		// If all decisions were NoOpinions, the constructor folds into a single NoOpinion decision.
 		return newDecisionChain.ToDecision()
 	default:
 		// No simplification possible

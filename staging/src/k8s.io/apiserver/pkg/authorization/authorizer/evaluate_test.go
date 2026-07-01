@@ -136,7 +136,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 			},
-			want: snapDecision{Kind: "Allow", Reason: `condition "c" allowed the request`},
+			want: snapDecision{Kind: "Allow", Reason: `1: condition "c" allowed the request`},
 		},
 		{
 			name: "builtin evaluation of union succeeds => Deny",
@@ -153,7 +153,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "d")
 			},
-			want: snapDecision{Kind: "Deny", Reason: `condition "d" denied the request`},
+			want: snapDecision{Kind: "Deny", Reason: `1: condition "d" denied the request`},
 		},
 		{
 			// First CM has an opaque allow condition that cannot be simplified, so the union
@@ -233,6 +233,52 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 			},
 		},
 		{
+			name: "first allow conditionsmap => NoOpinion, noopinion, third conditional deny, finally Deny => Deny",
+			decision: unionDecision(
+				mkCM(
+					cnd(effectAllow, "allow-false", "a", "transparent", ""),
+				),
+				authorizer.ConditionsAwareDecisionNoOpinion("", nil),
+				mkCM(
+					cnd(effectDeny, "b", "b", "opaque", ""),
+				),
+				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
+			),
+			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+				if condition.GetType() == "transparent" {
+					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "allow-true")
+				}
+				return authorizer.ConditionsEvaluationResultUnevaluatable()
+			},
+			want: snapDecision{
+				Kind:   "Deny",
+				Reason: "3: something later denies",
+			},
+		},
+		{
+			name: "first deny conditionsmap => NoOpinion, second conditional allow, noopinion, finally Allow => Allow",
+			decision: unionDecision(
+				mkCM(
+					cnd(effectDeny, "deny-false", "a", "transparent", ""),
+				),
+				mkCM(
+					cnd(effectAllow, "b", "b", "opaque", ""),
+				),
+				authorizer.ConditionsAwareDecisionNoOpinion("", nil),
+				authorizer.ConditionsAwareDecisionAllow("something later allows", nil),
+			),
+			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+				if condition.GetType() == "transparent" {
+					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "deny-true")
+				}
+				return authorizer.ConditionsEvaluationResultUnevaluatable()
+			},
+			want: snapDecision{
+				Kind:   "Allow",
+				Reason: "3: something later allows",
+			},
+		},
+		{
 			name: "evaluateConditionFn can be nil, and evaluation to concrete can still succeed",
 			decision: unionDecision(
 				mkCM(
@@ -254,7 +300,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				),
 				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
 			),
-			want: snapDecision{Kind: "Deny", Reason: `condition "foo" denied the request`},
+			want: snapDecision{Kind: "Deny", Reason: `0: condition "foo" denied the request`},
 		},
 		{
 			name: "evaluateConditionFn can be nil, and refinement can still happen",
