@@ -48,11 +48,30 @@ status:
   pools:
   - allocatedDevices: 5
     availableDevices: 6
+    counterSets:
+    - counters:
+        countersKey:
+          available: "0"
+          capacity: "0"
+          consumed: "0"
+      name: nameValue
     driver: driverValue
     generation: 9
     nodeName: nodeNameValue
+    partitionSummary:
+    - allocatable: 3
+      total: 2
+      type: typeValue
     poolName: poolNameValue
     resourceSliceCount: 8
+    shareableSummary:
+      capacity:
+      - available: "0"
+        consumed: "0"
+        name: nameValue
+        total: "0"
+      fullyAvailableDevices: 1
+      partiallyAvailableDevices: 2
     totalDevices: 4
     unavailableDevices: 7
     validationError: validationErrorValue
