@@ -1326,6 +1326,15 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v
 	if status == nil {
 		return remote.ErrContainerStatusNil
 	}
+	// Since v1.32, stdout may be nil if the stream is not requested.
+	if stdout != nil {
+		// Do a zero-byte write to stdout before handing off to the container runtime.
+		// This ensures at least one Write call is made to the writer when copying starts,
+		// even if we then block waiting for log output from the container.
+		if _, err := stdout.Write([]byte{}); err != nil {
+			return err
+		}
+	}
 	return m.ReadLogs(ctx, status.GetLogPath(), containerID.ID, logOptions, stdout, stderr)
 }
 
