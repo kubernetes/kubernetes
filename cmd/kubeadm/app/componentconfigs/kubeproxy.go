@@ -82,12 +82,18 @@ func (kp *kubeProxyConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
 	return kp.configBase.Unmarshal(docmap, &kp.config)
 }
 
-func kubeProxyDefaultBindAddress(localAdvertiseAddress string) string {
-	ip := netutils.ParseIPSloppy(localAdvertiseAddress)
-	if ip.To4() != nil {
+func kubeProxyDefaultBindAddress(address string) string {
+	if ip := netutils.ParseIPSloppy(address); ip != nil && ip.To4() != nil {
 		return kubeadmapiv1.DefaultProxyBindAddressv4
 	}
 	return kubeadmapiv1.DefaultProxyBindAddressv6
+}
+
+// isWildcardBindAddress reports whether the given bindAddress is one of the
+// recommended wildcard defaults (0.0.0.0 for IPv4 or :: for IPv6).
+func isWildcardBindAddress(bindAddress string) bool {
+	return bindAddress == kubeadmapiv1.DefaultProxyBindAddressv4 ||
+		bindAddress == kubeadmapiv1.DefaultProxyBindAddressv6
 }
 
 func (kp *kubeProxyConfig) Get() interface{} {
@@ -108,11 +114,18 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 		kp.config.FeatureGates = map[string]bool{}
 	}
 
-	defaultBindAddress := kubeProxyDefaultBindAddress(localAPIEndpoint.AdvertiseAddress)
-	if kp.config.BindAddress == "" {
-		kp.config.BindAddress = defaultBindAddress
-	} else if kp.config.BindAddress != defaultBindAddress {
-		warnDefaultComponentConfigValue(kind, "bindAddress", defaultBindAddress, kp.config.BindAddress)
+	switch {
+	case kp.config.BindAddress == "":
+		kp.config.BindAddress = kubeProxyDefaultBindAddress(localAPIEndpoint.AdvertiseAddress)
+	case isWildcardBindAddress(kp.config.BindAddress):
+		// 0.0.0.0 and :: are both valid explicit wildcard binds.
+	case netutils.ParseIPSloppy(kp.config.BindAddress) == nil:
+		klog.Warningf("The bindAddress %q in %q is not a valid IP address", kp.config.BindAddress, kind)
+	default:
+		// Warn if the bindAddress is not the recommended wildcard default for its
+		// own IP family (0.0.0.0 for IPv4 or :: for IPv6).
+		warnDefaultComponentConfigValue(kind, "bindAddress",
+			kubeProxyDefaultBindAddress(kp.config.BindAddress), kp.config.BindAddress)
 	}
 
 	if kp.config.ClusterCIDR == "" && cfg.Networking.PodSubnet != "" {
