@@ -62,6 +62,9 @@ const (
 	// sync period of the route controller.
 	minRouteResyncInterval time.Duration = 10 * time.Second
 
+	// routesSyncKey and routeCorrectionsKey are workqueue keys that both trigger a
+	// full-cluster route reconcile. They identify the trigger reason so we can
+	// attribute the outcome.
 	routesSyncKey       = "routes"
 	routeCorrectionsKey = "route-corrections"
 )
