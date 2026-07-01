@@ -44,4 +44,6 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 	k8s.io/cri-api => ../cri-api
+	k8s.io/kube-openapi => github.com/jpbetz/kube-openapi v0.0.0-20260701233525-7d8d9edb5314
+	sigs.k8s.io/structured-merge-diff/v6 => github.com/jpbetz/structured-merge-diff/v6 v6.3.3-0.20260701231238-8587764c81eb
 )
