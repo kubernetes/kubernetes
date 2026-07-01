@@ -30,6 +30,8 @@ import (
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -49,6 +51,21 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 					ctx, op, nil, /* fldPath */
 					obj.(*networkingv1.IPAddress),
 					safe.Cast[*networkingv1.IPAddress](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
+	// type Ingress
+	scheme.AddValidationFunc(
+		(*networkingv1.Ingress)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_Ingress(
+					ctx, op, nil, /* fldPath */
+					obj.(*networkingv1.Ingress),
+					safe.Cast[*networkingv1.Ingress](oldObj))
 			}
 			return field.ErrorList{
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
@@ -84,6 +101,21 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type ServiceCIDR
+	scheme.AddValidationFunc(
+		(*networkingv1.ServiceCIDR)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_ServiceCIDR(
+					ctx, op, nil, /* fldPath */
+					obj.(*networkingv1.ServiceCIDR),
+					safe.Cast[*networkingv1.ServiceCIDR](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
@@ -94,7 +126,28 @@ func Validate_IPAddress(
 	obj, oldObj *networkingv1.IPAddress) (errs field.ErrorList) {
 
 	// field networkingv1.IPAddress.TypeMeta has no validation
-	// field networkingv1.IPAddress.ObjectMeta has no validation
+
+	{ // field networkingv1.IPAddress.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *networkingv1.IPAddress) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field networkingv1.IPAddress.Spec
 		fn := func(
@@ -204,6 +257,41 @@ func Validate_IPBlock(
 	return errs
 }
 
+// Validate_Ingress validates an instance of Ingress according
+// to declarative validation rules in the API schema.
+func Validate_Ingress(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *networkingv1.Ingress) (errs field.ErrorList) {
+
+	// field networkingv1.Ingress.TypeMeta has no validation
+
+	{ // field networkingv1.Ingress.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *networkingv1.Ingress) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	// field networkingv1.Ingress.Spec has no validation
+	// field networkingv1.Ingress.Status has no validation
+	return errs
+}
+
 // Validate_IngressClass validates an instance of IngressClass according
 // to declarative validation rules in the API schema.
 func Validate_IngressClass(
@@ -211,7 +299,28 @@ func Validate_IngressClass(
 	obj, oldObj *networkingv1.IngressClass) (errs field.ErrorList) {
 
 	// field networkingv1.IngressClass.TypeMeta has no validation
-	// field networkingv1.IngressClass.ObjectMeta has no validation
+
+	{ // field networkingv1.IngressClass.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *networkingv1.IngressClass) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field networkingv1.IngressClass.Spec
 		fn := func(
@@ -357,7 +466,28 @@ func Validate_NetworkPolicy(
 	obj, oldObj *networkingv1.NetworkPolicy) (errs field.ErrorList) {
 
 	// field networkingv1.NetworkPolicy.TypeMeta has no validation
-	// field networkingv1.NetworkPolicy.ObjectMeta has no validation
+
+	{ // field networkingv1.NetworkPolicy.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *networkingv1.NetworkPolicy) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field networkingv1.NetworkPolicy.Spec
 		fn := func(
@@ -656,5 +786,40 @@ func Validate_ParentReference(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
+	return errs
+}
+
+// Validate_ServiceCIDR validates an instance of ServiceCIDR according
+// to declarative validation rules in the API schema.
+func Validate_ServiceCIDR(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *networkingv1.ServiceCIDR) (errs field.ErrorList) {
+
+	// field networkingv1.ServiceCIDR.TypeMeta has no validation
+
+	{ // field networkingv1.ServiceCIDR.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *networkingv1.ServiceCIDR) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	// field networkingv1.ServiceCIDR.Spec has no validation
+	// field networkingv1.ServiceCIDR.Status has no validation
 	return errs
 }

@@ -21,13 +21,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 	registry "k8s.io/kubernetes/pkg/registry/networking/ingress"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
-
-// TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1", "v1beta1"}
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -56,7 +54,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	}), metav1.NamespaceDefault)
 
 	obj := mkValidIngress()
-	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation(), meta.WithValidationConfig(apitesting.WithSkipGroupVersions("extensions/v1beta1")))
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
@@ -71,7 +69,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	}), metav1.NamespaceDefault)
 
 	updateObj := mkValidIngress()
-	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation(), meta.WithValidationConfig(apitesting.WithSkipGroupVersions("extensions/v1beta1")))
 }
 
 func mkValidIngress(tweaks ...func(ing *networking.Ingress)) networking.Ingress {

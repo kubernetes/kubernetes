@@ -39,6 +39,13 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
+			"metadata.generation": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"metadata.managedFields[*].operation": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
 		},
 	)
 }

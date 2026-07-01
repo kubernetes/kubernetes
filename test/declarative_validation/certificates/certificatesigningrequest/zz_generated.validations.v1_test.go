@@ -30,6 +30,13 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "certificates.k8s.io", Version: "v1", Kind: "CertificateSigningRequest"},
 		coverage.FieldRules{
+			"metadata.generation": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"metadata.managedFields[*].operation": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.conditions": {
 				{ErrorType: "FieldValueInvalid", Origin: "zeroOrOneOf"},
 			},

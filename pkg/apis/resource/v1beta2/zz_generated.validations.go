@@ -1262,6 +1262,8 @@ func Validate_DeviceClass(
 					errs = append(errs, e...)
 				}
 			}()
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -2126,7 +2128,28 @@ func Validate_DeviceTaintRule(
 	obj, oldObj *resourcev1beta2.DeviceTaintRule) (errs field.ErrorList) {
 
 	// field resourcev1beta2.DeviceTaintRule.TypeMeta has no validation
-	// field resourcev1beta2.DeviceTaintRule.ObjectMeta has no validation
+
+	{ // field resourcev1beta2.DeviceTaintRule.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta2.DeviceTaintRule) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field resourcev1beta2.DeviceTaintRule.Spec
 		fn := func(
@@ -2643,7 +2666,28 @@ func Validate_ResourceClaim(
 	obj, oldObj *resourcev1beta2.ResourceClaim) (errs field.ErrorList) {
 
 	// field resourcev1beta2.ResourceClaim.TypeMeta has no validation
-	// field resourcev1beta2.ResourceClaim.ObjectMeta has no validation
+
+	{ // field resourcev1beta2.ResourceClaim.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta2.ResourceClaim) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field resourcev1beta2.ResourceClaim.Spec
 		fn := func(
@@ -2863,7 +2907,28 @@ func Validate_ResourceClaimTemplate(
 	obj, oldObj *resourcev1beta2.ResourceClaimTemplate) (errs field.ErrorList) {
 
 	// field resourcev1beta2.ResourceClaimTemplate.TypeMeta has no validation
-	// field resourcev1beta2.ResourceClaimTemplate.ObjectMeta has no validation
+
+	{ // field resourcev1beta2.ResourceClaimTemplate.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta2.ResourceClaimTemplate) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field resourcev1beta2.ResourceClaimTemplate.Spec
 		fn := func(
@@ -2930,7 +2995,28 @@ func Validate_ResourceSlice(
 	obj, oldObj *resourcev1beta2.ResourceSlice) (errs field.ErrorList) {
 
 	// field resourcev1beta2.ResourceSlice.TypeMeta has no validation
-	// field resourcev1beta2.ResourceSlice.ObjectMeta has no validation
+
+	{ // field resourcev1beta2.ResourceSlice.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta2.ResourceSlice) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field resourcev1beta2.ResourceSlice.Spec
 		fn := func(

@@ -66,7 +66,29 @@ func Validate_StorageVersionMigration(
 	obj, oldObj *storagemigrationv1beta1.StorageVersionMigration) (errs field.ErrorList) {
 
 	// field storagemigrationv1beta1.StorageVersionMigration.TypeMeta has no validation
-	// field storagemigrationv1beta1.StorageVersionMigration.ObjectMeta has no validation
+
+	{ // field storagemigrationv1beta1.StorageVersionMigration.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagemigrationv1beta1.StorageVersionMigration) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
 	// field storagemigrationv1beta1.StorageVersionMigration.Spec has no validation
 
 	{ // field storagemigrationv1beta1.StorageVersionMigration.Status

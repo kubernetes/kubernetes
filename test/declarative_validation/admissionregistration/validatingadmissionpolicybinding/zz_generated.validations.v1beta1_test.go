@@ -30,6 +30,13 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingAdmissionPolicyBinding"},
 		coverage.FieldRules{
+			"metadata.generation": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"metadata.managedFields[*].operation": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.policyName": {
 				{ErrorType: "FieldValueRequired"},
 			},

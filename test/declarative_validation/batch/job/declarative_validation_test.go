@@ -17,6 +17,7 @@ limitations under the License.
 package job
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,20 +29,40 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/batch/job"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
-		testDeclarativeValidate(t, apiVersion)
+		t.Run(apiVersion, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:   "batch",
+				APIVersion: apiVersion,
+				Resource:   "jobs",
+			})
+			job := mkJob()
+			meta.RunObjectMetaTestCases(t, ctx, &job, registry.Strategy, meta.WithStringentFinalizerValidation())
+			testDeclarativeValidate(t, ctx, apiVersion)
+		})
 	}
 }
 
-func testDeclarativeValidate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "batch",
-		APIVersion: apiVersion,
-	})
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:   "batch",
+				APIVersion: apiVersion,
+				Resource:   "jobs",
+			})
+			job := mkJob()
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &job, registry.Strategy, meta.WithStringentFinalizerValidation())
+		})
+	}
+}
+
+func testDeclarativeValidate(t *testing.T, ctx context.Context, apiVersion string) {
 	testCases := map[string]struct {
 		input        batch.Job
 		expectedErrs field.ErrorList
@@ -90,6 +111,8 @@ func mkJob(mutators ...func(*batch.Job)) batch.Job {
 		},
 		Spec: validJobSpec,
 	}
+	manualSelector := true
+	job.Spec.ManualSelector = &manualSelector
 	for _, mutate := range mutators {
 		mutate(&job)
 	}

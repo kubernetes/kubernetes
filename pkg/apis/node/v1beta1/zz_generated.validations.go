@@ -25,15 +25,17 @@ import (
 	context "context"
 	fmt "fmt"
 
-	corev1 "k8s.io/api/core/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
-	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -66,7 +68,28 @@ func Validate_RuntimeClass(
 	obj, oldObj *nodev1beta1.RuntimeClass) (errs field.ErrorList) {
 
 	// field nodev1beta1.RuntimeClass.TypeMeta has no validation
-	// field nodev1beta1.RuntimeClass.ObjectMeta has no validation
+
+	{ // field nodev1beta1.RuntimeClass.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *nodev1beta1.RuntimeClass) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field nodev1beta1.RuntimeClass.Handler
 		fn := func(
@@ -150,7 +173,7 @@ func Validate_Scheduling(
 	{ // field nodev1beta1.Scheduling.Tolerations
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj []corev1.Toleration,
+			obj, oldObj []apicorev1.Toleration,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -167,13 +190,13 @@ func Validate_Scheduling(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, v1.Validate_Toleration); len(e) != 0 {
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, corev1.Validate_Toleration); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *nodev1beta1.Scheduling) []corev1.Toleration {
+			func(oldObj *nodev1beta1.Scheduling) []apicorev1.Toleration {
 				return oldObj.Tolerations
 			})
 		errs = append(errs, fn(fldPath.Child("tolerations"), obj.Tolerations, oldVal, oldObj != nil)...)

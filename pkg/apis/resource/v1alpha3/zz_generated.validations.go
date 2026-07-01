@@ -141,7 +141,28 @@ func Validate_DeviceTaintRule(
 	obj, oldObj *resourcev1alpha3.DeviceTaintRule) (errs field.ErrorList) {
 
 	// field resourcev1alpha3.DeviceTaintRule.TypeMeta has no validation
-	// field resourcev1alpha3.DeviceTaintRule.ObjectMeta has no validation
+
+	{ // field resourcev1alpha3.DeviceTaintRule.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1alpha3.DeviceTaintRule) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field resourcev1alpha3.DeviceTaintRule.Spec
 		fn := func(
@@ -599,7 +620,28 @@ func Validate_ResourcePoolStatusRequest(
 	obj, oldObj *resourcev1alpha3.ResourcePoolStatusRequest) (errs field.ErrorList) {
 
 	// field resourcev1alpha3.ResourcePoolStatusRequest.TypeMeta has no validation
-	// field resourcev1alpha3.ResourcePoolStatusRequest.ObjectMeta has no validation
+
+	{ // field resourcev1alpha3.ResourcePoolStatusRequest.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1alpha3.ResourcePoolStatusRequest) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field resourcev1alpha3.ResourcePoolStatusRequest.Spec
 		fn := func(

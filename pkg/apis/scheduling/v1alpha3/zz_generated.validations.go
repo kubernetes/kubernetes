@@ -206,7 +206,28 @@ func Validate_PodGroup(
 	obj, oldObj *schedulingv1alpha3.PodGroup) (errs field.ErrorList) {
 
 	// field schedulingv1alpha3.PodGroup.TypeMeta has no validation
-	// field schedulingv1alpha3.PodGroup.ObjectMeta has no validation
+
+	{ // field schedulingv1alpha3.PodGroup.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *schedulingv1alpha3.PodGroup) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field schedulingv1alpha3.PodGroup.Spec
 		fn := func(
@@ -1428,7 +1449,28 @@ func Validate_Workload(
 	obj, oldObj *schedulingv1alpha3.Workload) (errs field.ErrorList) {
 
 	// field schedulingv1alpha3.Workload.TypeMeta has no validation
-	// field schedulingv1alpha3.Workload.ObjectMeta has no validation
+
+	{ // field schedulingv1alpha3.Workload.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *schedulingv1alpha3.Workload) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field schedulingv1alpha3.Workload.Spec
 		fn := func(

@@ -30,6 +30,7 @@ import (
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 	testscheme "k8s.io/code-generator/cmd/validation-gen/testscheme"
 )
@@ -123,6 +124,8 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,

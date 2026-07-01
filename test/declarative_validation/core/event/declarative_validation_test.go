@@ -14,22 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package persistentvolumeclaim
+package event
 
 import (
 	"testing"
-
-	"k8s.io/apimachinery/pkg/api/resource"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	registry "k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim"
+	registry "k8s.io/kubernetes/pkg/registry/core/event"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
-
-// TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1"}
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -52,13 +49,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		APIPrefix:         "api",
 		APIGroup:          "",
 		APIVersion:        apiVersion,
-		Resource:          "persistentvolumeclaims",
+		Resource:          "events",
 		IsResourceRequest: true,
 		Verb:              "create",
 	}), metav1.NamespaceDefault)
 
-	obj := mkValidPersistentVolumeClaim()
-	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	t.Run("baseline", func(t *testing.T) {
+		obj := mkValidEvent()
+		apitesting.VerifyValidationEquivalence(t, ctx, &obj, registry.Strategy, nil, apitesting.WithSkipGroupVersions("events.k8s.io/v1", "events.k8s.io/v1beta1"))
+	})
+
+	obj := mkValidEvent()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithValidationConfig(apitesting.WithSkipGroupVersions("events.k8s.io/v1", "events.k8s.io/v1beta1")))
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
@@ -66,27 +68,38 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		APIPrefix:         "api",
 		APIGroup:          "",
 		APIVersion:        apiVersion,
-		Resource:          "persistentvolumeclaims",
+		Resource:          "events",
 		Name:              "valid-obj",
 		IsResourceRequest: true,
 		Verb:              "update",
 	}), metav1.NamespaceDefault)
 
-	updateObj := mkValidPersistentVolumeClaim()
-	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	t.Run("baseline", func(t *testing.T) {
+		oldObj := mkValidEvent()
+		newObj := mkValidEvent()
+		oldObj.SetResourceVersion("1")
+		newObj.SetResourceVersion("2")
+		apitesting.VerifyUpdateValidationEquivalence(t, ctx, &newObj, &oldObj, registry.Strategy, nil, apitesting.WithSkipGroupVersions("events.k8s.io/v1", "events.k8s.io/v1beta1"))
+	})
+
+	obj := mkValidEvent()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &obj, registry.Strategy, meta.WithValidationConfig(apitesting.WithSkipGroupVersions("events.k8s.io/v1", "events.k8s.io/v1beta1")))
 }
 
-func mkValidPersistentVolumeClaim() core.PersistentVolumeClaim {
-	return core.PersistentVolumeClaim{
+func mkValidEvent() core.Event {
+	return core.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "valid-obj",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: core.PersistentVolumeClaimSpec{
-			AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
-			Resources: core.VolumeResourceRequirements{
-				Requests: core.ResourceList{core.ResourceStorage: resource.MustParse("1Gi")},
-			},
+		InvolvedObject: core.ObjectReference{
+			Namespace: metav1.NamespaceDefault,
 		},
+		EventTime:           metav1.NewMicroTime(time.Now()),
+		Type:                "Normal",
+		ReportingController: "my-controller",
+		ReportingInstance:   "my-instance",
+		Action:              "my-action",
+		Reason:              "my-reason",
 	}
 }

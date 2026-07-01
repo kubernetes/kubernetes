@@ -90,7 +90,7 @@ func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
 			}
 
 			obj := mkValidNetworkPolicy("ingress")
-			meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+			meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation(), meta.WithValidationConfig(apitesting.WithSkipGroupVersions("extensions/v1beta1")))
 		})
 	}
 }
@@ -162,7 +162,7 @@ func TestDeclarativeValidateIPBlockCIDRUpdate(t *testing.T) {
 				})
 			}
 			updateObj := mkValidNetworkPolicy("ingress")
-			meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation(), meta.WithValidationConfig(apitesting.WithSkipGroupVersions("extensions/v1beta1")))
 		})
 	}
 }

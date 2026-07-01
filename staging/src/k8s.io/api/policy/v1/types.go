@@ -220,6 +220,7 @@ type Eviction struct {
 
 	// ObjectMeta describes the pod that is being evicted.
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// DeleteOptions may be provided
