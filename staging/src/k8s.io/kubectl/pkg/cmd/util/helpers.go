@@ -117,6 +117,15 @@ var ErrExit = fmt.Errorf("exit")
 //
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
+//
+// 功能分析：
+//  1. 这是 kubectl 命令 Run/RunE 中最常见的错误出口，用来把内部 error 转换为用户可读
+//     的 stderr 文本和进程退出码。
+//  2. 真正的格式化逻辑在 checkErr 中；这里通过 fatalErrHandler 执行默认退出行为，测试
+//     可以用 BehaviorOnFatal 替换该行为。
+//
+// 注意点：调用 CheckErr 后如果 err 非 nil，通常不会返回。命令代码不应在 CheckErr 后
+// 继续依赖后续逻辑执行。
 func CheckErr(err error) {
 	checkErr(err, fatalErrHandler)
 }
@@ -149,6 +158,20 @@ func isInvalidReasonStatusError(err error) bool {
 
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
+//
+// 功能分析：
+//  1. 先把只包含一个错误的 Aggregate 拆开，避免用户看到多余的聚合包装。
+//  2. 针对 kubectl 常见错误类型定制输出，包括 ErrExit、Invalid StatusError、
+//     kubeconfig 配置错误、NoResourceMatchError、Aggregate、外部命令退出码和 API
+//     server 返回的标准 Status 错误。
+//  3. 未识别错误会退化为 err.Error，并保证输出带有 "error: " 前缀。
+//
+// 注意点：
+//  1. Invalid StatusError 会优先打印 details.causes，这决定了 kubectl apply/create 等命令
+//     面对字段校验错误时的多行输出格式。
+//  2. utilexec.ExitError 会保留外部命令自己的退出码；这对 exec、diff 等间接调用外部
+//     程序的命令很重要。
+//  3. handleErr 由调用方注入，测试可替换为非退出实现；不要在本函数中直接 os.Exit。
 func checkErr(err error, handleErr func(string, int)) {
 	// unwrap aggregates of 1
 	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {
@@ -241,6 +264,16 @@ func statusCausesToAggrError(scs []metav1.StatusCause) utilerrors.Aggregate {
 //
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
+//
+// 功能分析：
+//  1. 把 APIStatus、UnexpectedObjectError 和网络 URL 错误转换为更接近用户语境的文本。
+//  2. 对实现 debugError 的错误，额外把调试信息写入 klog V(4)，方便维护者排查但不污染
+//     默认用户输出。
+//
+// 注意点：
+//  1. 返回 false 表示该错误类型不认识，调用方应继续使用通用格式化。
+//  2. Unauthorized 会被特别改写为登录提示；其他带 Reason 的 APIStatus 会保留 server
+//     端 reason，便于用户理解 Forbidden、NotFound、Conflict 等错误。
 func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
 		klog.V(4).Info(debugErr.DebugError())
@@ -336,15 +369,35 @@ func messageForError(err error) string {
 	return msg
 }
 
+// UsageErrorf 构造带帮助提示的用法错误。
+//
+// 功能分析：它把格式化后的错误消息和 "See '<command> -h' for help and examples" 拼接在
+// 一起，适合参数组合错误、缺少必填参数或命令语义不成立的场景。
+//
+// 注意点：这里不会打印也不会退出，只返回 error；调用方仍需要通过 CheckErr 或 RunE 返回值
+// 让 Cobra/cli 层处理。
 func UsageErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	msg := fmt.Sprintf(format, args...)
 	return fmt.Errorf("%s\nSee '%s -h' for help and examples", msg, cmd.CommandPath())
 }
 
+// IsFilenameSliceEmpty 判断 -f/--filename 和目录参数是否都未提供。
+//
+// 功能分析：kubectl 多个命令同时支持文件列表和目录输入，该 helper 统一判断“没有任何文件
+// 输入”的状态，避免每个命令重复检查 filenames 与 directory。
+//
+// 注意点：它只判断输入是否为空，不校验文件是否存在，也不处理 kustomize 输入。
 func IsFilenameSliceEmpty(filenames []string, directory string) bool {
 	return len(filenames) == 0 && directory == ""
 }
 
+// GetFlagString 从命令 flags 中读取 string 类型 flag，读取失败时视为编程错误并终止进程。
+//
+// 功能分析：kubectl 子命令在 Complete/Run 阶段经常需要读取已经注册过的 flag。此 helper
+// 将 pflag 的错误路径集中处理，避免每个调用点重复样板代码。
+//
+// 注意点：这里使用 klog.Fatalf，适用于“代码引用了不存在或类型不匹配的 flag”这类开发期
+// 错误，不适合处理用户输入非法值；用户输入校验应在 Complete/Validate 中返回普通 error。
 func GetFlagString(cmd *cobra.Command, flag string) string {
 	s, err := cmd.Flags().GetString(flag)
 	if err != nil {
@@ -371,6 +424,13 @@ func GetFlagStringArray(cmd *cobra.Command, flag string) []string {
 	return s
 }
 
+// GetFlagBool 从命令 flags 中读取 bool 类型 flag，读取失败时终止进程。
+//
+// 功能分析：和 GetFlagString 一样，它假设 flag 已经在命令构建阶段注册完成，因此读取失败
+// 表示代码 wiring 错误。
+//
+// 注意点：不要用它表达“用户没有设置该 flag”；如果需要区分默认值和用户显式设置，应使用
+// pflag.Flag.Changed。
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	b, err := cmd.Flags().GetBool(flag)
 	if err != nil {
@@ -406,6 +466,13 @@ func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 	return i
 }
 
+// GetFlagDuration 从命令 flags 中读取 duration 类型 flag，读取失败时终止进程。
+//
+// 功能分析：用于 kubectl 中需要超时或等待时间的命令，例如 wait、logs、run 或 Pod running
+// timeout 相关路径。
+//
+// 注意点：该函数只读取并解析 pflag 已接受的 duration 值，不负责检查业务上是否允许 0 或负数；
+// 业务约束应由调用方单独校验。
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	d, err := cmd.Flags().GetDuration(flag)
 	if err != nil {
@@ -414,6 +481,12 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	return d
 }
 
+// GetPodRunningTimeoutFlag 读取并校验 --pod-running-timeout。
+//
+// 功能分析：该 flag 表示等待 Pod 进入 Running 状态的最长时间，必须是正数才有明确语义。
+//
+// 注意点：这里返回普通 error 而不是 fatal，方便上层命令把它纳入 Complete/Validate 流程并
+// 以统一方式展示给用户。
 func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 	timeout := GetFlagDuration(cmd, "pod-running-timeout")
 	if timeout <= 0 {
@@ -465,6 +538,16 @@ func (f FeatureGate) IsDisabled() bool {
 	return strings.ToLower(os.Getenv(string(f))) == "false"
 }
 
+// AddValidateFlags 给命令添加通用 --validate flag。
+//
+// 功能分析：
+//  1. 该 flag 控制 kubectl 在读取或发送对象前如何进行 schema 校验。
+//  2. strict/true 会尽量使用 server-side field validation，并在不可用时回退到客户端校验；
+//     warn 只警告不阻断；ignore/false 跳过校验。
+//
+// 注意点：
+//  1. NoOptDefVal 被设置为 strict，因此用户写 "--validate" 等价于 "--validate=strict"。
+//  2. 该函数只注册 flag，不解释具体值；调用方需要通过 GetValidationDirective 获取最终策略。
 func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().String(
 		"validate",
@@ -475,12 +558,26 @@ func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Lookup("validate").NoOptDefVal = "strict"
 }
 
+// AddFilenameOptionFlags 给命令添加通用文件输入 flags。
+//
+// 功能分析：它统一注册 -f/--filename、-k/--kustomize 和 -R/--recursive，使 create、apply、
+// delete、replace、diff、convert 等命令可以复用同一套文件输入语义。
+//
+// 注意点：这里不校验 -f、-k、-R 的互斥关系，也不展开文件；实际解析在 resource.Builder 和
+// FilenameOptions 使用阶段完成。
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
 	AddJsonFilenameFlag(cmd.Flags(), &options.Filenames, "Filename, directory, or URL to files "+usage)
 	AddKustomizeFlag(cmd.Flags(), &options.Kustomize)
 	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 }
 
+// AddJsonFilenameFlag 注册 -f/--filename，并为 shell completion 标注支持的资源文件扩展名。
+//
+// 功能分析：kubectl 的文件输入支持 YAML/JSON 等 Kubernetes manifest 文件。该函数把
+// resource.FileExtensions 转成 Cobra completion annotation，帮助 shell 补全过滤候选文件。
+//
+// 注意点：flag 类型是 StringSlice，支持逗号分隔和重复指定；如果命令需要严格区分重复参数，
+// 不应复用该 helper。
 func AddJsonFilenameFlag(flags *pflag.FlagSet, value *[]string, usage string) {
 	flags.StringSliceVarP(value, "filename", "f", *value, usage)
 	annotations := make([]string, 0, len(resource.FileExtensions))

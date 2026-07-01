@@ -39,6 +39,23 @@ type checkField struct {
 	expected string
 }
 
+// TestConvertObject 验证 kubectl convert 能把典型内置资源转换为用户指定的目标 API 版本。
+//
+// 功能分析：
+//  1. 使用 test/fixtures/pkg/kubectl/cmd/convert 下的历史 manifest 作为输入，覆盖
+//     Deployment、Ingress 以及多对象文件等转换场景。
+//  2. 通过 NewCmdConvert 构造真实 Cobra 命令，并设置 --filename、--output-version、
+//     --local=true 和 -o yaml，尽量贴近用户运行 kubectl convert 的路径。
+//  3. 用 fake REST client 拦截任何网络请求；如果本地转换路径意外访问 apiserver，测试会
+//     立即失败。
+//  4. 最终只断言输出中包含期望 apiVersion，聚焦 convert 命令最核心的版本转换结果。
+//
+// 注意点：
+//  1. 该测试依赖 import_known_versions.go 的 blank imports。如果某个 API 组没有注册到
+//     legacy scheme，转换过程可能无法找到目标版本。
+//  2. 这里选择局部字段断言而不是完整 YAML golden，是为了避免 printer 的格式细节变化让
+//     测试过度脆弱。
+//  3. 增加新 fixture 时，应优先覆盖真实迁移路径，例如 deprecated API 到当前 API 的转换。
 func TestConvertObject(t *testing.T) {
 	testcases := []testcase{
 		{

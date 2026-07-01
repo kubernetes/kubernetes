@@ -18,6 +18,21 @@ package convert
 
 // These imports are the API groups the client will support.
 // TODO: Remove these manual install once we don't need legacy scheme in convert
+//
+// 功能分析：
+//  1. 这些 blank imports 通过各 API 组的 install 包把 internal/external 类型、默认值、
+//     转换函数和 scheme 信息注册到 Kubernetes legacy scheme。
+//  2. kubectl convert 在本地转换 manifest 时依赖这个 scheme 判断对象 GVK，并调用
+//     ConvertToVersion 把对象转成目标 API 版本。
+//  3. 该文件本身没有可调用函数，但它的 init side effect 是 convert 命令能够识别内置
+//     Kubernetes API 组的关键。
+//
+// 注意点：
+//  1. 新增内置 API 组或让 convert 支持新的历史版本时，需要在这里添加对应 install 包，
+//     并确保 internal 和 external 版本都注册完整。
+//  2. deprecated API 组放在最后，避免 prioritized versions 选择时优先落到旧版本。
+//  3. import_known_versions_test.go 会对 client-go scheme 与 legacy scheme 的已知类型做
+//     对比，漏加 API 组通常会在该测试中暴露。
 import (
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"

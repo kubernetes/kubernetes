@@ -77,6 +77,16 @@ type ConvertOptions struct {
 	genericiooptions.IOStreams
 }
 
+// NewConvertOptions 构造 kubectl convert 命令的默认选项对象。
+//
+// 功能分析：
+//  1. 初始化 PrintFlags，并把 Kubernetes legacy scheme 作为 TypeSetter，使输出 printer 能
+//     理解内置资源类型。
+//  2. 默认输出格式设置为 yaml，符合 convert 作为 manifest 转换工具的主要使用场景。
+//  3. local 默认为 true，表示默认只做本地转换，不访问 apiserver。
+//
+// 注意点：这里仅设置静态默认值，不读取 kubeconfig、不创建 builder，也不解析命令行 flag；
+// 这些依赖会在 Complete 中根据 Factory 和 Cobra command 补齐。
 func NewConvertOptions(ioStreams genericiooptions.IOStreams) *ConvertOptions {
 	return &ConvertOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("converted").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
@@ -87,6 +97,17 @@ func NewConvertOptions(ioStreams genericiooptions.IOStreams) *ConvertOptions {
 
 // NewCmdConvert creates a command object for the generic "convert" action, which
 // translates the config file into a given version.
+//
+// 功能分析：
+//  1. 创建 kubectl convert 的 Cobra 命令，注册 --local、--output-version、输出格式、
+//     --validate 和 -f/-k/-R 等文件输入 flags。
+//  2. Run 阶段先调用 Complete 收集运行依赖，再调用 RunConvert 执行实际转换。
+//  3. 所有错误都交给 cmdutil.CheckErr，以保持 kubectl 命令统一的错误格式和退出码。
+//
+// 注意点：
+//  1. convert 依赖 Kubernetes 主仓库 legacy scheme，因此该命令仍保留在 pkg/kubectl 下，
+//     而不是完全位于 staging/src/k8s.io/kubectl。
+//  2. --local=false 时才会启用 validator 并可能访问 apiserver；默认本地模式不应产生网络请求。
 func NewCmdConvert(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewConvertOptions(ioStreams)
 
@@ -112,6 +133,18 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cob
 }
 
 // Complete collects information required to run Convert command from command line.
+//
+// 功能分析：
+//  1. 校验用户必须提供文件、目录或 kustomize 输入。
+//  2. 从 Factory 中取出 resource.Builder 构造函数，后续 RunConvert 用它读取并展开输入对象。
+//  3. 读取当前 namespace，用于 builder 处理 namespaced 资源。
+//  4. 延迟构造 validator，使 --validate 的解析和 Factory 的 schema 获取逻辑保持一致。
+//  5. 根据输出 flags 构建 ResourcePrinter。
+//
+// 注意点：
+//  1. Complete 只收集依赖和校验静态输入，不执行对象转换。
+//  2. validator 是闭包，只有 --local=false 的 RunConvert 路径才会调用。
+//  3. PrintFlags.ToPrinter 的结果决定最终输出形态，后续 RunConvert 只负责交给 Printer 打印。
 func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err error) {
 	err = o.FilenameOptions.RequireFilenameOrKustomize()
 	if err != nil {
@@ -138,6 +171,18 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 }
 
 // RunConvert implements the generic Convert command
+//
+// 功能分析：
+//  1. 用 resource.Builder 读取 -f/-k/-R 指定的对象，并按 local 设置决定是否走本地模式。
+//  2. 非本地模式下加载 validation schema，对输入对象做更接近 apiserver 的校验。
+//  3. 将读取到的 resource.Info 转换为单对象或 List，并尽量转换到 --output-version 指定的
+//     group/version。
+//  4. 使用 Complete 阶段创建的 Printer 输出最终对象。
+//
+// 注意点：
+//  1. 没有任何对象输入时返回明确错误，避免静默输出空内容。
+//  2. singleItemImplied 会影响输出是否包成 List；这决定了单文件单对象和多对象输入的输出结构。
+//  3. 未注册到 legacy scheme 的对象不能做普通版本转换，会走 runtime.Unknown 或跳过路径。
 func (o *ConvertOptions) RunConvert() error {
 	b := o.builder().
 		WithScheme(scheme.Scheme).
@@ -193,6 +238,15 @@ func (o *ConvertOptions) RunConvert() error {
 // the objects as children, or if only a single Object is present, as that object. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
+//
+// 功能分析：
+//  1. 先把每个 resource.Info 转成目标版本对象。
+//  2. 如果只有一个对象且没有强制 List，则直接输出该对象。
+//  3. 多对象或强制 List 时，构造 core internal List，再尝试转换到用户指定版本或 core/v1。
+//
+// 注意点：
+//  1. forceList 通常由输入是否隐含单对象决定，错误设置会改变 YAML/JSON 顶层结构。
+//  2. 指定的 output version 不可用时不会立即失败，而是记录 V(1) 日志并使用实际可转换版本。
 func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVersion schema.GroupVersion, encoder runtime.Encoder, iostream genericclioptions.IOStreams) (runtime.Object, error) {
 	objects, err := asVersionedObjects(infos, specifiedOutputVersion, encoder, iostream)
 	if err != nil {
@@ -231,6 +285,18 @@ func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVe
 // asVersionedObjects converts a list of infos into versioned objects. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
+//
+// 功能分析：
+//  1. 跳过空对象，逐个计算可尝试的目标 group/version。
+//  2. 用户指定 --output-version 时优先尝试该版本；未指定时根据对象 GVK 选择该 group 的
+//     prioritized versions。
+//  3. 对未注册到 legacy scheme 的对象，尽量编码为 runtime.Unknown，避免因 CRD 或未知类型
+//     直接中断整个转换流程。
+//
+// 注意点：
+//  1. NotRegisteredError 会写到 ErrOut 并继续处理其他对象，这是 convert 对混合输入文件的
+//     宽容行为。
+//  2. 其他转换错误会直接返回，防止输出部分转换成功但语义不完整的结果。
 func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.GroupVersion, encoder runtime.Encoder, iostream genericclioptions.IOStreams) ([]runtime.Object, error) {
 	objects := []runtime.Object{}
 	for _, info := range infos {
@@ -281,6 +347,12 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 
 // tryConvert attempts to convert the given object to the provided versions in order. This function assumes
 // the object is in internal version.
+//
+// 功能分析：按 versions 顺序调用 runtime.ObjectConvertor.ConvertToVersion，返回第一个成功转换
+// 的对象；遇到空版本时直接返回原对象。
+//
+// 注意点：如果所有版本都失败，只返回最后一次错误，因此调用方需要自己决定是否继续处理其他
+// 对象或直接失败。
 func tryConvert(converter runtime.ObjectConvertor, object runtime.Object, versions ...schema.GroupVersion) (runtime.Object, error) {
 	var last error
 	for _, version := range versions {

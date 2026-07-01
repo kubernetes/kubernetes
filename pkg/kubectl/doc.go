@@ -14,8 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package kubectl provides the functions used by the kubectl command line tool
-// under k8s.io/kubernetes/cmd. The functions are kept in this package to better
-// support unit testing. The main() method for kubectl is only an entry point
-// and should contain no functionality.
+// Package kubectl provides Kubernetes-repository-specific helpers used by the
+// kubectl command line tool.
+//
+// 功能分析：
+//  1. 当前 Kubernetes 仓库中的 kubectl 大部分实现已经位于
+//     staging/src/k8s.io/kubectl，那里是可独立发布的 kubectl 模块源码。
+//  2. 本 pkg/kubectl 包只保留仍然需要依赖 k8s.io/kubernetes 内部代码的少量逻辑，
+//     典型例子是 cmd/convert，它需要使用 pkg/api/legacyscheme 和 pkg/apis/*/install
+//     完成历史 API 版本转换。
+//  3. cmd/kubectl/main 仍应保持薄入口，只负责进程初始化和调用 staging kubectl 命令树。
+//
+// 注意点：
+//  1. 新增 kubectl 普通子命令时，优先放到 staging/src/k8s.io/kubectl/pkg/cmd，不应放到
+//     pkg/kubectl。
+//  2. 只有当实现确实需要依赖 k8s.io/kubernetes/pkg 下的内部 API、legacy scheme 或其他
+//     不能发布到 staging 的代码时，才适合放在这里。
+//  3. 这里的代码仍应保持可测试，避免把逻辑塞回 cmd/kubectl/main。
 package kubectl

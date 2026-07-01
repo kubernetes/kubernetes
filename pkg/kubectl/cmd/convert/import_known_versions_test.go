@@ -27,6 +27,23 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
+// TestKnownVersions 确认 kubectl convert 使用的 legacy scheme 覆盖 client-go 已知的
+// Kubernetes 内置类型。
+//
+// 功能分析：
+//  1. 从 legacyscheme.Scheme 读取 convert 实际可用的类型集合。
+//  2. 从 client-go scheme 读取客户端通常知道的 Kubernetes API 类型集合。
+//  3. 对 client-go 中的每个 GVK 检查 legacy scheme 是否也已注册；如果某个 API 组缺失，
+//     convert/import_known_versions.go 就需要补充对应 install 包。
+//  4. 排序时把 WatchEvent、List、Options 和 internal 类型放在后面，使失败输出更可能先
+//     指向用户真正关心的资源类型，而不是辅助类型。
+//
+// 注意点：
+//  1. alreadyErroredGroups 用来让同一个 API group 只报一次错，避免一个 group 漏注册时刷出
+//     大量重复类型错误。
+//  2. 该测试保护的是注册完整性，不直接验证转换语义；具体转换结果由 convert_test.go 覆盖。
+//  3. 新增 API 组后如果这里失败，通常不是测试需要放宽，而是 legacy scheme 的 blank import
+//     没有同步更新。
 func TestKnownVersions(t *testing.T) {
 	legacytypes := legacyscheme.Scheme.AllKnownTypes()
 	alreadyErroredGroups := map[string]bool{}
