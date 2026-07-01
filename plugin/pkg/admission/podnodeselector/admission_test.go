@@ -17,6 +17,7 @@ limitations under the License.
 package podnodeselector
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -191,6 +192,23 @@ func TestHandles(t *testing.T) {
 		if e, a := shouldHandle, nodeEnvionment.Handles(op); e != a {
 			t.Errorf("%v: shouldHandle=%t, handles=%t", op, e, a)
 		}
+	}
+}
+
+func TestReadConfigInvalidYAML(t *testing.T) {
+	_, err := readConfig(bytes.NewBufferString("invalid: ["))
+	if err == nil {
+		t.Errorf("expected an error when decoding invalid config, got nil")
+	}
+}
+
+func TestReadConfigNil(t *testing.T) {
+	config, err := readConfig(nil)
+	if err != nil {
+		t.Errorf("unexpected error for nil config: %v", err)
+	}
+	if config == nil {
+		t.Error("expected non-nil config for nil reader")
 	}
 }
 

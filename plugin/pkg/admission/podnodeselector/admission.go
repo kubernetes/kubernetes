@@ -49,7 +49,10 @@ const PluginName = "PodNodeSelector"
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		// TODO move this to a versioned configuration file format.
-		pluginConfig := readConfig(config)
+		pluginConfig, err := readConfig(config)
+		if err != nil {
+			return nil, err
+		}
 		plugin := NewPodNodeSelector(pluginConfig.PodNodeSelectorPluginConfig)
 		return plugin, nil
 	})
@@ -80,21 +83,21 @@ type pluginConfig struct {
 //	clusterDefaultNodeSelector: <node-selectors-labels>
 //	namespace1: <node-selectors-labels>
 //	namespace2: <node-selectors-labels>
-func readConfig(config io.Reader) *pluginConfig {
+func readConfig(config io.Reader) (*pluginConfig, error) {
 	defaultConfig := &pluginConfig{}
 	if config == nil || reflect.ValueOf(config).IsNil() {
-		return defaultConfig
+		return defaultConfig, nil
 	}
 	d := yaml.NewYAMLOrJSONDecoder(config, 4096)
 	for {
 		if err := d.Decode(defaultConfig); err != nil {
-			if err != io.EOF {
-				continue
+			if err == io.EOF {
+				break
 			}
+			return nil, fmt.Errorf("failed to decode PodNodeSelector plugin config: %w", err)
 		}
-		break
 	}
-	return defaultConfig
+	return defaultConfig, nil
 }
 
 // Admit enforces that pod and its namespace node label selectors matches at least a node in the cluster.
