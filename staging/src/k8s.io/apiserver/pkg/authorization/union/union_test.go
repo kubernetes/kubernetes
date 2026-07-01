@@ -506,8 +506,8 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				conditionEffect: effectNoOpinion,
 				evalDecision:    authorizer.DecisionNoOpinion,
 			},
-			wantAuthorizeDecision: `NoOpinion`,
-			wantFinalDecision:     `NoOpinion`,
+			wantAuthorizeDecision: `NoOpinion(reason="2: only NoOpinion conditions always evaluate to NoOpinion")`,
+			wantFinalDecision:     `NoOpinion(reason="2: only NoOpinion conditions always evaluate to NoOpinion")`,
 		},
 
 		// === Conditional + concrete mixes ===
@@ -729,8 +729,8 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				conditionEffect: effectAllow,
 				evalDecision:    authorizer.DecisionNoOpinion,
 			},
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), ConditionsMap(denies=1)], NoOpinion], NoOpinion, ConditionsMap(allows=1)]`,
-			wantFinalDecision:     `NoOpinion`,
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), ConditionsMap(denies=1)], NoOpinion(reason="only NoOpinion conditions always evaluate to NoOpinion")], NoOpinion, ConditionsMap(allows=1)]`,
+			wantFinalDecision:     `NoOpinion(reason="only NoOpinion conditions always evaluate to NoOpinion")`,
 		},
 
 		// === Conditional deny in the chain ===
