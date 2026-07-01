@@ -34,6 +34,7 @@ import (
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/component-base/featuregate"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -687,6 +689,11 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// quit *before* restoring klog settings.
 	framework.GoleakCheck(t)
 
+	// We need to set emulation version for NodeDeclaredFeatures feature gate, which is locked at 1.37.
+	// Only emulate v1.36 when NodeDeclaredFeatures is explicitly disabled.
+	if ndfEnabled, exists := featureGates[features.NodeDeclaredFeatures]; exists && !ndfEnabled {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureGates)
 
 	if opts.preRunFn != nil {
