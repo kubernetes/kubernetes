@@ -1191,6 +1191,12 @@ func TestTmpfsMountOptions(t *testing.T) {
 
 			options := emptyDirObj.generateTmpfsMountOptions(testCase.tmpfsNoswapSupported)
 
+			for _, expected := range []string{"nodev", "nosuid", "noexec"} {
+				if !doesStringArrayContainSubstring(options, expected) {
+					t.Errorf("expected tmpfs option %q to be present. options: %v", expected, options)
+				}
+			}
+
 			if testCase.tmpfsNoswapSupported && !doesStringArrayContainSubstring(options, swap.TmpfsNoswapOption) {
 				t.Errorf("tmpfs noswap option is expected when supported. options: %v", options)
 			}

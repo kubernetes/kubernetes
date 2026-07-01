@@ -572,6 +572,10 @@ func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {
 }
 
 func (ed *emptyDir) generateTmpfsMountOptions(noswapSupported bool) (options []string) {
+	// Mount tmpfs with the same default nodev/nosuid/noexec options used by
+	// other kernel-mounted tmpfs filesystems.
+	options = append(options, "nodev", "nosuid", "noexec")
+
 	// Linux system default is 50% of capacity.
 	if ed.sizeLimit != nil && ed.sizeLimit.Value() > 0 {
 		options = append(options, fmt.Sprintf("size=%d", ed.sizeLimit.Value()))
