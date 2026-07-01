@@ -119,7 +119,7 @@ func (c ConditionsMap) Evaluate(ctx context.Context, data ConditionsData, evalua
 // conditions evaluators that support a certain conditions type), returning ConditionsEvaluationResultUnevaluatable
 // for conditions that the evaluator does not recognize. In the latter case, a partially evaluated, deep copied
 // ConditionsMap might be returned.
-func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap, data ConditionsData, evaluateConditionFn PartialEvaluateConditionFunc) ConditionsAwareDecision {
+func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap, data ConditionsData, evaluateConditionFn MaybeEvaluateConditionFunc) ConditionsAwareDecision {
 	evalCond := func(cond Condition) ConditionEvaluationResult {
 		// First, try to use the condition's own evaluate function.
 		// Fallback to evaluateConditionFn if set and unevaluatable
@@ -243,7 +243,7 @@ func conditionsToAppliedErroredUnevaluated(conditions iter.Seq[Condition], evalC
 // However, this method can also be used to evaluate a subset of the conditions (e.g. for builtin
 // conditions evaluators that only support a certain conditions type), returning ConditionsEvaluationResultUnevaluatable
 // for conditions that the evaluator does not recognize. In the latter case, a partially evaluated ConditionsAwareDecision is returned.
-func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDecision ConditionsAwareDecision, data ConditionsData, evaluateConditionFn PartialEvaluateConditionFunc) ConditionsAwareDecision {
+func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDecision ConditionsAwareDecision, data ConditionsData, evaluateConditionFn MaybeEvaluateConditionFunc) ConditionsAwareDecision {
 	switch {
 	case unevaluatedDecision.IsConditionsMap():
 		// Try to evaluate or refine the leaf ConditionsMap using the builtin evaluator.

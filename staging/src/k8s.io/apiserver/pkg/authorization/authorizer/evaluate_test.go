@@ -58,9 +58,9 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 		// decision is the input passed to PartiallyEvaluateConditionsAwareDecision.
 		decision authorizer.ConditionsAwareDecision
 
-		// builtinConditionsEvaluator is the PartialEvaluateConditionFunc supplied to the partial
+		// builtinConditionsEvaluator is the MaybeEvaluateConditionFunc supplied to the partial
 		// evaluator. Returning Unevaluatable leaves the condition in a refined ConditionsMap.
-		builtinConditionsEvaluator authorizer.PartialEvaluateConditionFunc
+		builtinConditionsEvaluator authorizer.MaybeEvaluateConditionFunc
 
 		// want is the expected snapshot of the returned ConditionsAwareDecision.
 		want snapDecision
