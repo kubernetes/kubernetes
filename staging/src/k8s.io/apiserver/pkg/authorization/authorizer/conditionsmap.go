@@ -149,7 +149,7 @@ func ConditionsAwareDecisionConditionsMap(denyConditions []Condition, noOpinionC
 	// but only NoOpinion, regardless of the data. Thus just fold to NoOpinion directly.
 	// this upholds the len(denyConditions) != 0 || len(allowConditions) != 0 invariant on the ConditionsMap.
 	if len(denyConditions) == 0 && len(allowConditions) == 0 {
-		return ConditionsAwareDecisionNoOpinion("", nil)
+		return ConditionsAwareDecisionNoOpinion("only NoOpinion conditions always evaluate to NoOpinion", nil)
 	}
 
 	seenIDs := sets.New[string]()

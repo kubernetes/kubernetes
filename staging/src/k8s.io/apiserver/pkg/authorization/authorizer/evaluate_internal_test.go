@@ -460,7 +460,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		// ============================================================
 		{
 			name:       "noopinion: unevaluatable nop, no allow -> NoOpinion",
-			wantString: `NoOpinion(reason="at least one NoOpinion condition matched, or no conditions matched")`,
+			wantString: `NoOpinion(reason="only NoOpinion conditions always evaluate to NoOpinion")`,
 			subCases: []subCase{
 				{
 					name:                         "false deny and unevaluatable noopinion folds to noopinion",

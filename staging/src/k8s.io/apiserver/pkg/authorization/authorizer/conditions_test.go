@@ -331,8 +331,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 				),
 			},
 			wantIsNoOpinion: true,
-			wantReason:      "",
-			wantString:      `NoOpinion`,
+			wantReason:      "only NoOpinion conditions always evaluate to NoOpinion",
+			wantString:      `NoOpinion(reason="only NoOpinion conditions always evaluate to NoOpinion")`,
 		},
 		// Union constructor simplification cases
 		{

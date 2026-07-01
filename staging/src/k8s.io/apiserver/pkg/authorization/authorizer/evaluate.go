@@ -129,74 +129,58 @@ func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap
 		return result
 	}
 
+	// General logic: Deny > NoOpinion > Allow. Within a set of same-effect conditions true > error > unevaluatable > false.
+
 	if len(c.denyConditions) != 0 {
-		appliedDenyReasons, denyErrors, unevaluatedDenyConditions := conditionsToAppliedErroredUnevaluated(c.DenyConditions(), evalCond, "Deny", "denied the request")
-		// If any deny conditions evaluated to true, return Deny
-		// Deny conditions that apply take precedence over deny conditions that error, as even if the erroring
-		// deny conditions wouldn't have errored, the applied deny conditions would have produced the same Deny decision.
-		if len(appliedDenyReasons) != 0 {
-			// A nil error must be returned here, in order for the WithAuthorization handler to return 403 and not 500.
-			return ConditionsAwareDecisionDeny(strings.Join(appliedDenyReasons, ", "), nil)
-		}
-		// If any deny errors were encountered, fail closed
-		if len(denyErrors) != 0 {
-			return ConditionsAwareDecisionDeny("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(denyErrors))
-		}
+		appliedReasons, errored, unevaluated := conditionsToAppliedErroredUnevaluated(
+			c.DenyConditions(), evalCond, "Deny", "denied the request")
 
-		// When len(unevaluatedDenyConditions) != 0, the possible outcomes are [Deny, NoOpinion] or [Deny, Allow] (depending on whether)
-		// there is some matching NoOpinion/Allow condition or not. This means that we need to return another, possibly refined ConditionsMap
-		if len(unevaluatedDenyConditions) != 0 {
-			return ConditionsAwareDecisionConditionsMap(
-				unevaluatedDenyConditions,
-				c.noOpinionConditions,
-				c.allowConditions)
+		if len(appliedReasons) != 0 {
+			// No errors are returned here, as that would turn this into a 500 instead of 403 in the WithAuthorization HTTP filter
+			return ConditionsAwareDecisionDeny(strings.Join(appliedReasons, ", "), nil)
+		}
+		if len(errored) != 0 {
+			return ConditionsAwareDecisionDeny("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(errored))
+		}
+		if len(unevaluated) != 0 {
+			return ConditionsAwareDecisionConditionsMap(unevaluated, c.noOpinionConditions, c.allowConditions)
 		}
 	}
+
 	// If we got here, all Deny conditions could be evaluated, and evaluated to false, nil
-	if len(c.noOpinionConditions) != 0 {
-		appliedNoOpinionReasons, noOpinionErrors, unevaluatedNoOpinionConditions := conditionsToAppliedErroredUnevaluated(c.NoOpinionConditions(), evalCond, "NoOpinion", "evaluated to NoOpinion")
-		// If any NoOpinion conditions evaluated to true, return NoOpinion
-		if len(appliedNoOpinionReasons) != 0 {
-			return ConditionsAwareDecisionNoOpinion(strings.Join(appliedNoOpinionReasons, ", "), nil)
-		}
-		// If any NoOpinion errors were encountered, fail closed to NoOpinion as if the conditions would have matched
-		if len(noOpinionErrors) != 0 {
-			return ConditionsAwareDecisionNoOpinion("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(noOpinionErrors))
-		}
-		// When len(unevaluatedNoOpinionConditions) != 0, the possible outcomes are [NoOpinion] or [NoOpinion, Allow]. (depending on whether)
-		// there is some matching Allow condition or not. This means that we need to return another, possibly refined ConditionsMap, unless
-		// there are no Allow conditions, in which the decision is always NoOpinion.
-		if len(unevaluatedNoOpinionConditions) != 0 {
-			// If there are no allow conditions, then either some unevaluated NoOpinion applies, in which the decision is NoOpinion, or all unevaluated
-			// NoOpinion conditions evaluate to false, no allow condition applies (as there are none), so the default NoOpinion is returned. In either
-			// case under that assumption, the return value is NoOpinion.
-			if len(c.allowConditions) == 0 {
-				return ConditionsAwareDecisionNoOpinion("at least one NoOpinion condition matched, or no conditions matched", nil)
-			}
 
-			// Otherwise, the possible outcomes are [NoOpinion, Allow]. Return a possibly refined ConditionsMap.
-			return ConditionsAwareDecisionConditionsMap(
-				nil,
-				unevaluatedNoOpinionConditions,
-				c.allowConditions)
+	if len(c.noOpinionConditions) != 0 {
+		appliedReasons, errored, unevaluated := conditionsToAppliedErroredUnevaluated(
+			c.NoOpinionConditions(), evalCond, "NoOpinion", "evaluated to NoOpinion")
+
+		if len(appliedReasons) != 0 {
+			// No errors are returned here, as that would turn this into a 500 instead of 403 in the WithAuthorization HTTP filter
+			return ConditionsAwareDecisionNoOpinion(strings.Join(appliedReasons, ", "), nil)
+		}
+		if len(errored) != 0 {
+			return ConditionsAwareDecisionNoOpinion("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(errored))
+		}
+		if len(unevaluated) != 0 {
+			// Note: If len(c.allowConditions) == 0, ConditionsAwareDecisionConditionsMap will fold this into an unconditional NoOpinion.
+			return ConditionsAwareDecisionConditionsMap(nil, unevaluated, c.allowConditions)
 		}
 	}
+
 	// If we got here, all Deny and NoOpinion conditions could be evaluated, and evaluated to false, nil
+
 	if len(c.allowConditions) != 0 {
-		appliedAllowReasons, allowErrors, unevaluatedAllowConditions := conditionsToAppliedErroredUnevaluated(c.AllowConditions(), evalCond, "Allow", "allowed the request")
-		// If there were at least one Allow condition that applied, then evaluation is successful, even if there
-		// were some errors that happened. Those are in this case considered warnings.
-		if len(appliedAllowReasons) != 0 {
-			return ConditionsAwareDecisionAllow(strings.Join(appliedAllowReasons, ", "), utilerrors.NewAggregate(allowErrors))
+		appliedReasons, errored, unevaluated := conditionsToAppliedErroredUnevaluated(
+			c.AllowConditions(), evalCond, "Allow", "allowed the request")
+
+		if len(appliedReasons) != 0 {
+			// Errors can be returned here, as the WithAuthorization HTTP filter just logs errors returned with Allow as warnings.
+			return ConditionsAwareDecisionAllow(strings.Join(appliedReasons, ", "), utilerrors.NewAggregate(errored))
 		}
-		// However, if no Allow condition evaluated to true, but at least one errored, return that as an error to the caller
-		if len(allowErrors) != 0 {
-			return ConditionsAwareDecisionNoOpinion("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(allowErrors))
+		if len(errored) != 0 {
+			return ConditionsAwareDecisionNoOpinion("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(errored))
 		}
-		// When len(unevaluatedAllowConditions) != 0, the possible outcomes are [NoOpinion, Allow].
-		// Return a possibly refined ConditionsMap with the Allow conditions that could not be evaluated.
-		if len(unevaluatedAllowConditions) != 0 {
-			return ConditionsAwareDecisionConditionsMap(nil, nil, unevaluatedAllowConditions)
+		if len(unevaluated) != 0 {
+			return ConditionsAwareDecisionConditionsMap(nil, nil, unevaluated)
 		}
 	}
 
