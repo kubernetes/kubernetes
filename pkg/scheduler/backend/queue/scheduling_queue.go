@@ -811,7 +811,7 @@ func (p *PriorityQueue) addPodGroupMember(logger klog.Logger, pInfo *framework.Q
 	if p.activeQ.isLastPoppedEntity(pgInfoLookup) {
 		// If the last popped entity is the matching pod group, add the pod to the pending pod group pods,
 		// so it will be added to the pod group when it's requeued.
-		p.pendingPodGroupPods.add(pgInfoLookup, pInfo)
+		p.pendingPodGroupPods.add(pInfo)
 		logger.V(5).Info("Pod added to pending pod group pods, waiting for its pod group to be requeued", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
 	} else {
 		// Create a new group as it's the first member pod in the queue.
@@ -1070,13 +1070,12 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 
 	p.activeQ.clearPoppedEntity()
 	// Get the pending pods and put them into the pod group.
-	pendingPods := p.pendingPodGroupPods.get(pgInfo)
+	pendingPods := p.pendingPodGroupPods.clear()
 	if len(pendingPods) == 0 {
 		// No pending pods, nothing to requeue.
 		return nil
 	}
 	pgInfo.SetPods(pendingPods)
-	p.pendingPodGroupPods.clear(pgInfo)
 
 	hasErrorPods := false
 	pgInfo.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
@@ -1277,13 +1276,10 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 		}
 		return
 	} else if p.isPodGroupMember(newPod) {
-		pgInfoLookup := entityLookup.(*framework.QueuedPodGroupInfo)
-		if p.pendingPodGroupPods.has(pgInfoLookup) {
-			if pInfo := p.pendingPodGroupPods.update(pgInfoLookup, newPod); pInfo != nil {
-				p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-				pInfo.PodSignature = p.signPod(ctx, newPod)
-				return
-			}
+		if pInfo := p.pendingPodGroupPods.update(newPod); pInfo != nil {
+			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+			pInfo.PodSignature = p.signPod(ctx, newPod)
+			return
 		}
 	}
 	// If the entity is not in any of the queues, we add it.
@@ -1322,8 +1318,7 @@ func (p *PriorityQueue) deletePodGroupMember(logger klog.Logger, pod *v1.Pod) {
 
 	entity, strategy := p.deleteFromAnyQueue(pgInfoLookup)
 	if entity == nil {
-		pgInfoLookup := newQueuedPodGroupInfoForLookup(pod)
-		pInfo := p.pendingPodGroupPods.delete(pgInfoLookup, pod)
+		pInfo := p.pendingPodGroupPods.delete(pod)
 		if pInfo == nil {
 			return
 		}
@@ -1517,10 +1512,8 @@ func (p *PriorityQueue) PendingPodGroupPods() []*v1.Pod {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	var result []*v1.Pod
-	for _, pInfos := range p.pendingPodGroupPods.podGroupToPods {
-		for _, pInfo := range pInfos {
-			result = append(result, pInfo.Pod)
-		}
+	for _, pInfo := range p.pendingPodGroupPods.keyToPod {
+		result = append(result, pInfo.Pod)
 	}
 	return result
 }
@@ -1559,7 +1552,7 @@ func (p *PriorityQueue) getPod(podLookup *v1.Pod, unlockedActiveQ unlockedActive
 		if !p.isPodGroupMember(podLookup) {
 			return nil
 		}
-		return p.pendingPodGroupPods.getPod(entityLookup, podLookup)
+		return p.pendingPodGroupPods.get(podLookup)
 	}
 	var foundPodInfo *framework.QueuedPodInfo
 	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {

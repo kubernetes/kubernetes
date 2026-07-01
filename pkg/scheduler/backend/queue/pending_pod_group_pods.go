@@ -17,93 +17,74 @@ limitations under the License.
 package queue
 
 import (
-	"slices"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-// pendingPodGroupMemberPods stores all pending pods that wait for their corresponding pod group to be requeued.
+// pendingPodGroupMemberPods stores all pending member pods of the currently scheduling pod group.
 type pendingPodGroupMemberPods struct {
-	podGroupToPods map[string][]*framework.QueuedPodInfo
+	keyToPod map[string]*framework.QueuedPodInfo
 }
 
 func newPendingPodGroupMemberPods() *pendingPodGroupMemberPods {
 	return &pendingPodGroupMemberPods{
-		podGroupToPods: make(map[string][]*framework.QueuedPodInfo),
+		keyToPod: make(map[string]*framework.QueuedPodInfo),
 	}
 }
 
-// add adds a pod info to the specified pod group.
-func (p *pendingPodGroupMemberPods) add(pgInfoLookup framework.QueuedEntityInfo, pInfo *framework.QueuedPodInfo) {
-	pgKey := queuedEntityKeyFunc(pgInfoLookup)
-	p.podGroupToPods[pgKey] = append(p.podGroupToPods[pgKey], pInfo)
+// add adds a pod info.
+func (p *pendingPodGroupMemberPods) add(pInfo *framework.QueuedPodInfo) {
+	p.keyToPod[pendingPodKey(pInfo.Pod)] = pInfo
 }
 
-// get returns all pod infos associated with the specified pod group.
-func (p *pendingPodGroupMemberPods) get(pgInfoLookup framework.QueuedEntityInfo) []*framework.QueuedPodInfo {
-	pgKey := queuedEntityKeyFunc(pgInfoLookup)
-	return p.podGroupToPods[pgKey]
-}
-
-// has checks if the specified pod group has any pending pods.
-func (p *pendingPodGroupMemberPods) has(pgInfoLookup framework.QueuedEntityInfo) bool {
-	pgKey := queuedEntityKeyFunc(pgInfoLookup)
-	_, ok := p.podGroupToPods[pgKey]
+// has checks if the pod is tracked.
+func (p *pendingPodGroupMemberPods) has(podLookup *v1.Pod) bool {
+	_, ok := p.keyToPod[pendingPodKey(podLookup)]
 	return ok
 }
 
 // len returns the number of pending pods.
 func (p *pendingPodGroupMemberPods) len() int {
-	count := 0
-	for _, pods := range p.podGroupToPods {
-		count += len(pods)
-	}
-	return count
+	return len(p.keyToPod)
 }
 
-// getPod searches for a specific pod within the provided pod group.
-func (p *pendingPodGroupMemberPods) getPod(pgInfoLookup framework.QueuedEntityInfo, pod *v1.Pod) *framework.QueuedPodInfo {
-	pgKey := queuedEntityKeyFunc(pgInfoLookup)
-	for _, pInfo := range p.podGroupToPods[pgKey] {
-		if pInfo.Pod.Name == pod.Name && pInfo.Pod.Namespace == pod.Namespace {
-			return pInfo
-		}
-	}
-	return nil
+// get returns the queued pod info for the given pod.
+func (p *pendingPodGroupMemberPods) get(podLookup *v1.Pod) *framework.QueuedPodInfo {
+	return p.keyToPod[pendingPodKey(podLookup)]
 }
 
-// update refreshes the pod object for a member of the specified pod group.
-// It returns the updated pod info if the pod was found, nil otherwise.
-func (p *pendingPodGroupMemberPods) update(pgInfoLookup framework.QueuedEntityInfo, newPod *v1.Pod) *framework.QueuedPodInfo {
-	pgKey := queuedEntityKeyFunc(pgInfoLookup)
-	for _, pInfo := range p.podGroupToPods[pgKey] {
-		if pInfo.Pod.Name == newPod.Name && pInfo.Pod.Namespace == newPod.Namespace {
-			pInfo.Pod = newPod
-			return pInfo
-		}
+// update refreshes the pod object and returns the updated pod info if found.
+func (p *pendingPodGroupMemberPods) update(newPod *v1.Pod) *framework.QueuedPodInfo {
+	pInfo, ok := p.keyToPod[pendingPodKey(newPod)]
+	if !ok {
+		return nil
 	}
-	return nil
+	pInfo.Pod = newPod
+	return pInfo
 }
 
-// delete removes a specific pod from the tracked members of a pod group.
-// It returns the removed pod info if found, nil otherwise.
-func (p *pendingPodGroupMemberPods) delete(pgInfoLookup framework.QueuedEntityInfo, pod *v1.Pod) *framework.QueuedPodInfo {
-	pgKey := queuedEntityKeyFunc(pgInfoLookup)
-	for i, pInfo := range p.podGroupToPods[pgKey] {
-		if pInfo.Pod.Name == pod.Name && pInfo.Pod.Namespace == pod.Namespace {
-			p.podGroupToPods[pgKey] = slices.Delete(p.podGroupToPods[pgKey], i, i+1)
-			if len(p.podGroupToPods[pgKey]) == 0 {
-				delete(p.podGroupToPods, pgKey)
-			}
-			return pInfo
-		}
+// delete removes a specific pod and returns its pod info if found.
+func (p *pendingPodGroupMemberPods) delete(podLookup *v1.Pod) *framework.QueuedPodInfo {
+	pInfo, ok := p.keyToPod[pendingPodKey(podLookup)]
+	if !ok {
+		return nil
 	}
-	return nil
+	delete(p.keyToPod, pendingPodKey(podLookup))
+	return pInfo
 }
 
-// clear removes all pods associated with the specified pod group.
-func (p *pendingPodGroupMemberPods) clear(pgInfoLookup framework.QueuedEntityInfo) {
-	pgKey := queuedEntityKeyFunc(pgInfoLookup)
-	delete(p.podGroupToPods, pgKey)
+// clear removes all tracked pods and returns them.
+func (p *pendingPodGroupMemberPods) clear() []*framework.QueuedPodInfo {
+	pods := make([]*framework.QueuedPodInfo, 0, len(p.keyToPod))
+	for _, pInfo := range p.keyToPod {
+		pods = append(pods, pInfo)
+	}
+	p.keyToPod = make(map[string]*framework.QueuedPodInfo)
+	return pods
+}
+
+func pendingPodKey(pod *v1.Pod) string {
+	return fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 }

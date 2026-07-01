@@ -3706,7 +3706,6 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 	pgName := "test-pg"
 	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Priority(midPriority).PodGroupName(pgName).Obj()
 	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("pod2").Priority(midPriority).PodGroupName(pgName).Obj()
-	pgLookup := newQueuedPodGroupInfoForLookup(pod1)
 
 	tests := []struct {
 		name                            string
@@ -3732,8 +3731,8 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
-				q.pendingPodGroupPods.add(pgLookup, pInfo1)
-				q.pendingPodGroupPods.add(pgLookup, pInfo2)
+				q.pendingPodGroupPods.add(pInfo1)
+				q.pendingPodGroupPods.add(pInfo2)
 			},
 			disableBackoff:                 true,
 			expectedConsecutiveErrorsCount: 1,
@@ -3745,8 +3744,8 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
-				q.pendingPodGroupPods.add(pgLookup, pInfo1)
-				q.pendingPodGroupPods.add(pgLookup, pInfo2)
+				q.pendingPodGroupPods.add(pInfo1)
+				q.pendingPodGroupPods.add(pInfo2)
 			},
 			disableBackoff:                 true,
 			expectedConsecutiveErrorsCount: 1,
@@ -3758,8 +3757,8 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1, "fakePlugin")
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
-				q.pendingPodGroupPods.add(pgLookup, pInfo1)
-				q.pendingPodGroupPods.add(pgLookup, pInfo2)
+				q.pendingPodGroupPods.add(pInfo1)
+				q.pendingPodGroupPods.add(pInfo2)
 				pgInfo.ConsecutiveErrorsCount = 5 // Set to non-zero to verify reset
 			},
 			disableBackoff:             true,
@@ -3772,8 +3771,8 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1, "fakePlugin")
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
-				q.pendingPodGroupPods.add(pgLookup, pInfo1)
-				q.pendingPodGroupPods.add(pgLookup, pInfo2)
+				q.pendingPodGroupPods.add(pInfo1)
+				q.pendingPodGroupPods.add(pInfo2)
 			},
 			disableBackoff:                  true,
 			blockOnPreEnqueue:               true,
@@ -3786,8 +3785,8 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
-				q.pendingPodGroupPods.add(pgLookup, pInfo1)
-				q.pendingPodGroupPods.add(pgLookup, pInfo2)
+				q.pendingPodGroupPods.add(pInfo1)
+				q.pendingPodGroupPods.add(pInfo2)
 			},
 			expectedConsecutiveErrorsCount: 1,
 			expectedInBackoffQ:             true,
@@ -3798,8 +3797,8 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
-				q.pendingPodGroupPods.add(pgLookup, pInfo1)
-				q.pendingPodGroupPods.add(pgLookup, pInfo2)
+				q.pendingPodGroupPods.add(pInfo1)
+				q.pendingPodGroupPods.add(pInfo2)
 			},
 			expectedConsecutiveErrorsCount: 1,
 			expectedInBackoffQ:             true,
@@ -3810,8 +3809,8 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1, "fakePlugin")
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
-				q.pendingPodGroupPods.add(pgLookup, pInfo1)
-				q.pendingPodGroupPods.add(pgLookup, pInfo2)
+				q.pendingPodGroupPods.add(pInfo1)
+				q.pendingPodGroupPods.add(pInfo2)
 				pgInfo.ConsecutiveErrorsCount = 5 // Set to non-zero to verify reset
 			},
 			expectedUnschedulableCount: 1,
@@ -3823,8 +3822,8 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
-				q.pendingPodGroupPods.add(pgLookup, pInfo1)
-				q.pendingPodGroupPods.add(pgLookup, pInfo2)
+				q.pendingPodGroupPods.add(pInfo1)
+				q.pendingPodGroupPods.add(pInfo2)
 			},
 			blockOnPreEnqueue:               true,
 			expectedConsecutiveErrorsCount:  1,
@@ -3876,7 +3875,7 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			if isInUnschedulable := q.unschedulableEntities.get(pgInfo) != nil; isInUnschedulable != test.expectedInUnschedulableEntities {
 				tCtx.Errorf("Expected pod group to be in unschedulableEntities: %v, got %v", test.expectedInUnschedulableEntities, isInUnschedulable)
 			}
-			if len(q.pendingPodGroupPods.get(pgInfo)) != 0 {
+			if q.pendingPodGroupPods.len() != 0 {
 				tCtx.Errorf("Expected pendingPodGroupPods to be cleared")
 			}
 			if len(pgInfo.QueuedPodInfos) != test.expectedPodsInGroup {
@@ -6189,13 +6188,7 @@ func TestAddPodGroupMember(t *testing.T) {
 				}
 			}
 
-			inPending := false
-			for _, pInfo := range q.pendingPodGroupPods.get(pgLookup) {
-				if pInfo.Pod.Name == tt.incomingPod.Name {
-					inPending = true
-					break
-				}
-			}
+			inPending := q.pendingPodGroupPods.has(tt.incomingPod)
 			if inPending != tt.expectedInPendingPodGroupPods {
 				t.Errorf("Expected incoming pod in pendingPodGroupPods: %v, got %v", tt.expectedInPendingPodGroupPods, inPending)
 			}
@@ -6380,14 +6373,11 @@ func TestDeletePodGroupMember(t *testing.T) {
 				}
 			}
 
-			pendingPods := q.pendingPodGroupPods.get(pgLookup)
-			if pendingLen := len(pendingPods); pendingLen != tt.expectedPodsInPending {
+			if pendingLen := q.pendingPodGroupPods.len(); pendingLen != tt.expectedPodsInPending {
 				t.Errorf("Expected pod group to have %d pods in pendingPodGroupPods, got %d", tt.expectedPodsInPending, pendingLen)
 			}
-			for _, pInfo := range pendingPods {
-				if pInfo.Pod.Name == tt.podToDelete.Name {
-					t.Errorf("Deleted pod %s is still present in pendingPodGroupPods map", tt.podToDelete.Name)
-				}
+			if q.pendingPodGroupPods.has(tt.podToDelete) {
+				t.Errorf("Deleted pod %s is still present in pendingPodGroupPods map", tt.podToDelete.Name)
 			}
 		})
 	}
@@ -6624,23 +6614,13 @@ func TestUpdatePodGroupMember(t *testing.T) {
 				}
 			}
 
-			pendingPods := q.pendingPodGroupPods.get(pgLookup)
-			if pendingLen := len(pendingPods); pendingLen != tt.expectedPodsInPending {
+			if pendingLen := q.pendingPodGroupPods.len(); pendingLen != tt.expectedPodsInPending {
 				t.Errorf("Expected pod group to have %d pods in pendingPodGroupPods, got %d", tt.expectedPodsInPending, pendingLen)
 			}
 			if tt.expectedPodsInPending > 0 {
-				inPending := false
-				for _, pInfo := range pendingPods {
-					if pInfo.Pod.Name == tt.newPod.Name {
-						inPending = true
-						if diff := cmp.Diff(tt.newPod, pInfo.Pod); diff != "" {
-							t.Errorf("Pending member pod differs from newPod (-want +got):\n%s", diff)
-						}
-						break
-					}
-				}
-				if !inPending {
-					t.Errorf("Updated pod %s was not found in pendingPodGroupPods map", tt.newPod.Name)
+				pInfo := q.pendingPodGroupPods.get(tt.newPod)
+				if diff := cmp.Diff(tt.newPod, pInfo.Pod); diff != "" {
+					t.Errorf("Pending member pod differs from newPod (-want +got):\n%s", diff)
 				}
 			}
 			if diff := cmp.Diff(tt.expectedNominatedPods, q.nominatedPodToNode, cmpopts.EquateEmpty()); diff != "" {
@@ -6770,21 +6750,11 @@ func TestActivatePodGroupMember(t *testing.T) {
 				}
 			}
 
-			pendingPods := q.pendingPodGroupPods.get(pgLookup)
-			if pendingLen := len(pendingPods); pendingLen != tt.expectedPodsInPending {
+			if pendingLen := q.pendingPodGroupPods.len(); pendingLen != tt.expectedPodsInPending {
 				t.Errorf("Expected pod group to have %d pods in pendingPodGroupPods, got %d", tt.expectedPodsInPending, pendingLen)
 			}
-			if tt.expectedPodsInPending > 0 {
-				inPending := false
-				for _, pInfo := range pendingPods {
-					if pInfo.Pod.Name == tt.podToActivate.Name {
-						inPending = true
-						break
-					}
-				}
-				if !inPending {
-					t.Errorf("Pod %s was not found in pendingPodGroupPods map", tt.podToActivate.Name)
-				}
+			if tt.expectedPodsInPending > 0 && !q.pendingPodGroupPods.has(tt.podToActivate) {
+				t.Errorf("Pod %s was not found in pendingPodGroupPods map", tt.podToActivate.Name)
 			}
 
 			if tt.expectedForceActivateEvent {
@@ -7362,8 +7332,7 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 				}
 			}
 
-			pendingPods := q.pendingPodGroupPods.get(pgLookup)
-			if pendingLen := len(pendingPods); pendingLen != tt.expectedPodsInPending {
+			if pendingLen := q.pendingPodGroupPods.len(); pendingLen != tt.expectedPodsInPending {
 				t.Errorf("Expected pod group to have %d pods in pendingPodGroupPods, got %d", tt.expectedPodsInPending, pendingLen)
 			}
 		})
