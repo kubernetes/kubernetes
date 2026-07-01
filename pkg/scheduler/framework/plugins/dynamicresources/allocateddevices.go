@@ -108,14 +108,13 @@ func foreachAllocatedDevice(claim *resourceapi.ResourceClaim,
 type allocatedDevices struct {
 	logger klog.Logger
 
-	mutex                      sync.RWMutex
-	revision                   int64
-	ids                        sets.Set[structured.DeviceID]
-	shareIDs                   sets.Set[structured.SharedDeviceID]
-	capacities                 structured.ConsumedCapacityCollection
-	enabledConsumableCapacity  bool
-	compatGroups               structured.CompatibilityGroupsCollection
-	enabledCompatibilityGroups bool
+	mutex                     sync.RWMutex
+	revision                  int64
+	ids                       sets.Set[structured.DeviceID]
+	shareIDs                  sets.Set[structured.SharedDeviceID]
+	capacities                structured.ConsumedCapacityCollection
+	enabledConsumableCapacity bool
+	compatibilityGroups       structured.CompatibilityGroupsCollection
 }
 
 func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
@@ -125,13 +124,12 @@ func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
 		shareIDs:                  sets.New[structured.SharedDeviceID](),
 		capacities:                structured.NewConsumedCapacityCollection(),
 		enabledConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
-		compatGroups:              structured.NewCompatibilityGroupsCollection(),
 		// Compatibility groups are tracked from claim statuses regardless of the
 		// feature gate. When the gate is enabled the allocator enforces
 		// compatibility; when it is disabled the allocator still needs to know
 		// which counter sets already have grouped allocations so it can avoid
 		// them during a version skew (KEP "Devices skipped" behavior).
-		enabledCompatibilityGroups: true,
+		compatibilityGroups: structured.NewCompatibilityGroupsCollection(),
 	}
 }
 
@@ -160,7 +158,7 @@ func (a *allocatedDevices) CompatibilityGroups() (structured.CompatibilityGroups
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	return a.compatGroups.Clone(), a.revision
+	return a.compatibilityGroups.Clone(), a.revision
 }
 
 func (a *allocatedDevices) Revision() int64 {
@@ -234,10 +232,7 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 		shareIDs = make([]structured.SharedDeviceID, 0, 20)
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
 	}
-	var compatGroupsByDevice map[structured.DeviceID]map[string][]string
-	if a.enabledCompatibilityGroups {
-		compatGroupsByDevice = make(map[structured.DeviceID]map[string][]string)
-	}
+	compatGroupsByDevice := make(map[structured.DeviceID]map[string][]string)
 	foreachAllocatedDevice(claim,
 		func(deviceID structured.DeviceID) {
 			a.logger.V(6).Info("Observed device allocation", "device", deviceID, "claim", klog.KObj(claim))
@@ -252,7 +247,7 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 			a.logger.V(6).Info("Observed consumed capacity", "device", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
 			deviceCapacities = append(deviceCapacities, capacity)
 		},
-		a.enabledCompatibilityGroups,
+		true,
 		func(deviceID structured.DeviceID, compatibilityGroups map[string][]string) {
 			a.logger.V(6).Info("Observed compatibility groups", "device", deviceID, "compatibilityGroups", compatibilityGroups, "claim", klog.KObj(claim))
 			compatGroupsByDevice[deviceID] = compatibilityGroups
@@ -276,7 +271,7 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 		a.capacities.Insert(capacity)
 	}
 	for deviceID, compatibilityGroups := range compatGroupsByDevice {
-		a.compatGroups.Insert(deviceID, compatibilityGroups)
+		a.compatibilityGroups.Insert(deviceID, compatibilityGroups)
 	}
 }
 
@@ -309,7 +304,7 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 			a.logger.V(6).Info("Observed consumed capacity release", "device id", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
 			deviceCapacities = append(deviceCapacities, capacity)
 		},
-		a.enabledCompatibilityGroups,
+		true,
 		func(deviceID structured.DeviceID, compatibilityGroups map[string][]string) {
 			a.logger.V(6).Info("Observed compatibility groups release", "device", deviceID, "claim", klog.KObj(claim))
 			compatGroupDeviceIDs = append(compatGroupDeviceIDs, deviceID)
@@ -332,6 +327,6 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 		a.capacities.Remove(capacity)
 	}
 	for _, deviceID := range compatGroupDeviceIDs {
-		delete(a.compatGroups, deviceID)
+		delete(a.compatibilityGroups, deviceID)
 	}
 }
