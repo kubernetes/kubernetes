@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"iter"
 	"reflect"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/validate/content"
@@ -166,9 +167,10 @@ func ConditionsAwareDecisionConditionsMap(denyConditions []Condition, noOpinionC
 	return ConditionsAwareDecision{
 		decisionType: conditionsAwareDecisionTypeConditionsMap,
 		conditionsMap: ConditionsMap{
-			denyConditions:      denyConditions,
-			noOpinionConditions: noOpinionConditions,
-			allowConditions:     allowConditions,
+			// ensure immutability of the ConditionsMap after construction by not sharing caller-owned references
+			denyConditions:      slices.Clone(denyConditions),
+			noOpinionConditions: slices.Clone(noOpinionConditions),
+			allowConditions:     slices.Clone(allowConditions),
 		},
 	}
 }

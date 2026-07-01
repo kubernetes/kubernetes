@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"slices"
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -149,8 +148,8 @@ func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap
 		if len(unevaluatedDenyConditions) != 0 {
 			return ConditionsAwareDecisionConditionsMap(
 				unevaluatedDenyConditions,
-				slices.Clone(c.noOpinionConditions),
-				slices.Clone(c.allowConditions))
+				c.noOpinionConditions,
+				c.allowConditions)
 		}
 	}
 	// If we got here, all Deny conditions could be evaluated, and evaluated to false, nil
@@ -179,7 +178,7 @@ func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap
 			return ConditionsAwareDecisionConditionsMap(
 				nil,
 				unevaluatedNoOpinionConditions,
-				slices.Clone(c.allowConditions))
+				c.allowConditions)
 		}
 	}
 	// If we got here, all Deny and NoOpinion conditions could be evaluated, and evaluated to false, nil

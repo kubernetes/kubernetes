@@ -31,7 +31,7 @@ type namedConditionsAwareDecision struct {
 	d                         ConditionsAwareDecision
 }
 
-// ConditionsAwareDecisionUnion is an unioned conditions-aware decision type, keyed by authorizer name.
+// ConditionsAwareDecisionUnion is a builder struct for a Union-typed ConditionsAwareDecision.
 // ConditionsAwareDecisionUnion is not thread-safe.
 type ConditionsAwareDecisionUnion struct {
 	// Note: Remember to register any fields added here to the deepcopy in ToDecision
@@ -179,7 +179,7 @@ func (unionMap *ConditionsAwareDecisionUnion) ToDecision() ConditionsAwareDecisi
 	return ConditionsAwareDecision{
 		decisionType: conditionsAwareDecisionTypeUnion,
 		union: ConditionsAwareDecisionUnion{
-			// avoid assigning unionMap here, as then unionMap.Add could change the returned decision
+			// ensure ConditionsAwareDecision immutability by not sharing any references between the builder and the result
 			inner:                            slices.Clone(unionMap.inner),
 			containsUnconditionalAllowOrDeny: unionMap.containsUnconditionalAllowOrDeny,
 			subDecisionsPossibleDecisions:    unionMap.subDecisionsPossibleDecisions.Clone(),

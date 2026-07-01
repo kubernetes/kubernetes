@@ -18,6 +18,7 @@ package authorizer_test
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -121,34 +122,52 @@ func TestConditionsAwareDecisionUnionAdd(t *testing.T) {
 	})
 }
 
-// TestConditionsAwareDecisionUnionToDecisionPostMutation verifies that mutating the source
-// ConditionsAwareDecisionUnion after calling ToDecision does NOT change the returned decision.
-// (The patch explicitly clones the inner slice in ToDecision for this reason.)
-func TestConditionsAwareDecisionUnionToDecisionPostMutation(t *testing.T) {
-	condMapAllow := authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "allow-1"}})
+// TestConditionsAwareDecisionUnion_AddAfterToDecisionDoesNotMutate verifies that once
+// ConditionsAwareDecisionUnion.ToDecision has produced a decision, further calls to
+// the builder's Add cannot mutate that decision — the builder's internal state
+// (including its memoized possible-decisions set) is defensively copied.
+func TestConditionsAwareDecisionUnion_AddAfterToDecisionDoesNotMutate(t *testing.T) {
+	// Build a union with two ConditionsMap sub-decisions. Neither is an unconditional
+	// Allow/Deny leaf, so the builder does NOT short-circuit subsequent Add calls.
+	cmAllow1 := authorizer.ConditionsAwareDecisionConditionsMap(
+		nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "allow-1"}},
+	)
+	cmAllow2 := authorizer.ConditionsAwareDecisionConditionsMap(
+		nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "allow-2"}},
+	)
 
 	var u authorizer.ConditionsAwareDecisionUnion
-	u.Add("0.example.com", condMapAllow)
-	u.Add("1.example.com", condMapAllow) // distinct name -> distinct entry
-	snapshot := u.ToDecision()
-
-	// Sanity: snapshot has 2 inner entries.
-	var beforeNames []string
-	for name := range snapshot.UnionedDecisions() {
-		beforeNames = append(beforeNames, name)
-	}
-	if !reflect.DeepEqual(beforeNames, []string{"0.example.com", "1.example.com"}) {
-		t.Fatalf("setup: snapshot inner = %v, want [0.example.com 1.example.com]", beforeNames)
+	u.Add("first.example.com", cmAllow1)
+	u.Add("second.example.com", cmAllow2)
+	d := u.ToDecision()
+	if !d.IsUnion() {
+		t.Fatalf("expected Union decision, got %s", d.String())
 	}
 
-	// Mutate u after the snapshot was taken. snapshot must remain unchanged.
-	u.Add("2", condMapAllow)
-
-	var afterNames []string
-	for name := range snapshot.UnionedDecisions() {
-		afterNames = append(afterNames, name)
+	collectNames := func(d authorizer.ConditionsAwareDecision) []string {
+		var names []string
+		for name := range d.UnionedDecisions() {
+			names = append(names, name)
+		}
+		return names
 	}
-	if !reflect.DeepEqual(afterNames, []string{"0.example.com", "1.example.com"}) {
-		t.Errorf("post-mutation snapshot inner = %v, want [0.example.com 1.example.com]; ToDecision must clone", afterNames)
+
+	namesBefore := []string{"first.example.com", "second.example.com"}
+	possibleBefore := d.PossibleDecisions()
+
+	// Add a further sub-decision to the builder, introducing a new possible outcome
+	// (Deny) not previously present. If ToDecision failed to defensively copy the
+	// builder's memoized state, this Add would leak into the already-returned decision.
+	cmDeny := authorizer.ConditionsAwareDecisionConditionsMap(
+		[]authorizer.Condition{authorizer.GenericCondition{ID: "deny-1"}}, nil, nil,
+	)
+	u.Add("third.example.com", cmDeny)
+
+	if got := collectNames(d); !slices.Equal(got, namesBefore) {
+		t.Errorf("UnionedDecisions names changed after builder Add: got %v, want %v (builder mutation must not leak)", got, namesBefore)
+	}
+	if got := d.PossibleDecisions(); !got.Equal(possibleBefore) {
+		t.Errorf("PossibleDecisions changed after builder Add: got %v, want %v (builder mutation must not leak)",
+			got.UnsortedList(), possibleBefore.UnsortedList())
 	}
 }

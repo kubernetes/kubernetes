@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"maps"
 	"reflect"
 	"slices"
@@ -943,6 +944,44 @@ func unconditionalParts(d authorizer.ConditionsAwareDecision) (authorizer.Decisi
 		// an error is important, as it is valid to always fail closed, as if this happens, no unconditional
 		// permissions were given the requestor.
 		return d.FailureDecision(), "failed closed: tried to return conditional decision to conditions-unaware authorizer", nil
+	}
+}
+
+// TestConditionsAwareDecisionConditionsMap_ClonesInputSlices verifies that
+// ConditionsAwareDecisionConditionsMap defensively copies its input slices, so that
+// callers mutating the slices after construction cannot alter the resulting decision.
+func TestConditionsAwareDecisionConditionsMap_ClonesInputSlices(t *testing.T) {
+	denyConditions := []authorizer.Condition{authorizer.GenericCondition{ID: "deny-orig"}}
+	noOpinionConditions := []authorizer.Condition{authorizer.GenericCondition{ID: "nop-orig"}}
+	allowConditions := []authorizer.Condition{authorizer.GenericCondition{ID: "allow-orig"}}
+
+	d := authorizer.ConditionsAwareDecisionConditionsMap(denyConditions, noOpinionConditions, allowConditions)
+	if !d.IsConditionsMap() {
+		t.Fatalf("expected ConditionsMap decision, got %s", d.String())
+	}
+
+	// Mutate every element of every input slice through the caller's backing arrays.
+	denyConditions[0] = authorizer.GenericCondition{ID: "deny-mutated"}
+	noOpinionConditions[0] = authorizer.GenericCondition{ID: "nop-mutated"}
+	allowConditions[0] = authorizer.GenericCondition{ID: "allow-mutated"}
+
+	collect := func(seq iter.Seq[authorizer.Condition]) []string {
+		var ids []string
+		for c := range seq {
+			ids = append(ids, c.GetID())
+		}
+		return ids
+	}
+
+	cm := d.ConditionsMap()
+	if got, want := collect(cm.DenyConditions()), []string{"deny-orig"}; !slices.Equal(got, want) {
+		t.Errorf("DenyConditions IDs = %v, want %v (caller mutation must not leak)", got, want)
+	}
+	if got, want := collect(cm.NoOpinionConditions()), []string{"nop-orig"}; !slices.Equal(got, want) {
+		t.Errorf("NoOpinionConditions IDs = %v, want %v (caller mutation must not leak)", got, want)
+	}
+	if got, want := collect(cm.AllowConditions()), []string{"allow-orig"}; !slices.Equal(got, want) {
+		t.Errorf("AllowConditions IDs = %v, want %v (caller mutation must not leak)", got, want)
 	}
 }
 
