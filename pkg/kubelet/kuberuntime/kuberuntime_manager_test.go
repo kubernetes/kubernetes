@@ -62,8 +62,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
+	"sync"
 )
 
 var (
@@ -755,6 +757,119 @@ func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
 		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
 	}
 }
+
+func TestSyncPodParallelKill(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	assert.NoError(t, err)
+
+	// 1. Create a pod with two containers
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "c1",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+				{
+					Name:            "c2",
+					Image:           "alpine",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// 2. Start the containers
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+	assert.NoError(t, result.Error())
+	assert.Len(t, fakeRuntime.Containers, 2)
+
+	// Get the started container statuses/IDs
+	runtimePod, err := m.GetPod(tCtx, pod.UID)
+	assert.NoError(t, err)
+	podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+	assert.NoError(t, err)
+	assert.Len(t, podStatus.ContainerStatuses, 2)
+	
+	c1ID := podStatus.ContainerStatuses[0].ID
+	c2ID := podStatus.ContainerStatuses[1].ID
+
+	// 3. Mark both containers as having failed their liveness probes
+	m.livenessManager.Set(c1ID, proberesults.Failure, pod)
+	m.livenessManager.Set(c2ID, proberesults.Failure, pod)
+
+	// 4. Wrap the runtimeService to monitor and block StopContainer calls
+	stopChan := make(chan string, 2)
+	var stopWg sync.WaitGroup
+	stopWg.Add(2)
+
+	concurrentService := &concurrentStopRuntimeService{
+		RuntimeService:    m.runtimeService,
+		stopContainerChan: stopChan,
+		wg:                &stopWg,
+	}
+	m.runtimeService = concurrentService
+
+	// 5. Run SyncPod again in a separate goroutine (as it will block on StopContainer calls)
+	syncPodDone := make(chan struct{})
+	go func() {
+		defer close(syncPodDone)
+		// We pass the podStatus computed above so computePodActions knows they are running
+		m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	}()
+
+	// 6. Wait to receive both container IDs on stopChan.
+	// If the kills were sequential, the first call would block on stopWg.Wait()
+	// and we would never receive the second container ID here (causing a deadlock/timeout).
+	// Because they are parallel, both calls enter StopContainer concurrently.
+	var stoppedContainers []string
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case id := <-stopChan:
+			stoppedContainers = append(stoppedContainers, id)
+		case <-timer.C:
+			t.Fatal("Timeout waiting for parallel StopContainer calls. This indicates sequential execution or deadlock.")
+		}
+	}
+
+	// Unblock the StopContainer calls
+	stopWg.Done()
+	stopWg.Done()
+
+	// Wait for SyncPod to finish
+	select {
+	case <-syncPodDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Timeout waiting for SyncPod to complete after unblocking.")
+	}
+
+	assert.ElementsMatch(t, []string{c1ID.ID, c2ID.ID}, stoppedContainers)
+}
+
+type concurrentStopRuntimeService struct {
+	internalapi.RuntimeService
+	stopContainerChan chan string
+	wg                *sync.WaitGroup
+}
+
+func (c *concurrentStopRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64) error {
+	c.stopContainerChan <- containerID
+	c.wg.Wait()
+	return c.RuntimeService.StopContainer(ctx, containerID, timeout)
+}
+
+
 
 func TestPruneInitContainers(t *testing.T) {
 	tCtx := ktesting.Init(t)

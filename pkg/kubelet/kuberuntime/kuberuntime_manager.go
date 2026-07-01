@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -1484,13 +1485,33 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
-		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
-			logger.V(3).Info("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
-			result.AddSyncResult(killContainerResult)
-			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
-				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				logger.Error(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+		if len(podContainerChanges.ContainersToKill) > 0 {
+			var wg sync.WaitGroup
+			var errs []error
+			var errsMu sync.Mutex
+
+			for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+				logger.V(3).Info("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+				killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
+				result.AddSyncResult(killContainerResult)
+
+				wg.Add(1)
+				go func(cID kubecontainer.ContainerID, cInfo containerToKillInfo, kr *kubecontainer.SyncResult) {
+					defer utilruntime.HandleCrashWithContext(ctx)
+					defer wg.Done()
+
+					if err := m.killContainer(ctx, pod, cID, cInfo.name, cInfo.message, cInfo.reason, nil, nil); err != nil {
+						kr.Fail(kubecontainer.ErrKillContainer, err.Error())
+						logger.Error(err, "killContainer for pod failed", "containerName", cInfo.name, "containerID", cID, "pod", klog.KObj(pod))
+						
+						errsMu.Lock()
+						errs = append(errs, err)
+						errsMu.Unlock()
+					}
+				}(containerID, containerInfo, killContainerResult)
+			}
+			wg.Wait()
+			if len(errs) > 0 {
 				return
 			}
 		}
