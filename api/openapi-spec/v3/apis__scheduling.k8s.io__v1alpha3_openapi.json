@@ -243,14 +243,6 @@
             },
             "description": "DisruptionMode defines the mode in which a given PodGroup can be disrupted. Controllers are expected to fill this field by copying it from a PodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable."
           },
-          "podGroupTemplateRef": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.PodGroupTemplateReference"
-              }
-            ],
-            "description": "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable."
-          },
           "preemptionPolicy": {
             "description": "PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. When Priority Admission Controller is enabled, it populates this field from PriorityClassName, and defaults to PreemptLowerPriority if value is unset in PriorityClass. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.",
             "type": "string"
@@ -293,6 +285,14 @@
             ],
             "default": {},
             "description": "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate."
+          },
+          "workloadRef": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadReference"
+              }
+            ],
+            "description": "WorkloadRef references an optional PodGroup template within the Workload object that was used to create the PodGroup. This field is immutable."
           }
         },
         "required": [
@@ -393,27 +393,6 @@
           "schedulingPolicy"
         ],
         "type": "object"
-      },
-      "io.k8s.api.scheduling.v1alpha3.PodGroupTemplateReference": {
-        "description": "PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload). Exactly one reference must be set.",
-        "properties": {
-          "workload": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupTemplateReference"
-              }
-            ],
-            "description": "Workload references the PodGroupTemplate within the Workload object that was used to create the PodGroup."
-          }
-        },
-        "type": "object",
-        "x-kubernetes-unions": [
-          {
-            "fields-to-discriminateBy": {
-              "workload": "Workload"
-            }
-          }
-        ]
       },
       "io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode": {
         "description": "SingleDisruptionMode specifies that children can be disrupted independently.",
@@ -539,23 +518,23 @@
           }
         ]
       },
-      "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupTemplateReference": {
-        "description": "WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.",
+      "io.k8s.api.scheduling.v1alpha3.WorkloadReference": {
+        "description": "WorkloadReference references the Workload object together with the template that was used to create a particular PodGroup.",
         "properties": {
-          "podGroupTemplateName": {
+          "templateName": {
             "default": "",
-            "description": "PodGroupTemplateName defines the PodGroupTemplate name within the Workload object.",
+            "description": "TemplateName is the name of a template within the Workload object that was used to create a pod group. It must be a DNS label. This field is required.",
             "type": "string"
           },
           "workloadName": {
             "default": "",
-            "description": "WorkloadName defines the name of the Workload object.",
+            "description": "WorkloadName is the name of the Workload object that contains a template that was used when creating a pod group. It must be a DNS name. This field is required.",
             "type": "string"
           }
         },
         "required": [
           "workloadName",
-          "podGroupTemplateName"
+          "templateName"
         ],
         "type": "object"
       },

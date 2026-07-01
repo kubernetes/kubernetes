@@ -55,14 +55,14 @@ func TestPodGroupScheduling(t *testing.T) {
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(3).Obj()).
 		Obj()
 
-	gangPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t1", "workload").
+	gangPodGroup := st.MakePodGroup().Name("pg1").WorkloadRef("t1", "workload").
 		Priority(100).MinCount(3).Obj()
 
-	otherGangPodGroup := st.MakePodGroup().Name("pg2").TemplateRef("t", "other-workload").
+	otherGangPodGroup := st.MakePodGroup().Name("pg2").WorkloadRef("t", "other-workload").
 		Priority(100).MinCount(3).Obj()
 
-	basicPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t2", "workload").Priority(100).BasicPolicy().Obj()
-	podGroupWithMinCount5 := st.MakePodGroup().Name("pg-mutable").TemplateRef("t-mutable", "workload").Priority(100).MinCount(5).Obj()
+	basicPodGroup := st.MakePodGroup().Name("pg1").WorkloadRef("t2", "workload").Priority(100).BasicPolicy().Obj()
+	podGroupWithMinCount5 := st.MakePodGroup().Name("pg-mutable").WorkloadRef("t-mutable", "workload").Priority(100).MinCount(5).Obj()
 
 	mutP1 := st.MakePod().Name("mut-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
 	mutP2 := st.MakePod().Name("mut-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
@@ -104,9 +104,9 @@ func TestPodGroupScheduling(t *testing.T) {
 	midP2 := st.MakePod().Name("mid-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
 		PodGroupName("mid-pg").Priority(50).Obj()
 
-	midPodGroup := st.MakePodGroup().Name("mid-pg").TemplateRef("t-mid", "workload").
+	midPodGroup := st.MakePodGroup().Name("mid-pg").WorkloadRef("t-mid", "workload").
 		Priority(50).MinCount(2).Obj()
-	midPodGroupWithConstraint := st.MakePodGroup().Name("mid-pg").TemplateRef("t-mid", "workload").
+	midPodGroupWithConstraint := st.MakePodGroup().Name("mid-pg").WorkloadRef("t-mid", "workload").
 		Priority(50).MinCount(2).TopologyKey("topology.kubernetes.io/zone").Obj()
 
 	otherP1 := st.MakePod().Name("other-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
@@ -664,7 +664,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
 
 	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
-	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
+	pg := st.MakePodGroup().Namespace("default").Name("pg1").WorkloadRef("t1", "workload").
 		DisruptionModeAll().Priority(100).MinCount(3).Obj()
 
 	// Low priority pods taking up all resources
@@ -773,7 +773,7 @@ func TestPostFilterInvocationCount(t *testing.T) {
 	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
 
 	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
-	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
+	pg := st.MakePodGroup().Namespace("default").Name("pg1").WorkloadRef("t1", "workload").
 		DisruptionModeAll().Priority(100).MinCount(3).Obj()
 
 	// Low priority pods taking up all resources

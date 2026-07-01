@@ -57,8 +57,6 @@ func (m *PodGroupStatus) Reset() { *m = PodGroupStatus{} }
 
 func (m *PodGroupTemplate) Reset() { *m = PodGroupTemplate{} }
 
-func (m *PodGroupTemplateReference) Reset() { *m = PodGroupTemplateReference{} }
-
 func (m *SingleDisruptionMode) Reset() { *m = SingleDisruptionMode{} }
 
 func (m *TopologyConstraint) Reset() { *m = TopologyConstraint{} }
@@ -69,7 +67,7 @@ func (m *Workload) Reset() { *m = Workload{} }
 
 func (m *WorkloadList) Reset() { *m = WorkloadList{} }
 
-func (m *WorkloadPodGroupTemplateReference) Reset() { *m = WorkloadPodGroupTemplateReference{} }
+func (m *WorkloadReference) Reset() { *m = WorkloadReference{} }
 
 func (m *WorkloadSpec) Reset() { *m = WorkloadSpec{} }
 
@@ -538,9 +536,9 @@ func (m *PodGroupSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	}
 	i--
 	dAtA[i] = 0x12
-	if m.PodGroupTemplateRef != nil {
+	if m.WorkloadRef != nil {
 		{
-			size, err := m.PodGroupTemplateRef.MarshalToSizedBuffer(dAtA[:i])
+			size, err := m.WorkloadRef.MarshalToSizedBuffer(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -687,41 +685,6 @@ func (m *PodGroupTemplate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
 	i--
 	dAtA[i] = 0xa
-	return len(dAtA) - i, nil
-}
-
-func (m *PodGroupTemplateReference) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *PodGroupTemplateReference) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *PodGroupTemplateReference) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.Workload != nil {
-		{
-			size, err := m.Workload.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintGenerated(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0xa
-	}
 	return len(dAtA) - i, nil
 }
 
@@ -904,7 +867,7 @@ func (m *WorkloadList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *WorkloadPodGroupTemplateReference) Marshal() (dAtA []byte, err error) {
+func (m *WorkloadReference) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -914,19 +877,19 @@ func (m *WorkloadPodGroupTemplateReference) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *WorkloadPodGroupTemplateReference) MarshalTo(dAtA []byte) (int, error) {
+func (m *WorkloadReference) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *WorkloadPodGroupTemplateReference) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *WorkloadReference) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	i -= len(m.PodGroupTemplateName)
-	copy(dAtA[i:], m.PodGroupTemplateName)
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PodGroupTemplateName)))
+	i -= len(m.TemplateName)
+	copy(dAtA[i:], m.TemplateName)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.TemplateName)))
 	i--
 	dAtA[i] = 0x12
 	i -= len(m.WorkloadName)
@@ -1146,8 +1109,8 @@ func (m *PodGroupSpec) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.PodGroupTemplateRef != nil {
-		l = m.PodGroupTemplateRef.Size()
+	if m.WorkloadRef != nil {
+		l = m.WorkloadRef.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	l = m.SchedulingPolicy.Size()
@@ -1231,19 +1194,6 @@ func (m *PodGroupTemplate) Size() (n int) {
 	return n
 }
 
-func (m *PodGroupTemplateReference) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.Workload != nil {
-		l = m.Workload.Size()
-		n += 1 + l + sovGenerated(uint64(l))
-	}
-	return n
-}
-
 func (m *SingleDisruptionMode) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1309,7 +1259,7 @@ func (m *WorkloadList) Size() (n int) {
 	return n
 }
 
-func (m *WorkloadPodGroupTemplateReference) Size() (n int) {
+func (m *WorkloadReference) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -1317,7 +1267,7 @@ func (m *WorkloadPodGroupTemplateReference) Size() (n int) {
 	_ = l
 	l = len(m.WorkloadName)
 	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.PodGroupTemplateName)
+	l = len(m.TemplateName)
 	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
@@ -1473,7 +1423,7 @@ func (this *PodGroupSpec) String() string {
 	}
 	repeatedStringForResourceClaims += "}"
 	s := strings.Join([]string{`&PodGroupSpec{`,
-		`PodGroupTemplateRef:` + strings.Replace(this.PodGroupTemplateRef.String(), "PodGroupTemplateReference", "PodGroupTemplateReference", 1) + `,`,
+		`WorkloadRef:` + strings.Replace(this.WorkloadRef.String(), "WorkloadReference", "WorkloadReference", 1) + `,`,
 		`SchedulingPolicy:` + strings.Replace(strings.Replace(this.SchedulingPolicy.String(), "PodGroupSchedulingPolicy", "PodGroupSchedulingPolicy", 1), `&`, ``, 1) + `,`,
 		`SchedulingConstraints:` + strings.Replace(this.SchedulingConstraints.String(), "PodGroupSchedulingConstraints", "PodGroupSchedulingConstraints", 1) + `,`,
 		`ResourceClaims:` + repeatedStringForResourceClaims + `,`,
@@ -1523,16 +1473,6 @@ func (this *PodGroupTemplate) String() string {
 		`DisruptionMode:` + strings.Replace(this.DisruptionMode.String(), "DisruptionMode", "DisruptionMode", 1) + `,`,
 		`PriorityClassName:` + fmt.Sprintf("%v", this.PriorityClassName) + `,`,
 		`Priority:` + valueToStringGenerated(this.Priority) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *PodGroupTemplateReference) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&PodGroupTemplateReference{`,
-		`Workload:` + strings.Replace(this.Workload.String(), "WorkloadPodGroupTemplateReference", "WorkloadPodGroupTemplateReference", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1595,13 +1535,13 @@ func (this *WorkloadList) String() string {
 	}, "")
 	return s
 }
-func (this *WorkloadPodGroupTemplateReference) String() string {
+func (this *WorkloadReference) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&WorkloadPodGroupTemplateReference{`,
+	s := strings.Join([]string{`&WorkloadReference{`,
 		`WorkloadName:` + fmt.Sprintf("%v", this.WorkloadName) + `,`,
-		`PodGroupTemplateName:` + fmt.Sprintf("%v", this.PodGroupTemplateName) + `,`,
+		`TemplateName:` + fmt.Sprintf("%v", this.TemplateName) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2687,7 +2627,7 @@ func (m *PodGroupSpec) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PodGroupTemplateRef", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field WorkloadRef", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -2714,10 +2654,10 @@ func (m *PodGroupSpec) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.PodGroupTemplateRef == nil {
-				m.PodGroupTemplateRef = &PodGroupTemplateReference{}
+			if m.WorkloadRef == nil {
+				m.WorkloadRef = &WorkloadReference{}
 			}
-			if err := m.PodGroupTemplateRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.WorkloadRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -3357,92 +3297,6 @@ func (m *PodGroupTemplate) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PodGroupTemplateReference) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: PodGroupTemplateReference: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PodGroupTemplateReference: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Workload", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Workload == nil {
-				m.Workload = &WorkloadPodGroupTemplateReference{}
-			}
-			if err := m.Workload.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
 func (m *SingleDisruptionMode) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3954,7 +3808,7 @@ func (m *WorkloadList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *WorkloadPodGroupTemplateReference) Unmarshal(dAtA []byte) error {
+func (m *WorkloadReference) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3977,10 +3831,10 @@ func (m *WorkloadPodGroupTemplateReference) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: WorkloadPodGroupTemplateReference: wiretype end group for non-group")
+			return fmt.Errorf("proto: WorkloadReference: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: WorkloadPodGroupTemplateReference: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: WorkloadReference: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4017,7 +3871,7 @@ func (m *WorkloadPodGroupTemplateReference) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PodGroupTemplateName", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field TemplateName", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -4045,7 +3899,7 @@ func (m *WorkloadPodGroupTemplateReference) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.PodGroupTemplateName = string(dAtA[iNdEx:postIndex])
+			m.TemplateName = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

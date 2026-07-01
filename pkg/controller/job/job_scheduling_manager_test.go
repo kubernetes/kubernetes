@@ -454,11 +454,9 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(baseJob, controllerKind)},
 			},
 			Spec: schedulingv1alpha3.PodGroupSpec{
-				PodGroupTemplateRef: &schedulingv1alpha3.PodGroupTemplateReference{
-					Workload: &schedulingv1alpha3.WorkloadPodGroupTemplateReference{
-						WorkloadName:         wlName,
-						PodGroupTemplateName: templateName,
-					},
+				WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+					WorkloadName: wlName,
+					TemplateName: templateName,
 				},
 			},
 		}
@@ -584,10 +582,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 						UID:       types.UID("ext-pg-uid"),
 					},
 					Spec: schedulingv1alpha3.PodGroupSpec{
-						PodGroupTemplateRef: &schedulingv1alpha3.PodGroupTemplateReference{
-							Workload: &schedulingv1alpha3.WorkloadPodGroupTemplateReference{
-								WorkloadName: workloadName,
-							},
+						WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+							WorkloadName: workloadName,
 						},
 					},
 				},

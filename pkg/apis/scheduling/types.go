@@ -410,11 +410,12 @@ type PodGroupList struct {
 
 // PodGroupSpec defines the desired state of a PodGroup.
 type PodGroupSpec struct {
-	// PodGroupTemplateRef references an optional PodGroup template within other object
-	// (e.g. Workload) that was used to create the PodGroup. This field is immutable.
+	// WorkloadRef references an optional PodGroup template within the Workload
+	// object that was used to create the PodGroup.
+	// This field is immutable.
 	//
 	// +optional
-	PodGroupTemplateRef *PodGroupTemplateReference
+	WorkloadRef *WorkloadReference
 
 	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
@@ -568,28 +569,23 @@ type PodGroupResourceClaimStatus struct {
 	ResourceClaimName *string
 }
 
-// PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload).
-// Exactly one reference must be set.
-// +union
-type PodGroupTemplateReference struct {
-	// Workload references the PodGroupTemplate within the Workload object that was used to create
-	// the PodGroup.
-	//
-	// +optional
-	Workload *WorkloadPodGroupTemplateReference
-}
-
-// WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.
-type WorkloadPodGroupTemplateReference struct {
-	// WorkloadName defines the name of the Workload object.
+// WorkloadReference references the Workload object together with the template
+// that was used to create a particular PodGroup.
+type WorkloadReference struct {
+	// WorkloadName is the name of the Workload object that contains a template
+	// that was used when creating a pod group. It must
+	// be a DNS name.
+	// This field is required.
 	//
 	// +required
 	WorkloadName string
 
-	// PodGroupTemplateName defines the PodGroupTemplate name within the Workload object.
+	// TemplateName is the name of a template within the Workload object that
+	// was used to create a pod group. It must be a DNS label.
+	// This field is required.
 	//
 	// +required
-	PodGroupTemplateName string
+	TemplateName string
 }
 
 // PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.

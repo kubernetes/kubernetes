@@ -1862,16 +1862,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1alpha3.PodGroupStatusApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("PodGroupTemplate"):
 		return &applyconfigurationsschedulingv1alpha3.PodGroupTemplateApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("PodGroupTemplateReference"):
-		return &applyconfigurationsschedulingv1alpha3.PodGroupTemplateReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("TopologyConstraint"):
 		return &applyconfigurationsschedulingv1alpha3.TopologyConstraintApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("TypedLocalObjectReference"):
 		return &applyconfigurationsschedulingv1alpha3.TypedLocalObjectReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("Workload"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupTemplateReference"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupTemplateReferenceApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadReference"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadSpec"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadSpecApplyConfiguration{}
 

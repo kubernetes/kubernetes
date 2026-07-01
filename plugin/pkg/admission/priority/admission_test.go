@@ -962,7 +962,7 @@ func TestAdmitPodGroup(t *testing.T) {
 			if (err != nil) != tt.expectError {
 				t.Errorf("PodGroup Admit(), error = %v, want = %v", err, tt.expectError)
 			}
-			if !tt.expectError && tt.operation == admission.Create && tt.enableGenericWorkload && tt.preparePodGroup.Spec.PodGroupTemplateRef == nil {
+			if !tt.expectError && tt.operation == admission.Create && tt.enableGenericWorkload && tt.preparePodGroup.Spec.WorkloadRef == nil {
 				if tt.preparePodGroup.Spec.PriorityClassName != tt.expectedPriorityClass {
 					t.Errorf("PodGroup Admit(), priorityClassName = %v, want = %v", tt.preparePodGroup.Spec.PriorityClassName, tt.expectedPriorityClass)
 				}

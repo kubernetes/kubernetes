@@ -87,11 +87,6 @@ func (in PodGroupTemplate) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PodGroupTemplateReference) OpenAPIModelName() string {
-	return "io.k8s.api.scheduling.v1alpha3.PodGroupTemplateReference"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in SingleDisruptionMode) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode"
 }
@@ -117,8 +112,8 @@ func (in WorkloadList) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in WorkloadPodGroupTemplateReference) OpenAPIModelName() string {
-	return "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupTemplateReference"
+func (in WorkloadReference) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1alpha3.WorkloadReference"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

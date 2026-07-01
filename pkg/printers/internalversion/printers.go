@@ -3511,8 +3511,8 @@ func printPodGroup(obj *scheduling.PodGroup, options printers.GenerateOptions) (
 	}
 
 	workload := "<none>"
-	if ref := obj.Spec.PodGroupTemplateRef; ref != nil {
-		workload = ref.Workload.WorkloadName
+	if ref := obj.Spec.WorkloadRef; ref != nil {
+		workload = ref.WorkloadName
 	}
 
 	row.Cells = append(row.Cells, obj.Name, policy, workload, status, translateTimestampSince(obj.CreationTimestamp))

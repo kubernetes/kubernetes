@@ -60,11 +60,9 @@ func validNewPodGroup() *scheduling.PodGroup {
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: scheduling.PodGroupSpec{
-			PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-				Workload: &scheduling.WorkloadPodGroupTemplateReference{
-					WorkloadName:         "w",
-					PodGroupTemplateName: "t",
-				},
+			WorkloadRef: &scheduling.WorkloadReference{
+				WorkloadName: "w",
+				TemplateName: "t",
 			},
 			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 				Gang: &scheduling.GangSchedulingPolicy{
@@ -140,14 +138,12 @@ func TestUpdate(t *testing.T) {
 			return pg
 		},
 		// invalid update
-		// Update PodGroupTemplateRef
+		// Update WorkloadRef
 		func(obj runtime.Object) runtime.Object {
 			pg := obj.(*scheduling.PodGroup)
-			pg.Spec.PodGroupTemplateRef = &scheduling.PodGroupTemplateReference{
-				Workload: &scheduling.WorkloadPodGroupTemplateReference{
-					WorkloadName:         "foo",
-					PodGroupTemplateName: "baz",
-				},
+			pg.Spec.WorkloadRef = &scheduling.WorkloadReference{
+				WorkloadName: "foo",
+				TemplateName: "baz",
 			}
 			return pg
 		},

@@ -41,11 +41,9 @@ var podGroup = &scheduling.PodGroup{
 		Namespace: metav1.NamespaceDefault,
 	},
 	Spec: scheduling.PodGroupSpec{
-		PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-			Workload: &scheduling.WorkloadPodGroupTemplateReference{
-				WorkloadName:         "w",
-				PodGroupTemplateName: "t",
-			},
+		WorkloadRef: &scheduling.WorkloadReference{
+			WorkloadName: "w",
+			TemplateName: "t",
 		},
 		SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 			Gang: &scheduling.GangSchedulingPolicy{
@@ -341,11 +339,9 @@ func TestStrategyUpdate(t *testing.T) {
 			oldObj: podGroup,
 			newObj: func() *scheduling.PodGroup {
 				newPodGroup := podGroup.DeepCopy()
-				newPodGroup.Spec.PodGroupTemplateRef = &scheduling.PodGroupTemplateReference{
-					Workload: &scheduling.WorkloadPodGroupTemplateReference{
-						WorkloadName:         "foo",
-						PodGroupTemplateName: "baz",
-					},
+				newPodGroup.Spec.WorkloadRef = &scheduling.WorkloadReference{
+					WorkloadName: "foo",
+					TemplateName: "baz",
 				}
 				return newPodGroup
 			}(),

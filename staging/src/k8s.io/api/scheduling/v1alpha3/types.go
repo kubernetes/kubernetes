@@ -395,13 +395,14 @@ type PodGroupList struct {
 
 // PodGroupSpec defines the desired state of a PodGroup.
 type PodGroupSpec struct {
-	// PodGroupTemplateRef references an optional PodGroup template within other object
-	// (e.g. Workload) that was used to create the PodGroup. This field is immutable.
+	// WorkloadRef references an optional PodGroup template within the Workload
+	// object that was used to create the PodGroup.
+	// This field is immutable.
 	//
 	// +optional
 	// +k8s:optional
 	// +k8s:immutable
-	PodGroupTemplateRef *PodGroupTemplateReference `json:"podGroupTemplateRef" protobuf:"bytes,1,opt,name=podGroupTemplateRef"`
+	WorkloadRef *WorkloadReference `json:"workloadRef,omitempty" protobuf:"bytes,1,opt,name=workloadRef"`
 
 	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
@@ -586,34 +587,27 @@ type PodGroupResourceClaimStatus struct {
 	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimName"`
 }
 
-// PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload).
-// Exactly one reference must be set.
-// +union
-type PodGroupTemplateReference struct {
-	// Workload references the PodGroupTemplate within the Workload object that was used to create
-	// the PodGroup.
-	//
-	// +optional
-	// +k8s:optional
-	// +k8s:unionMember
-	Workload *WorkloadPodGroupTemplateReference `json:"workload" protobuf:"bytes,1,opt,name=workload"`
-}
-
-// WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.
-type WorkloadPodGroupTemplateReference struct {
-	// WorkloadName defines the name of the Workload object.
+// WorkloadReference references the Workload object together with the template
+// that was used to create a particular PodGroup.
+type WorkloadReference struct {
+	// WorkloadName is the name of the Workload object that contains a template
+	// that was used when creating a pod group. It must
+	// be a DNS name.
+	// This field is required.
 	//
 	// +required
 	// +k8s:required
 	// +k8s:format=k8s-long-name
 	WorkloadName string `json:"workloadName" protobuf:"bytes,1,opt,name=workloadName"`
 
-	// PodGroupTemplateName defines the PodGroupTemplate name within the Workload object.
+	// TemplateName is the name of a template within the Workload object that
+	// was used to create a pod group. It must be a DNS label.
+	// This field is required.
 	//
 	// +required
 	// +k8s:required
 	// +k8s:format=k8s-short-name
-	PodGroupTemplateName string `json:"podGroupTemplateName" protobuf:"bytes,2,opt,name=podGroupTemplateName"`
+	TemplateName string `json:"templateName" protobuf:"bytes,2,opt,name=templateName"`
 }
 
 // PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.
