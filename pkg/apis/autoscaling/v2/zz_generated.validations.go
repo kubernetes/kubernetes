@@ -222,7 +222,7 @@ func Validate_HorizontalPodAutoscalerSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -231,13 +231,13 @@ func Validate_HorizontalPodAutoscalerSpec(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", true,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
 					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
-				}).MarkAlpha(); len(e) != 0 {
+				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", false,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
 					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)
-				}).MarkAlpha(); len(e) != 0 {
+				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -262,14 +262,14 @@ func Validate_HorizontalPodAutoscalerSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha(); len(e) != 0 {
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
