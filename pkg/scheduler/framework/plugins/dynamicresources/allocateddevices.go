@@ -232,7 +232,7 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 		shareIDs = make([]structured.SharedDeviceID, 0, 20)
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
 	}
-	compatGroupsByDevice := make(map[structured.DeviceID]map[string][]string)
+	compatibilityGroupsByDevice := make(map[structured.DeviceID]map[string][]string)
 	foreachAllocatedDevice(claim,
 		func(deviceID structured.DeviceID) {
 			a.logger.V(6).Info("Observed device allocation", "device", deviceID, "claim", klog.KObj(claim))
@@ -250,11 +250,11 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 		true,
 		func(deviceID structured.DeviceID, compatibilityGroups map[string][]string) {
 			a.logger.V(6).Info("Observed compatibility groups", "device", deviceID, "compatibilityGroups", compatibilityGroups, "claim", klog.KObj(claim))
-			compatGroupsByDevice[deviceID] = compatibilityGroups
+			compatibilityGroupsByDevice[deviceID] = compatibilityGroups
 		},
 	)
 
-	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && len(compatGroupsByDevice) == 0 {
+	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && len(compatibilityGroupsByDevice) == 0 {
 		return
 	}
 
@@ -270,7 +270,7 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	for _, capacity := range deviceCapacities {
 		a.capacities.Insert(capacity)
 	}
-	for deviceID, compatibilityGroups := range compatGroupsByDevice {
+	for deviceID, compatibilityGroups := range compatibilityGroupsByDevice {
 		a.compatibilityGroups.Insert(deviceID, compatibilityGroups)
 	}
 }
