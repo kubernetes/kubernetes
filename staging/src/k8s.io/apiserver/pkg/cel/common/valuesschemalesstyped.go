@@ -32,8 +32,8 @@ import (
 
 // Native Go target types recognized by the schemaless wrappers' ConvertToNative.
 var (
-	structpbValueType = reflect.TypeOf(&structpb.Value{})
-	anyType           = reflect.TypeOf((*any)(nil)).Elem()
+	structpbValueType = reflect.TypeFor[*structpb.Value]()
+	anyType           = reflect.TypeFor[any]()
 	mapStringAnyType  = reflect.TypeOf(map[string]interface{}(nil))
 )
 
