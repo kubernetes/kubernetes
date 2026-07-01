@@ -99,7 +99,8 @@ func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorize
 	return authorizer.DecisionNoOpinion, strings.Join(reasonlist, "\n"), utilerrors.NewAggregate(errlist)
 }
 
-// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+// ConditionsAwareAuthorize uses the chain of sub-authorizers to authorize the request with the given attributes,
+// potentially returning a Union-typed ConditionsAwareDecision if the sub-authorizer return conditional decisions.
 func (authzHandler unionAuthzHandler) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
 	var decisions authorizer.ConditionsAwareDecisionUnion
 
@@ -125,7 +126,8 @@ func (authzHandler unionAuthzHandler) ConditionsAwareAuthorize(ctx context.Conte
 	return decisions.ToDecision()
 }
 
-// EvaluateConditions is not supported by this authorizer.
+// EvaluateConditions evaluates a Union-typed unevaluatedDecision returned from ConditionsAwareAuthorize using the
+// union authorizer's sub-authorizer chain and the provided data.
 func (authzHandler unionAuthzHandler) EvaluateConditions(ctx context.Context, unevaluatedDecision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
 	// This should never happen, an authorizer shall only be called back on the union unevaluatedDecision that was returned from
 	// AuthorizeConditionsAware(). The caller should never call EvaluateConditions on an Allow/Deny/NoOpinion
