@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -182,6 +183,17 @@ func podInUnschedulableEntities(queue queue.SchedulingQueue, podName string) boo
 	return false
 }
 
+func podSchedulingAttempted(cs kubernetes.Interface, ns, name string) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
+		pod, err := cs.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+		return cond != nil, nil
+	}
+}
+
 func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, status metav1.ConditionStatus, reason string) wait.ConditionWithContextFunc {
 	return func(ctx context.Context) (bool, error) {
 		pg, err := cs.SchedulingV1alpha3().PodGroups(ns).Get(ctx, name, metav1.GetOptions{})
@@ -230,14 +242,16 @@ func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod, prese
 			return fmt.Errorf("failed to create pod %s: %w", p.Name, err)
 		}
 		if preserveOrder {
-			podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
+			podSchedulingAttemptedFn := podSchedulingAttempted(cs, ns, p.Name)
 			err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 				_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
 				if ok {
 					return true, nil
 				}
-				// pod may have gotten queued and scheduled between the polls
-				return podScheduledFn(ctx)
+				// The pod may have gotten queued and had a scheduling attempt between
+				// polls. A PodScheduled condition, either true or false, proves the
+				// scheduler has observed the pod.
+				return podSchedulingAttemptedFn(ctx)
 			})
 			if err != nil {
 				return fmt.Errorf("failed to ensure queueing order of pod %s: %w", p.Name, err)
