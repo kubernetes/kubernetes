@@ -36,6 +36,8 @@ import (
 	deploymentstorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
 )
 
+var apiVersions = []string{"v1beta1", "v1beta2"}
+
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	testCases := map[string]struct {
 		old          autoscaling.Scale

@@ -200,6 +200,7 @@ type VolumeAttachmentSource struct {
 	// PersistentVolumeSpec. This field is beta-level and is only
 	// honored by servers that enabled the CSIMigration feature.
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
 	InlineVolumeSpec *v1.PersistentVolumeSpec `json:"inlineVolumeSpec,omitempty" protobuf:"bytes,2,opt,name=inlineVolumeSpec"`
 }
 
