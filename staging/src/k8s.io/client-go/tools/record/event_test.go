@@ -638,7 +638,7 @@ func TestLotsOfEvents(t *testing.T) {
 			APIVersion: "version",
 		}
 		// we need to vary the reason to prevent aggregation
-		go recorder.Eventf(ref, v1.EventTypeNormal, "Reason-"+strconv.Itoa(i), strconv.Itoa(i))
+		go recorder.Eventf(ref, v1.EventTypeNormal, "Reason-"+strconv.Itoa(i), "%s", strconv.Itoa(i))
 	}
 	// Make sure no events were dropped by either of the listeners.
 	for i := 0; i < maxQueuedEvents; i++ {

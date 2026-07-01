@@ -85,6 +85,7 @@ const (
 
 // Image manager event reason list
 const (
+	InvalidImageID      = "InvalidImageID"
 	InvalidDiskCapacity = "InvalidDiskCapacity"
 	FreeDiskSpaceFailed = "FreeDiskSpaceFailed"
 )
