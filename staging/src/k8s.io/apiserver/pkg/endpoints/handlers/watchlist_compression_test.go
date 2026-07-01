@@ -20,11 +20,15 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	goruntime "runtime"
+	"runtime/debug"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 )
 
 const gzipContentOrDieEncodingLevel = 1
@@ -221,6 +226,106 @@ func TestPerFlushGzipWriter(t *testing.T) {
 			require.Equal(t, scenario.expected, string(got))
 		})
 	}
+}
+
+// BenchmarkPerFlushGzipWriterMemory measures retained heap growth per watch
+// connection when compression is enabled.
+//
+// Each iteration opens numConns compressed watch connections, reads the initial
+// events and the initial-events-end bookmark, then measures heap.
+// The perFlushGzipWriter releases the gzip.Writer back to the pool on Flush,
+// so idle connections after initial events should not hold gzip state.
+func BenchmarkPerFlushGzipWriterMemory(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.WatchListCompression, true)
+
+	numConns := b.N
+	numInitialEvents := 100
+	events := make([]watch.Event, 0, numInitialEvents+1)
+	for i := range numInitialEvents {
+		events = append(events, watch.Event{
+			Type: watch.Added,
+			Object: &endpointstesting.Simple{
+				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("obj-%d", i)},
+				TypeMeta:   metav1.TypeMeta{APIVersion: testGroupV2.String()},
+			},
+		})
+	}
+	events = append(events, watch.Event{
+		Type: watch.Bookmark,
+		Object: &endpointstesting.Simple{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "100",
+				Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+			},
+			TypeMeta: metav1.TypeMeta{APIVersion: testGroupV2.String()},
+		},
+	})
+
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	require.True(b, ok)
+	require.NotNil(b, info.StreamSerializer)
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		watcher := watch.NewFakeWithOptions(watch.FakeOptions{ChannelSize: len(events)})
+		for _, event := range events {
+			watcher.Action(event.Type, event.Object)
+		}
+		defer watcher.Stop()
+		ws := &WatchServer{
+			Scope:              &RequestScope{},
+			Watching:           watcher,
+			MediaType:          "application/json",
+			Framer:             info.StreamSerializer.Framer,
+			Encoder:            testCodecV2,
+			EmbeddedEncoder:    testCodecV2,
+			TimeoutFactory:     &fakeTimeoutFactory{done: make(chan struct{})},
+			isWatchListRequest: true,
+		}
+		ws.HandleHTTP(w, req)
+	}))
+	b.Cleanup(s.Close)
+
+	oldGCPercent := debug.SetGCPercent(-1)
+	defer debug.SetGCPercent(oldGCPercent)
+
+	goruntime.GC()
+	var memStart goruntime.MemStats
+	goruntime.ReadMemStats(&memStart)
+
+	decoders := make([]*json.Decoder, numConns)
+	for j := range decoders {
+		req, err := http.NewRequestWithContext(b.Context(), http.MethodGet, s.URL, nil)
+		require.NoError(b, err)
+		req.Header.Set("Accept-Encoding", "gzip")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(b, err)
+		b.Cleanup(func() { require.NoError(b, resp.Body.Close()) })
+
+		gr, err := gzip.NewReader(resp.Body)
+		require.NoError(b, err)
+		decoders[j] = json.NewDecoder(gr)
+	}
+
+	for _, decoder := range decoders {
+		for range events {
+			var got watchJSON
+			require.NoError(b, decoder.Decode(&got))
+		}
+	}
+
+	goruntime.GC()
+	var memAfter goruntime.MemStats
+	goruntime.ReadMemStats(&memAfter)
+	// prevent GC from collecting client connections before we measure heap
+	goruntime.KeepAlive(decoders)
+
+	var heapGrowth uint64
+	if memAfter.HeapInuse > memStart.HeapInuse {
+		heapGrowth = memAfter.HeapInuse - memStart.HeapInuse
+	}
+	b.ReportMetric(float64(heapGrowth)/float64(numConns)/1024, "KB/conn")
+	b.ReportMetric(float64(heapGrowth)/1024/1024, "MB-heap-growth/op")
 }
 
 func TestWatchServerCompression(t *testing.T) {
