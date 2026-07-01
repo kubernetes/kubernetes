@@ -95,13 +95,11 @@ func TestDeclarativeValidate(t *testing.T) {
 		}
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
-				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs,
-					apitesting.WithSkipGroupVersions("extensions/v1beta1"))
+				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
 			})
 		}
 		meta.RunObjectMetaTestCases(t, ctx, mkDeployment(), registry.Strategy,
 			meta.WithStringentFinalizerValidation(),
-			meta.WithValidationConfig(apitesting.WithSkipGroupVersions("extensions/v1beta1")),
 		)
 	}
 }
@@ -116,7 +114,6 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		})
 		meta.RunObjectMetaUpdateTestCases(t, ctx, mkDeployment(), registry.Strategy,
 			meta.WithStringentFinalizerValidation(),
-			meta.WithValidationConfig(apitesting.WithSkipGroupVersions("extensions/v1beta1")),
 		)
 	}
 }

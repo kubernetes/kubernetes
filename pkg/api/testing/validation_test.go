@@ -18,10 +18,12 @@ package testing
 
 import (
 	"math/rand"
+	"sort"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -29,93 +31,71 @@ import (
 	resourcevalidation "k8s.io/kubernetes/pkg/apis/resource/validation"
 )
 
-// FIXME: Automatically finds all group/versions supporting declarative validation, or add
-// a reflexive test that verifies that they are all registered.
 func TestVersionedValidationByFuzzing(t *testing.T) {
-	typesWithDeclarativeValidation := []schema.GroupVersion{
-		// Registered group versions for versioned validation fuzz testing:
-		{Group: "", Version: "v1"},
-		{Group: "batch", Version: "v1"},
-		{Group: "batch", Version: "v1beta1"},
-		{Group: "certificates.k8s.io", Version: "v1"},
-		{Group: "certificates.k8s.io", Version: "v1alpha1"},
-		{Group: "certificates.k8s.io", Version: "v1beta1"},
-		{Group: "resource.k8s.io", Version: "v1"},
-		{Group: "resource.k8s.io", Version: "v1alpha3"},
-		{Group: "resource.k8s.io", Version: "v1beta1"},
-		{Group: "resource.k8s.io", Version: "v1beta2"},
-		{Group: "storage.k8s.io", Version: "v1"},
-		{Group: "storage.k8s.io", Version: "v1alpha1"},
-		{Group: "storage.k8s.io", Version: "v1beta1"},
-		{Group: "node.k8s.io", Version: "v1"},
-		{Group: "node.k8s.io", Version: "v1alpha1"},
-		{Group: "node.k8s.io", Version: "v1beta1"},
-		{Group: "network.k8s.io", Version: "v1"},
-		{Group: "network.k8s.io", Version: "v1beta1"},
-		{Group: "autoscaling", Version: "v1"},
-		{Group: "autoscaling", Version: "v2"},
-		{Group: "admissionregistration.k8s.io", Version: "v1"},
-		{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"},
-		{Group: "discovery.k8s.io", Version: "v1"},
-		{Group: "discovery.k8s.io", Version: "v1beta1"},
-		{Group: "admissionregistration.k8s.io", Version: "v1"},
-		{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"},
+	// Discover every served GroupVersionKind that has declarative validation, so
+	// new group/versions are covered automatically without hand maintenance.
+	var gvks []schema.GroupVersionKind
+	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
+		if gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
+		obj, err := legacyscheme.Scheme.New(gvk)
+		if err != nil {
+			continue
+		}
+		if !legacyscheme.Scheme.HasValidationFunc(obj) {
+			continue
+		}
+		gvks = append(gvks, gvk)
 	}
+	sort.Slice(gvks, func(i, j int) bool { return gvks[i].String() < gvks[j].String() })
 
-	// subresourceOnly specifies the subresource path for types that can only be validated
-	// as subresources (e.g. autoscaling/Scale) and do not support root-level validation.
-	// For GVKs not in this map, the test defaults to fuzzing the root resource ("").
-	// Other resources with subresources (e.g. Pod status, exec) share validation logic with
-	// the root resource, so fuzzing the root is sufficient to verify validation equivalence.
-	subresourceOnly := map[schema.GroupVersionKind]string{
-		{Group: "autoscaling", Version: "v1", Kind: "Scale"}: "scale",
-		{Group: "autoscaling", Version: "v2", Kind: "Scale"}: "scale",
+	// subresourceOnlyKinds maps a Kind to the subresource it must be validated as
+	// (e.g. Scale), since it has no root-level validation. Keyed by Kind because
+	// the same Kind is registered under several groups (autoscaling, apps). Other
+	// kinds default to the root resource (""), whose validation covers their
+	// subresources too.
+	subresourceOnlyKinds := map[string]string{
+		"Scale": "scale",
 	}
 
 	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
 	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
 
-	for _, gv := range typesWithDeclarativeValidation {
-		for kind := range legacyscheme.Scheme.KnownTypes(gv) {
-			gvk := gv.WithKind(kind)
-			t.Run(gvk.String(), func(t *testing.T) {
-				for i := 0; i < fuzzIters; i++ {
-					obj, err := legacyscheme.Scheme.New(gvk)
-					if err != nil {
-						t.Fatalf("could not create a %v: %s", kind, err)
-					}
-
-					subresource := ""
-					if specific, ok := subresourceOnly[gvk]; ok {
-						subresource = specific
-					}
-
-					var opts []ValidationTestConfig
-					// TODO(API group level configuration): Consider configuring normalization rules at the
-					// API group level to avoid potential collisions when multiple rule sets are combined.
-					// This would allow each API group to register its own normalization rules independently.
-					allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
-					allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
-					opts = append(opts, WithNormalizationRules(allRules...), WithFuzzer(f), WithSkipGroupVersions("extensions/v1beta1"))
-
-					if subresource != "" {
-						opts = append(opts, WithSubResources(subresource))
-					}
-					// extensions/v1beta1 is unserved and does not carry declarative validation,
-					// so skip it from the versioned validation equivalence sweep.
-					opts = append(opts, WithSkipGroupVersions("extensions/v1beta1"))
-					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
-
-					old, err := legacyscheme.Scheme.New(gv.WithKind(kind))
-					if err != nil {
-						t.Fatalf("could not create a %v: %s", kind, err)
-					}
-
-					VerifyVersionedValidationEquivalence(t, obj, old, opts...)
+	for _, gvk := range gvks {
+		t.Run(gvk.String(), func(t *testing.T) {
+			for range fuzzIters {
+				obj, err := legacyscheme.Scheme.New(gvk)
+				if err != nil {
+					t.Fatalf("could not create a %v: %s", gvk.Kind, err)
 				}
-			})
-		}
+
+				subresource := ""
+				if specific, ok := subresourceOnlyKinds[gvk.Kind]; ok {
+					subresource = specific
+				}
+
+				var opts []ValidationTestConfig
+				// TODO(API group level configuration): Consider configuring normalization rules at the
+				// API group level to avoid potential collisions when multiple rule sets are combined.
+				// This would allow each API group to register its own normalization rules independently.
+				allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
+				allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
+				opts = append(opts, WithNormalizationRules(allRules...), WithFuzzer(f))
+
+				if subresource != "" {
+					opts = append(opts, WithSubResources(subresource))
+				}
+
+				VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
+
+				old, err := legacyscheme.Scheme.New(gvk)
+				if err != nil {
+					t.Fatalf("could not create a %v: %s", gvk.Kind, err)
+				}
+
+				VerifyVersionedValidationEquivalence(t, obj, old, opts...)
+			}
+		})
 	}
 }
