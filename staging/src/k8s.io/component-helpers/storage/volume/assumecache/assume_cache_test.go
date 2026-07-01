@@ -225,6 +225,8 @@ func TestAssume(t *testing.T) {
 			shouldSucceed: true,
 		},
 		"fail-new-higher-version": {
+			// A higher ResourceVersion is a written object; it must go through
+			// AssumeWritten, not the optimistic Assume.
 			old:           makeObj("pvc1", "5", "ns1"),
 			new:           makeObj("pvc1", "6", "ns1"),
 			shouldSucceed: false,
@@ -401,5 +403,101 @@ func TestDelayedInformerEvent(t *testing.T) {
 	// Expect assumed version not overwritten
 	if err := verifyObj(cache, keyOf(newObj), newObj); err != nil {
 		t.Fatalf("failed to get after assume: %v", err)
+	}
+}
+
+// TestAssumeWritten verifies the no-op paths and the basic behavior of
+// assuming an object that was already written to the apiserver.
+func TestAssumeWritten(t *testing.T) {
+	informer, cache := newTestCache(t)
+
+	// Object absent from the informer: no-op, and must not create a phantom.
+	if err := cache.AssumeWritten(makeObj("pvc1", "5", "ns1")); err != nil {
+		t.Fatalf("AssumeWritten(absent) returned error: %v", err)
+	}
+	if _, err := cache.Get(keyOf(makeObj("pvc1", "5", "ns1"))); err == nil {
+		t.Fatalf("AssumeWritten created a phantom for an object absent from the informer")
+	}
+
+	base := makeObj("pvc1", "5", "ns1")
+	informer.add(base)
+
+	// Informer already holds the same version: no-op, informer object is served.
+	if err := cache.AssumeWritten(makeObj("pvc1", "5", "ns1")); err != nil {
+		t.Fatalf("AssumeWritten(same) returned error: %v", err)
+	}
+	if err := verifyObj(cache, keyOf(base), base); err != nil {
+		t.Fatalf("expected informer object after no-op AssumeWritten: %v", err)
+	}
+
+	// Newer written version: assumed and served until the informer catches up.
+	newer := makeObj("pvc1", "7", "ns1")
+	if err := cache.AssumeWritten(newer); err != nil {
+		t.Fatalf("AssumeWritten(newer) returned error: %v", err)
+	}
+	if err := verifyObj(cache, keyOf(newer), newer); err != nil {
+		t.Fatalf("expected assumed written object: %v", err)
+	}
+}
+
+// TestAssumeWrittenNotRevertedByIntermediateEvent verifies that when the
+// controller writes an object several times in a row (e.g. spec then status)
+// and assumes each server-returned version, a later informer event for an
+// intermediate version does not revert the assumed newer version.
+func TestAssumeWrittenNotRevertedByIntermediateEvent(t *testing.T) {
+	informer, cache := newTestCache(t)
+
+	// Base object at RV 100.
+	informer.add(makeObj("pvc1", "100", "ns1"))
+
+	// Two consecutive writes 100 -> 105 -> 106, each assumed while the informer
+	// is still behind.
+	if err := cache.AssumeWritten(makeObj("pvc1", "105", "ns1")); err != nil {
+		t.Fatalf("AssumeWritten(105) failed: %v", err)
+	}
+	obj106 := makeObj("pvc1", "106", "ns1")
+	if err := cache.AssumeWritten(obj106); err != nil {
+		t.Fatalf("AssumeWritten(106) failed: %v", err)
+	}
+	if err := verifyObj(cache, keyOf(obj106), obj106); err != nil {
+		t.Fatalf("Get after Assume(106): %v", err)
+	}
+
+	// The informer now delivers the intermediate version 105 first. The assumed
+	// 106 must not be reverted to 105.
+	informer.add(makeObj("pvc1", "105", "ns1"))
+	if err := verifyObj(cache, keyOf(obj106), obj106); err != nil {
+		t.Fatalf("assumed 106 was reverted by intermediate informer event: %v", err)
+	}
+
+	// Once the informer catches up to 106, the assumption expires and the
+	// informer object is served.
+	final106 := makeObj("pvc1", "106", "ns1")
+	informer.add(final106)
+	if err := verifyObj(cache, keyOf(final106), final106); err != nil {
+		t.Fatalf("Get after informer caught up to 106: %v", err)
+	}
+}
+
+// TestAssumeWrittenExpiredOnDelete verifies that a written (post-write)
+// assumption does not resurrect an object that has been deleted from the
+// informer.
+func TestAssumeWrittenExpiredOnDelete(t *testing.T) {
+	informer, cache := newTestCache(t)
+
+	base := makeObj("pvc1", "100", "ns1")
+	informer.add(base)
+
+	// Assume a written version newer than the informer's.
+	if err := cache.AssumeWritten(makeObj("pvc1", "105", "ns1")); err != nil {
+		t.Fatalf("AssumeWritten(105) failed: %v", err)
+	}
+
+	// The object is deleted from the informer.
+	informer.delete(base)
+
+	// The assumed object must not survive the delete.
+	if _, err := cache.Get(keyOf(base)); err == nil {
+		t.Fatalf("Get() returned success after delete; assumed object was resurrected")
 	}
 }
