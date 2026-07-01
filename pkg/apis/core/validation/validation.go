@@ -7411,8 +7411,11 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	}
 
 	// Allow controller manager updating provider ID when not set
-	if len(oldNode.Spec.ProviderID) > 0 && oldNode.Spec.ProviderID != node.Spec.ProviderID {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "providerID"), "node updates may not change providerID except from \"\" to valid"))
+	if len(oldNode.Spec.ProviderID) > 0 && len(node.Spec.ProviderID) > 0 && oldNode.Spec.ProviderID != node.Spec.ProviderID {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "providerID"), nil, "field cannot be modified once set").WithOrigin("update").MarkCoveredByDeclarative())
+	}
+	if len(oldNode.Spec.ProviderID) > 0 && len(node.Spec.ProviderID) == 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "providerID"), nil, "field cannot be cleared once set").WithOrigin("update").MarkCoveredByDeclarative())
 	}
 
 	if node.Spec.ConfigSource != nil {

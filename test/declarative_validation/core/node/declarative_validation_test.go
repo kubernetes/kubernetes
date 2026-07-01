@@ -20,14 +20,13 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/core/node"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
-
-// TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1"}
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -41,6 +40,14 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testDeclarativeValidateUpdate(t, apiVersion)
+		})
+	}
+}
+
+func TestDeclarativeValidateNodeUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateNodeUpdate(t, apiVersion)
 		})
 	}
 }
@@ -74,10 +81,77 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
-func mkValidNode() core.Node {
-	return core.Node{
+func testDeclarativeValidateNodeUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "api",
+		APIGroup:          "",
+		APIVersion:        apiVersion,
+		Resource:          "nodes",
+		Name:              "valid-obj",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
+	testCases := map[string]struct {
+		old          core.Node
+		update       core.Node
+		expectedErrs field.ErrorList
+	}{
+		"no change": {
+			old:    mkValidNode(),
+			update: mkValidNode(),
+		},
+		"no change with providerID": {
+			old: mkValidNode(func(n *core.Node) {
+				n.Spec.ProviderID = "provider:///node-1"
+			}),
+			update: mkValidNode(func(n *core.Node) {
+				n.Spec.ProviderID = "provider:///node-1"
+			}),
+		},
+		"set providerID from empty": {
+			old: mkValidNode(),
+			update: mkValidNode(func(n *core.Node) {
+				n.Spec.ProviderID = "provider:///node-1"
+			}),
+		},
+		"modify providerID": {
+			old: mkValidNode(func(n *core.Node) {
+				n.Spec.ProviderID = "provider:///node-1"
+			}),
+			update: mkValidNode(func(n *core.Node) {
+				n.Spec.ProviderID = "provider:///node-2"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "providerID"), nil, "field cannot be modified once set").WithOrigin("update").MarkAlpha(),
+			},
+		},
+		"clear providerID": {
+			old: mkValidNode(func(n *core.Node) {
+				n.Spec.ProviderID = "provider:///node-1"
+			}),
+			update: mkValidNode(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "providerID"), nil, "field cannot be cleared once set").WithOrigin("update").MarkAlpha(),
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			tc.old.ObjectMeta.ResourceVersion = "1"
+			tc.update.ObjectMeta.ResourceVersion = "1"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
+		})
+	}
+}
+
+func mkValidNode(tweaks ...func(n *core.Node)) core.Node {
+	node := core.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-obj",
 		},
 	}
+	for _, tweak := range tweaks {
+		tweak(&node)
+	}
+	return node
 }
