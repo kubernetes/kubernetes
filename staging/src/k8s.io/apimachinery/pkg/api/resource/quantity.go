@@ -36,20 +36,31 @@ import (
 //
 // The serialization format is:
 //
-//	<quantity>        ::= <signedNumber><suffix>
-//	    (Note that <suffix> may be empty, from the "" case in <decimalSI>.)
-//	<digit>           ::= 0 | 1 | ... | 9
-//	<digits>          ::= <digit> | <digit><digits>
-//	<number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits>
-//	<sign>            ::= "+" | "-"
-//	<signedNumber>    ::= <number> | <sign><number>
-//	<signedDigits>    ::= <digits> | <sign><digits>
-//	<suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI>
-//	<binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei
-//	    (International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
-//	<decimalSI>       ::= n | u | m | "" | k | M | G | T | P | E
-//	    (Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
-//	<decimalExponent> ::= "e" <signedDigits> | "E" <signedDigits>
+// - `<quantity>`: `<signedNumber><suffix>`
+//
+// - `<digit>`: `0 | 1 | ... | 9`
+//
+// - `<digits>`: `<digit> | <digit><digits>`
+//
+// - `<number>`: `<digits> | <digits>.<digits> | <digits>. | .<digits>`
+//
+// - `<sign>`: `"+" | "-"`
+//
+// - `<signedNumber>`: `<number> | <sign><number>`
+//
+// - `<signedDigits>`: `<digits> | <sign><digits>`
+//
+// - `<suffix>`: `<binarySI> | <decimalExponent> | <decimalSI>`
+//
+// - `<binarySI>`: `Ki | Mi | Gi | Ti | Pi | Ei`
+//
+// - `<decimalSI>`: `n | u | m | "" | k | M | G | T | P | E`
+//
+// - `<decimalExponent>`: `"e" <signedDigits> | "E" <signedDigits>`
+//
+// Note that `<suffix>` may be empty, from the `""` case in `<decimalSI>`.
+// For `<binarySI>`, 1024 = 1Ki but 1000 = 1k; I didn't choose the
+// capitalization. See http://physics.nist.gov/cuu/Units/binary.html.
 //
 // A decimal quantity is not capped at 2^63-1 in magnitude, and no quantity is
 // limited to three decimal places: "18446744073709551616" keeps its value, and
@@ -66,16 +77,19 @@ import (
 // This means that Exponent/suffix will be adjusted up or down (with a
 // corresponding increase or decrease in Mantissa) such that:
 //
-//   - No precision is lost
-//   - No fractional digits will be emitted
-//   - The exponent (or suffix) is as large as possible.
+// - No precision is lost
+//
+// - No fractional digits will be emitted
+//
+// - The exponent (or suffix) is as large as possible.
 //
 // The sign will be omitted unless the number is negative.
 //
 // Examples:
 //
-//   - 1.5 will be serialized as "1500m"
-//   - 1.5Gi will be serialized as "1536Mi"
+// - 1.5 will be serialized as "1500m"
+//
+// - 1.5Gi will be serialized as "1536Mi"
 //
 // Note that the quantity will NEVER be internally represented by a
 // floating point number. That is the whole point of this exercise.
