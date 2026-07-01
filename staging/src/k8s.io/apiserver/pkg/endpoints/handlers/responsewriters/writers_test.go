@@ -134,6 +134,7 @@ func TestSerializeObject(t *testing.T) {
 
 		mediaType  string
 		out        []byte
+		partial    [][]byte
 		outErrs    []error
 		req        *http.Request
 		statusCode int
@@ -349,14 +350,35 @@ func TestSerializeObject(t *testing.T) {
 			},
 			wantBody: gzipContent([]byte(": "+string(largePayload)), gzipContentEncodingLevel),
 		},
+
+		{
+			name:               "discard buffered partial response when streaming encode fails",
+			compressionEnabled: true,
+			out:                smallPayload,
+			partial:            [][]byte{[]byte("{"), []byte(`"items":[{"name":"partial-item"}`)},
+			outErrs:            []error{errors.New("bad")},
+			mediaType:          "application/json",
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
+			wantCode: http.StatusInternalServerError,
+			wantHeaders: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+			wantBody: smallPayload,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIResponseCompression, tt.compressionEnabled)
 
 			encoder := &fakeEncoder{
-				buf:  tt.out,
-				errs: tt.outErrs,
+				buf:     tt.out,
+				partial: tt.partial,
+				errs:    tt.outErrs,
 			}
 			if tt.statusCode == 0 {
 				tt.statusCode = http.StatusOK
@@ -862,9 +884,10 @@ func (frw *fakeResponseRecorder) Write(buf []byte) (int, error) {
 }
 
 type fakeEncoder struct {
-	obj  runtime.Object
-	buf  []byte
-	errs []error
+	obj     runtime.Object
+	buf     []byte
+	partial [][]byte
+	errs    []error
 
 	encodeCalled bool
 }
@@ -874,6 +897,11 @@ func (e *fakeEncoder) Encode(obj runtime.Object, w io.Writer) error {
 	if len(e.errs) > 0 {
 		err := e.errs[0]
 		e.errs = e.errs[1:]
+		for _, chunk := range e.partial {
+			if _, werr := w.Write(chunk); werr != nil {
+				return werr
+			}
+		}
 		return err
 	}
 	_, err := w.Write(e.buf)

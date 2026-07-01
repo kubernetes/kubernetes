@@ -128,6 +128,7 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 
 	// make a best effort to write the object if a failure is detected
 	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
+	w.discardBufferedResponse()
 	status := ErrorToAPIStatus(err)
 	candidateStatusCode := int(status.Code)
 	// if the current status code is successful, allow the error's status code to overwrite it
@@ -210,6 +211,14 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 		}
 		return len(p), err
 	}
+}
+
+func (w *deferredResponseWriter) discardBufferedResponse() {
+	if w.hasWritten {
+		return
+	}
+	w.hasBuffered = false
+	w.buffer = nil
 }
 
 func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
