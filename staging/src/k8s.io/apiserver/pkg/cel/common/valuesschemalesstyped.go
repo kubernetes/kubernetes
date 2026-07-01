@@ -24,9 +24,17 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"google.golang.org/protobuf/types/known/structpb"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/structured-merge-diff/v6/value"
+)
+
+// Native Go target types recognized by the schemaless wrappers' ConvertToNative.
+var (
+	structpbValueType = reflect.TypeOf(&structpb.Value{})
+	anyType           = reflect.TypeOf((*any)(nil)).Elem()
+	mapStringAnyType  = reflect.TypeOf(map[string]interface{}(nil))
 )
 
 // SchemalessTypedToVal wraps a Go value as a CEL ref.Val.
@@ -136,6 +144,66 @@ func SchemalessTypedToVal(val interface{}) ref.Val {
 	}
 }
 
+// schemalessListToNative converts a schemaless list to *structpb.Value, walking
+// the backing reflect.Value directly so it retains no per-element ref.Val cache.
+func schemalessListToNative(v reflect.Value, typeDesc reflect.Type) (interface{}, error) {
+	if typeDesc != structpbValueType {
+		return nil, fmt.Errorf("unsupported target native type: %s", typeDesc)
+	}
+	values := make([]*structpb.Value, v.Len())
+	for idx := range values {
+		native, err := SchemalessTypedToVal(v.Index(idx).Interface()).ConvertToNative(typeDesc)
+		if err != nil {
+			return nil, err
+		}
+		pbVal, ok := native.(*structpb.Value)
+		if !ok {
+			return nil, fmt.Errorf("expected *structpb.Value converting list element %d, got %T", idx, native)
+		}
+		values[idx] = pbVal
+	}
+	return &structpb.Value{Kind: &structpb.Value_ListValue{ListValue: &structpb.ListValue{Values: values}}}, nil
+}
+
+// schemalessMapToNative converts the entries produced by forEachEntry to the
+// requested native type (*structpb.Value or map[string]interface{}), wrapping
+// each value directly so it populates no field cache.
+func schemalessMapToNative(typeDesc reflect.Type, forEachEntry func(func(key string, rawVal interface{}) error) error) (interface{}, error) {
+	switch typeDesc {
+	case structpbValueType:
+		fields := make(map[string]*structpb.Value)
+		if err := forEachEntry(func(key string, rawVal interface{}) error {
+			native, err := SchemalessTypedToVal(rawVal).ConvertToNative(typeDesc)
+			if err != nil {
+				return err
+			}
+			pbVal, ok := native.(*structpb.Value)
+			if !ok {
+				return fmt.Errorf("expected *structpb.Value converting field %q, got %T", key, native)
+			}
+			fields[key] = pbVal
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		return &structpb.Value{Kind: &structpb.Value_StructValue{StructValue: &structpb.Struct{Fields: fields}}}, nil
+	case mapStringAnyType:
+		out := make(map[string]interface{})
+		if err := forEachEntry(func(key string, rawVal interface{}) error {
+			native, err := SchemalessTypedToVal(rawVal).ConvertToNative(anyType)
+			if err != nil {
+				return err
+			}
+			out[key] = native
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		return out, nil
+	}
+	return nil, fmt.Errorf("unsupported target native type: %s", typeDesc)
+}
+
 var _ traits.Lister = &reflectSchemalessTypedList{}
 
 // reflectSchemalessTypedList wraps a Go slice/array as a lazy CEL Lister.
@@ -147,12 +215,10 @@ type reflectSchemalessTypedList struct {
 }
 
 func (l *reflectSchemalessTypedList) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
-	switch typeDesc.Kind() {
-	case reflect.Slice:
+	if typeDesc.Kind() == reflect.Slice || typeDesc == anyType {
 		return l.value.Interface(), nil
-	default:
-		return nil, fmt.Errorf("type conversion error from '%s' to '%s'", l.Type(), typeDesc)
 	}
+	return schemalessListToNative(l.value, typeDesc)
 }
 
 func (l *reflectSchemalessTypedList) ConvertToType(typeValue ref.Type) ref.Val {
@@ -280,7 +346,22 @@ func (m *reflectSchemalessTypedMap) ConvertToNative(typeDesc reflect.Type) (inte
 	if m.value.Type().AssignableTo(typeDesc) {
 		return m.value.Interface(), nil
 	}
-	return nil, fmt.Errorf("type conversion error from '%s' to '%s'", m.Type(), typeDesc)
+	return schemalessMapToNative(typeDesc, m.forEachEntry)
+}
+
+// forEachEntry invokes fn for each map entry with its raw Go value.
+func (m *reflectSchemalessTypedMap) forEachEntry(fn func(key string, rawVal interface{}) error) error {
+	iter := m.value.MapRange()
+	for iter.Next() {
+		key := iter.Key()
+		if key.Kind() != reflect.String {
+			return fmt.Errorf("unsupported map key type: %s", key.Type())
+		}
+		if err := fn(key.String(), iter.Value().Interface()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *reflectSchemalessTypedMap) ConvertToType(typeValue ref.Type) ref.Val {
@@ -413,7 +494,22 @@ func (s *reflectSchemalessTypedStruct) ConvertToNative(typeDesc reflect.Type) (i
 	if s.value.Type().AssignableTo(typeDesc) {
 		return s.value.Interface(), nil
 	}
-	return nil, fmt.Errorf("type conversion error from struct type %v to %v", s.value.Type(), typeDesc)
+	return schemalessMapToNative(typeDesc, s.forEachEntry)
+}
+
+// forEachEntry invokes fn for each set struct field (honoring omitempty via
+// CanOmit) with its raw Go value.
+func (s *reflectSchemalessTypedStruct) forEachEntry(fn func(key string, rawVal interface{}) error) error {
+	for fieldName, field := range value.TypeReflectEntryOf(s.value.Type()).Fields() {
+		e := field.GetFrom(s.value)
+		if field.CanOmit(e) {
+			continue
+		}
+		if err := fn(string(fieldName), e.Interface()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *reflectSchemalessTypedStruct) ConvertToType(typeValue ref.Type) ref.Val {
