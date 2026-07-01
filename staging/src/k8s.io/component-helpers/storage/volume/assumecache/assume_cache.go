@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -47,8 +48,6 @@ type Informer interface {
 // This is different from pkg/scheduler/util/assumecache in:
 //   - this does not dispatch events
 //   - this is always up-to-date with the informer
-//   - this only allow assuming objects yet to be sent to the apiserver,
-//     not the ones returned from the apiserver
 type AssumeCache[T v1.Object] struct {
 	// The logger that was chosen when setting up the cache.
 	// Will be used for all operations.
@@ -63,7 +62,33 @@ type AssumeCache[T v1.Object] struct {
 
 	// Objects from informer
 	store   cache.Indexer
-	assumed map[string]T
+	assumed map[string]assumedObject[T]
+}
+
+// assumedObject is an object assumed into the cache together with how it should
+// be reconciled against the informer.
+type assumedObject[T v1.Object] struct {
+	object T
+	// Whether object was already written to the apiserver.
+	persisted bool
+}
+
+// preferOver reports whether the assumed object should be served instead of the
+// informer object with the given resource version, i.e. the assumption has not
+// yet been superseded by the informer.
+func (a assumedObject[T]) preferOver(storeRV string) bool {
+	assumedRV := a.object.GetResourceVersion()
+	if !a.persisted {
+		// Keep the optimistic object, skip resync.
+		return assumedRV == storeRV
+	}
+	cmp, err := resourceversion.CompareResourceVersion(assumedRV, storeRV)
+	if err != nil {
+		// Non-conformant apiserver. Drop assumption to avoid leaks.
+		return false
+	}
+	// Keep the written object until the informer reaches its version.
+	return cmp > 0
 }
 
 // NewAssumeCache creates an assume cache for objects of type T.
@@ -72,7 +97,7 @@ func NewAssumeCache[T v1.Object](logger klog.Logger, informer Informer, gr schem
 		logger:  logger,
 		gr:      gr,
 		store:   informer.GetIndexer(),
-		assumed: make(map[string]T),
+		assumed: make(map[string]assumedObject[T]),
 	}
 
 	_, err := informer.AddEventHandler(
@@ -85,7 +110,8 @@ func NewAssumeCache[T v1.Object](logger klog.Logger, informer Informer, gr schem
 	return c, err
 }
 
-// Receives events from informer. May expire the assumed object if it is older.
+// Receives events from informer. May expire the assumed object once the
+// informer has caught up to (or past) it.
 func (c *AssumeCache[T]) mayExpire(key string) {
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
@@ -102,7 +128,6 @@ func (c *AssumeCache[T]) mayExpire(key string) {
 		return
 	}
 
-	expire := true
 	if exists {
 		newMeta, err := meta.Accessor(obj)
 		if err != nil {
@@ -110,20 +135,17 @@ func (c *AssumeCache[T]) mayExpire(key string) {
 			return
 		}
 
-		// Only overwrite assumed object if version is newer (not resync).
-		if assumed.GetResourceVersion() == newMeta.GetResourceVersion() {
-			c.logger.V(10).Info("ignoring resync of assumed object", "key", key, "version", assumed.GetResourceVersion())
-			expire = false
-		} else {
-			c.logger.V(4).Info("assumed object expired", "newVersion", newMeta.GetResourceVersion(),
-				"key", key, "version", assumed.GetResourceVersion())
+		if assumed.preferOver(newMeta.GetResourceVersion()) {
+			c.logger.V(10).Info("keeping assumed object", "key", key,
+				"version", assumed.object.GetResourceVersion(), "informerVersion", newMeta.GetResourceVersion())
+			return
 		}
+		c.logger.V(4).Info("assumed object expired", "key", key,
+			"version", assumed.object.GetResourceVersion(), "newVersion", newMeta.GetResourceVersion())
 	} else {
-		c.logger.V(4).Info("assumed object expired", "key", key, "version", assumed.GetResourceVersion())
+		c.logger.V(4).Info("assumed object expired", "key", key, "version", assumed.object.GetResourceVersion())
 	}
-	if expire {
-		delete(c.assumed, key)
-	}
+	delete(c.assumed, key)
 }
 
 func (c *AssumeCache[T]) add(obj any) {
@@ -173,10 +195,11 @@ func (c *AssumeCache[T]) Get(key string) (T, error) {
 	}
 
 	assumed, ok := c.assumed[key]
-	if !ok || assumed.GetResourceVersion() != obj.GetResourceVersion() { // not assumed or Informer object is newer
+	if !ok || !assumed.preferOver(obj.GetResourceVersion()) {
+		// not assumed, or the informer object is preferred
 		return obj, nil
 	}
-	return assumed, nil
+	return assumed.object, nil
 }
 
 // GetAPIObj gets the informer cache's version by its key.
@@ -208,23 +231,22 @@ func (c *AssumeCache[T]) replaceAssumed(objs []any) []T {
 			utilruntime.HandleErrorWithLogger(c.logger, nil, "listed object has wrong type", "type", fmt.Sprintf("%T", obj))
 			continue
 		}
-		assumed, ok := c.assumed[keyOf(v)]
-		if ok && assumed.GetResourceVersion() == v.GetResourceVersion() {
-			// assumed object is not in informer yet
-			v = assumed
+		if assumed, ok := c.assumed[keyOf(v)]; ok && assumed.preferOver(v.GetResourceVersion()) {
+			// the assumed object is newer than (or not yet in) the informer
+			v = assumed.object
 		}
 		allObjs = append(allObjs, v)
 	}
 	return allObjs
 }
 
-// Assume updates the object in-memory only.
+// Assume optimistically records an in-memory change to an object before it is
+// written to the apiserver. The object's ResourceVersion must equal the
+// informer's current version, otherwise an error is returned. The assumption is
+// dropped as soon as the informer observes any newer version.
 //
-// The version of the object must be equal to
-// the current object, otherwise an error is returned.
-// If an update is received via the informer while such an
-// object is assumed, it gets dropped in favor of the
-// newer object from the apiserver.
+// For an object that has already been written to the apiserver, use
+// [AssumeCache.AssumeWritten] instead.
 func (c *AssumeCache[T]) Assume(obj T) error {
 	key := keyOf(obj)
 
@@ -239,8 +261,49 @@ func (c *AssumeCache[T]) Assume(obj T) error {
 	if stored.GetResourceVersion() != obj.GetResourceVersion() {
 		return fmt.Errorf("%q is out of sync (stored: %s, assume: %s)", key, stored.GetResourceVersion(), obj.GetResourceVersion())
 	}
-	c.assumed[key] = obj
+	c.assumed[key] = assumedObject[T]{object: obj, persisted: false}
 	c.logger.V(4).Info("Assumed object", "key", key, "version", obj.GetResourceVersion())
+	return nil
+}
+
+// AssumeWritten records an object that has already been written to the
+// apiserver, i.e. obj carries the server-assigned ResourceVersion returned by
+// the write. Reads observe obj until the informer delivers that version or a
+// newer one, so a sequence of writes (e.g. spec then status) is not transiently
+// reverted to an intermediate version while the informer catches up.
+//
+// It is a no-op (returning nil) when:
+//   - obj is not present in the informer — either a creation whose event has
+//     not been delivered yet, or an object that has already been deleted;
+//     leaving these to the informer is what prevents a deleted object from
+//     being resurrected; or
+//   - the informer already holds the same or a newer version, or the
+//     ResourceVersions are not comparable (a non-conformant apiserver).
+func (c *AssumeCache[T]) AssumeWritten(obj T) error {
+	key := keyOf(obj)
+
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+
+	stored, exists, err := c.store.GetByKey(key)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	storedMeta, err := meta.Accessor(stored)
+	if err != nil {
+		return err
+	}
+	assumed := assumedObject[T]{object: obj, persisted: true}
+	if assumed.preferOver(storedMeta.GetResourceVersion()) {
+		c.assumed[key] = assumed
+		c.logger.V(4).Info("Assumed written object", "key", key, "version", obj.GetResourceVersion())
+	} else {
+		c.logger.V(4).Info("Reject expired assumption",
+			"key", key, "version", obj.GetResourceVersion(), "informerVersion", storedMeta.GetResourceVersion())
+	}
 	return nil
 }
 
@@ -252,7 +315,7 @@ func (c *AssumeCache[T]) Restore(obj T) {
 	defer c.rwMutex.Unlock()
 
 	assumed, ok := c.assumed[key]
-	if ok && assumed.GetResourceVersion() == obj.GetResourceVersion() {
+	if ok && assumed.object.GetResourceVersion() == obj.GetResourceVersion() {
 		delete(c.assumed, key)
 		c.logger.V(4).Info("Restored object", "key", key, "version", obj.GetResourceVersion())
 	}
