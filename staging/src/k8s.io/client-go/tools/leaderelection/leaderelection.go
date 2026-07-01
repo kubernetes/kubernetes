@@ -215,7 +215,6 @@ func (le *LeaderElector) Run(ctx context.Context) {
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
