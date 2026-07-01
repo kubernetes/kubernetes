@@ -191,7 +191,7 @@ func autoConvert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudShared
 }
 
 func autoConvert_v1alpha1_WebhookConfiguration_To_config_WebhookConfiguration(in *WebhookConfiguration, out *config.WebhookConfiguration, s conversion.Scope) error {
-	out.Webhooks = *(*[]string)(unsafe.Pointer(&in.Webhooks))
+	*out = *(*config.WebhookConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -201,7 +201,7 @@ func Convert_v1alpha1_WebhookConfiguration_To_config_WebhookConfiguration(in *We
 }
 
 func autoConvert_config_WebhookConfiguration_To_v1alpha1_WebhookConfiguration(in *config.WebhookConfiguration, out *WebhookConfiguration, s conversion.Scope) error {
-	out.Webhooks = *(*[]string)(unsafe.Pointer(&in.Webhooks))
+	*out = *(*WebhookConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 

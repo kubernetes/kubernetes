@@ -304,7 +304,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_ApplyConfiguration_To_admissionregistration_ApplyConfiguration(in *admissionregistrationv1alpha1.ApplyConfiguration, out *admissionregistration.ApplyConfiguration, s conversion.Scope) error {
-	out.Expression = in.Expression
+	*out = *(*admissionregistration.ApplyConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -314,7 +314,7 @@ func Convert_v1alpha1_ApplyConfiguration_To_admissionregistration_ApplyConfigura
 }
 
 func autoConvert_admissionregistration_ApplyConfiguration_To_v1alpha1_ApplyConfiguration(in *admissionregistration.ApplyConfiguration, out *admissionregistrationv1alpha1.ApplyConfiguration, s conversion.Scope) error {
-	out.Expression = in.Expression
+	*out = *(*admissionregistrationv1alpha1.ApplyConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -324,8 +324,7 @@ func Convert_admissionregistration_ApplyConfiguration_To_v1alpha1_ApplyConfigura
 }
 
 func autoConvert_v1alpha1_AuditAnnotation_To_admissionregistration_AuditAnnotation(in *admissionregistrationv1alpha1.AuditAnnotation, out *admissionregistration.AuditAnnotation, s conversion.Scope) error {
-	out.Key = in.Key
-	out.ValueExpression = in.ValueExpression
+	*out = *(*admissionregistration.AuditAnnotation)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -335,8 +334,7 @@ func Convert_v1alpha1_AuditAnnotation_To_admissionregistration_AuditAnnotation(i
 }
 
 func autoConvert_admissionregistration_AuditAnnotation_To_v1alpha1_AuditAnnotation(in *admissionregistration.AuditAnnotation, out *admissionregistrationv1alpha1.AuditAnnotation, s conversion.Scope) error {
-	out.Key = in.Key
-	out.ValueExpression = in.ValueExpression
+	*out = *(*admissionregistrationv1alpha1.AuditAnnotation)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -346,8 +344,7 @@ func Convert_admissionregistration_AuditAnnotation_To_v1alpha1_AuditAnnotation(i
 }
 
 func autoConvert_v1alpha1_ExpressionWarning_To_admissionregistration_ExpressionWarning(in *admissionregistrationv1alpha1.ExpressionWarning, out *admissionregistration.ExpressionWarning, s conversion.Scope) error {
-	out.FieldRef = in.FieldRef
-	out.Warning = in.Warning
+	*out = *(*admissionregistration.ExpressionWarning)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -357,8 +354,7 @@ func Convert_v1alpha1_ExpressionWarning_To_admissionregistration_ExpressionWarni
 }
 
 func autoConvert_admissionregistration_ExpressionWarning_To_v1alpha1_ExpressionWarning(in *admissionregistration.ExpressionWarning, out *admissionregistrationv1alpha1.ExpressionWarning, s conversion.Scope) error {
-	out.FieldRef = in.FieldRef
-	out.Warning = in.Warning
+	*out = *(*admissionregistrationv1alpha1.ExpressionWarning)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -368,7 +364,7 @@ func Convert_admissionregistration_ExpressionWarning_To_v1alpha1_ExpressionWarni
 }
 
 func autoConvert_v1alpha1_JSONPatch_To_admissionregistration_JSONPatch(in *admissionregistrationv1alpha1.JSONPatch, out *admissionregistration.JSONPatch, s conversion.Scope) error {
-	out.Expression = in.Expression
+	*out = *(*admissionregistration.JSONPatch)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -378,7 +374,7 @@ func Convert_v1alpha1_JSONPatch_To_admissionregistration_JSONPatch(in *admission
 }
 
 func autoConvert_admissionregistration_JSONPatch_To_v1alpha1_JSONPatch(in *admissionregistration.JSONPatch, out *admissionregistrationv1alpha1.JSONPatch, s conversion.Scope) error {
-	out.Expression = in.Expression
+	*out = *(*admissionregistrationv1alpha1.JSONPatch)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -388,8 +384,7 @@ func Convert_admissionregistration_JSONPatch_To_v1alpha1_JSONPatch(in *admission
 }
 
 func autoConvert_v1alpha1_MatchCondition_To_admissionregistration_MatchCondition(in *admissionregistrationv1alpha1.MatchCondition, out *admissionregistration.MatchCondition, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Expression = in.Expression
+	*out = *(*admissionregistration.MatchCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -399,8 +394,7 @@ func Convert_v1alpha1_MatchCondition_To_admissionregistration_MatchCondition(in 
 }
 
 func autoConvert_admissionregistration_MatchCondition_To_v1alpha1_MatchCondition(in *admissionregistration.MatchCondition, out *admissionregistrationv1alpha1.MatchCondition, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Expression = in.Expression
+	*out = *(*admissionregistrationv1alpha1.MatchCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -702,9 +696,7 @@ func Convert_admissionregistration_MutatingAdmissionPolicySpec_To_v1alpha1_Mutat
 }
 
 func autoConvert_v1alpha1_Mutation_To_admissionregistration_Mutation(in *admissionregistrationv1alpha1.Mutation, out *admissionregistration.Mutation, s conversion.Scope) error {
-	out.PatchType = admissionregistration.PatchType(in.PatchType)
-	out.ApplyConfiguration = (*admissionregistration.ApplyConfiguration)(unsafe.Pointer(in.ApplyConfiguration))
-	out.JSONPatch = (*admissionregistration.JSONPatch)(unsafe.Pointer(in.JSONPatch))
+	*out = *(*admissionregistration.Mutation)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -714,9 +706,7 @@ func Convert_v1alpha1_Mutation_To_admissionregistration_Mutation(in *admissionre
 }
 
 func autoConvert_admissionregistration_Mutation_To_v1alpha1_Mutation(in *admissionregistration.Mutation, out *admissionregistrationv1alpha1.Mutation, s conversion.Scope) error {
-	out.PatchType = admissionregistrationv1alpha1.PatchType(in.PatchType)
-	out.ApplyConfiguration = (*admissionregistrationv1alpha1.ApplyConfiguration)(unsafe.Pointer(in.ApplyConfiguration))
-	out.JSONPatch = (*admissionregistrationv1alpha1.JSONPatch)(unsafe.Pointer(in.JSONPatch))
+	*out = *(*admissionregistrationv1alpha1.Mutation)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -752,8 +742,7 @@ func Convert_admissionregistration_NamedRuleWithOperations_To_v1alpha1_NamedRule
 }
 
 func autoConvert_v1alpha1_ParamKind_To_admissionregistration_ParamKind(in *admissionregistrationv1alpha1.ParamKind, out *admissionregistration.ParamKind, s conversion.Scope) error {
-	out.APIVersion = in.APIVersion
-	out.Kind = in.Kind
+	*out = *(*admissionregistration.ParamKind)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -763,8 +752,7 @@ func Convert_v1alpha1_ParamKind_To_admissionregistration_ParamKind(in *admission
 }
 
 func autoConvert_admissionregistration_ParamKind_To_v1alpha1_ParamKind(in *admissionregistration.ParamKind, out *admissionregistrationv1alpha1.ParamKind, s conversion.Scope) error {
-	out.APIVersion = in.APIVersion
-	out.Kind = in.Kind
+	*out = *(*admissionregistrationv1alpha1.ParamKind)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -774,10 +762,7 @@ func Convert_admissionregistration_ParamKind_To_v1alpha1_ParamKind(in *admission
 }
 
 func autoConvert_v1alpha1_ParamRef_To_admissionregistration_ParamRef(in *admissionregistrationv1alpha1.ParamRef, out *admissionregistration.ParamRef, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Namespace = in.Namespace
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.ParameterNotFoundAction = (*admissionregistration.ParameterNotFoundActionType)(unsafe.Pointer(in.ParameterNotFoundAction))
+	*out = *(*admissionregistration.ParamRef)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -787,10 +772,7 @@ func Convert_v1alpha1_ParamRef_To_admissionregistration_ParamRef(in *admissionre
 }
 
 func autoConvert_admissionregistration_ParamRef_To_v1alpha1_ParamRef(in *admissionregistration.ParamRef, out *admissionregistrationv1alpha1.ParamRef, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Namespace = in.Namespace
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.ParameterNotFoundAction = (*admissionregistrationv1alpha1.ParameterNotFoundActionType)(unsafe.Pointer(in.ParameterNotFoundAction))
+	*out = *(*admissionregistrationv1alpha1.ParamRef)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -800,7 +782,7 @@ func Convert_admissionregistration_ParamRef_To_v1alpha1_ParamRef(in *admissionre
 }
 
 func autoConvert_v1alpha1_TypeChecking_To_admissionregistration_TypeChecking(in *admissionregistrationv1alpha1.TypeChecking, out *admissionregistration.TypeChecking, s conversion.Scope) error {
-	out.ExpressionWarnings = *(*[]admissionregistration.ExpressionWarning)(unsafe.Pointer(&in.ExpressionWarnings))
+	*out = *(*admissionregistration.TypeChecking)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -810,7 +792,7 @@ func Convert_v1alpha1_TypeChecking_To_admissionregistration_TypeChecking(in *adm
 }
 
 func autoConvert_admissionregistration_TypeChecking_To_v1alpha1_TypeChecking(in *admissionregistration.TypeChecking, out *admissionregistrationv1alpha1.TypeChecking, s conversion.Scope) error {
-	out.ExpressionWarnings = *(*[]admissionregistrationv1alpha1.ExpressionWarning)(unsafe.Pointer(&in.ExpressionWarnings))
+	*out = *(*admissionregistrationv1alpha1.TypeChecking)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1052,9 +1034,7 @@ func Convert_admissionregistration_ValidatingAdmissionPolicySpec_To_v1alpha1_Val
 }
 
 func autoConvert_v1alpha1_ValidatingAdmissionPolicyStatus_To_admissionregistration_ValidatingAdmissionPolicyStatus(in *admissionregistrationv1alpha1.ValidatingAdmissionPolicyStatus, out *admissionregistration.ValidatingAdmissionPolicyStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
-	out.TypeChecking = (*admissionregistration.TypeChecking)(unsafe.Pointer(in.TypeChecking))
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*admissionregistration.ValidatingAdmissionPolicyStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1064,9 +1044,7 @@ func Convert_v1alpha1_ValidatingAdmissionPolicyStatus_To_admissionregistration_V
 }
 
 func autoConvert_admissionregistration_ValidatingAdmissionPolicyStatus_To_v1alpha1_ValidatingAdmissionPolicyStatus(in *admissionregistration.ValidatingAdmissionPolicyStatus, out *admissionregistrationv1alpha1.ValidatingAdmissionPolicyStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
-	out.TypeChecking = (*admissionregistrationv1alpha1.TypeChecking)(unsafe.Pointer(in.TypeChecking))
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*admissionregistrationv1alpha1.ValidatingAdmissionPolicyStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1076,10 +1054,7 @@ func Convert_admissionregistration_ValidatingAdmissionPolicyStatus_To_v1alpha1_V
 }
 
 func autoConvert_v1alpha1_Validation_To_admissionregistration_Validation(in *admissionregistrationv1alpha1.Validation, out *admissionregistration.Validation, s conversion.Scope) error {
-	out.Expression = in.Expression
-	out.Message = in.Message
-	out.Reason = (*v1.StatusReason)(unsafe.Pointer(in.Reason))
-	out.MessageExpression = in.MessageExpression
+	*out = *(*admissionregistration.Validation)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1089,10 +1064,7 @@ func Convert_v1alpha1_Validation_To_admissionregistration_Validation(in *admissi
 }
 
 func autoConvert_admissionregistration_Validation_To_v1alpha1_Validation(in *admissionregistration.Validation, out *admissionregistrationv1alpha1.Validation, s conversion.Scope) error {
-	out.Expression = in.Expression
-	out.Message = in.Message
-	out.Reason = (*v1.StatusReason)(unsafe.Pointer(in.Reason))
-	out.MessageExpression = in.MessageExpression
+	*out = *(*admissionregistrationv1alpha1.Validation)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1102,8 +1074,7 @@ func Convert_admissionregistration_Validation_To_v1alpha1_Validation(in *admissi
 }
 
 func autoConvert_v1alpha1_Variable_To_admissionregistration_Variable(in *admissionregistrationv1alpha1.Variable, out *admissionregistration.Variable, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Expression = in.Expression
+	*out = *(*admissionregistration.Variable)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1113,8 +1084,7 @@ func Convert_v1alpha1_Variable_To_admissionregistration_Variable(in *admissionre
 }
 
 func autoConvert_admissionregistration_Variable_To_v1alpha1_Variable(in *admissionregistration.Variable, out *admissionregistrationv1alpha1.Variable, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Expression = in.Expression
+	*out = *(*admissionregistrationv1alpha1.Variable)(unsafe.Pointer(in))
 	return nil
 }
 

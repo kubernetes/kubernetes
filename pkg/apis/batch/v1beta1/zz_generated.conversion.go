@@ -25,13 +25,10 @@ import (
 	unsafe "unsafe"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	core "k8s.io/kubernetes/pkg/apis/core"
+	v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 )
 
 func init() {
@@ -207,9 +204,7 @@ func Convert_batch_CronJobSpec_To_v1beta1_CronJobSpec(in *batch.CronJobSpec, out
 }
 
 func autoConvert_v1beta1_CronJobStatus_To_batch_CronJobStatus(in *batchv1beta1.CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]core.ObjectReference)(unsafe.Pointer(&in.Active))
-	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
-	out.LastSuccessfulTime = (*v1.Time)(unsafe.Pointer(in.LastSuccessfulTime))
+	*out = *(*batch.CronJobStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -219,9 +214,7 @@ func Convert_v1beta1_CronJobStatus_To_batch_CronJobStatus(in *batchv1beta1.CronJ
 }
 
 func autoConvert_batch_CronJobStatus_To_v1beta1_CronJobStatus(in *batch.CronJobStatus, out *batchv1beta1.CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]corev1.ObjectReference)(unsafe.Pointer(&in.Active))
-	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
-	out.LastSuccessfulTime = (*v1.Time)(unsafe.Pointer(in.LastSuccessfulTime))
+	*out = *(*batchv1beta1.CronJobStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -232,7 +225,7 @@ func Convert_batch_CronJobStatus_To_v1beta1_CronJobStatus(in *batch.CronJobStatu
 
 func autoConvert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec(in *batchv1beta1.JobTemplateSpec, out *batch.JobTemplateSpec, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := batchv1.Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := v1.Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil
@@ -245,7 +238,7 @@ func Convert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec(in *batchv1beta1.J
 
 func autoConvert_batch_JobTemplateSpec_To_v1beta1_JobTemplateSpec(in *batch.JobTemplateSpec, out *batchv1beta1.JobTemplateSpec, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := batchv1.Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := v1.Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil

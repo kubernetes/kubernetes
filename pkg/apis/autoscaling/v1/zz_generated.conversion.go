@@ -294,9 +294,7 @@ func autoConvert_autoscaling_ContainerResourceMetricStatus_To_v1_ContainerResour
 }
 
 func autoConvert_v1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(in *autoscalingv1.CrossVersionObjectReference, out *autoscaling.CrossVersionObjectReference, s conversion.Scope) error {
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.APIVersion = in.APIVersion
+	*out = *(*autoscaling.CrossVersionObjectReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -306,9 +304,7 @@ func Convert_v1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectRef
 }
 
 func autoConvert_autoscaling_CrossVersionObjectReference_To_v1_CrossVersionObjectReference(in *autoscaling.CrossVersionObjectReference, out *autoscalingv1.CrossVersionObjectReference, s conversion.Scope) error {
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.APIVersion = in.APIVersion
+	*out = *(*autoscalingv1.CrossVersionObjectReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -368,12 +364,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscal
 }
 
 func autoConvert_v1_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(in *autoscalingv1.HorizontalPodAutoscalerCondition, out *autoscaling.HorizontalPodAutoscalerCondition, s conversion.Scope) error {
-	out.Type = autoscaling.HorizontalPodAutoscalerConditionType(in.Type)
-	out.Status = autoscaling.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
-	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
+	*out = *(*autoscaling.HorizontalPodAutoscalerCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -383,12 +374,7 @@ func Convert_v1_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAut
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerCondition_To_v1_HorizontalPodAutoscalerCondition(in *autoscaling.HorizontalPodAutoscalerCondition, out *autoscalingv1.HorizontalPodAutoscalerCondition, s conversion.Scope) error {
-	out.Type = autoscalingv1.HorizontalPodAutoscalerConditionType(in.Type)
-	out.Status = corev1.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
-	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
+	*out = *(*autoscalingv1.HorizontalPodAutoscalerCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -820,7 +806,7 @@ func Convert_autoscaling_Scale_To_v1_Scale(in *autoscaling.Scale, out *autoscali
 }
 
 func autoConvert_v1_ScaleSpec_To_autoscaling_ScaleSpec(in *autoscalingv1.ScaleSpec, out *autoscaling.ScaleSpec, s conversion.Scope) error {
-	out.Replicas = in.Replicas
+	*out = *(*autoscaling.ScaleSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -830,7 +816,7 @@ func Convert_v1_ScaleSpec_To_autoscaling_ScaleSpec(in *autoscalingv1.ScaleSpec, 
 }
 
 func autoConvert_autoscaling_ScaleSpec_To_v1_ScaleSpec(in *autoscaling.ScaleSpec, out *autoscalingv1.ScaleSpec, s conversion.Scope) error {
-	out.Replicas = in.Replicas
+	*out = *(*autoscalingv1.ScaleSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -840,8 +826,7 @@ func Convert_autoscaling_ScaleSpec_To_v1_ScaleSpec(in *autoscaling.ScaleSpec, ou
 }
 
 func autoConvert_v1_ScaleStatus_To_autoscaling_ScaleStatus(in *autoscalingv1.ScaleStatus, out *autoscaling.ScaleStatus, s conversion.Scope) error {
-	out.Replicas = in.Replicas
-	out.Selector = in.Selector
+	*out = *(*autoscaling.ScaleStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -851,8 +836,7 @@ func Convert_v1_ScaleStatus_To_autoscaling_ScaleStatus(in *autoscalingv1.ScaleSt
 }
 
 func autoConvert_autoscaling_ScaleStatus_To_v1_ScaleStatus(in *autoscaling.ScaleStatus, out *autoscalingv1.ScaleStatus, s conversion.Scope) error {
-	out.Replicas = in.Replicas
-	out.Selector = in.Selector
+	*out = *(*autoscalingv1.ScaleStatus)(unsafe.Pointer(in))
 	return nil
 }
 

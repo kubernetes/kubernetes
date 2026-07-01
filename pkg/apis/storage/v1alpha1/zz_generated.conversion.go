@@ -336,10 +336,7 @@ func Convert_storage_VolumeAttachmentSpec_To_v1alpha1_VolumeAttachmentSpec(in *s
 }
 
 func autoConvert_v1alpha1_VolumeAttachmentStatus_To_storage_VolumeAttachmentStatus(in *storagev1alpha1.VolumeAttachmentStatus, out *storage.VolumeAttachmentStatus, s conversion.Scope) error {
-	out.Attached = in.Attached
-	out.AttachmentMetadata = *(*map[string]string)(unsafe.Pointer(&in.AttachmentMetadata))
-	out.AttachError = (*storage.VolumeError)(unsafe.Pointer(in.AttachError))
-	out.DetachError = (*storage.VolumeError)(unsafe.Pointer(in.DetachError))
+	*out = *(*storage.VolumeAttachmentStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -349,10 +346,7 @@ func Convert_v1alpha1_VolumeAttachmentStatus_To_storage_VolumeAttachmentStatus(i
 }
 
 func autoConvert_storage_VolumeAttachmentStatus_To_v1alpha1_VolumeAttachmentStatus(in *storage.VolumeAttachmentStatus, out *storagev1alpha1.VolumeAttachmentStatus, s conversion.Scope) error {
-	out.Attached = in.Attached
-	out.AttachmentMetadata = *(*map[string]string)(unsafe.Pointer(&in.AttachmentMetadata))
-	out.AttachError = (*storagev1alpha1.VolumeError)(unsafe.Pointer(in.AttachError))
-	out.DetachError = (*storagev1alpha1.VolumeError)(unsafe.Pointer(in.DetachError))
+	*out = *(*storagev1alpha1.VolumeAttachmentStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -408,9 +402,7 @@ func Convert_storage_VolumeAttributesClassList_To_v1alpha1_VolumeAttributesClass
 }
 
 func autoConvert_v1alpha1_VolumeError_To_storage_VolumeError(in *storagev1alpha1.VolumeError, out *storage.VolumeError, s conversion.Scope) error {
-	out.Time = in.Time
-	out.Message = in.Message
-	out.ErrorCode = (*int32)(unsafe.Pointer(in.ErrorCode))
+	*out = *(*storage.VolumeError)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -420,9 +412,7 @@ func Convert_v1alpha1_VolumeError_To_storage_VolumeError(in *storagev1alpha1.Vol
 }
 
 func autoConvert_storage_VolumeError_To_v1alpha1_VolumeError(in *storage.VolumeError, out *storagev1alpha1.VolumeError, s conversion.Scope) error {
-	out.Time = in.Time
-	out.Message = in.Message
-	out.ErrorCode = (*int32)(unsafe.Pointer(in.ErrorCode))
+	*out = *(*storagev1alpha1.VolumeError)(unsafe.Pointer(in))
 	return nil
 }
 

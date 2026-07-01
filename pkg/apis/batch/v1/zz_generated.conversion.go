@@ -25,14 +25,11 @@ import (
 	unsafe "unsafe"
 
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
-	core "k8s.io/kubernetes/pkg/apis/core"
-	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func init() {
@@ -328,9 +325,7 @@ func Convert_batch_CronJobSpec_To_v1_CronJobSpec(in *batch.CronJobSpec, out *bat
 }
 
 func autoConvert_v1_CronJobStatus_To_batch_CronJobStatus(in *batchv1.CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]core.ObjectReference)(unsafe.Pointer(&in.Active))
-	out.LastScheduleTime = (*metav1.Time)(unsafe.Pointer(in.LastScheduleTime))
-	out.LastSuccessfulTime = (*metav1.Time)(unsafe.Pointer(in.LastSuccessfulTime))
+	*out = *(*batch.CronJobStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -340,9 +335,7 @@ func Convert_v1_CronJobStatus_To_batch_CronJobStatus(in *batchv1.CronJobStatus, 
 }
 
 func autoConvert_batch_CronJobStatus_To_v1_CronJobStatus(in *batch.CronJobStatus, out *batchv1.CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]corev1.ObjectReference)(unsafe.Pointer(&in.Active))
-	out.LastScheduleTime = (*metav1.Time)(unsafe.Pointer(in.LastScheduleTime))
-	out.LastSuccessfulTime = (*metav1.Time)(unsafe.Pointer(in.LastSuccessfulTime))
+	*out = *(*batchv1.CronJobStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -384,12 +377,7 @@ func Convert_batch_Job_To_v1_Job(in *batch.Job, out *batchv1.Job, s conversion.S
 }
 
 func autoConvert_v1_JobCondition_To_batch_JobCondition(in *batchv1.JobCondition, out *batch.JobCondition, s conversion.Scope) error {
-	out.Type = batch.JobConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
-	out.LastProbeTime = in.LastProbeTime
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*batch.JobCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -399,12 +387,7 @@ func Convert_v1_JobCondition_To_batch_JobCondition(in *batchv1.JobCondition, out
 }
 
 func autoConvert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *batchv1.JobCondition, s conversion.Scope) error {
-	out.Type = batchv1.JobConditionType(in.Type)
-	out.Status = corev1.ConditionStatus(in.Status)
-	out.LastProbeTime = in.LastProbeTime
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*batchv1.JobCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -466,7 +449,7 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *batchv1.JobSpec, out *batch.Job
 	out.MaxFailedIndexes = (*int32)(unsafe.Pointer(in.MaxFailedIndexes))
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
-	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	out.TTLSecondsAfterFinished = (*int32)(unsafe.Pointer(in.TTLSecondsAfterFinished))
@@ -488,7 +471,7 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *batchv1.Job
 	out.MaxFailedIndexes = (*int32)(unsafe.Pointer(in.MaxFailedIndexes))
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
-	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	out.TTLSecondsAfterFinished = (*int32)(unsafe.Pointer(in.TTLSecondsAfterFinished))
@@ -566,7 +549,7 @@ func Convert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(in *batch.JobTemplateSp
 }
 
 func autoConvert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(in *batchv1.PodFailurePolicy, out *batch.PodFailurePolicy, s conversion.Scope) error {
-	out.Rules = *(*[]batch.PodFailurePolicyRule)(unsafe.Pointer(&in.Rules))
+	*out = *(*batch.PodFailurePolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -576,7 +559,7 @@ func Convert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(in *batchv1.PodFailur
 }
 
 func autoConvert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(in *batch.PodFailurePolicy, out *batchv1.PodFailurePolicy, s conversion.Scope) error {
-	out.Rules = *(*[]batchv1.PodFailurePolicyRule)(unsafe.Pointer(&in.Rules))
+	*out = *(*batchv1.PodFailurePolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -586,9 +569,7 @@ func Convert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(in *batch.PodFailureP
 }
 
 func autoConvert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePolicyOnExitCodesRequirement(in *batchv1.PodFailurePolicyOnExitCodesRequirement, out *batch.PodFailurePolicyOnExitCodesRequirement, s conversion.Scope) error {
-	out.ContainerName = (*string)(unsafe.Pointer(in.ContainerName))
-	out.Operator = batch.PodFailurePolicyOnExitCodesOperator(in.Operator)
-	out.Values = *(*[]int32)(unsafe.Pointer(&in.Values))
+	*out = *(*batch.PodFailurePolicyOnExitCodesRequirement)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -598,9 +579,7 @@ func Convert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePolicy
 }
 
 func autoConvert_batch_PodFailurePolicyOnExitCodesRequirement_To_v1_PodFailurePolicyOnExitCodesRequirement(in *batch.PodFailurePolicyOnExitCodesRequirement, out *batchv1.PodFailurePolicyOnExitCodesRequirement, s conversion.Scope) error {
-	out.ContainerName = (*string)(unsafe.Pointer(in.ContainerName))
-	out.Operator = batchv1.PodFailurePolicyOnExitCodesOperator(in.Operator)
-	out.Values = *(*[]int32)(unsafe.Pointer(&in.Values))
+	*out = *(*batchv1.PodFailurePolicyOnExitCodesRequirement)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -610,8 +589,7 @@ func Convert_batch_PodFailurePolicyOnExitCodesRequirement_To_v1_PodFailurePolicy
 }
 
 func autoConvert_v1_PodFailurePolicyOnPodConditionsPattern_To_batch_PodFailurePolicyOnPodConditionsPattern(in *batchv1.PodFailurePolicyOnPodConditionsPattern, out *batch.PodFailurePolicyOnPodConditionsPattern, s conversion.Scope) error {
-	out.Type = core.PodConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
+	*out = *(*batch.PodFailurePolicyOnPodConditionsPattern)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -621,8 +599,7 @@ func Convert_v1_PodFailurePolicyOnPodConditionsPattern_To_batch_PodFailurePolicy
 }
 
 func autoConvert_batch_PodFailurePolicyOnPodConditionsPattern_To_v1_PodFailurePolicyOnPodConditionsPattern(in *batch.PodFailurePolicyOnPodConditionsPattern, out *batchv1.PodFailurePolicyOnPodConditionsPattern, s conversion.Scope) error {
-	out.Type = corev1.PodConditionType(in.Type)
-	out.Status = corev1.ConditionStatus(in.Status)
+	*out = *(*batchv1.PodFailurePolicyOnPodConditionsPattern)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -632,9 +609,7 @@ func Convert_batch_PodFailurePolicyOnPodConditionsPattern_To_v1_PodFailurePolicy
 }
 
 func autoConvert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(in *batchv1.PodFailurePolicyRule, out *batch.PodFailurePolicyRule, s conversion.Scope) error {
-	out.Action = batch.PodFailurePolicyAction(in.Action)
-	out.OnExitCodes = (*batch.PodFailurePolicyOnExitCodesRequirement)(unsafe.Pointer(in.OnExitCodes))
-	out.OnPodConditions = *(*[]batch.PodFailurePolicyOnPodConditionsPattern)(unsafe.Pointer(&in.OnPodConditions))
+	*out = *(*batch.PodFailurePolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -644,9 +619,7 @@ func Convert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(in *batchv1.P
 }
 
 func autoConvert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(in *batch.PodFailurePolicyRule, out *batchv1.PodFailurePolicyRule, s conversion.Scope) error {
-	out.Action = batchv1.PodFailurePolicyAction(in.Action)
-	out.OnExitCodes = (*batchv1.PodFailurePolicyOnExitCodesRequirement)(unsafe.Pointer(in.OnExitCodes))
-	out.OnPodConditions = *(*[]batchv1.PodFailurePolicyOnPodConditionsPattern)(unsafe.Pointer(&in.OnPodConditions))
+	*out = *(*batchv1.PodFailurePolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -656,7 +629,7 @@ func Convert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(in *batch.Pod
 }
 
 func autoConvert_v1_SuccessPolicy_To_batch_SuccessPolicy(in *batchv1.SuccessPolicy, out *batch.SuccessPolicy, s conversion.Scope) error {
-	out.Rules = *(*[]batch.SuccessPolicyRule)(unsafe.Pointer(&in.Rules))
+	*out = *(*batch.SuccessPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -666,7 +639,7 @@ func Convert_v1_SuccessPolicy_To_batch_SuccessPolicy(in *batchv1.SuccessPolicy, 
 }
 
 func autoConvert_batch_SuccessPolicy_To_v1_SuccessPolicy(in *batch.SuccessPolicy, out *batchv1.SuccessPolicy, s conversion.Scope) error {
-	out.Rules = *(*[]batchv1.SuccessPolicyRule)(unsafe.Pointer(&in.Rules))
+	*out = *(*batchv1.SuccessPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -676,8 +649,7 @@ func Convert_batch_SuccessPolicy_To_v1_SuccessPolicy(in *batch.SuccessPolicy, ou
 }
 
 func autoConvert_v1_SuccessPolicyRule_To_batch_SuccessPolicyRule(in *batchv1.SuccessPolicyRule, out *batch.SuccessPolicyRule, s conversion.Scope) error {
-	out.SucceededIndexes = (*string)(unsafe.Pointer(in.SucceededIndexes))
-	out.SucceededCount = (*int32)(unsafe.Pointer(in.SucceededCount))
+	*out = *(*batch.SuccessPolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -687,8 +659,7 @@ func Convert_v1_SuccessPolicyRule_To_batch_SuccessPolicyRule(in *batchv1.Success
 }
 
 func autoConvert_batch_SuccessPolicyRule_To_v1_SuccessPolicyRule(in *batch.SuccessPolicyRule, out *batchv1.SuccessPolicyRule, s conversion.Scope) error {
-	out.SucceededIndexes = (*string)(unsafe.Pointer(in.SucceededIndexes))
-	out.SucceededCount = (*int32)(unsafe.Pointer(in.SucceededCount))
+	*out = *(*batchv1.SuccessPolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -698,8 +669,7 @@ func Convert_batch_SuccessPolicyRule_To_v1_SuccessPolicyRule(in *batch.SuccessPo
 }
 
 func autoConvert_v1_UncountedTerminatedPods_To_batch_UncountedTerminatedPods(in *batchv1.UncountedTerminatedPods, out *batch.UncountedTerminatedPods, s conversion.Scope) error {
-	out.Succeeded = *(*[]types.UID)(unsafe.Pointer(&in.Succeeded))
-	out.Failed = *(*[]types.UID)(unsafe.Pointer(&in.Failed))
+	*out = *(*batch.UncountedTerminatedPods)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -709,8 +679,7 @@ func Convert_v1_UncountedTerminatedPods_To_batch_UncountedTerminatedPods(in *bat
 }
 
 func autoConvert_batch_UncountedTerminatedPods_To_v1_UncountedTerminatedPods(in *batch.UncountedTerminatedPods, out *batchv1.UncountedTerminatedPods, s conversion.Scope) error {
-	out.Succeeded = *(*[]types.UID)(unsafe.Pointer(&in.Succeeded))
-	out.Failed = *(*[]types.UID)(unsafe.Pointer(&in.Failed))
+	*out = *(*batchv1.UncountedTerminatedPods)(unsafe.Pointer(in))
 	return nil
 }
 

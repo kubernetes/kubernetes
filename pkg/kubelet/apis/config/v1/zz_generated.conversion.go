@@ -24,7 +24,6 @@ package v1
 import (
 	unsafe "unsafe"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	configv1 "k8s.io/kubelet/config/v1"
@@ -82,13 +81,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1_CredentialProvider_To_config_CredentialProvider(in *configv1.CredentialProvider, out *config.CredentialProvider, s conversion.Scope) error {
-	out.Name = in.Name
-	out.MatchImages = *(*[]string)(unsafe.Pointer(&in.MatchImages))
-	out.DefaultCacheDuration = (*metav1.Duration)(unsafe.Pointer(in.DefaultCacheDuration))
-	out.APIVersion = in.APIVersion
-	out.Args = *(*[]string)(unsafe.Pointer(&in.Args))
-	out.Env = *(*[]config.ExecEnvVar)(unsafe.Pointer(&in.Env))
-	out.TokenAttributes = (*config.ServiceAccountTokenAttributes)(unsafe.Pointer(in.TokenAttributes))
+	*out = *(*config.CredentialProvider)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -98,13 +91,7 @@ func Convert_v1_CredentialProvider_To_config_CredentialProvider(in *configv1.Cre
 }
 
 func autoConvert_config_CredentialProvider_To_v1_CredentialProvider(in *config.CredentialProvider, out *configv1.CredentialProvider, s conversion.Scope) error {
-	out.Name = in.Name
-	out.MatchImages = *(*[]string)(unsafe.Pointer(&in.MatchImages))
-	out.DefaultCacheDuration = (*metav1.Duration)(unsafe.Pointer(in.DefaultCacheDuration))
-	out.APIVersion = in.APIVersion
-	out.Args = *(*[]string)(unsafe.Pointer(&in.Args))
-	out.Env = *(*[]configv1.ExecEnvVar)(unsafe.Pointer(&in.Env))
-	out.TokenAttributes = (*configv1.ServiceAccountTokenAttributes)(unsafe.Pointer(in.TokenAttributes))
+	*out = *(*configv1.CredentialProvider)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -134,8 +121,7 @@ func Convert_config_CredentialProviderConfig_To_v1_CredentialProviderConfig(in *
 }
 
 func autoConvert_v1_ExecEnvVar_To_config_ExecEnvVar(in *configv1.ExecEnvVar, out *config.ExecEnvVar, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Value = in.Value
+	*out = *(*config.ExecEnvVar)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -145,8 +131,7 @@ func Convert_v1_ExecEnvVar_To_config_ExecEnvVar(in *configv1.ExecEnvVar, out *co
 }
 
 func autoConvert_config_ExecEnvVar_To_v1_ExecEnvVar(in *config.ExecEnvVar, out *configv1.ExecEnvVar, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Value = in.Value
+	*out = *(*configv1.ExecEnvVar)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -156,11 +141,7 @@ func Convert_config_ExecEnvVar_To_v1_ExecEnvVar(in *config.ExecEnvVar, out *conf
 }
 
 func autoConvert_v1_ServiceAccountTokenAttributes_To_config_ServiceAccountTokenAttributes(in *configv1.ServiceAccountTokenAttributes, out *config.ServiceAccountTokenAttributes, s conversion.Scope) error {
-	out.ServiceAccountTokenAudience = in.ServiceAccountTokenAudience
-	out.CacheType = config.ServiceAccountTokenCacheType(in.CacheType)
-	out.RequireServiceAccount = (*bool)(unsafe.Pointer(in.RequireServiceAccount))
-	out.RequiredServiceAccountAnnotationKeys = *(*[]string)(unsafe.Pointer(&in.RequiredServiceAccountAnnotationKeys))
-	out.OptionalServiceAccountAnnotationKeys = *(*[]string)(unsafe.Pointer(&in.OptionalServiceAccountAnnotationKeys))
+	*out = *(*config.ServiceAccountTokenAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -170,11 +151,7 @@ func Convert_v1_ServiceAccountTokenAttributes_To_config_ServiceAccountTokenAttri
 }
 
 func autoConvert_config_ServiceAccountTokenAttributes_To_v1_ServiceAccountTokenAttributes(in *config.ServiceAccountTokenAttributes, out *configv1.ServiceAccountTokenAttributes, s conversion.Scope) error {
-	out.ServiceAccountTokenAudience = in.ServiceAccountTokenAudience
-	out.CacheType = configv1.ServiceAccountTokenCacheType(in.CacheType)
-	out.RequireServiceAccount = (*bool)(unsafe.Pointer(in.RequireServiceAccount))
-	out.RequiredServiceAccountAnnotationKeys = *(*[]string)(unsafe.Pointer(&in.RequiredServiceAccountAnnotationKeys))
-	out.OptionalServiceAccountAnnotationKeys = *(*[]string)(unsafe.Pointer(&in.OptionalServiceAccountAnnotationKeys))
+	*out = *(*configv1.ServiceAccountTokenAttributes)(unsafe.Pointer(in))
 	return nil
 }
 

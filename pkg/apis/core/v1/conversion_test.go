@@ -803,6 +803,10 @@ func assertMemoryIdentical(t *testing.T, path string, a, b reflect.Value) {
 	}
 	switch a.Kind() {
 	case reflect.Struct: // allow for copied structs since conversion copies status/spec today
+		if a.Type().Size() != b.Type().Size() {
+			t.Errorf("%s: unexpected struct size mismatch: %d, %d", path, a.Type().Size(), b.Type().Size())
+			return
+		}
 		if a.NumField() != b.NumField() {
 			t.Errorf("%s: unexpected field count mismatch: %d, %d", path, a.NumField(), b.NumField())
 			return
@@ -812,6 +816,9 @@ func assertMemoryIdentical(t *testing.T, path string, a, b reflect.Value) {
 			bTypeField := b.Type().Field(i)
 			if aTypeField.Name != bTypeField.Name {
 				t.Errorf("%s: unexpected field name mismatch: %s, %s", path, aTypeField.Name, bTypeField.Name)
+			}
+			if aTypeField.Offset != bTypeField.Offset {
+				t.Errorf("%s.%s: unexpected field offset mismatch: %d, %d", path, aTypeField.Name, aTypeField.Offset, bTypeField.Offset)
 			}
 			assertMemoryIdentical(t, path+"."+aTypeField.Name, a.Field(i), b.Field(i))
 		}
