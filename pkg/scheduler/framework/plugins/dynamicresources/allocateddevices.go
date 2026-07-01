@@ -289,7 +289,7 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 		shareIDs = make([]structured.SharedDeviceID, 0, 20)
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
 	}
-	var compatGroupDeviceIDs []structured.DeviceID
+	var compatibilityGroupsDeviceIDs []structured.DeviceID
 	foreachAllocatedDevice(claim,
 		func(deviceID structured.DeviceID) {
 			a.logger.V(6).Info("Observed device deallocation", "device", deviceID, "claim", klog.KObj(claim))
@@ -307,10 +307,10 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 		true,
 		func(deviceID structured.DeviceID, compatibilityGroups map[string][]string) {
 			a.logger.V(6).Info("Observed compatibility groups release", "device", deviceID, "claim", klog.KObj(claim))
-			compatGroupDeviceIDs = append(compatGroupDeviceIDs, deviceID)
+			compatibilityGroupsDeviceIDs = append(compatibilityGroupsDeviceIDs, deviceID)
 		})
 
-	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && len(compatGroupDeviceIDs) == 0 {
+	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && len(compatibilityGroupsDeviceIDs) == 0 {
 		return
 	}
 
@@ -326,7 +326,7 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	for _, capacity := range deviceCapacities {
 		a.capacities.Remove(capacity)
 	}
-	for _, deviceID := range compatGroupDeviceIDs {
+	for _, deviceID := range compatibilityGroupsDeviceIDs {
 		delete(a.compatibilityGroups, deviceID)
 	}
 }
