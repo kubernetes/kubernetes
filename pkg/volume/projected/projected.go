@@ -361,14 +361,14 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			var trustAnchors []byte
 			if source.ClusterTrustBundle.Name != nil {
 				var err error
-				trustAnchors, err = s.plugin.kvHost.GetTrustAnchorsByName(*source.ClusterTrustBundle.Name, allowEmpty)
+				trustAnchors, err = s.plugin.kvHost.GetTrustAnchorsByName(context.TODO(), *source.ClusterTrustBundle.Name, allowEmpty)
 				if err != nil {
 					errlist = append(errlist, err)
 					continue
 				}
 			} else if source.ClusterTrustBundle.SignerName != nil {
 				var err error
-				trustAnchors, err = s.plugin.kvHost.GetTrustAnchorsBySigner(*source.ClusterTrustBundle.SignerName, source.ClusterTrustBundle.LabelSelector, allowEmpty)
+				trustAnchors, err = s.plugin.kvHost.GetTrustAnchorsBySigner(context.TODO(), *source.ClusterTrustBundle.SignerName, source.ClusterTrustBundle.LabelSelector, allowEmpty)
 				if err != nil {
 					errlist = append(errlist, err)
 					continue
