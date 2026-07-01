@@ -26,25 +26,23 @@ import (
 )
 
 func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
-	// mkCM builds a ConditionsMap decision from individually-tagged (effect, condition) pairs,
-	// preserving the inline readability of the original test cases (which carried .Effect on
-	// each GenericCondition).
+	// mkCM builds a ConditionsMap decision from individually-tagged (effect, condition) pairs.
 	mkCM := func(items ...effectCondition) authorizer.ConditionsAwareDecision {
 		var deny, nop, allow []authorizer.Condition
 		for _, it := range items {
 			switch it.effect {
-			case effectAllow:
-				allow = append(allow, it.cond)
 			case effectDeny:
 				deny = append(deny, it.cond)
 			case effectNoOpinion:
 				nop = append(nop, it.cond)
+			case effectAllow:
+				allow = append(allow, it.cond)
 			}
 		}
 		return authorizer.ConditionsAwareDecisionConditionsMap(deny, nop, allow)
 	}
 
-	// genericCond is a shorthand for an authorizer.GenericCondition. Description is optional.
+	// cnd is a shorthand for a labeled authorizer.GenericCondition. Description is optional.
 	cnd := func(effect conditionEffect, id, condition, typ, description string) effectCondition {
 		return effectCondition{
 			effect: effect,
@@ -54,44 +52,29 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 		}
 	}
 
-	type testCase struct {
+	tests := []struct {
 		name string
 
 		// decision is the input passed to PartiallyEvaluateConditionsAwareDecision.
 		decision authorizer.ConditionsAwareDecision
 
-		// noACRReviewer: in the original test suite this flag meant "no webhook required for
-		// this case because the partial evaluator simplifies fully to an unconditional decision".
-		// Here it means: the partial result must be Unconditional (Allow/Deny/NoOpinion), and
-		// only wantDecision / wantReason are checked.
-		noACRReviewer bool
-
 		// builtinConditionsEvaluator is the PartialEvaluateConditionFunc supplied to the partial
 		// evaluator. Returning Unevaluatable leaves the condition in a refined ConditionsMap.
 		builtinConditionsEvaluator authorizer.PartialEvaluateConditionFunc
 
-		wantDecision authorizer.Decision
-		wantReason   string
-
-		// verifyPartial is the replacement for verifyACR. When the partial result is still
-		// conditional (noACRReviewer == false), it asserts the shape of the returned
-		// ConditionsAwareDecision tree.
-		verifyPartial func(t *testing.T, partial authorizer.ConditionsAwareDecision)
-	}
-
-	tests := []testCase{
+		// want is the expected snapshot of the returned ConditionsAwareDecision.
+		want snapDecision
+	}{
 		{
 			name: "full builtin evaluation of one ConditionsMap => Deny",
 			decision: mkCM(
 				cnd(effectAllow, "c", "c", "transparent", "all ok"),
 				cnd(effectDeny, "d", "d", "transparent", "very bad"),
 			),
-			noACRReviewer: true,
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "d")
 			},
-			wantDecision: authorizer.DecisionDeny,
-			wantReason:   `condition "d" denied the request with description "very bad"`,
+			want: snapDecision{Kind: "Deny", Reason: `condition "d" denied the request with description "very bad"`},
 		},
 		{
 			name: "full builtin evaluation of one ConditionsMap => NoOpinion",
@@ -99,12 +82,10 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				cnd(effectAllow, "c", "c", "transparent", "all ok"),
 				cnd(effectDeny, "d", "d", "transparent", "very bad"),
 			),
-			noACRReviewer: true,
 			builtinConditionsEvaluator: func(_ context.Context, _ authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(false)
 			},
-			wantDecision: authorizer.DecisionNoOpinion,
-			wantReason:   `no conditions matched`,
+			want: snapDecision{Kind: "NoOpinion", Reason: "no conditions matched"},
 		},
 		{
 			name: "full builtin evaluation of one ConditionsMap => Allow",
@@ -112,21 +93,18 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				cnd(effectAllow, "c", "c", "transparent", "all ok"),
 				cnd(effectDeny, "d", "d", "transparent", "very bad"),
 			),
-			noACRReviewer: true,
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 			},
-			wantDecision: authorizer.DecisionAllow,
-			wantReason:   `condition "c" allowed the request with description "all ok"`,
+			want: snapDecision{Kind: "Allow", Reason: `condition "c" allowed the request with description "all ok"`},
 		},
 		{
 			// The opaque allow condition cannot be evaluated in-process, so the partial result
-			// is a refined ConditionsMap containing only that condition. (Previously a webhook
-			// was consulted to finish the evaluation; here we just verify the partial tree.)
+			// is a refined ConditionsMap containing only that condition.
 			name: "partial builtin evaluation of one ConditionsMap => refined ConditionsMap",
 			decision: mkCM(
-				cnd(effectAllow, "c", "c", "opaque", "all ok"),       // needs a webhook due to opaque type
-				cnd(effectDeny, "d", "d", "transparent", "very bad"), // simplified in-process
+				cnd(effectAllow, "c", "c", "opaque", "all ok"),
+				cnd(effectDeny, "d", "d", "transparent", "very bad"),
 			),
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				if condition.GetType() == "transparent" {
@@ -134,14 +112,14 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				}
 				return authorizer.ConditionsEvaluationResultUnevaluatable()
 			},
-			verifyPartial: assertDecisionTree(snapDecision{
+			want: snapDecision{
 				Kind: "ConditionsMap",
 				CM: &snapCM{
 					Allow: []snapCondition{
 						{ID: "c", Condition: "c", Type: "opaque", Description: "all ok"},
 					},
 				},
-			}),
+			},
 		},
 		{
 			name: "builtin evaluation of union succeeds => Allow",
@@ -155,12 +133,10 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 					cnd(effectDeny, "d", "d", "transparent", ""),
 				),
 			),
-			noACRReviewer: true,
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 			},
-			wantDecision: authorizer.DecisionAllow,
-			wantReason:   `condition "c" allowed the request`,
+			want: snapDecision{Kind: "Allow", Reason: `condition "c" allowed the request`},
 		},
 		{
 			name: "builtin evaluation of union succeeds => Deny",
@@ -174,12 +150,10 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 					cnd(effectDeny, "d", "d", "transparent", ""),
 				),
 			),
-			noACRReviewer: true,
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "d")
 			},
-			wantDecision: authorizer.DecisionDeny,
-			wantReason:   `condition "d" denied the request`,
+			want: snapDecision{Kind: "Deny", Reason: `condition "d" denied the request`},
 		},
 		{
 			// First CM has an opaque allow condition that cannot be simplified, so the union
@@ -202,7 +176,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				}
 				return authorizer.ConditionsEvaluationResultUnevaluatable()
 			},
-			verifyPartial: assertDecisionTree(snapDecision{
+			want: snapDecision{
 				Kind: "Union",
 				Union: []snapDecision{
 					{
@@ -219,7 +193,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 						},
 					},
 				},
-			}),
+			},
 		},
 		{
 			// First CM simplifies fully to NoOpinion (none of its transparent conditions match).
@@ -243,7 +217,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				}
 				return authorizer.ConditionsEvaluationResultUnevaluatable()
 			},
-			verifyPartial: assertDecisionTree(snapDecision{
+			want: snapDecision{
 				Kind: "Union",
 				Union: []snapDecision{
 					{Kind: "NoOpinion", Reason: "no conditions matched"},
@@ -256,7 +230,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 					},
 					{Kind: "Deny", Reason: "something later denies"},
 				},
-			}),
+			},
 		},
 		{
 			name: "evaluateConditionFn can be nil, and evaluation to concrete can still succeed",
@@ -280,15 +254,13 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				),
 				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
 			),
-			wantDecision:  authorizer.DecisionDeny,
-			wantReason:    `condition "foo" denied the request`,
-			noACRReviewer: true,
+			want: snapDecision{Kind: "Deny", Reason: `condition "foo" denied the request`},
 		},
 		{
 			name: "evaluateConditionFn can be nil, and refinement can still happen",
 			decision: unionDecision(
 				mkCM(
-					// This condition should removed from the refined ConditionsAwareDecision
+					// This condition should be removed from the refined ConditionsAwareDecision
 					effectCondition{
 						effect: effectDeny,
 						cond: authorizer.GenericCondition{
@@ -306,7 +278,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				),
 				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
 			),
-			verifyPartial: assertDecisionTree(snapDecision{
+			want: snapDecision{
 				Kind: "Union",
 				Union: []snapDecision{
 					{
@@ -324,7 +296,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 					},
 					{Kind: "Deny", Reason: "something later denies"},
 				},
-			}),
+			},
 		},
 	}
 
@@ -336,36 +308,21 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				authorizer.ConditionsData{},
 				tt.builtinConditionsEvaluator,
 			)
-
-			if tt.noACRReviewer {
-				if !got.IsUnconditional() {
-					t.Fatalf("expected unconditional decision, got %s", got.String())
-				}
-				gotDecision, gotReason, _ := unconditionalParts(got)
-				if gotDecision != tt.wantDecision {
-					t.Errorf("decision = %v, want %v", gotDecision, tt.wantDecision)
-				}
-				if gotReason != tt.wantReason {
-					t.Errorf("reason = %q, want %q", gotReason, tt.wantReason)
-				}
-				return
+			if diff := cmp.Diff(tt.want, snapshotDecision(got)); diff != "" {
+				t.Errorf("decision mismatch (-want +got):\n%s", diff)
 			}
-			if tt.verifyPartial == nil {
-				t.Fatalf("test case %q must set either noACRReviewer or verifyPartial", tt.name)
-			}
-			tt.verifyPartial(t, got)
 		})
 	}
 }
 
-// conditionEffect mirrors the deny/noOpinion/allow categorization the old
-// GenericCondition.Effect field encoded, but lives entirely in the test rather than the API.
+// conditionEffect categorizes a Condition into the deny/noOpinion/allow slice of a ConditionsMap.
+// The ordering matches the argument order of ConditionsAwareDecisionConditionsMap.
 type conditionEffect int
 
 const (
-	effectAllow conditionEffect = iota
-	effectDeny
+	effectDeny conditionEffect = iota
 	effectNoOpinion
+	effectAllow
 )
 
 // effectCondition pairs a Condition with the effect slice it should be placed into.
@@ -374,8 +331,7 @@ type effectCondition struct {
 	cond   authorizer.Condition
 }
 
-// snapDecision is a deep-comparable snapshot of an authorizer.ConditionsAwareDecision tree,
-// used in lieu of comparing against the (now-removed) authorizationv1alpha1 wire types.
+// snapDecision is a deep-comparable snapshot of an authorizer.ConditionsAwareDecision tree.
 type snapDecision struct {
 	Kind   string // "Allow" | "Deny" | "NoOpinion" | "ConditionsMap" | "Union"
 	Reason string
@@ -436,17 +392,5 @@ func snapshotCondition(c authorizer.Condition) snapCondition {
 		Condition:   c.GetCondition(),
 		Type:        c.GetType(),
 		Description: c.GetDescription(),
-	}
-}
-
-// assertDecisionTree returns a verifyPartial that snapshots the actual partial decision and
-// compares it against want using cmp.Diff. This is the modern equivalent of the verifyACR
-// helper that used cmp.Diff on the (now-removed) authorizationv1alpha1 wire decision tree.
-func assertDecisionTree(want snapDecision) func(t *testing.T, got authorizer.ConditionsAwareDecision) {
-	return func(t *testing.T, got authorizer.ConditionsAwareDecision) {
-		t.Helper()
-		if diff := cmp.Diff(want, snapshotDecision(got)); diff != "" {
-			t.Errorf("partial decision mismatch (-want +got):\n%s", diff)
-		}
 	}
 }
