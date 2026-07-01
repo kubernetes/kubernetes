@@ -161,6 +161,9 @@ type ImagePullCredentials struct {
 	// If true, it is mutually exclusive with the `kubernetesSecrets` field.
 	// +optional
 	NodePodsAccessible bool `json:"nodePodsAccessible,omitempty"`
+
+	// FIXME: just for now, I don't want to be adding custom conversions right now
+	Preloaded bool `json:"preloaded,omitempty"`
 }
 
 // ImagePullSecret is a representation of a Kubernetes secret object coordinates along

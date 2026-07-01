@@ -1232,6 +1232,11 @@ type ImagePullCredentials struct {
 	// If true, it is mutually exclusive with the `kubernetesSecrets` field.
 	// +optional
 	NodePodsAccessible bool `json:"nodePodsAccessible,omitempty"`
+
+	// Preloaded indicates that the image was already present on the node when
+	// the kubelet first accessed it, and there were no other non-preloaded pulled
+	// records or ImagePullIntents for the image
+	Preloaded bool `json:"preloaded,omitempty"`
 }
 
 // ImagePullSecret is a representation of a Kubernetes secret object coordinates along
