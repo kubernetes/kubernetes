@@ -151,6 +151,11 @@ func (p *Plugin) ValidateInitialization() error {
 			return fmt.Errorf("%s requires an authorizer", PluginName)
 		}
 	}
+	if p.podCertificateRequestsEnabled {
+		if p.authz == nil {
+			return fmt.Errorf("%s requires an authorizer", PluginName)
+		}
+	}
 	if p.serviceAccountGetter == nil {
 		return fmt.Errorf("%s requires a service account getter", PluginName)
 	}
@@ -162,7 +167,7 @@ func (p *Plugin) ValidateInitialization() error {
 
 // SetUnconditionalAuthorizer sets the authorizer.
 func (p *Plugin) SetUnconditionalAuthorizer(authz authorizer.UnconditionalAuthorizer) {
-	if p.serviceAccountNodeAudienceRestriction {
+	if p.serviceAccountNodeAudienceRestriction || p.podCertificateRequestsEnabled {
 		p.authz = authz
 	}
 }
@@ -226,7 +231,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		return p.admitServiceAccount(ctx, nodeName, a)
 
 	case podCertificateRequestResource:
-		return p.admitPodCertificateRequest(nodeName, a)
+		return p.admitPodCertificateRequest(ctx, nodeName, a)
 
 	case leaseResource:
 		return p.admitLease(nodeName, a)
@@ -726,17 +731,12 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		return nil
 	}
 
-	userInfo := a.GetUserInfo()
-	attrs := authorizer.AttributesRecord{
-		User:            userInfo, // this is the user info of the node requesting the token
-		Verb:            "request-serviceaccounts-token-audience",
-		Namespace:       a.GetNamespace(),
-		APIGroup:        "",
-		APIVersion:      "v1",
-		Resource:        requestedAudience, // this gives us the audience for which node is requesting a token for; wildcard will allow all audiences
-		Name:            a.GetName(),       // this gives us the service account name for which node is requesting a token for; if not set, default will allow all service accounts
-		ResourceRequest: true,
-	}
+	attrs := buildAuthorizerAttributes(
+		a,
+		"request-serviceaccounts-token-audience",
+		requestedAudience,
+		a.GetName(), // This API operation is on the service account, so this is the SA name.
+	)
 
 	authorized, _, err := p.authz.Authorize(ctx, attrs)
 	// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
@@ -745,10 +745,10 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("error authorizing %s to request tokens for audience %q: %w", userInfo.GetName(), requestedAudience, err)
+		return fmt.Errorf("error authorizing %s to request tokens for audience %q: %w", a.GetUserInfo().GetName(), requestedAudience, err)
 	}
 
-	return fmt.Errorf("%s is not authorized to request tokens for audience %q", userInfo.GetName(), requestedAudience)
+	return fmt.Errorf("%s is not authorized to request tokens for audience %q", a.GetUserInfo().GetName(), requestedAudience)
 }
 
 func (p *Plugin) podReferencesAudience(ctx context.Context, pod *v1.Pod, audience string) (bool, error) {
@@ -850,7 +850,7 @@ func (p *Plugin) csiDriverHasAudience(driverName, audience string) (bool, error)
 	return false, nil
 }
 
-func (p *Plugin) admitPodCertificateRequest(nodeName string, a admission.Attributes) error {
+func (p *Plugin) admitPodCertificateRequest(ctx context.Context, nodeName string, a admission.Attributes) error {
 	if !p.podCertificateRequestsEnabled {
 		return admission.NewForbidden(a, fmt.Errorf("PodCertificateRequest feature gate is disabled"))
 	}
@@ -924,7 +924,72 @@ func (p *Plugin) admitPodCertificateRequest(nodeName string, a admission.Attribu
 		return fmt.Errorf("PodCertificateRequest for pod %q names service account UID %q, which differs from the running service account (%q)", namespace+"/"+req.Spec.PodName, req.Spec.ServiceAccountUID, sa.ObjectMeta.UID)
 	}
 
+	// Does this node have a reason to be requesting this service account /
+	// signername combo?
+	if err := p.validateNodePodCertificateSigner(ctx, pod, req, a); err != nil {
+		return admission.NewForbidden(a, err)
+	}
+
 	return nil
+}
+
+func (p *Plugin) validateNodePodCertificateSigner(ctx context.Context, pod *v1.Pod, req *certapi.PodCertificateRequest, a admission.Attributes) error {
+	// Direct reference to service account / signer combo.
+	if podHasPodCertificateVolumeForSigner(pod, req.Spec.SignerName) {
+		return nil
+	}
+
+	// Check for authorization, similar to validateNodeServiceAccountAudience.
+
+	// RBAC can't handle resources that contain slashes.  Apply the same munging
+	// that we use for encoding signerNames into ClusterTrustBundle names.
+	mungedSignerName := strings.ReplaceAll(req.Spec.SignerName, "/", ":")
+
+	attrs := buildAuthorizerAttributes(
+		a,
+		"request-serviceaccounts-podcertificate-signer",
+		mungedSignerName,
+		req.Spec.ServiceAccountName,
+	)
+
+	authorized, _, err := p.authz.Authorize(ctx, attrs)
+	// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
+	// following the same pattern as withAuthorization (ref: https://github.com/kubernetes/kubernetes/blob/2b025e645975d6d51bf38c008f972c632cf49657/staging/src/k8s.io/apiserver/pkg/endpoints/filters/authorization.go#L71-L91)
+	if authorized == authorizer.DecisionAllow {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("error authorizing %s to request podcertificaterequests for signer %q: %w", a.GetUserInfo().GetName(), req.Spec.SignerName, err)
+	}
+	return fmt.Errorf("pod %q does not mount a podCertificate projected volume for signer %q", a.GetNamespace()+"/"+req.Spec.PodName, req.Spec.SignerName)
+}
+
+func buildAuthorizerAttributes(a admission.Attributes, verb, resource, name string) authorizer.AttributesRecord {
+	return authorizer.AttributesRecord{
+		User:            a.GetUserInfo(),
+		Verb:            verb,
+		APIGroup:        a.GetResource().Group,
+		APIVersion:      a.GetResource().Version,
+		Resource:        resource,
+		Namespace:       a.GetNamespace(),
+		Name:            name,
+		ResourceRequest: true,
+	}
+}
+
+func podHasPodCertificateVolumeForSigner(pod *v1.Pod, signerName string) bool {
+	for i := range pod.Spec.Volumes {
+		if pod.Spec.Volumes[i].Projected == nil {
+			continue
+		}
+		for j := range pod.Spec.Volumes[i].Projected.Sources {
+			s := &pod.Spec.Volumes[i].Projected.Sources[j]
+			if s.PodCertificate != nil && s.PodCertificate.SignerName == signerName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (p *Plugin) admitLease(nodeName string, a admission.Attributes) error {
