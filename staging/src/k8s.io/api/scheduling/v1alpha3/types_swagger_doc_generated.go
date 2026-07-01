@@ -125,7 +125,7 @@ func (PodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
 
 var map_PodGroupSpec = map[string]string{
 	"":                      "PodGroupSpec defines the desired state of a PodGroup.",
-	"podGroupTemplateRef":   "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable.",
+	"workloadRef":           "WorkloadRef references an optional PodGroup template within the Workload object that was used to create the PodGroup. This field is immutable.",
 	"schedulingPolicy":      "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate.",
 	"schedulingConstraints": "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate. This field is immutable. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
 	"resourceClaims":        "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
@@ -162,15 +162,6 @@ var map_PodGroupTemplate = map[string]string{
 
 func (PodGroupTemplate) SwaggerDoc() map[string]string {
 	return map_PodGroupTemplate
-}
-
-var map_PodGroupTemplateReference = map[string]string{
-	"":         "PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload). Exactly one reference must be set.",
-	"workload": "Workload references the PodGroupTemplate within the Workload object that was used to create the PodGroup.",
-}
-
-func (PodGroupTemplateReference) SwaggerDoc() map[string]string {
-	return map_PodGroupTemplateReference
 }
 
 var map_SingleDisruptionMode = map[string]string{
@@ -221,14 +212,14 @@ func (WorkloadList) SwaggerDoc() map[string]string {
 	return map_WorkloadList
 }
 
-var map_WorkloadPodGroupTemplateReference = map[string]string{
-	"":                     "WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.",
-	"workloadName":         "WorkloadName defines the name of the Workload object.",
-	"podGroupTemplateName": "PodGroupTemplateName defines the PodGroupTemplate name within the Workload object.",
+var map_WorkloadReference = map[string]string{
+	"":             "WorkloadReference references the Workload object together with the template that was used to create a particular PodGroup.",
+	"workloadName": "WorkloadName is the name of the Workload object that contains a template that was used when creating a pod group. It must be a DNS name. This field is required.",
+	"templateName": "TemplateName is the name of a template within the Workload object that was used to create a pod group. It must be a DNS label. This field is required.",
 }
 
-func (WorkloadPodGroupTemplateReference) SwaggerDoc() map[string]string {
-	return map_WorkloadPodGroupTemplateReference
+func (WorkloadReference) SwaggerDoc() map[string]string {
+	return map_WorkloadReference
 }
 
 var map_WorkloadSpec = map[string]string{

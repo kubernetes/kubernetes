@@ -83,7 +83,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: mkValidPodGroup(unsetWorkloadRef()),
 		},
 		"empty workloadRef": {
-			input:        mkValidPodGroup(setEmptyWorkloadRef()),
+			input: mkValidPodGroup(setEmptyWorkloadRef()),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "workloadRef", "workloadName"), ""),
 				field.Required(field.NewPath("spec", "workloadRef", "templateName"), ""),

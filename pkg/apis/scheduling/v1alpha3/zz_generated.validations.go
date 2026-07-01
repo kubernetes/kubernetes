@@ -562,14 +562,14 @@ func Validate_PodGroupSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *schedulingv1alpha3.PodGroupSpec) (errs field.ErrorList) {
 
-	{ // field schedulingv1alpha3.PodGroupSpec.PodGroupTemplateRef
+	{ // field schedulingv1alpha3.PodGroupSpec.WorkloadRef
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *schedulingv1alpha3.PodGroupTemplateReference,
+			obj, oldObj *schedulingv1alpha3.WorkloadReference,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
 					return nil
 				}
 			}
@@ -586,14 +586,14 @@ func Validate_PodGroupSpec(
 				return // do not proceed
 			}
 			// call the type's validation function
-			errs = append(errs, Validate_PodGroupTemplateReference(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, Validate_WorkloadReference(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.PodGroupSpec) *schedulingv1alpha3.PodGroupTemplateReference {
-				return oldObj.PodGroupTemplateRef
+			func(oldObj *schedulingv1alpha3.PodGroupSpec) *schedulingv1alpha3.WorkloadReference {
+				return oldObj.WorkloadRef
 			})
-		errs = append(errs, fn(fldPath.Child("podGroupTemplateRef"), obj.PodGroupTemplateRef, oldVal, oldObj != nil)...)
+		errs = append(errs, fn(fldPath.Child("workloadRef"), obj.WorkloadRef, oldVal, oldObj != nil)...)
 	}
 
 	{ // field schedulingv1alpha3.PodGroupSpec.SchedulingPolicy
@@ -1210,57 +1210,6 @@ func Validate_PodGroupTemplate(
 	return errs
 }
 
-var unionMembershipFor_k8s_io_api_scheduling_v1alpha3_PodGroupTemplateReference_ = validate.NewUnionMembership(validate.NewUnionMember("workload"))
-
-// Validate_PodGroupTemplateReference validates an instance of PodGroupTemplateReference according
-// to declarative validation rules in the API schema.
-func Validate_PodGroupTemplateReference(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *schedulingv1alpha3.PodGroupTemplateReference) (errs field.ErrorList) {
-
-	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_scheduling_v1alpha3_PodGroupTemplateReference_,
-		func(obj *schedulingv1alpha3.PodGroupTemplateReference) bool {
-			if obj == nil {
-				return false
-			}
-			return obj.Workload != nil
-		}); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	{ // field schedulingv1alpha3.PodGroupTemplateReference.Workload
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupTemplateReference,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_WorkloadPodGroupTemplateReference(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.PodGroupTemplateReference) *schedulingv1alpha3.WorkloadPodGroupTemplateReference {
-				return oldObj.Workload
-			})
-		errs = append(errs, fn(fldPath.Child("workload"), obj.Workload, oldVal, oldObj != nil)...)
-	}
-
-	return errs
-}
-
 var symbolsForPreemptionPolicy = sets.New(schedulingv1alpha3.PreemptLowerPriority, schedulingv1alpha3.PreemptNever)
 
 // Validate_PreemptionPolicy validates an instance of PreemptionPolicy according
@@ -1455,13 +1404,13 @@ func Validate_Workload(
 	return errs
 }
 
-// Validate_WorkloadPodGroupTemplateReference validates an instance of WorkloadPodGroupTemplateReference according
+// Validate_WorkloadReference validates an instance of WorkloadReference according
 // to declarative validation rules in the API schema.
-func Validate_WorkloadPodGroupTemplateReference(
+func Validate_WorkloadReference(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *schedulingv1alpha3.WorkloadPodGroupTemplateReference) (errs field.ErrorList) {
+	obj, oldObj *schedulingv1alpha3.WorkloadReference) (errs field.ErrorList) {
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupTemplateReference.WorkloadName
+	{ // field schedulingv1alpha3.WorkloadReference.WorkloadName
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1487,13 +1436,13 @@ func Validate_WorkloadPodGroupTemplateReference(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupTemplateReference) *string {
+			func(oldObj *schedulingv1alpha3.WorkloadReference) *string {
 				return &oldObj.WorkloadName
 			})
 		errs = append(errs, fn(fldPath.Child("workloadName"), &obj.WorkloadName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupTemplateReference.PodGroupTemplateName
+	{ // field schedulingv1alpha3.WorkloadReference.TemplateName
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1519,10 +1468,10 @@ func Validate_WorkloadPodGroupTemplateReference(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupTemplateReference) *string {
-				return &oldObj.PodGroupTemplateName
+			func(oldObj *schedulingv1alpha3.WorkloadReference) *string {
+				return &oldObj.TemplateName
 			})
-		errs = append(errs, fn(fldPath.Child("podGroupTemplateName"), &obj.PodGroupTemplateName, oldVal, oldObj != nil)...)
+		errs = append(errs, fn(fldPath.Child("templateName"), &obj.TemplateName, oldVal, oldObj != nil)...)
 	}
 
 	return errs

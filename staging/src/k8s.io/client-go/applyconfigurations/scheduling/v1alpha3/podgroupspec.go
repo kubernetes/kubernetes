@@ -27,9 +27,10 @@ import (
 //
 // PodGroupSpec defines the desired state of a PodGroup.
 type PodGroupSpecApplyConfiguration struct {
-	// PodGroupTemplateRef references an optional PodGroup template within other object
-	// (e.g. Workload) that was used to create the PodGroup. This field is immutable.
-	PodGroupTemplateRef *PodGroupTemplateReferenceApplyConfiguration `json:"podGroupTemplateRef,omitempty"`
+	// WorkloadRef references an optional PodGroup template within the Workload
+	// object that was used to create the PodGroup.
+	// This field is immutable.
+	WorkloadRef *WorkloadReferenceApplyConfiguration `json:"workloadRef,omitempty"`
 	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
 	SchedulingPolicy *PodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
@@ -83,11 +84,11 @@ func PodGroupSpec() *PodGroupSpecApplyConfiguration {
 	return &PodGroupSpecApplyConfiguration{}
 }
 
-// WithPodGroupTemplateRef sets the PodGroupTemplateRef field in the declarative configuration to the given value
+// WithWorkloadRef sets the WorkloadRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PodGroupTemplateRef field is set to the value of the last call.
-func (b *PodGroupSpecApplyConfiguration) WithPodGroupTemplateRef(value *PodGroupTemplateReferenceApplyConfiguration) *PodGroupSpecApplyConfiguration {
-	b.PodGroupTemplateRef = value
+// If called multiple times, the WorkloadRef field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithWorkloadRef(value *WorkloadReferenceApplyConfiguration) *PodGroupSpecApplyConfiguration {
+	b.WorkloadRef = value
 	return b
 }
 
