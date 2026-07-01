@@ -3131,5 +3131,6 @@ func Validate_ResourceSliceSpec(
 		errs = append(errs, fn(fldPath.Child("sharedCounters"), obj.SharedCounters, oldVal, oldObj != nil)...)
 	}
 
+	// field resourcev1beta2.ResourceSliceSpec.PartitionTypeAttribute has no validation
 	return errs
 }

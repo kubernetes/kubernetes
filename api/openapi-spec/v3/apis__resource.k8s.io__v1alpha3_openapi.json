@@ -1,6 +1,62 @@
 {
   "components": {
     "schemas": {
+      "io.k8s.api.resource.v1alpha3.CounterSetStatus": {
+        "description": "CounterSetStatus reports capacity, consumption, and availability for the counters of a single shared counter set.",
+        "properties": {
+          "counters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.CounterStatus"
+            },
+            "description": "Counters reports per-counter status, keyed by counter name.",
+            "type": "object"
+          },
+          "name": {
+            "description": "Name is the name of the counter set, matching a SharedCounters entry.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "counters"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1alpha3.CounterStatus": {
+        "description": "CounterStatus reports the capacity, consumption, and remaining availability of a single counter.",
+        "properties": {
+          "available": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "Available is Capacity minus Consumed, never negative."
+          },
+          "capacity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "Capacity is the total value the counter provides."
+          },
+          "consumed": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "Consumed is the amount drawn by currently allocated devices."
+          }
+        },
+        "required": [
+          "capacity",
+          "consumed",
+          "available"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.resource.v1alpha3.DeviceTaint": {
         "description": "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
         "properties": {
@@ -187,6 +243,29 @@
         },
         "type": "object"
       },
+      "io.k8s.api.resource.v1alpha3.PartitionTypeStatus": {
+        "description": "PartitionTypeStatus reports allocatability for a single partition type, identified by the value of the pool's PartitionTypeAttribute.",
+        "properties": {
+          "allocatable": {
+            "description": "Allocatable is the number of additional devices of this partition type that could still be allocated given current shared-counter consumption.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Total is the number of devices of this partition type in the pool.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "type": {
+            "description": "Type is the partition type value (e.g. \"Full\" or \"Half\").",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.resource.v1alpha3.PoolStatus": {
         "description": "PoolStatus contains status information for a single resource pool.",
         "properties": {
@@ -199,6 +278,14 @@
             "description": "AvailableDevices is the number of devices available for allocation. This equals TotalDevices - AllocatedDevices - UnavailableDevices. A value of 0 means no devices are currently available. May be unset when validationError is set.",
             "format": "int32",
             "type": "integer"
+          },
+          "counterSets": {
+            "description": "CounterSets reports per-counter capacity, consumption, and availability for a partitionable pool that publishes SharedCounters without a PartitionTypeAttribute. Mutually exclusive with PartitionSummary.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.CounterSetStatus"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "driver": {
             "description": "Driver is the DRA driver name for this pool. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
@@ -214,6 +301,14 @@
             "description": "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node. Must be a valid DNS subdomain name (RFC1123).",
             "type": "string"
           },
+          "partitionSummary": {
+            "description": "PartitionSummary reports allocatability per partition type for a partitionable pool. It is populated only when the pool's slices set PartitionTypeAttribute and publish SharedCounters. Mutually exclusive with CounterSets.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.PartitionTypeStatus"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
           "poolName": {
             "description": "PoolName is the name of the pool. Must be a valid resource pool name (DNS subdomains separated by \"/\").",
             "type": "string"
@@ -222,6 +317,14 @@
             "description": "ResourceSliceCount is the number of ResourceSlices that make up this pool. May be unset when validationError is set.",
             "format": "int32",
             "type": "integer"
+          },
+          "shareableSummary": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.ShareableSummaryStatus"
+              }
+            ],
+            "description": "ShareableSummary reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations. It is populated only when at least one device in the pool is shareable."
           },
           "totalDevices": {
             "description": "TotalDevices is the total number of devices in the pool across all slices. A value of 0 means the pool has no devices. May be unset when validationError is set.",
@@ -394,6 +497,81 @@
           "poolCount"
         ],
         "type": "object"
+      },
+      "io.k8s.api.resource.v1alpha3.ShareableCapacityStatus": {
+        "description": "ShareableCapacityStatus reports aggregate amounts for a single shareable capacity key.",
+        "properties": {
+          "available": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "Available is Total minus Consumed, never negative."
+          },
+          "consumed": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "Consumed is the amount drawn by current allocations."
+          },
+          "name": {
+            "description": "Name is the capacity name.",
+            "type": "string"
+          },
+          "total": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "Total is the sum of this capacity across shareable devices in the pool."
+          }
+        },
+        "required": [
+          "name",
+          "total",
+          "consumed",
+          "available"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1alpha3.ShareableSummaryStatus": {
+        "description": "ShareableSummaryStatus reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations.",
+        "properties": {
+          "capacity": {
+            "description": "Capacity reports aggregate total, consumed, and available amounts per shareable capacity key across the pool.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.ShareableCapacityStatus"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "fullyAvailableDevices": {
+            "description": "FullyAvailableDevices is the number of shareable devices with no capacity consumed.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "partiallyAvailableDevices": {
+            "description": "PartiallyAvailableDevices is the number of shareable devices with some but not all capacity consumed.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.apimachinery.pkg.api.resource.Quantity": {
+        "description": "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          }
+        ]
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.APIResource": {
         "description": "APIResource specifies the name of a resource and whether it is namespaced.",

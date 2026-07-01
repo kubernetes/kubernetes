@@ -110,6 +110,7 @@ spec:
         operator: operatorValue
         values:
         - valuesValue
+  partitionTypeAttribute: partitionTypeAttributeValue
   perDeviceNodeSelection: true
   pool:
     generation: 2

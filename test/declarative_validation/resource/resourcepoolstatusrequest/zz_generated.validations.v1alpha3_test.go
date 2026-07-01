@@ -109,6 +109,15 @@ func init() {
 			"status.pools[*].availableDevices": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"status.pools[*].counterSets": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.pools[*].counterSets[*].counters": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.pools[*].counterSets[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.pools[*].driver": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name-caseless"},
 				{ErrorType: "FieldValueRequired"},
@@ -120,11 +129,35 @@ func init() {
 			"status.pools[*].nodeName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 			},
+			"status.pools[*].partitionSummary": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.pools[*].partitionSummary[*].allocatable": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"status.pools[*].partitionSummary[*].total": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"status.pools[*].partitionSummary[*].type": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.pools[*].poolName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-pool-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.pools[*].resourceSliceCount": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"status.pools[*].shareableSummary.capacity": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.pools[*].shareableSummary.capacity[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.pools[*].shareableSummary.fullyAvailableDevices": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"status.pools[*].shareableSummary.partiallyAvailableDevices": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"status.pools[*].totalDevices": {

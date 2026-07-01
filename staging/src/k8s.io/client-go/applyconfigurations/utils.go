@@ -1670,6 +1670,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ResourceSliceSpecApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1alpha3
+	case v1alpha3.SchemeGroupVersion.WithKind("CounterSetStatus"):
+		return &resourcev1alpha3.CounterSetStatusApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("CounterStatus"):
+		return &resourcev1alpha3.CounterStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaint"):
 		return &resourcev1alpha3.DeviceTaintApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRule"):
@@ -1680,6 +1684,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceTaintRuleStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintSelector"):
 		return &resourcev1alpha3.DeviceTaintSelectorApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("PartitionTypeStatus"):
+		return &resourcev1alpha3.PartitionTypeStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("PoolStatus"):
 		return &resourcev1alpha3.PoolStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequest"):
@@ -1688,6 +1694,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.ResourcePoolStatusRequestSpecApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequestStatus"):
 		return &resourcev1alpha3.ResourcePoolStatusRequestStatusApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ShareableCapacityStatus"):
+		return &resourcev1alpha3.ShareableCapacityStatusApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ShareableSummaryStatus"):
+		return &resourcev1alpha3.ShareableSummaryStatusApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1beta1
 	case resourcev1beta1.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):
