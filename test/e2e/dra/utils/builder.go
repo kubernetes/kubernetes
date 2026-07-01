@@ -36,6 +36,7 @@ import (
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
@@ -766,6 +767,104 @@ func NetworkResources(maxAllocations int, tainted bool) driverResourcesGenFunc {
 			},
 		}
 		return driverResources
+	}
+}
+
+// PartitionProfileAttribute is the fully qualified device attribute whose value
+// labels each device's partition type in PartitionableResources.
+const PartitionProfileAttribute = resourceapi.FullyQualifiedName("dra.e2e.example.com/profile")
+
+// PartitionableResources publishes one pool "partitioned" split into a
+// shared-counter slice and a device slice whose devices consume those counters.
+// Each device carries the PartitionProfileAttribute ("Full"/"Half"). When
+// withPartitionType is true both slices declare PartitionTypeAttribute, which
+// opts the pool into the typed partitionSummary view; otherwise the pool falls
+// back to the counterSets view. Node-selected for control-plane use.
+func PartitionableResources(withPartitionType bool) driverResourcesGenFunc {
+	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
+		full := "Full"
+		half := "Half"
+		devices := []resourceapi.Device{
+			partitionDevice("full", full, "8"),
+			partitionDevice("half-a", half, "4"),
+			partitionDevice("half-b", half, "4"),
+		}
+		counterSlice := resourceslice.Slice{
+			SharedCounters: []resourceapi.CounterSet{{
+				Name:     "gpu-0",
+				Counters: map[string]resourceapi.Counter{"memory": {Value: resource.MustParse("8")}},
+			}},
+		}
+		deviceSlice := resourceslice.Slice{Devices: devices}
+		if withPartitionType {
+			attr := PartitionProfileAttribute
+			counterSlice.PartitionTypeAttribute = &attr
+			deviceSlice.PartitionTypeAttribute = &attr
+		}
+		return map[string]resourceslice.DriverResources{
+			multiHostDriverResources: {
+				Pools: map[string]resourceslice.Pool{
+					"partitioned": {
+						Slices:       []resourceslice.Slice{counterSlice, deviceSlice},
+						NodeSelector: hostnameSelector(nodes),
+						Generation:   1,
+					},
+				},
+			},
+		}
+	}
+}
+
+// partitionDevice builds a device that consumes "memory" counters from gpu-0 and
+// carries the partition-type attribute.
+func partitionDevice(name, profile, memory string) resourceapi.Device {
+	return resourceapi.Device{
+		Name:       name,
+		Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{resourceapi.QualifiedName(PartitionProfileAttribute): {StringValue: &profile}},
+		ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+			CounterSet: "gpu-0",
+			Counters:   map[string]resourceapi.Counter{"memory": {Value: resource.MustParse(memory)}},
+		}},
+	}
+}
+
+// ShareableResources publishes one pool "shareable" with count shareable devices
+// (AllowMultipleAllocations), each carrying "memory" capacity, exercising the
+// shareableSummary view. Node-selected for control-plane use.
+func ShareableResources(count int) driverResourcesGenFunc {
+	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
+		devices := make([]resourceapi.Device, count)
+		for i := range count {
+			devices[i] = resourceapi.Device{
+				Name:                     fmt.Sprintf("shared-%d", i),
+				AllowMultipleAllocations: ptr.To(true),
+				Capacity:                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("16")}},
+			}
+		}
+		return map[string]resourceslice.DriverResources{
+			multiHostDriverResources: {
+				Pools: map[string]resourceslice.Pool{
+					"shareable": {
+						Slices:       []resourceslice.Slice{{Devices: devices}},
+						NodeSelector: hostnameSelector(nodes),
+						Generation:   1,
+					},
+				},
+			},
+		}
+	}
+}
+
+// hostnameSelector selects all of the test's nodes by hostname.
+func hostnameSelector(nodes *Nodes) *v1.NodeSelector {
+	return &v1.NodeSelector{
+		NodeSelectorTerms: []v1.NodeSelectorTerm{{
+			MatchExpressions: []v1.NodeSelectorRequirement{{
+				Key:      "kubernetes.io/hostname",
+				Operator: v1.NodeSelectorOpIn,
+				Values:   nodes.NodeNames,
+			}},
+		}},
 	}
 }
 

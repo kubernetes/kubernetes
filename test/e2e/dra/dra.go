@@ -725,6 +725,92 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					})))
 			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
 		})
+
+		// expectPool creates a request for driverName and waits until the
+		// completed status contains a pool matching poolMatcher.
+		expectPool := func(ctx context.Context, driverName string, poolMatcher any) {
+			client := f.ClientSet.ResourceV1alpha3().ResourcePoolStatusRequests()
+			gomega.Eventually(ctx, func(g gomega.Gomega, ctx context.Context) {
+				request, err := client.Create(ctx, &resourcealphaapi.ResourcePoolStatusRequest{
+					ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-views-"},
+					Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: driverName},
+				}, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				defer func() { _ = client.Delete(ctx, request.Name, metav1.DeleteOptions{}) }()
+
+				g.Eventually(ctx, framework.GetObject(client.Get, request.Name, metav1.GetOptions{})).
+					WithTimeout(15 * time.Second).
+					Should(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Status": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Pools": gomega.ContainElement(poolMatcher),
+							"Conditions": gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Type":   gomega.Equal("Complete"),
+								"Status": gomega.Equal(metav1.ConditionTrue),
+							})),
+						})),
+					})))
+			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+		}
+
+		framework.Context("partitionable typed view", f.WithFeatureGate(features.DRAPartitionableDevices), func() {
+			pnodes := drautils.NewNodes(f, 1, 1)
+			pdriver := drautils.NewDriver(f, pnodes, drautils.PartitionableResources(true))
+			pdriver.WithKubelet = false
+
+			f.It("should report partitionSummary for a partitionable pool", func(ctx context.Context) {
+				expectPool(ctx, pdriver.Name, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"PoolName":        gomega.Equal("partitioned"),
+					"ValidationError": gomega.BeNil(),
+					"PartitionSummary": gomega.ConsistOf(
+						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Type: "Full", Total: 1, Allocatable: 1}),
+						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Type: "Half", Total: 2, Allocatable: 2}),
+					),
+					"CounterSets": gomega.BeEmpty(),
+				}))
+			})
+		})
+
+		framework.Context("partitionable counter view", f.WithFeatureGate(features.DRAPartitionableDevices), func() {
+			cnodes := drautils.NewNodes(f, 1, 1)
+			cdriver := drautils.NewDriver(f, cnodes, drautils.PartitionableResources(false))
+			cdriver.WithKubelet = false
+
+			f.It("should report counterSets fallback when no partition type is declared", func(ctx context.Context) {
+				expectPool(ctx, cdriver.Name, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"PoolName":         gomega.Equal("partitioned"),
+					"ValidationError":  gomega.BeNil(),
+					"PartitionSummary": gomega.BeEmpty(),
+					"CounterSets": gomega.ConsistOf(
+						gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Name":     gomega.Equal("gpu-0"),
+							"Counters": gomega.HaveKey("memory"),
+						}),
+					),
+				}))
+			})
+		})
+
+		framework.Context("shareable view", f.WithFeatureGate(features.DRAConsumableCapacity), func() {
+			snodes := drautils.NewNodes(f, 1, 1)
+			sdriver := drautils.NewDriver(f, snodes, drautils.ShareableResources(2))
+			sdriver.WithKubelet = false
+
+			f.It("should report shareableSummary for a pool with shareable devices", func(ctx context.Context) {
+				expectPool(ctx, sdriver.Name, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"PoolName":        gomega.Equal("shareable"),
+					"ValidationError": gomega.BeNil(),
+					"ShareableSummary": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"FullyAvailableDevices":     gomega.BeEquivalentTo(2),
+						"PartiallyAvailableDevices": gomega.BeEquivalentTo(0),
+						"Capacity": gomega.ConsistOf(
+							gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Name": gomega.Equal("memory"),
+							}),
+						),
+					})),
+				}))
+			})
+		})
 	})
 
 	type expectedMetadataFile struct {
