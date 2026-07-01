@@ -214,9 +214,25 @@ func assertEquivalence(t *testing.T, val interface{}) {
 			unstrMap, expectedCEL, expectedCEL.Type(), gotCEL.Value(), gotCEL, gotCEL.Type())
 	}
 
-	// Verify inverse equality (NativeToValue.Equal(SchemalessTypedToVal)).
-	if expectedCEL.Equal(gotCEL) != types.True {
-		t.Errorf("Inverse equivalence mismatch!")
+	// Verify ConvertToNative(structpbValueType) matches the result of converting unstrMap via expectedCEL.ConvertToNative(structpbValueType).
+	gotPB, err := gotCEL.ConvertToNative(structpbValueType)
+	if err != nil {
+		t.Fatalf("SchemalessTypedToVal.ConvertToNative(structpbValueType) failed: %v", err)
+	}
+
+	expectedPB, err := expectedCEL.ConvertToNative(structpbValueType)
+	if err != nil {
+		t.Fatalf("expectedCEL.ConvertToNative(structpbValueType) failed: %v", err)
+	}
+
+	gotStructPB, ok1 := gotPB.(*structpb.Value)
+	expectedStructPB, ok2 := expectedPB.(*structpb.Value)
+	if !ok1 || !ok2 {
+		t.Fatalf("expected *structpb.Value results, got %T and %T", gotPB, expectedPB)
+	}
+
+	if !proto.Equal(gotStructPB, expectedStructPB) {
+		t.Errorf("ConvertToNative(structpbValueType) equivalence mismatch!\nGot:      %v\nExpected: %v", gotStructPB, expectedStructPB)
 	}
 }
 
