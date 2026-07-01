@@ -387,6 +387,12 @@ func (s *Scheme) ValidateUpdate(ctx context.Context, options []string, object, o
 	return nil
 }
 
+// HasValidatationFunc checks if the provided object supports declarative validation.
+func (s *Scheme) HasValidationFunc(obj Object) bool {
+	_, ok := s.validationFuncs[reflect.TypeOf(obj)]
+	return ok
+}
+
 // Convert will attempt to convert in into out. Both must be pointers. For easy
 // testing of conversion functions. Returns an error if the conversion isn't
 // possible. You can call this with types that haven't been registered (for example,

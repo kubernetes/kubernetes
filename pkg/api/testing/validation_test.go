@@ -18,10 +18,12 @@ package testing
 
 import (
 	"math/rand"
+	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -29,40 +31,23 @@ import (
 	resourcevalidation "k8s.io/kubernetes/pkg/apis/resource/validation"
 )
 
-// FIXME: Automatically finds all group/versions supporting declarative validation, or add
-// a reflexive test that verifies that they are all registered.
-func TestVersionedValidationByFuzzing(t *testing.T) {
-	typesWithDeclarativeValidation := []schema.GroupVersion{
-		// Registered group versions for versioned validation fuzz testing:
-		{Group: "", Version: "v1"},
-		{Group: "batch", Version: "v1"},
-		{Group: "batch", Version: "v1beta1"},
-		{Group: "certificates.k8s.io", Version: "v1"},
-		{Group: "certificates.k8s.io", Version: "v1alpha1"},
-		{Group: "certificates.k8s.io", Version: "v1beta1"},
-		{Group: "resource.k8s.io", Version: "v1"},
-		{Group: "resource.k8s.io", Version: "v1alpha3"},
-		{Group: "resource.k8s.io", Version: "v1beta1"},
-		{Group: "resource.k8s.io", Version: "v1beta2"},
-		{Group: "storage.k8s.io", Version: "v1"},
-		{Group: "storage.k8s.io", Version: "v1alpha1"},
-		{Group: "storage.k8s.io", Version: "v1beta1"},
-		{Group: "node.k8s.io", Version: "v1"},
-		{Group: "node.k8s.io", Version: "v1alpha1"},
-		{Group: "node.k8s.io", Version: "v1beta1"},
-		{Group: "network.k8s.io", Version: "v1"},
-		{Group: "network.k8s.io", Version: "v1beta1"},
-		{Group: "autoscaling", Version: "v1"},
-		{Group: "autoscaling", Version: "v2"},
-		{Group: "admissionregistration.k8s.io", Version: "v1"},
-		{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"},
-		{Group: "discovery.k8s.io", Version: "v1"},
-		{Group: "discovery.k8s.io", Version: "v1beta1"},
-		{Group: "admissionregistration.k8s.io", Version: "v1"},
-		{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1"},
+// getGVsWithDeclarativeValidation gets all group/versions supporting declarative validation.
+func getGVsWithDeclarativeValidation() []schema.GroupVersion {
+	var groupVersions []schema.GroupVersion
+
+	for gvk, rtype := range legacyscheme.Scheme.AllKnownTypes() {
+		obj, ok := reflect.New(rtype).Interface().(runtime.Object)
+		if !ok || !legacyscheme.Scheme.HasValidationFunc(obj) {
+			continue
+		}
+		groupVersions = append(groupVersions, gvk.GroupVersion())
 	}
+
+	return groupVersions
+}
+
+func TestVersionedValidationByFuzzing(t *testing.T) {
+	typesWithDeclarativeValidation := getGVsWithDeclarativeValidation()
 
 	// subresourceOnly specifies the subresource path for types that can only be validated
 	// as subresources (e.g. autoscaling/Scale) and do not support root-level validation.
@@ -72,6 +57,8 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 	subresourceOnly := map[schema.GroupVersionKind]string{
 		{Group: "autoscaling", Version: "v1", Kind: "Scale"}: "scale",
 		{Group: "autoscaling", Version: "v2", Kind: "Scale"}: "scale",
+		{Group: "apps", Version: "v1beta1", Kind: "Scale"}:   "scale",
+		{Group: "apps", Version: "v1beta2", Kind: "Scale"}:   "scale",
 	}
 
 	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
@@ -81,7 +68,7 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		for kind := range legacyscheme.Scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
 			t.Run(gvk.String(), func(t *testing.T) {
-				for i := 0; i < fuzzIters; i++ {
+				for range fuzzIters {
 					obj, err := legacyscheme.Scheme.New(gvk)
 					if err != nil {
 						t.Fatalf("could not create a %v: %s", kind, err)
