@@ -226,7 +226,10 @@ func conditionsToAppliedErroredUnevaluated(conditions iter.Seq[Condition], evalC
 			}
 			appliedCondReasons = append(appliedCondReasons, reason)
 			continue
-		default: // => evalResult.IsFalse() == true
+		case evalResult.IsFalse():
+			continue
+		default:
+			errs = append(errs, fmt.Errorf("condition %q with effect=%s produced error: unknown evaluation result %v", id, effect, evalResult))
 			continue
 		}
 	}
