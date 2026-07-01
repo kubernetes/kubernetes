@@ -340,11 +340,11 @@ type ConditionsDataAdmissionControl interface {
 	// However, a value of false for this does not mean that the modification will be persisted, because it
 	// could still be rejected by a subsequent validation step.
 	IsDryRun() bool
-	// GetObject is the object from the incoming request prior to default values being applied
+	// GetObject is the object from the incoming request. Only populated for CREATE and UPDATE requests.
 	GetObject() runtime.Object
-	// GetOldObject is the existing object. Only populated for UPDATE and DELETE requests.
+	// GetOldObject is the existing object in storage. Only populated for UPDATE and DELETE requests.
 	GetOldObject() runtime.Object
-	// GetKind is the type of object being manipulated.  For example: Pod
+	// GetKind is the type of object being manipulated. For example: Pod
 	GetKind() schema.GroupVersionKind
 	// GetUserInfo is information about the requesting user
 	GetUserInfo() user.Info
