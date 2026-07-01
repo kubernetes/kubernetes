@@ -75,13 +75,14 @@ func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 // making this the variant that is used when any of those
 // are enabled.
 var SupportedFeatures = internal.Features{
-	AdminAccess:            true,
-	PrioritizedList:        true,
-	PartitionableDevices:   true,
-	DeviceTaints:           true,
-	DeviceBindingAndStatus: true,
-	ConsumableCapacity:     true,
-	ListTypeAttributes:     true,
+	AdminAccess:             true,
+	PrioritizedList:         true,
+	PartitionableDevices:    true,
+	DeviceTaints:            true,
+	DeviceBindingAndStatus:  true,
+	ConsumableCapacity:      true,
+	FractionalCapacityRange: true,
+	ListTypeAttributes:      true,
 }
 
 type Allocator struct {
@@ -1402,9 +1403,9 @@ func (alloc *allocator) CmpRequestOverCapacity(request requestAccessor, slice *d
 	allowMultipleAllocations := device.AllowMultipleAllocations
 	capacities := device.Capacity
 	if allocatedCapacity, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
-		return CmpRequestOverCapacity(allocatedCapacity, request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity)
+		return CmpRequestOverCapacity(allocatedCapacity, request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
 	}
-	return CmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity)
+	return CmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
 }
 
 func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
@@ -1571,7 +1572,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		}
 
 		if allowMultipleAllocations {
-			consumedCapacity = GetConsumedCapacityFromRequest(request.capacities(), device.Capacity)
+			consumedCapacity = GetConsumedCapacityFromRequest(request.capacities(), device.Capacity, alloc.features.FractionalCapacityRange)
 			shareID = GenerateNewShareID()
 			alloc.logger.V(7).Info("Device capacity allocated", "device", device.id,
 				"consumed capacity", klog.Format(consumedCapacity))

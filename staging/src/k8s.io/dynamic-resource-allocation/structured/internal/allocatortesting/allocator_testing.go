@@ -109,6 +109,12 @@ var (
 	two   = *resource.NewQuantity(2, resource.BinarySI)
 	three = *resource.NewQuantity(3, resource.BinarySI)
 	four  = *resource.NewQuantity(4, resource.BinarySI)
+
+	pointOne     = resource.MustParse("100m")
+	pointTwo     = resource.MustParse("200m")
+	pointTwoFive = resource.MustParse("250m")
+	// pointThree uses NewMilliQuantity so its s field matches allocator output (s:"").
+	pointThree = *resource.NewMilliQuantity(300, resource.DecimalSI)
 )
 
 func init() {
@@ -515,6 +521,30 @@ func (in wrapDevice) withCapacityRequestPolicyRange(capacity map[resourceapi.Qua
 					Min:  ptr.To(two),
 					Step: ptr.To(two),
 					Max:  ptr.To(four),
+				},
+			},
+		}
+	}
+	return wrapDevice{Device: *device}
+}
+
+// withFractionalCapacityRequestPolicyRange adds capacity with a fractional requestPolicy
+// (min=200m, step=100m, max=1, default=200m).
+func (in wrapDevice) withFractionalCapacityRequestPolicyRange(capacity map[resourceapi.QualifiedName]resource.Quantity) wrapDevice {
+	inDevice := in.Device
+	device := inDevice.DeepCopy()
+	if device.Capacity == nil {
+		device.Capacity = make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, len(capacity))
+	}
+	for name, quantity := range capacity {
+		device.Capacity[name] = resourceapi.DeviceCapacity{
+			Value: quantity,
+			RequestPolicy: &resourceapi.CapacityRequestPolicy{
+				Default: &pointTwo,
+				ValidRange: &resourceapi.CapacityRequestPolicyRange{
+					Min:  &pointTwo,
+					Step: &pointOne,
+					Max:  &one,
 				},
 			},
 		}
@@ -5969,6 +5999,68 @@ func TestAllocator(t *testing.T,
 					localNodeSelector(node1),
 					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 					deviceRequestAllocationResult(req1, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+				),
+			},
+		},
+
+		// Test cases for DRAFractionalCapacityRange feature
+		"consumable-capacity-fractional-range-gate-disabled": {
+			// FractionalCapacityRange is off: step arithmetic uses Value(), which rounds
+			// sub-integer quantities up to 1.  With min=1, step=1, request=1:
+			// added=0, n=0 → consumed = min + step*0 = 1 (DecimalSI, from step's format).
+			features: Features{
+				ConsumableCapacity: true,
+				// FractionalCapacityRange intentionally not set
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&pointTwo)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withFractionalCapacityRequestPolicyRange(
+						map[resourceapi.QualifiedName]resource.Quantity{capacity0: one},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					// Integer path: Value() of 200m and 100m both round up to 1,
+					// so min=1, step=1, added=0 → result = NewQuantity(1, DecimalSI).
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{
+						capacity0: *resource.NewQuantity(1, resource.DecimalSI),
+					}),
+				),
+			},
+		},
+		"consumable-capacity-fractional-range-gate-enabled-round-up": {
+			// FractionalCapacityRange on: 250m is between min=200m and next step=300m,
+			// so it is rounded up to 300m (milli-arithmetic: (250-200)/100 rounds up to 1 step).
+			features: Features{
+				ConsumableCapacity:      true,
+				FractionalCapacityRange: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&pointTwoFive)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withFractionalCapacityRequestPolicyRange(
+						map[resourceapi.QualifiedName]resource.Quantity{capacity0: one},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					// Milli path: (250m - 200m) / 100m = 0.5 → ceil → 1 step → 200m + 100m = 300m.
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{
+						capacity0: pointThree,
+					}),
 				),
 			},
 		},
