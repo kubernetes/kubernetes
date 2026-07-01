@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,6 +36,17 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+)
+
+const (
+	// minFeasiblePlacementsToFind is the minimum number of placements that would be scored
+	// in each scheduling cycle.
+	minFeasiblePlacementsToFind = 1
+	// minFeasiblePlacementsPercentageToFind is the minimum percentage of placements that
+	// would be scored in each scheduling cycle. This is a semi-arbitrary value
+	// to ensure that a certain minimum of placements are checked for feasibility.
+	// This in turn helps ensure a minimum level of spreading.
+	minFeasiblePlacementsPercentageToFind = 5
 )
 
 // errPodGroupUnschedulable is used to describe that the pod group is unschedulable.
@@ -677,6 +689,19 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
 
+	numPlacementsToFind := 1
+	if schedFwk.HasPlacementScorePlugins() {
+		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
+	}
+
+	// Only a subset of placements will be evaluated (the loop breaks once enough feasible ones are
+	// found), so shuffle to make that subset random rather than dictated by the PlacementGenerate
+	// plugin. Shuffle a copy to avoid mutating the slice the plugin returned.
+	if sched.shufflePlacements != nil && numPlacementsToFind < len(placements) {
+		placements = slices.Clone(placements)
+		sched.shufflePlacements(placements)
+	}
+
 	for _, placement := range placements {
 		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
 		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
@@ -699,6 +724,10 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 
 		if result.status.IsSuccess() || result.waitingOnPreemption {
 			successfulResults[placement] = &result
+		}
+
+		if len(successfulResults) >= numPlacementsToFind {
+			break
 		}
 	}
 
@@ -723,6 +752,49 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	}
 
 	return *successfulResults[bestPlacement]
+}
+
+// randShufflePlacements is the default placement shuffler, randomizing placement order in place.
+func randShufflePlacements(placements []*fwk.Placement) {
+	rand.Shuffle(len(placements), func(i, j int) {
+		placements[i], placements[j] = placements[j], placements[i]
+	})
+}
+
+// numFeasiblePlacementsToFind returns the number of feasible placements that once found, the scheduler stops
+// its search for more feasible placements.
+func (sched *Scheduler) numFeasiblePlacementsToFind(percentageOfPlacementsToScore *int32, placements []*fwk.Placement) (numPlacements int) {
+	numAllPlacements := len(placements)
+
+	if numAllPlacements < minFeasiblePlacementsToFind {
+		return numAllPlacements
+	}
+
+	// Use profile percentageOfPlacementsToScore if it's set. Otherwise, use global percentageOfPlacementsToScore.
+	var percentage int
+	if percentageOfPlacementsToScore != nil {
+		percentage = int(*percentageOfPlacementsToScore)
+	} else {
+		percentage = int(sched.percentageOfPlacementsToScore)
+	}
+
+	// If neither is set or the set value is 0, linearly interpolate the value between (0, 100) and (5000, 10),
+	// that is for small clusters use 100% of the placements, and for large clusters use 10% of the placements,
+	// with a hard cap at 5% placements for even larger clusters.
+	if percentage == 0 {
+		numAllNodes := 0
+		for _, placement := range placements {
+			// We are summing up placement nodes as those can overlap or skip over certain nodes.
+			// For the purpose of this computation we care about the upper bound of computed nodes throughout the scheduling cycle,
+			// which can be different than the number of nodes in the cluster.
+			numAllNodes += len(placement.Nodes)
+		}
+		percentage = max(minFeasiblePlacementsPercentageToFind, 100-numAllNodes*9/500)
+	}
+
+	numPlacements = max(minFeasiblePlacementsToFind, numAllPlacements*percentage/100)
+
+	return numPlacements
 }
 
 // findBestPlacement uses PlacementScore plugins to determine the best placement based on the scheduling results.

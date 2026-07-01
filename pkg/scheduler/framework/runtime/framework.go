@@ -95,9 +95,10 @@ type frameworkImpl struct {
 
 	sharedCSIManager fwk.CSIManager
 
-	metricsRecorder          *metrics.MetricAsyncRecorder
-	profileName              string
-	percentageOfNodesToScore *int32
+	metricsRecorder               *metrics.MetricAsyncRecorder
+	profileName                   string
+	percentageOfNodesToScore      *int32
+	percentageOfPlacementsToScore *int32
 
 	extenders []fwk.Extender
 	fwk.PodNominator
@@ -374,6 +375,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 
 	f.profileName = profile.SchedulerName
 	f.percentageOfNodesToScore = profile.PercentageOfNodesToScore
+	f.percentageOfPlacementsToScore = profile.PercentageOfPlacementsToScore
 	if profile.Plugins == nil {
 		return f, nil
 	}
@@ -390,10 +392,11 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		pluginConfig[name] = profile.PluginConfig[i].Args
 	}
 	outputProfile := config.KubeSchedulerProfile{
-		SchedulerName:            f.profileName,
-		PercentageOfNodesToScore: f.percentageOfNodesToScore,
-		Plugins:                  profile.Plugins,
-		PluginConfig:             make([]config.PluginConfig, 0, len(pg)),
+		SchedulerName:                 f.profileName,
+		PercentageOfNodesToScore:      f.percentageOfNodesToScore,
+		PercentageOfPlacementsToScore: f.percentageOfPlacementsToScore,
+		Plugins:                       profile.Plugins,
+		PluginConfig:                  make([]config.PluginConfig, 0, len(pg)),
 	}
 
 	f.pluginsMap = make(map[string]fwk.Plugin)
@@ -2204,6 +2207,11 @@ func (f *frameworkImpl) HasScorePlugins() bool {
 	return len(f.scorePlugins) > 0
 }
 
+// HasPlacementScorePlugins returns true if at least one placementScore plugin is defined.
+func (f *frameworkImpl) HasPlacementScorePlugins() bool {
+	return len(f.placementScorePlugins) > 0
+}
+
 // PodGroupPostFilterPlugins returns registered PodGroup PostFilter plugins.
 func (f *frameworkImpl) PodGroupPostFilterPlugins() []framework.PodGroupPostFilterPlugin {
 	return f.podGroupPostFilterPlugins
@@ -2302,6 +2310,11 @@ func (f *frameworkImpl) ProfileName() string {
 // PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
 func (f *frameworkImpl) PercentageOfNodesToScore() *int32 {
 	return f.percentageOfNodesToScore
+}
+
+// PercentageOfPlacementsToScore returns percentageOfPlacementsToScore associated to a profile.
+func (f *frameworkImpl) PercentageOfPlacementsToScore() *int32 {
+	return f.percentageOfPlacementsToScore
 }
 
 // Parallelizer returns a parallelizer holding parallelism for scheduler.
