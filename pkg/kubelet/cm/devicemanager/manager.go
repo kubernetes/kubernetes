@@ -195,7 +195,7 @@ func newManagerImpl(logger klog.Logger, socketPaths []string, topology []cadviso
 	for _, sp := range socketPaths {
 		server, err := plugin.NewServer(logger, sp, manager, manager)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create plugin server for %q: %v", sp, err)
+			return nil, fmt.Errorf("failed to create plugin server for %q: %w", sp, err)
 		}
 		manager.servers = append(manager.servers, server)
 	}
@@ -413,9 +413,18 @@ func (m *ManagerImpl) Start(logger klog.Logger, activePods ActivePodsFunc, sourc
 		logger.Error(err, "Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date")
 	}
 
-	for _, srv := range m.servers {
+	for i, srv := range m.servers {
 		if err := srv.Start(logger); err != nil {
-			return fmt.Errorf("failed to start device plugin server at %q: %v", srv.SocketPath(), err)
+			// Roll back the servers we already started. Callers typically
+			// `defer Stop()` only after Start returns successfully, so a
+			// partially started manager would otherwise leak the running
+			// listeners.
+			for _, started := range m.servers[:i] {
+				if stopErr := started.Stop(logger); stopErr != nil {
+					logger.Error(stopErr, "Failed to stop device plugin server while rolling back partial start", "socket", started.SocketPath())
+				}
+			}
+			return fmt.Errorf("failed to start device plugin server at %q: %w", srv.SocketPath(), err)
 		}
 	}
 	return nil
