@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 
@@ -102,9 +103,8 @@ type CompilationResult struct {
 	// as used by cel.EstimateCost.
 	MaxCost uint64
 
+	typesFromEnv
 	emptyMapVal ref.Val
-
-	features Features
 }
 
 // Device defines the input values for a CEL selector expression.
@@ -119,18 +119,8 @@ type Device struct {
 }
 
 type compiler struct {
-	// deviceType is a definition for the latest type of the `device` variable.
-	// This is needed for the cost estimator.
-	// If that ever changes such as involving type-checking expressions,
-	// some additional logic might be needed to make
-	// cost estimates version-dependent.
-	deviceType *apiservercel.DeclType
-	envset     *environment.EnvSet
-
-	// attributeType is the latest attribute type, used for cost estimation.
-	attributeType *apiservercel.DeclType
-
-	features Features
+	envset        *environment.EnvSet
+	declaredTypes []*apiservercel.DeclType
 }
 
 // Options contains several additional parameters
@@ -160,7 +150,6 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 			},
 			Expression: expression,
 			MaxCost:    math.MaxUint64,
-			features:   c.features,
 		}
 	}
 
@@ -175,7 +164,7 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
 	}
 
-	attributeReturnType, err := attributeTypeFromEnv(env)
+	typesFromEnv, err := c.getTypesFromEnv(env)
 	if err != nil {
 		return resultError("unexpected error loading CEL environment: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
@@ -184,7 +173,7 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 	// a boolean type, which then has the attribute type of this environment.
 	expectedReturnType := cel.BoolType
 	if ast.OutputType().IsExactType(expectedReturnType) ||
-		ast.OutputType().IsExactType(attributeReturnType) {
+		ast.OutputType().IsExactType(typesFromEnv.attributeType.CelType()) {
 		// Okay, is one of the acceptable types.
 	} else {
 		return resultError(fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), ast.OutputType().String()), apiservercel.ErrorTypeInvalid)
@@ -207,19 +196,19 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 	}
 
 	compilationResult := CompilationResult{
-		Program:     prog,
-		Expression:  expression,
-		OutputType:  ast.OutputType(),
-		Environment: env,
-		emptyMapVal: env.CELTypeAdapter().NativeToValue(map[string]any{}),
-		MaxCost:     math.MaxUint64,
-		features:    c.features,
+		Program:      prog,
+		Expression:   expression,
+		OutputType:   ast.OutputType(),
+		Environment:  env,
+		emptyMapVal:  env.CELTypeAdapter().NativeToValue(map[string]any{}),
+		MaxCost:      math.MaxUint64,
+		typesFromEnv: typesFromEnv,
 	}
 
 	if !options.DisableCostEstimation {
 		// We don't have a SizeEstimator. The potential size of the input (= a
 		// device) is already declared in the definition of the environment.
-		estimator := c.newCostEstimator()
+		estimator := c.newCostEstimator(typesFromEnv)
 		costEst, err := env.EstimateCost(ast, estimator)
 		if err != nil {
 			compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed: " + err.Error()}
@@ -231,56 +220,73 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 	return compilationResult
 }
 
-func (c *compiler) newCostEstimator() checker.CostEstimator {
-	base := &library.CostEstimator{SizeEstimator: &sizeEstimator{compiler: c}}
+func (c *compiler) newCostEstimator(typesFromEnv typesFromEnv) checker.CostEstimator {
+	base := &library.CostEstimator{SizeEstimator: &sizeEstimator{typesFromEnv}}
 	return &draCostEstimator{base: base}
 }
 
-// deviceFieldTypeFromEnv resolves a device field type from the actual CEL environment.
-// This is needed so NewExpressions uses the device type selected by VersionedOptions
-// and feature gates instead of the compiler's latest device type.
-func deviceFieldTypeFromEnv(env *cel.Env, field string) (*cel.Type, bool, error) {
-	var deviceType *cel.Type
-	for _, variable := range env.Variables() {
+type typesFromEnv struct {
+	deviceType          *apiservercel.DeclType // "device"
+	outerAttributesType *apiservercel.DeclType // "device.attributes" = map to map to value
+	innerAttributesType *apiservercel.DeclType // "device.attributes[foo]" = map to value
+	attributeType       *apiservercel.DeclType // "device.attributes[foo].bar" = value
+}
+
+// getTypesFromEnv determines the actual type definitions based on
+// the environment, which reflects features and stored vs. new expression.
+func (c *compiler) getTypesFromEnv(env *cel.Env) (typesFromEnv, error) {
+	var result typesFromEnv
+
+	// Use the *latest* variable with the right name because that
+	// instance overwrites the ones before it.
+	for _, variable := range slices.Backward(env.Variables()) {
 		if variable.Name() == deviceVar {
-			deviceType = variable.Type()
+			result.deviceType = c.getDeclType(variable.Type())
 			break
 		}
 	}
-	if deviceType == nil {
-		return nil, false, fmt.Errorf("%q variable is not declared", deviceVar)
+	if result.deviceType == nil {
+		return result, fmt.Errorf("%q variable is not declared", deviceVar)
 	}
 
-	fieldType, ok := env.CELTypeProvider().FindStructFieldType(deviceType.TypeName(), field)
+	fieldType, ok := env.CELTypeProvider().FindStructFieldType(result.deviceType.TypeName(), attributesVar)
 	if !ok {
-		return nil, false, nil
+		return result, fmt.Errorf("%q variable does not declare %q field", deviceVar, attributesVar)
 	}
-	if fieldType.Type == nil {
-		return nil, true, fmt.Errorf("%q field has no type", field)
+	result.outerAttributesType = c.getDeclType(fieldType.Type)
+	if result.outerAttributesType == nil {
+		return result, fmt.Errorf("%q field has no type", attributesVar)
 	}
-	return fieldType.Type, true, nil
+
+	outerMapParams := result.outerAttributesType.CelType().Parameters()
+	if len(outerMapParams) != 2 {
+		return result, fmt.Errorf("%q field should be a map, got %s", attributesVar, result.outerAttributesType.String())
+	}
+	result.innerAttributesType = c.getDeclType(outerMapParams[1])
+	if result.innerAttributesType == nil {
+		return result, fmt.Errorf("%q field does not map to type", attributesVar)
+	}
+
+	innerMapParams := result.innerAttributesType.CelType().Parameters()
+	if len(innerMapParams) != 2 {
+		return result, fmt.Errorf("%q field values should be maps, got %s", attributesVar, result.innerAttributesType.String())
+	}
+	result.attributeType = c.getDeclType(innerMapParams[1])
+	if result.attributeType == nil {
+		return result, fmt.Errorf("%q field mapped to no type at leafs", attributesVar)
+	}
+
+	return result, nil
 }
 
-// attributeTypeFromEnv resolves the attribute value type from the actual CEL environment.
-// This keeps return-type validation aligned with the VersionedOptions selection,
-// including NewExpressions environments where feature gates affect the device type.
-func attributeTypeFromEnv(env *cel.Env) (*cel.Type, error) {
-	attributesType, ok, err := deviceFieldTypeFromEnv(env, attributesVar)
-	if err != nil {
-		return nil, err
+// getDeclType maps the cel.Type to the apiservercel.DeclType. Only works for types defined by newCompiler.
+func (c *compiler) getDeclType(t *cel.Type) *apiservercel.DeclType {
+	for _, dt := range c.declaredTypes {
+		if dt.CelType() == t {
+			return dt
+		}
 	}
-	if !ok {
-		return nil, fmt.Errorf("%q variable does not declare %q field", deviceVar, attributesVar)
-	}
-	outerMapParams := attributesType.Parameters()
-	if len(outerMapParams) != 2 {
-		return nil, fmt.Errorf("%q field should be a map, got %s", attributesVar, attributesType.String())
-	}
-	innerMapParams := outerMapParams[1].Parameters()
-	if len(innerMapParams) != 2 {
-		return nil, fmt.Errorf("%q field values should be maps, got %s", attributesVar, outerMapParams[1].String())
-	}
-	return innerMapParams[1], nil
+	return nil
 }
 
 // getAttributeValue returns the native representation of the one value that
@@ -390,49 +396,56 @@ func newCompiler(features Features) *compiler {
 		return result
 	}
 
-	attributeTypeV131 := withMaxElements(
+	// declaredTypes collects all types that we declare for the environment.
+	var declaredTypes []*apiservercel.DeclType
+	declareType := func(t *apiservercel.DeclType) *apiservercel.DeclType {
+		declaredTypes = append(declaredTypes, t)
+		return t
+	}
+
+	attributeTypeV131 := declareType(withMaxElements(
 		apiservercel.AnyType,
 		resourceapi.DeviceAttributeMaxValueLength,
-	)
-	attributeTypeV136ListTypeAttributes := withMaxElements(
+	))
+	attributeTypeV136ListTypeAttributes := declareType(withMaxElements(
 		// Use DynType so that iterate functions can work (e.g. exists, all)
 		// for list type attributes.
 		apiservercel.DynType,
 		// At compile time we don't know whether an attribute will be a scalar or list.
 		uint64(max(resourceapi.DeviceAttributeMaxValueLength, resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
-	)
+	))
 	// Each map is bound by the maximum number of different attributes.
-	innerAttributesMapTypeV131 := apiservercel.NewMapType(idType, attributeTypeV131, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
-	outerAttributesMapTypeV131 := apiservercel.NewMapType(domainType, innerAttributesMapTypeV131, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
-	innerAttributesMapTypeV136ListTypeAttributes := apiservercel.NewMapType(
+	innerAttributesMapTypeV131 := declareType(apiservercel.NewMapType(idType, attributeTypeV131, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice))
+	outerAttributesMapTypeV131 := declareType(apiservercel.NewMapType(domainType, innerAttributesMapTypeV131, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice))
+	innerAttributesMapTypeV136ListTypeAttributes := declareType(apiservercel.NewMapType(
 		idType, attributeTypeV136ListTypeAttributes, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice,
-	)
-	outerAttributesMapTypeV136ListTypeAttributes := apiservercel.NewMapType(
+	))
+	outerAttributesMapTypeV136ListTypeAttributes := declareType(apiservercel.NewMapType(
 		domainType, innerAttributesMapTypeV136ListTypeAttributes, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice,
-	)
+	))
 
 	fieldsV131 := []*apiservercel.DeclField{
 		field(driverVar, driverType, true),
 		field(attributesVar, outerAttributesMapTypeV131, true),
 		field(capacityVar, outerCapacityMapType, true),
 	}
-	deviceTypeV131 := apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV131...))
+	deviceTypeV131 := declareType(apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV131...)))
 
 	// One additional field, feature-gated below.
 	fieldsV134ConsumableCapacity := []*apiservercel.DeclField{field(multiAllocVar, multiAllocType, true)}
 	fieldsV134ConsumableCapacity = append(fieldsV134ConsumableCapacity, fieldsV131...)
-	deviceTypeV134ConsumableCapacity := apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV134ConsumableCapacity...))
+	deviceTypeV134ConsumableCapacity := declareType(apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV134ConsumableCapacity...)))
 
 	fieldsV136ListTypeAttributes := []*apiservercel.DeclField{
 		field(driverVar, driverType, true),
 		field(attributesVar, outerAttributesMapTypeV136ListTypeAttributes, true),
 		field(capacityVar, outerCapacityMapType, true),
 	}
-	deviceTypeV136ListTypeAttributes := apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV136ListTypeAttributes...))
+	deviceTypeV136ListTypeAttributes := declareType(apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV136ListTypeAttributes...)))
 
 	fieldsV136ConsumableCapacityListTypeAttributes := []*apiservercel.DeclField{field(multiAllocVar, multiAllocType, true)}
 	fieldsV136ConsumableCapacityListTypeAttributes = append(fieldsV136ConsumableCapacityListTypeAttributes, fieldsV136ListTypeAttributes...)
-	deviceTypeV136ConsumableCapacityListTypeAttributes := apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV136ConsumableCapacityListTypeAttributes...))
+	deviceTypeV136ConsumableCapacityListTypeAttributes := declareType(apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV136ConsumableCapacityListTypeAttributes...)))
 
 	versioned := []environment.VersionedOptions{
 		{
@@ -522,12 +535,19 @@ func newCompiler(features Features) *compiler {
 	if err != nil {
 		panic(fmt.Errorf("internal error building CEL environment: %w", err))
 	}
-	// return with newest deviceType
+
+	// Features can be still be changed before using the compiler.
+	// The FeatureEnabled checks above ensure that the environment
+	// is set up as necessary.
+	//
+	// Also, the compiler supports both stored and new expressions.
+	//
+	// Code which needs to know the actual type of items in the current
+	// expression needs to look up the type from the active environment
+	// (see deviceFieldTypeFromEnv above).
 	return &compiler{
 		envset:        envset,
-		deviceType:    deviceTypeV136ConsumableCapacityListTypeAttributes,
-		features:      features,
-		attributeType: attributeTypeV136ListTypeAttributes,
+		declaredTypes: declaredTypes,
 	}
 }
 
@@ -632,10 +652,10 @@ func (e *draCostEstimator) EstimateCallCost(function, overloadID string, target 
 //
 // sizeEstimator is derived from the sizeEstimator in k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel.
 type sizeEstimator struct {
-	compiler *compiler
+	typesFromEnv
 }
 
-func (s *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstimate {
+func (s *sizeEstimator) EstimateSize(element checker.AstNode) (res *checker.SizeEstimate) {
 	path := element.Path()
 	if len(path) == 0 {
 		// Path() can return an empty list, early exit if it does since we can't
@@ -647,7 +667,7 @@ func (s *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstim
 	var currentNode *apiservercel.DeclType
 	switch path[0] {
 	case deviceVar:
-		currentNode = s.compiler.deviceType
+		currentNode = s.deviceType
 	default:
 		// Unknown root, shouldn't happen.
 		return nil
@@ -672,8 +692,8 @@ func (s *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstim
 				// If this is an attribute map, then we know that all elements
 				// have the same maximum size as set in attributeType, regardless
 				// of their name.
-				if currentNode.ElemType == s.compiler.attributeType {
-					currentNode = s.compiler.attributeType
+				if currentNode.ElemType == s.attributeType {
+					currentNode = s.attributeType
 					continue
 				}
 				return nil
