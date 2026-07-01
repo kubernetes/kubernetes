@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -109,6 +110,8 @@ func TestValidateClaim(t *testing.T) {
 		claim                         *resource.ResourceClaim
 		wantFailures                  field.ErrorList
 		consumableCapacityFeatureGate bool
+		derivedAttributesFeatureGate  bool
+		listTypeAttributesFeatureGate bool
 	}{
 		"good-claim": {
 			claim: testClaim(goodName, goodNS, validClaimSpec),
@@ -262,10 +265,10 @@ func TestValidateClaim(t *testing.T) {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')").MarkCoveredByDeclarative(),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), resource.FullyQualifiedName("missing-domain"), "a fully qualified name must be a domain and a name separated by a slash").MarkCoveredByDeclarative(),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), "", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')").MarkCoveredByDeclarative(),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), resource.FullyQualifiedName(""), "a fully qualified name must be a domain and a name separated by a slash").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), resource.QualifiedName("missing-domain"), "names without a domain prefix are not allowed when the DRADerivedAttributes feature gate is disabled"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), "", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), resource.QualifiedName(""), "names without a domain prefix are not allowed when the DRADerivedAttributes feature gate is disabled"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(2).Child("matchAttribute"), ""),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
@@ -275,10 +278,10 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{claim.Spec.Devices.Requests[0].Name, badName},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("missing-domain")),
+						MatchAttribute: ptr.To(resource.QualifiedName("missing-domain")),
 					},
 					{
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("")),
+						MatchAttribute: ptr.To(resource.QualifiedName("")),
 					},
 					{
 						MatchAttribute: nil,
@@ -309,17 +312,17 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{claim.Spec.Devices.Requests[0].Name, badName},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("missing-domain")),
+						MatchAttribute: ptr.To(resource.QualifiedName("missing-domain")),
 					},
 					{
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("")),
+						MatchAttribute: ptr.To(resource.QualifiedName("")),
 					},
 					{
 						MatchAttribute: nil,
 					},
 				}
 				for i := len(claim.Spec.Devices.Constraints); i < resource.DeviceConstraintsMaxSize+1; i++ {
-					claim.Spec.Devices.Constraints = append(claim.Spec.Devices.Constraints, resource.DeviceConstraint{MatchAttribute: ptr.To(resource.FullyQualifiedName("foo/bar"))})
+					claim.Spec.Devices.Constraints = append(claim.Spec.Devices.Constraints, resource.DeviceConstraint{MatchAttribute: ptr.To(resource.QualifiedName("foo/bar"))})
 				}
 				claim.Spec.Devices.Config = []resource.DeviceClaimConfiguration{{
 					Requests: []string{claim.Spec.Devices.Requests[0].Name, badName},
@@ -355,19 +358,19 @@ func TestValidateClaim(t *testing.T) {
 		"invalid-distinct-constraint": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), resource.FullyQualifiedName("missing-domain"), "a fully qualified name must be a domain and a name separated by a slash"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), resource.QualifiedName("missing-domain"), "names without a domain prefix are not allowed when the DRADerivedAttributes feature gate is disabled"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), "", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), resource.FullyQualifiedName(""), "a fully qualified name must be a domain and a name separated by a slash"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), resource.QualifiedName(""), "names without a domain prefix are not allowed when the DRADerivedAttributes feature gate is disabled"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(2), `exactly one of "matchAttribute" or "distinctAttribute" is required, but multiple fields are set`)},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:          []string{claim.Spec.Devices.Requests[0].Name},
-						DistinctAttribute: ptr.To(resource.FullyQualifiedName("missing-domain")),
+						DistinctAttribute: ptr.To(resource.QualifiedName("missing-domain")),
 					},
 					{
-						DistinctAttribute: ptr.To(resource.FullyQualifiedName("")),
+						DistinctAttribute: ptr.To(resource.QualifiedName("")),
 					},
 					{
 						MatchAttribute:    nil,
@@ -378,11 +381,104 @@ func TestValidateClaim(t *testing.T) {
 			}(),
 			consumableCapacityFeatureGate: true,
 		},
+		// Verify that a constraint referencing a derived attribute (a name without
+		// a domain prefix) is accepted if that derived attribute is defined by all
+		// targeted requests.
+		"valid-claim-with-derived-attributes": {
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "version",
+						Expression: "device.attributes['dra.example.com']['version']",
+					},
+				}
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{claim.Spec.Devices.Requests[0].Name},
+						MatchAttribute: ptr.To(resource.QualifiedName("version")),
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		// Verify that constraints referencing a derived attribute (a name without
+		// a domain prefix) are rejected if even one of the affected requests does
+		// not define that derived attribute.
+		"invalid-constraints-missing-derived-definition": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), resource.QualifiedName("version"), "must be defined as a derived attribute in request \"bar\""),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), resource.QualifiedName("version"), "must be defined as a derived attribute in request \"bar\""),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "version",
+						Expression: "device.attributes['dra.example.com']['version']",
+					},
+				}
+				barReq := claim.Spec.Devices.Requests[0].DeepCopy()
+				barReq.Name = "bar"
+				barReq.Exactly.DerivedAttributes = nil
+				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *barReq)
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{"foo", "bar"},
+						MatchAttribute: ptr.To(resource.QualifiedName("version")),
+					},
+					{
+						Requests:          []string{"foo", "bar"},
+						DistinctAttribute: ptr.To(resource.QualifiedName("version")),
+					},
+				}
+				return claim
+			}(),
+			consumableCapacityFeatureGate: true,
+			derivedAttributesFeatureGate:  true,
+		},
+		// Verify that constraints referencing a derived attribute (a name without
+		// a domain prefix) are rejected if the constraint applies to all requests
+		// (Requests is empty) and even one of the requests does not define that
+		// derived attribute.
+		"invalid-constraints-missing-derived-definition-apply-to-all": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), resource.QualifiedName("version"), "must be defined as a derived attribute in request \"bar\""),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), resource.QualifiedName("version"), "must be defined as a derived attribute in request \"bar\""),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "version",
+						Expression: "device.attributes['dra.example.com']['version']",
+					},
+				}
+				barReq := claim.Spec.Devices.Requests[0].DeepCopy()
+				barReq.Name = "bar"
+				barReq.Exactly.DerivedAttributes = nil
+				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *barReq)
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       nil, // applies to all: "foo" and "bar"
+						MatchAttribute: ptr.To(resource.QualifiedName("version")),
+					},
+					{
+						Requests:          nil, // applies to all: "foo" and "bar"
+						DistinctAttribute: ptr.To(resource.QualifiedName("version")),
+					},
+				}
+				return claim
+			}(),
+			consumableCapacityFeatureGate: true,
+			derivedAttributesFeatureGate:  true,
+		},
 		"valid-request": {
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
 				for i := len(claim.Spec.Devices.Constraints); i < resource.DeviceConstraintsMaxSize; i++ {
-					claim.Spec.Devices.Constraints = append(claim.Spec.Devices.Constraints, resource.DeviceConstraint{MatchAttribute: ptr.To(resource.FullyQualifiedName("foo/bar"))})
+					claim.Spec.Devices.Constraints = append(claim.Spec.Devices.Constraints, resource.DeviceConstraint{MatchAttribute: ptr.To(resource.QualifiedName("foo/bar"))})
 				}
 				for i := len(claim.Spec.Devices.Config); i < resource.DeviceConfigMaxSize; i++ {
 					claim.Spec.Devices.Config = append(claim.Spec.Devices.Config, resource.DeviceClaimConfiguration{
@@ -408,10 +504,10 @@ func TestValidateClaim(t *testing.T) {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')").MarkCoveredByDeclarative(),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), resource.FullyQualifiedName("missing-domain"), "a fully qualified name must be a domain and a name separated by a slash").MarkCoveredByDeclarative(),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), "", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')").MarkCoveredByDeclarative(),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), resource.FullyQualifiedName(""), "a fully qualified name must be a domain and a name separated by a slash").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), resource.QualifiedName("missing-domain"), "names without a domain prefix are not allowed when the DRADerivedAttributes feature gate is disabled"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), "", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), resource.QualifiedName(""), "names without a domain prefix are not allowed when the DRADerivedAttributes feature gate is disabled"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(2).Child("matchAttribute"), ""),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
@@ -421,10 +517,10 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{claim.Spec.Devices.Requests[0].Name, badName},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("missing-domain")),
+						MatchAttribute: ptr.To(resource.QualifiedName("missing-domain")),
 					},
 					{
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("")),
+						MatchAttribute: ptr.To(resource.QualifiedName("")),
 					},
 					{
 						MatchAttribute: nil,
@@ -633,6 +729,167 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
+		"derived-attributes-valid": {
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-invalid-name": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("name"), badName, content.IsCIdentifier(string(badName))[0]),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       resource.QualifiedName(badName), // Invalid name format (contains special characters)
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-duplicate-name": {
+			wantFailures: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(1), "sharedNumaNode").MarkCoveredByDeclarative(),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+					{
+						Name:       "sharedNumaNode", // Duplicate name
+						Expression: `device.attributes["dra.example.com"]["socket"]`,
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-CEL-compile-errors": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), `device.attributes[true].someBoolean`, "compilation failed: ERROR: <input>:1:18: found no matching overload for '_[_]' applied to '(map(string, map(string, any)), bool)'\n | device.attributes[true].someBoolean\n | .................^"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `device.attributes[true].someBoolean`, // Invalid map lookup key type (boolean instead of string)
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-CEL-invalid-type": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), `device.attributes`, "must evaluate to a primitive scalar (string, integer, boolean), not map(string, map(string, google.protobuf.Any))"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `device.attributes`, // Invalid return type (map instead of primitive scalar or list)
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-CEL-length": {
+			wantFailures: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), "" /*unused*/, resource.CELSelectorExpressionMaxLength),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				expression := `device.driver == ""`
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name: "sharedNumaNode",
+						// Expression length exceeds maximum allowed characters (1023)
+						Expression: strings.ReplaceAll(expression, `""`, `"`+strings.Repeat("x", resource.CELSelectorExpressionMaxLength-len(expression)+1)+`"`),
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-CEL-cost": {
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), "too complex, exceeds cost limit"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name: "sharedNumaNode",
+						// Expression complexity exceeds maximum allowed execution cost
+						Expression: `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z4, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z5, int('1'.find('[0-9]*')) < 100)))))))`,
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-list-type-disabled": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), `[1, 2, 3]`, "must evaluate to a primitive scalar (string, integer, boolean), not list(int)"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `[1, 2, 3]`, // List return type (rejected if DRAListTypeAttributes feature gate is disabled)
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate:  true,
+			listTypeAttributesFeatureGate: false,
+		},
+		"derived-attributes-list-type-enabled": {
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `[1, 2, 3]`, // List return type (allowed if DRAListTypeAttributes feature gate is enabled)
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate:  true,
+			listTypeAttributesFeatureGate: true,
+		},
+		"derived-attributes-disabled-feature-gate": {
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `[device.attributes]`, // Completely invalid type, but should be ignored because gate is disabled
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate:  false,
+			listTypeAttributesFeatureGate: false,
+		},
 		"prioritized-list-valid": {
 			wantFailures: nil,
 			claim: func() *resource.ResourceClaim {
@@ -778,7 +1035,7 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{"foo/bar"},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("dra.example.com/driverVersion")),
+						MatchAttribute: ptr.To(resource.QualifiedName("dra.example.com/driverVersion")),
 					},
 				}
 				return claim
@@ -791,7 +1048,7 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{"foo"},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("dra.example.com/driverVersion")),
+						MatchAttribute: ptr.To(resource.QualifiedName("dra.example.com/driverVersion")),
 					},
 				}
 				return claim
@@ -804,7 +1061,7 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{"foo/baz"},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("dra.example.com/driverVersion")),
+						MatchAttribute: ptr.To(resource.QualifiedName("dra.example.com/driverVersion")),
 					},
 				}
 				return claim
@@ -878,7 +1135,11 @@ func TestValidateClaim(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity: scenario.consumableCapacityFeatureGate,
+				features.DRADerivedAttributes:  scenario.derivedAttributesFeatureGate,
+				features.DRAListTypeAttributes: scenario.listTypeAttributesFeatureGate,
+			})
 			errs := ValidateResourceClaim(scenario.claim)
 			assertFailures(t, scenario.wantFailures, errs)
 		})
@@ -887,9 +1148,10 @@ func TestValidateClaim(t *testing.T) {
 
 func TestValidateClaimUpdate(t *testing.T) {
 	scenarios := map[string]struct {
-		oldClaim     *resource.ResourceClaim
-		update       func(claim *resource.ResourceClaim) *resource.ResourceClaim
-		wantFailures field.ErrorList
+		oldClaim                     *resource.ResourceClaim
+		update                       func(claim *resource.ResourceClaim) *resource.ResourceClaim
+		wantFailures                 field.ErrorList
+		derivedAttributesFeatureGate bool
 	}{
 		"valid-no-op-update": {
 			oldClaim: validClaim,
@@ -925,10 +1187,41 @@ func TestValidateClaimUpdate(t *testing.T) {
 				return claim
 			},
 		},
+		// Verify that a claim with derived attributes (unqualified
+		// matchAttribute) in its spec remains updatable even if the
+		// DRADerivedAttributes feature gate is disabled. This guarantees
+		// rollback safety.
+		//
+		// Note that at the time of writing, ResourceClaimSpec is completely
+		// immutable, which means spec validation is not executed during
+		// updates. This test is a forward-looking safeguard to ensure that
+		// if spec immutability is ever relaxed or modified in the future,
+		// rollback safety for derived attributes is still preserved.
+		"update-claim-with-derived-attribute-when-gate-is-disabled": {
+			oldClaim: func() *resource.ResourceClaim {
+				claim := validClaim.DeepCopy()
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:       []string{claim.Spec.Devices.Requests[0].Name},
+						MatchAttribute: ptr.To(resource.QualifiedName("version")),
+					},
+				}
+				return claim
+			}(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				if claim.Labels == nil {
+					claim.Labels = make(map[string]string)
+				}
+				claim.Labels["foo"] = "bar"
+				return claim
+			},
+			derivedAttributesFeatureGate: false,
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, scenario.derivedAttributesFeatureGate)
 			scenario.oldClaim.ResourceVersion = "1"
 			errs := ValidateResourceClaimUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)
 			assertFailures(t, scenario.wantFailures, errs)

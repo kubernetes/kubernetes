@@ -75,6 +75,7 @@ var (
 type Features struct {
 	EnableConsumableCapacity bool
 	EnableListTypeAttributes bool
+	EnableDerivedAttributes  bool
 }
 
 func GetCompiler(features Features) *compiler {
@@ -146,6 +147,9 @@ type Options struct {
 	// DisableCostEstimation can be set to skip estimating the worst-case CEL cost.
 	// If disabled or after an error, [CompilationResult.MaxCost] will be set to [math.Uint64].
 	DisableCostEstimation bool
+
+	// DerivedAttribute indicates if the expression is for a derived attribute.
+	DerivedAttribute bool
 }
 
 // CompileCELExpression returns a compiled CEL expression. It evaluates to bool.
@@ -175,19 +179,8 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
 	}
 
-	attributeReturnType, err := attributeTypeFromEnv(env)
-	if err != nil {
-		return resultError("unexpected error loading CEL environment: "+err.Error(), apiservercel.ErrorTypeInternal)
-	}
-
-	// This has to be valid because the end result of a CEL expression might be
-	// a boolean type, which then has the attribute type of this environment.
-	expectedReturnType := cel.BoolType
-	if ast.OutputType().IsExactType(expectedReturnType) ||
-		ast.OutputType().IsExactType(attributeReturnType) {
-		// Okay, is one of the acceptable types.
-	} else {
-		return resultError(fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), ast.OutputType().String()), apiservercel.ErrorTypeInvalid)
+	if outputTypeErr := c.validateOutputType(env, ast.OutputType(), options); outputTypeErr != nil {
+		return resultError(outputTypeErr.Detail, outputTypeErr.Type)
 	}
 
 	_, err = cel.AstToCheckedExpr(ast)
@@ -375,6 +368,135 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 		return false, details, fmt.Errorf("CEL native result value should have been a bool, got instead: %T", resultAny)
 	}
 	return resultBool, details, nil
+}
+
+// EvaluateDerivedAttribute evaluates the compiled CEL expression as a derived attribute against a device,
+// returning the evaluated DeviceAttribute or an error.
+func (c CompilationResult) EvaluateDerivedAttribute(ctx context.Context, input Device) (*resourceapi.DeviceAttribute, *cel.EvalDetails, error) {
+	attributes := make(map[string]any)
+	for name, attr := range input.Attributes {
+		value, err := c.getAttributeValue(attr)
+		if err != nil {
+			return nil, nil, fmt.Errorf("attribute %s: %w", name, err)
+		}
+		domain, id := parseQualifiedName(name, input.Driver)
+		if attributes[domain] == nil {
+			attributes[domain] = make(map[string]any)
+		}
+		attributes[domain].(map[string]any)[id] = value
+	}
+
+	capacity := make(map[string]any)
+	for name, cap := range input.Capacity {
+		domain, id := parseQualifiedName(name, input.Driver)
+		if capacity[domain] == nil {
+			capacity[domain] = make(map[string]apiservercel.Quantity)
+		}
+		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
+	}
+
+	variables := map[string]any{
+		deviceVar: map[string]any{
+			driverVar:     input.Driver,
+			multiAllocVar: ptr.Deref(input.AllowMultipleAllocations, false),
+			attributesVar: newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), attributes, c.emptyMapVal),
+			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
+		},
+	}
+
+	result, details, err := c.Program.ContextEval(ctx, variables)
+	if err != nil {
+		if strings.Contains(err.Error(), "operation interrupted") && ctx.Err() != nil {
+			return nil, details, fmt.Errorf("%w: %w", err, context.Cause(ctx))
+		}
+		return nil, details, err
+	}
+
+	attr, err := valToDeviceAttribute(result)
+	if err != nil {
+		return nil, details, err
+	}
+	return attr, details, nil
+}
+
+func valToDeviceAttribute(val ref.Val) (*resourceapi.DeviceAttribute, error) {
+	switch val.Type().TypeName() {
+	case "bool":
+		b := val.Value().(bool)
+		return &resourceapi.DeviceAttribute{BoolValue: &b}, nil
+
+	case "int":
+		i := val.Value().(int64)
+		return &resourceapi.DeviceAttribute{IntValue: &i}, nil
+
+	case "string":
+		s := val.Value().(string)
+		return &resourceapi.DeviceAttribute{StringValue: &s}, nil
+
+	case "kubernetes.Semver":
+		s := val.Value().(semver.Version).String()
+		return &resourceapi.DeviceAttribute{VersionValue: &s}, nil
+
+	case "list":
+		lister, ok := val.(traits.Lister)
+		if !ok {
+			return nil, fmt.Errorf("list value does not implement traits.Lister")
+		}
+
+		length := int(lister.Size().Value().(int64))
+		if length == 0 {
+			return &resourceapi.DeviceAttribute{StringValues: []string{}}, nil
+		}
+
+		first := lister.Get(types.Int(0))
+		switch first.Type().TypeName() {
+		case "bool":
+			vals := make([]bool, length)
+			for i := range length {
+				elemVal, err := lister.Get(types.Int(i)).ConvertToNative(reflect.TypeFor[bool]())
+				if err != nil {
+					return nil, fmt.Errorf("convert element %d to bool failed: %w", i, err)
+				}
+				vals[i] = elemVal.(bool)
+			}
+			return &resourceapi.DeviceAttribute{BoolValues: vals}, nil
+
+		case "int":
+			vals := make([]int64, length)
+			for i := range length {
+				elemVal, err := lister.Get(types.Int(i)).ConvertToNative(reflect.TypeFor[int64]())
+				if err != nil {
+					return nil, fmt.Errorf("convert element %d to int failed: %w", i, err)
+				}
+				vals[i] = elemVal.(int64)
+			}
+			return &resourceapi.DeviceAttribute{IntValues: vals}, nil
+
+		case "string":
+			vals := make([]string, length)
+			for i := range length {
+				elemVal, err := lister.Get(types.Int(i)).ConvertToNative(reflect.TypeFor[string]())
+				if err != nil {
+					return nil, fmt.Errorf("convert element %d to string failed: %w", i, err)
+				}
+				vals[i] = elemVal.(string)
+			}
+			return &resourceapi.DeviceAttribute{StringValues: vals}, nil
+
+		case "kubernetes.Semver":
+			vals := make([]string, length)
+			for i := range length {
+				vals[i] = lister.Get(types.Int(i)).Value().(semver.Version).String()
+			}
+			return &resourceapi.DeviceAttribute{VersionValues: vals}, nil
+
+		default:
+			return nil, fmt.Errorf("unsupported list element type: %s", first.Type().TypeName())
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported CEL return type: %s", val.Type().TypeName())
+	}
 }
 
 func newCompiler(features Features) *compiler {
@@ -689,4 +811,67 @@ func (s *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstim
 
 func (s *sizeEstimator) EstimateCallCost(function, overloadID string, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
 	return nil
+}
+
+func (c compiler) validateOutputType(env *cel.Env, t *cel.Type, options Options) *apiservercel.Error {
+	// Scenario: Derived attributes.
+	// They must evaluate to primitive scalars or lists of those scalars to
+	// ensure they can be matched by the scheduler using basic equality or
+	// disjointness comparisons.
+	if options.DerivedAttribute {
+		if !c.features.EnableDerivedAttributes {
+			return nil
+		}
+		if c.isAllowedDerivedAttributeType(t) {
+			return nil
+		}
+		detail := "must evaluate to a primitive scalar (string, integer, boolean), not %v"
+		if c.features.EnableListTypeAttributes {
+			detail = "must evaluate to a primitive scalar (string, integer, boolean) or a list of these scalars, not %v"
+		}
+		return &apiservercel.Error{
+			Type:   apiservercel.ErrorTypeInvalid,
+			Detail: fmt.Sprintf(detail, t.String()),
+		}
+	}
+
+	// Scenario: Device selector expressions.
+	attributeReturnType, err := attributeTypeFromEnv(env)
+	if err != nil {
+		return &apiservercel.Error{
+			Type:   apiservercel.ErrorTypeInternal,
+			Detail: "unexpected error loading CEL environment: " + err.Error(),
+		}
+	}
+
+	expectedReturnType := cel.BoolType
+	if t.IsExactType(expectedReturnType) || t.IsExactType(attributeReturnType) {
+		return nil
+	}
+	return &apiservercel.Error{
+		Type:   apiservercel.ErrorTypeInvalid,
+		Detail: fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), t.String()),
+	}
+}
+
+func (c compiler) isAllowedDerivedAttributeType(t *cel.Type) bool {
+	if c.isAllowedDerivedAttributeScalarType(t) {
+		return true
+	}
+	// A list in CEL is a unary generic type parameterized by exactly 1
+	// type parameter (the element type). We check that the length is 1
+	// to ensure it is a valid list and to safely access the element type.
+	if c.features.EnableListTypeAttributes && t.TypeName() == "list" && len(t.Parameters()) == 1 {
+		return c.isAllowedDerivedAttributeScalarType(t.Parameters()[0])
+	}
+	return false
+}
+
+func (c compiler) isAllowedDerivedAttributeScalarType(t *cel.Type) bool {
+	return t.IsExactType(cel.BoolType) ||
+		t.IsExactType(cel.IntType) ||
+		t.IsExactType(cel.StringType) ||
+		t.IsExactType(cel.AnyType) ||
+		t.IsExactType(cel.DynType) ||
+		t.IsExactType(apiservercel.SemverType)
 }

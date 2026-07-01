@@ -222,6 +222,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				features.DRADeviceBindingConditions:   true,
 				features.DRAConsumableCapacity:        true,
 				features.DRADeviceTaintRules:          true,
+				features.DRADerivedAttributes:         true,
 				features.DRAListTypeAttributes:        true,
 				features.DRAPartitionableDevices:      true,
 				features.DRAPrioritizedList:           true,
@@ -237,6 +238,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				runSubTest(tCtx, "Convert", testConvert)
 				runSubTest(tCtx, "ControllerManagerMetrics", testControllerManagerMetrics)
+				runSubTest(tCtx, "DerivedAttributes", testDerivedAttributes)
 				runSubTest(tCtx, "DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, true) })
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })

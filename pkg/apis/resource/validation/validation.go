@@ -57,12 +57,12 @@ import (
 var ResourceNormalizationRules = []field.NormalizationRule{
 	{
 		// ResourceClaim
-		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes)`),
 		Replacement: "spec.devices.requests[$1].exactly.$2",
 	},
 	{
 		// ResourceClaimTemplate (RCT.Spec.Spec adds an extra "spec." prefix)
-		Regexp:      regexp.MustCompile(`spec\.spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		Regexp:      regexp.MustCompile(`spec\.spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes)`),
 		Replacement: "spec.spec.devices.requests[$1].exactly.$2",
 	},
 	{
@@ -146,6 +146,7 @@ func validateResourceClaimSpec(spec *resource.ResourceClaimSpec, fldPath *field.
 func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	requestNames := gatherRequestNames(deviceClaim)
+	derivedAttrs := gatherRequestDerivedAttributes(deviceClaim)
 	allErrs = append(allErrs, validateSet(deviceClaim.Requests, resource.DeviceRequestsMaxSize,
 		func(request resource.DeviceRequest, fldPath *field.Path) field.ErrorList {
 			return validateDeviceRequest(request, fldPath, stored)
@@ -156,7 +157,7 @@ func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path,
 		fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	allErrs = append(allErrs, validateSlice(deviceClaim.Constraints, resource.DeviceConstraintsMaxSize,
 		func(constraint resource.DeviceConstraint, fldPath *field.Path) field.ErrorList {
-			return validateDeviceConstraint(constraint, fldPath, requestNames)
+			return validateDeviceConstraint(constraint, fldPath, requestNames, derivedAttrs)
 		}, fldPath.Child("constraints"), sizeCovered)...)
 	allErrs = append(allErrs, validateSlice(deviceClaim.Config, resource.DeviceConfigMaxSize,
 		func(config resource.DeviceClaimConfiguration, fldPath *field.Path) field.ErrorList {
@@ -202,6 +203,30 @@ func gatherRequestNames(deviceClaim *resource.DeviceClaim) requestNames {
 		requestNames[request.Name] = subRequestNames
 	}
 	return requestNames
+}
+
+type requestDerivedAttributes map[string]sets.Set[string]
+
+func gatherRequestDerivedAttributes(deviceClaim *resource.DeviceClaim) requestDerivedAttributes {
+	maps := make(requestDerivedAttributes)
+	for _, request := range deviceClaim.Requests {
+		if request.Exactly != nil {
+			attrs := sets.New[string]()
+			for _, attr := range request.Exactly.DerivedAttributes {
+				attrs.Insert(string(attr.Name))
+			}
+			maps[request.Name] = attrs
+		}
+		for _, subRequest := range request.FirstAvailable {
+			attrs := sets.New[string]()
+			for _, attr := range subRequest.DerivedAttributes {
+				attrs.Insert(string(attr.Name))
+			}
+			fullPath := fmt.Sprintf("%s/%s", request.Name, subRequest.Name)
+			maps[fullPath] = attrs
+		}
+	}
+	return maps
 }
 
 func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) sets.Set[structured.SharedDeviceID] {
@@ -253,6 +278,7 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	allErrs := validateRequestName(subRequest.Name, fldPath.Child("name"))
 	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
+	allErrs = append(allErrs, validateDeviceDerivedAttributes(subRequest.DerivedAttributes, fldPath.Child("derivedAttributes"), stored)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	for i, toleration := range subRequest.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
@@ -264,6 +290,7 @@ func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *fi
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
+	allErrs = append(allErrs, validateDeviceDerivedAttributes(request.DerivedAttributes, fldPath.Child("derivedAttributes"), stored)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	for i, toleration := range request.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
@@ -359,7 +386,61 @@ func convertCELErrorToValidationError(fldPath *field.Path, expression string, er
 	return field.InternalError(fldPath, fmt.Errorf("unsupported error type: %w", err))
 }
 
-func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *field.Path, requestNames requestNames) field.ErrorList {
+func validateDeviceDerivedAttributes(attrs []resource.DeviceDerivedAttribute, fldPath *field.Path, stored bool) field.ErrorList {
+	return validateSet(attrs, resource.DeviceDerivedAttributesMaxSize,
+		func(attr resource.DeviceDerivedAttribute, fldPath *field.Path) field.ErrorList {
+			return validateDeviceDerivedAttribute(attr, fldPath, stored)
+		},
+		func(attr resource.DeviceDerivedAttribute) string {
+			return string(attr.Name)
+		},
+		fldPath, sizeCovered, uniquenessCovered)
+}
+
+func validateDeviceDerivedAttribute(attr resource.DeviceDerivedAttribute, fldPath *field.Path, stored bool) field.ErrorList {
+	var allErrs field.ErrorList
+	if attr.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
+	} else {
+		allErrs = append(allErrs, validateQualifiedName(attr.Name, fldPath.Child("name"))...)
+	}
+	if attr.Expression == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("expression"), "").MarkCoveredByDeclarative())
+	} else {
+		allErrs = append(allErrs, validateCELDerivedAttributeExpression(attr.Expression, fldPath.Child("expression"), stored)...)
+	}
+	return allErrs
+}
+
+func validateCELDerivedAttributeExpression(expression string, fldPath *field.Path, stored bool) field.ErrorList {
+	var allErrs field.ErrorList
+	envType := environment.NewExpressions
+	if stored {
+		envType = environment.StoredExpressions
+	}
+	if len(expression) > resource.CELSelectorExpressionMaxLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.CELSelectorExpressionMaxLength))
+		return allErrs
+	}
+
+	result := dracel.GetCompiler(dracel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+		EnableDerivedAttributes:  utilfeature.DefaultFeatureGate.Enabled(features.DRADerivedAttributes),
+	}).CompileCELExpression(expression, dracel.Options{
+		EnvType:          &envType,
+		DerivedAttribute: true,
+	})
+	if result.Error != nil {
+		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath, expression, result.Error))
+	} else if result.MaxCost > resource.CELSelectorExpressionMaxCost {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "too complex, exceeds cost limit"))
+	}
+
+	return allErrs
+}
+
+func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *field.Path, requestNames requestNames, derivedAttrs requestDerivedAttributes) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateSet(constraint.Requests, resource.DeviceRequestsMaxSize,
 		func(name string, fldPath *field.Path) field.ErrorList {
@@ -367,9 +448,9 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 		},
 		stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	if constraint.MatchAttribute != nil {
-		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute")).MarkCoveredByDeclarative()...)
+		allErrs = append(allErrs, validateConstraintAttribute(*constraint.MatchAttribute, fldPath.Child("matchAttribute"), constraint.Requests, requestNames, derivedAttrs)...)
 	} else if constraint.DistinctAttribute != nil {
-		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute"))...)
+		allErrs = append(allErrs, validateConstraintAttribute(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute"), constraint.Requests, requestNames, derivedAttrs)...)
 	} else if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
 		allErrs = append(allErrs, field.Required(fldPath, `exactly one of "matchAttribute" or "distinctAttribute" is required, but multiple fields are set`))
 	} else {
@@ -1242,15 +1323,68 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 	return allErrs
 }
 
-func validateFullyQualifiedName(name resource.FullyQualifiedName, fldPath *field.Path) field.ErrorList {
+// validateConstraintAttribute validates that a constraint attribute
+// (MatchAttribute or DistinctAttribute) is formatted correctly. If it is a
+// fully-qualified physical attribute (contains a slash), it is allowed.
+// If it is a name without a domain prefix, it refers to a derived
+// attribute, which must be defined by all affected requests
+func validateConstraintAttribute(name resource.QualifiedName, fldPath *field.Path, affectedRequests []string, requestNames requestNames, derivedAttrs requestDerivedAttributes) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateQualifiedName(resource.QualifiedName(name), fldPath)...)
-	// validateQualifiedName checks that both parts are valid.
-	// What we need to enforce here is that there really is a domain.
-	if !strings.Contains(string(name), "/") {
-		allErrs = append(allErrs, field.Invalid(fldPath, name, "a fully qualified name must be a domain and a name separated by a slash"))
+	allErrs = append(allErrs, validateQualifiedName(name, fldPath)...)
+
+	// If the name is fully qualified (contains a slash), it refers to a physical attribute
+	// published by a driver, which is always allowed.
+	if strings.Contains(string(name), "/") {
+		return allErrs
 	}
-	return allErrs.WithOrigin("format=k8s-resource-fully-qualified-name")
+
+	// The name does not contain a slash, meaning it has no domain prefix.
+	// If the feature gate is disabled, names without a domain prefix are not permitted.
+	// Note: Unconditionally rejecting this here is rollback-safe because the
+	// ResourceClaim and ResourceClaimTemplate specs are completely immutable.
+	// Existing claims in the database with derived attributes will not be
+	// re-validated during updates (only checked for immutability), preventing
+	// update failures if the feature gate is disabled or rolled back.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRADerivedAttributes) {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, "names without a domain prefix are not allowed when the DRADerivedAttributes feature gate is disabled"))
+		return allErrs
+	}
+
+	// Verify that the derived attribute is defined by every request/subrequest
+	// that this constraint applies to.
+	if len(affectedRequests) == 0 {
+		affectedRequests = make([]string, 0, len(requestNames))
+		for req := range requestNames {
+			affectedRequests = append(affectedRequests, req)
+		}
+		slices.Sort(affectedRequests)
+	}
+
+	for _, reqRef := range affectedRequests {
+		segments := strings.Split(reqRef, "/")
+		parentReq := segments[0]
+
+		subRequests, ok := requestNames[parentReq]
+		hasSubRequests := ok && subRequests != nil
+		if !hasSubRequests || len(segments) > 1 {
+			// It refers to a single request or a specific subrequest.
+			// It must be defined as a derived attribute in that request.
+			if attrs, ok := derivedAttrs[reqRef]; !ok || !attrs.Has(string(name)) {
+				allErrs = append(allErrs, field.Invalid(fldPath, name, fmt.Sprintf("must be defined as a derived attribute in request %q", reqRef)))
+			}
+		} else {
+			// It refers to a parent request with FirstAvailable.
+			// To ensure the constraint can always be evaluated, the derived attribute
+			// must be defined in every subrequest of this request.
+			for subReq := range subRequests {
+				fullPath := fmt.Sprintf("%s/%s", parentReq, subReq)
+				if attrs, ok := derivedAttrs[fullPath]; !ok || !attrs.Has(string(name)) {
+					allErrs = append(allErrs, field.Invalid(fldPath, name, fmt.Sprintf("must be defined as a derived attribute in subrequest %q", fullPath)))
+				}
+			}
+		}
+	}
+	return allErrs
 }
 
 func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {

@@ -878,9 +878,10 @@ type DeviceClaim struct {
 }
 
 const (
-	DeviceRequestsMaxSize    = AllocationResultsMaxSize
-	DeviceConstraintsMaxSize = 32
-	DeviceConfigMaxSize      = 32
+	DeviceRequestsMaxSize          = AllocationResultsMaxSize
+	DeviceConstraintsMaxSize       = 32
+	DeviceConfigMaxSize            = 32
+	DeviceDerivedAttributesMaxSize = 32
 )
 
 // DRAAdminNamespaceLabelKey is a label key used to grant administrative access
@@ -966,6 +967,30 @@ type ExactDeviceRequest struct {
 	// +optional
 	// +listType=atomic
 	Selectors []DeviceSelector
+
+	// DerivedAttributes defines a set of virtual attributes computed via CEL expressions
+	// for each candidate device. These virtual attributes can be referenced in
+	// `.devices.constraints` to align and match different devices (e.g., co-allocating
+	// a GPU and a NIC on the same NUMA node) even if their drivers publish different
+	// attributes. Derived attributes are not available via `device.attributes`
+	// in the CEL environment when evaluating selector expressions.
+	//
+	// Derived attributes allow you to extract, transform, or normalize topology
+	// information (such as extracting a NUMA index from a complex topology string or
+	// renaming a vendor-specific attribute) into a common virtual attribute name at
+	// scheduling time. The scheduler then evaluates these virtual attributes exactly
+	// like static attributes when matching constraints.
+	//
+	// The maximum number of derived attributes is 32.
+	//
+	// This is an alpha field and requires enabling the DRADerivedAttributes
+	// feature gate.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRADerivedAttributes
+	DerivedAttributes []DeviceDerivedAttribute
 
 	// AllocationMode and its related fields define how devices are allocated
 	// to satisfy this request. Supported values are:
@@ -1091,6 +1116,30 @@ type DeviceSubRequest struct {
 	// +optional
 	// +listType=atomic
 	Selectors []DeviceSelector
+
+	// DerivedAttributes defines a set of virtual attributes computed via CEL expressions
+	// for each candidate device. These virtual attributes can be referenced in
+	// `.devices.constraints` to align and match different devices (e.g., co-allocating
+	// a GPU and a NIC on the same NUMA node) even if their drivers publish different
+	// attributes. Derived attributes are not available via `device.attributes`
+	// in the CEL environment when evaluating selector expressions.
+	//
+	// Derived attributes allow you to extract, transform, or normalize topology
+	// information (such as extracting a NUMA index from a complex topology string or
+	// renaming a vendor-specific attribute) into a common virtual attribute name at
+	// scheduling time. The scheduler then evaluates these virtual attributes exactly
+	// like static attributes when matching constraints.
+	//
+	// The maximum number of derived attributes is 32.
+	//
+	// This is an alpha field and requires enabling the DRADerivedAttributes
+	// feature gate.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRADerivedAttributes
+	DerivedAttributes []DeviceDerivedAttribute
 
 	// AllocationMode and its related fields define how devices are allocated
 	// to satisfy this subrequest. Supported values are:
@@ -1280,6 +1329,52 @@ type CELDeviceSelector struct {
 	Expression string
 }
 
+// DeviceDerivedAttribute defines a derived attribute computed via CEL.
+type DeviceDerivedAttribute struct {
+	// Name is the identifier for this derived attribute, used in constraints.
+	//
+	// It must be either a C identifier (e.g. "numaNode") or a DNS
+	// subdomain followed by a slash ("/") followed by a C identifier
+	// (e.g. "example.com/numaNode").
+	//
+	// If the chosen name matches an existing physical attribute from a driver,
+	// the derived attribute's expression will shadow the physical attribute,
+	// and its evaluated value will be used in constraints instead.
+	//
+	// +required
+	Name QualifiedName
+
+	// Expression is a CEL expression evaluated against each candidate device.
+	// The expression must evaluate to a primitive scalar (string, integer,
+	// boolean, or semver) or a list of these scalars ([]string, []int64,
+	// []bool, []semver) to act as a virtual grouping key. Any other return type
+	// is an error and causes CEL evaluation for the device to fail.
+	//
+	// The expression's input is an object named "device", which carries the
+	// same properties as in a CELDeviceSelector.
+	//
+	// When pod scheduling encounters CEL runtime errors (such as looking
+	// up an attribute that isn't defined) for some devices, it will abort
+	// allocation and fail scheduling for the Pod. Surfacing evaluation
+	// errors immediately prevents silent topology matching failures that are
+	// extremely hard to detect. A robust expression should, for example, check
+	// for the existence of attributes before referencing them to avoid
+	// runtime evaluation errors.
+	//
+	// The expression gets evaluated after a device has passed the other
+	// selector expressions for the request in which this expression is used.
+	// This allows writing expressions that are tailored towards the specific
+	// devices being requested (for example, by assuming the device is from a
+	// certain vendor and skipping those checks).
+	//
+	// The length of the expression must be smaller or equal to 10 Ki. The
+	// cost of evaluating it is also limited based on the estimated number
+	// of logical steps.
+	//
+	// +required
+	Expression string
+}
+
 // CELSelectorExpressionMaxCost specifies the cost limit for a single CEL selector
 // evaluation.
 //
@@ -1340,11 +1435,14 @@ type DeviceConstraint struct {
 	// match when the intersection across all devices is non-empty.
 	// Scalar values are treated as singleton sets for backward compatibility.
 	//
-	// Must include the domain qualifier.
+	// If the DRADerivedAttributes feature gate is enabled and the domain
+	// prefix is omitted, the name refers to a derived attribute and must
+	// match the name of a derived attribute defined in the claim's requests.
+	// Otherwise, the domain prefix is required.
 	//
 	// +optional
 	// +oneOf=ConstraintType
-	MatchAttribute *FullyQualifiedName
+	MatchAttribute *QualifiedName
 
 	// Potential future extension, not part of the current design:
 	// A CEL expression which compares different devices and returns
@@ -1372,10 +1470,15 @@ type DeviceConstraint struct {
 	// This is useful for scenarios where resource requests must be fulfilled by separate physical devices.
 	// For example, a container requests two network interfaces that must be allocated from two different physical NICs.
 	//
+	// If the DRADerivedAttributes feature gate is enabled and the domain
+	// prefix is omitted, the name refers to a derived attribute and must
+	// match the name of a derived attribute defined in the claim's requests.
+	// Otherwise, the domain prefix is required.
+	//
 	// +optional
 	// +oneOf=ConstraintType
 	// +featureGate=DRAConsumableCapacity
-	DistinctAttribute *FullyQualifiedName
+	DistinctAttribute *QualifiedName
 }
 
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.

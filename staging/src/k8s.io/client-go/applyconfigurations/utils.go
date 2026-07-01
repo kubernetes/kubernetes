@@ -1606,6 +1606,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.DeviceConstraintApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("DeviceCounterConsumption"):
 		return &applyconfigurationsresourcev1.DeviceCounterConsumptionApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("DeviceDerivedAttribute"):
+		return &applyconfigurationsresourcev1.DeviceDerivedAttributeApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("DeviceRequest"):
 		return &applyconfigurationsresourcev1.DeviceRequestApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("DeviceRequestAllocationResult"):
@@ -1710,6 +1712,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceConstraintApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceCounterConsumption"):
 		return &applyconfigurationsresourcev1beta1.DeviceCounterConsumptionApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceDerivedAttribute"):
+		return &applyconfigurationsresourcev1beta1.DeviceDerivedAttributeApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceRequest"):
 		return &applyconfigurationsresourcev1beta1.DeviceRequestApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceRequestAllocationResult"):
@@ -1790,6 +1794,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.DeviceConstraintApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceCounterConsumption"):
 		return &applyconfigurationsresourcev1beta2.DeviceCounterConsumptionApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceDerivedAttribute"):
+		return &applyconfigurationsresourcev1beta2.DeviceDerivedAttributeApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceRequest"):
 		return &applyconfigurationsresourcev1beta2.DeviceRequestApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceRequestAllocationResult"):

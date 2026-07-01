@@ -79,6 +79,7 @@ type Features struct {
 
 	AdminAccess            bool
 	ConsumableCapacity     bool
+	DerivedAttributes      bool
 	DeviceBindingAndStatus bool
 	DeviceTaints           bool
 	ListTypeAttributes     bool
@@ -99,6 +100,9 @@ func (f Features) Set() sets.Set[string] {
 	}
 	if f.ConsumableCapacity {
 		enabled.Insert("DRAConsumableCapacity")
+	}
+	if f.DerivedAttributes {
+		enabled.Insert("DRADerivedAttributes")
 	}
 	if f.DeviceTaints {
 		enabled.Insert("DRADeviceTaints")
@@ -121,6 +125,7 @@ func (f Features) Set() sets.Set[string] {
 var FeaturesAll = Features{
 	AdminAccess:            true,
 	ConsumableCapacity:     true,
+	DerivedAttributes:      true,
 	DeviceBindingAndStatus: true,
 	DeviceTaints:           true,
 	ListTypeAttributes:     true,

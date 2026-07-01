@@ -282,7 +282,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		for i, constraint := range claim.Spec.Devices.Constraints {
 			switch {
 			case constraint.MatchAttribute != nil:
-				matchAttribute := resourceapi.FullyQualifiedName(*constraint.MatchAttribute)
+				matchAttribute := *constraint.MatchAttribute
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchAttributeConstraint")
@@ -295,7 +295,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				}
 				constraints[i] = m
 			case constraint.DistinctAttribute != nil:
-				distinctAttribute := resourceapi.FullyQualifiedName(*constraint.DistinctAttribute)
+				distinctAttribute := *constraint.DistinctAttribute
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "distinctAttributeConstraint")
@@ -801,7 +801,7 @@ type constraint interface {
 type matchAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
-	attributeName resourceapi.FullyQualifiedName
+	attributeName resourceapi.QualifiedName
 
 	attribute  *resourceapi.DeviceAttribute
 	numDevices int
@@ -883,9 +883,9 @@ func (m *matchAttributeConstraint) matches(requestName, subRequestName string) b
 	}
 }
 
-func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) *resourceapi.DeviceAttribute {
+func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName resourceapi.QualifiedName) *resourceapi.DeviceAttribute {
 	// Fully-qualified match?
-	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName)]; ok {
+	if attr, ok := device.Attributes[attributeName]; ok {
 		return &attr
 	}
 	index := strings.Index(string(attributeName), "/")

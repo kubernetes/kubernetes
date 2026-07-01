@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -957,5 +958,267 @@ func BenchmarkDeviceMatches(b *testing.B) {
 				run(b, *scenario.enableListTypeAttributes)
 			})
 		}
+	}
+}
+
+func TestCompileDerivedAttributes(t *testing.T) {
+	testCases := []struct {
+		name                      string
+		expression                string
+		listTypeAttributesEnabled bool
+		derivedAttributesEnabled  *bool // default to true if nil
+		expectCompileError        string
+	}{
+		{
+			name:                      "valid-bool",
+			expression:                "true",
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-int",
+			expression:                "1",
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-string",
+			expression:                `"fish"`,
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-semver",
+			expression:                `semver("1.0.0")`,
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-semver-list",
+			expression:                `[semver("1.0.0"), semver("2.0.0")]`,
+			listTypeAttributesEnabled: true,
+		},
+		{
+			name:                      "valid-attribute-lookup",
+			expression:                `device.attributes["dra.example.com"]["numa"]`,
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "invalid-map-type",
+			expression:                `device.attributes`,
+			listTypeAttributesEnabled: false,
+			expectCompileError:        "must evaluate to a primitive scalar (string, integer, boolean), not map(string, map(string, dyn))",
+		},
+		{
+			name:                      "valid-list-when-listType-enabled",
+			expression:                `[1, 2, 3]`,
+			listTypeAttributesEnabled: true,
+		},
+		{
+			name:                      "invalid-list-when-listType-disabled",
+			expression:                `[1, 2, 3]`,
+			listTypeAttributesEnabled: false,
+			expectCompileError:        "must evaluate to a primitive scalar (string, integer, boolean), not list(int)",
+		},
+		{
+			name:                      "invalid-list-of-maps",
+			expression:                `[device.attributes]`,
+			listTypeAttributesEnabled: true,
+			expectCompileError:        "must evaluate to a primitive scalar (string, integer, boolean) or a list of these scalars, not list(map(string, map(string, dyn)))",
+		},
+		{
+			name:                     "disabled-feature-gate",
+			expression:               `[device.attributes]`, // syntactically valid expression with invalid return type (list of maps)
+			derivedAttributesEnabled: new(bool),             // but gate is disabled
+			expectCompileError:       "",                    // so the type check is bypassed and it returns NO error!
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			enableDerivedAttributes := true
+			if tc.derivedAttributesEnabled != nil {
+				enableDerivedAttributes = *tc.derivedAttributesEnabled
+			}
+			compiler := GetCompiler(Features{
+				EnableListTypeAttributes: tc.listTypeAttributesEnabled,
+				EnableDerivedAttributes:  enableDerivedAttributes,
+			})
+			result := compiler.CompileCELExpression(tc.expression, Options{
+				DerivedAttribute: true,
+			})
+
+			if tc.expectCompileError != "" {
+				if result.Error == nil {
+					t.Fatalf("expected compile error %q, got none", tc.expectCompileError)
+				}
+				if !strings.Contains(result.Error.Error(), tc.expectCompileError) {
+					t.Fatalf("expected compile error to contain %q, but got: %v", tc.expectCompileError, result.Error)
+				}
+			} else if result.Error != nil {
+				t.Fatalf("unexpected compile error: %v", result.Error)
+			}
+		})
+	}
+}
+func TestEvaluateDerivedAttributes(t *testing.T) {
+	mockDevice := Device{
+		Driver: "driver-a",
+		Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+			"bool-attr":      {BoolValue: new(true)},
+			"int-attr":       {IntValue: new(int64(42))},
+			"str-attr":       {StringValue: new("hello")},
+			"ver-attr":       {VersionValue: new("1.0.0")},
+			"bool-list-attr": {BoolValues: []bool{true, false}},
+			"int-list-attr":  {IntValues: []int64{1, 2, 3}},
+			"str-list-attr":  {StringValues: []string{"hello", "world"}},
+			"ver-list-attr":  {VersionValues: []string{"1.0.0", "2.0.0"}},
+		},
+	}
+
+	testCases := []struct {
+		name            string
+		expression      string
+		device          Device
+		expectAttr      *resourceapi.DeviceAttribute
+		expectEvalError string
+	}{
+		// Scalar Literal cases
+		{
+			name:       "bool-scalar-literal",
+			expression: "true",
+			expectAttr: &resourceapi.DeviceAttribute{BoolValue: new(true)},
+		},
+		{
+			name:       "int-scalar-literal",
+			expression: "42",
+			expectAttr: &resourceapi.DeviceAttribute{IntValue: new(int64(42))},
+		},
+		{
+			name:       "string-scalar-literal",
+			expression: `"hello"`,
+			expectAttr: &resourceapi.DeviceAttribute{StringValue: new("hello")},
+		},
+		{
+			name:       "semver-scalar-literal",
+			expression: `semver("1.0.0")`,
+			expectAttr: &resourceapi.DeviceAttribute{VersionValue: new("1.0.0")},
+		},
+
+		// Scalar Device Attribute cases
+		{
+			name:       "bool-scalar-device",
+			expression: `device.attributes["driver-a"]["bool-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{BoolValue: new(true)},
+		},
+		{
+			name:       "int-scalar-device",
+			expression: `device.attributes["driver-a"]["int-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{IntValue: new(int64(42))},
+		},
+		{
+			name:       "string-scalar-device",
+			expression: `device.attributes["driver-a"]["str-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{StringValue: new("hello")},
+		},
+		{
+			name:       "semver-scalar-device",
+			expression: `device.attributes["driver-a"]["ver-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{VersionValue: new("1.0.0")},
+		},
+
+		// List Literal cases
+		{
+			name:       "bool-list-literal",
+			expression: `[true, false]`,
+			expectAttr: &resourceapi.DeviceAttribute{BoolValues: []bool{true, false}},
+		},
+		{
+			name:       "int-list-literal",
+			expression: `[1, 2, 3]`,
+			expectAttr: &resourceapi.DeviceAttribute{IntValues: []int64{1, 2, 3}},
+		},
+		{
+			name:       "string-list-literal",
+			expression: `["hello", "world"]`,
+			expectAttr: &resourceapi.DeviceAttribute{StringValues: []string{"hello", "world"}},
+		},
+		{
+			name:       "semver-list-literal",
+			expression: `[semver("1.0.0"), semver("2.0.0")]`,
+			expectAttr: &resourceapi.DeviceAttribute{VersionValues: []string{"1.0.0", "2.0.0"}},
+		},
+
+		// List Device Attribute cases
+		{
+			name:       "bool-list-device",
+			expression: `device.attributes["driver-a"]["bool-list-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{BoolValues: []bool{true, false}},
+		},
+		{
+			name:       "int-list-device",
+			expression: `device.attributes["driver-a"]["int-list-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{IntValues: []int64{1, 2, 3}},
+		},
+		{
+			name:       "string-list-device",
+			expression: `device.attributes["driver-a"]["str-list-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{StringValues: []string{"hello", "world"}},
+		},
+		{
+			name:       "semver-list-device",
+			expression: `device.attributes["driver-a"]["ver-list-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{VersionValues: []string{"1.0.0", "2.0.0"}},
+		},
+
+		// Error cases
+		{
+			name:            "runtime-error-attribute-not-found",
+			expression:      `device.attributes["driver-a"]["non-existent-attr"]`,
+			device:          mockDevice,
+			expectEvalError: "no such key",
+		},
+		{
+			name:            "runtime-error-type-mismatch-op",
+			expression:      `device.attributes["driver-a"]["int-attr"] + "hello"`, // attempt to add an int and string together should fail.
+			device:          mockDevice,
+			expectEvalError: "no such overload",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			compiler := GetCompiler(Features{
+				EnableListTypeAttributes: true,
+				EnableDerivedAttributes:  true,
+			})
+			result := compiler.CompileCELExpression(tc.expression, Options{
+				DerivedAttribute: true,
+			})
+			if result.Error != nil {
+				t.Fatalf("unexpected compile error: %v", result.Error)
+			}
+
+			attr, _, err := result.EvaluateDerivedAttribute(context.Background(), tc.device)
+			if tc.expectEvalError != "" {
+				if err == nil {
+					t.Fatalf("expected evaluation error %q, got none", tc.expectEvalError)
+				}
+				if !strings.Contains(err.Error(), tc.expectEvalError) {
+					t.Fatalf("expected evaluation error to contain %q, but got: %v", tc.expectEvalError, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected evaluation error: %v", err)
+				}
+				if diff := cmp.Diff(tc.expectAttr, attr); diff != "" {
+					t.Fatalf("unexpected attribute (-want +got):\n%s", diff)
+				}
+			}
+		})
 	}
 }
