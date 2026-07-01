@@ -126,7 +126,7 @@ func TestMapPodGroupConfig(t *testing.T) {
 		},
 		{
 			name:   "resource claims",
-			claims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{Name: "gpu", ResourceClaimName: ptr.To("shared-gpu")}},
+			claims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{Name: "gpu", ResourceClaimName: new("shared-gpu")}},
 			check: func(t *testing.T, cfg *SchedulingConfig) {
 				if len(cfg.ResourceClaims) != 1 {
 					t.Fatalf("expected 1 claim, got %d", len(cfg.ResourceClaims))
@@ -146,7 +146,7 @@ func TestMapPodGroupConfig(t *testing.T) {
 				Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "zone"}},
 			},
 			disruption: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{}},
-			claims:     []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{Name: "net", ResourceClaimTemplateName: ptr.To("tpl")}},
+			claims:     []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{Name: "net", ResourceClaimTemplateName: new("tpl")}},
 			check: func(t *testing.T, cfg *SchedulingConfig) {
 				if cfg.Policy == nil || cfg.Policy.Gang == nil {
 					t.Error("expected Gang policy")

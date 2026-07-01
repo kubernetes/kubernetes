@@ -36,7 +36,7 @@ func gangWorkload() *schedulingv1alpha3.Workload {
 						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
 					},
 					DisruptionMode:    &schedulingv1alpha3.DisruptionMode{All: &schedulingv1alpha3.AllDisruptionMode{}},
-					ResourceClaims:    []schedulingv1alpha3.PodGroupResourceClaim{{Name: "gpu", ResourceClaimName: ptr.To("shared-gpu")}},
+					ResourceClaims:    []schedulingv1alpha3.PodGroupResourceClaim{{Name: "gpu", ResourceClaimName: new("shared-gpu")}},
 					PriorityClassName: "high",
 					Priority:          ptr.To[int32](1000),
 				},
@@ -48,7 +48,7 @@ func gangWorkload() *schedulingv1alpha3.Workload {
 func TestNewPodGroup(t *testing.T) {
 	wl := gangWorkload()
 	owners := []metav1.OwnerReference{
-		{APIVersion: "batch/v1", Kind: "Job", Name: "job", Controller: ptr.To(true)},
+		{APIVersion: "batch/v1", Kind: "Job", Name: "job", Controller: new(true)},
 		{APIVersion: "scheduling.k8s.io/v1alpha3", Kind: "Workload", Name: wl.Name},
 	}
 

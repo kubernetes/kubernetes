@@ -24,4 +24,9 @@ limitations under the License.
 // NewPodGroup() to materialize its runtime PodGroup. Controllers guard their own
 // API with ValidateSchedulingPolicy and ValidateDisruptionMode; API-server
 // validation calls Validate() to reject configs Build could not compile.
+//
+// Build and Validate return a field.ErrorList. Each WorkloadItem may declare a
+// FieldPaths mapping describing where its fields live in the controller's API,
+// so errors are reported against controller-relative paths rather than the
+// library's internal IR structure; undeclared paths fall back to relative ones.
 package workloadbuilder
