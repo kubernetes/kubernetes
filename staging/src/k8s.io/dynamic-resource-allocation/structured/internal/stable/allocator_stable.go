@@ -1167,6 +1167,17 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		}
 	}
 
+	// The stable allocator does not support the DRADeviceCompatibilityGroups
+	// feature. When compatibility groups are present in the cluster (served by a
+	// newer apiserver during a version skew), a device that declares them must be
+	// skipped so that the feature can later be enabled without deleting pods.
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
+		if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
+			alloc.logger.V(7).Info("Skipping device with compatibility groups because the feature is not supported", "device", device.id)
+			return false, nil, nil
+		}
+	}
+
 	var parentRequestName string
 	var baseRequestName string
 	var subRequestName string

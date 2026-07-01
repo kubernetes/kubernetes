@@ -76,6 +76,7 @@ type Device struct {
 }
 
 type DeviceCounterConsumption struct {
-	CounterSet UniqueString
-	Counters   map[string]resourceapi.Counter `json:",omitempty"`
+	CounterSet          UniqueString
+	Counters            map[string]resourceapi.Counter `json:",omitempty"`
+	CompatibilityGroups []string                       `json:",omitempty"`
 }

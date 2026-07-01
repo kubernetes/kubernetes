@@ -1018,18 +1018,19 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		Namespace:         metav1.NamespaceDefault,
 	})
 	testcases := map[string]struct {
-		oldObj                        *resource.ResourceClaim
-		newObj                        *resource.ResourceClaim
-		authz                         authorizer.UnconditionalAuthorizer
-		ctxOverride                   func(context.Context) context.Context // if set, transforms the default ctx
-		adminAccess                   bool
-		deviceStatusFeatureGate       bool
-		consumableCapacityFeatureGate bool
-		prioritizedListFeatureGate    bool
-		bindingConditions             bool
-		expectValidationErrors        []string
-		expectObj                     *resource.ResourceClaim
-		verify                        func(*testing.T, []testclient.Action)
+		oldObj                               *resource.ResourceClaim
+		newObj                               *resource.ResourceClaim
+		authz                                authorizer.UnconditionalAuthorizer
+		ctxOverride                          func(context.Context) context.Context // if set, transforms the default ctx
+		adminAccess                          bool
+		deviceStatusFeatureGate              bool
+		consumableCapacityFeatureGate        bool
+		deviceCompatibilityGroupsFeatureGate bool
+		prioritizedListFeatureGate           bool
+		bindingConditions                    bool
+		expectValidationErrors               []string
+		expectObj                            *resource.ResourceClaim
+		verify                               func(*testing.T, []testclient.Action)
 	}{
 		"no-changes-okay": {
 			oldObj:    obj,
@@ -1567,6 +1568,46 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 		},
+		"keep-fields-compatibility-groups": {
+			oldObj: obj,
+			newObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addStatusAllocationDevicesResultsWithCompatibilityGroups(obj, testDriver, testPool, testDevice, req0, map[string]resource.CompatibilityGroupList{"pool-1": {Groups: []string{"mig"}}})
+				return obj
+			}(),
+			deviceCompatibilityGroupsFeatureGate: true,
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addStatusAllocationDevicesResultsWithCompatibilityGroups(obj, testDriver, testPool, testDevice, req0, map[string]resource.CompatibilityGroupList{"pool-1": {Groups: []string{"mig"}}})
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-compatibility-groups-disabled-feature": {
+			oldObj: obj,
+			newObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addStatusAllocationDevicesResultsWithCompatibilityGroups(obj, testDriver, testPool, testDevice, req0, map[string]resource.CompatibilityGroupList{"pool-1": {Groups: []string{"mig"}}})
+				return obj
+			}(),
+			deviceCompatibilityGroupsFeatureGate: false,
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				// The CompatibilityGroups snapshot is stripped because the feature is
+				// disabled and the old object did not use it.
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, req0, nil, nil)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
 		"keep-fields-consumable-capacity-with-device-status-with-prioritized-list-disabled-feature-gate": {
 			oldObj: func() *resource.ResourceClaim {
 				obj := objWithPrioritizedList.DeepCopy()
@@ -1711,17 +1752,36 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			if !tc.adminAccess {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
+			// DRADeviceCompatibilityGroups is alpha and only exists from 1.37, so a
+			// case that exercises it must emulate that release for the gate to be
+			// settable.
+			if tc.deviceCompatibilityGroupsFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			effectiveVersion := utilfeature.DefaultMutableFeatureGate.EmulationVersion()
+
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAAdminAccess:               tc.adminAccess,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatusFeatureGate,
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 			})
+			// Only toggle DRAAdminAccess where it is not yet locked-to-default.
+			if effectiveVersion.LessThan(version.MustParse("1.36")) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAAdminAccess: tc.adminAccess,
+				})
+			}
 			klog.InfoS("Testing strategy", "adminAccess", tc.adminAccess, "bindingConditions", tc.bindingConditions, "deviceStatus", tc.deviceStatusFeatureGate)
 
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRAConsumableCapacity: tc.consumableCapacityFeatureGate,
 				features.DRAPrioritizedList:    tc.prioritizedListFeatureGate,
 			})
+			// Only toggle DRADeviceCompatibilityGroups where it exists.
+			if effectiveVersion.AtLeast(version.MustParse("1.37")) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRADeviceCompatibilityGroups: tc.deviceCompatibilityGroupsFeatureGate,
+				})
+			}
 			statusStrategy := NewStatusStrategy(strategy)
 
 			ctx := ctx
@@ -1801,6 +1861,20 @@ func addStatusAllocationDevicesResults(resourceClaim *resource.ResourceClaim, dr
 		Device:           device,
 		ShareID:          shareID,
 		ConsumedCapacity: consumedCapacity,
+	})
+}
+
+func addStatusAllocationDevicesResultsWithCompatibilityGroups(resourceClaim *resource.ResourceClaim, driver string, pool string, device string, request string,
+	compatibilityGroups map[string]resource.CompatibilityGroupList) {
+	if resourceClaim.Status.Allocation == nil {
+		resourceClaim.Status.Allocation = &resource.AllocationResult{}
+	}
+	resourceClaim.Status.Allocation.Devices.Results = append(resourceClaim.Status.Allocation.Devices.Results, resource.DeviceRequestAllocationResult{
+		Request:             request,
+		Driver:              driver,
+		Pool:                pool,
+		Device:              device,
+		CompatibilityGroups: compatibilityGroups,
 	})
 }
 

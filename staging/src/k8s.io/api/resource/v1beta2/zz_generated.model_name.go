@@ -52,6 +52,11 @@ func (in CapacityRequirements) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CompatibilityGroupList) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.CompatibilityGroupList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Counter) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta2.Counter"
 }

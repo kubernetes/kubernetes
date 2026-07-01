@@ -36,6 +36,11 @@ type AllocatedState = schedulerapi.AllocatedState
 type ConsumedCapacity = schedulerapi.ConsumedCapacity
 type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
 type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
+type CompatibilityGroupsCollection = schedulerapi.CompatibilityGroupsCollection
+
+func NewCompatibilityGroupsCollection() CompatibilityGroupsCollection {
+	return schedulerapi.NewCompatibilityGroupsCollection()
+}
 
 // Wrapper functions that delegate to the schedulerapi package
 func MakeDeviceID(driver, pool, device string) DeviceID {

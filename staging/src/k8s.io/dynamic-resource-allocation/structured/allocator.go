@@ -65,6 +65,7 @@ type SharedDeviceID = schedulerapi.SharedDeviceID
 type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
 type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
 type ConsumedCapacity = schedulerapi.ConsumedCapacity
+type CompatibilityGroupsCollection = schedulerapi.CompatibilityGroupsCollection
 
 func MakeDeviceID(driver, pool, device string) DeviceID {
 	return schedulerapi.MakeDeviceID(driver, pool, device)
@@ -76,6 +77,10 @@ func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
 
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 	return schedulerapi.NewConsumedCapacityCollection()
+}
+
+func NewCompatibilityGroupsCollection() CompatibilityGroupsCollection {
+	return schedulerapi.NewCompatibilityGroupsCollection()
 }
 
 func NewDeviceConsumedCapacity(deviceID DeviceID,

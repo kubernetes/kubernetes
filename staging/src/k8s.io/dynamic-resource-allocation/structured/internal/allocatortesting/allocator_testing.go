@@ -54,6 +54,7 @@ type SharedDeviceID = internal.SharedDeviceID
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
 type AllocatedState = internal.AllocatedState
+type CompatibilityGroupsCollection = internal.CompatibilityGroupsCollection
 
 func MakeDeviceID(driver, pool, device string) DeviceID {
 	return internal.MakeDeviceID(driver, pool, device)
@@ -550,6 +551,14 @@ func deviceCounterConsumption(counterSet string, counters map[string]resource.Qu
 	}
 }
 
+func deviceCounterConsumptionWithGroups(counterSet string, counters map[string]resource.Quantity, compatibilityGroups ...string) resourceapi.DeviceCounterConsumption {
+	return resourceapi.DeviceCounterConsumption{
+		CounterSet:          counterSet,
+		Counters:            toCounters(counters),
+		CompatibilityGroups: compatibilityGroups,
+	}
+}
+
 const (
 	nodeSelectionAll       = "nodeSelectionAll"
 	nodeSelectionPerDevice = "nodeSelectionPerDevice"
@@ -683,6 +692,16 @@ func (in wrapDeviceRequestAllocationResult) withConsumedCapacity(shareID *apityp
 	out := in.DeepCopy()
 	out.ShareID = shareID
 	out.ConsumedCapacity = consumedCapacity
+	return *out
+}
+
+func (in wrapDeviceRequestAllocationResult) withCompatibilityGroups(compatibilityGroups map[string][]string) resourceapi.DeviceRequestAllocationResult {
+	out := in.DeepCopy()
+	cg := make(map[string]resourceapi.CompatibilityGroupList, len(compatibilityGroups))
+	for counterSet, groups := range compatibilityGroups {
+		cg[counterSet] = resourceapi.CompatibilityGroupList{Groups: groups}
+	}
+	out.CompatibilityGroups = cg
 	return *out
 }
 
@@ -896,14 +915,15 @@ func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, d
 }
 
 type AllocatorTestCase struct {
-	features                 Features
-	claimsToAllocate         []wrapResourceClaim
-	allocatedDevices         []DeviceID
-	allocatedSharedDeviceIDs sets.Set[SharedDeviceID]
-	allocatedCapacityDevices ConsumedCapacityCollection
-	classes                  []*resourceapi.DeviceClass
-	slices                   []*resourceapi.ResourceSlice
-	node                     *v1.Node
+	features                     Features
+	claimsToAllocate             []wrapResourceClaim
+	allocatedDevices             []DeviceID
+	allocatedSharedDeviceIDs     sets.Set[SharedDeviceID]
+	allocatedCapacityDevices     ConsumedCapacityCollection
+	allocatedCompatibilityGroups CompatibilityGroupsCollection
+	classes                      []*resourceapi.DeviceClass
+	slices                       []*resourceapi.ResourceSlice
+	node                         *v1.Node
 
 	expectResults []any
 	expectError   types.GomegaMatcher // can be used to check for no error or match specific error
@@ -976,6 +996,148 @@ func TestAllocator(t *testing.T,
 
 	testcases := map[string]AllocatorTestCase{
 		"empty": {},
+		// Two requests in one claim, both landing on the same counter set with the
+		// same compatibility group: they can be co-allocated.
+		"compatibility-groups-compatible": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+				deviceRequest(req1, classA, 1),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceRequestAllocationResult(req0, driverA, pool1, device1).withCompatibilityGroups(map[string][]string{counterSet1: {"mig"}}),
+				deviceRequestAllocationResult(req1, driverA, pool1, device2).withCompatibilityGroups(map[string][]string{counterSet1: {"mig"}}),
+			)},
+		},
+		// Two requests in one claim, the only candidates are an incompatible pair on
+		// the same counter set (mig vs vgpu): no combination satisfies the claim.
+		"compatibility-groups-incompatible": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+				deviceRequest(req1, classA, 1),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// An incompatible device is already allocated on the counter set; its groups
+		// are read from the allocation-result snapshot (not the slice). The only
+		// remaining candidate shares no group, so the claim is unschedulable.
+		"compatibility-groups-incompatible-with-allocated-peer": {
+			features:         Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			allocatedDevices: []DeviceID{MakeDeviceID(driverA, pool1, device1)},
+			allocatedCompatibilityGroups: CompatibilityGroupsCollection{
+				MakeDeviceID(driverA, pool1, device1): {counterSet1: {"mig"}},
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// A compatible device is already allocated on the counter set; the candidate
+		// shares its snapshotted group and is admitted.
+		"compatibility-groups-compatible-with-allocated-peer": {
+			features:         Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			allocatedDevices: []DeviceID{MakeDeviceID(driverA, pool1, device1)},
+			allocatedCompatibilityGroups: CompatibilityGroupsCollection{
+				MakeDeviceID(driverA, pool1, device1): {counterSet1: {"mig"}},
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceRequestAllocationResult(req0, driverA, pool1, device2).withCompatibilityGroups(map[string][]string{counterSet1: {"mig"}}),
+			)},
+		},
+		// With the feature disabled, a device declaring compatibility groups is
+		// skipped (the scheduler cannot validate it), but a sibling without groups
+		// on the same counter set is still allocated. This is the version-skew
+		// "Devices skipped" behavior and is verified across all allocator variants.
+		"compatibility-groups-disabled-skips-grouped-device": {
+			// CompatibilityGroups is set explicitly to false so this case keeps
+			// exercising the feature-disabled path unchanged after the feature
+			// graduates to on-by-default.
+			features: Features{PartitionableDevices: true, CompatibilityGroups: false},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{capacity0: two}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
 		"simple": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
@@ -7396,9 +7558,10 @@ func RunTestAllocator(t *testing.T,
 			allocatedShare := tc.allocatedCapacityDevices.Clone()
 			slices := slices.Clone(tc.slices)
 			allocatedState := AllocatedState{
-				AllocatedDevices:         sets.New(allocatedDevices...),
-				AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
-				AggregatedCapacity:       allocatedShare,
+				AllocatedDevices:             sets.New(allocatedDevices...),
+				AllocatedSharedDeviceIDs:     tc.allocatedSharedDeviceIDs,
+				AggregatedCapacity:           allocatedShare,
+				AllocatedCompatibilityGroups: tc.allocatedCompatibilityGroups,
 			}
 			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, slices, cel.NewCache(1, cel.Features{
 				EnableConsumableCapacity: tc.features.ConsumableCapacity,

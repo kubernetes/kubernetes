@@ -995,6 +995,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.CapacityRequestPolicy{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1_CapacityRequestPolicy(ref),
 		resourcev1.CapacityRequestPolicyRange{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1_CapacityRequestPolicyRange(ref),
 		resourcev1.CapacityRequirements{}.OpenAPIModelName():                                                            schema_k8sio_api_resource_v1_CapacityRequirements(ref),
+		resourcev1.CompatibilityGroupList{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1_CompatibilityGroupList(ref),
 		resourcev1.Counter{}.OpenAPIModelName():                                                                         schema_k8sio_api_resource_v1_Counter(ref),
 		resourcev1.CounterSet{}.OpenAPIModelName():                                                                      schema_k8sio_api_resource_v1_CounterSet(ref),
 		resourcev1.Device{}.OpenAPIModelName():                                                                          schema_k8sio_api_resource_v1_Device(ref),
@@ -1053,6 +1054,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.CapacityRequestPolicy{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta1_CapacityRequestPolicy(ref),
 		resourcev1beta1.CapacityRequestPolicyRange{}.OpenAPIModelName():                                                 schema_k8sio_api_resource_v1beta1_CapacityRequestPolicyRange(ref),
 		resourcev1beta1.CapacityRequirements{}.OpenAPIModelName():                                                       schema_k8sio_api_resource_v1beta1_CapacityRequirements(ref),
+		resourcev1beta1.CompatibilityGroupList{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta1_CompatibilityGroupList(ref),
 		resourcev1beta1.Counter{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1beta1_Counter(ref),
 		resourcev1beta1.CounterSet{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1beta1_CounterSet(ref),
 		resourcev1beta1.Device{}.OpenAPIModelName():                                                                     schema_k8sio_api_resource_v1beta1_Device(ref),
@@ -1096,6 +1098,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.CapacityRequestPolicy{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta2_CapacityRequestPolicy(ref),
 		resourcev1beta2.CapacityRequestPolicyRange{}.OpenAPIModelName():                                                 schema_k8sio_api_resource_v1beta2_CapacityRequestPolicyRange(ref),
 		resourcev1beta2.CapacityRequirements{}.OpenAPIModelName():                                                       schema_k8sio_api_resource_v1beta2_CapacityRequirements(ref),
+		resourcev1beta2.CompatibilityGroupList{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta2_CompatibilityGroupList(ref),
 		resourcev1beta2.Counter{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1beta2_Counter(ref),
 		resourcev1beta2.CounterSet{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1beta2_CounterSet(ref),
 		resourcev1beta2.Device{}.OpenAPIModelName():                                                                     schema_k8sio_api_resource_v1beta2_Device(ref),
@@ -46467,6 +46470,38 @@ func schema_k8sio_api_resource_v1_CapacityRequirements(ref common.ReferenceCallb
 	}
 }
 
+func schema_k8sio_api_resource_v1_CompatibilityGroupList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompatibilityGroupList is the list of compatibility groups declared for a single counter-set consumption.\n\nIt exists as a named type so that the per-counter-set snapshot on DeviceRequestAllocationResult can be represented as a map value: protobuf map values cannot themselves be repeated, so a list of group names is wrapped in this message.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"groups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Groups is the list of opaque compatibility group names declared for the counter set.\n\nThe maximum number of groups is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_resource_v1_Counter(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -47324,6 +47359,25 @@ func schema_k8sio_api_resource_v1_DeviceCounterConsumption(ref common.ReferenceC
 							},
 						},
 					},
+					"compatibilityGroups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CompatibilityGroups is a driver-declared list of opaque group names for this counter-set consumption.\n\nThe scheduler uses it to decide whether devices that draw from the same counter set may be allocated at the same time: two such devices may be co-allocated only if their CompatibilityGroups for that counter set intersect (share at least one name). Devices that consume from different counter sets are never compared via this field.\n\nAn unset field, an explicit nil, and an empty list are equivalent and mean \"no groups\": such a device is only co-allocatable with sibling devices on the same counter set that also have no groups, and is never co-allocatable with a device that declares one or more groups.\n\nGroup names are opaque to the scheduler and meaningful only within the publishing driver's pool.\n\nThe maximum number of groups is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"counterSet", "counters"},
 			},
@@ -47504,12 +47558,26 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 							},
 						},
 					},
+					"compatibilityGroups": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CompatibilityGroups is written by the scheduler at allocation time and is a per-counter-set snapshot of the allocated device's declared compatibility groups. It is keyed by counter-set name (matching consumesCounters[*].counterSet), and each value is the list of groups declared on the allocated device's consumesCounters[] entry for that counter set at the time of allocation. Counter sets the device does not consume from are omitted from the map.\n\nThe scheduler consults this snapshot on subsequent allocations against the same counter set, rather than re-reading the (possibly mutated) source ResourceSlice. Drivers do not write this field.\n\nIt is present only when the allocated device's slice entry declares at least one compatibility group on any counter set.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1.CompatibilityGroupList{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			resourcev1.CompatibilityGroupList{}.OpenAPIModelName(), resourcev1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -49481,6 +49549,38 @@ func schema_k8sio_api_resource_v1beta1_CapacityRequirements(ref common.Reference
 	}
 }
 
+func schema_k8sio_api_resource_v1beta1_CompatibilityGroupList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompatibilityGroupList is the list of compatibility groups declared for a single counter-set consumption.\n\nIt exists as a named type so that the per-counter-set snapshot on DeviceRequestAllocationResult can be represented as a map value: protobuf map values cannot themselves be repeated, so a list of group names is wrapped in this message.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"groups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Groups is the list of opaque compatibility group names declared for the counter set.\n\nThe maximum number of groups is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta1_Counter(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -50194,6 +50294,25 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 							},
 						},
 					},
+					"compatibilityGroups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CompatibilityGroups is a driver-declared list of opaque group names for this counter-set consumption.\n\nThe scheduler uses it to decide whether devices that draw from the same counter set may be allocated at the same time: two such devices may be co-allocated only if their CompatibilityGroups for that counter set intersect (share at least one name). Devices that consume from different counter sets are never compared via this field.\n\nAn unset field, an explicit nil, and an empty list are equivalent and mean \"no groups\": such a device is only co-allocatable with sibling devices on the same counter set that also have no groups, and is never co-allocatable with a device that declares one or more groups.\n\nGroup names are opaque to the scheduler and meaningful only within the publishing driver's pool.\n\nThe maximum number of groups is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"counterSet", "counters"},
 			},
@@ -50440,12 +50559,26 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							},
 						},
 					},
+					"compatibilityGroups": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CompatibilityGroups is written by the scheduler at allocation time and is a per-counter-set snapshot of the allocated device's declared compatibility groups. It is keyed by counter-set name (matching consumesCounters[*].counterSet), and each value is the list of groups declared on the allocated device's consumesCounters[] entry for that counter set at the time of allocation. Counter sets the device does not consume from are omitted from the map.\n\nThe scheduler consults this snapshot on subsequent allocations against the same counter set, rather than re-reading the (possibly mutated) source ResourceSlice. Drivers do not write this field.\n\nIt is present only when the allocated device's slice entry declares at least one compatibility group on any counter set.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta1.CompatibilityGroupList{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			resourcev1beta1.CompatibilityGroupList{}.OpenAPIModelName(), resourcev1beta1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -51587,6 +51720,38 @@ func schema_k8sio_api_resource_v1beta2_CapacityRequirements(ref common.Reference
 	}
 }
 
+func schema_k8sio_api_resource_v1beta2_CompatibilityGroupList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompatibilityGroupList is the list of compatibility groups declared for a single counter-set consumption.\n\nIt exists as a named type so that the per-counter-set snapshot on DeviceRequestAllocationResult can be represented as a map value: protobuf map values cannot themselves be repeated, so a list of group names is wrapped in this message.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"groups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Groups is the list of opaque compatibility group names declared for the counter set.\n\nThe maximum number of groups is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta2_Counter(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -52444,6 +52609,25 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 							},
 						},
 					},
+					"compatibilityGroups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CompatibilityGroups is a driver-declared list of opaque group names for this counter-set consumption.\n\nThe scheduler uses it to decide whether devices that draw from the same counter set may be allocated at the same time: two such devices may be co-allocated only if their CompatibilityGroups for that counter set intersect (share at least one name). Devices that consume from different counter sets are never compared via this field.\n\nAn unset field, an explicit nil, and an empty list are equivalent and mean \"no groups\": such a device is only co-allocatable with sibling devices on the same counter set that also have no groups, and is never co-allocatable with a device that declares one or more groups.\n\nGroup names are opaque to the scheduler and meaningful only within the publishing driver's pool.\n\nThe maximum number of groups is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"counterSet", "counters"},
 			},
@@ -52624,12 +52808,26 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							},
 						},
 					},
+					"compatibilityGroups": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CompatibilityGroups is written by the scheduler at allocation time and is a per-counter-set snapshot of the allocated device's declared compatibility groups. It is keyed by counter-set name (matching consumesCounters[*].counterSet), and each value is the list of groups declared on the allocated device's consumesCounters[] entry for that counter set at the time of allocation. Counter sets the device does not consume from are omitted from the map.\n\nThe scheduler consults this snapshot on subsequent allocations against the same counter set, rather than re-reading the (possibly mutated) source ResourceSlice. Drivers do not write this field.\n\nIt is present only when the allocated device's slice entry declares at least one compatibility group on any counter set.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta2.CompatibilityGroupList{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			resourcev1beta2.CompatibilityGroupList{}.OpenAPIModelName(), resourcev1beta2.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 

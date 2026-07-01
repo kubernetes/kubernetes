@@ -347,7 +347,8 @@ func (c *claimTracker) ListAllAllocatedDevices() (a sets.Set[structured.DeviceID
 		foreachAllocatedDevice(claim, func(deviceID structured.DeviceID) {
 			c.logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
 			allocated.Insert(deviceID)
-		}, false, func(structured.SharedDeviceID) {}, func(structured.DeviceConsumedCapacity) {})
+		}, false, func(structured.SharedDeviceID) {}, func(structured.DeviceConsumedCapacity) {},
+			false, func(structured.DeviceID, map[string][]string) {})
 	}
 
 	if revision == c.allocatedDevices.Revision() {
@@ -390,12 +391,14 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
 	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
+	enabledCompatibilityGroups := utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceCompatibilityGroups)
 
 	allocated, revision1 := c.allocatedDevices.Get()
 	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.GetSharedDeviceIDs()
 	aggregatedCapacity, revision3 := c.allocatedDevices.Capacities()
+	allocatedCompatibilityGroups, revision4 := c.allocatedDevices.CompatibilityGroups()
 
-	if revision1 != revision2 || revision2 != revision3 {
+	if revision1 != revision2 || revision2 != revision3 || revision3 != revision4 {
 		// Already not consistent. Try again.
 		return nil, errClaimTrackerConcurrentModification
 	}
@@ -429,14 +432,20 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 			func(capacity structured.DeviceConsumedCapacity) { // consumedCapacityCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "consumed capacity", capacity, "claim", klog.KObj(claim))
 				aggregatedCapacity.Insert(capacity)
+			},
+			enabledCompatibilityGroups,
+			func(deviceID structured.DeviceID, compatibilityGroups map[string][]string) { // compatibilityGroupsCallback
+				c.logger.V(6).Info("Device is in flight for allocation", "compatibility groups", compatibilityGroups, "device", deviceID, "claim", klog.KObj(claim))
+				allocatedCompatibilityGroups.Insert(deviceID, compatibilityGroups)
 			})
 	}
 	if revision1 == c.allocatedDevices.Revision() {
 		// Our current result is valid, nothing changed in the meantime.
 		return &structured.AllocatedState{
-			AllocatedDevices:         allocated,
-			AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
-			AggregatedCapacity:       aggregatedCapacity,
+			AllocatedDevices:             allocated,
+			AllocatedSharedDeviceIDs:     allocatedSharedDeviceIDs,
+			AggregatedCapacity:           aggregatedCapacity,
+			AllocatedCompatibilityGroups: allocatedCompatibilityGroups,
 		}, nil
 	}
 
