@@ -426,6 +426,38 @@ var (
 			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
 		}(),
 	}
+	allocationResultWithCompatibilityGroups = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  "instance-1",
+				Request: "req-1",
+				CompatibilityGroups: map[string]resourceapi.CompatibilityGroupList{
+					"counter-set-1": {Groups: []string{"mig"}},
+				},
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	allocationResultWithCompatibilityGroups2 = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  "instance-2",
+				Request: "req-1",
+				CompatibilityGroups: map[string]resourceapi.CompatibilityGroupList{
+					"counter-set-1": {Groups: []string{"mig"}},
+				},
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
 	allocationResult2 = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
@@ -682,6 +714,12 @@ var (
 						Obj()
 	allocatedClaimWithConsumedCapacity2 = st.FromResourceClaim(pendingClaim).
 						Allocation(allocationResultWithConsumedCapacity2).
+						Obj()
+	allocatedClaimWithCompatibilityGroups = st.FromResourceClaim(pendingClaim).
+						Allocation(allocationResultWithCompatibilityGroups).
+						Obj()
+	allocatedClaimWithCompatibilityGroups2 = st.FromResourceClaim(pendingClaim).
+						Allocation(allocationResultWithCompatibilityGroups2).
 						Obj()
 	otherClaim = st.MakeResourceClaim().
 			Name("not-my-claim").
@@ -4973,13 +5011,15 @@ func TestGatherAllocatedState(t *testing.T) {
 }
 func testGatherAllocatedState(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
-		allocatedResourceClaims   []*resourceapi.ResourceClaim
-		inflightResourceClaims    map[types.UID]*resourceapi.ResourceClaim
-		enabledConsumableCapacity bool
-		expectErr                 bool
-		expectedIDAllocated       int
-		expectedSharedIDAllocated int
-		expectedConsumedCapacity  string
+		allocatedResourceClaims     []*resourceapi.ResourceClaim
+		inflightResourceClaims      map[types.UID]*resourceapi.ResourceClaim
+		enabledConsumableCapacity   bool
+		enabledCompatibilityGroups  bool
+		expectErr                   bool
+		expectedIDAllocated         int
+		expectedSharedIDAllocated   int
+		expectedConsumedCapacity    string
+		expectedCompatibilityGroups schedulerapi.CompatibilityGroupsCollection
 	}{
 		"no-claims": {
 			expectedIDAllocated:       0,
@@ -5054,10 +5094,69 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 			expectedSharedIDAllocated: 0,
 			expectedConsumedCapacity:  "",
 		},
+		"single-allocated-claim-with-compatibility-groups": {
+			enabledCompatibilityGroups: true,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithCompatibilityGroups,
+			},
+			expectedIDAllocated:       1,
+			expectedSharedIDAllocated: 0,
+			expectedCompatibilityGroups: schedulerapi.CompatibilityGroupsCollection{
+				schedulerapi.MakeDeviceID(driver, nodeName, "instance-1"): {"counter-set-1": {"mig"}},
+			},
+		},
+		// The allocated-device cache records compatibility groups regardless of the
+		// feature gate, so a persisted claim's groups are still gathered when the
+		// gate is off. This lets the allocator avoid counter sets that already have
+		// grouped allocations during a version skew ("Devices skipped" behavior).
+		"disabled-single-allocated-claim-with-compatibility-groups": {
+			enabledCompatibilityGroups: false,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithCompatibilityGroups,
+			},
+			expectedIDAllocated:       1,
+			expectedSharedIDAllocated: 0,
+			expectedCompatibilityGroups: schedulerapi.CompatibilityGroupsCollection{
+				schedulerapi.MakeDeviceID(driver, nodeName, "instance-1"): {"counter-set-1": {"mig"}},
+			},
+		},
+		"add-inflight-allocated-claim-with-compatibility-groups": {
+			enabledCompatibilityGroups: true,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithCompatibilityGroups,
+			},
+			inflightResourceClaims: map[types.UID]*resourceapi.ResourceClaim{
+				"claim-2-uid": allocatedClaimWithCompatibilityGroups2,
+			},
+			expectedIDAllocated:       2,
+			expectedSharedIDAllocated: 0,
+			expectedCompatibilityGroups: schedulerapi.CompatibilityGroupsCollection{
+				schedulerapi.MakeDeviceID(driver, nodeName, "instance-1"): {"counter-set-1": {"mig"}},
+				schedulerapi.MakeDeviceID(driver, nodeName, "instance-2"): {"counter-set-1": {"mig"}},
+			},
+		},
+		// In-flight (not-yet-persisted) allocations only contribute compatibility
+		// groups when the gate is on, so with it off only the persisted claim's
+		// groups are gathered.
+		"disabled-inflight-allocated-claim-with-compatibility-groups": {
+			enabledCompatibilityGroups: false,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithCompatibilityGroups,
+			},
+			inflightResourceClaims: map[types.UID]*resourceapi.ResourceClaim{
+				"claim-2-uid": allocatedClaimWithCompatibilityGroups2,
+			},
+			expectedIDAllocated:       2,
+			expectedSharedIDAllocated: 0,
+			expectedCompatibilityGroups: schedulerapi.CompatibilityGroupsCollection{
+				schedulerapi.MakeDeviceID(driver, nodeName, "instance-1"): {"counter-set-1": {"mig"}},
+			},
+		},
 	}
 	for name, tc := range testcases {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, tc.enabledConsumableCapacity)
+			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRADeviceCompatibilityGroups, tc.enabledCompatibilityGroups)
 
 			tCtx.Helper()
 			logger := klog.FromContext(tCtx)
@@ -5132,6 +5231,17 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 				}
 			} else if len(aggregatedCapacity) > 0 {
 				tCtx.Errorf("got unexpected consumed capacity")
+			}
+
+			// Verify gathered compatibility groups.
+			gatheredCompatibilityGroups := allocatedState.AllocatedCompatibilityGroups
+			if len(gatheredCompatibilityGroups) != len(tc.expectedCompatibilityGroups) {
+				tCtx.Errorf("expected %d device(s) with compatibility groups, got %d: %v", len(tc.expectedCompatibilityGroups), len(gatheredCompatibilityGroups), gatheredCompatibilityGroups)
+			}
+			for deviceID, groups := range tc.expectedCompatibilityGroups {
+				if !reflect.DeepEqual(gatheredCompatibilityGroups[deviceID], groups) {
+					tCtx.Errorf("device %s: expected compatibility groups %v, got %v", deviceID, groups, gatheredCompatibilityGroups[deviceID])
+				}
 			}
 		})
 	}
