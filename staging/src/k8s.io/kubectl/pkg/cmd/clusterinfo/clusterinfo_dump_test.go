@@ -56,12 +56,13 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 func TestSetupOutputWriterFile(t *testing.T) {
 	file := "output"
 	extension := ".json"
-	dir, err := os.MkdirTemp(os.TempDir(), "out")
+	baseDir, err := os.MkdirTemp(os.TempDir(), "out")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	dir := filepath.Join(baseDir, "cluster-info")
 	fullPath := filepath.Join(dir, file) + extension
-	defer os.RemoveAll(dir)
+	defer os.RemoveAll(baseDir)
 
 	_, _, buf, _ := genericiooptions.NewTestIOStreams()
 	f := cmdtesting.NewTestFactory()
@@ -80,5 +81,21 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	}
 	if string(data) != output {
 		t.Errorf("expected: %v, saw: %v", output, data)
+	}
+
+	fileInfo, err := os.Stat(fullPath)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fileInfo.Mode().Perm() != 0600 {
+		t.Errorf("expected file mode: %v, saw: %v", os.FileMode(0600), fileInfo.Mode().Perm())
+	}
+
+	dirInfo, err := os.Stat(dir)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if dirInfo.Mode().Perm() != 0700 {
+		t.Errorf("expected directory mode: %v, saw: %v", os.FileMode(0700), dirInfo.Mode().Perm())
 	}
 }
