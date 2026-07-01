@@ -272,10 +272,7 @@ func getPlacementFeasibleState(placementCycleState fwk.PlacementCycleState) *pla
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
 // In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
 func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
-	pg, err := pl.podGroupLister.PodGroups(podGroupInfo.GetNamespace()).Get(podGroupInfo.GetName())
-	if err != nil {
-		return fwk.AsStatus(fmt.Errorf("failed to get podGroup %s to compute gang feasibility: %w", klog.KObj(podGroupInfo), err))
-	}
+	pg := podGroupInfo.GetPodGroup()
 
 	gangPolicy := pg.Spec.SchedulingPolicy.Gang
 	// This plugin only cares about pods with a Gang scheduling policy.
