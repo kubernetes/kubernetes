@@ -23,12 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
+	"k8s.io/component-helpers/storage/volume/assumecache"
 	"k8s.io/klog/v2"
 )
 
 // PVAssumeCache is a AssumeCache for PersistentVolume objects
 type PVAssumeCache struct {
-	*passiveAssumeCache[*v1.PersistentVolume]
+	*assumecache.AssumeCache[*v1.PersistentVolume]
 }
 
 func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
@@ -41,7 +42,7 @@ func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 const storageClassIndex = "storageclass"
 
 // NewPVAssumeCache creates a PV assume cache.
-func NewPVAssumeCache(logger klog.Logger, informer informer) (PVAssumeCache, error) {
+func NewPVAssumeCache(logger klog.Logger, informer assumecache.Informer) (PVAssumeCache, error) {
 	logger = klog.LoggerWithName(logger, "pv-cache")
 	err := informer.GetIndexer().AddIndexers(map[string]cache.IndexFunc{
 		storageClassIndex: pvStorageClassIndexFunc,
@@ -53,7 +54,7 @@ func NewPVAssumeCache(logger klog.Logger, informer informer) (PVAssumeCache, err
 			return PVAssumeCache{}, err
 		}
 	}
-	cache, err := newAssumeCache[*v1.PersistentVolume](logger, informer, schema.GroupResource{Resource: "persistentvolumes"})
+	cache, err := assumecache.NewAssumeCache[*v1.PersistentVolume](logger, informer, schema.GroupResource{Resource: "persistentvolumes"})
 	return PVAssumeCache{cache}, err
 }
 
@@ -65,12 +66,12 @@ func (c PVAssumeCache) ListPVs(storageClassName string) ([]*v1.PersistentVolume,
 
 // PVCAssumeCache is a AssumeCache for PersistentVolumeClaim objects
 type PVCAssumeCache struct {
-	*passiveAssumeCache[*v1.PersistentVolumeClaim]
+	*assumecache.AssumeCache[*v1.PersistentVolumeClaim]
 }
 
 // NewPVCAssumeCache creates a PVC assume cache.
-func NewPVCAssumeCache(logger klog.Logger, informer informer) (PVCAssumeCache, error) {
+func NewPVCAssumeCache(logger klog.Logger, informer assumecache.Informer) (PVCAssumeCache, error) {
 	logger = klog.LoggerWithName(logger, "pvc-cache")
-	cache, err := newAssumeCache[*v1.PersistentVolumeClaim](logger, informer, schema.GroupResource{Resource: "persistentvolumeclaims"})
+	cache, err := assumecache.NewAssumeCache[*v1.PersistentVolumeClaim](logger, informer, schema.GroupResource{Resource: "persistentvolumeclaims"})
 	return PVCAssumeCache{cache}, err
 }

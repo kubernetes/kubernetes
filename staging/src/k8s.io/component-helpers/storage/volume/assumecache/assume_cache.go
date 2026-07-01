@@ -14,7 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volumebinding
+// Package assumecache provides a cache layered on top of a shared informer that
+// lets a client observe its own writes ("assumptions") before the informer
+// delivers them, while always deferring to the informer as the source of truth.
+package assumecache
 
 import (
 	"fmt"
@@ -29,13 +32,13 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// informer is the subset of [cache.SharedInformer] that newAssumeCache depends upon.
-type informer interface {
+// Informer is the subset of [cache.SharedInformer] that NewAssumeCache depends upon.
+type Informer interface {
 	AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error)
 	GetIndexer() cache.Indexer
 }
 
-// passiveAssumeCache is a cache on top of the informer that allows for updating
+// AssumeCache is a cache on top of the informer that allows for updating
 // objects outside of informer events and also restoring the informer
 // cache's version of the object.
 //
@@ -46,7 +49,7 @@ type informer interface {
 //   - this is always up-to-date with the informer
 //   - this only allow assuming objects yet to be sent to the apiserver,
 //     not the ones returned from the apiserver
-type passiveAssumeCache[T v1.Object] struct {
+type AssumeCache[T v1.Object] struct {
 	// The logger that was chosen when setting up the cache.
 	// Will be used for all operations.
 	logger klog.Logger
@@ -63,9 +66,9 @@ type passiveAssumeCache[T v1.Object] struct {
 	assumed map[string]T
 }
 
-// newAssumeCache creates an assume cache for objects of type T.
-func newAssumeCache[T v1.Object](logger klog.Logger, informer informer, gr schema.GroupResource) (*passiveAssumeCache[T], error) {
-	c := &passiveAssumeCache[T]{
+// NewAssumeCache creates an assume cache for objects of type T.
+func NewAssumeCache[T v1.Object](logger klog.Logger, informer Informer, gr schema.GroupResource) (*AssumeCache[T], error) {
+	c := &AssumeCache[T]{
 		logger:  logger,
 		gr:      gr,
 		store:   informer.GetIndexer(),
@@ -83,7 +86,7 @@ func newAssumeCache[T v1.Object](logger klog.Logger, informer informer, gr schem
 }
 
 // Receives events from informer. May expire the assumed object if it is older.
-func (c *passiveAssumeCache[T]) mayExpire(key string) {
+func (c *AssumeCache[T]) mayExpire(key string) {
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
 
@@ -123,7 +126,7 @@ func (c *passiveAssumeCache[T]) mayExpire(key string) {
 	}
 }
 
-func (c *passiveAssumeCache[T]) add(obj any) {
+func (c *AssumeCache[T]) add(obj any) {
 	key, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(c.logger, err, "Add object get key")
@@ -132,11 +135,11 @@ func (c *passiveAssumeCache[T]) add(obj any) {
 	c.mayExpire(key)
 }
 
-func (c *passiveAssumeCache[T]) update(_, obj any) {
+func (c *AssumeCache[T]) update(_, obj any) {
 	c.add(obj)
 }
 
-func (c *passiveAssumeCache[T]) delete(obj any) {
+func (c *AssumeCache[T]) delete(obj any) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(c.logger, err, "Delete object get key")
@@ -148,7 +151,7 @@ func (c *passiveAssumeCache[T]) delete(obj any) {
 // ByIndex returns the stored objects whose set of indexed values for the named index includes the given indexed value
 //
 // The index is evaluated on the object from store. Objects from [Assume] will present in the result but will not affect the index.
-func (c *passiveAssumeCache[T]) ByIndex(indexName, indexedValue string) ([]T, error) {
+func (c *AssumeCache[T]) ByIndex(indexName, indexedValue string) ([]T, error) {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
@@ -160,7 +163,7 @@ func (c *passiveAssumeCache[T]) ByIndex(indexName, indexedValue string) ([]T, er
 }
 
 // Get the object by its key.
-func (c *passiveAssumeCache[T]) Get(key string) (T, error) {
+func (c *AssumeCache[T]) Get(key string) (T, error) {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
@@ -177,7 +180,7 @@ func (c *passiveAssumeCache[T]) Get(key string) (T, error) {
 }
 
 // GetAPIObj gets the informer cache's version by its key.
-func (c *passiveAssumeCache[T]) GetAPIObj(key string) (T, error) {
+func (c *AssumeCache[T]) GetAPIObj(key string) (T, error) {
 	obj, ok, err := c.store.GetByKey(key)
 	var zero T
 	if err != nil {
@@ -197,7 +200,7 @@ func keyOf[T v1.Object](obj T) string {
 	return cache.MetaObjectToName(obj).String()
 }
 
-func (c *passiveAssumeCache[T]) replaceAssumed(objs []any) []T {
+func (c *AssumeCache[T]) replaceAssumed(objs []any) []T {
 	allObjs := make([]T, 0, len(objs))
 	for _, obj := range objs {
 		v, ok := obj.(T)
@@ -222,7 +225,7 @@ func (c *passiveAssumeCache[T]) replaceAssumed(objs []any) []T {
 // If an update is received via the informer while such an
 // object is assumed, it gets dropped in favor of the
 // newer object from the apiserver.
-func (c *passiveAssumeCache[T]) Assume(obj T) error {
+func (c *AssumeCache[T]) Assume(obj T) error {
 	key := keyOf(obj)
 
 	c.rwMutex.Lock()
@@ -242,7 +245,7 @@ func (c *passiveAssumeCache[T]) Assume(obj T) error {
 }
 
 // Restore the informer cache's version of the object.
-func (c *passiveAssumeCache[T]) Restore(obj T) {
+func (c *AssumeCache[T]) Restore(obj T) {
 	key := keyOf(obj)
 
 	c.rwMutex.Lock()

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volumebinding
+package assumecache
 
 import (
 	"fmt"
@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2/ktesting"
 )
 
@@ -180,7 +179,7 @@ func makeObj(name, version, namespace string) *testObj {
 	}
 }
 
-type testCache = *passiveAssumeCache[*testObj]
+type testCache = *AssumeCache[*testObj]
 
 func verifyObj(cache testCache, key string, expected *testObj) error {
 	obj, err := cache.Get(key)
@@ -195,6 +194,8 @@ func verifyObj(cache testCache, key string, expected *testObj) error {
 
 const testIndex = "testIndex"
 
+const testAnnotationKey = "volume.kubernetes.io/selected-node"
+
 func newTestCache(t *testing.T) (*testInformer, testCache) {
 	logger, _ := ktesting.NewTestContext(t)
 	informer := &testInformer{
@@ -205,9 +206,9 @@ func newTestCache(t *testing.T) (*testInformer, testCache) {
 		}),
 		t: t,
 	}
-	cache, err := newAssumeCache[*testObj](logger, informer, schema.GroupResource{Resource: "tests"})
+	cache, err := NewAssumeCache[*testObj](logger, informer, schema.GroupResource{Resource: "tests"})
 	if err != nil {
-		t.Fatalf("newAssumeCache() failed: %v", err)
+		t.Fatalf("NewAssumeCache() failed: %v", err)
 	}
 	return informer, cache
 }
@@ -362,7 +363,7 @@ func TestAssumeUpdateCache(t *testing.T) {
 
 	// Assume
 	newObj := obj.DeepCopy()
-	newObj.Annotations[volume.AnnSelectedNode] = "test-node"
+	newObj.Annotations[testAnnotationKey] = "test-node"
 	if err := cache.Assume(newObj); err != nil {
 		t.Fatalf("failed to assume: %v", err)
 	}
@@ -388,7 +389,7 @@ func TestDelayedInformerEvent(t *testing.T) {
 	}
 
 	newObj := obj2.DeepCopy()
-	newObj.Annotations[volume.AnnSelectedNode] = "test-node"
+	newObj.Annotations[testAnnotationKey] = "test-node"
 	if err := cache.Assume(newObj); err != nil {
 		t.Fatalf("failed to assume: %v", err)
 	}
