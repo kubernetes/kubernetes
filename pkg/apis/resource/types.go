@@ -186,6 +186,21 @@ type ResourceSliceSpec struct {
 	// +featureGate=DRAPartitionableDevices
 	// +zeroOrOneOf=ResourceSliceType
 	SharedCounters []CounterSet
+
+	// PartitionTypeAttribute names a string device attribute (by fully
+	// qualified name, e.g. "gpu.example.com/profile") whose value labels
+	// each device with its partition type, such as "Full" or "Half" for a
+	// MIG-style GPU.
+	//
+	// When set, every device in the pool must carry the attribute and
+	// devices sharing a value must share the same ConsumesCounters cost.
+	// It opts the pool into the typed partitionSummary view of
+	// ResourcePoolStatusRequest; unset keeps the CounterSet fallback view.
+	// Only meaningful for pools that publish SharedCounters.
+	//
+	// +optional
+	// +featureGate=DRAResourcePoolStatus
+	PartitionTypeAttribute *FullyQualifiedName
 }
 
 // CounterSet defines a named set of counters
@@ -2241,6 +2256,92 @@ type PoolStatus struct {
 	// When set, device count fields and ResourceSliceCount may be unset.
 	// +optional
 	ValidationError *string
+
+	// PartitionSummary reports allocatability per partition type for a
+	// partitionable pool. Mutually exclusive with CounterSets.
+	// +optional
+	PartitionSummary []PartitionTypeStatus
+
+	// CounterSets reports per-counter capacity, consumption, and availability
+	// for a partitionable pool without a PartitionTypeAttribute.
+	// Mutually exclusive with PartitionSummary.
+	// +optional
+	CounterSets []CounterSetStatus
+
+	// ShareableSummary reports aggregate capacity for a pool that contains
+	// devices with AllowMultipleAllocations.
+	// +optional
+	ShareableSummary *ShareableSummaryStatus
+}
+
+// PartitionTypeStatus reports allocatability for a single partition type,
+// identified by the value of the pool's PartitionTypeAttribute.
+type PartitionTypeStatus struct {
+	// Type is the partition type value (e.g. "Full" or "Half").
+	Type string
+
+	// Total is the number of devices of this partition type in the pool.
+	Total int32
+
+	// Allocatable is the number of additional devices of this partition type
+	// that could still be allocated given current shared-counter consumption.
+	Allocatable int32
+}
+
+// CounterSetStatus reports capacity, consumption, and availability for the
+// counters of a single shared counter set.
+type CounterSetStatus struct {
+	// Name is the name of the counter set, matching a SharedCounters entry.
+	Name string
+
+	// Counters reports per-counter status, keyed by counter name.
+	Counters map[string]CounterStatus
+}
+
+// CounterStatus reports the capacity, consumption, and remaining availability
+// of a single counter.
+type CounterStatus struct {
+	// Capacity is the total value the counter provides.
+	Capacity resource.Quantity
+
+	// Consumed is the amount drawn by currently allocated devices.
+	Consumed resource.Quantity
+
+	// Available is Capacity minus Consumed, never negative.
+	Available resource.Quantity
+}
+
+// ShareableSummaryStatus reports aggregate capacity for a pool that contains
+// devices with AllowMultipleAllocations.
+type ShareableSummaryStatus struct {
+	// FullyAvailableDevices is the number of shareable devices with no
+	// capacity consumed.
+	FullyAvailableDevices int32
+
+	// PartiallyAvailableDevices is the number of shareable devices with some
+	// but not all capacity consumed.
+	PartiallyAvailableDevices int32
+
+	// Capacity reports aggregate total, consumed, and available amounts per
+	// shareable capacity key across the pool.
+	// +optional
+	Capacity []ShareableCapacityStatus
+}
+
+// ShareableCapacityStatus reports aggregate amounts for a single shareable
+// capacity key.
+type ShareableCapacityStatus struct {
+	// Name is the capacity name.
+	Name string
+
+	// Total is the sum of this capacity across shareable devices in the pool.
+	Total resource.Quantity
+
+	// Consumed is the amount drawn by current allocations.
+	Consumed resource.Quantity
+
+	// Available is Total minus Consumed, never negative.
+	Available resource.Quantity
 }
 
 // ResourcePoolStatusRequestConditionComplete is the condition type for completed requests.
