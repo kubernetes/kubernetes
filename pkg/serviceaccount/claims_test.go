@@ -25,6 +25,7 @@ import (
 
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -498,10 +499,12 @@ func errString(err error) string {
 }
 
 type fakeGetter struct {
-	serviceAccount *v1.ServiceAccount
-	secret         *v1.Secret
-	pod            *v1.Pod
-	node           *v1.Node
+	serviceAccount                 *v1.ServiceAccount
+	secret                         *v1.Secret
+	pod                            *v1.Pod
+	node                           *v1.Node
+	validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration
+	mutatingWebhookConfiguration   *admissionregistrationv1.MutatingWebhookConfiguration
 }
 
 func (f fakeGetter) GetServiceAccount(ctx context.Context, namespace, name string) (*v1.ServiceAccount, error) {
@@ -527,4 +530,16 @@ func (f fakeGetter) GetNode(ctx context.Context, name string) (*v1.Node, error) 
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "nodes"}, name)
 	}
 	return f.node, nil
+}
+func (f fakeGetter) GetValidatingWebhookConfiguration(ctx context.Context, name string) (*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
+	if f.validatingWebhookConfiguration == nil {
+		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "admissionregistration.kubernetes.io", Resource: "validatingWebhookConfigurations"}, name)
+	}
+	return f.validatingWebhookConfiguration, nil
+}
+func (f fakeGetter) GetMutatingWebhookConfiguration(ctx context.Context, name string) (*admissionregistrationv1.MutatingWebhookConfiguration, error) {
+	if f.mutatingWebhookConfiguration == nil {
+		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "admissionregistration.kubernetes.io", Resource: "mutatingWebhookConfigurations"}, name)
+	}
+	return f.mutatingWebhookConfiguration, nil
 }

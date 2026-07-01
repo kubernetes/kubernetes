@@ -1422,24 +1422,9 @@ func TestPeter(t *testing.T) {
 			t.Fatalf("expected err creating token bound to nonexistent validatingwebhookconfiguration but got: %#v", resp)
 		}
 
-		validating, err = cs.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(tCtx, validating, metav1.CreateOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		var done bool
-		t.Cleanup(func() {
-			t.Helper()
-			if done {
-				return
-			}
-			done = true
-			if err := cs.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), validating.Name, metav1.DeleteOptions{
-				GracePeriodSeconds: new(int64(0)),
-			}); err != nil {
-				t.Fatalf("err: %v", err)
-			}
-		})
+		warningHandler.clear()
+		validating, delValidating := createDeleteValidating(t, cs, validating)
+		defer delValidating()
 
 		warningHandler.assertEqual(t, nil)
 
@@ -1483,11 +1468,12 @@ func TestPeter(t *testing.T) {
 			t.Fatalf("expected Extra have length of 2 but was length %d: %#v", len(info.Extra), info.Extra)
 		}
 		if expected := map[string]authenticationv1.ExtraValue{
-			"authentication.kubernetes.io/pod-name": {pod.ObjectMeta.Name},
-			"authentication.kubernetes.io/pod-uid":  {string(pod.ObjectMeta.UID)},
+			"authentication.kubernetes.io/validating-webhook-configuration-name": {validating.ObjectMeta.Name},
+			"authentication.kubernetes.io/validating-webhook-configuration-uid":  {string(validating.ObjectMeta.UID)},
 		}; !reflect.DeepEqual(info.Extra, expected) {
 			t.Fatalf("unexpected Extra:\ngot:\t%#v\nwant:\t%#v", info.Extra, expected)
 		}
+		delValidating()
 		doTokenReview(t, cs, treq, true)
 	})
 }
@@ -1609,6 +1595,27 @@ func createDeletePod(t *testing.T, cs clientset.Interface, pod *v1.Pod) (*v1.Pod
 		done = true
 		if err := cs.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
 			GracePeriodSeconds: ptr.To(int64(0)),
+		}); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+	}
+}
+
+func createDeleteValidating(t *testing.T, cs clientset.Interface, validating *admissionregistrationv1.ValidatingWebhookConfiguration) (*admissionregistrationv1.ValidatingWebhookConfiguration, func()) {
+	t.Helper()
+	validating, err := cs.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), validating, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	done := false
+	return validating, func() {
+		t.Helper()
+		if done {
+			return
+		}
+		done = true
+		if err := cs.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), validating.Name, metav1.DeleteOptions{
+			GracePeriodSeconds: new(int64(0)),
 		}); err != nil {
 			t.Fatalf("err: %v", err)
 		}

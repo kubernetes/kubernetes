@@ -48,6 +48,22 @@ const (
 	// NodeUIDKey is the key used in a user's "extra" to specify the node UID of
 	// the authenticating request.
 	NodeUIDKey = "authentication.kubernetes.io/node-uid"
+	// ValidatingWebhookConfigurationNameKey is the key used in a user's
+	// "extra" to specify the validating webhook configuration name of
+	// the authenticating request.
+	ValidatingWebhookConfigurationNameKey = "authentication.kubernetes.io/validating-webhook-configuration-name"
+	// ValidatingWebhookConfigurationUIDKey is the key used in a user's
+	// "extra" to specify the validating webhook configuration UID of
+	// the authenticating request.
+	ValidatingWebhookConfigurationUIDKey = "authentication.kubernetes.io/validating-webhook-configuration-uid"
+	// MutatingWebhookConfigurationNameKey is the key used in a user's
+	// "extra" to specify the mutating webhook configuration name of
+	// the authenticating request.
+	MutatingWebhookConfigurationNameKey = "authentication.kubernetes.io/mutating-webhook-configuration-name"
+	// MutatingWebhookConfigurationUIDKey is the key used in a user's
+	// "extra" to specify the mutating webhook configuration UID of
+	// the authenticating request.
+	MutatingWebhookConfigurationUIDKey = "authentication.kubernetes.io/mutating-webhook-configuration-uid"
 )
 
 // MakeUsername generates a username from the given namespace and ServiceAccount name.
@@ -123,10 +139,12 @@ func UserInfo(namespace, name, uid string) user.Info {
 }
 
 type ServiceAccountInfo struct {
-	Name, Namespace, UID string
-	PodName, PodUID      string
-	CredentialID         string
-	NodeName, NodeUID    string
+	Name, Namespace, UID                                                  string
+	PodName, PodUID                                                       string
+	CredentialID                                                          string
+	NodeName, NodeUID                                                     string
+	ValidatingWebhookConfigurationName, ValidatingWebhookConfigurationUID string
+	MutatingWebhookConfigurationName, MutatingWebhookConfigurationUID     string
 }
 
 func (sa *ServiceAccountInfo) UserInfo() user.Info {
@@ -158,6 +176,13 @@ func (sa *ServiceAccountInfo) UserInfo() user.Info {
 		if sa.NodeUID != "" {
 			info.Extra[NodeUIDKey] = []string{sa.NodeUID}
 		}
+	}
+	if sa.ValidatingWebhookConfigurationName != "" && sa.ValidatingWebhookConfigurationUID != "" {
+		if info.Extra == nil {
+			info.Extra = make(map[string][]string)
+		}
+		info.Extra[ValidatingWebhookConfigurationNameKey] = []string{sa.ValidatingWebhookConfigurationName}
+		info.Extra[ValidatingWebhookConfigurationUIDKey] = []string{sa.ValidatingWebhookConfigurationUID}
 	}
 
 	return info

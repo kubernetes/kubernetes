@@ -192,6 +192,8 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	podref := private.Kubernetes.Pod
 	noderef := private.Kubernetes.Node
 	secref := private.Kubernetes.Secret
+	valref := private.Kubernetes.ValidatingWebhookConfiguration
+	mutref := private.Kubernetes.MutatingWebhookConfiguration
 	// Make sure service account still exists (name and UID)
 	serviceAccount, err := v.getter.GetServiceAccount(ctx, namespace, saref.Name)
 	if err != nil {
@@ -278,6 +280,44 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 		}
 	}
 
+	var validatingName, validatingUID string
+	if valref != nil {
+		validating, err := v.getter.GetValidatingWebhookConfiguration(ctx, valref.Name)
+		if err != nil {
+			klog.V(4).Infof("Could not retrieve validatingwebhookconfiguration object %q for service account %s/%s: %v", valref.Name, namespace, saref.Name, err)
+			return nil, errors.New("service account token has been invalidated")
+		}
+		if valref.UID != string(validating.UID) {
+			klog.V(4).Infof("ValidatingWebhookConfiguration UID no longer matches %s: %q != %q", valref.Name, string(validating.UID), valref.UID)
+			return nil, fmt.Errorf("validating UID (%s) does not match service account validating ref claim (%s)", validating.UID, valref.UID)
+		}
+		if validating.DeletionTimestamp != nil && validating.DeletionTimestamp.Time.Before(invalidIfDeletedBefore) {
+			klog.V(4).Infof("ValidatingWebhookConfiguration %q is deleted and awaiting removal for service account %s/%s", validating.Name, namespace, saref.Name)
+			return nil, errors.New("service account token has been invalidated")
+		}
+		validatingName = valref.Name
+		validatingUID = valref.UID
+	}
+
+	var mutatingName, mutatingUID string
+	if mutref != nil {
+		mutating, err := v.getter.GetMutatingWebhookConfiguration(ctx, mutref.Name)
+		if err != nil {
+			klog.V(4).Infof("Could not retrieve mutatingwebhookconfiguration object %q for service account %s/%s: %v", mutref.Name, namespace, saref.Name, err)
+			return nil, errors.New("service account token has been invalidated")
+		}
+		if mutref.UID != string(mutating.UID) {
+			klog.V(4).Infof("MutatingWebhookConfiguration UID no longer matches %s: %q != %q", mutref.Name, string(mutating.UID), mutref.UID)
+			return nil, fmt.Errorf("mutating UID (%s) does not match service account mutating ref claim (%s)", mutating.UID, mutref.UID)
+		}
+		if mutating.DeletionTimestamp != nil && mutating.DeletionTimestamp.Time.Before(invalidIfDeletedBefore) {
+			klog.V(4).Infof("MutatingWebhookConfiguration %q is deleted and awaiting removal for service account %s/%s", mutating.Name, namespace, saref.Name)
+			return nil, errors.New("service account token has been invalidated")
+		}
+		mutatingName = mutref.Name
+		mutatingUID = mutref.UID
+	}
+
 	// Check special 'warnafter' field for projected service account token transition.
 	warnafter := private.Kubernetes.WarnAfter
 	if warnafter != nil && *warnafter != 0 {
@@ -296,13 +336,17 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 		jti = public.ID
 	}
 	return &apiserverserviceaccount.ServiceAccountInfo{
-		Namespace:    private.Kubernetes.Namespace,
-		Name:         private.Kubernetes.Svcacct.Name,
-		UID:          private.Kubernetes.Svcacct.UID,
-		PodName:      podName,
-		PodUID:       podUID,
-		NodeName:     nodeName,
-		NodeUID:      nodeUID,
-		CredentialID: authenticationtokenjwt.CredentialIDForJTI(jti),
+		Namespace:                          private.Kubernetes.Namespace,
+		Name:                               private.Kubernetes.Svcacct.Name,
+		UID:                                private.Kubernetes.Svcacct.UID,
+		PodName:                            podName,
+		PodUID:                             podUID,
+		NodeName:                           nodeName,
+		NodeUID:                            nodeUID,
+		ValidatingWebhookConfigurationName: validatingName,
+		ValidatingWebhookConfigurationUID:  validatingUID,
+		MutatingWebhookConfigurationName:   mutatingName,
+		MutatingWebhookConfigurationUID:    mutatingUID,
+		CredentialID:                       authenticationtokenjwt.CredentialIDForJTI(jti),
 	}, nil
 }
