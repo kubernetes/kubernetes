@@ -225,13 +225,19 @@ func (le *LeaderElector) Run(ctx context.Context) {
 		return
 	}
 
-	// When ReleaseOnCancel is set, we need to make sure OnStartedLeading returns before we release the lock
-	// to ensure there is no business logic running while the lock is already released.
+	// When ReleaseOnCancel is set, keep renewing the lock until
+	// OnStartedLeading returns, then release it. The caller's context
+	// cancellation signals OnStartedLeading to shut down, but renew()
+	// keeps the lock held until that shutdown is complete.
+	renewCtx, cancelRenew := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 	wg.Go(func() {
+		defer cancelRenew()
 		le.config.Callbacks.OnStartedLeading(ctx)
 	})
-	le.renew(ctx)
+	le.renew(renewCtx)
+	// Signal OnStartedLeading to stop in case renew exited due to renewal
+	// failure rather than context cancellation.
 	cancel()
 	wg.Wait()
 	le.release(klog.FromContext(ctx))

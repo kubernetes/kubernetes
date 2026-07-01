@@ -841,8 +841,9 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 		Callbacks: LeaderCallbacks{
 			OnNewLeader:      func(identity string) {},
 			OnStoppedLeading: func() {},
-			OnStartedLeading: func(context.Context) {
+			OnStartedLeading: func(ctx context.Context) {
 				close(onNewLeader)
+				<-ctx.Done()
 			},
 		},
 	}
@@ -1140,6 +1141,128 @@ func TestReleaseOnRenewalFailure(t *testing.T) {
 	defer eventsMu.Unlock()
 	assert.Equal(t, []string{"OnStartedLeading returned", "lock released"}, events,
 		"OnStartedLeading must return before release()")
+}
+
+// TestReleaseOnCancelKeepsRenewingUntilStartedLeadingReturns verifies that
+// when the context is cancelled, the lock continues to be renewed until
+// OnStartedLeading has returned, and only then is the lock released.
+func TestReleaseOnCancelKeepsRenewingUntilStartedLeadingReturns(t *testing.T) {
+	objectType := "leases"
+
+	var (
+		lockObj   runtime.Object
+		lockObjMu sync.Mutex
+
+		events   []string
+		eventsMu sync.Mutex
+	)
+
+	trackEvent := func(name string) {
+		eventsMu.Lock()
+		defer eventsMu.Unlock()
+		events = append(events, name)
+	}
+
+	renewedAfterCancel := make(chan struct{})
+	closeRenewedAfterCancel := sync.OnceFunc(func() { close(renewedAfterCancel) })
+
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+
+	recorder := record.NewFakeRecorder(100)
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+		EventRecorder: recorder,
+	}
+
+	c := &fake.Clientset{}
+	c.AddReactor("get", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockObjMu.Lock()
+		defer lockObjMu.Unlock()
+		if lockObj != nil {
+			return true, lockObj, nil
+		}
+		act := action.(fakeclient.GetAction)
+		return true, nil, errors.NewNotFound(act.GetResource().GroupResource(), act.GetName())
+	})
+	c.AddReactor("create", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockObjMu.Lock()
+		defer lockObjMu.Unlock()
+		lockObj = action.(fakeclient.CreateAction).GetObject()
+		return true, lockObj, nil
+	})
+	c.AddReactor("update", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockObjMu.Lock()
+		defer lockObjMu.Unlock()
+
+		lease := action.(fakeclient.UpdateAction).GetObject().(*coordinationv1.Lease)
+
+		if lease.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity == "" {
+			trackEvent("lock released")
+			lockObj = lease
+			return true, lockObj, nil
+		}
+
+		if ctx.Err() != nil {
+			closeRenewedAfterCancel()
+		}
+
+		lockObj = lease
+		return true, lockObj, nil
+	})
+
+	lock, err := rl.New(objectType, "foo", "bar", c.CoreV1(), c.CoordinationV1(), resourceLockConfig)
+	if err != nil {
+		t.Fatal("Failed to create a resource lock: ", err)
+	}
+
+	startedLeading := make(chan struct{})
+
+	lec := LeaderElectionConfig{
+		Lock:            lock,
+		LeaseDuration:   500 * time.Millisecond,
+		RenewDeadline:   300 * time.Millisecond,
+		RetryPeriod:     50 * time.Millisecond,
+		ReleaseOnCancel: true,
+		Callbacks: LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				close(startedLeading)
+				<-ctx.Done()
+				// Wait for at least one renewal after cancellation before returning.
+				<-renewedAfterCancel
+				trackEvent("OnStartedLeading returned")
+			},
+			OnStoppedLeading: func() {},
+		},
+	}
+
+	elector, err := NewLeaderElector(lec)
+	if err != nil {
+		t.Fatal("Failed to create leader elector: ", err)
+	}
+
+	runReturned := make(chan struct{})
+	go func() {
+		elector.Run(ctx)
+		close(runReturned)
+	}()
+
+	await := func(ch <-chan struct{}, msg string) {
+		select {
+		case <-ch:
+		case <-time.After(5 * time.Second):
+			t.Fatal(msg)
+		}
+	}
+
+	await(startedLeading, "failed to become the leader")
+	cancel()
+	await(runReturned, "Run() did not return; likely renew() stopped after context cancellation while OnStartedLeading was still running")
+
+	eventsMu.Lock()
+	defer eventsMu.Unlock()
+	assert.Equal(t, []string{"OnStartedLeading returned", "lock released"}, events,
+		"OnStartedLeading must return before the lock is released")
 }
 
 func TestLeaderElectionConfigValidation(t *testing.T) {
