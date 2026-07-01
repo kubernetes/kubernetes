@@ -157,7 +157,7 @@ func TestDevicePluginSocketPaths(t *testing.T) {
 
 func TestNewManagerImplDualSockets(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	topologyStore := topologymanager.NewFakeManager()
+	topologyStore := topologymanager.NewFakeManager(logger)
 
 	primaryDir, err := os.MkdirTemp("", "device_plugin_primary")
 	require.NoError(t, err)
