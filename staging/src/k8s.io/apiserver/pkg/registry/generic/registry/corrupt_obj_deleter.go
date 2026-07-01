@@ -23,10 +23,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
+	"k8s.io/apiserver/pkg/util/dryrun"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -51,6 +53,27 @@ func NewCorruptObjectDeleter(store *Store) rest.GracefulDeleter {
 type corruptObjectDeleter struct {
 	store *Store
 }
+
+// errUnsafeDeleteDryRun is a sentinel error returned by the deletion validator
+// on dry run requests. The etcd3 store calls the validator only after the
+// corruption check, and before it executes the delete:
+//
+//	getState(key, expectTransformOrDecodeError=true)
+//	    key not found          -> KeyNotFoundError, validator never runs
+//	    decodes cleanly        -> InvalidObjError, validator never runs
+//	    transform/decode fails -> validateDeletion, then OptimisticDelete
+//
+// Getting this error back means the object is corrupt at the latest revision
+// and the delete would have gone through.
+var errUnsafeDeleteDryRun = errors.New("aborting unsafe delete, dry run requested")
+
+// errUnsafeDeleteDryRunBypassed indicates the storage deleted the object
+// without calling the deletion validator on a dry run request. This MUST
+// NEVER happen with ANY storage.Interface implementation. The validator is
+// the same parameter that carries delete admission for regular deletion
+// requests, see Store.Delete. A backend that triggers this error has a bug
+// that allows object deletion without running delete admission.
+var errUnsafeDeleteDryRunBypassed = errors.New("storage deleted the object despite the dry run request")
 
 // Delete performs an unsafe deletion of the given resource from the storage.
 //
@@ -81,6 +104,26 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 	//  b) skip admission validation, rest.ValidateAllObjectFunc will "admit everything"
 	var nilPreconditions *storage.Preconditions = nil
 	var nilCachedExistingObject runtime.Object = nil
+	if dryrun.IsDryRun(opts.DryRun) {
+		err := storageBackend.Delete(
+			ctx, key, out, nilPreconditions,
+			func(context.Context, runtime.Object) error { return errUnsafeDeleteDryRun },
+			nilCachedExistingObject, storageOpts,
+		)
+		switch {
+		case errors.Is(err, errUnsafeDeleteDryRun):
+			// the object is corrupt at the latest revision, the
+			// delete would have proceeded
+			return nil, true, nil
+		case err == nil:
+			// Should never happen. Indicates a critical bug in the
+			// storage.Interface implementation, see errUnsafeDeleteDryRunBypassed
+			utilruntime.HandleErrorWithContext(ctx, errUnsafeDeleteDryRunBypassed, "The storage bypassed delete admission on a dry run request", "object", klog.KRef(genericapirequest.NamespaceValue(ctx), name))
+			return nil, false, apierrors.NewInternalError(errUnsafeDeleteDryRunBypassed)
+		default:
+			return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
+		}
+	}
 	if err := storageBackend.Delete(ctx, key, out, nilPreconditions, rest.ValidateAllObjectFunc, nilCachedExistingObject, storageOpts); err != nil {
 		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
