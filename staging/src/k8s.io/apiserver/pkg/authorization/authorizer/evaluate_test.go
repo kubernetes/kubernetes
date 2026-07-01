@@ -258,6 +258,74 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				},
 			}),
 		},
+		{
+			name: "evaluateConditionFn can be nil, and evaluation to concrete can still succeed",
+			decision: unionDecision(
+				mkCM(
+					// This should take precedence and make the outcome Deny
+					effectCondition{
+						effect: effectDeny,
+						cond: authorizer.GenericCondition{
+							ID: "foo",
+							EvaluateFunc: func(ctx context.Context, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+								return authorizer.ConditionEvaluationResultBoolean(true)
+							},
+						},
+					},
+					cnd(effectAllow, "c", "c", "transparent", ""),
+				),
+				mkCM(
+					cnd(effectAllow, "c", "c", "transparent", ""),
+					cnd(effectDeny, "d", "d", "opaque", ""),
+				),
+				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
+			),
+			wantDecision:  authorizer.DecisionDeny,
+			wantReason:    `condition "foo" denied the request`,
+			noACRReviewer: true,
+		},
+		{
+			name: "evaluateConditionFn can be nil, and refinement can still happen",
+			decision: unionDecision(
+				mkCM(
+					// This condition should removed from the refined ConditionsAwareDecision
+					effectCondition{
+						effect: effectDeny,
+						cond: authorizer.GenericCondition{
+							ID: "foo",
+							EvaluateFunc: func(ctx context.Context, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+								return authorizer.ConditionEvaluationResultBoolean(false)
+							},
+						},
+					},
+					cnd(effectAllow, "c", "c", "transparent", ""),
+				),
+				mkCM(
+					cnd(effectAllow, "c", "c", "transparent", ""),
+					cnd(effectDeny, "d", "d", "opaque", ""),
+				),
+				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
+			),
+			verifyPartial: assertDecisionTree(snapDecision{
+				Kind: "Union",
+				Union: []snapDecision{
+					{
+						Kind: "ConditionsMap",
+						CM: &snapCM{
+							Allow: []snapCondition{{ID: "c", Condition: "c", Type: "transparent"}},
+						},
+					},
+					{
+						Kind: "ConditionsMap",
+						CM: &snapCM{
+							Deny:  []snapCondition{{ID: "d", Condition: "d", Type: "opaque"}},
+							Allow: []snapCondition{{ID: "c", Condition: "c", Type: "transparent"}},
+						},
+					},
+					{Kind: "Deny", Reason: "something later denies"},
+				},
+			}),
+		},
 	}
 
 	for _, tt := range tests {
