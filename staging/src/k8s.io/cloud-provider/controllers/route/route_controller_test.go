@@ -473,7 +473,8 @@ func TestReconcile(t *testing.T) {
 			defer e.Stop()
 
 			rc.nodeListerSynced = alwaysReady
-			require.NoError(t, rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes), "failed to reconcile")
+			_, err = rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes)
+			require.NoError(t, err, "failed to reconcile")
 			for _, action := range testCase.clientset.Actions() {
 				if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
 					node := action.(core.UpdateAction).GetObject().(*v1.Node)

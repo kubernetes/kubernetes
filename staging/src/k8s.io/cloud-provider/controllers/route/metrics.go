@@ -37,10 +37,18 @@ var (
 		Help:           "A metric counting the amount of times routes have been synced with the cloud provider.",
 		StabilityLevel: metrics.ALPHA,
 	})
+
+	routeCorrectionsCount = metrics.NewCounter(&metrics.CounterOpts{
+		Name:           "route_corrections_total",
+		Subsystem:      subsystem,
+		Help:           "A metric counting the amount of times routes required adjustment after a periodic reconcile.",
+		StabilityLevel: metrics.ALPHA,
+	})
 )
 
 func registerMetrics() {
 	registration.Do(func() {
 		legacyregistry.MustRegister(routeSyncCount)
+		legacyregistry.MustRegister(routeCorrectionsCount)
 	})
 }
