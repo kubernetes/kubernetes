@@ -145,15 +145,15 @@ func (unionMap *ConditionsAwareDecisionUnion) ToDecision() ConditionsAwareDecisi
 		// the reasons and errors for all of the same-type decisions.
 		reasonlist := make([]string, 0, len(unionMap.inner))
 		errlist := make([]error, 0, len(unionMap.inner))
-		for i, subDecision := range unionMap.inner {
+		for _, subDecision := range unionMap.inner {
 			if (onlyPossibleDecision == DecisionAllow && subDecision.d.IsAllow()) ||
 				(onlyPossibleDecision == DecisionNoOpinion && subDecision.d.IsNoOpinion()) ||
 				(onlyPossibleDecision == DecisionDeny && subDecision.d.IsDeny()) {
 				if reason := subDecision.d.Reason(); len(reason) != 0 {
-					reasonlist = append(reasonlist, fmt.Sprintf("%d: %s", i, reason))
+					reasonlist = append(reasonlist, fmt.Sprintf("%s: %s", subDecision.conditionalAuthorizerName, reason))
 				}
 				if err := subDecision.d.Error(); err != nil {
-					errlist = append(errlist, fmt.Errorf("%d: %w", i, err))
+					errlist = append(errlist, fmt.Errorf("%s: %w", subDecision.conditionalAuthorizerName, err))
 				}
 			}
 		}

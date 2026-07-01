@@ -320,15 +320,15 @@ func TestConditionsAwareDecision(t *testing.T) {
 		},
 		{
 			// A single unconditional decision is simplified to that decision; the reason gets
-			// an "%d: %s" index prefix (the index in the union's inner slice) per ToDecision.
+			// an "%s: %s" authorizer-name prefix (the sub-decision's authorizerName) per ToDecision.
 			name: "union: single Allow simplifies to Allow",
 			testDecisions: []authorizer.ConditionsAwareDecision{
 				unionDecision(authorizer.ConditionsAwareDecisionAllow("ok", nil)),
 			},
 			wantIsAllow:                          true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "0: ok",
-			wantString:                           `Allow(reason="0: ok")`,
+			wantReason:                           "0.example.com: ok",
+			wantString:                           `Allow(reason="0.example.com: ok")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
 		},
 		{
@@ -338,8 +338,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsDeny:                           true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "0: denied",
-			wantString:                           `Deny(reason="0: denied")`,
+			wantReason:                           "0.example.com: denied",
+			wantString:                           `Deny(reason="0.example.com: denied")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionDeny),
 		},
 		{
@@ -349,8 +349,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsNoOpinion:                      true,
 			wantContainsUnconditionalAllowOrDeny: false,
-			wantReason:                           "0: noop",
-			wantString:                           `NoOpinion(reason="0: noop")`,
+			wantReason:                           "0.example.com: noop",
+			wantString:                           `NoOpinion(reason="0.example.com: noop")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion),
 		},
 		{
@@ -361,7 +361,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsUnion:                          true,
 			wantContainsUnconditionalAllowOrDeny: false,
 			wantReason:                           `[""]`,
-			wantString:                           `Union[ConditionsMap(allows=1)]`,
+			wantString:                           `Union[0.example.com: ConditionsMap(allows=1)]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion, authorizer.DecisionAllow),
 		},
 		{
@@ -372,7 +372,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsUnion:                          true,
 			wantContainsUnconditionalAllowOrDeny: true,
 			wantReason:                           `[["", ""]]`,
-			wantString:                           `Union[Union[ConditionsMap(denies=1), Allow]]`,
+			wantString:                           `Union[0.example.com: Union[0.example.com: ConditionsMap(denies=1), 1.example.com: Allow]]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow, authorizer.DecisionDeny),
 		},
 		{
@@ -386,15 +386,15 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsNoOpinion:                      true,
 			wantContainsUnconditionalAllowOrDeny: false,
-			wantReason:                           "0: a, 2: c",
+			wantReason:                           "0.example.com: a, 2.example.com: c",
 			wantErrorIs:                          unexpectedErr,
-			wantString:                           `NoOpinion(reason="0: a, 2: c", err="[1: unexpected things happened, 2: other error]")`,
+			wantString:                           `NoOpinion(reason="0.example.com: a, 2.example.com: c", err="[1.example.com: unexpected things happened, 2.example.com: other error]")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion),
 		},
 		{
 			// Add short-circuits after the first Allow/Deny leaf, so the trailing Deny("second")
 			// is dropped. The remaining inner slice is [NoOpinion, NoOpinion, Allow], so the
-			// simplified reason references the Allow at index 2.
+			// simplified reason references the Allow at authorizer name "2.example.com".
 			name: "union: Allow before Deny returns Allow, NoOpinions are ignored",
 			testDecisions: []authorizer.ConditionsAwareDecision{
 				unionDecision(
@@ -406,8 +406,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsAllow:                          true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "2: first",
-			wantString:                           `Allow(reason="2: first")`,
+			wantReason:                           "2.example.com: first",
+			wantString:                           `Allow(reason="2.example.com: first")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
 		},
 		{
@@ -422,8 +422,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsDeny:                           true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "2: first",
-			wantString:                           `Deny(reason="2: first")`,
+			wantReason:                           "2.example.com: first",
+			wantString:                           `Deny(reason="2.example.com: first")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionDeny),
 		},
 		// Actual union decisions (not simplified)
@@ -438,7 +438,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsUnion:                          true,
 			wantContainsUnconditionalAllowOrDeny: false,
 			wantReason:                           `[no-op1, "", no-op2]`,
-			wantString:                           `Union[NoOpinion(reason="no-op1"), ConditionsMap(allows=1), NoOpinion(reason="no-op2")]`,
+			wantString:                           `Union[0.example.com: NoOpinion(reason="no-op1"), 1.example.com: ConditionsMap(allows=1), 2.example.com: NoOpinion(reason="no-op2")]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion, authorizer.DecisionAllow),
 		},
 		{
@@ -451,8 +451,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsAllow:                          true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "1: allowed",
-			wantString:                           `Allow(reason="1: allowed")`,
+			wantReason:                           "1.example.com: allowed",
+			wantString:                           `Allow(reason="1.example.com: allowed")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
 		},
 		{
@@ -463,7 +463,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsUnion:                          true,
 			wantContainsUnconditionalAllowOrDeny: true, // There is an inner Deny
 			wantReason:                           `["", no]`,
-			wantString:                           `Union[ConditionsMap(allows=1), Deny(reason="no")]`,
+			wantString:                           `Union[0.example.com: ConditionsMap(allows=1), 1.example.com: Deny(reason="no")]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow, authorizer.DecisionDeny),
 		},
 		{
@@ -474,7 +474,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsUnion:                          true,
 			wantContainsUnconditionalAllowOrDeny: false,
 			wantReason:                           `["", noop]`,
-			wantString:                           `Union[ConditionsMap(denies=1), NoOpinion(reason="noop")]`,
+			wantString:                           `Union[0.example.com: ConditionsMap(denies=1), 1.example.com: NoOpinion(reason="noop")]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion, authorizer.DecisionDeny),
 		},
 		{
@@ -486,7 +486,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantContainsUnconditionalAllowOrDeny: true, // There is an inner Allow
 			wantReason:                           `["", allowed]`,
 			wantErrorIs:                          unexpectedErr,
-			wantString:                           `Union[ConditionsMap(denies=1), Allow(reason="allowed", err="unexpected things happened")]`,
+			wantString:                           `Union[0.example.com: ConditionsMap(denies=1), 1.example.com: Allow(reason="allowed", err="unexpected things happened")]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow, authorizer.DecisionDeny),
 		},
 		{
@@ -497,14 +497,14 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsUnion:                          true,
 			wantContainsUnconditionalAllowOrDeny: false,
 			wantReason:                           `["", ""]`,
-			wantString:                           `Union[ConditionsMap(allows=1), ConditionsMap(denies=1)]`,
+			wantString:                           `Union[0.example.com: ConditionsMap(allows=1), 1.example.com: ConditionsMap(denies=1)]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion, authorizer.DecisionAllow, authorizer.DecisionDeny),
 		},
 		{
-			// The inner union [condMapAllow, Allow("ok")] simplifies to Allow(reason="1: ok").
+			// The inner union [condMapAllow, Allow("ok")] simplifies to Allow(reason="1.example.com: ok").
 			// The trailing NoOpinion is dropped by the outer Add's short-circuit (an Allow is
-			// already present). The remaining outer inner is [condMapAllow, Allow("1: ok")],
-			// which again simplifies to Allow with a nested index prefix.
+			// already present). The remaining outer inner is [condMapAllow, Allow("1.example.com: ok")],
+			// which again simplifies to Allow with a nested authorizer-name prefix.
 			name: "union: nested with allow simplifies through both levels",
 			testDecisions: []authorizer.ConditionsAwareDecision{
 				unionDecision(
@@ -515,8 +515,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsAllow:                          true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "1: 1: ok",
-			wantString:                           `Allow(reason="1: 1: ok")`,
+			wantReason:                           "1.example.com: 1.example.com: ok",
+			wantString:                           `Allow(reason="1.example.com: 1.example.com: ok")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
 		},
 		{
@@ -536,7 +536,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsUnion:                          true,
 			wantContainsUnconditionalAllowOrDeny: false,
 			wantReason:                           `["", ["", inner, ["", inner2]]]`,
-			wantString:                           `Union[ConditionsMap(allows=1), Union[ConditionsMap(allows=1), NoOpinion(reason="inner"), Union[ConditionsMap(denies=1), NoOpinion(reason="inner2")]]]`,
+			wantString:                           `Union[0.example.com: ConditionsMap(allows=1), 1.example.com: Union[0.example.com: ConditionsMap(allows=1), 1.example.com: NoOpinion(reason="inner"), 2.example.com: Union[0.example.com: ConditionsMap(denies=1), 1.example.com: NoOpinion(reason="inner2")]]]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion, authorizer.DecisionAllow, authorizer.DecisionDeny),
 		},
 
@@ -653,7 +653,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:           true,
 			wantReason:            `[""]`,
-			wantString:            `Union[ConditionsMap(denies=1)]`,
+			wantString:            `Union[0.example.com: ConditionsMap(denies=1)]`,
 			wantPossibleDecisions: sets.New(authorizer.DecisionNoOpinion, authorizer.DecisionDeny),
 		},
 		{
@@ -666,7 +666,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsUnion:                          true,
 			wantContainsUnconditionalAllowOrDeny: true, // trailing Allow leaf
 			wantReason:                           `["", ""]`,
-			wantString:                           `Union[ConditionsMap(denies=1), Allow]`,
+			wantString:                           `Union[0.example.com: ConditionsMap(denies=1), 1.example.com: Allow]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow, authorizer.DecisionDeny),
 		},
 		{
@@ -690,7 +690,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:           true,
 			wantReason:            `["", ""]`,
-			wantString:            `Union[ConditionsMap(allows=1), NoOpinion]`,
+			wantString:            `Union[0.example.com: ConditionsMap(allows=1), 1.example.com: NoOpinion]`,
 			wantPossibleDecisions: sets.New(authorizer.DecisionNoOpinion, authorizer.DecisionAllow),
 		},
 		{
@@ -700,7 +700,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsUnion:           true,
 			wantReason:            `[""]`,
-			wantString:            `Union[ConditionsMap(denies=1, allows=1)]`,
+			wantString:            `Union[0.example.com: ConditionsMap(denies=1, allows=1)]`,
 			wantPossibleDecisions: sets.New(authorizer.DecisionNoOpinion, authorizer.DecisionAllow, authorizer.DecisionDeny),
 		},
 		{
@@ -711,7 +711,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsUnion:                          true,
 			wantContainsUnconditionalAllowOrDeny: true, // trailing Deny leaf
 			wantReason:                           `["", "", ""]`,
-			wantString:                           `Union[NoOpinion, ConditionsMap(allows=1), Deny]`,
+			wantString:                           `Union[0.example.com: NoOpinion, 1.example.com: ConditionsMap(allows=1), 2.example.com: Deny]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow, authorizer.DecisionDeny),
 		},
 		{
@@ -722,7 +722,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantIsUnion:                          true,
 			wantContainsUnconditionalAllowOrDeny: true,
 			wantReason:                           `["", "", ""]`,
-			wantString:                           `Union[ConditionsMap(allows=1), ConditionsMap(denies=1), Allow]`,
+			wantString:                           `Union[0.example.com: ConditionsMap(allows=1), 1.example.com: ConditionsMap(denies=1), 2.example.com: Allow]`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow, authorizer.DecisionDeny),
 		},
 	}

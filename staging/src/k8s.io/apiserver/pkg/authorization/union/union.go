@@ -86,7 +86,7 @@ func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorize
 			errlist = append(errlist, err)
 		}
 		if len(reason) != 0 {
-			reasonlist = append(reasonlist, reason)
+			reasonlist = append(reasonlist, fmt.Sprintf("%s: %s", currAuthzHandler.AuthorizerName, reason))
 		}
 		switch decision {
 		case authorizer.DecisionAllow, authorizer.DecisionDeny:
@@ -177,7 +177,7 @@ func (authzHandler unionAuthzHandler) EvaluateConditions(ctx context.Context, un
 				errlist = append(errlist, err)
 			}
 			if len(reason) != 0 {
-				reasonlist = append(reasonlist, reason)
+				reasonlist = append(reasonlist, fmt.Sprintf("%s: %s", currentAuthorizerName, reason))
 			}
 		}
 	}

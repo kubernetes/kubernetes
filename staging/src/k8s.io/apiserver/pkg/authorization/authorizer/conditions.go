@@ -283,6 +283,8 @@ func (d ConditionsAwareDecision) String() string {
 			if i != 0 {
 				b.WriteString(", ")
 			}
+			b.WriteString(sub.conditionalAuthorizerName)
+			b.WriteString(": ")
 			b.WriteString(sub.d.String())
 		}
 		b.WriteByte(']')

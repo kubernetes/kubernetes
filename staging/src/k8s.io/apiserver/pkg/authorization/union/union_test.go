@@ -53,7 +53,7 @@ func mustNewIndexed(t *testing.T, handlers ...authorizer.Authorizer) authorizer.
 	t.Helper()
 	named := make([]NamedAuthorizer, len(handlers))
 	for i, h := range handlers {
-		named[i] = NamedAuthorizer{AuthorizerName: fmt.Sprintf("authz%d.example.com", i), Authorizer: h}
+		named[i] = NamedAuthorizer{AuthorizerName: fmt.Sprintf("authz%d", i), Authorizer: h}
 	}
 	u, err := New(named...)
 	if err != nil {
@@ -454,7 +454,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			authz3:                noOpinion(),
 			authz4:                noOpinion(),
 			authz5:                noOpinion(),
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), NoOpinion], NoOpinion], NoOpinion, NoOpinion]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: ConditionsMap(allows=1), authz2: NoOpinion], authz3: NoOpinion], union3: NoOpinion, authz5: NoOpinion]`,
 			wantFinalDecision:     `Allow`,
 		},
 		{
@@ -467,7 +467,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			authz3:                noOpinion(),
 			authz4:                noOpinion(),
 			authz5:                noOpinion(),
-			wantAuthorizeDecision: `Union[Union[Union[NoOpinion, ConditionsMap(allows=1)], NoOpinion], NoOpinion, NoOpinion]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: NoOpinion, authz2: ConditionsMap(allows=1)], authz3: NoOpinion], union3: NoOpinion, authz5: NoOpinion]`,
 			wantFinalDecision:     `NoOpinion`,
 		},
 		{
@@ -480,7 +480,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			},
 			authz4:                noOpinion(),
 			authz5:                noOpinion(),
-			wantAuthorizeDecision: `Union[Union[NoOpinion, ConditionsMap(denies=1)], NoOpinion, NoOpinion]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: NoOpinion, authz3: ConditionsMap(denies=1)], union3: NoOpinion, authz5: NoOpinion]`,
 			wantFinalDecision:     `Deny`,
 		},
 		{
@@ -493,7 +493,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				evalDecision:    authorizer.DecisionNoOpinion,
 			},
 			authz5:                noOpinion(),
-			wantAuthorizeDecision: `Union[NoOpinion, Union[ConditionsMap(denies=1)], NoOpinion]`,
+			wantAuthorizeDecision: `Union[union1: NoOpinion, union3: Union[authz4: ConditionsMap(denies=1)], authz5: NoOpinion]`,
 			wantFinalDecision:     `NoOpinion`,
 		},
 		{
@@ -506,8 +506,8 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				conditionEffect: effectNoOpinion,
 				evalDecision:    authorizer.DecisionNoOpinion,
 			},
-			wantAuthorizeDecision: `NoOpinion(reason="2: only NoOpinion conditions always evaluate to NoOpinion")`,
-			wantFinalDecision:     `NoOpinion(reason="2: only NoOpinion conditions always evaluate to NoOpinion")`,
+			wantAuthorizeDecision: `NoOpinion(reason="authz5: only NoOpinion conditions always evaluate to NoOpinion")`,
+			wantFinalDecision:     `NoOpinion(reason="authz5: only NoOpinion conditions always evaluate to NoOpinion")`,
 		},
 
 		// === Conditional + concrete mixes ===
@@ -579,7 +579,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			},
 			authz4:                noOpinion(),
 			authz5:                &evalTestAuthz{decision: authorizer.DecisionDeny},
-			wantAuthorizeDecision: `Union[Union[NoOpinion, ConditionsMap(allows=1)], NoOpinion, Deny]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: NoOpinion, authz3: ConditionsMap(allows=1)], union3: NoOpinion, authz5: Deny]`,
 			wantFinalDecision:     `Deny`,
 		},
 		{
@@ -605,7 +605,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			},
 			authz4:                noOpinion(),
 			authz5:                &evalTestAuthz{decision: authorizer.DecisionDeny},
-			wantAuthorizeDecision: `Union[Union[NoOpinion, ConditionsMap(allows=1)], NoOpinion, Deny]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: NoOpinion, authz3: ConditionsMap(allows=1)], union3: NoOpinion, authz5: Deny]`,
 			wantFinalDecision:     `Allow`,
 		},
 		{
@@ -618,7 +618,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			authz3:                &evalTestAuthz{decision: authorizer.DecisionAllow},
 			authz4:                noOpinion(),
 			authz5:                noOpinion(),
-			wantAuthorizeDecision: `Union[Union[Union[NoOpinion, ConditionsMap(denies=1)], Allow]]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: NoOpinion, authz2: ConditionsMap(denies=1)], authz3: Allow]]`,
 			wantFinalDecision:     `Deny`,
 		},
 		{
@@ -653,7 +653,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			},
 			authz4:                noOpinion(),
 			authz5:                noOpinion(),
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), NoOpinion], ConditionsMap(allows=1)], NoOpinion, NoOpinion]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: ConditionsMap(allows=1), authz2: NoOpinion], authz3: ConditionsMap(allows=1)], union3: NoOpinion, authz5: NoOpinion]`,
 			wantFinalDecision:     `Allow`,
 		},
 		{
@@ -669,7 +669,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			},
 			authz4:                noOpinion(),
 			authz5:                noOpinion(),
-			wantAuthorizeDecision: `Union[Union[Union[NoOpinion, ConditionsMap(allows=1)], ConditionsMap(denies=1)], NoOpinion, NoOpinion]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: NoOpinion, authz2: ConditionsMap(allows=1)], authz3: ConditionsMap(denies=1)], union3: NoOpinion, authz5: NoOpinion]`,
 			wantFinalDecision:     `Deny`,
 		},
 		{
@@ -688,7 +688,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				conditionEffect: effectAllow,
 				evalDecision:    authorizer.DecisionAllow,
 			},
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), NoOpinion], ConditionsMap(allows=1)], NoOpinion, ConditionsMap(allows=1)]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: ConditionsMap(allows=1), authz2: NoOpinion], authz3: ConditionsMap(allows=1)], union3: NoOpinion, authz5: ConditionsMap(allows=1)]`,
 			wantFinalDecision:     `Allow`,
 		},
 		{
@@ -707,7 +707,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				conditionEffect: effectDeny,
 				evalDecision:    authorizer.DecisionDeny,
 			},
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), NoOpinion], ConditionsMap(allows=1)], NoOpinion, ConditionsMap(denies=1)]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: ConditionsMap(allows=1), authz2: NoOpinion], authz3: ConditionsMap(allows=1)], union3: NoOpinion, authz5: ConditionsMap(denies=1)]`,
 			wantFinalDecision:     `Allow`,
 		},
 		{
@@ -729,8 +729,8 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				conditionEffect: effectAllow,
 				evalDecision:    authorizer.DecisionNoOpinion,
 			},
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), ConditionsMap(denies=1)], NoOpinion(reason="only NoOpinion conditions always evaluate to NoOpinion")], NoOpinion, ConditionsMap(allows=1)]`,
-			wantFinalDecision:     `NoOpinion(reason="only NoOpinion conditions always evaluate to NoOpinion")`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: ConditionsMap(allows=1), authz2: ConditionsMap(denies=1)], authz3: NoOpinion(reason="only NoOpinion conditions always evaluate to NoOpinion")], union3: NoOpinion, authz5: ConditionsMap(allows=1)]`,
+			wantFinalDecision:     `NoOpinion(reason="union1: authz3: only NoOpinion conditions always evaluate to NoOpinion")`,
 		},
 
 		// === Conditional deny in the chain ===
@@ -751,7 +751,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				conditionEffect: effectAllow,
 				evalDecision:    authorizer.DecisionAllow,
 			},
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(denies=1), NoOpinion], ConditionsMap(allows=1)], NoOpinion, ConditionsMap(allows=1)]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: ConditionsMap(denies=1), authz2: NoOpinion], authz3: ConditionsMap(allows=1)], union3: NoOpinion, authz5: ConditionsMap(allows=1)]`,
 			wantFinalDecision:     `Deny`,
 		},
 		{
@@ -770,7 +770,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				conditionEffect: effectDeny,
 				evalDecision:    authorizer.DecisionDeny,
 			},
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(denies=1), NoOpinion], ConditionsMap(allows=1)], NoOpinion, ConditionsMap(denies=1)]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: ConditionsMap(denies=1), authz2: NoOpinion], authz3: ConditionsMap(allows=1)], union3: NoOpinion, authz5: ConditionsMap(denies=1)]`,
 			wantFinalDecision:     `Deny`,
 		},
 
@@ -778,8 +778,8 @@ func TestUnionEvaluateConditions(t *testing.T) {
 
 		{
 			// authz1's error rides through three layers of union ToDecision (union2, union1, union0).
-			// Each layer prepends the source authorizer index "0:" when collecting deciding errors,
-			// so the final error string is "0: 0: 0: authz error".
+			// Each layer prepends the source authorizer name when collecting deciding errors,
+			// so the final error string is "union1: union2: authz1: authz error".
 			name: "authorize error propagated",
 			authz1: &evalTestAuthz{
 				decision:     authorizer.DecisionAllow,
@@ -789,9 +789,9 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			authz3:                noOpinion(),
 			authz4:                noOpinion(),
 			authz5:                noOpinion(),
-			wantAuthorizeDecision: `Allow(err="0: 0: 0: authz error")`,
+			wantAuthorizeDecision: `Allow(err="union1: union2: authz1: authz error")`,
 			wantAuthorizeErr:      true,
-			wantFinalDecision:     `Allow(err="0: 0: 0: authz error")`,
+			wantFinalDecision:     `Allow(err="union1: union2: authz1: authz error")`,
 			wantFinalErr:          true,
 		},
 		{
@@ -805,7 +805,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			authz3:                noOpinion(),
 			authz4:                noOpinion(),
 			authz5:                noOpinion(),
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), NoOpinion], NoOpinion], NoOpinion, NoOpinion]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: ConditionsMap(allows=1), authz2: NoOpinion], authz3: NoOpinion], union3: NoOpinion, authz5: NoOpinion]`,
 			wantFinalDecision:     `Allow(err="eval error")`,
 			wantFinalErr:          true,
 		},
@@ -820,7 +820,7 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			authz3:                noOpinion(),
 			authz4:                noOpinion(),
 			authz5:                noOpinion(),
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(denies=1), NoOpinion], NoOpinion], NoOpinion, NoOpinion]`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: ConditionsMap(denies=1), authz2: NoOpinion], authz3: NoOpinion], union3: NoOpinion, authz5: NoOpinion]`,
 			wantFinalDecision:     `Deny(reason="failed closed", err="evaluated to decision Allow, but only [Deny NoOpinion] were possible")`,
 			wantFinalErr:          true,
 		},
@@ -843,36 +843,36 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				conditionEffect: effectAllow,
 				evalDecision:    authorizer.DecisionDeny,
 			},
-			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(denies=1), NoOpinion], NoOpinion], NoOpinion, ConditionsMap(allows=1)]`,
-			wantFinalDecision:     `NoOpinion(reason="failed closed", err="evaluated to decision Deny, but only [Allow NoOpinion] were possible")`,
+			wantAuthorizeDecision: `Union[union1: Union[union2: Union[authz1: ConditionsMap(denies=1), authz2: NoOpinion], authz3: NoOpinion], union3: NoOpinion, authz5: ConditionsMap(allows=1)]`,
+			wantFinalDecision:     `NoOpinion(reason="authz5: failed closed", err="evaluated to decision Deny, but only [Allow NoOpinion] were possible")`,
 			wantFinalErr:          true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			union3, err := New(NamedAuthorizer{AuthorizerName: "authz4.example.com", Authorizer: tt.authz4})
+			union3, err := New(NamedAuthorizer{AuthorizerName: "authz4", Authorizer: tt.authz4})
 			if err != nil {
 				t.Fatalf("union3 New: %v", err)
 			}
 			union2, err := New(
-				NamedAuthorizer{AuthorizerName: "authz1.example.com", Authorizer: tt.authz1},
-				NamedAuthorizer{AuthorizerName: "authz2.example.com", Authorizer: tt.authz2},
+				NamedAuthorizer{AuthorizerName: "authz1", Authorizer: tt.authz1},
+				NamedAuthorizer{AuthorizerName: "authz2", Authorizer: tt.authz2},
 			)
 			if err != nil {
 				t.Fatalf("union2 New: %v", err)
 			}
 			union1, err := New(
-				NamedAuthorizer{AuthorizerName: "union2.example.com", Authorizer: union2},
-				NamedAuthorizer{AuthorizerName: "authz3.example.com", Authorizer: tt.authz3},
+				NamedAuthorizer{AuthorizerName: "union2", Authorizer: union2},
+				NamedAuthorizer{AuthorizerName: "authz3", Authorizer: tt.authz3},
 			)
 			if err != nil {
 				t.Fatalf("union1 New: %v", err)
 			}
 			union0, err := New(
-				NamedAuthorizer{AuthorizerName: "union1.example.com", Authorizer: union1},
-				NamedAuthorizer{AuthorizerName: "union3.example.com", Authorizer: union3},
-				NamedAuthorizer{AuthorizerName: "authz5.example.com", Authorizer: tt.authz5},
+				NamedAuthorizer{AuthorizerName: "union1", Authorizer: union1},
+				NamedAuthorizer{AuthorizerName: "union3", Authorizer: union3},
+				NamedAuthorizer{AuthorizerName: "authz5", Authorizer: tt.authz5},
 			)
 			if err != nil {
 				t.Fatalf("union0 New: %v", err)
@@ -1006,8 +1006,8 @@ func TestUnionEvaluateConditionsRoutesByAuthorizerName(t *testing.T) {
 	first := &evalTestAuthz{conditionEffect: effectAllow, evalDecision: authorizer.DecisionNoOpinion}
 	second := &evalTestAuthz{conditionEffect: effectAllow, evalDecision: authorizer.DecisionAllow}
 	authz, err := New(
-		NamedAuthorizer{AuthorizerName: "first.example.com", Authorizer: first},
-		NamedAuthorizer{AuthorizerName: "second.example.com", Authorizer: second},
+		NamedAuthorizer{AuthorizerName: "first", Authorizer: first},
+		NamedAuthorizer{AuthorizerName: "second", Authorizer: second},
 	)
 	if err != nil {
 		t.Fatalf("union.New returned an unexpected error: %v", err)
