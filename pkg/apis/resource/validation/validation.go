@@ -914,24 +914,61 @@ func validateNodeAllocatableResourceMappings(mappings map[corev1.ResourceName]re
 			allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
 		}
 
-		if mapping.AllocationMultiplier == nil && mapping.CapacityKey == nil {
-			allErrs = append(allErrs, field.Invalid(keyPath, "", "at least one of allocationMultiplier or capacityKey must be set"))
+		if mapping.Direct == nil && mapping.Overhead == nil {
+			allErrs = append(allErrs, field.Required(keyPath, "exactly one of direct or overhead must be set"))
+		} else if mapping.Direct != nil && mapping.Overhead != nil {
+			allErrs = append(allErrs, field.Invalid(keyPath, "", "direct and overhead are mutually exclusive"))
+		} else if mapping.Direct != nil {
+			allErrs = append(allErrs, validateNodeAllocatableDirectMapping(mapping.Direct, capacities, keyPath.Child("direct"))...)
+		} else if mapping.Overhead != nil {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadMapping(mapping.Overhead, keyPath.Child("overhead"))...)
+		}
+	}
+	return allErrs
+}
+
+// validateNodeAllocatableDirectMapping validates a direct-mapped node allocatable resource configuration
+func validateNodeAllocatableDirectMapping(direct *resource.NodeAllocatableDirectMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if direct.AllocationMultiplier == nil && direct.CapacityKey == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "at least one of allocationMultiplier or capacityKey must be set"))
+		return allErrs
+	}
+
+	if direct.AllocationMultiplier != nil && direct.AllocationMultiplier.Sign() <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("allocationMultiplier"), direct.AllocationMultiplier.String(), "must be positive"))
+	}
+
+	if direct.CapacityKey != nil {
+		if *direct.CapacityKey == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
 		} else {
-			if mapping.AllocationMultiplier != nil {
-				if mapping.AllocationMultiplier.Sign() <= 0 {
-					allErrs = append(allErrs, field.Invalid(keyPath.Child("allocationMultiplier"), mapping.AllocationMultiplier.String(), "must be positive"))
-				}
+			var exists bool
+			if capacities != nil {
+				_, exists = capacities[*direct.CapacityKey]
 			}
-			if mapping.CapacityKey != nil {
-				if *mapping.CapacityKey == "" {
-					allErrs = append(allErrs, field.Invalid(keyPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
-				} else if capacities == nil {
-					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
-				} else if _, exists := capacities[*mapping.CapacityKey]; !exists {
-					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
-				}
+			if !exists {
+				allErrs = append(allErrs, field.NotFound(fldPath.Child("capacityKey"), *direct.CapacityKey))
 			}
 		}
+	}
+	return allErrs
+}
+
+// validateNodeAllocatableOverheadMapping validates an overhead node allocatable resource configuration
+func validateNodeAllocatableOverheadMapping(overhead *resource.NodeAllocatableOverhead, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if overhead.PerPod == nil && overhead.PerContainer == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "at least one of perPod or perContainer must be set"))
+		return allErrs
+	}
+
+	if overhead.PerPod != nil && overhead.PerPod.Sign() < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perPod"), overhead.PerPod.String(), "must be non-negative"))
+	}
+
+	if overhead.PerContainer != nil && overhead.PerContainer.Sign() < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perContainer"), overhead.PerContainer.String(), "must be non-negative"))
 	}
 	return allErrs
 }

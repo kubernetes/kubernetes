@@ -3613,6 +3613,59 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.NodeAllocatableDirectResources": {
+        "description": "NodeAllocatableDirectResources describes direct node allocatable resource allocations.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name is the name of the resource (e.g., cpu, memory).",
+            "type": "string"
+          },
+          "quantity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "Quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim."
+          }
+        },
+        "required": [
+          "name",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.NodeAllocatableOverheadResources": {
+        "description": "NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name is the name of the resource (e.g., cpu, memory).",
+            "type": "string"
+          },
+          "perContainer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "PerContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences)"
+          },
+          "perPod": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "PerPod is the flat overhead quantity allocated per pod."
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus": {
         "description": "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
         "properties": {
@@ -3624,22 +3677,36 @@
             "type": "array",
             "x-kubernetes-list-type": "set"
           },
+          "direct": {
+            "description": "Direct contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.direct`. This is used by kubelet for node cgroup enforcement. Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableDirectResources"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "overhead": {
+            "description": "Overhead contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.overhead`. This is used by kubelet for node cgroup enforcement. Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableOverheadResources"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
           "resourceClaimName": {
             "default": "",
             "description": "ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
             "type": "string"
-          },
-          "resources": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-            },
-            "description": "Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.",
-            "type": "object"
           }
         },
         "required": [
-          "resourceClaimName",
-          "resources"
+          "resourceClaimName"
         ],
         "type": "object"
       },
@@ -5812,7 +5879,10 @@
               "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-map-keys": [
+              "resourceClaimName"
+            ],
+            "x-kubernetes-list-type": "map"
           },
           "nominatedNodeName": {
             "description": "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",

@@ -2161,9 +2161,19 @@
         "containers": [
           "containersValue"
         ],
-        "resources": {
-          "resourcesKey": "0"
-        }
+        "direct": [
+          {
+            "name": "nameValue",
+            "quantity": "0"
+          }
+        ],
+        "overhead": [
+          {
+            "name": "nameValue",
+            "perPod": "0",
+            "perContainer": "0"
+          }
+        ]
       }
     ]
   }

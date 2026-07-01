@@ -27,17 +27,20 @@ package qos
 
 import (
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // minRegularContainerMemory returns the minimum memory resource quantity
 // across all regular containers in pod.Spec.Containers.
 // It does not include initContainers (both restartable and non-restartable).
-func minRegularContainerMemory(pod v1.Pod) int64 {
-	memoryValue := pod.Spec.Containers[0].Resources.Requests.Memory().Value()
-	for _, container := range pod.Spec.Containers[1:] {
-		if container.Resources.Requests.Memory().Value() < memoryValue {
-			memoryValue = container.Resources.Requests.Memory().Value()
+func minRegularContainerMemory(pod *v1.Pod) int64 {
+	memoryValue := getEffectiveContainerMemoryRequest(pod, &pod.Spec.Containers[0])
+	for i := 1; i < len(pod.Spec.Containers); i++ {
+		effectiveMem := getEffectiveContainerMemoryRequest(pod, &pod.Spec.Containers[i])
+		if effectiveMem < memoryValue {
+			memoryValue = effectiveMem
 		}
 	}
 	return memoryValue
@@ -46,11 +49,11 @@ func minRegularContainerMemory(pod v1.Pod) int64 {
 // remainingPodMemReqPerContainer calculates the remaining pod memory request per
 // container by:
 // 1. Taking the total pod memory requests
-// 2. Subtracting total container memory requests from pod memory requests
+// 2. Subtracting total container memory requests and any DRA memory allocations from pod memory requests
 // 3. Dividing the remainder by the number of containers.
 // This gives us the additional memory request that is not allocated to any
 // containers in the pod. This value will be divided equally among all containers to
-// calculate oom score adjusment.
+// calculate oom score adjustment.
 // See https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#oom-score-adjustment
 // for more details.
 func remainingPodMemReqPerContainer(pod *v1.Pod) int64 {
@@ -58,14 +61,13 @@ func remainingPodMemReqPerContainer(pod *v1.Pod) int64 {
 	if pod.Spec.Resources.Requests.Memory().IsZero() {
 		return remainingMemory
 	}
-
 	numContainers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers)
-
-	// Aggregated requests of all containers.
-	aggrContainerReqs := resourcehelper.AggregateContainerRequests(pod, resourcehelper.PodResourcesOptions{})
-
+	// Aggregated requests of all containers (including DRA if enabled).
+	opts := resourcehelper.PodResourcesOptions{
+		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+	}
+	aggrContainerReqs := resourcehelper.AggregateContainerRequests(pod, opts)
 	remainingMemory = pod.Spec.Resources.Requests.Memory().Value() - aggrContainerReqs.Memory().Value()
-
 	remainingMemoryPerContainer := remainingMemory / int64(numContainers)
 	return remainingMemoryPerContainer
 }

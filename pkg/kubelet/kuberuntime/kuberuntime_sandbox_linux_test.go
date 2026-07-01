@@ -26,7 +26,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -93,15 +96,103 @@ func TestApplySandboxResources(t *testing.T) {
 			},
 		}
 	}
+	getPodWithDra := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "12345678",
+				Name:      "bar",
+				Namespace: "new",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("128Mi"),
+								v1.ResourceCPU:    resource.MustParse("2"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("256Mi"),
+								v1.ResourceCPU:    resource.MustParse("4"),
+							},
+						},
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "direct-claim",
+						Containers:        []string{"c1"},
+						Direct: []v1.NodeAllocatableDirectResources{
+							{Name: v1.ResourceCPU, Quantity: resource.MustParse("200m")},
+							{Name: v1.ResourceMemory, Quantity: resource.MustParse("128Mi")},
+						},
+					},
+				},
+			},
+		}
+	}
+	getPodWithPodLevelResources := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "12345678",
+				Name:      "bar",
+				Namespace: "new",
+			},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("512Mi"),
+						v1.ResourceCPU:    resource.MustParse("4"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+						v1.ResourceCPU:    resource.MustParse("8"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("128Mi"),
+								v1.ResourceCPU:    resource.MustParse("1"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("256Mi"),
+								v1.ResourceCPU:    resource.MustParse("2"),
+							},
+						},
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "direct-claim",
+						Containers:        []string{"c1"},
+						Direct: []v1.NodeAllocatableDirectResources{
+							{Name: v1.ResourceCPU, Quantity: resource.MustParse("200m")},
+							{Name: v1.ResourceMemory, Quantity: resource.MustParse("128Mi")},
+						},
+					},
+				},
+			},
+		}
+	}
 
 	require.NoError(t, err)
 
 	tests := []struct {
-		description      string
-		pod              *v1.Pod
-		expectedResource *runtimeapi.LinuxContainerResources
-		expectedOverhead *runtimeapi.LinuxContainerResources
-		cgroupVersion    CgroupVersion
+		description              string
+		pod                      *v1.Pod
+		draEnabled               bool
+		podLevelResourcesEnabled bool
+		expectedResource         *runtimeapi.LinuxContainerResources
+		expectedOverhead         *runtimeapi.LinuxContainerResources
+		cgroupVersion            CgroupVersion
 	}{
 		{
 			description: "pod with overhead defined",
@@ -164,10 +255,55 @@ func TestApplySandboxResources(t *testing.T) {
 			expectedOverhead: &runtimeapi.LinuxContainerResources{},
 			cgroupVersion:    cgroupV2,
 		},
+		{
+			description: "pod with DRA memory direct claims",
+			pod:         getPodWithDra(),
+			draEnabled:  true,
+			expectedResource: &runtimeapi.LinuxContainerResources{
+				MemoryLimitInBytes: 402653184, // 256Mi spec + 128Mi DRA = 384Mi = 402653184
+				CpuPeriod:          100000,
+				CpuQuota:           420000, // 4 CPUs spec + 0.2 CPU DRA = 4.2 CPUs = 420000
+				CpuShares:          2252,   // 2 CPUs spec + 0.2 CPU DRA = 2.2 CPUs = 2252 shares
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			expectedOverhead: &runtimeapi.LinuxContainerResources{},
+			cgroupVersion:    cgroupV2,
+		},
+		{
+			description: "pod with DRA memory direct claims and feature disabled",
+			pod:         getPodWithDra(),
+			draEnabled:  false,
+			expectedResource: &runtimeapi.LinuxContainerResources{
+				MemoryLimitInBytes: 268435456, // DRA ignored, only 256Mi spec limit is used
+				CpuPeriod:          100000,
+				CpuQuota:           400000, // DRA ignored, only 4 CPUs spec limit is used
+				CpuShares:          2048,   // DRA ignored, only 2 CPUs spec request is used
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			expectedOverhead: &runtimeapi.LinuxContainerResources{},
+			cgroupVersion:    cgroupV2,
+		},
+		{
+			description:              "pod with pod-level resources",
+			pod:                      getPodWithPodLevelResources(),
+			draEnabled:               true,
+			podLevelResourcesEnabled: true,
+			expectedResource: &runtimeapi.LinuxContainerResources{
+				MemoryLimitInBytes: 1073741824, // Pod-level limit of 1Gi = 1073741824 bytes (overrides container limits and DRA)
+				CpuPeriod:          100000,
+				CpuQuota:           800000, // Pod-level limit of 8 CPUs = 800000 quota
+				CpuShares:          4096,   // Pod-level request of 4 CPUs = 4096 shares
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			expectedOverhead: &runtimeapi.LinuxContainerResources{},
+			cgroupVersion:    cgroupV2,
+		},
 	}
 
 	for i, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.draEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
 
 		err = m.applySandboxResources(tCtx, test.pod, config)
 		require.NoError(t, err)

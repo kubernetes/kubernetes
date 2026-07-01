@@ -4691,7 +4691,8 @@ type PodStatus struct {
 	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
 	// +featureGate=DRANodeAllocatableResources
 	// +optional
-	// +listType=atomic
+	// +listType=map
+	// +listMapKey=resourceClaimName
 	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus
 }
 
@@ -7228,7 +7229,45 @@ type NodeAllocatableResourceClaimStatus struct {
 	// +optional
 	// +listType=set
 	Containers []string
-	// Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
+	// Direct contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.direct`.
+	// Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +oneOf=MappingType
+	Direct []NodeAllocatableDirectResources
+	// Overhead contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.overhead`.
+	// Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +oneOf=MappingType
+	Overhead []NodeAllocatableOverheadResources
+}
+
+// NodeAllocatableDirectResources describes direct node allocatable resource allocations.
+type NodeAllocatableDirectResources struct {
+	// Name is the name of the resource (e.g., cpu, memory).
 	// +required
-	Resources map[ResourceName]resource.Quantity
+	Name ResourceName
+	// Quantity is the total node allocatable resource capacity allocated for the claim.
+	// This claim's allocated devices is shared by all the containers referencing the claim.
+	// +required
+	Quantity resource.Quantity
+}
+
+// NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.
+type NodeAllocatableOverheadResources struct {
+	// Name is the name of the resource (e.g., cpu, memory).
+	// +required
+	Name ResourceName
+	// PerPod is the flat overhead quantity allocated per pod.
+	// +optional
+	PerPod *resource.Quantity
+	// PerContainer is the variable overhead quantity applied for each container referencing the claim.
+	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
+	// The total overhead quantity allocated for the claim is computed as:
+	// Quantity = PerPod + (PerContainer * NumReferences)
+	// +optional
+	PerContainer *resource.Quantity
 }

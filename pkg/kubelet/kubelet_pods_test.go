@@ -4446,6 +4446,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		expectedPodDisruptionCondition                 *v1.PodCondition
 		expectedPodReadyToStartContainersCondition     v1.PodCondition
 		inPlacePodLevelResourcesVerticalScalingEnabled bool
+		enableDRANodeAllocatableResources              bool
 	}{
 		{
 			name: "pod disruption condition is copied over and the phase is set to failed when deleted",
@@ -5721,6 +5722,92 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			},
 			inPlacePodLevelResourcesVerticalScalingEnabled: true,
 		},
+		{
+			name: "pod status AllocatedResources includes DRA claim allocations",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "uid-dra-alloc",
+					Name:      "pod-dra-alloc",
+					Namespace: "foo",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "dra-claim",
+							Direct: []v1.NodeAllocatableDirectResources{
+								{
+									Name:     v1.ResourceCPU,
+									Quantity: resource.MustParse("50m"),
+								},
+								{
+									Name:     v1.ResourceMemory,
+									Quantity: resource.MustParse("50Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			currentStatus: sandboxReadyStatus,
+			expected: v1.PodStatus{
+				Phase:   v1.PodPending,
+				HostIP:  "127.0.0.1",
+				HostIPs: []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				QOSClass: v1.PodQOSBurstable,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "c1",
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"},
+						},
+						Ready: true,
+					},
+				},
+				// Resources field should reflect total allocated pod level requests/limits (standard + DRA)
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("150m"),
+						v1.ResourceMemory: resource.MustParse("150Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("50m"),
+						v1.ResourceMemory: resource.MustParse("50Mi"),
+					},
+				},
+				// AllocatedResources should sum standard requests (100m, 100Mi) + DRA allocations (50m, 50Mi)
+				AllocatedResources: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("150m"),
+					v1.ResourceMemory: resource.MustParse("150Mi"),
+				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   v1.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+			inPlacePodLevelResourcesVerticalScalingEnabled: true,
+			enableDRANodeAllocatableResources:              true,
+		},
 	}
 	for _, test := range tests {
 		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
@@ -5728,6 +5815,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				logger, tCtx := ktesting.NewTestContext(t)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResourcesVerticalScalingEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
 
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()

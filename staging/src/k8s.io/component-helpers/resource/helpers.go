@@ -17,9 +17,11 @@ limitations under the License.
 package resource
 
 import (
+	"slices"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -150,21 +152,38 @@ func IsPodLevelLimitsSet(pod *v1.Pod) bool {
 // The computation is part of the API and must be reviewed as an API change.
 func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	reqs := v1.ResourceList{}
+	podLevelStatusFieldsPresent := opts.InPlacePodLevelResourcesVerticalScalingEnabled && (pod.Status.Resources != nil)
 	if !opts.SkipContainerLevelResources {
-		reqs = AggregateContainerRequests(pod, opts)
+		containerOpts := opts
+		usePodLevelAllocatedStatus := false
+		if opts.UseDRANodeAllocatableResourceClaimStatus && opts.UseStatusResources && podLevelStatusFieldsPresent {
+			// If DRA node-allocatable claims are used and UseStatusResources is set, we cannot rely on container-level status fields
+			// in AggregateContainerRequests. When claims are shared between containers, using the container status fields would
+			// result in double counting of DRA allocations.
+			// Since pod-level status fields will have the deduplicated values already, we can just aggregate the container level
+			// based on spec only and use pod-level fields for actuated and allocated values.
+			// TODO: We can follow this pattern of using only pod-level status fields even without DRA. See https://github.com/kubernetes/kubernetes/issues/140046 for details.
+			containerOpts.UseStatusResources = false
+			usePodLevelAllocatedStatus = true
+		}
+		reqs = AggregateContainerRequests(pod, containerOpts)
+		if usePodLevelAllocatedStatus {
+			reqs = determineEffectiveRequests(pod, &ResourceState{
+				Spec:      reqs,
+				Actuated:  pod.Status.Resources.Requests,
+				Allocated: pod.Status.AllocatedResources,
+			})
+		}
 	}
 
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
-
 		var effectiveReqs v1.ResourceList
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
-			if pod.Status.Resources != nil {
-				effectiveReqs = determineEffectiveRequests(pod, &ResourceState{
-					Spec:      pod.Spec.Resources.Requests,
-					Actuated:  pod.Status.Resources.Requests,
-					Allocated: pod.Status.AllocatedResources,
-				})
-			}
+		if opts.UseStatusResources && podLevelStatusFieldsPresent {
+			effectiveReqs = determineEffectiveRequests(pod, &ResourceState{
+				Spec:      pod.Spec.Resources.Requests,
+				Actuated:  pod.Status.Resources.Requests,
+				Allocated: pod.Status.AllocatedResources,
+			})
 		}
 
 		for resourceName, quantity := range pod.Spec.Resources.Requests {
@@ -173,7 +192,6 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 				if effectiveReqs != nil {
 					reqs[resourceName] = effectiveReqs[resourceName]
 				}
-
 			}
 		}
 	}
@@ -278,14 +296,7 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 
 	maxResourceList(reqs, initContainerReqs)
 
-	// Add resources from node allocatable ResourceClaims
-	if opts.UseDRANodeAllocatableResourceClaimStatus && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
-		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
-			for resName, resQty := range claimStatus.Resources {
-				addResourceList(reqs, v1.ResourceList{resName: resQty})
-			}
-		}
-	}
+	addDRANodeAllocatableClaimResources(reqs, pod, opts)
 
 	return reqs
 }
@@ -351,19 +362,40 @@ func applyNonMissing(reqs v1.ResourceList, nonMissing v1.ResourceList) v1.Resour
 // the limits are returned including pod overhead for any non-zero limits. The computation is part of the API and must be reviewed
 // as an API change.
 func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
-	// attempt to reuse the maps if passed, or allocate otherwise
-	limits := AggregateContainerLimits(pod, opts)
-	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
-
-		var effectiveLims v1.ResourceList
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
-			if pod.Status.Resources != nil {
-				effectiveLims = determineEffectiveLimits(pod, &ResourceState{
-					Spec:     pod.Spec.Resources.Limits,
-					Actuated: pod.Status.Resources.Limits,
-				})
-			}
+	limits := v1.ResourceList{}
+	podLevelStatusFieldsPresent := opts.InPlacePodLevelResourcesVerticalScalingEnabled && (pod.Status.Resources != nil)
+	if !opts.SkipContainerLevelResources {
+		containerOpts := opts
+		usePodLevelAllocatedStatus := false
+		if opts.UseDRANodeAllocatableResourceClaimStatus && opts.UseStatusResources && podLevelStatusFieldsPresent {
+			// If DRA node-allocatable claims are used and UseStatusResources is set, we cannot rely on container-level status fields
+			// in AggregateContainerLimits. When claims are shared between containers, using the container status fields would
+			// result in double counting of DRA allocations.
+			// Since pod-level status fields will have the deduplicated values already, we can just aggregate the container level
+			// based on spec only and use pod-level fields for actuated.
+			// TODO: We can follow this pattern of using only pod-level status fields even without DRA. See https://github.com/kubernetes/kubernetes/issues/140046 for details.
+			containerOpts.UseStatusResources = false
+			usePodLevelAllocatedStatus = true
 		}
+		limits = AggregateContainerLimits(pod, containerOpts)
+
+		if usePodLevelAllocatedStatus {
+			limits = determineEffectiveLimits(pod, &ResourceState{
+				Spec:     limits,
+				Actuated: pod.Status.Resources.Limits,
+			})
+		}
+	}
+
+	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
+		var effectiveLims v1.ResourceList
+		if opts.UseStatusResources && podLevelStatusFieldsPresent {
+			effectiveLims = determineEffectiveLimits(pod, &ResourceState{
+				Spec:     pod.Spec.Resources.Limits,
+				Actuated: pod.Status.Resources.Limits,
+			})
+		}
+
 		for resourceName, quantity := range pod.Spec.Resources.Limits {
 			if IsSupportedPodLevelResource(resourceName) {
 				limits[resourceName] = quantity
@@ -467,7 +499,34 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 	}
 
 	maxResourceList(limits, initContainerLimits)
+
+	addDRANodeAllocatableClaimResources(limits, pod, opts)
+
 	return limits
+}
+
+func addDRANodeAllocatableClaimResources(resources v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) {
+	if opts.UseDRANodeAllocatableResourceClaimStatus && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+			// TODO(pravk03): Handle claim references by init containers and peak resource calculation based on that.
+			// Currently, any DRA allocation is always added into the pod footprint.
+			for _, direct := range claimStatus.Direct {
+				addResourceList(resources, v1.ResourceList{direct.Name: direct.Quantity})
+			}
+			for _, overhead := range claimStatus.Overhead {
+				var quantity resource.Quantity
+				if overhead.PerPod != nil {
+					quantity.Add(*overhead.PerPod)
+				}
+				if overhead.PerContainer != nil && len(claimStatus.Containers) > 0 {
+					varOverhead := overhead.PerContainer.DeepCopy()
+					varOverhead.Mul(int64(len(claimStatus.Containers)))
+					quantity.Add(varOverhead)
+				}
+				addResourceList(resources, v1.ResourceList{overhead.Name: quantity})
+			}
+		}
+	}
 }
 
 // addResourceList adds the resources in newList to list.
@@ -516,4 +575,36 @@ func reuseOrClearResourceList(reuse v1.ResourceList) v1.ResourceList {
 		delete(reuse, k)
 	}
 	return reuse
+}
+
+// GetContainerDRAAllocations returns the sum of all DRA resource allocations assigned to a container.
+func GetContainerDRAAllocations(pod *v1.Pod, containerName string) v1.ResourceList {
+	draAllocations := make(v1.ResourceList)
+	for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+		if !slices.Contains(claimStatus.Containers, containerName) {
+			continue
+		}
+
+		// Add Direct resources
+		for _, direct := range claimStatus.Direct {
+			q := draAllocations[direct.Name]
+			q.Add(direct.Quantity)
+			draAllocations[direct.Name] = q
+		}
+
+		// Add Overhead resources
+		for _, overhead := range claimStatus.Overhead {
+			var quantity resource.Quantity
+			if overhead.PerPod != nil {
+				quantity.Add(*overhead.PerPod)
+			}
+			if overhead.PerContainer != nil {
+				quantity.Add(*overhead.PerContainer)
+			}
+			q := draAllocations[overhead.Name]
+			q.Add(quantity)
+			draAllocations[overhead.Name] = q
+		}
+	}
+	return draAllocations
 }

@@ -68,6 +68,7 @@ import (
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
+	"k8s.io/utils/ptr"
 )
 
 func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
@@ -600,9 +601,10 @@ func TestAdmissionCheck(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim",
-						Resources: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceCPU: resource.MustParse("8"),
-						},
+						Direct: []v1.NodeAllocatableDirectResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: resource.MustParse("8"),
+						}},
 					},
 				}
 				return p
@@ -618,9 +620,10 @@ func TestAdmissionCheck(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim",
-						Resources: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceCPU: resource.MustParse(nodeCPUCapacity[v1.ResourceCPU]), // We should exceed node capacity since we also request 1 CPU in standard request.
-						},
+						Direct: []v1.NodeAllocatableDirectResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: resource.MustParse(nodeCPUCapacity[v1.ResourceCPU]), // We should exceed node capacity since we also request 1 CPU in standard request.
+						}},
 					},
 				}
 				return p
@@ -638,9 +641,52 @@ func TestAdmissionCheck(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim",
-						Resources: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceCPU: cpuQty,
-						},
+						Direct: []v1.NodeAllocatableDirectResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: cpuQty,
+						}},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{nil, nil},
+			enableDRANodeAllocatableResources: true,
+		},
+		{
+			name: "pod rejected when DRANodeAllocatableResources flag is enabled and pod's resource request + DRA Overhead exceeds node capacity",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Containers:        []string{"bar"}, // Default container name created by st.MakePod() is usually "bar" (let's use that or empty containers since it's just PerPod)
+						Overhead: []v1.NodeAllocatableOverheadResources{{
+							Name:   v1.ResourceCPU,
+							PerPod: ptr.To(resource.MustParse(nodeCPUCapacity[v1.ResourceCPU])), // 1 CPU + nodeCPUCapacity CPU > nodeCPUCapacity
+						}},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{{nodeAllocatableResourceError}, {nodeAllocatableResourceError}},
+			enableDRANodeAllocatableResources: true,
+		},
+		{
+			name: "pod not rejected when DRANodeAllocatableResources flag is enabled and pod's resource request + DRA Overhead fits within node capacity",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				cpuQty := resource.MustParse(nodeCPUCapacity[v1.ResourceCPU])
+				cpuQty.Sub(resource.MustParse("1")) // Now cpuQty + 1 CPU (request) = nodeCPUCapacity CPU
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Containers:        []string{"bar"},
+						Overhead: []v1.NodeAllocatableOverheadResources{{
+							Name:   v1.ResourceCPU,
+							PerPod: &cpuQty,
+						}},
 					},
 				}
 				return p

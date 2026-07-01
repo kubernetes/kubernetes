@@ -16365,9 +16365,9 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU:    resource.MustParse("1"),
-							core.ResourceMemory: resource.MustParse("1Gi"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
+							{Name: core.ResourceMemory, Quantity: resource.MustParse("1Gi")},
 						},
 					},
 				},
@@ -16382,15 +16382,15 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 					{
 						ResourceClaimName: "my-claim2",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceMemory: resource.MustParse("2Gi"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceMemory, Quantity: resource.MustParse("2Gi")},
 						},
 					},
 				},
@@ -16405,15 +16405,15 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							"example.com/foo": resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: "example.com/foo", Quantity: resource.MustParse("1")},
 						},
 					},
 				},
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources[example.com/foo]",
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].direct[0].name",
 			errorMsg:    "must be a node allocatable resource name",
 		},
 		{
@@ -16424,34 +16424,31 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("-1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("-1")},
 						},
 					},
 				},
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources[cpu]",
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].direct[0].quantity",
 			errorMsg:    "must be non-negative",
 		},
 		{
-			name: "Empty containers list",
+			name: "Valid NodeAllocatableResourceClaimStatus with empty containers",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
 				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "my-claim1",
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeRequired,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].containers",
-			errorMsg:    "must not be empty",
+			expectError: false,
 		},
 		{
 			name: "Missing ResourceClaimName",
@@ -16460,8 +16457,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
 					{
 						Containers: []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
@@ -16479,14 +16476,13 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources:         map[core.ResourceName]resource.Quantity{},
 					},
 				},
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeRequired,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources",
-			errorMsg:    "must not be empty",
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0]",
+			errorMsg:    "exactly one of direct or overhead must be set",
 		},
 		{
 			name: "Valid ResourceClaimName from PodSpec",
@@ -16506,8 +16502,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
@@ -16532,8 +16528,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "generated-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
@@ -16561,8 +16557,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "non-existent-claim",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
@@ -16571,6 +16567,211 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resourceClaimName",
 			errorMsg:    "not found in PodSpec.ResourceClaims or PodStatus.ResourceClaimStatuses",
+		},
+		{
+			name: "Invalid NodeAllocatableResourceClaimStatus both direct and overhead set",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
+						},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: core.ResourceMemory, PerPod: ptr.To(resource.MustParse("1Gi"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0]",
+			errorMsg:    "direct and overhead are mutually exclusive",
+		},
+		{
+			name: "Invalid NodeAllocatableResourceClaimStatus overhead neither perPod nor perContainer set",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: core.ResourceMemory},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0]",
+			errorMsg:    "at least one of perPod or perContainer must be set",
+		},
+		{
+			name: "Invalid NodeAllocatableResourceClaimStatus overhead negative perPod",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: core.ResourceMemory, PerPod: ptr.To(resource.MustParse("-1Gi"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].perPod",
+			errorMsg:    "must be non-negative",
+		},
+		{
+			name: "Invalid NodeAllocatableResourceClaimStatus overhead negative perContainer",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: core.ResourceMemory, PerContainer: ptr.To(resource.MustParse("-500Mi"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].perContainer",
+			errorMsg:    "must be non-negative",
+		},
+		{
+			name: "Valid NodeAllocatableResourceClaimStatus overhead both set",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{
+								Name:         core.ResourceMemory,
+								PerPod:       ptr.To(resource.MustParse("1Gi")),
+								PerContainer: ptr.To(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid Resource Name in Overhead",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: "example.com/foo", PerPod: ptr.To(resource.MustParse("1Gi"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].name",
+			errorMsg:    "must be a node allocatable resource name",
+		},
+		{
+			name: "Duplicate Resource Name in Direct",
+			spec: validPodSpec1,
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("2")},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeDuplicate,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].direct[1].name",
+		},
+		{
+			name: "Duplicate Resource Name in Overhead",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: core.ResourceMemory, PerPod: ptr.To(resource.MustParse("1Gi"))},
+							{Name: core.ResourceMemory, PerPod: ptr.To(resource.MustParse("2Gi"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeDuplicate,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[1].name",
+		},
+		{
+			name: "Duplicate ResourceClaimName in NodeAllocatableResourceClaimStatuses",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
+						},
+					},
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceMemory, Quantity: resource.MustParse("1Gi")},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeDuplicate,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[1].resourceClaimName",
 		},
 	}
 
@@ -29176,33 +29377,7 @@ func TestValidatePodResize(t *testing.T) {
 			err: "spec: Forbidden: only cpu and memory resources are mutable",
 		},
 		{
-			test: "Resize pod with NodeAllocatableResourceClaimStatuses",
-			old: func() *core.Pod {
-				p := podtest.MakePod("pod",
-					podtest.SetContainers(podtest.MakeContainer("container",
-						podtest.SetContainerResources(core.ResourceRequirements{
-							Requests: getResources("100m", "200Mi", "", ""),
-						}))),
-					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
-				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{{ResourceClaimName: "node-allocatable-claim"}}
-				return p
-			}(),
-			new: func() *core.Pod {
-				p := podtest.MakePod("pod",
-					podtest.SetContainers(podtest.MakeContainer("container",
-						podtest.SetContainerResources(core.ResourceRequirements{
-							Requests: getResources("200m", "200Mi", "", ""),
-						}))),
-					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
-				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{{ResourceClaimName: "node-allocatable-claim"}}
-				return p
-			}(),
-			err: "spec: Forbidden: pods with node allocatable resource claims cannot be resized",
-		},
-		{
-			test: "Resize pod with NodeAllocatableResourceClaimStatuses",
+			test: "Resize allowed for pod with NodeAllocatableResourceClaimStatuses",
 			old: func() *core.Pod {
 				p := podtest.MakePod("pod",
 					podtest.SetContainers(podtest.MakeContainer("container",
@@ -29214,9 +29389,10 @@ func TestValidatePodResize(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim-1",
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("100m"),
-						},
+						Direct: []core.NodeAllocatableDirectResources{{
+							Name:     core.ResourceCPU,
+							Quantity: resource.MustParse("100m"),
+						}},
 					},
 				}
 				return p
@@ -29232,14 +29408,14 @@ func TestValidatePodResize(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim-1",
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("100m"),
-						},
+						Direct: []core.NodeAllocatableDirectResources{{
+							Name:     core.ResourceCPU,
+							Quantity: resource.MustParse("100m"),
+						}},
 					},
 				}
 				return p
 			}(),
-			err: "spec: Forbidden: pods with node allocatable resource claims cannot be resized",
 		},
 	}
 

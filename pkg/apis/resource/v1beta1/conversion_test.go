@@ -322,7 +322,7 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "ResourceSlice v1beta1 to internal with node allocatable resource mappings",
+			name: "ResourceSlice v1beta1 to internal with node allocatable resource direct mappings",
 			in: &resourcev1beta1.ResourceSlice{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
 				Spec: resourcev1beta1.ResourceSliceSpec{
@@ -341,7 +341,9 @@ func TestConversion(t *testing.T) {
 								},
 								NodeAllocatableResourceMappings: map[v1.ResourceName]resourcev1beta1.NodeAllocatableResourceMapping{
 									"cpu": {
-										AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+										Direct: &resourcev1beta1.NodeAllocatableDirectMapping{
+											AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+										},
 									},
 								},
 							},
@@ -367,7 +369,9 @@ func TestConversion(t *testing.T) {
 							},
 							NodeAllocatableResourceMappings: map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
 								"cpu": {
-									AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+									Direct: &resource.NodeAllocatableDirectMapping{
+										AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+									},
 								},
 							}},
 					},
@@ -375,7 +379,7 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "ResourceSlice internal to v1beta1 with node allocatable resource mappings",
+			name: "ResourceSlice internal to v1beta1 with node allocatable resource direct mappings",
 			in: &resource.ResourceSlice{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
 				Spec: resource.ResourceSliceSpec{
@@ -393,7 +397,9 @@ func TestConversion(t *testing.T) {
 							},
 							NodeAllocatableResourceMappings: map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
 								"cpu": {
-									AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+									Direct: &resource.NodeAllocatableDirectMapping{
+										AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+									},
 								},
 							}},
 					},
@@ -418,7 +424,127 @@ func TestConversion(t *testing.T) {
 								},
 								NodeAllocatableResourceMappings: map[v1.ResourceName]resourcev1beta1.NodeAllocatableResourceMapping{
 									"cpu": {
-										AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+										Direct: &resourcev1beta1.NodeAllocatableDirectMapping{
+											AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "ResourceSlice v1beta1 to internal node allocatable resource overhead mappings",
+			in: &resourcev1beta1.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
+				Spec: resourcev1beta1.ResourceSliceSpec{
+					NodeName: nodeName,
+					Driver:   "test-driver",
+					Pool: resourcev1beta1.ResourcePool{
+						Name:               "test-pool",
+						ResourceSliceCount: 1,
+					},
+					Devices: []resourcev1beta1.Device{
+						{
+							Name: "test-device",
+							Basic: &resourcev1beta1.BasicDevice{
+								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+									"cpu_per_instance": {IntValue: ptr.To[int64](2)},
+								},
+								NodeAllocatableResourceMappings: map[v1.ResourceName]resourcev1beta1.NodeAllocatableResourceMapping{
+									"cpu": {
+										Overhead: &resourcev1beta1.NodeAllocatableOverhead{
+											PerPod:       ptr.To(apiresource.MustParse("100m")),
+											PerContainer: ptr.To(apiresource.MustParse("100m")),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			out: &resource.ResourceSlice{},
+			expectOut: &resource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
+				Spec: resource.ResourceSliceSpec{
+					NodeName: &nodeName,
+					Driver:   "test-driver",
+					Pool: resource.ResourcePool{
+						Name:               "test-pool",
+						ResourceSliceCount: 1,
+					},
+					Devices: []resource.Device{
+						{
+							Name: "test-device",
+							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+								"cpu_per_instance": {IntValue: ptr.To[int64](2)},
+							},
+							NodeAllocatableResourceMappings: map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
+								"cpu": {
+									Overhead: &resource.NodeAllocatableOverhead{
+										PerPod:       ptr.To(apiresource.MustParse("100m")),
+										PerContainer: ptr.To(apiresource.MustParse("100m")),
+									},
+								},
+							}},
+					},
+				},
+			},
+		},
+		{
+			name: "ResourceSlice internal to v1beta1 node allocatable resource overhead mappings",
+			in: &resource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
+				Spec: resource.ResourceSliceSpec{
+					NodeName: &nodeName,
+					Driver:   "test-driver",
+					Pool: resource.ResourcePool{
+						Name:               "test-pool",
+						ResourceSliceCount: 1,
+					},
+					Devices: []resource.Device{
+						{
+							Name: "test-device",
+							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+								"cpu_per_instance": {IntValue: ptr.To[int64](2)},
+							},
+							NodeAllocatableResourceMappings: map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
+								"cpu": {
+									Overhead: &resource.NodeAllocatableOverhead{
+										PerPod:       ptr.To(apiresource.MustParse("100m")),
+										PerContainer: ptr.To(apiresource.MustParse("100m")),
+									},
+								},
+							}},
+					},
+				},
+			},
+			out: &resourcev1beta1.ResourceSlice{},
+			expectOut: &resourcev1beta1.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
+				Spec: resourcev1beta1.ResourceSliceSpec{
+					NodeName: nodeName,
+					Driver:   "test-driver",
+					Pool: resourcev1beta1.ResourcePool{
+						Name:               "test-pool",
+						ResourceSliceCount: 1,
+					},
+					Devices: []resourcev1beta1.Device{
+						{
+							Name: "test-device",
+							Basic: &resourcev1beta1.BasicDevice{
+								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+									"cpu_per_instance": {IntValue: ptr.To[int64](2)},
+								},
+								NodeAllocatableResourceMappings: map[v1.ResourceName]resourcev1beta1.NodeAllocatableResourceMapping{
+									"cpu": {
+										Overhead: &resourcev1beta1.NodeAllocatableOverhead{
+											PerPod:       ptr.To(apiresource.MustParse("100m")),
+											PerContainer: ptr.To(apiresource.MustParse("100m")),
+										},
 									},
 								},
 							},

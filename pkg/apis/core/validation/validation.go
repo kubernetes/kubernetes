@@ -6175,10 +6175,15 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 		return allErrs
 	}
 
+	seenClaims := sets.New[string]()
 	for i, nodeAllocatableStatus := range podStatus.NodeAllocatableResourceClaimStatuses {
 		statusFldPath := fldPath.Index(i)
 		if nodeAllocatableStatus.ResourceClaimName == "" {
 			allErrs = append(allErrs, field.Required(statusFldPath.Child("resourceClaimName"), "must not be empty"))
+		} else if seenClaims.Has(nodeAllocatableStatus.ResourceClaimName) {
+			allErrs = append(allErrs, field.Duplicate(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName))
+		} else {
+			seenClaims.Insert(nodeAllocatableStatus.ResourceClaimName)
 		}
 
 		// First check the podSpec to see if the ResourceClaim is directly referenced.
@@ -6203,28 +6208,67 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 			allErrs = append(allErrs, field.Invalid(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName, "no mapping found in pod reference"))
 		}
 
-		// TODO(KEP-5517): Evaluate if its ok to have no containers referencing a node allocatable resource claim.
-		// This is pending on defining kubelet cgroup enforcement.
-		if len(nodeAllocatableStatus.Containers) == 0 {
-			allErrs = append(allErrs, field.Required(statusFldPath.Child("containers"), "must not be empty"))
-		}
-
-		resourcesFldPath := statusFldPath.Child("resources")
-		if len(nodeAllocatableStatus.Resources) == 0 {
-			allErrs = append(allErrs, field.Required(resourcesFldPath, "must not be empty"))
-		}
-
-		for resourceName, quantity := range nodeAllocatableStatus.Resources {
-			keyPath := resourcesFldPath.Key(string(resourceName))
-			if !v1helper.IsNativeResource(v1.ResourceName(resourceName)) {
-				allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
-			}
-			if quantity.Cmp(resource.Quantity{}) < 0 {
-				allErrs = append(allErrs, field.Invalid(keyPath, quantity.String(), "must be non-negative"))
-			}
+		// Exactly one of direct or overhead must be set.
+		if len(nodeAllocatableStatus.Direct) == 0 && len(nodeAllocatableStatus.Overhead) == 0 {
+			allErrs = append(allErrs, field.Required(statusFldPath, "exactly one of direct or overhead must be set"))
+		} else if len(nodeAllocatableStatus.Direct) > 0 && len(nodeAllocatableStatus.Overhead) > 0 {
+			allErrs = append(allErrs, field.Invalid(statusFldPath, "", "direct and overhead are mutually exclusive"))
+		} else if len(nodeAllocatableStatus.Direct) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableDirectResources(nodeAllocatableStatus.Direct, statusFldPath.Child("direct"))...)
+		} else if len(nodeAllocatableStatus.Overhead) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(nodeAllocatableStatus.Overhead, statusFldPath.Child("overhead"))...)
 		}
 	}
 
+	return allErrs
+}
+
+// validateNodeAllocatableDirectResources validates a list of direct-mapped node allocatable resources
+func validateNodeAllocatableDirectResources(direct []core.NodeAllocatableDirectResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	seenResources := sets.New[core.ResourceName]()
+	for i, item := range direct {
+		itemPath := fldPath.Index(i)
+		if seenResources.Has(item.Name) {
+			allErrs = append(allErrs, field.Duplicate(itemPath.Child("name"), item.Name))
+		} else {
+			seenResources.Insert(item.Name)
+		}
+		if !v1helper.IsNativeResource(v1.ResourceName(item.Name)) {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
+		}
+		if item.Quantity.Cmp(resource.Quantity{}) < 0 {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("quantity"), item.Quantity.String(), "must be non-negative"))
+		}
+	}
+	return allErrs
+}
+
+// validateNodeAllocatableOverheadResources validates a list of overhead node allocatable resources
+func validateNodeAllocatableOverheadResources(overhead []core.NodeAllocatableOverheadResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	seenResources := sets.New[core.ResourceName]()
+	for i, item := range overhead {
+		itemPath := fldPath.Index(i)
+		if seenResources.Has(item.Name) {
+			allErrs = append(allErrs, field.Duplicate(itemPath.Child("name"), item.Name))
+		} else {
+			seenResources.Insert(item.Name)
+		}
+		if !v1helper.IsNativeResource(v1.ResourceName(item.Name)) {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
+		}
+		if item.PerPod == nil && item.PerContainer == nil {
+			allErrs = append(allErrs, field.Invalid(itemPath, "", "at least one of perPod or perContainer must be set"))
+		} else {
+			if item.PerPod != nil && item.PerPod.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("perPod"), item.PerPod.String(), "must be non-negative"))
+			}
+			if item.PerContainer != nil && item.PerContainer.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("perContainer"), item.PerContainer.String(), "must be non-negative"))
+			}
+		}
+	}
 	return allErrs
 }
 
@@ -6378,15 +6422,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, validatePodLevelResourcesResize(newPod, oldPod, &newPodSpecCopy, specPath, opts)...)
 	}
 
-	// Part 3: Disable InPlaceResize if a pod is using DRA resource claims for node-allocatable resources.
-	// TODO(KEP-5517) - Handle in place resize with node-allocatable resource claims.
-	// Currently, the presence of any node-allocatable resource claim blocks resizing for all resources, irrespective of whether
-	// ResourceClaim is used for the same resource.
-	if len(oldPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
-		allErrs = append(allErrs, field.Forbidden(specPath, "pods with node allocatable resource claims cannot be resized"))
-	}
-
-	// Part 4: Validate that the changes between oldPod.Spec.Containers[].Resources and
+	// Part 3: Validate that the changes between oldPod.Spec.Containers[].Resources and
 	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
 	// newPod.Spec.InitContainers[].Resources are allowed.
 

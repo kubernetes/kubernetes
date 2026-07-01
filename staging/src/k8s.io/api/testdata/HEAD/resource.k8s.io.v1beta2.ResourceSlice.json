@@ -169,8 +169,14 @@
         "allowMultipleAllocations": true,
         "nodeAllocatableResourceMappings": {
           "nodeAllocatableResourceMappingsKey": {
-            "capacityKey": "capacityKeyValue",
-            "allocationMultiplier": "0"
+            "direct": {
+              "capacityKey": "capacityKeyValue",
+              "allocationMultiplier": "0"
+            },
+            "overhead": {
+              "perPodReference": "0",
+              "perContainerReference": "0"
+            }
           }
         }
       }

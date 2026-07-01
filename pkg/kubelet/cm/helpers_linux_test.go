@@ -30,6 +30,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/utils/ptr"
 )
 
 // getResourceList returns a ResourceList with the
@@ -71,12 +72,13 @@ func TestResourceConfigForPod(t *testing.T) {
 	cpuNoLimit := int64(-1)
 	guaranteedMemory := memoryQuantity.Value()
 	testCases := []struct {
-		description              string
-		pod                      *v1.Pod
-		expected                 *ResourceConfig
-		enforceCPULimits         bool
-		quotaPeriod              uint64 // in microseconds
-		podLevelResourcesEnabled bool
+		description                        string
+		pod                                *v1.Pod
+		expected                           *ResourceConfig
+		enforceCPULimits                   bool
+		quotaPeriod                        uint64 // in microseconds
+		podLevelResourcesEnabled           bool
+		draNodeAllocatableResourcesEnabled bool
 	}{
 		{
 			description: "besteffort",
@@ -478,11 +480,367 @@ func TestResourceConfigForPod(t *testing.T) {
 			quotaPeriod:              defaultQuotaPeriod,
 			expected:                 &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
 		},
+		{
+			description: "burstable-with-dra-direct-claims",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "direct-claim",
+							Containers:        []string{"c1"},
+							Direct: []v1.NodeAllocatableDirectResources{
+								{Name: v1.ResourceCPU, Quantity: resource.MustParse("200m")},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			// CPUShares: c1 request (100) + direct claim (200)
+			// CPUQuota: c1 limit (200) + direct claim (200)
+			expected: &ResourceConfig{CPUShares: ptr.To(MilliCPUToShares(100 + 200)), CPUQuota: ptr.To(MilliCPUToQuota(200+200, int64(defaultQuotaPeriod))), CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
+		},
+		{
+			description: "burstable-with-dra-overhead-claims",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "overhead-claim",
+							Containers:        []string{"c1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{
+									Name:         v1.ResourceMemory,
+									PerPod:       ptr.To(resource.MustParse("100Mi")),
+									PerContainer: ptr.To(resource.MustParse("50Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			// Memory: c1 limit (200) + perPodRef overhead (100) + perContainerRef overhead * 1 container (50 * 1)
+			expected: &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: ptr.To(int64((200 + 100 + 50) * 1024 * 1024))},
+		},
+		{
+			description: "burstable-with-dra-feature-gate-disabled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "direct-claim",
+							Containers:        []string{"c1"},
+							Direct: []v1.NodeAllocatableDirectResources{
+								{Name: v1.ResourceCPU, Quantity: resource.MustParse("200m")},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: false,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			expected:                           &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
+		},
+		{
+			description: "burstable-with-dra-hugepages-only",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "hugepage-claim",
+							Containers:        []string{"c1"},
+							Direct: []v1.NodeAllocatableDirectResources{
+								{Name: v1.ResourceName(v1.ResourceHugePagesPrefix + "1Gi"), Quantity: resource.MustParse("2Gi")},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			expected: &ResourceConfig{
+				CPUShares: &burstableShares,
+				CPUQuota:  &burstableQuota,
+				CPUPeriod: &defaultQuotaPeriod,
+				Memory:    &burstableMemory,
+				HugePageLimit: map[int64]int64{
+					// HugePageLimit: DRA claim hugepage allocation of 2 x 1Gi
+					1073741824: 2147483648,
+				},
+			},
+		},
+		{
+			description: "burstable-with-dra-and-pod-level-resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("400m", "400Mi"),
+						Limits:   getResourceList("800m", "800Mi"),
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "direct-claim",
+							Containers:        []string{"c1"},
+							Direct: []v1.NodeAllocatableDirectResources{
+								{Name: v1.ResourceCPU, Quantity: resource.MustParse("200m")},
+								{Name: v1.ResourceMemory, Quantity: resource.MustParse("200Mi")},
+							},
+						},
+					},
+				},
+			},
+			podLevelResourcesEnabled:           true,
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			// pod-level resources override DRA CPU/Memory
+			expected: &ResourceConfig{
+				CPUShares: ptr.To(MilliCPUToShares(400)),
+				CPUQuota:  ptr.To(MilliCPUToQuota(800, int64(defaultQuotaPeriod))),
+				CPUPeriod: &defaultQuotaPeriod,
+				Memory:    ptr.To(int64(800 * 1024 * 1024)),
+			},
+		},
+		{
+			description: "burstable-with-multiple-dra-claims",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:      "c1",
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "direct-claim-1",
+							Containers:        []string{"c1"},
+							Direct: []v1.NodeAllocatableDirectResources{
+								{Name: v1.ResourceCPU, Quantity: resource.MustParse("100m")},
+							},
+						},
+						{
+							ResourceClaimName: "direct-claim-2",
+							Containers:        []string{"c1"},
+							Direct: []v1.NodeAllocatableDirectResources{
+								{Name: v1.ResourceCPU, Quantity: resource.MustParse("200m")},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			// CPUShares: c1 request (100) + claim 1 CPU (100) + claim 2 CPU (200)
+			// CPUQuota: c1 limit (200) + claim 1 CPU (100) + claim 2 CPU (200)
+			expected: &ResourceConfig{
+				CPUShares: ptr.To(MilliCPUToShares(100 + 100 + 200)),
+				CPUQuota:  ptr.To(MilliCPUToQuota(200+100+200, int64(defaultQuotaPeriod))),
+				CPUPeriod: &defaultQuotaPeriod,
+				Memory:    &burstableMemory,
+			},
+		},
+		{
+			description: "burstable-with-multiple-containers-referencing-overhead-claim",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:      "c1",
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+						{
+							Name:      "c2",
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "overhead-claim",
+							Containers:        []string{"c1", "c2"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{
+									Name:         v1.ResourceMemory,
+									PerPod:       ptr.To(resource.MustParse("100Mi")),
+									PerContainer: ptr.To(resource.MustParse("50Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			expected: &ResourceConfig{
+				CPUShares: ptr.To(MilliCPUToShares(100 + 100)),
+				CPUQuota:  ptr.To(MilliCPUToQuota(200+200, int64(defaultQuotaPeriod))),
+				CPUPeriod: &defaultQuotaPeriod,
+				// Memory: c1 limit (200) + c2 limit (200) + perPodRef (100) + perContainerRef * 2 containers (50 * 2)
+				Memory: ptr.To(int64((200 + 200 + 100 + 50*2) * 1024 * 1024)),
+			},
+		},
+		{
+			description: "burstable-with-direct-claim-shared-by-two-containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:      "c1",
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+						{
+							Name:      "c2",
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "shared-direct-claim",
+							Containers:        []string{"c1", "c2"},
+							Direct: []v1.NodeAllocatableDirectResources{
+								{Name: v1.ResourceCPU, Quantity: resource.MustParse("200m")},
+								{Name: v1.ResourceMemory, Quantity: resource.MustParse("200Mi")},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			expected: &ResourceConfig{
+				// CPUShares: c1 request (100) + c2 request (100) + direct claim CPU (200) (shared direct resources are not multiplied)
+				CPUShares: ptr.To(MilliCPUToShares(100 + 100 + 200)),
+				// CPUQuota: c1 limit (200) + c2 limit (200) + direct claim CPU (200)
+				CPUQuota:  ptr.To(MilliCPUToQuota(200+200+200, int64(defaultQuotaPeriod))),
+				CPUPeriod: &defaultQuotaPeriod,
+				// Memory: c1 limit (200) + c2 limit (200) + direct claim memory (200)
+				Memory: ptr.To(int64((200 + 200 + 200) * 1024 * 1024)),
+			},
+		},
+		{
+			description: "besteffort-with-dra-direct-claims",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "direct-claim",
+							Containers:        []string{"c1"},
+							Direct: []v1.NodeAllocatableDirectResources{
+								{Name: v1.ResourceCPU, Quantity: resource.MustParse("200m")},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			// set min shares with DRA and without spec requests
+			expected: &ResourceConfig{
+				CPUShares: ptr.To(uint64(MinShares)),
+			},
+		},
+		{
+			description: "guaranteed-with-dra-direct-claims",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:      "c1",
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "direct-claim",
+							Containers:        []string{"c1"},
+							Direct: []v1.NodeAllocatableDirectResources{
+								{Name: v1.ResourceCPU, Quantity: resource.MustParse("200m")},
+								{Name: v1.ResourceMemory, Quantity: resource.MustParse("200Mi")},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			expected: &ResourceConfig{
+				// CPUShares: c1 request (100) + direct claim CPU (200)
+				CPUShares: ptr.To(MilliCPUToShares(100 + 200)),
+				// CPUQuota: c1 limit (100) + direct claim CPU (200)
+				CPUQuota:  ptr.To(MilliCPUToQuota(100+200, int64(defaultQuotaPeriod))),
+				CPUPeriod: &defaultQuotaPeriod,
+				// Memory: c1 limit (100) + direct claim memory (200)
+				Memory: ptr.To(int64((100 + 200) * 1024 * 1024)),
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.DRANodeAllocatableResources, testCase.draNodeAllocatableResourcesEnabled)
 			actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, false, kubeletconfig.NoneMemoryReservationPolicy)
 			if !reflect.DeepEqual(actual.CPUPeriod, testCase.expected.CPUPeriod) {
 				t.Errorf("cpu period not as expected. Expected: %v, Actual:%v", *testCase.expected.CPUPeriod, *actual.CPUPeriod)
@@ -495,6 +853,11 @@ func TestResourceConfigForPod(t *testing.T) {
 			}
 			if !reflect.DeepEqual(actual.Memory, testCase.expected.Memory) {
 				t.Errorf("memory not as expected. Expected: %v, Actual:%v", *testCase.expected.Memory, *actual.Memory)
+			}
+			if len(testCase.expected.HugePageLimit) > 0 || len(actual.HugePageLimit) > 0 {
+				if !reflect.DeepEqual(actual.HugePageLimit, testCase.expected.HugePageLimit) {
+					t.Errorf("hugepage limit not as expected. Expected: %v, Actual:%v", testCase.expected.HugePageLimit, actual.HugePageLimit)
+				}
 			}
 		})
 	}

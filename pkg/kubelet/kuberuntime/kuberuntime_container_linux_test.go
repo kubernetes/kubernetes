@@ -1030,7 +1030,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 			testPod.Spec.Resources = &test.podResources
 		}
 
-		results := GetHugepageLimitsFromResources(tCtx, testPod, test.resources)
+		results := GetHugepageLimitsFromResources(tCtx, testPod, test.resources, nil)
 		if !reflect.DeepEqual(expectedHugepages, results) {
 			t.Errorf("%s test failed. Expected %v but got %v", test.name, expectedHugepages, results)
 		}
@@ -1286,6 +1286,307 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			resources := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
 			tc.expected.HugepageLimits = resources.HugepageLimits
 			assert.Equal(t, tc.expected, resources)
+		})
+	}
+}
+
+func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
+	m.cpuCFSQuota = true
+
+	tests := []struct {
+		name                string
+		draNodeAllocatable  bool
+		podLevelResources   bool
+		podLimits           v1.ResourceList
+		podRequests         v1.ResourceList
+		containerLimits     v1.ResourceList
+		containerRequests   v1.ResourceList
+		claimStatuses       []v1.NodeAllocatableResourceClaimStatus
+		expectedCPUShares   int64
+		expectedCPUQuota    int64
+		expectedMemoryLimit int64
+		expectedHugepages   map[string]uint64
+	}{
+		{
+			name:               "feature gate DRANodeAllocatableResources disabled",
+			draNodeAllocatable: false,
+			containerLimits:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("500Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "cpu-memory-claim",
+					Containers:        []string{"c1"},
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: resource.MustParse("1")},
+						{Name: v1.ResourceMemory, Quantity: resource.MustParse("256Mi")},
+						{Name: "hugepages-2Mi", Quantity: resource.MustParse("2Mi")},
+					},
+				},
+			},
+			expectedCPUShares:   2048,                              // limit 2 CPUs * 1024 (requests omitted defaults to limits)
+			expectedCPUQuota:    200000,                            // limit 2 CPUs * 100,000
+			expectedMemoryLimit: 524288000,                         // limit 500Mi * 1024 * 1024
+			expectedHugepages:   map[string]uint64{"2MB": 2097152}, // limit 2Mi * 1024 * 1024
+		},
+		{
+			name:               "explicit container spec limits + DRA allocations",
+			draNodeAllocatable: true,
+			containerRequests:  v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("256Mi")},
+			containerLimits:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("500Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "cpu-memory-claim",
+					Containers:        []string{"c1"},
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: resource.MustParse("1")},
+						{Name: v1.ResourceMemory, Quantity: resource.MustParse("256Mi")},
+						{Name: "hugepages-2Mi", Quantity: resource.MustParse("2Mi")},
+					},
+				},
+			},
+			expectedCPUShares:   1024,                              // request 1 CPU * 1024 (does not include DRA)
+			expectedCPUQuota:    300000,                            // (limit 2 CPUs + DRA 1 CPU) * 100,000
+			expectedMemoryLimit: 792723456,                         // (limit 500Mi + DRA 256Mi) * 1024 * 1024
+			expectedHugepages:   map[string]uint64{"2MB": 4194304}, // (limit 2Mi + DRA 2Mi) * 1024 * 1024
+		},
+		{
+			name:               "container limits omitted + pod level resource limits set + DRA allocations",
+			draNodeAllocatable: true,
+			podLevelResources:  true,
+			podLimits:          v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("1Gi"), "hugepages-2Mi": resource.MustParse("4Mi")},
+			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "cpu-memory-claim",
+					Containers:        []string{"c1"},
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: resource.MustParse("1")},
+						{Name: v1.ResourceMemory, Quantity: resource.MustParse("256Mi")},
+						{Name: "hugepages-2Mi", Quantity: resource.MustParse("2Mi")},
+					},
+				},
+			},
+			expectedCPUShares:   4096,                              // pod limit 4 CPUs * 1024 (no container limit, no requests, fallbacks to pod limit)
+			expectedCPUQuota:    400000,                            // pod limit 4 CPUs * 100,000 (no container limit, falls back to pod limit)
+			expectedMemoryLimit: 1073741824,                        // pod limit 1Gi * 1024 * 1024 * 1024
+			expectedHugepages:   map[string]uint64{"2MB": 4194304}, // inherits pod limit 4Mi * 1024 * 1024 exactly (no DRA fallback inflation)
+		},
+		{
+			name:               "container limits omitted + pod level limits omitted + DRA allocations",
+			draNodeAllocatable: true,
+			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "cpu-memory-claim",
+					Containers:        []string{"c1"},
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: resource.MustParse("1")},
+						{Name: v1.ResourceMemory, Quantity: resource.MustParse("256Mi")},
+						{Name: "hugepages-2Mi", Quantity: resource.MustParse("2Mi")},
+					},
+				},
+			},
+			expectedCPUShares:   2,
+			expectedCPUQuota:    0,
+			expectedMemoryLimit: 0,
+			expectedHugepages:   map[string]uint64{"2MB": 2097152}, // defaults to 0 but gets inflated with DRA 2Mi * 1024 * 1024 to allow allocation
+		},
+		{
+			name:                "container limits specified + no DRA allocations",
+			draNodeAllocatable:  true,
+			containerLimits:     v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("500Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+			expectedCPUShares:   2048,                              // limit 2 CPUs * 1024 (requests omitted defaults to limits)
+			expectedCPUQuota:    200000,                            // limit 2 CPUs * 100,000
+			expectedMemoryLimit: 524288000,                         // limit 500Mi * 1024 * 1024
+			expectedHugepages:   map[string]uint64{"2MB": 2097152}, // limit 2Mi * 1024 * 1024
+		},
+		{
+			name:                "container limits omitted + pod level resource limits set + no DRA allocations (no inflation fallback)",
+			draNodeAllocatable:  true,
+			podLevelResources:   true,
+			podLimits:           v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("1Gi"), "hugepages-2Mi": resource.MustParse("4Mi")},
+			expectedCPUShares:   4096,                              // pod limit 4 CPUs * 1024
+			expectedCPUQuota:    400000,                            // pod limit 4 CPUs * 100,000
+			expectedMemoryLimit: 1073741824,                        // pod limit 1Gi * 1024 * 1024 * 1024
+			expectedHugepages:   map[string]uint64{"2MB": 4194304}, // pod limit 4Mi * 1024 * 1024
+		},
+		{
+			name:                "container limits omitted + pod level limits omitted + no DRA allocations (default disallowed/unlimited)",
+			draNodeAllocatable:  true,
+			expectedCPUShares:   2,
+			expectedCPUQuota:    0,
+			expectedMemoryLimit: 0,
+			expectedHugepages:   map[string]uint64{"2MB": 0},
+		},
+		{
+			name:               "multiple claims for the same resource",
+			draNodeAllocatable: true,
+			containerLimits:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "cpu-claim-1",
+					Containers:        []string{"c1"},
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: resource.MustParse("1")},
+					},
+				},
+				{
+					ResourceClaimName: "cpu-claim-2",
+					Containers:        []string{"c1"},
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: resource.MustParse("2")},
+					},
+				},
+			},
+			expectedCPUShares:   5120,   // (limit 2 CPUs + claim1 1 CPU + claim2 2 CPUs) * 1024
+			expectedCPUQuota:    500000, // (limit 2 CPUs + claim1 1 CPU + claim2 2 CPUs) * 100,000
+			expectedMemoryLimit: 0,
+			expectedHugepages:   map[string]uint64{"2MB": 0},
+		},
+		{
+			name:               "per-pod and per-container DRA overhead",
+			draNodeAllocatable: true,
+			containerLimits:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "overhead-claim",
+					Containers:        []string{"c1"},
+					Overhead: []v1.NodeAllocatableOverheadResources{
+						{Name: v1.ResourceCPU, PerPod: ptr.To(resource.MustParse("1")), PerContainer: ptr.To(resource.MustParse("2"))},
+					},
+				},
+			},
+			expectedCPUShares:   4096,   // (limit 1 CPU + per-pod 1 CPU + per-container 2 CPUs) * 1024
+			expectedCPUQuota:    400000, // (limit 1 CPU + per-pod 1 CPU + per-container 2 CPUs) * 100,000
+			expectedMemoryLimit: 0,
+			expectedHugepages:   map[string]uint64{"2MB": 0},
+		},
+		{
+			name:               "hugepages omitted at container level + pod level limits set + DRA allocations",
+			draNodeAllocatable: true,
+			podLevelResources:  true,
+			podLimits:          v1.ResourceList{"hugepages-2Mi": resource.MustParse("4Mi")},
+			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "hugepage-claim",
+					Containers:        []string{"c1"},
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: "hugepages-2Mi", Quantity: resource.MustParse("2Mi")},
+					},
+				},
+			},
+			expectedCPUShares:   2,
+			expectedCPUQuota:    0,
+			expectedMemoryLimit: 0,
+			expectedHugepages:   map[string]uint64{"2MB": 4194304}, // inherits pod limit 4Mi * 1024 * 1024
+		},
+		{
+			name:               "hugepages at pod level + container level + DRA allocations",
+			draNodeAllocatable: true,
+			podLevelResources:  true,
+			podLimits:          v1.ResourceList{"hugepages-2Mi": resource.MustParse("4Mi")},
+			containerLimits:    v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "hugepage-claim",
+					Containers:        []string{"c1"},
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: "hugepages-2Mi", Quantity: resource.MustParse("2Mi")},
+					},
+				},
+			},
+			expectedCPUShares:   2,
+			expectedCPUQuota:    0,
+			expectedMemoryLimit: 0,
+			expectedHugepages:   map[string]uint64{"2MB": 4194304}, // (container limit 2Mi + DRA 2Mi) * 1024 * 1024 = 4Mi
+		},
+		{
+			name:               "hugepages omitted at pod and container level + DRA allocations",
+			draNodeAllocatable: true,
+			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "hugepage-claim",
+					Containers:        []string{"c1"},
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: "hugepages-2Mi", Quantity: resource.MustParse("2Mi")},
+					},
+				},
+			},
+			expectedCPUShares:   2,
+			expectedCPUQuota:    0,
+			expectedMemoryLimit: 0,
+			expectedHugepages:   map[string]uint64{"2MB": 2097152}, // gets inflated with DRA 2Mi * 1024 * 1024 to allow allocation
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, tc.draNodeAllocatable)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResources)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "busybox",
+							Resources: v1.ResourceRequirements{
+								Requests: tc.containerRequests,
+								Limits:   tc.containerLimits,
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: tc.claimStatuses,
+				},
+			}
+
+			if tc.podLevelResources {
+				pod.Spec.Resources = &v1.ResourceRequirements{
+					Limits:   tc.podLimits,
+					Requests: tc.podRequests,
+				}
+			}
+
+			setCgroupVersionDuringTest(cgroupV2)
+			m.getSwapControllerAvailable = func() bool { return false }
+			m.singleProcessOOMKill = ptr.To(false)
+
+			resources := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
+
+			assert.Equal(t, tc.expectedCPUShares, resources.CpuShares)
+			assert.Equal(t, tc.expectedCPUQuota, resources.CpuQuota)
+			assert.Equal(t, tc.expectedMemoryLimit, resources.MemoryLimitInBytes)
+
+			supportedSizes := make(map[string]bool)
+			for _, size := range libcontainercgroups.HugePageSizes() {
+				supportedSizes[size] = true
+			}
+
+			for pageSize, expectedLimit := range tc.expectedHugepages {
+				if !supportedSizes[pageSize] {
+					t.Logf("Skipping assertion for unsupported hugepage size %q on this machine", pageSize)
+					continue
+				}
+				var actualLimit uint64
+				found := false
+				for _, limit := range resources.HugepageLimits {
+					if limit.PageSize == pageSize {
+						actualLimit = limit.Limit
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "Expected page size %q not found in hugepage limits", pageSize)
+				assert.Equal(t, expectedLimit, actualLimit, "Page size %q limit mismatch", pageSize)
+			}
 		})
 	}
 }

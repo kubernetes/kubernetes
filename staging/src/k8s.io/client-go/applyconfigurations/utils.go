@@ -790,6 +790,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeAddressApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeAffinity"):
 		return &applyconfigurationscorev1.NodeAffinityApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableDirectResources"):
+		return &applyconfigurationscorev1.NodeAllocatableDirectResourcesApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableOverheadResources"):
+		return &applyconfigurationscorev1.NodeAllocatableOverheadResourcesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceClaimStatus"):
 		return &applyconfigurationscorev1.NodeAllocatableResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeCondition"):
@@ -1622,6 +1626,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ExactDeviceRequestApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1.NetworkDeviceDataApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableDirectMapping"):
+		return &applyconfigurationsresourcev1.NodeAllocatableDirectMappingApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableOverhead"):
+		return &applyconfigurationsresourcev1.NodeAllocatableOverheadApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
 		return &applyconfigurationsresourcev1.NodeAllocatableResourceMappingApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
@@ -1724,6 +1732,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceTolerationApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta1.NetworkDeviceDataApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableDirectMapping"):
+		return &applyconfigurationsresourcev1beta1.NodeAllocatableDirectMappingApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableOverhead"):
+		return &applyconfigurationsresourcev1beta1.NodeAllocatableOverheadApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
 		return &applyconfigurationsresourcev1beta1.NodeAllocatableResourceMappingApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
@@ -1814,6 +1826,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.ExactDeviceRequestApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta2.NetworkDeviceDataApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableDirectMapping"):
+		return &applyconfigurationsresourcev1beta2.NodeAllocatableDirectMappingApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableOverhead"):
+		return &applyconfigurationsresourcev1beta2.NodeAllocatableOverheadApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
 		return &applyconfigurationsresourcev1beta2.NodeAllocatableResourceMappingApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
