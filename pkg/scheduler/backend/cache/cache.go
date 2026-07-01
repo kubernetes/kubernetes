@@ -880,6 +880,7 @@ func (cache *cacheImpl) updatePodGroupMember(logger klog.Logger, oldPod, newPod 
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
 		// This should not happen: the pod group state should have been already created by a prior pod add action.
+		metrics.PodGroupCacheMissedEvents.WithLabelValues("update").Inc()
 		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "pod", klog.KObj(newPod), "podGroupKey", key)
 		return
 	}
@@ -921,6 +922,7 @@ func (cache *cacheImpl) forgetPodGroupMember(logger klog.Logger, pod *v1.Pod) {
 	pgs, exists := cache.podGroupStates[key]
 	if !exists {
 		// This should not happen: the pod group state should have been already created by a prior pod add or assume action.
+		metrics.PodGroupCacheMissedEvents.WithLabelValues("forget").Inc()
 		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for forget, this indicates a missed add or assume event", "pod", klog.KObj(pod), "podGroupKey", key)
 		return
 	}
