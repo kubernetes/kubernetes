@@ -1107,7 +1107,7 @@ func TestSampleAuthorizer(t *testing.T) {
 					object:            objWithLabels(map[string]string{"supersecret": "yes"}),
 					oldObject:         objWithLabels(map[string]string{"supersecret": "yes"}),
 					authorizeDecision: [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(denies=2)`},
-					finalDecision:     [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `Deny(reason="condition \"deny-supersecret-label-on-oldObject\" denied the request, condition \"deny-supersecret-label-on-object\" denied the request")`},
+					finalDecision:     [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `Deny(reason="condition \"deny-supersecret-label-on-oldObject\" denied the request")`},
 				},
 				{
 					name:              "new with supersecret old without",

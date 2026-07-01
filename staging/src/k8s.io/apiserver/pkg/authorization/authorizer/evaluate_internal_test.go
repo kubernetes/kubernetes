@@ -177,7 +177,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		// ============================================================
 		{
 			name:       "deny: error fail closed",
-			wantString: `Deny(reason="one or more conditional evaluation errors occurred", err="condition \"deny-1\" with effect=Deny produced error: eval error")`,
+			wantString: `Deny(reason="one or more conditional evaluation errors occurred", err="condition \"deny-1\" with effect=Deny evaluated to an error: eval error")`,
 			subCases: []subCase{
 				{
 					name:           "minimal",
@@ -223,7 +223,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		},
 		{
 			name:       "deny: error fail closed",
-			wantString: `Deny(reason="one or more conditional evaluation errors occurred", err="[condition \"deny-1\" with effect=Deny produced error: eval error, condition \"deny-2\" with effect=Deny produced error: eval error]")`,
+			wantString: `Deny(reason="one or more conditional evaluation errors occurred", err="[condition \"deny-1\" with effect=Deny evaluated to an error: eval error, condition \"deny-2\" with effect=Deny evaluated to an error: eval error]")`,
 			subCases: []subCase{
 				{
 					name:           "minimal",
@@ -332,7 +332,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		// ============================================================
 		{
 			name:       "noopinion: nop error fail closed",
-			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="condition \"nop-1\" with effect=NoOpinion produced error: eval error")`,
+			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="condition \"nop-1\" with effect=NoOpinion evaluated to an error: eval error")`,
 			subCases: []subCase{
 				{
 					name:                "simple",
@@ -373,7 +373,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		// ============================================================
 		{
 			name:       "noopinion: single allow error fail closed",
-			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="condition \"allow-1\" with effect=Allow produced error: eval error")`,
+			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="condition \"allow-1\" with effect=Allow evaluated to an error: eval error")`,
 			subCases: []subCase{
 				{
 					name:            "minimal",
@@ -408,7 +408,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		},
 		{
 			name:       "noopinion: multiple allow errors fail closed",
-			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="[condition \"allow-1\" with effect=Allow produced error: eval error, condition \"allow-2\" with effect=Allow produced error: eval error]")`,
+			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="[condition \"allow-1\" with effect=Allow evaluated to an error: eval error, condition \"allow-2\" with effect=Allow evaluated to an error: eval error]")`,
 			subCases: []subCase{
 				{
 					name: "minimal",
@@ -529,11 +529,14 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		},
 
 		// ============================================================
-		// Allow: condition matched with error warning
+		// Allow: matching allow short-circuits and drops any prior errors
 		// ============================================================
 		{
-			name:       "allow: condition matched with error warning from other allow",
-			wantString: `Allow(reason="condition \"allow-1\" allowed the request", err="condition \"allow-err\" with effect=Allow produced error: eval error")`,
+			// Iteration is: allow-err (accumulated as an error), then allow-1 (true) which
+			// short-circuits. The short-circuit path returns the reason with nil errors,
+			// so the accumulated allow-err warning is dropped and not surfaced on Allow.
+			name:       "allow: matching allow short-circuits and drops prior error",
+			wantString: `Allow(reason="condition \"allow-1\" allowed the request")`,
 			subCases: []subCase{
 				{
 					name: "minimal",

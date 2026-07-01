@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
@@ -98,7 +97,8 @@ func (r ConditionEvaluationResult) IsUnevaluatable() bool {
 }
 
 // Evaluate evaluates the ConditionsMap primarily using the Conditions' own Evaluate() function,
-// and secondarily using evaluateConditionFn, if set.
+// and secondarily using evaluateConditionFn, if set. The first matching (true) condition
+// short-circuits the process, in order for the evaluation to be as efficient as possible.
 func (c ConditionsMap) Evaluate(ctx context.Context, data ConditionsData, evaluateConditionFn EvaluateConditionFunc) (Decision, string, error) {
 	// This is a translation between the generic, private function, and the interface we want to expose to callers.
 	return partiallyEvaluateConditionsMapInternal(ctx, c, data, func(ctx context.Context, cond Condition, condData ConditionsData) ConditionEvaluationResult {
@@ -116,7 +116,7 @@ func (c ConditionsMap) Evaluate(ctx context.Context, data ConditionsData, evalua
 // ConditionsEvaluationResultUnevaluatable, the returned decision is guaranteed to be Allow/Deny/NoOpinion.
 // However, this method can also be used to evaluate a subset of the conditions (e.g. for builtin
 // conditions evaluators that support a certain conditions type), returning ConditionsEvaluationResultUnevaluatable
-// for conditions that the evaluator does not recognize. In the latter case, a partially evaluated, deep copied
+// for conditions that the evaluator does not recognize. In the latter case, a partially evaluated,
 // ConditionsMap might be returned.
 func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap, data ConditionsData, evaluateConditionFn MaybeEvaluateConditionFunc) ConditionsAwareDecision {
 	evalCond := func(cond Condition) ConditionEvaluationResult {
@@ -132,12 +132,14 @@ func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap
 	// General logic: Deny > NoOpinion > Allow. Within a set of same-effect conditions true > error > unevaluatable > false.
 
 	if len(c.denyConditions) != 0 {
-		appliedReasons, errored, unevaluated := conditionsToAppliedErroredUnevaluated(
+		appliedReason, errored, unevaluated := conditionsToAppliedErroredUnevaluated(
 			c.DenyConditions(), evalCond, "Deny", "denied the request")
 
-		if len(appliedReasons) != 0 {
+		if len(appliedReason) != 0 {
 			// No errors are returned here, as that would turn this into a 500 instead of 403 in the WithAuthorization HTTP filter
-			return ConditionsAwareDecisionDeny(strings.Join(appliedReasons, ", "), nil)
+			// TODO(luxas): We might want to change the WithAuthorization logic such that it becomes possible for an authorizer to
+			// surface non-critical errors also in the precence of denies.
+			return ConditionsAwareDecisionDeny(appliedReason, nil)
 		}
 		if len(errored) != 0 {
 			return ConditionsAwareDecisionDeny("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(errored))
@@ -150,12 +152,12 @@ func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap
 	// If we got here, all Deny conditions could be evaluated, and evaluated to false, nil
 
 	if len(c.noOpinionConditions) != 0 {
-		appliedReasons, errored, unevaluated := conditionsToAppliedErroredUnevaluated(
+		appliedReason, errored, unevaluated := conditionsToAppliedErroredUnevaluated(
 			c.NoOpinionConditions(), evalCond, "NoOpinion", "evaluated to NoOpinion")
 
-		if len(appliedReasons) != 0 {
+		if len(appliedReason) != 0 {
 			// No errors are returned here, as that would turn this into a 500 instead of 403 in the WithAuthorization HTTP filter
-			return ConditionsAwareDecisionNoOpinion(strings.Join(appliedReasons, ", "), nil)
+			return ConditionsAwareDecisionNoOpinion(appliedReason, nil)
 		}
 		if len(errored) != 0 {
 			return ConditionsAwareDecisionNoOpinion("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(errored))
@@ -169,12 +171,13 @@ func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap
 	// If we got here, all Deny and NoOpinion conditions could be evaluated, and evaluated to false, nil
 
 	if len(c.allowConditions) != 0 {
-		appliedReasons, errored, unevaluated := conditionsToAppliedErroredUnevaluated(
+		appliedReason, errored, unevaluated := conditionsToAppliedErroredUnevaluated(
 			c.AllowConditions(), evalCond, "Allow", "allowed the request")
 
-		if len(appliedReasons) != 0 {
-			// Errors can be returned here, as the WithAuthorization HTTP filter just logs errors returned with Allow as warnings.
-			return ConditionsAwareDecisionAllow(strings.Join(appliedReasons, ", "), utilerrors.NewAggregate(errored))
+		if len(appliedReason) != 0 {
+			// Errors could technically be returned with an Allow (and be logged), but no errors are returned for
+			// the short-circuit true case, as the error list might be incomplete.
+			return ConditionsAwareDecisionAllow(appliedReason, nil)
 		}
 		if len(errored) != 0 {
 			return ConditionsAwareDecisionNoOpinion("one or more conditional evaluation errors occurred", utilerrors.NewAggregate(errored))
@@ -188,36 +191,37 @@ func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap
 	return ConditionsAwareDecisionNoOpinion("no conditions matched", nil)
 }
 
-func conditionsToAppliedErroredUnevaluated(conditions iter.Seq[Condition], evalCond func(cond Condition) ConditionEvaluationResult, effect, appliedDescription string) ([]string, []error, []Condition) {
-	errs := []error{}
-	appliedCondReasons := []string{}
-	unevaluatedConditions := []Condition{}
+// Note: the signature is string, error, []Condition, as that is the order in which the return values should be processed
+// The first true short-circuits the evaluation with a nil error, even though some potentially happened before the first
+// true evaluation, as the errors list in that case wouldn't necessarily be comprehensive.
+func conditionsToAppliedErroredUnevaluated(conditions iter.Seq[Condition], evalCond func(cond Condition) ConditionEvaluationResult, effect, appliedDescription string) (string, []error, []Condition) {
+	var errs []error
+	var unevaluatedConditions []Condition
 	for cond := range conditions {
 		id := cond.GetID()
 		evalResult := evalCond(cond)
 		switch {
-		case evalResult.IsUnevaluatable():
-			unevaluatedConditions = append(unevaluatedConditions, cond)
-			continue
-		case evalResult.IsError():
-			errs = append(errs, fmt.Errorf("condition %q with effect=%s produced error: %w", id, effect, evalResult.Error()))
-			continue
 		case evalResult.IsTrue():
 			reason := fmt.Sprintf("condition %q %s", id, appliedDescription)
 			if desc := cond.GetDescription(); len(desc) != 0 {
 				reason += fmt.Sprintf(" with description %q", desc)
 			}
-			appliedCondReasons = append(appliedCondReasons, reason)
-			continue
+			// Note: nil is returned for errors here as the list is not comprehensive in the short-circuit case.
+			return reason, nil, nil
 		case evalResult.IsFalse():
 			continue
+		case evalResult.IsUnevaluatable():
+			unevaluatedConditions = append(unevaluatedConditions, cond)
+			continue
+		case evalResult.IsError():
+			errs = append(errs, fmt.Errorf("condition %q with effect=%s evaluated to an error: %w", id, effect, evalResult.Error()))
+			continue
 		default:
-			errs = append(errs, fmt.Errorf("condition %q with effect=%s produced error: unknown evaluation result %v", id, effect, evalResult))
+			errs = append(errs, fmt.Errorf("condition %q with effect=%s evaluated to an error: unknown evaluation result %v", id, effect, evalResult))
 			continue
 		}
 	}
-	// Arguments are returned in the order that they should be considered.
-	return appliedCondReasons, errs, unevaluatedConditions
+	return "", errs, unevaluatedConditions
 }
 
 // PartiallyEvaluateConditionsAwareDecision evaluates the ConditionsAwareDecision primarily using any conditions' own Evaluate() function,
@@ -226,6 +230,8 @@ func conditionsToAppliedErroredUnevaluated(conditions iter.Seq[Condition], evalC
 // However, this method can also be used to evaluate a subset of the conditions (e.g. for builtin
 // conditions evaluators that only support a certain conditions type), returning ConditionsEvaluationResultUnevaluatable
 // for conditions that the evaluator does not recognize. In the latter case, a partially evaluated ConditionsAwareDecision is returned.
+// When evaluating a ConditionsMap, only the first matching (true) condition short-circuits the process,
+// in order for the evaluation to be as efficient as possible.
 func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDecision ConditionsAwareDecision, data ConditionsData, evaluateConditionFn MaybeEvaluateConditionFunc) ConditionsAwareDecision {
 	switch {
 	case unevaluatedDecision.IsConditionsMap():
