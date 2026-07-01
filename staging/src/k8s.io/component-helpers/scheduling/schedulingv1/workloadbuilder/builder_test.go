@@ -21,6 +21,7 @@ import (
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
@@ -389,13 +390,17 @@ func TestBuild(t *testing.T) {
 			if owner == nil && tt.name != "missing owner returns error" {
 				owner = dummyOwner
 			}
-			wl, err := Build(tt.root, BuildOptions{Name: "wl", Namespace: "ns", Owner: owner})
+			wl, errs := Build(tt.root, BuildOptions{Name: "wl", Namespace: "ns", Owner: owner})
 			if tt.wantErr {
-				if err == nil {
+				if len(errs) == 0 {
 					t.Fatal("expected error, got nil")
 				}
-			} else if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			} else if errs != nil {
+				t.Fatalf("unexpected error: %v", errs)
+				return
+			}
+			if len(errs) > 0 {
+				t.Fatalf("unexpected error: %v", errs.ToAggregate())
 			}
 			if tt.verify != nil {
 				tt.verify(t, wl, tt.root)
@@ -467,15 +472,15 @@ func TestValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := Validate(tt.root)
+			errs := Validate(tt.root)
 			if tt.wantErr {
-				if err == nil {
+				if len(errs) == 0 {
 					t.Fatal("expected error, got nil")
 				}
 				return
 			}
-			if err != nil {
-				t.Fatalf("expected no error, got %v", err)
+			if len(errs) > 0 {
+				t.Fatalf("expected no error, got %v", errs.ToAggregate())
 			}
 		})
 	}
@@ -493,8 +498,8 @@ func TestValidateAgreesWithBuild(t *testing.T) {
 
 	for name, root := range roots {
 		t.Run(name, func(t *testing.T) {
-			validateErr := Validate(root) != nil
-			_, err := Build(root, BuildOptions{
+			validateErr := len(Validate(root)) > 0
+			_, buildErrs := Build(root, BuildOptions{
 				Name:      "wl",
 				Namespace: "ns",
 				Owner: &metav1.OwnerReference{
@@ -504,9 +509,94 @@ func TestValidateAgreesWithBuild(t *testing.T) {
 					UID:        "12345",
 				},
 			})
-			buildErr := err != nil
+			buildErr := len(buildErrs) > 0
 			if validateErr != buildErr {
 				t.Errorf("Validate/Build disagree: validateErr=%v buildErr=%v", validateErr, buildErr)
+			}
+		})
+	}
+}
+
+// TestValidateFieldPaths verifies that errors are reported against the field
+// paths a controller declares in WorkloadItem.FieldPaths, and fall back to
+// relative paths when no mapping is declared.
+func TestValidateFieldPaths(t *testing.T) {
+	base := field.NewPath("spec", "scheduling")
+
+	tests := []struct {
+		name      string
+		root      *WorkloadItem
+		wantField string
+	}{
+		{
+			name: "gang minCount uses declared path",
+			root: &WorkloadItem{
+				Name:       "job",
+				UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{}}},
+				FieldPaths: &FieldPaths{
+					GangMinCount: base.Child("policy", "gang", "minCount"),
+				},
+			},
+			wantField: "spec.scheduling.policy.gang.minCount",
+		},
+		{
+			name: "gang minCount falls back to relative path",
+			root: &WorkloadItem{
+				Name:       "job",
+				UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{}}},
+			},
+			wantField: "policy.gang.minCount",
+		},
+		{
+			name: "duplicate resource claim uses declared list path with index",
+			root: &WorkloadItem{
+				Name:          "job",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				UserConfig: &SchedulingConfig{
+					ResourceClaims: []ResourceClaim{
+						{Name: "dup", ResourceClaimName: ptr.To("a")},
+						{Name: "dup", ResourceClaimName: ptr.To("b")},
+					},
+				},
+				FieldPaths: &FieldPaths{ResourceClaims: base.Child("resourceClaims")},
+			},
+			wantField: "spec.scheduling.resourceClaims[1].name",
+		},
+		{
+			name: "empty name uses declared name path",
+			root: &WorkloadItem{
+				Name:       "",
+				UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				FieldPaths: &FieldPaths{Name: field.NewPath("metadata", "name")},
+			},
+			wantField: "metadata.name",
+		},
+		{
+			name: "non-standard root proves mapping drives the path",
+			root: &WorkloadItem{
+				Name:       "job",
+				UserConfig: &SchedulingConfig{DisruptionMode: &DisruptionMode{}},
+				FieldPaths: &FieldPaths{DisruptionMode: field.NewPath("spec", "custom", "disruption")},
+			},
+			wantField: "spec.custom.disruption",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := Validate(tt.root)
+			if len(errs) == 0 {
+				t.Fatalf("expected an error, got none")
+			}
+			found := false
+			for _, e := range errs {
+				if e.Field == tt.wantField {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected an error on field %q, got %v", tt.wantField, errs)
 			}
 		})
 	}

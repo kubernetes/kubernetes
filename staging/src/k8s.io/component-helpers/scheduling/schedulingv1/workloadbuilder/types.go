@@ -18,6 +18,7 @@ package workloadbuilder
 
 import (
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // SchedulingConfig is the hierarchy-agnostic intermediate representation of a
@@ -74,6 +75,22 @@ type ResourceClaim struct {
 	ResourceClaimTemplateName *string
 }
 
+// FieldPaths declares where this item's scheduling fields live in the
+// controller's API, so validation errors point at real, controller-relative
+// paths instead of the library's internal IR structure. Each path is the root
+// of its field; the builder derives deeper paths (e.g. per-claim indices) from
+// it. Any nil path falls back to a relative path, so the mapping is optional.
+// Controllers set this during tree construction, and hierarchical controllers
+// can give each WorkloadItem its own paths.
+type FieldPaths struct {
+	Name           *field.Path
+	Policy         *field.Path
+	GangMinCount   *field.Path
+	Constraints    *field.Path
+	DisruptionMode *field.Path
+	ResourceClaims *field.Path
+}
+
 // WorkloadItemFunc post-processes an item's ResolvedConfig after the
 // default/user merge, typically for controller defaulting (e.g. gang MinCount).
 type WorkloadItemFunc func(*WorkloadItem)
@@ -98,6 +115,14 @@ type WorkloadItem struct {
 	// ResolvedConfig is the merged config, populated by Build before Callbacks
 	// run. Callers do not set it.
 	ResolvedConfig *SchedulingConfig
+
+	// FieldPaths optionally declares where this item's fields live in the
+	// controller's API, so Build and Validate can report errors against the
+	// controller's own field paths. When nil, errors use relative paths.
+	FieldPaths *FieldPaths
+
+	// Children, when non-empty, mark this node as a structural group.
+	Children []*WorkloadItem
 }
 
 // DeepCopy returns a deep copy of c, or nil if c is nil. Build copies configs
