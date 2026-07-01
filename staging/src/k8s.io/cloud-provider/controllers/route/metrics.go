@@ -41,7 +41,7 @@ var (
 	routeCorrectionsCount = metrics.NewCounter(&metrics.CounterOpts{
 		Name:           "route_corrections_total",
 		Subsystem:      subsystem,
-		Help:           "A metric counting the amount of times routes required adjustment after a periodic reconcile.",
+		Help:           "A metric counting the number of periodically-triggered reconciles that resulted in at least one route being created or deleted.",
 		StabilityLevel: metrics.ALPHA,
 	})
 )
