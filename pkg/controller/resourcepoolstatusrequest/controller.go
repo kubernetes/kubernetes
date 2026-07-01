@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -257,11 +259,12 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 	// Calculate the pool status on-demand from listers
 	status := c.calculatePoolStatus(ctx, request)
 
-	// Requeue if pools have validation errors and retries remain — gives drivers
-	// time to publish remaining slices before we finalize the response.
+	// Requeue only for incomplete pools (driver still publishing slices), giving
+	// drivers time before we finalize. Structural view errors are permanent and
+	// are written to status as-is.
 	hasIncomplete := false
 	for _, p := range status.Pools {
-		if p.ValidationError != nil {
+		if p.ValidationError != nil && strings.HasPrefix(*p.ValidationError, prefixPoolIncomplete) {
 			hasIncomplete = true
 			break
 		}
@@ -363,6 +366,11 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		sliceCount         int32
 		expectedSliceCount int64
 		generation         int64
+		// Data for the partition/counter/shareable views (Alpha 1.37).
+		devices         []deviceRecord
+		sharedCounters  []resourcev1.CounterSet
+		partitionValues map[string]struct{} // distinct PartitionTypeAttribute values across slices
+		slicesWithAttr  int32               // slices that declared PartitionTypeAttribute
 	}
 
 	slices, err := c.sliceLister.List(labels.Everything())
@@ -429,7 +437,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			if slice.Spec.NodeName != nil {
 				nodeName = *slice.Spec.NodeName
 			}
-			poolData[key] = &poolInfo{
+			info = &poolInfo{
 				driver:             slice.Spec.Driver,
 				poolName:           slicePoolName,
 				nodeName:           nodeName,
@@ -438,7 +446,9 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				sliceCount:         1,
 				expectedSliceCount: slice.Spec.Pool.ResourceSliceCount,
 				generation:         maxGeneration[key],
+				partitionValues:    make(map[string]struct{}),
 			}
+			poolData[key] = info
 		} else {
 			info.totalDevices += deviceCount
 			info.unavailableDevices += unavailCount
@@ -452,6 +462,14 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				info.nodeNameMixed = true
 			}
 		}
+
+		// Per-device data and pool-level counters/attribute for the advanced views.
+		info.devices = append(info.devices, sliceDeviceRecords(slice)...)
+		info.sharedCounters = append(info.sharedCounters, slice.Spec.SharedCounters...)
+		if slice.Spec.PartitionTypeAttribute != nil {
+			info.partitionValues[string(*slice.Spec.PartitionTypeAttribute)] = struct{}{}
+			info.slicesWithAttr++
+		}
 	}
 
 	// Step 2: Count allocated devices from ResourceClaims.
@@ -460,6 +478,8 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 	// (allowMultipleAllocations). AdminAccess results are observers, not
 	// consumers, and are skipped.
 	allocatedDevices := make(map[string]map[string]struct{})
+	// Per-pool consumed capacity over non-AdminAccess claims; feeds shareableSummary.
+	consumedCapacity := make(map[string]map[resourcev1.QualifiedName]resource.Quantity)
 
 	claims, err := c.claimLister.List(labels.Everything())
 	if err != nil {
@@ -482,6 +502,17 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				allocatedDevices[key] = devices
 			}
 			devices[result.Device] = struct{}{}
+
+			for capacityName, quantity := range result.ConsumedCapacity {
+				m := consumedCapacity[key]
+				if m == nil {
+					m = make(map[resourcev1.QualifiedName]resource.Quantity)
+					consumedCapacity[key] = m
+				}
+				cur := m[capacityName].DeepCopy()
+				cur.Add(quantity)
+				m[capacityName] = cur
+			}
 		}
 	}
 
@@ -500,9 +531,8 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 
 		if int64(info.sliceCount) < info.expectedSliceCount {
 			// Incomplete pool: set validation error, leave device counts and slice count nil.
-			// PoolIncomplete: is a stable machine-readable prefix.
-			errMsg := fmt.Sprintf("PoolIncomplete: pool %s/%s is incomplete: observed %d/%d slices at generation %d",
-				info.driver, info.poolName, info.sliceCount, info.expectedSliceCount, info.generation)
+			errMsg := fmt.Sprintf("%s pool %s/%s is incomplete: observed %d/%d slices at generation %d",
+				prefixPoolIncomplete, info.driver, info.poolName, info.sliceCount, info.expectedSliceCount, info.generation)
 			// Truncate to 256 bytes to stay within the API field's +k8s:maxBytes=256 limit.
 			if len(errMsg) > 256 {
 				errMsg = errMsg[:256]
@@ -510,12 +540,13 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			pool.ValidationError = &errMsg
 		} else {
 			// Complete pool: populate device counts and slice count
-			allocatedDevices := int32(len(allocatedDevices[key]))
+			inUse := allocatedDevices[key]
+			allocDeviceCount := int32(len(inUse))
 			unavailDevices := info.unavailableDevices
-			availableDevices := max(0, info.totalDevices-allocatedDevices-unavailDevices)
+			availableDevices := max(0, info.totalDevices-allocDeviceCount-unavailDevices)
 
 			totalDevices := info.totalDevices
-			allocDevices := allocatedDevices
+			allocDevices := allocDeviceCount
 			availDevices := availableDevices
 			sliceCount := info.sliceCount
 			pool.ResourceSliceCount = &sliceCount
@@ -523,6 +554,28 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			pool.AllocatedDevices = &allocDevices
 			pool.AvailableDevices = &availDevices
 			pool.UnavailableDevices = &unavailDevices
+
+			// Advanced views. Counts above stay valid even if a view flags an error.
+			viewInput := poolViewInput{
+				driver:           info.driver,
+				poolName:         info.poolName,
+				devices:          info.devices,
+				sharedCounters:   info.sharedCounters,
+				inUse:            inUse,
+				consumedCapacity: consumedCapacity[key],
+			}
+			resolvePartitionAttribute(info.partitionValues, info.slicesWithAttr, info.sliceCount, &viewInput)
+
+			partitionSummary, counterSets, shareable, viewErr := computePoolViews(viewInput)
+			pool.PartitionSummary = partitionSummary
+			pool.CounterSets = counterSets
+			pool.ShareableSummary = shareable
+			if viewErr != "" {
+				if len(viewErr) > 256 {
+					viewErr = viewErr[:256]
+				}
+				pool.ValidationError = &viewErr
+			}
 		}
 		pools = append(pools, pool)
 	}

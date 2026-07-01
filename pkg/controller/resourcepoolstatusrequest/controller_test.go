@@ -18,12 +18,14 @@ package resourcepoolstatusrequest
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -31,6 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func TestCalculatePoolStatus(t *testing.T) {
@@ -570,6 +573,67 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 	err = controller.syncRequest(ctx, "test-request")
 	if err == nil {
 		t.Fatal("Expected syncRequest to still return error for incomplete pools after retries exhausted")
+	}
+}
+
+func TestSyncRequestWritesStructuralViewError(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	request := &resourcev1alpha3.ResourcePoolStatusRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request"},
+		Spec: resourcev1alpha3.ResourcePoolStatusRequestSpec{
+			Driver: "test.example.com",
+		},
+	}
+
+	fakeClient := fake.NewClientset(request)
+	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+
+	controller, err := NewController(ctx, fakeClient,
+		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
+		informerFactory.Resource().V1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1beta2().DeviceTaintRules(),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create controller: %v", err)
+	}
+
+	if err := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Add(request); err != nil {
+		t.Fatalf("Failed to add request to informer: %v", err)
+	}
+
+	// A complete pool (1/1 slices) with a permanent structural view error: it
+	// declares a partitionTypeAttribute but publishes no sharedCounters.
+	slice := makeSlice("slice-1", "test.example.com", "pool-1", "node-1", 2)
+	attr := resourcev1.FullyQualifiedName("test.example.com/profile")
+	slice.Spec.PartitionTypeAttribute = &attr
+	if err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(slice); err != nil {
+		t.Fatalf("Failed to add slice to informer: %v", err)
+	}
+
+	// Structural errors are permanent: syncRequest must not requeue, and must
+	// write the status so the error reaches the user.
+	if err := controller.syncRequest(ctx, "test-request"); err != nil {
+		t.Fatalf("syncRequest requeued on a permanent structural error: %v", err)
+	}
+
+	updated, err := fakeClient.ResourceV1alpha3().ResourcePoolStatusRequests().Get(ctx, "test-request", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get request: %v", err)
+	}
+	if updated.Status == nil {
+		t.Fatal("Expected status to be written for a structural view error, got nil")
+	}
+	if len(updated.Status.Pools) != 1 {
+		t.Fatalf("Expected 1 pool, got %d", len(updated.Status.Pools))
+	}
+	ve := updated.Status.Pools[0].ValidationError
+	if ve == nil {
+		t.Fatal("Expected pool ValidationError to be set")
+	}
+	if !strings.HasPrefix(*ve, prefixPartitionTypeMissing) {
+		t.Errorf("Expected validationError with prefix %q, got %q", prefixPartitionTypeMissing, *ve)
 	}
 }
 
@@ -1155,4 +1219,98 @@ func makeSliceWithoutNode(name, driver, pool string, deviceCount int) *resourcev
 // new is a generic helper to create a pointer to a value.
 func new[T any](v T) *T {
 	return &v
+}
+
+// makePartitionCounterSlice is the counter-only slice of a partitionable pool:
+// it publishes a shared counter set and declares the pool's partition attribute.
+func makePartitionCounterSlice(name, driver, pool, node string, sliceCount int64) *resourcev1.ResourceSlice {
+	s := makeSliceWithGenerationAndCount(name, driver, pool, node, 0, 1, sliceCount)
+	s.Spec.Devices = nil
+	s.Spec.SharedCounters = []resourcev1.CounterSet{counterSet("gpu-0", map[string]string{"memory": "80Gi"})}
+	s.Spec.PartitionTypeAttribute = ptr.To(resourcev1.FullyQualifiedName(driver + "/profile"))
+	return s
+}
+
+// makePartitionDeviceSlice is the device-bearing slice of a partitionable pool:
+// one Full (80Gi) and two Half (40Gi) partitions drawing from the sibling's
+// counter set.
+func makePartitionDeviceSlice(name, driver, pool, node string, sliceCount int64) *resourcev1.ResourceSlice {
+	s := makeSliceWithGenerationAndCount(name, driver, pool, node, 0, 1, sliceCount)
+	s.Spec.PartitionTypeAttribute = ptr.To(resourcev1.FullyQualifiedName(driver + "/profile"))
+	s.Spec.Devices = []resourcev1.Device{
+		partitionSliceDevice("full-0", "Full", "80Gi"),
+		partitionSliceDevice("half-0", "Half", "40Gi"),
+		partitionSliceDevice("half-1", "Half", "40Gi"),
+	}
+	return s
+}
+
+func partitionSliceDevice(name, profile, cost string) resourcev1.Device {
+	return resourcev1.Device{
+		Name: name,
+		Attributes: map[resourcev1.QualifiedName]resourcev1.DeviceAttribute{
+			"profile": {StringValue: ptr.To(profile)},
+		},
+		ConsumesCounters: []resourcev1.DeviceCounterConsumption{consumes("gpu-0", map[string]string{"memory": cost})},
+	}
+}
+
+// End-to-end: a two-slice partitionable pool produces a typed partitionSummary
+// (and no counterSets), exercising slice collection and attribute resolution.
+func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
+	driver := "gpu.example.com"
+	counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", 2)
+	devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", 2)
+
+	status := runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{counters, devices}, nil)
+	pool := requireSinglePool(t, status)
+
+	if pool.ValidationError != nil {
+		t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
+	}
+	if pool.CounterSets != nil {
+		t.Errorf("counterSets must be nil for a typed pool, got %+v", pool.CounterSets)
+	}
+	got := map[string][2]int32{}
+	for _, p := range pool.PartitionSummary {
+		got[p.Type] = [2]int32{p.Total, p.Allocatable}
+	}
+	if got["Full"] != [2]int32{1, 1} {
+		t.Errorf("Full {total,allocatable} = %v, want [1 1]", got["Full"])
+	}
+	if got["Half"] != [2]int32{2, 2} {
+		t.Errorf("Half {total,allocatable} = %v, want [2 2]", got["Half"])
+	}
+}
+
+// End-to-end: a shareable device with a capacity-consuming claim produces a
+// shareableSummary, exercising consumed-capacity aggregation from claim results.
+func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
+	driver := "gpu.example.com"
+	slice := makeSlice("shareable", driver, "pool-0", "node-0", 1)
+	slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+	slice.Spec.Devices[0].Capacity = map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
+		"memory": {Value: qty("40Gi")},
+	}
+	claim := makeAllocatedClaim("c0", "ns", driver, "pool-0", "device-0")
+	claim.Status.Allocation.Devices.Results[0].ConsumedCapacity = map[resourcev1.QualifiedName]resource.Quantity{
+		"memory": qty("10Gi"),
+	}
+
+	status := runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{slice}, []*resourcev1.ResourceClaim{claim})
+	pool := requireSinglePool(t, status)
+
+	if pool.ShareableSummary == nil {
+		t.Fatal("expected a shareableSummary")
+	}
+	sh := pool.ShareableSummary
+	if sh.FullyAvailableDevices != 0 || sh.PartiallyAvailableDevices != 1 {
+		t.Errorf("full/partial devices = %d/%d, want 0/1", sh.FullyAvailableDevices, sh.PartiallyAvailableDevices)
+	}
+	if len(sh.Capacity) != 1 {
+		t.Fatalf("want 1 capacity key, got %d", len(sh.Capacity))
+	}
+	if sh.Capacity[0].Total.String() != "40Gi" || sh.Capacity[0].Consumed.String() != "10Gi" || sh.Capacity[0].Available.Cmp(qty("30Gi")) != 0 {
+		t.Errorf("capacity = %+v, want total=40Gi consumed=10Gi available=30Gi", sh.Capacity[0])
+	}
 }
