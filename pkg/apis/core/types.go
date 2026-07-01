@@ -5582,6 +5582,11 @@ type NodeFeatures struct {
 	// SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
 	// +optional
 	SupplementalGroupsPolicy *bool
+	// SupportsCgroupOptions is set to true if the CRI implementation supports CgroupOptions
+	// as implemented in Kubernetes SecurityContext.
+	// +featureGate=CgroupOptions
+	// +optional
+	SupportsCgroupOptions *bool
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -5708,6 +5713,7 @@ type NodeStatus struct {
 	RuntimeHandlers []NodeRuntimeHandler
 	// Features describes the set of features implemented by the CRI implementation.
 	// +featureGate=SupplementalGroupsPolicy
+	// +featureGate=CgroupOptions
 	// +optional
 	Features *NodeFeatures
 	// DeclaredFeatures represents the declared features of a node.
@@ -6923,7 +6929,35 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	AppArmorProfile *AppArmorProfile
+	// CgroupOptions controls cgroup filesystem access and configuration.
+	// This allows unprivileged containers to manage their own cgroup hierarchies on cgroup v2 systems.
+	// Only effective on Linux containers with cgroup v2.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +featureGate=CgroupOptions
+	// +optional
+	CgroupOptions *CgroupOptions
 }
+
+// CgroupOptions defines options for cgroup filesystem access.
+type CgroupOptions struct {
+	// MountMode controls whether the cgroup filesystem is mounted as writable.
+	// Defaults to "ReadOnly" if not specified.
+	// +optional
+	MountMode *CgroupMountMode
+}
+
+// CgroupMountMode defines the mount mode for cgroup filesystem.
+// +enum
+type CgroupMountMode string
+
+const (
+	// CgroupMountModeReadOnly mounts cgroup filesystem as read-only (default)
+	CgroupMountModeReadOnly CgroupMountMode = "ReadOnly"
+
+	// CgroupMountModeWritable mounts cgroup filesystem as writable,
+	// allowing containers to manage their own cgroup subtree
+	CgroupMountModeWritable CgroupMountMode = "Writable"
+)
 
 // ProcMountType defines the type of proc mount
 type ProcMountType string

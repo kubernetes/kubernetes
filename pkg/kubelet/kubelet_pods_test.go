@@ -9317,3 +9317,35 @@ func TestMakemountsSubpathCleanupAccumulation(t *testing.T) {
 		})
 	}
 }
+
+func TestNodeSupportsCgroupOptions(t *testing.T) {
+	testCases := []struct {
+		name            string
+		runtimeFeatures *kubecontainer.RuntimeFeatures
+		expected        bool
+	}{
+		{
+			name:            "nil features",
+			runtimeFeatures: nil,
+			expected:        false,
+		},
+		{
+			name:            "runtime supports cgroup options",
+			runtimeFeatures: &kubecontainer.RuntimeFeatures{SupportsCgroupOptions: true},
+			expected:        true,
+		},
+		{
+			name:            "runtime does not support cgroup options",
+			runtimeFeatures: &kubecontainer.RuntimeFeatures{SupportsCgroupOptions: false},
+			expected:        false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kl := &Kubelet{runtimeState: newRuntimeState(time.Minute)}
+			kl.runtimeState.setRuntimeFeatures(tc.runtimeFeatures)
+			assert.Equal(t, tc.expected, kl.nodeSupportsCgroupOptions())
+		})
+	}
+}

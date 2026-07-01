@@ -644,6 +644,15 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 	logger := klog.FromContext(ctx)
 	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
 
+	// Validate CgroupOptions runtime support
+	if container.SecurityContext != nil && container.SecurityContext.CgroupOptions != nil &&
+		container.SecurityContext.CgroupOptions.MountMode != nil &&
+		*container.SecurityContext.CgroupOptions.MountMode == v1.CgroupMountModeWritable {
+		if !kl.nodeSupportsCgroupOptions() {
+			return nil, nil, fmt.Errorf("container %q requires CgroupOptions but the container runtime does not support it", container.Name)
+		}
+	}
+
 	opts, err := kl.containerManager.GetResources(ctx, pod, container)
 	if err != nil {
 		return nil, nil, err
@@ -2953,4 +2962,13 @@ func resolveRecursiveReadOnly(m v1.VolumeMount, runtimeSupportsRRO bool) (bool, 
 	default:
 		return false, fmt.Errorf("unknown recursive read-only mode %q", rroMode)
 	}
+}
+
+// nodeSupportsCgroupOptions reports whether the CRI implementation advertised support for
+// CgroupOptions via the node-level RuntimeFeatures (propagated to NodeFeatures). Support is a
+// property of the CRI implementation, independent of the runtime handler / RuntimeClass.
+// The kubelet feature gate is not checked here.
+func (kl *Kubelet) nodeSupportsCgroupOptions() bool {
+	runtimeFeatures := kl.runtimeState.runtimeFeatures()
+	return runtimeFeatures != nil && runtimeFeatures.SupportsCgroupOptions
 }
