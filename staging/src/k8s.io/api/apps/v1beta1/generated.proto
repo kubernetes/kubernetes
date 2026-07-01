@@ -66,6 +66,12 @@ message ControllerRevisionList {
   repeated ControllerRevision items = 2;
 }
 
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.6
+// +k8s:prerelease-lifecycle-gen:deprecated=1.8
+// +k8s:prerelease-lifecycle-gen:removed=1.16
+// +k8s:prerelease-lifecycle-gen:replacement=apps,v1,Deployment
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -147,7 +153,9 @@ message DeploymentSpec {
 
   // selector is the label selector for pods. Existing ReplicaSets whose pods are
   // selected by this will be the ones affected by this deployment.
-  // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:required
+  // +required
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
