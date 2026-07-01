@@ -51,13 +51,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"missing roleRef.name": {
 			input: mkValidClusterRoleBinding(tweakRoleRefName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("roleRef", "name"), "").MarkAlpha(),
+				field.Required(field.NewPath("roleRef", "name"), "").MarkBeta(),
 			},
 		},
 		"missing subjects[0].name": {
 			input: mkValidClusterRoleBinding(tweakSubjectName(0, "")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("subjects").Index(0).Child("name"), "").MarkAlpha(),
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), "").MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases
@@ -98,7 +98,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidClusterRoleBinding(),
 			update: mkValidClusterRoleBinding(tweakSubjectName(0, "")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("subjects").Index(0).Child("name"), "").MarkAlpha(),
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), "").MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases

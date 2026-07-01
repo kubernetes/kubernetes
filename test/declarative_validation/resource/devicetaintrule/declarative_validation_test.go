@@ -55,13 +55,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"missing taint.effect": {
 			input: mkValidDeviceTaintRule(tweakTaintEffect("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkBeta(),
 			},
 		},
 		"invalid taint.effect": {
 			input: mkValidDeviceTaintRule(tweakTaintEffect("BadEffect")),
 			expectedErrs: field.ErrorList{
-				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("BadEffect"), []resource.DeviceTaintEffect{}).MarkAlpha(),
+				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("BadEffect"), []resource.DeviceTaintEffect{}).MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases
@@ -115,14 +115,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidDeviceTaintRule(),
 			update: mkValidDeviceTaintRule(tweakTaintEffect("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkBeta(),
 			},
 		},
 		"invalid update with unsupported effect": {
 			old:    mkValidDeviceTaintRule(),
 			update: mkValidDeviceTaintRule(tweakTaintEffect("some-other-effect")),
 			expectedErrs: field.ErrorList{
-				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("some-other-effect"), []resource.DeviceTaintEffect{resource.DeviceTaintEffectNoExecute, resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNone}).MarkAlpha(),
+				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("some-other-effect"), []resource.DeviceTaintEffect{resource.DeviceTaintEffectNoExecute, resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNone}).MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases

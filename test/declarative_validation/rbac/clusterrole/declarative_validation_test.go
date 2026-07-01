@@ -51,13 +51,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid ClusterRole missing verbs": {
 			input: mkValidClusterRole(tweakVerbs(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "").MarkAlpha(),
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "").MarkBeta(),
 			},
 		},
 		"invalid ClusterRole empty verbs": {
 			input: mkValidClusterRole(tweakVerbs([]string{})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "").MarkAlpha(),
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "").MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases
@@ -98,7 +98,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidClusterRole(),
 			update: mkValidClusterRole(tweakVerbs([]string{})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "").MarkAlpha(),
+				field.Required(field.NewPath("rules").Index(0).Child("verbs"), "").MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases
