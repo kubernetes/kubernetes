@@ -227,6 +227,13 @@ const (
 	// Enables support for providing extended resource requests backed by DRA.
 	DRAExtendedResource featuregate.Feature = "DRAExtendedResource"
 
+	// owner: @sunya-ch
+	// kep: https://kep.k8s.io/5075
+	//
+	// Enables fractional (milli-unit) values in CapacityRequestPolicyRange
+	// min, max, and step fields.
+	DRAFractionalCapacityRange featuregate.Feature = "DRAFractionalCapacityRange"
+
 	// owner: @everpeace
 	// kep: http://kep.k8s.io/5491
 	//
@@ -1333,6 +1340,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.37; remove in 1.40
 	},
 
+	DRAFractionalCapacityRange: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.37")},
+	},
+
 	DRAListTypeAttributes: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2338,6 +2350,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRADeviceTaints: {DynamicResourceAllocation},
 
 	DRAExtendedResource: {DynamicResourceAllocation},
+
+	DRAFractionalCapacityRange: {DRAConsumableCapacity},
 
 	DRAListTypeAttributes: {DynamicResourceAllocation},
 
