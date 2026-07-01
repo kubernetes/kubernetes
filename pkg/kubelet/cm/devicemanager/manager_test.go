@@ -19,6 +19,7 @@ package devicemanager
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -163,12 +164,8 @@ func TestNewManagerImplDualSockets(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	topologyStore := topologymanager.NewFakeManager(logger)
 
-	primaryDir, err := os.MkdirTemp("", "device_plugin_primary")
-	require.NoError(t, err)
-	defer os.RemoveAll(primaryDir)
-	compatDir, err := os.MkdirTemp("", "device_plugin_compat")
-	require.NoError(t, err)
-	defer os.RemoveAll(compatDir)
+	primaryDir := t.TempDir()
+	compatDir := t.TempDir()
 
 	primarySocket := filepath.Join(primaryDir, "kubelet.sock")
 	compatSocket := filepath.Join(compatDir, "kubelet.sock")
@@ -180,6 +177,70 @@ func TestNewManagerImplDualSockets(t *testing.T) {
 	require.Equal(t, compatSocket, m.servers[1].SocketPath())
 	// Checkpoint must live under the primary (rootdir-relative) directory.
 	require.Equal(t, primaryDir+string(filepath.Separator), m.checkpointdir)
+}
+
+// fakeServer is a plugin.Server stub that records Start/Stop calls and can be
+// configured to fail on Start. It is used to exercise Manager.Start rollback
+// behaviour without binding real unix sockets.
+type fakeServer struct {
+	socket     string
+	startErr   error
+	startCalls int
+	stopCalls  int
+}
+
+func (s *fakeServer) Start(klog.Logger) error {
+	s.startCalls++
+	return s.startErr
+}
+func (s *fakeServer) Stop(klog.Logger) error {
+	s.stopCalls++
+	return nil
+}
+func (s *fakeServer) SocketPath() string { return s.socket }
+func (s *fakeServer) Name() string       { return "fake" }
+func (s *fakeServer) Check(*http.Request) error {
+	return nil
+}
+func (s *fakeServer) ValidatePlugin(context.Context, string, string, []string) error {
+	return nil
+}
+func (s *fakeServer) RegisterPlugin(context.Context, string, string, []string, *time.Duration) error {
+	return nil
+}
+func (s *fakeServer) DeRegisterPlugin(context.Context, string, string) {}
+
+// TestManagerStartRollsBackOnPartialFailure ensures that when one of the
+// dual-socket servers fails to start, the servers that already started are
+// stopped so the manager does not leak running listeners. Callers typically
+// `defer Stop()` only after Start returns successfully, so Start must clean up
+// after itself on partial failure.
+func TestManagerStartRollsBackOnPartialFailure(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	primary := &fakeServer{socket: "/primary.sock"}
+	compat := &fakeServer{socket: "/compat.sock", startErr: fmt.Errorf("bind failed")}
+
+	checkpointDir := t.TempDir()
+	checkpointManager, err := checkpointmanager.NewCheckpointManager(checkpointDir)
+	require.NoError(t, err)
+
+	m := &ManagerImpl{
+		servers:               []plugin.Server{primary, compat},
+		activePods:            func() []*v1.Pod { return nil },
+		sourcesReady:          &sourcesReadyStub{},
+		checkpointManager:     checkpointManager,
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
+	}
+
+	err = m.Start(logger, m.activePods, m.sourcesReady, containermap.ContainerMap{}, sets.New[string]())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), compat.SocketPath())
+
+	require.Equal(t, 1, primary.startCalls, "primary server should have been started")
+	require.Equal(t, 1, compat.startCalls, "compat server should have been attempted")
+	require.Equal(t, 1, primary.stopCalls, "already-started primary server should be rolled back")
+	require.Equal(t, 0, compat.stopCalls, "failed server should not be stopped")
 }
 
 func TestNewManagerImplStart(t *testing.T) {
