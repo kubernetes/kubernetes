@@ -824,6 +824,29 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			wantFinalDecision:     `Deny(reason="failed closed", err="evaluated to decision Allow, but only [Deny NoOpinion] were possible")`,
 			wantFinalErr:          true,
 		},
+		{
+			// Regression guard: an impossible sub-decision must fail closed to the
+			// SUB-decision's FailureDecision, not the OUTER union's. Here authz5's
+			// Allow-only ConditionsMap has FailureDecision=NoOpinion, while the outer
+			// union0 has FailureDecision=Deny (authz1 contributes Deny to its possible
+			// set). If the guard regressed to using the outer FailureDecision, the
+			// result below would be Deny instead of NoOpinion.
+			name: "impossible sub-decision fails closed to sub's FailureDecision, not outer union's",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz2: noOpinion(),
+			authz3: noOpinion(),
+			authz4: noOpinion(),
+			authz5: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionDeny,
+			},
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(denies=1), NoOpinion], NoOpinion], NoOpinion, ConditionsMap(allows=1)]`,
+			wantFinalDecision:     `NoOpinion(reason="failed closed", err="evaluated to decision Deny, but only [Allow NoOpinion] were possible")`,
+			wantFinalErr:          true,
+		},
 	}
 
 	for _, tt := range tests {
