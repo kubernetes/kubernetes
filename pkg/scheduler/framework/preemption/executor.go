@@ -299,7 +299,12 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 		e.preempting.Delete(preemptor.UID())
 		delete(e.lastVictimsPendingPreemption, preemptor.UID())
 		e.mu.Unlock()
-
+		// Ensure the preemptor is requeued after async preemption completes.
+		// This is necessary for the CancelPod/WaitingPod path where no API
+		// delete is performed and no informer event will arrive if
+		// EventAssignedPodDelete was discarded during the race window.
+		// Activate() is a no-op if the preemptor is already in activeQ.
+		e.fh.Activate(logger, preemptor.Pods())
 		logger.V(2).Info("Async Preemption finished completely", "preemptor", klog.KObj(preemptor), "node", c.Name(), "result", result)
 	}()
 }
