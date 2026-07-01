@@ -772,6 +772,7 @@ func dropDisabledFields(
 	}
 
 	dropFileKeyRefInUse(podSpec, oldPodSpec)
+	dropContainerUlimitsInUse(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
 	dropContainerStopSignals(podSpec, oldPodSpec)
@@ -801,6 +802,19 @@ func dropFileKeyRefInUse(podSpec, oldPodSpec *api.PodSpec) {
 	})
 }
 
+func dropContainerUlimitsInUse(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerUlimits) || containerUlimitsInUse(oldPodSpec) {
+		return
+	}
+
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		if c.SecurityContext != nil && c.SecurityContext.Ulimits != nil {
+			c.SecurityContext.Ulimits = nil
+		}
+		return true
+	})
+}
+
 func podFileKeyRefInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
@@ -813,6 +827,22 @@ func podFileKeyRefInUse(podSpec *api.PodSpec) bool {
 				inUse = true
 				return false
 			}
+		}
+		return true
+	})
+	return inUse
+}
+
+func containerUlimitsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		if c.SecurityContext != nil && c.SecurityContext.Ulimits != nil {
+			inUse = true
+			return false
 		}
 		return true
 	})
