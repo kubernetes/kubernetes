@@ -1898,6 +1898,9 @@ message RuntimeFeatures {
     // user_namespaces_host_network is set to true if the runtime supports containers using both
     // host network and user namespace simultaneously.
     bool user_namespaces_host_network = 2;
+    // mount_options is set to true if the runtime supports additional bind
+    // mount options (noexec, nodev, nosuid) on container mounts.
+    bool mount_options = 3;
 }
 
 message StatusResponse {
