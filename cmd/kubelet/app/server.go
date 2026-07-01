@@ -83,6 +83,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/component-base/logs/datapol"
 	"k8s.io/component-base/metrics"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -264,7 +265,15 @@ is checked every 20 seconds (also configurable with a flag).`,
 
 			// We always validate the local configuration (command line + config file).
 			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig, utilfeature.DefaultFeatureGate); err != nil {
-				return fmt.Errorf("failed to validate kubelet configuration, error: %w, path: %s", err, kubeletConfig)
+				// Redact datapolicy-tagged fields (e.g. the credential-bearing
+				// StaticPodURLHeader) on a deep copy before formatting the config
+				// into the error, so secrets are not leaked to logs on the
+				// validation-failure path.
+				safeConfig := kubeletConfig.DeepCopy()
+				if redactErr := datapol.Redact(safeConfig); redactErr != nil {
+					return fmt.Errorf("failed to validate kubelet configuration, error: %w (config redaction also failed: %v)", err, redactErr)
+				}
+				return fmt.Errorf("failed to validate kubelet configuration, error: %w, path: %s", err, safeConfig)
 			}
 
 			if (kubeletConfig.KubeletCgroups != "" && kubeletConfig.KubeReservedCgroup != "") && (strings.Index(kubeletConfig.KubeletCgroups, kubeletConfig.KubeReservedCgroup) != 0) {
@@ -582,13 +591,15 @@ func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfigurati
 }
 
 // marshalKubeletConfigForLog renders the effective KubeletConfiguration as a human-readable
-// YAML string for startup logging. The output mirrors what /configz serves except the
-// sensitive field StaticPodURLHeader is masked while /configz outputs it.
+// YAML string for startup logging. Fields tagged with `datapolicy` (e.g. the credential-bearing
+// StaticPodURLHeader) are redacted via datapol.Redact so secrets are not written to the log.
 func marshalKubeletConfigForLog(kc *kubeletconfiginternal.KubeletConfiguration) (string, error) {
-	// Make the config safe for logging without mutating the caller's copy.
+	// Redact datapolicy-tagged fields on a deep copy so secrets are not logged and
+	// the caller's config is left untouched. The internal type carries the
+	// datapolicy tags, so redact before converting to the versioned type.
 	safe := kc.DeepCopy()
-	for k := range safe.StaticPodURLHeader {
-		safe.StaticPodURLHeader[k] = []string{"<masked>"}
+	if err := datapol.Redact(safe); err != nil {
+		return "", fmt.Errorf("failed to redact sensitive fields: %w", err)
 	}
 	versioned, err := convertToVersionedKubeletConfig(safe)
 	if err != nil {
