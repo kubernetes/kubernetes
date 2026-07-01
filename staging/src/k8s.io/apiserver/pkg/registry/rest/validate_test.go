@@ -708,9 +708,16 @@ func TestValidateDeclarativelyWithMigrationChecks(t *testing.T) {
 	// Additional Declarative (No HV counterpart)
 	errDVAdditional := field.Invalid(field.NewPath("spec", "additional"), "decAdditional", "declarative additional")
 
-	// Beta Lifecycle (Gated by DeclarativeValidationBeta)
-	errHVBetaCovered := field.Forbidden(field.NewPath("spec", "beta"), "imperative beta").MarkCoveredByDeclarative().MarkBeta()
-	errDVBeta := field.Invalid(field.NewPath("spec", "beta"), "decBeta", "declarative beta").MarkBeta()
+	// Beta Lifecycle (Gated by DeclarativeValidationBeta).
+	// The HV error carries no lifecycle marker; it is removed when a matching enforced beta DV
+	// error exists. The pair shares type, field, and origin, as real HV/DV counterparts do.
+	errHVBetaCovered := field.Invalid(field.NewPath("spec", "beta"), "val", "imperative beta").WithOrigin("min").MarkCoveredByDeclarative()
+	errDVBeta := field.Invalid(field.NewPath("spec", "beta"), "decBeta", "declarative beta").WithOrigin("min").MarkBeta()
+
+	// Beta Lifecycle, origin-less non-Invalid pair. Forbidden errors carry no origin, so
+	// RequireOriginWhenInvalid does not apply and the pair matches on type and field alone.
+	errHVBetaForbidden := field.Forbidden(field.NewPath("spec", "betaForbidden"), "imperative beta forbidden").MarkCoveredByDeclarative()
+	errDVBetaForbidden := field.Forbidden(field.NewPath("spec", "betaForbidden"), "declarative beta forbidden").MarkBeta()
 
 	// Alpha Lifecycle (Shadowed)
 	// Alpha rules should NOT mark HV as covered, so HV remains authoritative.
@@ -769,6 +776,22 @@ func TestValidateDeclarativelyWithMigrationChecks(t *testing.T) {
 			imperativeErrors:  field.ErrorList{errHVBetaCovered},
 			declarativeErrors: field.ErrorList{errDVBeta},
 			expectedErrors:    field.ErrorList{errHVBetaCovered},
+		},
+		{
+			name:              "Beta Gate Enabled, declarative not emitted -> HV kept",
+			dvFeatureEnabled:  true,
+			betaGateEnabled:   true,
+			imperativeErrors:  field.ErrorList{errHVBetaCovered},
+			declarativeErrors: field.ErrorList{},
+			expectedErrors:    field.ErrorList{errHVBetaCovered},
+		},
+		{
+			name:              "Beta Gate Enabled, origin-less Forbidden -> HV removed, DV returned",
+			dvFeatureEnabled:  true,
+			betaGateEnabled:   true,
+			imperativeErrors:  field.ErrorList{errHVBetaForbidden},
+			declarativeErrors: field.ErrorList{errDVBetaForbidden},
+			expectedErrors:    field.ErrorList{errDVBetaForbidden},
 		},
 		{
 			name:              "Alpha -> Shadows Alpha (HV kept, DV hidden)",
