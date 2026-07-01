@@ -114,13 +114,14 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 		kp.config.FeatureGates = map[string]bool{}
 	}
 
-	if kp.config.BindAddress == "" {
+	switch {
+	case kp.config.BindAddress == "":
 		kp.config.BindAddress = kubeProxyDefaultBindAddress(localAPIEndpoint.AdvertiseAddress)
-	} else if isWildcardBindAddress(kp.config.BindAddress) {
+	case isWildcardBindAddress(kp.config.BindAddress):
 		// 0.0.0.0 and :: are both valid explicit wildcard binds.
-	} else if netutils.ParseIPSloppy(kp.config.BindAddress) == nil {
+	case netutils.ParseIPSloppy(kp.config.BindAddress) == nil:
 		klog.Warningf("The bindAddress %q in %q is not a valid IP address", kp.config.BindAddress, kind)
-	} else {
+	default:
 		// Warn if the bindAddress is not the recommended wildcard default for its
 		// own IP family (0.0.0.0 for IPv4 or :: for IPv6).
 		warnDefaultComponentConfigValue(kind, "bindAddress",
