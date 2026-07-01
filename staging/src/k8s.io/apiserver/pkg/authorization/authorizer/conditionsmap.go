@@ -61,7 +61,7 @@ func (c ConditionsMap) Length() int {
 }
 
 // DenyConditions returns the Deny conditions in this map.
-// The order in which elements are returned is deterministic but undefined.
+// The conditions are returned in the same order as they were supplied to ConditionsAwareDecisionConditionsMap.
 func (c ConditionsMap) DenyConditions() iter.Seq[Condition] {
 	return func(yield func(Condition) bool) {
 		for _, cond := range c.denyConditions {
@@ -73,7 +73,7 @@ func (c ConditionsMap) DenyConditions() iter.Seq[Condition] {
 }
 
 // NoOpinionConditions returns the NoOpinion conditions in this map.
-// The order in which elements are returned is deterministic but undefined.
+// The conditions are returned in the same order as they were supplied to ConditionsAwareDecisionConditionsMap.
 func (c ConditionsMap) NoOpinionConditions() iter.Seq[Condition] {
 	return func(yield func(Condition) bool) {
 		for _, cond := range c.noOpinionConditions {
@@ -85,7 +85,7 @@ func (c ConditionsMap) NoOpinionConditions() iter.Seq[Condition] {
 }
 
 // AllowConditions returns the Allow conditions in this map.
-// The order in which elements are returned is deterministic but undefined.
+// The conditions are returned in the same order as they were supplied to ConditionsAwareDecisionConditionsMap.
 func (c ConditionsMap) AllowConditions() iter.Seq[Condition] {
 	return func(yield func(Condition) bool) {
 		for _, cond := range c.allowConditions {
