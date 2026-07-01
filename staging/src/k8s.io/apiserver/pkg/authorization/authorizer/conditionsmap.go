@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"iter"
-	"reflect"
 	"slices"
 	"strings"
 
@@ -126,6 +125,8 @@ const MaxConditionsPerMap = 128
 //   - Allow: If any Allow condition evaluates to true, the ConditionsMap evaluates to Allow,
 //     unless any Deny/NoOpinion condition also evaluates to true (in which case the Deny/NoOpinion conditions
 //     have precedence).
+//
+// All conditions must be non-nil, this function panics if any condition is nil.
 func ConditionsAwareDecisionConditionsMap(denyConditions []Condition, noOpinionConditions []Condition, allowConditions []Condition) ConditionsAwareDecision {
 	// if there are any Deny conditions, Deny is a possible decision, and thus should we fail closed with Deny in that case
 	hasDenyEffect := len(denyConditions) > 0
@@ -176,9 +177,6 @@ func ConditionsAwareDecisionConditionsMap(denyConditions []Condition, noOpinionC
 }
 func validateConditions(seenIDs sets.Set[string], conditions []Condition) error {
 	for _, condition := range conditions {
-		if isNilValue(condition) {
-			return fmt.Errorf("encountered nil condition")
-		}
 
 		id := condition.GetID()
 		if seenIDs.Has(id) {
@@ -199,22 +197,6 @@ func validateConditions(seenIDs sets.Set[string], conditions []Condition) error 
 		}
 	}
 	return nil
-}
-
-func isNilValue(i any) bool {
-	if i == nil {
-		return true // both type and data nil
-	}
-	v := reflect.ValueOf(i)
-	switch v.Kind() {
-	// v.IsNil() panics if the kind is anything else than these,
-	// the list is taken from the IsNil source code
-	case reflect.Chan, reflect.Func, reflect.Map,
-		reflect.Pointer, reflect.UnsafePointer,
-		reflect.Interface, reflect.Slice:
-		return v.IsNil() // type non-nil, but data nil
-	}
-	return false // data non-nil
 }
 
 // GenericCondition is a generic implementation of the Condition interface,

@@ -37,11 +37,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
-func typedNil() authorizer.Condition {
-	var c *authorizer.GenericCondition = nil
-	return c
-}
-
 // unionDecision builds a ConditionsAwareDecisionUnion from the given decisions, assigning each
 // a synthetic authorizerName ("0.example.com", "1.example.com", ...), and returns the equivalent ConditionsAwareDecision.
 // It is a thin shim over the public Add + ToDecision API to keep the existing test cases readable.
@@ -224,29 +219,6 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantReason:   "failed closed",
 			wantAnyError: true,
 			wantString:   `Deny(reason="failed closed", err="too many conditions: 129 exceeds maximum of 128")`,
-		},
-		{
-			name: "nil condition is a validation error",
-			testDecisions: []authorizer.ConditionsAwareDecision{
-				authorizer.ConditionsAwareDecisionConditionsMap(
-					nil, nil,
-					[]authorizer.Condition{
-						authorizer.GenericCondition{ID: "foo"},
-						nil,
-					},
-				),
-				authorizer.ConditionsAwareDecisionConditionsMap(
-					nil, nil,
-					[]authorizer.Condition{
-						authorizer.GenericCondition{ID: "foo"},
-						typedNil(),
-					},
-				),
-			},
-			wantIsNoOpinion: true,
-			wantReason:      "failed closed",
-			wantAnyError:    true,
-			wantString:      `NoOpinion(reason="failed closed", err="encountered nil condition")`,
 		},
 		{
 			name: "duplicate IDs",
