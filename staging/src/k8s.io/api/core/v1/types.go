@@ -2859,11 +2859,13 @@ type ResourceRequirements struct {
 	//
 	// This field is immutable. It can only be set for containers.
 	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
 	// +featureGate=DynamicResourceAllocation
 	// +optional
-	Claims []ResourceClaim `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
+	Claims []ResourceClaim `json:"claims,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,3,opt,name=claims"`
 }
 
 // VolumeResourceRequirements describes the storage resource requirements for a volume.
