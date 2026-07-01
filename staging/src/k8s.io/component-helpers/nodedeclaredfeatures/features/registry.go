@@ -22,6 +22,7 @@ import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/usernamespaceshostnetwork"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/volumebindmountoptions"
 	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
@@ -36,4 +37,5 @@ var AllFeatures = []types.Feature{
 	inplacepodresize.MemoryBackedVolumesResizeFeature,
 	usernamespaceshostnetwork.Feature,
 	dranodeallocatableresources.Feature,
+	volumebindmountoptions.Feature,
 }
