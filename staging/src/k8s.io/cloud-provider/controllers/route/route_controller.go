@@ -269,11 +269,11 @@ func (rc *RouteController) reconcileNodeRoutes(ctx context.Context) (bool, error
 
 	routeList, err := rc.routes.ListRoutes(ctx, rc.clusterName)
 	if err != nil {
-		return false, fmt.Errorf("error listing routes: %v", err)
+		return false, fmt.Errorf("error listing routes: %w", err)
 	}
 	nodes, err := rc.nodeLister.List(labels.Everything())
 	if err != nil {
-		return false, fmt.Errorf("error listing nodes: %v", err)
+		return false, fmt.Errorf("error listing nodes: %w", err)
 	}
 	return rc.reconcile(ctx, nodes, routeList)
 }
