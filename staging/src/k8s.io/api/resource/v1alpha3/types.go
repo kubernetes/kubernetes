@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha3
 
 import (
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -566,6 +567,149 @@ type PoolStatus struct {
 	// +k8s:optional
 	// +k8s:maxBytes=256
 	ValidationError *string `json:"validationError,omitempty" protobuf:"bytes,10,opt,name=validationError"`
+
+	// PartitionSummary reports allocatability per partition type for a
+	// partitionable pool. It is populated only when the pool's slices set
+	// PartitionTypeAttribute and publish SharedCounters. Mutually exclusive
+	// with CounterSets.
+	//
+	// +optional
+	// +k8s:optional
+	// +listType=atomic
+	// +k8s:maxItems=32
+	PartitionSummary []PartitionTypeStatus `json:"partitionSummary,omitempty" protobuf:"bytes,11,rep,name=partitionSummary"`
+
+	// CounterSets reports per-counter capacity, consumption, and availability
+	// for a partitionable pool that publishes SharedCounters without a
+	// PartitionTypeAttribute. Mutually exclusive with PartitionSummary.
+	//
+	// +optional
+	// +k8s:optional
+	// +listType=atomic
+	// +k8s:maxItems=32
+	CounterSets []CounterSetStatus `json:"counterSets,omitempty" protobuf:"bytes,12,rep,name=counterSets"`
+
+	// ShareableSummary reports aggregate capacity for a pool that contains
+	// devices with AllowMultipleAllocations. It is populated only when at
+	// least one device in the pool is shareable.
+	//
+	// +optional
+	// +k8s:optional
+	ShareableSummary *ShareableSummaryStatus `json:"shareableSummary,omitempty" protobuf:"bytes,13,opt,name=shareableSummary"`
+}
+
+// PartitionTypeStatus reports allocatability for a single partition type,
+// identified by the value of the pool's PartitionTypeAttribute.
+type PartitionTypeStatus struct {
+	// Type is the partition type value (e.g. "Full" or "Half").
+	//
+	// +required
+	// +k8s:required
+	Type string `json:"type,omitempty" protobuf:"bytes,1,name=type"`
+
+	// Total is the number of devices of this partition type in the pool.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=0
+	Total int32 `json:"total,omitempty" protobuf:"varint,2,name=total"`
+
+	// Allocatable is the number of additional devices of this partition type
+	// that could still be allocated given current shared-counter consumption.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=0
+	Allocatable int32 `json:"allocatable,omitempty" protobuf:"varint,3,name=allocatable"`
+}
+
+// CounterSetStatus reports capacity, consumption, and availability for the
+// counters of a single shared counter set.
+type CounterSetStatus struct {
+	// Name is the name of the counter set, matching a SharedCounters entry.
+	//
+	// +required
+	// +k8s:required
+	Name string `json:"name,omitempty" protobuf:"bytes,1,name=name"`
+
+	// Counters reports per-counter status, keyed by counter name.
+	//
+	// +required
+	// +k8s:required
+	Counters map[string]CounterStatus `json:"counters,omitempty" protobuf:"bytes,2,rep,name=counters"`
+}
+
+// CounterStatus reports the capacity, consumption, and remaining availability
+// of a single counter.
+type CounterStatus struct {
+	// Capacity is the total value the counter provides.
+	//
+	// +required
+	Capacity resource.Quantity `json:"capacity" protobuf:"bytes,1,name=capacity"`
+
+	// Consumed is the amount drawn by currently allocated devices.
+	//
+	// +required
+	Consumed resource.Quantity `json:"consumed" protobuf:"bytes,2,name=consumed"`
+
+	// Available is Capacity minus Consumed, never negative.
+	//
+	// +required
+	Available resource.Quantity `json:"available" protobuf:"bytes,3,name=available"`
+}
+
+// ShareableSummaryStatus reports aggregate capacity for a pool that contains
+// devices with AllowMultipleAllocations.
+type ShareableSummaryStatus struct {
+	// FullyAvailableDevices is the number of shareable devices with no
+	// capacity consumed.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=0
+	FullyAvailableDevices int32 `json:"fullyAvailableDevices,omitempty" protobuf:"varint,1,name=fullyAvailableDevices"`
+
+	// PartiallyAvailableDevices is the number of shareable devices with some
+	// but not all capacity consumed.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=0
+	PartiallyAvailableDevices int32 `json:"partiallyAvailableDevices,omitempty" protobuf:"varint,2,name=partiallyAvailableDevices"`
+
+	// Capacity reports aggregate total, consumed, and available amounts per
+	// shareable capacity key across the pool.
+	//
+	// +optional
+	// +k8s:optional
+	// +listType=atomic
+	// +k8s:maxItems=32
+	Capacity []ShareableCapacityStatus `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity"`
+}
+
+// ShareableCapacityStatus reports aggregate amounts for a single shareable
+// capacity key.
+type ShareableCapacityStatus struct {
+	// Name is the capacity name.
+	//
+	// +required
+	// +k8s:required
+	Name string `json:"name,omitempty" protobuf:"bytes,1,name=name"`
+
+	// Total is the sum of this capacity across shareable devices in the pool.
+	//
+	// +required
+	Total resource.Quantity `json:"total" protobuf:"bytes,2,name=total"`
+
+	// Consumed is the amount drawn by current allocations.
+	//
+	// +required
+	Consumed resource.Quantity `json:"consumed" protobuf:"bytes,3,name=consumed"`
+
+	// Available is Total minus Consumed, never negative.
+	//
+	// +required
+	Available resource.Quantity `json:"available" protobuf:"bytes,4,name=available"`
 }
 
 // ResourcePoolStatusRequestConditionComplete is the condition type for completed requests.
