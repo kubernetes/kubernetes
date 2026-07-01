@@ -297,6 +297,26 @@ func TestTypeCheck(t *testing.T) {
 			},
 		}},
 	}}
+
+	reproducerPolicy := &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
+		Validations: []v1.Validation{
+			{
+				Expression: "has(object.spec.text)",
+			},
+		},
+		MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+			{
+				RuleWithOperations: v1.RuleWithOperations{
+					Rule: v1.Rule{
+						APIGroups:   []string{"example.com"},
+						APIVersions: []string{"v1alpha1"},
+						Resources:   []string{"reproducers"},
+					},
+				},
+			},
+		}},
+	}}
+
 	for _, tc := range []struct {
 		name           string
 		schemaToReturn *spec.Schema
@@ -436,6 +456,39 @@ func TestTypeCheck(t *testing.T) {
 				toHaveLengthOf(1),
 				toContain("found no matching overload for 'allowed' applied to 'kubernetes.authorization.Authorizer"),
 			},
+		},
+		{
+			name:   "additionalProperties: true",
+			policy: reproducerPolicy,
+			schemaToReturn: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					Properties: map[string]spec.Schema{
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Type: []string{"object"},
+								Properties: map[string]spec.Schema{
+									"text": *spec.StringProperty(),
+								},
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Type: []string{"object"},
+								Properties: map[string]spec.Schema{
+									"problematicProperty": {
+										SchemaProps: spec.SchemaProps{
+											Type:                 []string{"object"},
+											AdditionalProperties: &spec.SchemaOrBool{Allows: true},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			assertions: []assertionFunc{toBeEmpty},
 		},
 		{
 			name: "variables valid",
