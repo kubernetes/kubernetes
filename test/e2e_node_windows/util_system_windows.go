@@ -21,6 +21,8 @@ package e2enodewindows
 import (
 	"fmt"
 	"runtime"
+	"sort"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -103,9 +105,12 @@ func enablePrivilege(name string) error {
 	return nil
 }
 
-// duplicateSystemToken walks running processes and duplicates an impersonation
-// token from the first one running as SYSTEM whose token can be fully
-// duplicated. Returns an error if none can be obtained.
+// duplicateSystemToken duplicates an impersonation token from a SYSTEM process.
+// It prefers well-known host (session-0) SYSTEM processes: a token duplicated
+// from a process running *inside* a container silo is silo-scoped and cannot
+// open a different container's silo job object (STATUS_ACCESS_DENIED), even
+// though its user is S-1-5-18. Host processes like services.exe yield a
+// host-scoped token that can open any silo.
 func duplicateSystemToken() (windows.Token, error) {
 	systemSID, err := windows.StringToSid(systemSIDString)
 	if err != nil {
@@ -118,13 +123,33 @@ func duplicateSystemToken() (windows.Token, error) {
 	}
 	defer windows.CloseHandle(snap)
 
+	type proc struct {
+		pid  uint32
+		name string
+	}
+	var procs []proc
 	var pe windows.ProcessEntry32
 	pe.Size = uint32(unsafe.Sizeof(pe))
 	for err = windows.Process32First(snap, &pe); err == nil; err = windows.Process32Next(snap, &pe) {
 		if pe.ProcessID == 0 {
 			continue
 		}
-		if dup, ok := trySystemTokenFromPID(pe.ProcessID, systemSID); ok {
+		procs = append(procs, proc{pe.ProcessID, strings.ToLower(windows.UTF16ToString(pe.ExeFile[:]))})
+	}
+
+	// Preferred host SYSTEM processes first; then anything else as fallback.
+	preferred := map[string]int{"services.exe": 0, "winlogon.exe": 1, "wininit.exe": 2, "lsass.exe": 3}
+	sort.SliceStable(procs, func(i, j int) bool {
+		pi, oki := preferred[procs[i].name]
+		pj, okj := preferred[procs[j].name]
+		if oki != okj {
+			return oki // preferred ones sort first
+		}
+		return pi < pj
+	})
+
+	for _, p := range procs {
+		if dup, ok := trySystemTokenFromPID(p.pid, systemSID); ok {
 			return dup, nil
 		}
 	}
