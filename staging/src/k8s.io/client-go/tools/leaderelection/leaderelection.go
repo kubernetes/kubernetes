@@ -155,6 +155,10 @@ type LeaderElectionConfig struct {
 	// ensure all code guarded by this lease has successfully completed
 	// prior to cancelling the context, or you may have two processes
 	// simultaneously acting on the critical path.
+	//
+	// When enabled, Run() keeps renewing the lock until OnStartedLeading
+	// returns, and only then releases it. OnStartedLeading MUST return
+	// promptly after its context is cancelled, otherwise Run() will block.
 	ReleaseOnCancel bool
 
 	// Name is the name of the resource lock for debugging
@@ -171,7 +175,10 @@ type LeaderElectionConfig struct {
 // possible future callbacks:
 //   - OnChallenge()
 type LeaderCallbacks struct {
-	// OnStartedLeading is called when a LeaderElector client starts leading
+	// OnStartedLeading is called when a LeaderElector client starts leading.
+	// When ReleaseOnCancel is set, it must return after the provided context
+	// is cancelled, otherwise Run() will block. At the same time, it must only
+	// return when all spawned goroutines are terminated.
 	OnStartedLeading func(context.Context)
 	// OnStoppedLeading is called when a LeaderElector client stops leading.
 	// This callback is always called when the LeaderElector exits, even if it did not start leading.
