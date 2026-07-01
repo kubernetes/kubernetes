@@ -167,6 +167,39 @@ func TestValidateDeviceCapacity(t *testing.T) {
 				field.Invalid(validRangeField.Child("step"), "10Gi", "value is not a multiple of a given step (2Gi) from (1Gi)"),
 			},
 		},
+		"valid-range-fractional-step": {
+			// min=0.2, step=0.1, max=1, default=0.2, capacity=1: 0.2 = min+0*0.1, 1.0 = min+8*0.1
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("1"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("200m")),
+					nil,
+					testValidRange(
+						ptr.To(apiresource.MustParse("200m")),
+						ptr.To(apiresource.MustParse("1")),
+						ptr.To(apiresource.MustParse("100m")),
+					),
+				),
+			),
+		},
+		"invalid-range-fractional-step-not-aligned": {
+			// default=0.25 is not a multiple of 0.1 from 0.2
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("1"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("250m")),
+					nil,
+					testValidRange(
+						ptr.To(apiresource.MustParse("200m")),
+						ptr.To(apiresource.MustParse("1")),
+						ptr.To(apiresource.MustParse("100m")),
+					),
+				),
+			),
+			wantFailures: field.ErrorList{
+				field.Invalid(validRangeField.Child("step"), "250m", "value is not a multiple of a given step (100m) from (200m)"),
+			},
+		},
 		"invalid-range-large-step": {
 			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&one, nil, testValidRange(ptr.To(one), nil, ptr.To(maxCapacity)))),
 			wantFailures: field.ErrorList{
