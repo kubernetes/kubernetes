@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Node
+metadata:
+  generateName: starvation-node-
+spec: {}
+status:
+  capacity:
+    pods: "110"
+    cpu: "4"
+    memory: 8Gi
+  conditions:
+    - status: "True"
+      type: Ready
+  phase: Running
