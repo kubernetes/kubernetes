@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -531,6 +532,67 @@ func TestAddAllEventHandlers(t *testing.T) {
 				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestAddAllEventHandlersPodEventResources(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+	schedulingQueue := internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
+	testSched := Scheduler{
+		StopEverything:  ctx.Done(),
+		SchedulingQueue: schedulingQueue,
+		logger:          logger,
+	}
+
+	dynclient := dyfake.NewSimpleDynamicClient(runtime.NewScheme())
+	dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
+	gvkMap := map[fwk.EventResource]fwk.ActionType{
+		fwk.AssignedPod:    fwk.Add | fwk.Update | fwk.Delete,
+		fwk.UnscheduledPod: fwk.Add | fwk.Update | fwk.Delete,
+		fwk.TargetPod:      fwk.Update,
+	}
+
+	handledErrorMessages := []string{}
+	oldErrorHandlers := utilruntime.ErrorHandlers
+	t.Cleanup(func() {
+		utilruntime.ErrorHandlers = oldErrorHandlers
+	})
+	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
+		func(_ context.Context, _ error, msg string, _ ...interface{}) {
+			handledErrorMessages = append(handledErrorMessages, msg)
+		},
+	}
+
+	err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, nil, nil, nil, gvkMap)
+	utilruntime.ErrorHandlers = oldErrorHandlers
+	if err != nil {
+		t.Fatalf("Add event handlers failed, error = %v", err)
+	}
+	for _, msg := range handledErrorMessages {
+		if msg == "Incorrect event registration" {
+			t.Fatalf("expected no incorrect event registration, got handled errors: %v", handledErrorMessages)
+		}
+	}
+
+	informerFactory.Start(testSched.StopEverything)
+	dynInformerFactory.Start(testSched.StopEverything)
+	staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
+	dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
+
+	expectStaticInformers := map[reflect.Type]bool{
+		reflect.TypeFor[*v1.Pod]():       true,
+		reflect.TypeFor[*v1.Node]():      true,
+		reflect.TypeFor[*v1.Namespace](): true,
+	}
+	if diff := cmp.Diff(expectStaticInformers, staticInformers); diff != "" {
+		t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
+	}
+	if len(dynamicInformers) != 0 {
+		t.Errorf("expected no dynamic informers, got %v", dynamicInformers)
 	}
 }
 

@@ -522,8 +522,12 @@ func addAllEventHandlers(
 
 	for gvk, at := range gvkMap {
 		switch gvk {
-		case fwk.Node, fwk.Pod:
-			// Do nothing.
+		case fwk.Node:
+			// Node informer is already registered above.
+		case fwk.Pod, fwk.AssignedPod, fwk.UnscheduledPod, fwk.TargetPod:
+			// Pod informer is already registered above. AssignedPod,
+			// UnscheduledPod, and TargetPod are logical Pod event resources
+			// emitted from the Pod add/update/delete handlers.
 		case fwk.CSINode:
 			if handlerRegistration, err = informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
 				buildEvtResHandler(at, fwk.CSINode),
