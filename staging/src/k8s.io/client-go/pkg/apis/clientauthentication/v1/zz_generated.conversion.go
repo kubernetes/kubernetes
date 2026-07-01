@@ -183,6 +183,7 @@ func Convert_clientauthentication_ExecCredentialSpec_To_v1_ExecCredentialSpec(in
 func autoConvert_v1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(in *ExecCredentialStatus, out *clientauthentication.ExecCredentialStatus, s conversion.Scope) error {
 	out.ExpirationTimestamp = (*metav1.Time)(unsafe.Pointer(in.ExpirationTimestamp))
 	out.Token = in.Token
+	out.AuthProxyHeaders = *(*map[string]string)(unsafe.Pointer(&in.AuthProxyHeaders))
 	out.ClientCertificateData = in.ClientCertificateData
 	out.ClientKeyData = in.ClientKeyData
 	return nil
@@ -196,6 +197,7 @@ func Convert_v1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatu
 func autoConvert_clientauthentication_ExecCredentialStatus_To_v1_ExecCredentialStatus(in *clientauthentication.ExecCredentialStatus, out *ExecCredentialStatus, s conversion.Scope) error {
 	out.ExpirationTimestamp = (*metav1.Time)(unsafe.Pointer(in.ExpirationTimestamp))
 	out.Token = in.Token
+	out.AuthProxyHeaders = *(*map[string]string)(unsafe.Pointer(&in.AuthProxyHeaders))
 	out.ClientCertificateData = in.ClientCertificateData
 	out.ClientKeyData = in.ClientKeyData
 	return nil

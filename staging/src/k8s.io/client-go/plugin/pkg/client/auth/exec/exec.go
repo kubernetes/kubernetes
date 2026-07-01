@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/pkg/apis/clientauthentication/install"
 	clientauthenticationv1 "k8s.io/client-go/pkg/apis/clientauthentication/v1"
@@ -304,8 +305,70 @@ type Authenticator struct {
 }
 
 type credentials struct {
-	token string           `datapolicy:"token"`
-	cert  *tls.Certificate `datapolicy:"secret-key"`
+	token            string            `datapolicy:"token"`
+	authProxyHeaders map[string]string `datapolicy:"token"`
+	cert             *tls.Certificate  `datapolicy:"secret-key"`
+}
+
+var disallowedAuthProxyHeaderNames = sets.New[string](
+	"Accept",
+	"Accept-Encoding",
+	"Authorization",
+	"Audit-Id",
+	"Connection",
+	"Content-Length",
+	"Content-Type",
+	"Host",
+	"Keep-Alive",
+	"Prefer",
+	"Proxy-Authenticate",
+	"Proxy-Authorization",
+	"Te",
+	"Trailer",
+	"Transfer-Encoding",
+	"Upgrade",
+	"User-Agent",
+	"X-Remote-User",
+	"X-Remote-Uid",
+	"X-Remote-Group",
+	transport.ImpersonateUserHeader,
+	transport.ImpersonateUIDHeader,
+	transport.ImpersonateGroupHeader,
+)
+
+var disallowedAuthProxyHeaderPrefixes = []string{
+	"Impersonate-Extra-",
+	"X-Remote-Extra-",
+}
+
+func validateAuthProxyHeaders(headers map[string]string) (map[string]string, error) {
+	if len(headers) == 0 {
+		return nil, nil
+	}
+
+	ret := make(map[string]string, len(headers))
+	for k, v := range headers {
+		if errs := validation.IsHTTPHeaderName(k); len(errs) > 0 {
+			return nil, fmt.Errorf("exec plugin returned invalid auth proxy header %q: %s", k, strings.Join(errs, "; "))
+		}
+		headerName := http.CanonicalHeaderKey(k)
+		if disallowedAuthProxyHeaderNames.Has(headerName) {
+			if headerName == "Authorization" {
+				return nil, fmt.Errorf("exec plugin returned unsupported auth proxy header %q: use status.token to set bearer credentials", k)
+			}
+			return nil, fmt.Errorf("exec plugin returned unsupported auth proxy header %q", k)
+		}
+		for _, prefix := range disallowedAuthProxyHeaderPrefixes {
+			if strings.HasPrefix(headerName, prefix) {
+				return nil, fmt.Errorf("exec plugin returned unsupported auth proxy header %q", k)
+			}
+		}
+		if _, ok := ret[headerName]; ok {
+			return nil, fmt.Errorf("exec plugin returned duplicate auth proxy header %q after canonicalization", k)
+		}
+		ret[headerName] = v
+	}
+	return ret, nil
 }
 
 // UpdateTransportConfig updates the transport.Config to use credentials
@@ -369,7 +432,18 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("getting credentials: %v", err)
 	}
 	if creds.token != "" {
+		req = utilnet.CloneRequest(req)
 		req.Header.Set("Authorization", "Bearer "+creds.token)
+	}
+	if len(creds.authProxyHeaders) > 0 {
+		if creds.token == "" {
+			req = utilnet.CloneRequest(req)
+		}
+		for k, v := range creds.authProxyHeaders {
+			if req.Header.Get(k) == "" {
+				req.Header.Set(k, v)
+			}
+		}
 	}
 
 	res, err := r.base.RoundTrip(req)
@@ -487,11 +561,15 @@ func (a *Authenticator) refreshCredsLocked() error {
 	if cred.Status == nil {
 		return fmt.Errorf("exec plugin didn't return a status field")
 	}
-	if cred.Status.Token == "" && cred.Status.ClientCertificateData == "" && cred.Status.ClientKeyData == "" {
-		return fmt.Errorf("exec plugin didn't return a token or cert/key pair")
+	if cred.Status.Token == "" && len(cred.Status.AuthProxyHeaders) == 0 && cred.Status.ClientCertificateData == "" && cred.Status.ClientKeyData == "" {
+		return fmt.Errorf("exec plugin didn't return a token, auth proxy headers, or cert/key pair")
 	}
 	if (cred.Status.ClientCertificateData == "") != (cred.Status.ClientKeyData == "") {
 		return fmt.Errorf("exec plugin returned only certificate or key, not both")
+	}
+	authProxyHeaders, err := validateAuthProxyHeaders(cred.Status.AuthProxyHeaders)
+	if err != nil {
+		return err
 	}
 
 	if cred.Status.ExpirationTimestamp != nil {
@@ -501,7 +579,8 @@ func (a *Authenticator) refreshCredsLocked() error {
 	}
 
 	newCreds := &credentials{
-		token: cred.Status.Token,
+		token:            cred.Status.Token,
+		authProxyHeaders: authProxyHeaders,
 	}
 	if cred.Status.ClientKeyData != "" && cred.Status.ClientCertificateData != "" {
 		cert, err := tls.X509KeyPair([]byte(cred.Status.ClientCertificateData), []byte(cred.Status.ClientKeyData))

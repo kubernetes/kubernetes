@@ -400,6 +400,162 @@ func TestRefreshCreds(t *testing.T) {
 			wantCreds: credentials{token: "foo-bar"},
 		},
 		{
+			name: "v1-auth-proxy-header-request",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"spec": {
+					"interactive": false
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"authProxyHeaders": {
+						"cf-access-token": "foo-bar"
+					}
+				}
+			}`,
+			wantCreds: credentials{authProxyHeaders: map[string]string{"Cf-Access-Token": "foo-bar"}},
+		},
+		{
+			name: "v1-auth-proxy-header-invalid-name",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"authProxyHeaders": {
+						"bad:header": "foo-bar"
+					}
+				}
+			}`,
+			wantErr:       true,
+			wantErrSubstr: `exec plugin returned invalid auth proxy header "bad:header"`,
+		},
+		{
+			name: "v1-auth-proxy-header-authorization-is-rejected",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"authProxyHeaders": {
+						"Authorization": "Bearer foo-bar"
+					}
+				}
+			}`,
+			wantErr:       true,
+			wantErrSubstr: `use status.token to set bearer credentials`,
+		},
+		{
+			name: "v1-auth-proxy-header-impersonation-is-rejected",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"authProxyHeaders": {
+						"Impersonate-Extra-Foo": "bar"
+					}
+				}
+			}`,
+			wantErr:       true,
+			wantErrSubstr: `exec plugin returned unsupported auth proxy header "Impersonate-Extra-Foo"`,
+		},
+		{
+			name: "v1-auth-proxy-header-requestheader-auth-is-rejected",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"authProxyHeaders": {
+						"X-Remote-User": "user"
+					}
+				}
+			}`,
+			wantErr:       true,
+			wantErrSubstr: `exec plugin returned unsupported auth proxy header "X-Remote-User"`,
+		},
+		{
+			name: "v1-auth-proxy-header-requestheader-uid-is-rejected",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"authProxyHeaders": {
+						"X-Remote-Uid": "uid"
+					}
+				}
+			}`,
+			wantErr:       true,
+			wantErrSubstr: `exec plugin returned unsupported auth proxy header "X-Remote-Uid"`,
+		},
+		{
+			name: "v1-auth-proxy-header-hop-by-hop-is-rejected",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"authProxyHeaders": {
+						"Connection": "close"
+					}
+				}
+			}`,
+			wantErr:       true,
+			wantErrSubstr: `exec plugin returned unsupported auth proxy header "Connection"`,
+		},
+		{
+			name: "v1-auth-proxy-header-custom-name",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"spec": {
+					"interactive": false
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"authProxyHeaders": {
+						"X-Trace-Id": "foo-bar"
+					}
+				}
+			}`,
+			wantCreds: credentials{authProxyHeaders: map[string]string{"X-Trace-Id": "foo-bar"}},
+		},
+		{
 			name: "beta-basic-request-with-never-interactive-mode",
 			config: api.ExecConfig{
 				APIVersion:      "client.authentication.k8s.io/v1beta1",
@@ -1314,6 +1470,149 @@ func TestRoundTripper(t *testing.T) {
 	wantToken = "token4"
 	// Old token is expired, should refresh automatically without hitting a 401.
 	get(t, http.StatusOK)
+}
+
+func TestRoundTripperCustomHeaders(t *testing.T) {
+	wantToken := ""
+	wantHeader := ""
+
+	n := time.Now()
+	now := func() time.Time { return n }
+
+	env := []string{""}
+	environ := func() []string {
+		s := make([]string, len(env))
+		copy(s, env)
+		return s
+	}
+
+	setOutput := func(s string) {
+		env[0] = "TEST_OUTPUT=" + s
+	}
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		gotToken := ""
+		parts := strings.Split(r.Header.Get("Authorization"), " ")
+		if len(parts) > 1 && strings.EqualFold(parts[0], "bearer") {
+			gotToken = parts[1]
+		}
+
+		if wantToken != gotToken || wantHeader != r.Header.Get("Cf-Access-Token") {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		fmt.Fprintln(w, "ok")
+	}
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	defer server.Close()
+
+	c := api.ExecConfig{
+		Command:         "./testdata/test-plugin.sh",
+		APIVersion:      "client.authentication.k8s.io/v1",
+		InteractiveMode: api.IfAvailableExecInteractiveMode,
+	}
+	a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.environ = environ
+	a.now = now
+	a.stderr = io.Discard
+
+	tc := &transport.Config{}
+	if err := a.UpdateTransportConfig(tc); err != nil {
+		t.Fatal(err)
+	}
+	client := http.Client{
+		Transport: tc.WrapTransport(http.DefaultTransport),
+	}
+
+	get := func(t *testing.T, statusCode int, header string) {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if header != "" {
+			req.Header.Set("Cf-Access-Token", header)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != statusCode {
+			t.Errorf("wanted status %d got %d", statusCode, resp.StatusCode)
+		}
+	}
+
+	setOutput(`{
+		"kind": "ExecCredential",
+		"apiVersion": "client.authentication.k8s.io/v1",
+		"status": {
+			"token": "token1",
+			"authProxyHeaders": {
+				"cf-access-token": "header1"
+			}
+		}
+	}`)
+	wantToken = "token1"
+	wantHeader = "header1"
+	get(t, http.StatusOK, "")
+
+	setOutput(`{
+		"kind": "ExecCredential",
+		"apiVersion": "client.authentication.k8s.io/v1",
+		"status": {
+			"token": "token2",
+			"authProxyHeaders": {
+				"cf-access-token": "header2"
+			}
+		}
+	}`)
+	// Previous credentials should be cached.
+	get(t, http.StatusOK, "")
+
+	wantToken = "token2"
+	wantHeader = "header2"
+	// Credentials are still cached, so the 401 causes a refresh.
+	get(t, http.StatusUnauthorized, "")
+	get(t, http.StatusOK, "")
+
+	setOutput(`{
+		"kind": "ExecCredential",
+		"apiVersion": "client.authentication.k8s.io/v1",
+		"status": {
+			"token": "token3",
+			"authProxyHeaders": {
+				"cf-access-token": "header3"
+			},
+			"expirationTimestamp": "` + now().Add(time.Hour).Format(time.RFC3339Nano) + `"
+		}
+	}`)
+	wantToken = "token3"
+	wantHeader = "header3"
+	get(t, http.StatusUnauthorized, "")
+	get(t, http.StatusOK, "")
+
+	n = n.Add(time.Hour * 2)
+	setOutput(`{
+		"kind": "ExecCredential",
+		"apiVersion": "client.authentication.k8s.io/v1",
+		"status": {
+			"token": "token4",
+			"authProxyHeaders": {
+				"cf-access-token": "header4"
+			},
+			"expirationTimestamp": "` + now().Add(time.Hour).Format(time.RFC3339Nano) + `"
+		}
+	}`)
+	wantToken = "token4"
+	wantHeader = "header4"
+	get(t, http.StatusOK, "")
+
+	wantHeader = "caller-header"
+	get(t, http.StatusOK, "caller-header")
 }
 
 func TestAuthorizationHeaderPresentCancelsExecAction(t *testing.T) {
