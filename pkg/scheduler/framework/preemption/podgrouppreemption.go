@@ -107,6 +107,9 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodG
 		name:                   "cluster",
 	}
 	status = ev.Executor.actuatePodGroupPreemption(ctx, candidate, preemptor.pods, preemptor.podGroup, names.DefaultPreemption)
+	if status.IsSuccess() {
+		status = fwk.NewStatus(fwk.Success, fmt.Sprintf("found a placement for podgroup, preempting %d victims", len(res.victims.Pods)))
+	}
 	return &fwk.PodGroupPostFilterResult{NominatingInfos: res.nominatedNodeNames}, status
 }
 
