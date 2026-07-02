@@ -18,6 +18,7 @@ package library
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -87,13 +88,45 @@ import (
 //	['a', 'b', 'b', 'c'].lastIndexOf('b') // returns 2
 //	[1.0].indexOf(1.1) // returns -1
 //	[].indexOf('string') // returns -1
-func Lists() cel.EnvOption {
-	return cel.Lib(listsLib)
+//
+// includes
+//
+// Returns true if the target list contains the element, or if the target is equal to the element.
+//
+//	<dyn>.includes(<dyn>) <bool>
+//
+// Examples:
+//
+//	[1, 2, 3].includes(2) // returns true
+//	[1, 2, 3].includes(4) // returns false
+//	'model-a'.includes('model-a') // returns true
+//	'model-a'.includes('model-b') // returns false
+//
+// ListsOption is a functional interface for configuring the lists library.
+type ListsOption func(*lists) *lists
+
+// ListsVersion sets the version of the lists library to use.
+func ListsVersion(version uint32) ListsOption {
+	return func(lib *lists) *lists {
+		lib.version = version
+		return lib
+	}
 }
 
-var listsLib = &lists{}
+// Lists provides a CEL function library extension of list utility functions.
+func Lists(options ...ListsOption) cel.EnvOption {
+	l := &lists{}
+	for _, o := range options {
+		l = o(l)
+	}
+	return cel.Lib(l)
+}
 
-type lists struct{}
+var listsLib = &lists{version: math.MaxUint32}
+
+type lists struct {
+	version uint32
+}
 
 func (*lists) LibraryName() string {
 	return "kubernetes.lists"
@@ -103,8 +136,45 @@ func (*lists) Types() []*cel.Type {
 	return []*cel.Type{}
 }
 
-func (*lists) declarations() map[string][]cel.FunctionOpt {
-	return listsLibraryDecls
+func (l *lists) declarations() map[string][]cel.FunctionOpt {
+	decls := map[string][]cel.FunctionOpt{
+		"isSorted": templatedOverloads(comparableTypes, func(name string, paramType *cel.Type) cel.FunctionOpt {
+			return cel.MemberOverload(fmt.Sprintf("list_%s_is_sorted_bool", name),
+				[]*cel.Type{cel.ListType(paramType)}, cel.BoolType, cel.UnaryBinding(isSorted))
+		}),
+		"sum": templatedOverloads(summableTypes, func(name string, paramType *cel.Type) cel.FunctionOpt {
+			return cel.MemberOverload(fmt.Sprintf("list_%s_sum_%s", name, name),
+				[]*cel.Type{cel.ListType(paramType)}, paramType, cel.UnaryBinding(func(list ref.Val) ref.Val {
+					return sum(
+						func() ref.Val {
+							return zeroValuesOfSummableTypes[name]
+						})(list)
+				}))
+		}),
+		"max": templatedOverloads(comparableTypes, func(name string, paramType *cel.Type) cel.FunctionOpt {
+			return cel.MemberOverload(fmt.Sprintf("list_%s_max_%s", name, name),
+				[]*cel.Type{cel.ListType(paramType)}, paramType, cel.UnaryBinding(max()))
+		}),
+		"min": templatedOverloads(comparableTypes, func(name string, paramType *cel.Type) cel.FunctionOpt {
+			return cel.MemberOverload(fmt.Sprintf("list_%s_min_%s", name, name),
+				[]*cel.Type{cel.ListType(paramType)}, paramType, cel.UnaryBinding(min()))
+		}),
+		"indexOf": {
+			cel.MemberOverload("list_a_index_of_int", []*cel.Type{cel.ListType(paramA), paramA}, cel.IntType,
+				cel.BinaryBinding(indexOf)),
+		},
+		"lastIndexOf": {
+			cel.MemberOverload("list_a_last_index_of_int", []*cel.Type{cel.ListType(paramA), paramA}, cel.IntType,
+				cel.BinaryBinding(lastIndexOf)),
+		},
+	}
+	if l.version >= 1 {
+		decls["includes"] = []cel.FunctionOpt{
+			cel.MemberOverload("list_includes_dyn_dyn", []*cel.Type{cel.DynType, cel.DynType}, cel.BoolType,
+				cel.BinaryBinding(includes)),
+		}
+	}
+	return decls
 }
 
 var paramA = cel.TypeParamType("A")
@@ -141,46 +211,19 @@ var comparableTypes = []namedCELType{
 	{typeName: "bytes", celType: cel.BytesType},
 }
 
-// WARNING: All library additions or modifications must follow
-// https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/2876-crd-validation-expression-language#function-library-updates
-var listsLibraryDecls = map[string][]cel.FunctionOpt{
-	"isSorted": templatedOverloads(comparableTypes, func(name string, paramType *cel.Type) cel.FunctionOpt {
-		return cel.MemberOverload(fmt.Sprintf("list_%s_is_sorted_bool", name),
-			[]*cel.Type{cel.ListType(paramType)}, cel.BoolType, cel.UnaryBinding(isSorted))
-	}),
-	"sum": templatedOverloads(summableTypes, func(name string, paramType *cel.Type) cel.FunctionOpt {
-		return cel.MemberOverload(fmt.Sprintf("list_%s_sum_%s", name, name),
-			[]*cel.Type{cel.ListType(paramType)}, paramType, cel.UnaryBinding(func(list ref.Val) ref.Val {
-				return sum(
-					func() ref.Val {
-						return zeroValuesOfSummableTypes[name]
-					})(list)
-			}))
-	}),
-	"max": templatedOverloads(comparableTypes, func(name string, paramType *cel.Type) cel.FunctionOpt {
-		return cel.MemberOverload(fmt.Sprintf("list_%s_max_%s", name, name),
-			[]*cel.Type{cel.ListType(paramType)}, paramType, cel.UnaryBinding(max()))
-	}),
-	"min": templatedOverloads(comparableTypes, func(name string, paramType *cel.Type) cel.FunctionOpt {
-		return cel.MemberOverload(fmt.Sprintf("list_%s_min_%s", name, name),
-			[]*cel.Type{cel.ListType(paramType)}, paramType, cel.UnaryBinding(min()))
-	}),
-	"indexOf": {
-		cel.MemberOverload("list_a_index_of_int", []*cel.Type{cel.ListType(paramA), paramA}, cel.IntType,
-			cel.BinaryBinding(indexOf)),
-	},
-	"lastIndexOf": {
-		cel.MemberOverload("list_a_last_index_of_int", []*cel.Type{cel.ListType(paramA), paramA}, cel.IntType,
-			cel.BinaryBinding(lastIndexOf)),
-	},
-}
-
-func (*lists) CompileOptions() []cel.EnvOption {
+func (l *lists) CompileOptions() []cel.EnvOption {
 	options := []cel.EnvOption{}
-	for name, overloads := range listsLibraryDecls {
+	for name, overloads := range l.declarations() {
 		options = append(options, cel.Function(name, overloads...))
 	}
 	return options
+}
+
+// IncludesOption returns the EnvOption to register the includes function directly.
+func IncludesOption() cel.EnvOption {
+	return cel.Function("includes",
+		cel.MemberOverload("list_includes_dyn_dyn", []*cel.Type{cel.DynType, cel.DynType}, cel.BoolType,
+			cel.BinaryBinding(includes)))
 }
 
 func (*lists) ProgramOptions() []cel.ProgramOption {
@@ -309,6 +352,24 @@ func lastIndexOf(list ref.Val, item ref.Val) ref.Val {
 		}
 	}
 	return types.Int(-1)
+}
+
+func includes(target, arg ref.Val) ref.Val {
+	if list, ok := target.(traits.Lister); ok {
+		it := list.Iterator()
+		for it.HasNext() == types.True {
+			item := it.Next()
+			if item.Equal(arg) == types.True {
+				return types.True
+			}
+		}
+		return types.False
+	}
+
+	if target.Equal(arg) == types.True {
+		return types.True
+	}
+	return types.False
 }
 
 // templatedOverloads returns overloads for each of the provided types. The template function is called with each type
