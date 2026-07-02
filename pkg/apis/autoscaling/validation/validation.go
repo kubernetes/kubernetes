@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,8 +44,9 @@ const (
 // ValidateScale validates a Scale and returns an ErrorList with any errors.
 func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-
+	// Only validate managed fields and replicas. Other metadata fields are ignored
+	// and discarded by the scale subresource handler.
+	allErrs = append(allErrs, metav1validation.ValidateManagedFields(scale.GetManagedFields(), field.NewPath("metadata").Child("managedFields"))...)
 	if scale.Spec.Replicas < 0 {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(scale.Spec.Replicas), field.NewPath("spec", "replicas")).MarkCoveredByDeclarative()...)
 	}

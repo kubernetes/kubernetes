@@ -92,6 +92,22 @@ func TestValidateScale(t *testing.T) {
 			},
 		},
 		msg: "must be greater than or equal to 0",
+	}, {
+		scale: autoscaling.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "frontend",
+				Namespace: metav1.NamespaceDefault,
+				ManagedFields: []metav1.ManagedFieldsEntry{{
+					Operation:  "InvalidOperation",
+					FieldsType: "FieldsV1",
+					APIVersion: "v1",
+				}},
+			},
+			Spec: autoscaling.ScaleSpec{
+				Replicas: 1,
+			},
+		},
+		msg: "metadata.managedFields[0].operation: Invalid value",
 	}}
 
 	for _, c := range errorCases {
