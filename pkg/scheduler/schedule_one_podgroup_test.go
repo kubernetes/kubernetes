@@ -996,7 +996,7 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 				},
 			},
 			podGroupFeasibleStatuses: []fwk.Code{
-				fwk.Success,
+				fwk.Unschedulable,
 				fwk.Error,
 			},
 			expectedGroupStatusCode: fwk.Error,
@@ -1038,7 +1038,7 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 				},
 			},
 			podGroupFeasibleStatuses: []fwk.Code{
-				fwk.Success,
+				fwk.Unschedulable,
 				fwk.Error,
 			},
 			expectedGroupStatusCode: fwk.Error,

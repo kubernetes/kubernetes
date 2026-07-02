@@ -2018,6 +2018,28 @@ func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin
 	return status, timeout
 }
 
+const successfulPlacementFeasiblePluginsKey = "FrameworkPlacementFeasibleSuccess"
+
+type successfulPlacementFeasiblePluginsState struct {
+	plugins sets.Set[string]
+}
+
+func (s *successfulPlacementFeasiblePluginsState) Clone() fwk.StateData {
+	return &successfulPlacementFeasiblePluginsState{plugins: s.plugins.Clone()}
+}
+
+func getSuccessfulPlacementFeasiblePlugins(placementCycleState fwk.PlacementCycleState) (sets.Set[string], error) {
+	state, err := placementCycleState.Read(successfulPlacementFeasiblePluginsKey)
+	if err != nil {
+		if !errors.Is(err, fwk.ErrNotFound) {
+			return nil, err
+		}
+		state = &successfulPlacementFeasiblePluginsState{plugins: sets.New[string]()}
+		placementCycleState.Write(successfulPlacementFeasiblePluginsKey, state)
+	}
+	return state.(*successfulPlacementFeasiblePluginsState).plugins, nil
+}
+
 // RunPlacementFeasiblePlugins runs the set of configured Permit plugins that implement PlacementFeasible interface.
 // The result will be Success if all plugins return Success.
 // The only other valid statuses are Wait and Unschedulable.
@@ -2030,9 +2052,18 @@ func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placeme
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementFeasible, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
+	successfulPlugins, err := getSuccessfulPlacementFeasiblePlugins(placementCycleState)
+	if err != nil {
+		return fwk.AsStatus(fmt.Errorf("failed to get successful placement feasible plugins from cycle state: %w", err))
+	}
+
 	for _, pl := range f.placementFeasiblePlugins {
+		if successfulPlugins.Has(pl.Name()) {
+			continue
+		}
 		plStatus := f.runPlacementFeasiblePlugin(ctx, pl, placementCycleState, podGroupInfo)
 		if plStatus.IsSuccess() {
+			successfulPlugins.Insert(pl.Name())
 			continue
 		}
 		if plStatus.Code() == fwk.Wait {
