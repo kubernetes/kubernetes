@@ -143,34 +143,27 @@ func (unionMap *ConditionsAwareDecisionUnion) ToDecision() ConditionsAwareDecisi
 		// decision is Allow or Deny, we in principle know it's the last decision added, but
 		// keep the logic generic and aligned with NoOpinion, for which we aggregate together
 		// the reasons and errors for all of the same-type decisions.
-		reasonlist := make([]string, 0, len(unionMap.inner))
-		errlist := make([]error, 0, len(unionMap.inner))
-		for _, subDecision := range unionMap.inner {
-			if (onlyPossibleDecision == DecisionAllow && subDecision.d.IsAllow()) ||
-				(onlyPossibleDecision == DecisionNoOpinion && subDecision.d.IsNoOpinion()) ||
-				(onlyPossibleDecision == DecisionDeny && subDecision.d.IsDeny()) {
-				if reason := subDecision.d.Reason(); len(reason) != 0 {
-					reasonlist = append(reasonlist, fmt.Sprintf("%s: %s", subDecision.conditionalAuthorizerName, reason))
-				}
-				if err := subDecision.d.Error(); err != nil {
-					errlist = append(errlist, fmt.Errorf("%s: %w", subDecision.conditionalAuthorizerName, err))
-				}
-			}
+		var aggregateReasons []string
+		var aggregateErrors []error
+		for _, namedDecision := range unionMap.inner {
+			reasons, errs := collectReasonsAndErrors([]string{namedDecision.conditionalAuthorizerName}, namedDecision.d, onlyPossibleDecision)
+			aggregateReasons = append(aggregateReasons, reasons...)
+			aggregateErrors = append(aggregateErrors, errs...)
 		}
 
 		switch onlyPossibleDecision {
 		case DecisionDeny:
 			// For example, a union of decisions with possible outcomes "[Deny, NoOpinion], [NoOpinion], [Deny], [Allow]" yields possible outcome [Deny] always,
 			// regardless of how the ConditionsMap in the beginning evaluates.
-			return ConditionsAwareDecisionDeny(strings.Join(reasonlist, ", "), utilerrors.NewAggregate(errlist))
+			return ConditionsAwareDecisionDeny(strings.Join(aggregateReasons, ", "), utilerrors.NewAggregate(aggregateErrors))
 		case DecisionNoOpinion:
 			// This happens for instance when called on the empty slice, then the only possible mode is NoOpinion
 			// This can only happen if there were only NoOpinions in the chain, so we can gather them here. TODO: (formally) verify this
-			return ConditionsAwareDecisionNoOpinion(strings.Join(reasonlist, ", "), utilerrors.NewAggregate(errlist))
+			return ConditionsAwareDecisionNoOpinion(strings.Join(aggregateReasons, ", "), utilerrors.NewAggregate(aggregateErrors))
 		case DecisionAllow:
 			// For example, a union of decisions with possible outcomes "[Allow, NoOpinion], [NoOpinion], [Allow], [Deny]" yields possible outcome [Allow] always,
 			// regardless of how the ConditionsMap in the beginning evaluates.
-			return ConditionsAwareDecisionAllow(strings.Join(reasonlist, ", "), utilerrors.NewAggregate(errlist))
+			return ConditionsAwareDecisionAllow(strings.Join(aggregateReasons, ", "), utilerrors.NewAggregate(aggregateErrors))
 		default:
 			return ConditionsAwareDecisionDeny("failed closed", errors.New("should be unreachable: ConditionsAwareDecision should only contain Allow/Deny/NoOpinion"))
 		}
@@ -185,4 +178,27 @@ func (unionMap *ConditionsAwareDecisionUnion) ToDecision() ConditionsAwareDecisi
 			subDecisionsPossibleDecisions:    unionMap.subDecisionsPossibleDecisions.Clone(),
 		},
 	}
+}
+
+func collectReasonsAndErrors(authorizerNamePrefix []string, condAwareDecision ConditionsAwareDecision, unconditionalDecisionToCollect Decision) (aggregateReasons []string, aggregateErrors []error) {
+	if (unconditionalDecisionToCollect == DecisionAllow && condAwareDecision.IsAllow()) ||
+		(unconditionalDecisionToCollect == DecisionNoOpinion && condAwareDecision.IsNoOpinion()) ||
+		(unconditionalDecisionToCollect == DecisionDeny && condAwareDecision.IsDeny()) {
+		if reason := condAwareDecision.Reason(); len(reason) != 0 {
+			aggregateReasons = append(aggregateReasons, fmt.Sprintf("%s: {%s}", strings.Join(authorizerNamePrefix, ": "), reason))
+		}
+		if err := condAwareDecision.Error(); err != nil {
+			aggregateErrors = append(aggregateErrors, fmt.Errorf("%s: %w", strings.Join(authorizerNamePrefix, ": "), err))
+		}
+		return
+	}
+	if condAwareDecision.IsUnion() {
+		for authorizerName, subDecision := range condAwareDecision.UnionedDecisions() {
+			reasons, errs := collectReasonsAndErrors(slices.Concat(authorizerNamePrefix, []string{authorizerName}), subDecision, unconditionalDecisionToCollect)
+			aggregateReasons = append(aggregateReasons, reasons...)
+			aggregateErrors = append(aggregateErrors, errs...)
+		}
+		return
+	}
+	return
 }

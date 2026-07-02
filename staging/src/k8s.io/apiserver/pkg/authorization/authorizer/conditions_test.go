@@ -327,8 +327,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsAllow:                          true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "0.example.com: ok",
-			wantString:                           `Allow(reason="0.example.com: ok")`,
+			wantReason:                           `0.example.com: {ok}`,
+			wantString:                           `Allow(reason="0.example.com: {ok}")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
 		},
 		{
@@ -338,8 +338,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsDeny:                           true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "0.example.com: denied",
-			wantString:                           `Deny(reason="0.example.com: denied")`,
+			wantReason:                           `0.example.com: {denied}`,
+			wantString:                           `Deny(reason="0.example.com: {denied}")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionDeny),
 		},
 		{
@@ -349,8 +349,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsNoOpinion:                      true,
 			wantContainsUnconditionalAllowOrDeny: false,
-			wantReason:                           "0.example.com: noop",
-			wantString:                           `NoOpinion(reason="0.example.com: noop")`,
+			wantReason:                           `0.example.com: {noop}`,
+			wantString:                           `NoOpinion(reason="0.example.com: {noop}")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion),
 		},
 		{
@@ -386,9 +386,75 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsNoOpinion:                      true,
 			wantContainsUnconditionalAllowOrDeny: false,
-			wantReason:                           "0.example.com: a, 2.example.com: c",
+			wantReason:                           `0.example.com: {a}, 2.example.com: {c}`,
 			wantErrorIs:                          unexpectedErr,
-			wantString:                           `NoOpinion(reason="0.example.com: a, 2.example.com: c", err="[1.example.com: unexpected things happened, 2.example.com: other error]")`,
+			wantString:                           `NoOpinion(reason="0.example.com: {a}, 2.example.com: {c}", err="[1.example.com: unexpected things happened, 2.example.com: other error]")`,
+			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion),
+		},
+		{
+			// Inner union folds to NoOpinion with an already-aggregated reason. When the
+			// outer union folds, collectReasonsAndErrors matches the inner as an unconditional
+			// NoOpinion leaf and prepends only the outer sub-name; the inner's aggregated
+			// string appears verbatim after the colon.
+			name: "union: nested NoOpinion fold embeds inner aggregate under outer prefix",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				unionDecision(
+					unionDecision(
+						authorizer.ConditionsAwareDecisionNoOpinion("a", nil),
+						authorizer.ConditionsAwareDecisionNoOpinion("b", nil),
+					),
+				),
+			},
+			wantIsNoOpinion:                      true,
+			wantContainsUnconditionalAllowOrDeny: false,
+			wantReason:                           `0.example.com: {0.example.com: {a}, 1.example.com: {b}}`,
+			wantString:                           `NoOpinion(reason="0.example.com: {0.example.com: {a}, 1.example.com: {b}}")`,
+			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion),
+		},
+		{
+			// Both inner unions fold to NoOpinion with their own aggregated reasons. The
+			// outer union then folds and produces a flattened, prefix-embedded string that
+			// contains both inner aggregates in order.
+			name: "union: nested NoOpinion fold with siblings at each level",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				unionDecision(
+					unionDecision(
+						authorizer.ConditionsAwareDecisionNoOpinion("a1", nil),
+						authorizer.ConditionsAwareDecisionNoOpinion("a2", nil),
+					),
+					unionDecision(
+						authorizer.ConditionsAwareDecisionNoOpinion("b1", nil),
+						authorizer.ConditionsAwareDecisionNoOpinion("b2", nil),
+					),
+				),
+			},
+			wantIsNoOpinion:                      true,
+			wantContainsUnconditionalAllowOrDeny: false,
+			wantReason:                           `0.example.com: {0.example.com: {a1}, 1.example.com: {a2}}, 1.example.com: {0.example.com: {b1}, 1.example.com: {b2}}`,
+			wantString:                           `NoOpinion(reason="0.example.com: {0.example.com: {a1}, 1.example.com: {a2}}, 1.example.com: {0.example.com: {b1}, 1.example.com: {b2}}")`,
+			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion),
+		},
+		{
+			// Errors at multiple depths: the inner union's fold wraps its own child's error
+			// with the inner sub-name; the outer fold wraps the (already-wrapped) inner
+			// aggregate again with the outer sub-name, and additionally aggregates a sibling
+			// error at the outer level. Result: two prefix-wrapped errors in a length-2
+			// aggregate.
+			name: "union: nested NoOpinion fold with errors at multiple depths",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				unionDecision(
+					authorizer.ConditionsAwareDecisionNoOpinion("outer-a", otherErr),
+					unionDecision(
+						authorizer.ConditionsAwareDecisionNoOpinion("inner-b", unexpectedErr),
+						authorizer.ConditionsAwareDecisionNoOpinion("inner-c", nil),
+					),
+				),
+			},
+			wantIsNoOpinion:                      true,
+			wantContainsUnconditionalAllowOrDeny: false,
+			wantReason:                           `0.example.com: {outer-a}, 1.example.com: {0.example.com: {inner-b}, 1.example.com: {inner-c}}`,
+			wantErrorIs:                          unexpectedErr,
+			wantString:                           `NoOpinion(reason="0.example.com: {outer-a}, 1.example.com: {0.example.com: {inner-b}, 1.example.com: {inner-c}}", err="[0.example.com: other error, 1.example.com: 0.example.com: unexpected things happened]")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionNoOpinion),
 		},
 		{
@@ -406,8 +472,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsAllow:                          true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "2.example.com: first",
-			wantString:                           `Allow(reason="2.example.com: first")`,
+			wantReason:                           `2.example.com: {first}`,
+			wantString:                           `Allow(reason="2.example.com: {first}")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
 		},
 		{
@@ -422,8 +488,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsDeny:                           true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "2.example.com: first",
-			wantString:                           `Deny(reason="2.example.com: first")`,
+			wantReason:                           `2.example.com: {first}`,
+			wantString:                           `Deny(reason="2.example.com: {first}")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionDeny),
 		},
 		// Actual union decisions (not simplified)
@@ -451,8 +517,8 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsAllow:                          true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "1.example.com: allowed",
-			wantString:                           `Allow(reason="1.example.com: allowed")`,
+			wantReason:                           `1.example.com: {allowed}`,
+			wantString:                           `Allow(reason="1.example.com: {allowed}")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
 		},
 		{
@@ -515,8 +581,81 @@ func TestConditionsAwareDecision(t *testing.T) {
 			},
 			wantIsAllow:                          true,
 			wantContainsUnconditionalAllowOrDeny: true,
-			wantReason:                           "1.example.com: 1.example.com: ok",
-			wantString:                           `Allow(reason="1.example.com: 1.example.com: ok")`,
+			wantReason:                           `1.example.com: {1.example.com: {ok}}`,
+			wantString:                           `Allow(reason="1.example.com: {1.example.com: {ok}}")`,
+			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
+		},
+		{
+			// Two-level nesting where every level folds. Inner fold produces
+			// Allow(reason="0.example.com: deep"); outer fold matches that as an
+			// unconditional Allow leaf and prefixes with its own sub-name.
+			name: "union: two-level nested allow (inner union folds to Allow)",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				unionDecision(
+					unionDecision(authorizer.ConditionsAwareDecisionAllow("deep", nil)),
+				),
+			},
+			wantIsAllow:                          true,
+			wantContainsUnconditionalAllowOrDeny: true,
+			wantReason:                           `0.example.com: {0.example.com: {deep}}`,
+			wantString:                           `Allow(reason="0.example.com: {0.example.com: {deep}}")`,
+			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
+		},
+		{
+			// Three-level nesting with an error carried through each fold. Each fold wraps
+			// the sub-decision's Error() with the sub-name prefix (via fmt.Errorf %w) and
+			// puts it back into a single-element aggregate, so the final err prints
+			// (without brackets) as three concatenated prefixes.
+			name: "union: three-level nested allow with error propagates through every fold",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				unionDecision(
+					unionDecision(
+						unionDecision(authorizer.ConditionsAwareDecisionAllow("deep", unexpectedErr)),
+					),
+				),
+			},
+			wantIsAllow:                          true,
+			wantContainsUnconditionalAllowOrDeny: true,
+			wantReason:                           `0.example.com: {0.example.com: {0.example.com: {deep}}}`,
+			wantErrorIs:                          unexpectedErr,
+			wantString:                           `Allow(reason="0.example.com: {0.example.com: {0.example.com: {deep}}}", err="0.example.com: 0.example.com: 0.example.com: unexpected things happened")`,
+			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
+		},
+		{
+			// Outer union has a NoOpinion sibling. NoOpinion doesn't match the Allow filter
+			// and contributes nothing to the aggregate; only the folded inner Allow's
+			// reason surfaces, prefixed with the outer sub-name.
+			name: "union: nested allow with sibling NoOpinion in outer",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				unionDecision(
+					authorizer.ConditionsAwareDecisionNoOpinion("outer-noop", nil),
+					unionDecision(condMapAllow, authorizer.ConditionsAwareDecisionAllow("inner-allow", nil)),
+				),
+			},
+			wantIsAllow:                          true,
+			wantContainsUnconditionalAllowOrDeny: true,
+			wantReason:                           `1.example.com: {1.example.com: {inner-allow}}`,
+			wantString:                           `Allow(reason="1.example.com: {1.example.com: {inner-allow}}")`,
+			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
+		},
+		{
+			// Contrast with the "two-level nested allow" case: here the nested union does
+			// NOT fold (its PossibleDecisions is {NoOpinion, Allow} — two outcomes). During
+			// the outer fold, collectReasonsAndErrors recurses INTO the still-Union inner
+			// via the IsUnion branch. The inner has no matching Allow leaves (its NoOpinion
+			// is filtered out, ConditionsMap is skipped by both branches), so only the
+			// outer's direct Allow leaf contributes.
+			name: "union: nested allow where inner union stays a Union (recursed into, not folded)",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				unionDecision(
+					unionDecision(condMapAllow, authorizer.ConditionsAwareDecisionNoOpinion("inner-noop", nil)),
+					authorizer.ConditionsAwareDecisionAllow("outer-allow", nil),
+				),
+			},
+			wantIsAllow:                          true,
+			wantContainsUnconditionalAllowOrDeny: true,
+			wantReason:                           `1.example.com: {outer-allow}`,
+			wantString:                           `Allow(reason="1.example.com: {outer-allow}")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionAllow),
 		},
 		{
@@ -680,6 +819,57 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantContainsUnconditionalAllowOrDeny: true,
 			wantReason:                           "",
 			wantString:                           `Deny`,
+			wantPossibleDecisions:                sets.New(authorizer.DecisionDeny),
+		},
+		{
+			// Deny counterpart to the two-level nested Allow case.
+			name: "union: two-level nested deny (inner union folds to Deny)",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				unionDecision(
+					unionDecision(authorizer.ConditionsAwareDecisionDeny("deep", nil)),
+				),
+			},
+			wantIsDeny:                           true,
+			wantContainsUnconditionalAllowOrDeny: true,
+			wantReason:                           `0.example.com: {0.example.com: {deep}}`,
+			wantString:                           `Deny(reason="0.example.com: {0.example.com: {deep}}")`,
+			wantPossibleDecisions:                sets.New(authorizer.DecisionDeny),
+		},
+		{
+			// Three-level Deny fold carrying an error through every level. Same
+			// mechanism as the three-level Allow variant.
+			name: "union: three-level nested deny with error propagates through every fold",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				unionDecision(
+					unionDecision(
+						unionDecision(authorizer.ConditionsAwareDecisionDeny("deep", otherErr)),
+					),
+				),
+			},
+			wantIsDeny:                           true,
+			wantContainsUnconditionalAllowOrDeny: true,
+			wantReason:                           `0.example.com: {0.example.com: {0.example.com: {deep}}}`,
+			wantErrorIs:                          otherErr,
+			wantString:                           `Deny(reason="0.example.com: {0.example.com: {0.example.com: {deep}}}", err="0.example.com: 0.example.com: 0.example.com: other error")`,
+			wantPossibleDecisions:                sets.New(authorizer.DecisionDeny),
+		},
+		{
+			// Deny counterpart to "nested allow where inner union stays a Union": the
+			// inner union has PossibleDecisions={NoOpinion, Deny} (two outcomes, does not
+			// fold). Outer folds to Deny; collectReasonsAndErrors recurses into the still-
+			// Union inner but its NoOpinion is filtered out and CM(deny) is skipped, so
+			// only the outer Deny leaf contributes.
+			name: "union: nested deny where inner union stays a Union (recursed into, not folded)",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				unionDecision(
+					unionDecision(condMapDeny, authorizer.ConditionsAwareDecisionNoOpinion("inner-noop", nil)),
+					authorizer.ConditionsAwareDecisionDeny("outer-deny", nil),
+				),
+			},
+			wantIsDeny:                           true,
+			wantContainsUnconditionalAllowOrDeny: true,
+			wantReason:                           `1.example.com: {outer-deny}`,
+			wantString:                           `Deny(reason="1.example.com: {outer-deny}")`,
 			wantPossibleDecisions:                sets.New(authorizer.DecisionDeny),
 		},
 		{

@@ -506,8 +506,8 @@ func TestUnionEvaluateConditions(t *testing.T) {
 				conditionEffect: effectNoOpinion,
 				evalDecision:    authorizer.DecisionNoOpinion,
 			},
-			wantAuthorizeDecision: `NoOpinion(reason="authz5: only NoOpinion conditions always evaluate to NoOpinion")`,
-			wantFinalDecision:     `NoOpinion(reason="authz5: only NoOpinion conditions always evaluate to NoOpinion")`,
+			wantAuthorizeDecision: `NoOpinion(reason="authz5: {only NoOpinion conditions always evaluate to NoOpinion}")`,
+			wantFinalDecision:     `NoOpinion(reason="authz5: {only NoOpinion conditions always evaluate to NoOpinion}")`,
 		},
 
 		// === Conditional + concrete mixes ===
