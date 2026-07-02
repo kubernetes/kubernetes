@@ -389,7 +389,7 @@ func Validate_ScaleSpec(
 				}
 			}
 			// call field-attached validations
-			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

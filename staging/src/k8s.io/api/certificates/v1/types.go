@@ -179,12 +179,12 @@ type CertificateSigningRequestStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:listType=map
-	// +k8s:alpha(since: "1.36")=+k8s:listMapKey=type
-	// +k8s:alpha(since: "1.36")=+k8s:customUnique
-	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
-	// +k8s:alpha(since: "1.36")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
+	// +k8s:beta(since: "1.37")=+k8s:listType=map
+	// +k8s:beta(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.37")=+k8s:customUnique
+	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
+	// +k8s:beta(since: "1.37")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// certificate is populated with an issued certificate by the signer after an Approved condition is present.

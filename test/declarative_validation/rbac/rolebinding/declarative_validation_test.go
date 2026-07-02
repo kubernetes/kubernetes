@@ -92,14 +92,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				Kind:     "ClusterRole",
 			})),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("roleRef", "name"), "name is required").MarkAlpha(),
+				field.Required(field.NewPath("roleRef", "name"), "name is required").MarkBeta(),
 			},
 		},
 
 		"missing subject.name": {
 			input: mkValidRoleBinding(tweakSubjectName(0, "")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("subjects").Index(0).Child("name"), "name is required").MarkAlpha(),
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), "name is required").MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases

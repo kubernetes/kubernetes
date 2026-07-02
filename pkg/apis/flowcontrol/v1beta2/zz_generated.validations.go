@@ -70,7 +70,7 @@ func Validate_LimitResponse(
 		func(obj *flowcontrolv1beta2.LimitResponse) flowcontrolv1beta2.LimitResponseType { return obj.Type }, validate.DirectEqualPtr,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta2.QueuingConfiguration) field.ErrorList {
 			errs := field.ErrorList{}
-			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
 			return errs
 		},
 		[]validate.DiscriminatedRule[*flowcontrolv1beta2.QueuingConfiguration, flowcontrolv1beta2.LimitResponseType]{
@@ -80,7 +80,7 @@ func Validate_LimitResponse(
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta2.QueuingConfiguration) field.ErrorList {
 					errs := field.ErrorList{}
 					earlyReturn := false
-					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
 						errs = append(errs, e...)
 						earlyReturn = true
 					}
@@ -107,7 +107,7 @@ func Validate_LimitResponse(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -136,7 +136,7 @@ func Validate_LimitResponse(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -239,7 +239,7 @@ func Validate_PriorityLevelConfigurationSpec(
 		}, validate.SemanticDeepEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta2.ExemptPriorityLevelConfiguration) field.ErrorList {
 			errs := field.ErrorList{}
-			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
 			return errs
 		},
 		[]validate.DiscriminatedRule[*flowcontrolv1beta2.ExemptPriorityLevelConfiguration, flowcontrolv1beta2.PriorityLevelEnablement]{
@@ -249,7 +249,7 @@ func Validate_PriorityLevelConfigurationSpec(
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta2.ExemptPriorityLevelConfiguration) field.ErrorList {
 					errs := field.ErrorList{}
 					earlyReturn := false
-					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
 						earlyReturn = true
 					}
 					if earlyReturn {
@@ -270,7 +270,7 @@ func Validate_PriorityLevelConfigurationSpec(
 		}, validate.SemanticDeepEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta2.LimitedPriorityLevelConfiguration) field.ErrorList {
 			errs := field.ErrorList{}
-			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
 			return errs
 		},
 		[]validate.DiscriminatedRule[*flowcontrolv1beta2.LimitedPriorityLevelConfiguration, flowcontrolv1beta2.PriorityLevelEnablement]{
@@ -280,7 +280,7 @@ func Validate_PriorityLevelConfigurationSpec(
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta2.LimitedPriorityLevelConfiguration) field.ErrorList {
 					errs := field.ErrorList{}
 					earlyReturn := false
-					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
 						errs = append(errs, e...)
 						earlyReturn = true
 					}
@@ -307,7 +307,7 @@ func Validate_PriorityLevelConfigurationSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -336,7 +336,7 @@ func Validate_PriorityLevelConfigurationSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -366,7 +366,7 @@ func Validate_PriorityLevelConfigurationSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {

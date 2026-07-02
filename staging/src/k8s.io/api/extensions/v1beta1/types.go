@@ -27,9 +27,9 @@ import (
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	// +default=0
-	// +k8s:alpha(since: "1.36")=+k8s:minimum=0
+	// +k8s:beta(since: "1.37")=+k8s:minimum=0
 	Replicas int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 }
 
@@ -1110,7 +1110,7 @@ type NetworkPolicySpec struct {
 	// (and serves solely to ensure that the pods it selects are isolated by default).
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty" protobuf:"bytes,2,rep,name=ingress"`
 
 	// List of egress rules to be applied to the selected pods. Outgoing traffic is
@@ -1122,7 +1122,7 @@ type NetworkPolicySpec struct {
 	// This field is beta-level in 1.8
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
 	// List of rule types that the NetworkPolicy relates to.
@@ -1159,7 +1159,7 @@ type NetworkPolicyIngressRule struct {
 	// traffic matches at least one item in the from list.
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`
 }
 
@@ -1184,7 +1184,7 @@ type NetworkPolicyEgressRule struct {
 	// allows traffic only if the traffic matches at least one item in the to list.
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	To []NetworkPolicyPeer `json:"to,omitempty" protobuf:"bytes,2,rep,name=to"`
 }
 
@@ -1218,7 +1218,7 @@ type IPBlock struct {
 	// CIDR is a string representing the IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// +required
-	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
 	// Except is a slice of CIDRs that should not be included within an IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
@@ -1251,7 +1251,7 @@ type NetworkPolicyPeer struct {
 	// IPBlock defines policy on a particular IPBlock. If this field is set then
 	// neither of the other fields can be.
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
 }
 

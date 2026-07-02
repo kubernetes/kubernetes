@@ -449,15 +449,15 @@ type PriorityLevelConfigurationSpec struct {
 	// capacity is made available exclusively to this priority level.
 	// Required.
 	// +unionDiscriminator
-	// +k8s:alpha(since: "1.36")=+k8s:required
-	// +k8s:alpha(since: "1.36")=+k8s:modeDiscriminator
+	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:modeDiscriminator
 	Type PriorityLevelEnablement `json:"type" protobuf:"bytes,1,opt,name=type"`
 
 	// `limited` specifies how requests are handled for a Limited priority level.
 	// This field must be non-empty if and only if `type` is `"Limited"`.
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:ifMode("Limited")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:ifMode("Limited")=+k8s:required
 	Limited *LimitedPriorityLevelConfiguration `json:"limited,omitempty" protobuf:"bytes,2,opt,name=limited"`
 
 	// `exempt` specifies how requests are handled for an exempt priority level.
@@ -466,8 +466,8 @@ type PriorityLevelConfigurationSpec struct {
 	// If empty and `type` is `"Exempt"` then the default values
 	// for `ExemptPriorityLevelConfiguration` apply.
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:ifMode("Exempt")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:ifMode("Exempt")=+k8s:optional
 	Exempt *ExemptPriorityLevelConfiguration `json:"exempt,omitempty" protobuf:"bytes,3,opt,name=exempt"`
 }
 
@@ -587,15 +587,15 @@ type LimitResponse struct {
 	// are rejected.
 	// Required.
 	// +unionDiscriminator
-	// +k8s:alpha(since: "1.36")=+k8s:required
-	// +k8s:alpha(since: "1.36")=+k8s:modeDiscriminator
+	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:modeDiscriminator
 	Type LimitResponseType `json:"type" protobuf:"bytes,1,opt,name=type"`
 
 	// `queuing` holds the configuration parameters for queuing.
 	// This field may be non-empty only if `type` is `"Queue"`.
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:ifMode("Queue")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:ifMode("Queue")=+k8s:required
 	Queuing *QueuingConfiguration `json:"queuing,omitempty" protobuf:"bytes,2,opt,name=queuing"`
 }
 

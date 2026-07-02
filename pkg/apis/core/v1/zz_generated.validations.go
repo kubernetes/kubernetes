@@ -409,14 +409,14 @@ func Validate_ReplicationController(
 			func() { // cohort = "name"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName).MarkAlpha(); len(e) != 0 {
+					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName).MarkBeta(); len(e) != 0 {
 					errs = append(errs, e...)
 				}
 			}()
@@ -475,14 +475,14 @@ func Validate_ReplicationControllerSpec(
 			// call field-attached validations
 			earlyReturn := false
 			// optional fields with default values are effectively required
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -507,7 +507,7 @@ func Validate_ReplicationControllerSpec(
 				}
 			}
 			// call field-attached validations
-			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

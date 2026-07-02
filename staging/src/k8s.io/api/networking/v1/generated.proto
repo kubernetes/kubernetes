@@ -107,8 +107,8 @@ message IPAddressSpec {
   // ParentRef references the resource that an IPAddress is attached to.
   // An IPAddress must reference a parent object.
   // +required
-  // +k8s:alpha(since: "1.36")=+k8s:required
-  // +k8s:alpha(since: "1.36")=+k8s:immutable
+  // +k8s:beta(since: "1.37")=+k8s:required
+  // +k8s:beta(since: "1.37")=+k8s:immutable
   optional ParentReference parentRef = 1;
 }
 
@@ -119,7 +119,7 @@ message IPBlock {
   // cidr is a string representing the IPBlock
   // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
   // +required
-  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:beta(since: "1.37")=+k8s:required
   optional string cidr = 1;
 
   // except is a slice of CIDRs that should not be included within an IPBlock
@@ -205,12 +205,12 @@ message IngressClassParametersReference {
 
   // kind is the type of resource being referenced.
   // +required
-  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:beta(since: "1.37")=+k8s:required
   optional string kind = 2;
 
   // name is the name of resource being referenced.
   // +required
-  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:beta(since: "1.37")=+k8s:required
   optional string name = 3;
 
   // scope represents if this refers to a cluster or namespace scoped resource.
@@ -239,7 +239,7 @@ message IngressClassSpec {
   // configuration for the controller. This is optional if the controller does
   // not require extra parameters.
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:optional
   optional IngressClassParametersReference parameters = 2;
 }
 
@@ -456,7 +456,7 @@ message NetworkPolicyEgressRule {
   // allows traffic only if the traffic matches at least one item in the to list.
   // +optional
   // +listType=atomic
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:optional
   repeated NetworkPolicyPeer to = 2;
 }
 
@@ -479,7 +479,7 @@ message NetworkPolicyIngressRule {
   // allows traffic only if the traffic matches at least one item in the from list.
   // +optional
   // +listType=atomic
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:optional
   repeated NetworkPolicyPeer from = 2;
 }
 
@@ -518,7 +518,7 @@ message NetworkPolicyPeer {
   // ipBlock defines policy on a particular IPBlock. If this field is set then
   // neither of the other fields can be.
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:optional
   optional IPBlock ipBlock = 3;
 }
 
@@ -564,7 +564,7 @@ message NetworkPolicySpec {
   // solely to ensure that the pods it selects are isolated by default)
   // +optional
   // +listType=atomic
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:optional
   repeated NetworkPolicyIngressRule ingress = 2;
 
   // egress is a list of egress rules to be applied to the selected pods. Outgoing traffic
@@ -576,7 +576,7 @@ message NetworkPolicySpec {
   // This field is beta-level in 1.8
   // +optional
   // +listType=atomic
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:optional
   repeated NetworkPolicyEgressRule egress = 3;
 
   // policyTypes is a list of rule types that the NetworkPolicy relates to.
@@ -602,7 +602,7 @@ message ParentReference {
 
   // Resource is the resource of the object being referenced.
   // +required
-  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:beta(since: "1.37")=+k8s:required
   optional string resource = 2;
 
   // Namespace is the namespace of the object being referenced.
@@ -611,7 +611,7 @@ message ParentReference {
 
   // Name is the name of the object being referenced.
   // +required
-  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:beta(since: "1.37")=+k8s:required
   optional string name = 4;
 }
 

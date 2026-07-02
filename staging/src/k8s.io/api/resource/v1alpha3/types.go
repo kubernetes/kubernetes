@@ -149,7 +149,7 @@ type DeviceTaint struct {
 	// Consumers must treat unknown effects like None.
 	//
 	// +required
-	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	Effect DeviceTaintEffect `json:"effect" protobuf:"bytes,3,name=effect,casttype=DeviceTaintEffect"`
 
 	// ^^^^
@@ -188,7 +188,7 @@ type DeviceTaint struct {
 }
 
 // +enum
-// +k8s:alpha(since: "1.36")=+k8s:enum
+// +k8s:beta(since: "1.37")=+k8s:enum
 type DeviceTaintEffect string
 
 const (

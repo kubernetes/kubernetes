@@ -62,25 +62,25 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				obj.Endpoints[0].Addresses = nil
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("endpoints").Index(0).Child("addresses"), "").MarkAlpha(),
+				field.Required(field.NewPath("endpoints").Index(0).Child("addresses"), "").MarkBeta(),
 			},
 		},
 		"invalid too many endpoint addresses": {
 			input: mkValidEndpointSlice(tweakAddresses(101)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems").MarkBeta(),
 			},
 		},
 		"invalid missing addressType": {
 			input: mkValidEndpointSlice(tweakAddressType("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("addressType"), "").MarkAlpha(),
+				field.Required(field.NewPath("addressType"), "").MarkBeta(),
 			},
 		},
 		"invalid addressType not supported": {
 			input: mkValidEndpointSlice(tweakAddressType("invalid")),
 			expectedErrs: field.ErrorList{
-				field.NotSupported(field.NewPath("addressType"), discovery.AddressType("invalid"), []string{string(discovery.AddressTypeIPv4), string(discovery.AddressTypeIPv6), string(discovery.AddressTypeFQDN)}).MarkAlpha(),
+				field.NotSupported(field.NewPath("addressType"), discovery.AddressType("invalid"), []string{string(discovery.AddressTypeIPv4), string(discovery.AddressTypeIPv6), string(discovery.AddressTypeFQDN)}).MarkBeta(),
 			},
 		},
 	}
@@ -130,21 +130,21 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				obj.Endpoints[0].Addresses = nil
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("endpoints").Index(0).Child("addresses"), "").MarkAlpha(),
+				field.Required(field.NewPath("endpoints").Index(0).Child("addresses"), "").MarkBeta(),
 			},
 		},
 		"invalid update too many addresses": {
 			oldObj:    mkValidEndpointSlice(),
 			updateObj: mkValidEndpointSlice(tweakAddresses(101)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("endpoints").Index(0).Child("addresses"), 101, 100).WithOrigin("maxItems").MarkBeta(),
 			},
 		},
 		"invalid update addressType immutable": {
 			oldObj:    mkValidEndpointSlice(),
 			updateObj: mkValidEndpointSlice(tweakAddressType(discovery.AddressTypeIPv6)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("addressType"), discovery.AddressTypeIPv6, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("addressType"), discovery.AddressTypeIPv6, "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 	}

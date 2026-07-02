@@ -56,7 +56,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"schedule: empty": {
 			input: mkCronJob(tweakSchedule("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "schedule"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "schedule"), "").MarkBeta(),
 			},
 		},
 		"jobTemplate.spec.maxFailedIndexes set without backoffLimitPerIndex": {
@@ -124,7 +124,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkCronJob(),
 			update: mkCronJob(tweakSchedule("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "schedule"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "schedule"), "").MarkBeta(),
 			},
 		},
 	}
