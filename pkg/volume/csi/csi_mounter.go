@@ -236,7 +236,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	serviceAccountTokenAttrs, serviceAccountTokenInSecrets, err := c.podServiceAccountTokenAttrs()
 	if err != nil {
-		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service accoount token attributes: %v", err))
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service account token attributes: %v", err))
 	}
 
 	// Inject service account token information into
