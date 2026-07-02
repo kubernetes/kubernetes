@@ -67,6 +67,7 @@ type TokenREST struct {
 	maxExpirationSeconds         int64
 	extendExpiration             bool
 	maxExtendedExpirationSeconds int64
+	scheme                       *runtime.Scheme
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
@@ -139,7 +140,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	req.Status = authenticationapi.TokenRequestStatus{}
 
 	// call static validation, then validating admission
-	if errs := authenticationvalidation.ValidateTokenRequest(req); len(errs) != 0 {
+	if errs := authenticationvalidation.ValidateTokenRequestCreate(ctx, r.scheme, req); len(errs) != 0 {
 		return nil, errors.NewInvalid(gvk.GroupKind(), "", errs)
 	}
 	if createValidation != nil {

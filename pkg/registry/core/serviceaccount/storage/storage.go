@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -69,8 +70,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, 
 			auds:                         auds,
 			audsSet:                      sets.NewString(auds...),
 			maxExpirationSeconds:         int64(max.Seconds()),
-			maxExtendedExpirationSeconds: int64(maxExtendedExpiration.Seconds()),
 			extendExpiration:             extendExpiration,
+			maxExtendedExpirationSeconds: int64(maxExtendedExpiration.Seconds()),
+			scheme:                       legacyscheme.Scheme,
 		}
 	}
 
