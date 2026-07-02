@@ -688,6 +688,7 @@ type setupOptions struct {
 	codec          runtime.Codec
 	newFunc        func() runtime.Object
 	newListFunc    func() runtime.Object
+	reverseKeyFunc storage.ReverseKeyFunc
 	prefix         string
 	resourcePrefix string
 	groupResource  schema.GroupResource
@@ -742,6 +743,7 @@ func withDefaults(options *setupOptions) {
 	options.codec = apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	options.newFunc = newPod
 	options.newListFunc = newPodList
+	options.reverseKeyFunc = parsePodKey
 	options.prefix = ""
 	options.resourcePrefix = "/pods/"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
@@ -767,6 +769,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		setupOpts.codec,
 		setupOpts.newFunc,
 		setupOpts.newListFunc,
+		setupOpts.reverseKeyFunc,
 		setupOpts.prefix,
 		setupOpts.resourcePrefix,
 		setupOpts.groupResource,
@@ -1086,6 +1089,35 @@ func BenchmarkStoreList(b *testing.B) {
 
 func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+}
+
+func parsePodKey(key string) (name string, namespace string, err error) {
+	prefix := "/pods/"
+	tokens := strings.Split(key[len(prefix):], "/")
+	if len(tokens) != 2 {
+		err = fmt.Errorf("invalid key %q, requiring namspace/", key)
+		return
+	}
+	return tokens[1], tokens[0], nil
+}
+
+func TestParsePodKey(t *testing.T) {
+	// Verify that parsePodKey correctly reverses keys produced by computePodKey.
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "testpod", Namespace: "testns"}}
+	key := computePodKey(pod)
+	name, namespace, err := parsePodKey(key)
+	if err != nil {
+		t.Errorf("unexpected error for key %q: %v", key, err)
+	}
+	if name != pod.Name || namespace != pod.Namespace {
+		t.Errorf("expected name=%q namespace=%q, got name=%q namespace=%q", pod.Name, pod.Namespace, name, namespace)
+	}
+
+	// Verify that parsePodKey returns an error for a malformed key.
+	_, _, err = parsePodKey("/pods/onlyonenamespace")
+	if err == nil {
+		t.Error("expected error for malformed key")
+	}
 }
 
 func TestGetCurrentResourceVersion(t *testing.T) {

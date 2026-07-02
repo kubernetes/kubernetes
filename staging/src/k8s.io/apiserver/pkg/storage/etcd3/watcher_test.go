@@ -73,6 +73,10 @@ func TestWatch(t *testing.T) {
 		ctx, store, _ := testSetup(t)
 		storagetesting.RunTestWatchFromNonZero(ctx, t, store)
 	})
+	t.Run("WatchWithoutPrevKV", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestWatchWithoutPrevKV(ctx, t, store)
+	})
 	t.Run("DelayedWatchDelivery", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
 		storagetesting.RunTestDelayedWatchDelivery(ctx, t, store)
@@ -313,6 +317,7 @@ func TestWatchChanSync(t *testing.T) {
 					0,
 					true,
 					false,
+					true,
 					storage.Everything)
 
 				sync := w.syncPaginated
@@ -399,7 +404,7 @@ func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 	kvWrapper.streamUnimplemented = true
 	store.client.KV = kvWrapper
 
-	w := store.watcher.createWatchChan(origCtx, "/pods/", 0, true, false, storage.Everything)
+	w := store.watcher.createWatchChan(origCtx, "/pods/", 0, true, false, true, storage.Everything)
 
 	if err := w.sync(); err != nil {
 		t.Fatalf("sync failed: %v", err)
@@ -428,7 +433,7 @@ func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 
 func drainSync(t *testing.T, store *store, ctx context.Context, sync func(*watchChan) error) map[string]*event {
 	t.Helper()
-	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, true, storage.Everything)
 	if err := sync(wc); err != nil {
 		t.Fatalf("sync failed: %v", err)
 	}
@@ -464,7 +469,7 @@ func TestWatchChanSyncStreamCompactionError(t *testing.T) {
 	legacyregistry.Reset()
 	t.Cleanup(legacyregistry.Reset)
 
-	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, true, storage.Everything)
 	if err := wc.syncStreamRecursive(); !apierrors.IsResourceExpired(err) {
 		t.Fatalf("expected ResourceExpired from a compacted revision, got %T %v", err, err)
 	}
@@ -491,7 +496,7 @@ func TestWatchChanSyncStreamMetrics(t *testing.T) {
 		legacyregistry.Reset()
 		t.Cleanup(legacyregistry.Reset)
 
-		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, true, storage.Everything)
 		if err := wc.syncStreamRecursive(); err != nil {
 			t.Fatal(err)
 		}
@@ -514,7 +519,7 @@ etcd_requests_total{group="",operation="listStream",resource="pods"} 1
 		legacyregistry.Reset()
 		t.Cleanup(legacyregistry.Reset)
 
-		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, true, storage.Everything)
 		err := wc.syncStreamRecursive()
 		if grpcstatus.Code(err) != grpccodes.Unimplemented {
 			t.Fatalf("expected Unimplemented error, got %v", err)

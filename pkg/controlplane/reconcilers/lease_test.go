@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
@@ -336,7 +337,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
 			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, registry.NamespaceReverseKeyFunc(baseKey), baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}
@@ -426,7 +427,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
 			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, registry.NamespaceReverseKeyFunc(baseKey), baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}
@@ -541,7 +542,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
 			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, registry.NamespaceReverseKeyFunc(baseKey), baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}
@@ -658,7 +659,7 @@ func TestApiserverShutdown(t *testing.T) {
 			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
 			// ref: https://issues.k8s.io/114049
 			baseKey := "/" + uuid.New().String() + "/masterleases/"
-			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, registry.NamespaceReverseKeyFunc(baseKey), baseKey)
 			if err != nil {
 				t.Fatalf("Error creating storage: %v", err)
 			}
