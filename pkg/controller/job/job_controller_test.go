@@ -7926,6 +7926,11 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 	gangWorkload := makeWorkload(gangJob)
 	gangPodGroup := makePodGroup(gangJob, gangWorkload)
 
+	// A Basic Job (no spec.scheduling) still materializes a Workload/PodGroup
+	// under Universal Representation, so its pods get a schedulingGroup too.
+	basicJob := newJob(2, 5, 6, batch.NonIndexedCompletion)
+	basicPodGroupName := computePodGroupName(computeWorkloadName(basicJob), podGroupTemplateName(basicJob))
+
 	testCases := map[string]struct {
 		job              *batch.Job
 		existingWorkload *schedulingv1alpha3.Workload
@@ -7947,10 +7952,12 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			wantPodGroupOwnerRef:    true,
 			wantCreations:           4,
 		},
-		"non-eligible job: no schedulingGroup on pods": {
-			job:             newJob(2, 5, 6, batch.NonIndexedCompletion),
-			workloadWithJob: true,
-			wantCreations:   2,
+		"basic job: Workload/PodGroup materialized and pods get schedulingGroup": {
+			job:                     basicJob,
+			workloadWithJob:         true,
+			wantSchedulingGroupName: basicPodGroupName,
+			wantPodGroupOwnerRef:    true,
+			wantCreations:           2,
 		},
 		"job with pre-existing schedulingGroup: preserved without PodGroup ownerRef": {
 			job: func() *batch.Job {
