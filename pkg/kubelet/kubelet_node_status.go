@@ -673,8 +673,10 @@ func (kl *Kubelet) setNodeStatus(ctx context.Context, node *v1.Node) {
 			logger.Error(err, "Failed to set some node status fields", "node", klog.KObj(node))
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && kl.nodeDeclaredFeatures != nil {
-		node.Status.DeclaredFeatures = kl.nodeDeclaredFeatures
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		if ndf := kl.getNodeDeclaredFeatures(); ndf != nil {
+			node.Status.DeclaredFeatures = ndf
+		}
 	}
 }
 
