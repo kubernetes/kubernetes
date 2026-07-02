@@ -635,3 +635,126 @@ type TopologyConstraint struct {
 	// +k8s:format=k8s-label-key
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 }
+
+// WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling
+// constraints, such as topology.
+type WorkloadPodGroupSchedulingConstraints struct {
+	// Topology specifies desired topological placements for all pods
+	// within the scheduling group.
+	// This field is optional, which means if unset, no topology
+	// placement is required.
+	//
+	// +optional
+	// +k8s:optional
+	// +listType=atomic
+	// +k8s:listType=atomic
+	Topology []TopologyConstraint `json:"topology,omitempty" protobuf:"bytes,1,rep,name=topology"`
+}
+
+// WorkloadPodGroupDisruptionMode defines how individual pods within a
+// group can be disrupted. Exactly one mode must be set.
+//
+// +union
+type WorkloadPodGroupDisruptionMode struct {
+	// Single specifies that pods can be disrupted independently from each other.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Single *WorkloadPodGroupSingleDisruptionMode `json:"single,omitempty" protobuf:"bytes,1,opt,name=single"`
+
+	// All specifies that all pods in the group must be disrupted together.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	All *WorkloadPodGroupAllDisruptionMode `json:"all,omitempty" protobuf:"bytes,2,opt,name=all"`
+}
+
+// WorkloadPodGroupSingleDisruptionMode indicates that individual pods
+// can be disrupted independently.
+type WorkloadPodGroupSingleDisruptionMode struct {
+	// Intentionally empty for now.
+}
+
+// WorkloadPodGroupAllDisruptionMode indicates that all pods in the
+// group must be disrupted together.
+type WorkloadPodGroupAllDisruptionMode struct {
+	// Intentionally empty for now.
+}
+
+// WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a
+// group of pods managed by a workload controller.
+// Exactly one policy must be set.
+//
+// +union
+type WorkloadPodGroupSchedulingPolicy struct {
+	// Basic specifies that standard, pod-by-pod Kubernetes scheduling
+	// behavior should be used.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Basic *WorkloadPodGroupBasicSchedulingPolicy `json:"basic,omitempty" protobuf:"bytes,1,opt,name=basic"`
+
+	// Gang specifies all-or-nothing scheduling semantics.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Gang *WorkloadPodGroupGangSchedulingPolicy `json:"gang,omitempty" protobuf:"bytes,2,opt,name=gang"`
+}
+
+// WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes
+// scheduling behavior.
+type WorkloadPodGroupBasicSchedulingPolicy struct {
+	// Intentionally empty for now.
+}
+
+// WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang
+// (all-or-nothing) scheduling.
+type WorkloadPodGroupGangSchedulingPolicy struct {
+	// MinCount is the minimum number of pods that must be scheduled
+	// at the same time for the scheduler to admit the entire group.
+	// This field is optional. If it is not specified, the controller
+	// should inject a context-specific sane default (e.g.,
+	// parallelism for a Job).
+	//
+	// +optional
+	// +k8s:optional
+	MinCount *int32 `json:"minCount,omitempty" protobuf:"varint,1,opt,name=minCount"`
+}
+
+// WorkloadPodGroupResourceClaim references a dynamic resource claim
+// that is shared across pods in the group.
+type WorkloadPodGroupResourceClaim struct {
+	// Name uniquely identifies this resource claim inside the group.
+	// This field is required. It must be a DNS_LABEL.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-short-name
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// ResourceClaimName is the name of a ResourceClaim object in the same
+	// namespace.
+	// This field is optional. If it is not specified, no resource claim
+	// is used. If set, it must be a DNS subdomain.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	// +k8s:format=k8s-long-name
+	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimName"`
+
+	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+	// object in the same namespace.
+	// This field is optional. If it is not specified, no resource claim
+	// template is used. If set, it must be a DNS subdomain.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	// +k8s:format=k8s-long-name
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,3,opt,name=resourceClaimTemplateName"`
+}
