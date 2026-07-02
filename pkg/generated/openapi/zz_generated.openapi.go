@@ -14466,7 +14466,6 @@ func schema_k8sio_api_autoscaling_v1_ContainerResourceMetricStatus(ref common.Re
 						},
 					},
 				},
-				Required: []string{"name", "currentAverageValue", "container"},
 			},
 		},
 		Dependencies: []string{
@@ -14592,7 +14591,6 @@ func schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"metricName", "currentValue"},
 			},
 		},
 		Dependencies: []string{
@@ -14668,7 +14666,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref common
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the status of the condition (True, False, Unknown)",
+							Description: "status is the status of the condition, one of True, False, Unknown.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -14702,7 +14700,6 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref common
 						},
 					},
 				},
-				Required: []string{"type", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -14849,7 +14846,6 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref common.Re
 						},
 					},
 				},
-				Required: []string{"currentReplicas", "desiredReplicas"},
 			},
 		},
 		Dependencies: []string{
@@ -14921,7 +14917,7 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "type is the type of metric source.  It will be one of \"ContainerResource\", \"External\", \"Object\", \"Pods\" or \"Resource\", each corresponds to a matching field in the object.\n\nPossible enum values:\n - `\"ContainerResource\"` is a resource metric known to Kubernetes, as specified in requests and limits, describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics (the \"pods\" source).\n - `\"External\"` is a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).\n - `\"Object\"` is a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).\n - `\"Pods\"` is a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.\n - `\"Resource\"` is a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics (the \"pods\" source).",
+							Description: "type is the type of metric source.  It should be one of \"ContainerResource\", \"External\", \"Object\", \"Pods\" or \"Resource\", each corresponds to a matching field in the object.\n\nPossible enum values:\n - `\"ContainerResource\"` is a resource metric known to Kubernetes, as specified in requests and limits, describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics (the \"pods\" source).\n - `\"External\"` is a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).\n - `\"Object\"` is a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).\n - `\"Pods\"` is a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.\n - `\"Resource\"` is a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics (the \"pods\" source).",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -14959,7 +14955,6 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 						},
 					},
 				},
-				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -15008,7 +15003,7 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"target", "metricName", "targetValue"},
+				Required: []string{"target", "metricName"},
 			},
 		},
 		Dependencies: []string{
@@ -15057,7 +15052,6 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"target", "metricName", "currentValue"},
 			},
 		},
 		Dependencies: []string{
@@ -15129,7 +15123,6 @@ func schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"metricName", "currentAverageValue"},
 			},
 		},
 		Dependencies: []string{
@@ -15203,7 +15196,6 @@ func schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"name", "currentAverageValue"},
 			},
 		},
 		Dependencies: []string{
@@ -15305,7 +15297,6 @@ func schema_k8sio_api_autoscaling_v1_ScaleStatus(ref common.ReferenceCallback) c
 						},
 					},
 				},
-				Required: []string{"replicas"},
 			},
 		},
 	}
@@ -15381,7 +15372,6 @@ func schema_k8sio_api_autoscaling_v2_ContainerResourceMetricStatus(ref common.Re
 						},
 					},
 				},
-				Required: []string{"name", "current", "container"},
 			},
 		},
 		Dependencies: []string{
@@ -15478,7 +15468,6 @@ func schema_k8sio_api_autoscaling_v2_ExternalMetricStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"metric", "current"},
 			},
 		},
 		Dependencies: []string{
@@ -15672,7 +15661,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerCondition(ref common
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the status of the condition (True, False, Unknown)",
+							Description: "status is the status of the condition, one of True, False, Unknown.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -15706,7 +15695,6 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerCondition(ref common
 						},
 					},
 				},
-				Required: []string{"type", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -15903,7 +15891,6 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerStatus(ref common.Re
 						},
 					},
 				},
-				Required: []string{"desiredReplicas"},
 			},
 		},
 		Dependencies: []string{
@@ -16041,7 +16028,6 @@ func schema_k8sio_api_autoscaling_v2_MetricStatus(ref common.ReferenceCallback) 
 						},
 					},
 				},
-				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -16192,7 +16178,6 @@ func schema_k8sio_api_autoscaling_v2_ObjectMetricStatus(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"metric", "current", "describedObject"},
 			},
 		},
 		Dependencies: []string{
@@ -16252,7 +16237,6 @@ func schema_k8sio_api_autoscaling_v2_PodsMetricStatus(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"metric", "current"},
 			},
 		},
 		Dependencies: []string{
@@ -16314,7 +16298,6 @@ func schema_k8sio_api_autoscaling_v2_ResourceMetricStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"name", "current"},
 			},
 		},
 		Dependencies: []string{

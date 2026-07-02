@@ -32,7 +32,7 @@ import (
 type HorizontalPodAutoscalerConditionApplyConfiguration struct {
 	// type describes the current condition
 	Type *autoscalingv2.HorizontalPodAutoscalerConditionType `json:"type,omitempty"`
-	// status is the status of the condition (True, False, Unknown)
+	// status is the status of the condition, one of True, False, Unknown.
 	Status *v1.ConditionStatus `json:"status,omitempty"`
 	// lastTransitionTime is the last time the condition transitioned from
 	// one status to another
