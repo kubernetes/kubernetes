@@ -19,6 +19,7 @@ package cache
 import (
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -81,6 +82,38 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 		t, generatedVolumeName, []string{"volume-name"}, false /* expectReportedInUse */, dsw)
 	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
+}
+
+// Calls AddPodToVolume() with a nil volume spec.
+// Verifies it returns an error and leaves the desired state unchanged.
+func Test_AddPodToVolume_Negative_NilVolumeSpec(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod-nil-volume-spec",
+			UID:  "pod-nil-volume-spec-uid",
+		},
+	}
+	podName := util.GetUniquePodName(pod)
+
+	generatedVolumeName, err := dsw.AddPodToVolume(
+		logger, podName, pod, nil, "" /* outerVolumeSpecName */, "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
+
+	if err == nil {
+		t.Fatal("AddPodToVolume did not fail. Expected error for nil volume spec, got nil")
+	}
+	if !strings.Contains(err.Error(), "volume spec is nil") {
+		t.Fatalf("AddPodToVolume returned unexpected error. Expected to contain %q, got %q", "volume spec is nil", err.Error())
+	}
+	if generatedVolumeName != "" {
+		t.Fatalf("AddPodToVolume returned unexpected volume name. Expected empty, got %q", generatedVolumeName)
+	}
+	if volumesToMount := dsw.GetVolumesToMount(); len(volumesToMount) != 0 {
+		t.Fatalf("AddPodToVolume mutated desired state. Expected no volumes, got %v", volumesToMount)
+	}
 }
 
 // Calls AddPodToVolume() twice to add the same pod to the same volume
