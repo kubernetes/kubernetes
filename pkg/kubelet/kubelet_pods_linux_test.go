@@ -447,6 +447,47 @@ func TestMakeMounts(t *testing.T) {
 			expectErr:      true,
 			expectedErrMsg: "cannot find volume \"disk\" to mount into container \"\"",
 		},
+		"volume requires SELinux relabel": {
+			imageVolumeFeatureEnabled: []bool{true, false},
+			podVolumes: kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{
+					Mounter: &stubVolume{
+						path: "/mnt/disk",
+						attributes: volume.Attributes{
+							Managed:        true,
+							SELinuxRelabel: true,
+						},
+					},
+				},
+			},
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/mnt/path",
+						Name:      "disk",
+						ReadOnly:  false,
+					},
+				},
+			},
+			expectedMounts: []kubecontainer.Mount{
+				{
+					Name:           "disk",
+					ContainerPath:  "/mnt/path",
+					HostPath:       "/mnt/disk",
+					ReadOnly:       false,
+					SELinuxRelabel: true,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
+				},
+				{
+					Name:           "k8s-managed-etc-hosts",
+					ContainerPath:  "/etc/hosts",
+					HostPath:       "/pod/etc-hosts",
+					ReadOnly:       false,
+					SELinuxRelabel: true,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
