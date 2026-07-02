@@ -290,10 +290,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					logger = klog.LoggerWithValues(logger, "matchAttribute", matchAttribute)
 				}
 				m := &matchAttributeConstraint{
-					logger:        logger,
-					requestNames:  sets.New(constraint.Requests...),
-					attributeName: matchAttribute,
-					features:      a.features,
+					logger:            logger,
+					requestNames:      sets.New(constraint.Requests...),
+					attributeName:     matchAttribute,
+					features:          a.features,
+					attributeSetCache: newDeviceAttributeAsSetCache(matchAttribute),
 				}
 				constraints[i] = m
 			case constraint.DistinctAttribute != nil:
@@ -304,11 +305,13 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					logger = klog.LoggerWithValues(logger, "distinctAttribute", distinctAttribute)
 				}
 				m := &distinctAttributeConstraint{
-					logger:        logger,
-					requestNames:  sets.New(constraint.Requests...),
-					attributeName: distinctAttribute,
-					features:      a.features,
-					attributes:    make(map[string]resourceapi.DeviceAttribute),
+					logger:            logger,
+					requestNames:      sets.New(constraint.Requests...),
+					attributeName:     distinctAttribute,
+					features:          a.features,
+					attributes:        make(map[string]resourceapi.DeviceAttribute),
+					attributeSets:     make(map[string]*deviceAttributeListAsSet),
+					attributeSetCache: newDeviceAttributeAsSetCache(distinctAttribute),
 				}
 				constraints[i] = m
 			default:
@@ -803,6 +806,61 @@ type deviceAttributeListAsSet struct {
 	versionValue sets.Set[string]
 }
 
+// deviceAttributeAsSetCache caches the set representation for one fixed
+// attribute name, so device ID is enough as the map key.
+type deviceAttributeAsSetCache struct {
+	attributeName resourceapi.FullyQualifiedName
+	attributeSets map[DeviceID]*deviceAttributeListAsSet
+}
+
+func newDeviceAttributeAsSetCache(attributeName resourceapi.FullyQualifiedName) *deviceAttributeAsSetCache {
+	return &deviceAttributeAsSetCache{
+		attributeName: attributeName,
+		attributeSets: make(map[DeviceID]*deviceAttributeListAsSet),
+	}
+}
+
+func (c *deviceAttributeAsSetCache) get(device *draapi.Device, deviceID DeviceID) *deviceAttributeListAsSet {
+	if c.attributeSets == nil {
+		c.attributeSets = make(map[DeviceID]*deviceAttributeListAsSet)
+	}
+
+	if attributeSet, ok := c.attributeSets[deviceID]; ok {
+		return attributeSet
+	}
+
+	attribute := lookupAttribute(device, deviceID, c.attributeName)
+	if attribute == nil {
+		c.attributeSets[deviceID] = nil
+		return nil
+	}
+
+	attributeSet := attributeAsSet(attribute)
+	c.attributeSets[deviceID] = attributeSet
+	return attributeSet
+}
+
+func (s *deviceAttributeListAsSet) clone() *deviceAttributeListAsSet {
+	if s == nil {
+		return nil
+	}
+
+	result := &deviceAttributeListAsSet{}
+	if s.intValue != nil {
+		result.intValue = s.intValue.Clone()
+	}
+	if s.boolValue != nil {
+		result.boolValue = s.boolValue.Clone()
+	}
+	if s.stringValue != nil {
+		result.stringValue = s.stringValue.Clone()
+	}
+	if s.versionValue != nil {
+		result.versionValue = s.versionValue.Clone()
+	}
+	return result
+}
+
 // hasIntersection checks if two attribute sets have common elements.
 // Returns true if there is at least one common element.
 func (s *deviceAttributeListAsSet) hasIntersection(other *deviceAttributeListAsSet) bool {
@@ -902,7 +960,8 @@ type matchAttributeConstraint struct {
 	attribute *resourceapi.DeviceAttribute
 
 	// For list values (when DRAListTypeAttributes feature gate is enabled)
-	intersection *deviceAttributeListAsSet
+	intersection      *deviceAttributeListAsSet
+	attributeSetCache *deviceAttributeAsSetCache
 
 	numDevices int
 }
@@ -914,23 +973,31 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 		return true
 	}
 
-	attribute := lookupAttribute(device, deviceID, m.attributeName)
-	if attribute == nil {
-		// Doesn't have the attribute.
-		m.logger.V(7).Info("Constraint not satisfied, attribute not set")
-		return false
+	var attribute *resourceapi.DeviceAttribute
+	var attributeSet *deviceAttributeListAsSet
+	if m.features.ListTypeAttributes {
+		if m.attributeSetCache == nil {
+			m.attributeSetCache = newDeviceAttributeAsSetCache(m.attributeName)
+		}
+		attributeSet = m.attributeSetCache.get(device, deviceID)
+	} else {
+		attribute = lookupAttribute(device, deviceID, m.attributeName)
+		if attribute == nil {
+			// Doesn't have the attribute.
+			m.logger.V(7).Info("Constraint not satisfied, attribute not set")
+			return false
+		}
 	}
 
 	if m.numDevices == 0 {
 		// The first device can always get picked.
 		// Initialize either scalar attribute or list set based on the attribute type.
 		if m.features.ListTypeAttributes {
-			// Convert attribute to set representation (both scalar and list)
-			m.intersection = attributeAsSet(attribute)
-			if m.intersection == nil {
+			if attributeSet == nil {
 				m.logger.V(7).Info("Attribute type unknown")
 				return false
 			}
+			m.intersection = attributeSet.clone()
 		} else {
 			// Scalar attribute: use existing behavior
 			m.attribute = attribute
@@ -942,18 +1009,15 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 
 	// Check if we are matching with set-based logic or scalar-based logic
 	if m.features.ListTypeAttributes {
-		// Set-based matching: check if there is non-empty intersection
-		newSet := attributeAsSet(attribute)
-		if newSet == nil {
+		if attributeSet == nil {
 			m.logger.V(7).Info("Unknown attribute type")
 			return false
 		}
-		if !m.intersection.hasIntersection(newSet) {
+		if !m.intersection.hasIntersection(attributeSet) {
 			m.logger.V(7).Info("Attribute values have no common elements")
 			return false
 		}
-		// Update to intersection
-		m.intersection.updateToIntersection(newSet)
+		m.intersection.updateToIntersection(attributeSet)
 	} else {
 		// Scalar matching: use existing behavior
 		switch {

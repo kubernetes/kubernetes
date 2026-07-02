@@ -38,7 +38,16 @@ type distinctAttributeConstraint struct {
 	attributeName resourceapi.FullyQualifiedName
 	features      Features
 
+	// attributes tracks allocated scalar attributes when list-type
+	// attributes are disabled.
 	attributes map[string]resourceapi.DeviceAttribute
+
+	// attributeSets tracks allocated attribute sets when list-type
+	// attributes are enabled. attributeSetCache avoids re-building those
+	// sets for candidate devices.
+	attributeSets     map[string]*deviceAttributeListAsSet
+	attributeSetCache *deviceAttributeAsSetCache
+
 	numDevices int
 }
 
@@ -55,19 +64,42 @@ func (m *distinctAttributeConstraint) add(requestName, subRequestName string, de
 		return false
 	}
 
+	var attributeSet *deviceAttributeListAsSet
+	if m.features.ListTypeAttributes {
+		if m.attributeSetCache == nil {
+			m.attributeSetCache = newDeviceAttributeAsSetCache(m.attributeName)
+		}
+		if m.attributeSets == nil {
+			m.attributeSets = make(map[string]*deviceAttributeListAsSet)
+		}
+		attributeSet = m.attributeSetCache.get(device, deviceID)
+	}
+
 	if m.numDevices == 0 {
 		// The first device can always get picked.
-		m.attributes[requestName] = *attribute
+		if m.features.ListTypeAttributes {
+			m.attributeSets[requestName] = attributeSet
+		} else {
+			m.attributes[requestName] = *attribute
+		}
 		m.numDevices = 1
 		m.logger.V(7).Info("First attribute added")
 		return true
 	}
 
-	if !m.matchesAttribute(*attribute) {
-		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
-		return false
+	if m.features.ListTypeAttributes {
+		if !m.matchesAttributeSet(attributeSet) {
+			m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
+			return false
+		}
+		m.attributeSets[requestName] = attributeSet
+	} else {
+		if !m.matchesAttribute(*attribute) {
+			m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
+			return false
+		}
+		m.attributes[requestName] = *attribute
 	}
-	m.attributes[requestName] = *attribute
 	m.numDevices++
 	m.logger.V(7).Info("Constraint satisfied by device", "device", deviceID, "numDevices", m.numDevices)
 	return true
@@ -80,6 +112,7 @@ func (m *distinctAttributeConstraint) remove(requestName, subRequestName string,
 		return
 	}
 	delete(m.attributes, requestName)
+	delete(m.attributeSets, requestName)
 	m.numDevices--
 	m.logger.V(7).Info("Device removed from constraint set", "device", deviceID, "numDevices", m.numDevices)
 }
@@ -93,37 +126,28 @@ func (m *distinctAttributeConstraint) matches(requestName, subRequestName string
 	}
 }
 
-func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.DeviceAttribute) bool {
-	if m.features.ListTypeAttributes {
-		// Set-based comparison for ListAttributes feature:
-		// Check that the new device's attribute set is disjoint from all existing devices.
-		// This implements "Pairwise Disjoint" semantics for distinct attributes.
-		newSet := attributeAsSet(&attribute)
-		if newSet == nil {
-			m.logger.V(7).Info("Unknown attribute type")
-			return false
-		}
-
-		// Check that the new device is disjoint from each existing device
-		for _, attr := range m.attributes {
-			existingSet := attributeAsSet(&attr)
-			if existingSet == nil {
-				continue
-			}
-			if newSet.hasIntersection(existingSet) {
-				// New device has common elements with an existing device.
-				// This violates the distinct constraint.
-				m.logger.V(7).Info("Constraint not satisfied, devices have common elements")
-				return false
-			}
-		}
-
-		// New device is disjoint from all existing devices.
-		// The constraint is satisfied.
-		m.logger.V(7).Info("Constraint satisfied, new device is disjoint from all existing devices")
-		return true
+func (m *distinctAttributeConstraint) matchesAttributeSet(newSet *deviceAttributeListAsSet) bool {
+	if newSet == nil {
+		m.logger.V(7).Info("Unknown attribute type")
+		return false
 	}
 
+	// Check that the new device is disjoint from each existing device.
+	for _, existingSet := range m.attributeSets {
+		if existingSet == nil {
+			continue
+		}
+		if newSet.hasIntersection(existingSet) {
+			m.logger.V(7).Info("Constraint not satisfied, devices have common elements")
+			return false
+		}
+	}
+
+	m.logger.V(7).Info("Constraint satisfied, new device is disjoint from all existing devices")
+	return true
+}
+
+func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.DeviceAttribute) bool {
 	// Scalar comparison (existing behavior)
 	for _, attr := range m.attributes {
 		switch {
