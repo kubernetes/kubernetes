@@ -633,6 +633,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.26"
+- name: ExcludeAdmissionWebhookVirtualResources
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: ExecProbeTimeout
   versionedSpecs:
   - default: true
