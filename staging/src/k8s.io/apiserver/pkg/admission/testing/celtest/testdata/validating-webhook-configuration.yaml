@@ -1,0 +1,7 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+webhooks:
+  - name: validate.example.com
+    matchConditions:
+      - name: only-pods
+        expression: "request.resource.resource == 'pods'"

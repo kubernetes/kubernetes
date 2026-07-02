@@ -1,0 +1,26 @@
+object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: test-pod
+    namespace: default
+params:
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: policy-config
+  data:
+    allowed: "true"
+request:
+  operation: CREATE
+  kind:
+    version: v1
+    kind: Pod
+  resource:
+    version: v1
+    resource: pods
+namespaceObject:
+  apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: default
