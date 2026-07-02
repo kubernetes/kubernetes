@@ -4733,6 +4733,17 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: mountMode
       type:
         scalar: string
+- name: io.k8s.api.core.v1.CheckpointReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: uid
+      type:
+        scalar: string
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.CinderPersistentVolumeSource
   map:
     fields:
@@ -7368,6 +7379,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: restartPolicy
       type:
         scalar: string
+    - name: restoreFrom
+      type:
+        namedType: io.k8s.api.core.v1.CheckpointReference
     - name: runtimeClassName
       type:
         scalar: string

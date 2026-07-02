@@ -195,6 +195,10 @@ func init() {
 			"status.checkpointedPodTemplate.spec.podNetwork": {
 				{ErrorType: "FieldValueNotSupported"},
 			},
+			"status.checkpointedPodTemplate.spec.restoreFrom.name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.checkpointedPodTemplate.spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},

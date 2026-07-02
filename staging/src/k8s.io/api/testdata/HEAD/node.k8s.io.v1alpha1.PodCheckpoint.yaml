@@ -969,6 +969,9 @@ status:
         requests:
           requestsKey: "0"
       restartPolicy: restartPolicyValue
+      restoreFrom:
+        name: nameValue
+        uid: uidValue
       runtimeClassName: runtimeClassNameValue
       schedulerName: schedulerNameValue
       schedulingGates:
