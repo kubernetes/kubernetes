@@ -90,7 +90,6 @@ type CustomResourceDefinitionSpec struct {
 	// selectableFields specifies paths to fields that may be used as field selectors.
 	// See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
 	//
-	// +featureGate=CustomResourceFieldSelectors
 	// +optional
 	// +listType=atomic
 	SelectableFields []SelectableField `json:"selectableFields,omitempty" protobuf:"bytes,11,rep,name=selectableFields"`
@@ -244,7 +243,6 @@ type CustomResourceDefinitionVersion struct {
 	// selectableFields specifies paths to fields that may be used as field selectors.
 	// See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
 	//
-	// +featureGate=CustomResourceFieldSelectors
 	// +optional
 	// +listType=atomic
 	SelectableFields []SelectableField `json:"selectableFields,omitempty" protobuf:"bytes,9,rep,name=selectableFields"`
