@@ -66,11 +66,17 @@ func main() {
 	flag.StringVar(&leaseLockNamespace, "lease-lock-namespace", "", "the lease lock resource namespace")
 	flag.Parse()
 
+	// Some more complete example could also allow configuring different logging backends.
+	// In this one we use the klog default.
+	logger := klog.Background()
+
 	if leaseLockName == "" {
-		klog.Fatal("unable to get lease lock resource name (missing lease-lock-name flag).")
+		logger.Error(nil, "Unable to get lease lock resource name (missing lease-lock-name flag)")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	if leaseLockNamespace == "" {
-		klog.Fatal("unable to get lease lock resource namespace (missing lease-lock-namespace flag).")
+		logger.Error(nil, "Unable to get lease lock resource namespace (missing lease-lock-namespace flag)")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
 	// leader election uses the Kubernetes API by writing to a
@@ -80,13 +86,14 @@ func main() {
 	// independently.
 	config, err := buildConfig(kubeconfig)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "Building Kubernetes client configuration failed")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	client := clientset.NewForConfigOrDie(config)
 
 	run := func(ctx context.Context) {
 		// complete your controller loop here
-		klog.Info("Controller loop...")
+		logger.Info("Controller loop...")
 
 		select {}
 	}
@@ -103,7 +110,7 @@ func main() {
 	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-ch
-		klog.Info("Received termination, signaling shutdown")
+		logger.Info("Received termination, signaling shutdown")
 		cancel()
 	}()
 
@@ -145,15 +152,15 @@ func main() {
 				// when the LeaderElector exits, even if it did not start leading.
 				// Therefore, we should check if we actually started leading before
 				// performing any cleanup operations to avoid unexpected behavior.
-				klog.Infof("leader lost: %s", id)
+				logger.Info("Leader lost", "identity", id)
 
 				// Example check to ensure we only perform cleanup if we actually started leading
 				if startedLeading.Load() {
 					// Perform cleanup operations here
 					// For example, releasing resources, closing connections, etc.
-					klog.Info("Performing cleanup operations...")
+					logger.Info("Performing cleanup operations...")
 				} else {
-					klog.Info("No cleanup needed as we never started leading.")
+					logger.Info("Skipping cleanup because we never started leading")
 				}
 				os.Exit(0)
 			},
@@ -163,7 +170,7 @@ func main() {
 					// I just got the lock
 					return
 				}
-				klog.Infof("new leader elected: %s", identity)
+				logger.Info("New leader elected", "identity", identity)
 			},
 		},
 	})
