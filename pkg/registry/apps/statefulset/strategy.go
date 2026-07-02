@@ -129,7 +129,11 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
 	opts := pod.GetValidationOptionsFromPodTemplate(&statefulSet.Spec.Template, nil)
-	return validation.ValidateStatefulSet(statefulSet, opts)
+	setOpts := validation.StatefulSetValidationOptions{
+		AllowInvalidServiceName:          false, // require valid serviceNames in new StatefulSets
+		AllowStatefulSetRecreateStrategy: utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy),
+	}
+	return validation.ValidateStatefulSet(statefulSet, setOpts, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -160,8 +164,14 @@ func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	newStatefulSet := obj.(*apps.StatefulSet)
 	oldStatefulSet := old.(*apps.StatefulSet)
 
+	setOpts := validation.StatefulSetValidationOptions{
+		AllowInvalidServiceName:          true, // serviceName is immutable, tolerate existing invalid names on update
+		SkipValidateVolumeClaimTemplates: true, // volumeClaimTemplates are immutable, tolerate previously persisted invalid values on update
+		AllowStatefulSetRecreateStrategy: utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) ||
+			oldStatefulSet.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType,
+	}
 	opts := pod.GetValidationOptionsFromPodTemplate(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
-	return validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, opts)
+	return validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, setOpts, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

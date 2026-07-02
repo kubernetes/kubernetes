@@ -30,11 +30,34 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/features"
+)
+
+const (
+	// Reasons for the Progressing condition:
+
+	// RecreateInProgressReason is set on the Progressing condition when old revision
+	// pods are being deleted or are still terminating, or when new revision pods
+	// are being created as part of the Recreate update strategy.
+	RecreateInProgressReason = "RecreateInProgress"
+	// RecreateCompletedReason is set on the Progressing condition when all pods
+	// have been recreated with the update revision and are ready.
+	RecreateCompletedReason = "RecreateCompleted"
+	// RollingUpdateInProgressReason is set on the Progressing condition when
+	// pods are being updated via the RollingUpdate strategy.
+	RollingUpdateInProgressReason = "RollingUpdateInProgress"
+	// RollingUpdateCompletedReason is set on the Progressing condition when all
+	// pods have been updated via the RollingUpdate strategy.
+	RollingUpdateCompletedReason = "RollingUpdateCompleted"
+	// OnDeleteUpdatePendingReason is set on the Progressing condition when
+	// an update is pending and pods need to be manually deleted.
+	OnDeleteUpdatePendingReason = "OnDeleteUpdatePending"
 )
 
 var patchCodec = scheme.Codecs.LegacyCodec(apps.SchemeGroupVersion)
@@ -631,6 +654,12 @@ func completeUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
 		status.Replicas == *set.Spec.Replicas {
 		status.CurrentReplicas = status.UpdatedReplicas
 		status.CurrentRevision = status.UpdateRevision
+
+		// Update statefulset progressing condition upon completion
+		if getStatefulSetCondition(*status, apps.StatefulSetProgressing) != nil &&
+			set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
+			setProgressingCondition(status, RecreateCompletedReason, "All pods recreated successfully")
+		}
 	}
 }
 
@@ -684,4 +713,60 @@ func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, replicaCou
 		maxUnavailableNum = 1
 	}
 	return maxUnavailableNum, nil
+}
+
+// setProgressingCondition sets the Progressing condition on the status.
+func setProgressingCondition(status *apps.StatefulSetStatus, reason, message string) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
+		return
+	}
+	condition := newStatefulSetCondition(apps.StatefulSetProgressing, v1.ConditionTrue, reason, message)
+	setStatefulSetCondition(status, *condition)
+}
+
+// newStatefulSetCondition creates a new statefulset condition.
+func newStatefulSetCondition(condType apps.StatefulSetConditionType, status v1.ConditionStatus, reason, message string) *apps.StatefulSetCondition {
+	return &apps.StatefulSetCondition{
+		Type:               condType,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
+// getStatefulSetCondition returns the condition with the provided type.
+func getStatefulSetCondition(status apps.StatefulSetStatus, condType apps.StatefulSetConditionType) *apps.StatefulSetCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &status.Conditions[i]
+		}
+	}
+	return nil
+}
+
+// setStatefulSetCondition updates the statefulset to include the provided condition. If the condition that
+// we are about to add already exists and has the same status, reason, and message then we are not going to update.
+func setStatefulSetCondition(status *apps.StatefulSetStatus, condition apps.StatefulSetCondition) {
+	currentCond := getStatefulSetCondition(*status, condition.Type)
+	if currentCond == nil {
+		status.Conditions = append(status.Conditions, condition)
+		return
+	}
+
+	if currentCond.Status == condition.Status &&
+		currentCond.Reason == condition.Reason &&
+		currentCond.Message == condition.Message {
+		return
+	}
+	// Do not update lastTransitionTime if the status of the condition doesn't change.
+	if currentCond.Status == condition.Status {
+		condition.LastTransitionTime = currentCond.LastTransitionTime
+	}
+
+	currentCond.LastTransitionTime = condition.LastTransitionTime
+	currentCond.Status = condition.Status
+	currentCond.Reason = condition.Reason
+	currentCond.Message = condition.Message
 }
