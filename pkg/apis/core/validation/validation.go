@@ -4643,6 +4643,9 @@ type PodValidationOptions struct {
 	AllowSysAdminWhenPrivilegeEscalationFalse bool
 	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
 	AllowMLDSAPodCertificateKeyTypes bool
+	// Allow spec.restoreFrom to be set (gated by the PodLevelCheckpointRestore
+	// feature gate, with ratcheting for objects that already set it).
+	AllowRestoreFrom bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4901,6 +4904,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 			// covered by alpha DV dependentForbidden
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("schedulingGroup"), "may not be set when evictionResponders is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative())
 		}
+	}
+
+	if spec.RestoreFrom != nil && !opts.AllowRestoreFrom {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("restoreFrom"), "spec.restoreFrom may not be set: the PodLevelCheckpointRestore feature gate is disabled"))
 	}
 
 	allErrs = append(allErrs, validateFileKeyRefVolumes(spec, fldPath)...)
@@ -5960,6 +5967,10 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// tolerations are checked before the deep copy, so munge those too
 	mungedPodSpec.Tolerations = oldPod.Spec.Tolerations // +k8s:verify-mutation:reason=clone
 
+	// Declarative validation enforces spec.restoreFrom immutability. Exclude it
+	// from the catch-all comparison so the error identifies the field.
+	mungedPodSpec.RestoreFrom = oldPod.Spec.RestoreFrom // +k8s:verify-mutation:reason=clone
+
 	// Relax validation of immutable fields to allow it to be set to 1 if it was previously negative.
 	if oldPod.Spec.TerminationGracePeriodSeconds != nil && *oldPod.Spec.TerminationGracePeriodSeconds < 0 &&
 		mungedPodSpec.TerminationGracePeriodSeconds != nil && *mungedPodSpec.TerminationGracePeriodSeconds == 1 {
@@ -6183,6 +6194,55 @@ func ValidateEphemeralContainerStateTransition(newStatuses, oldStatuses []core.C
 	return allErrs
 }
 
+func validatePodRestoredConditionUpdate(newPod, oldPod *core.Pod, fldPath *field.Path) field.ErrorList {
+	var oldCondition *core.PodCondition
+	for i := range oldPod.Status.Conditions {
+		if oldPod.Status.Conditions[i].Type == core.PodRestored {
+			oldCondition = &oldPod.Status.Conditions[i]
+			break
+		}
+	}
+	var allErrs field.ErrorList
+	found := false
+	for i, condition := range newPod.Status.Conditions {
+		if condition.Type != core.PodRestored {
+			continue
+		}
+		path := fldPath.Index(i)
+		if found {
+			allErrs = append(allErrs, field.Duplicate(path.Child("type"), condition.Type))
+		}
+		found = true
+		// Use the standard condition rules without tightening validation for
+		// existing Pod condition types. ObservedGeneration is checked for all
+		// Pod conditions by validatePodConditions.
+		errs := unversionedvalidation.ValidateCondition(metav1.Condition{
+			Type: string(condition.Type), Status: metav1.ConditionStatus(condition.Status),
+			LastTransitionTime: condition.LastTransitionTime,
+			Reason:             condition.Reason, Message: condition.Message,
+		}, path)
+		for _, err := range errs {
+			// PodCondition does not use metav1.Condition's declarative tags.
+			err.CoveredByDeclarative = false
+		}
+		allErrs = append(allErrs, errs...)
+		if oldCondition == nil {
+			continue
+		}
+		// Terminal outcomes prevent checkpoint replay, even after kubelet restart.
+		if (oldCondition.Status == core.ConditionTrue || oldCondition.Status == core.ConditionFalse) && condition.Status != oldCondition.Status {
+			allErrs = append(allErrs, field.Invalid(path.Child("status"), condition.Status, "may not change once the restore has completed or failed"))
+		}
+		if condition.ObservedGeneration != oldCondition.ObservedGeneration {
+			allErrs = append(allErrs, field.Invalid(path.Child("observedGeneration"), condition.ObservedGeneration, "must retain the generation at which restore started"))
+		}
+	}
+	if oldCondition != nil && !found {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "the PodRestored condition may not be removed"))
+	}
+	return allErrs
+}
+
 // ValidatePodStatusUpdate checks for changes to status that shouldn't occur in normal operation.
 func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
@@ -6191,6 +6251,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 
 	fldPath = field.NewPath("status")
 	allErrs = append(allErrs, validatePodConditions(newPod.Status.Conditions, fldPath.Child("conditions"))...)
+	allErrs = append(allErrs, validatePodRestoredConditionUpdate(newPod, oldPod, fldPath.Child("conditions"))...)
 
 	if newPod.Spec.NodeName != oldPod.Spec.NodeName {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nodeName"), "may not be changed directly"))

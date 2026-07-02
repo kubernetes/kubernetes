@@ -24943,6 +24943,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ResourceClaims[*].ResourceClaimTemplateName",
 		"Resources",
 		"RestartPolicy",
+		"RestoreFrom",
 		"RuntimeClassName",
 		"SchedulerName",
 		"SchedulingGates[*].Name",

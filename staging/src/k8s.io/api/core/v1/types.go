@@ -3862,6 +3862,13 @@ const (
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+	// PodRestored records the outcome of the one-time restore requested by spec.restoreFrom.
+	// Unknown means the restore is in progress, True means it completed, and False
+	// means it failed. A terminal outcome is retained across kubelet and container
+	// restarts to prevent replaying the checkpoint. ObservedGeneration records the
+	// Pod generation at which the restore started and is not advanced afterwards.
+	// This condition is set only when PodLevelCheckpointRestore is enabled.
+	PodRestored PodConditionType = "PodRestored"
 )
 
 // These are reasons for a pod's transition to a condition.
@@ -4844,6 +4851,36 @@ type PodSpec struct {
 	// +k8s:maxItems=10
 	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+	// restoreFrom specifies a PodCheckpoint in this Pod's namespace to restore
+	// this Pod from. When set, the Pod is restored from that checkpoint's archive
+	// instead of being created from scratch; the kubelet resolves the reference to
+	// the on-node archive via the PodCheckpoint's status.
+	// The Pod spec must match status.checkpointedPodTemplate.spec, except for
+	// nodeName, restoreFrom, ephemeralContainers, and schedulingGates. Scheduling
+	// directives, including node-identity constraints, and resource requests and
+	// limits must match the captured values, with the checkpoint-node affinity
+	// constraint added by admission.
+	// Ephemeral containers are not checkpointed. Scheduling gates may delay restore
+	// and be removed before scheduling. Do not set nodeName on creation; admission
+	// pins restore to the checkpoint's node through required node affinity.
+	// Workload updates, including resize and adding ephemeral containers, are
+	// rejected until PodRestored=True. Resize may be requested after restore.
+	// This field is immutable. Restoring from another checkpoint requires creating
+	// a new Pod; in-place restore of an existing Pod is not supported.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	// +k8s:optional
+	RestoreFrom *CheckpointReference `json:"restoreFrom,omitempty" protobuf:"bytes,45,opt,name=restoreFrom"`
+}
+
+// CheckpointReference identifies a PodCheckpoint to restore a Pod from.
+// +structType=atomic
+type CheckpointReference struct {
+	// name is the name of a PodCheckpoint in the Pod's namespace.
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-long-name
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly
@@ -5724,6 +5761,7 @@ type PodStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	Conditions []PodCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
+
 	// A human readable message indicating details about why the pod is in this condition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
@@ -5906,6 +5944,7 @@ type Pod struct {
 	// spec is the specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
+	// +k8s:subfield(restoreFrom)=+k8s:immutable
 	Spec PodSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is the most recently observed status of the pod.
