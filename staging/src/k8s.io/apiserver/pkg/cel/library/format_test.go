@@ -226,7 +226,7 @@ func TestFormat(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			testQuantity(t, tc.expr, tc.expectValue, tc.expectedRuntimeErr, tc.expectedCompileErr)
+			testQuantity(t, tc.expr, tc.expectValue, tc.expectedRuntimeErr, tc.expectedCompileErr, nil)
 		})
 	}
 }
