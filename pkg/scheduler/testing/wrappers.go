@@ -24,7 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1844,7 +1845,7 @@ func (wrapper *CompositePodGroupTemplateWrapper) BasicPolicy() *CompositePodGrou
 
 // CompositePodGroupWrapper wraps a CompositePodGroup inside.
 type CompositePodGroupWrapper struct {
-	schedulingapi.CompositePodGroup
+	schedulingv1alpha3.CompositePodGroup
 }
 
 // MakeCompositePodGroup creates a CompositePodGroup wrapper.
@@ -1853,7 +1854,7 @@ func MakeCompositePodGroup() *CompositePodGroupWrapper {
 }
 
 // Obj returns the inner CompositePodGroup.
-func (wrapper *CompositePodGroupWrapper) Obj() *schedulingapi.CompositePodGroup {
+func (wrapper *CompositePodGroupWrapper) Obj() *schedulingv1alpha3.CompositePodGroup {
 	return &wrapper.CompositePodGroup
 }
 
@@ -1883,19 +1884,19 @@ func (wrapper *CompositePodGroupWrapper) ParentCompositePodGroup(parent string) 
 
 // MinGroupCount sets the policy to Gang with the given minGroupCount.
 func (wrapper *CompositePodGroupWrapper) MinGroupCount(minGroupCount int32) *CompositePodGroupWrapper {
-	wrapper.CompositePodGroup.Spec.SchedulingPolicy.Gang = &schedulingapi.CompositeGangSchedulingPolicy{MinGroupCount: minGroupCount}
+	wrapper.CompositePodGroup.Spec.SchedulingPolicy.Gang = &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: minGroupCount}
 	return wrapper
 }
 
 // BasicPolicy sets the policy to Basic.
 func (wrapper *CompositePodGroupWrapper) BasicPolicy() *CompositePodGroupWrapper {
-	wrapper.CompositePodGroup.Spec.SchedulingPolicy.Basic = &schedulingapi.CompositeBasicSchedulingPolicy{}
+	wrapper.CompositePodGroup.Spec.SchedulingPolicy.Basic = &schedulingv1alpha3.CompositeBasicSchedulingPolicy{}
 	return wrapper
 }
 
 // WorkloadRef sets the WorkloadReference for the CompositePodGroup.
 func (wrapper *CompositePodGroupWrapper) WorkloadRef(workloadName, templateName string) *CompositePodGroupWrapper {
-	wrapper.CompositePodGroup.Spec.WorkloadRef = &schedulingapi.WorkloadReference{
+	wrapper.CompositePodGroup.Spec.WorkloadRef = &schedulingv1alpha3.WorkloadReference{
 		WorkloadName: workloadName,
 		TemplateName: templateName,
 	}
@@ -1904,8 +1905,8 @@ func (wrapper *CompositePodGroupWrapper) WorkloadRef(workloadName, templateName 
 
 // TopologyKey sets appropriate TopologyKey field in the SchedulingConstraints of the inner CompositePodGroup.
 func (wrapper *CompositePodGroupWrapper) TopologyKey(topologyKey string) *CompositePodGroupWrapper {
-	wrapper.CompositePodGroup.Spec.SchedulingConstraints = &schedulingapi.CompositePodGroupSchedulingConstraints{
-		Topology: []schedulingapi.TopologyConstraint{
+	wrapper.CompositePodGroup.Spec.SchedulingConstraints = &schedulingv1alpha3.CompositePodGroupSchedulingConstraints{
+		Topology: []schedulingv1alpha3.TopologyConstraint{
 			{
 				Key: topologyKey,
 			},

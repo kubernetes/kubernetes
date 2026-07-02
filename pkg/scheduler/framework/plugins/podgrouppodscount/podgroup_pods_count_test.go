@@ -24,7 +24,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -221,7 +222,7 @@ func TestScorePlacement(t *testing.T) {
 				_, tCtx := ktesting.NewTestContext(t)
 
 				pgs := []schedulingapi.PodGroup{}
-				cpgs := []schedulingapi.CompositePodGroup{}
+				cpgs := []schedulingv1alpha3.CompositePodGroup{}
 				pods := []*v1.Pod{}
 				alreadyAdded := sets.New[string]()
 				namespace := tt.podGroupInfo.GetNamespace()
@@ -268,16 +269,16 @@ func TestScorePlacement(t *testing.T) {
 
 				cs := clientsetfake.NewClientset(
 					&schedulingapi.PodGroupList{Items: pgs},
-					&schedulingapi.CompositePodGroupList{Items: cpgs},
+					&schedulingv1alpha3.CompositePodGroupList{Items: cpgs},
 				)
 				informerFactory := informers.NewSharedInformerFactory(cs, 0)
-				_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+				_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
 				_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
 				informerFactory.StartWithContext(tCtx)
 				informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 				pgPtrs := make([]*schedulingapi.PodGroup, len(pgs))
-				cpgPtrs := make([]*schedulingapi.CompositePodGroup, len(cpgs))
+				cpgPtrs := make([]*schedulingv1alpha3.CompositePodGroup, len(cpgs))
 				for i := range pgs {
 					pgPtrs[i] = &pgs[i]
 				}
@@ -412,7 +413,7 @@ func makePodGroupInfoFromPG(pg *schedulingapi.PodGroup) fwk.PodGroupInfo {
 	}
 }
 
-func makePodGroupInfoFromCPG(cpg *schedulingapi.CompositePodGroup) fwk.PodGroupInfo {
+func makePodGroupInfoFromCPG(cpg *schedulingv1alpha3.CompositePodGroup) fwk.PodGroupInfo {
 	return &framework.PodGroupInfo{
 		Name:              cpg.Name,
 		Namespace:         cpg.Namespace,
@@ -431,7 +432,7 @@ func makePodGroup() fwk.PodGroupInfo {
 }
 
 func makeCompositePodGroup() fwk.PodGroupInfo {
-	return makePodGroupInfoFromCPG(&schedulingapi.CompositePodGroup{
+	return makePodGroupInfoFromCPG(&schedulingv1alpha3.CompositePodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "root",
 			Namespace: "default",

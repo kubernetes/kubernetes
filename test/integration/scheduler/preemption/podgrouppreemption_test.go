@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1005,7 +1005,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			// 1. Create PodGroups
 			for _, pg := range tt.podGroups {
 				pg.Namespace = ns
-				if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
 				}
 			}
@@ -1078,7 +1078,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				for _, pg := range tt.podGroups {
 					pgCopy := pg.DeepCopy()
 					pgCopy.ResourceVersion = ""
-					if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
+					if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to recreate PodGroup %s: %v", pg.Name, err)
 					}
 				}
@@ -1224,7 +1224,7 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 	}
 	// Create a high-priority pod high-1 belonging to pg1 (priority=100)
 	pg := st.MakePodGroup().Name("pg1").Namespace(ns).MinCount(1).Priority(100).Obj()
-	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create PodGroup: %v", err)
 	}
 	highPod := st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj()
@@ -1247,7 +1247,7 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 	// both "minCount (1) cannot be satisfied" and "pod group preemption found a placement for podgroup"
 	var cond *metav1.Condition
 	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
-		currentPG, err := cs.SchedulingV1alpha3().PodGroups(ns).Get(ctx, pg.Name, metav1.GetOptions{})
+		currentPG, err := cs.SchedulingV1beta1().PodGroups(ns).Get(ctx, pg.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -1314,7 +1314,7 @@ func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
 
 	// 2. Create PodGroup with minCount=2
 	pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(50).MinCount(2).Obj()
-	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create pod group pg1: %v", err)
 	}
 
@@ -1592,17 +1592,17 @@ func isPodInUnschedulableQueue(sched *scheduler.Scheduler, name, namespace strin
 func deletePodGroups(ctx context.Context, cs clientset.Interface, ns string, pgNames []string) error {
 	for _, name := range pgNames {
 		patch := []byte(`{"metadata":{"finalizers":null}}`)
-		if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if _, err := cs.SchedulingV1beta1().PodGroups(ns).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
-		if err := cs.SchedulingV1alpha3().PodGroups(ns).Delete(ctx, name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if err := cs.SchedulingV1beta1().PodGroups(ns).Delete(ctx, name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
 	// Wait for the pod groups to be deleted.
 	for _, name := range pgNames {
 		err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-			_, err := cs.SchedulingV1alpha3().PodGroups(ns).Get(ctx, name, metav1.GetOptions{})
+			_, err := cs.SchedulingV1beta1().PodGroups(ns).Get(ctx, name, metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil
 		})
 		if err != nil {

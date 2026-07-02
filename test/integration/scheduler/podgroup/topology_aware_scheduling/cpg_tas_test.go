@@ -20,7 +20,8 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -78,7 +79,7 @@ func makeBasicPodGroupWithParent(podGroupName, parentCPGName, topologyKey string
 	return pg.Obj()
 }
 
-func makeGangCompositePodGroup(cpgName, parentCPGName, topologyKey string, minGroupCount int32) *schedulingapi.CompositePodGroup {
+func makeGangCompositePodGroup(cpgName, parentCPGName, topologyKey string, minGroupCount int32) *schedulingv1alpha3.CompositePodGroup {
 	cpg := st.MakeCompositePodGroup().Name(cpgName).WorkloadRef("cpg", "workload").MinGroupCount(minGroupCount).Priority(100)
 	if parentCPGName != "" {
 		cpg.ParentCompositePodGroup(parentCPGName)
@@ -89,7 +90,7 @@ func makeGangCompositePodGroup(cpgName, parentCPGName, topologyKey string, minGr
 	return cpg.Obj()
 }
 
-func makeBasicCompositePodGroup(cpgName, parentCPGName, topologyKey string) *schedulingapi.CompositePodGroup {
+func makeBasicCompositePodGroup(cpgName, parentCPGName, topologyKey string) *schedulingv1alpha3.CompositePodGroup {
 	cpg := st.MakeCompositePodGroup().Name(cpgName).WorkloadRef("cpg", "workload").BasicPolicy().Priority(100)
 	if parentCPGName != "" {
 		cpg.ParentCompositePodGroup(parentCPGName)

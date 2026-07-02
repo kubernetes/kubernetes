@@ -22,7 +22,8 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1alphav3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -181,7 +182,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Error,
 		},
 		"for cpg without constraint returns placement matching all nodes": {
-			podGroupInfo: makePodGroupInfoFromCPG(&schedulingapi.CompositePodGroup{}),
+			podGroupInfo: makePodGroupInfoFromCPG(&schedulingv1alphav3.CompositePodGroup{}),
 			placementNodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
 				st.MakeNode().Name("node2").Label("foo", "bar").Obj(),
@@ -374,7 +375,7 @@ func TestGeneratePlacements(t *testing.T) {
 				}
 
 				pgs := []schedulingapi.PodGroup{}
-				cpgs := []schedulingapi.CompositePodGroup{}
+				cpgs := []schedulingv1alphav3.CompositePodGroup{}
 				pods := []*v1.Pod{}
 				alreadyAdded := sets.New[string]()
 				namespace := tt.podGroupInfo.GetNamespace()
@@ -404,18 +405,18 @@ func TestGeneratePlacements(t *testing.T) {
 
 				cs := clientsetfake.NewClientset(
 					&schedulingapi.PodGroupList{Items: pgs},
-					&schedulingapi.CompositePodGroupList{Items: cpgs},
+					&schedulingv1alphav3.CompositePodGroupList{Items: cpgs},
 					&v1.NodeList{Items: nodes},
 				)
 				informerFactory := informers.NewSharedInformerFactory(cs, 0)
-				_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+				_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
 				_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
 				_ = informerFactory.Core().V1().Nodes().Informer()
 				informerFactory.StartWithContext(tCtx)
 				informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 				pgPtrs := make([]*schedulingapi.PodGroup, len(pgs))
-				cpgPtrs := make([]*schedulingapi.CompositePodGroup, len(cpgs))
+				cpgPtrs := make([]*schedulingv1alphav3.CompositePodGroup, len(cpgs))
 				nodePtrs := make([]*v1.Node, len(nodes))
 				for i := range pgs {
 					pgPtrs[i] = &pgs[i]
@@ -482,7 +483,7 @@ func makePodGroupInfoFromPG(pg *schedulingapi.PodGroup) fwk.PodGroupInfo {
 	}
 }
 
-func makePodGroupInfoFromCPG(cpg *schedulingapi.CompositePodGroup) fwk.PodGroupInfo {
+func makePodGroupInfoFromCPG(cpg *schedulingv1alphav3.CompositePodGroup) fwk.PodGroupInfo {
 	return &framework.PodGroupInfo{
 		Name:              cpg.Name,
 		Namespace:         cpg.Namespace,

@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -135,7 +136,7 @@ func TestGetPodGroupStates(t *testing.T) {
 
 	testCases := []struct {
 		name               string
-		podGroups          []*schedulingv1alpha3.PodGroup
+		podGroups          []*schedulingv1beta1.PodGroup
 		compositePodGroups []*schedulingv1alpha3.CompositePodGroup
 		rootEntityKey      fwk.EntityKey
 		faultyEntityKeys   []fwk.EntityKey
@@ -143,14 +144,14 @@ func TestGetPodGroupStates(t *testing.T) {
 	}{
 		{
 			name: "root is PodGroup",
-			podGroups: []*schedulingv1alpha3.PodGroup{
+			podGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("test").Obj(),
 			},
 			rootEntityKey: fwk.PodGroupKey("test", "pg1"),
 		},
 		{
 			name: "root is CompositePodGroup",
-			podGroups: []*schedulingv1alpha3.PodGroup{
+			podGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),
 			},
@@ -161,7 +162,7 @@ func TestGetPodGroupStates(t *testing.T) {
 		},
 		{
 			name:      "root is CompositePodGroup and has no leaves",
-			podGroups: []*schedulingv1alpha3.PodGroup{},
+			podGroups: []*schedulingv1beta1.PodGroup{},
 			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").Namespace("test").Obj(),
 			},
@@ -169,7 +170,7 @@ func TestGetPodGroupStates(t *testing.T) {
 		},
 		{
 			name: "root is CompositePodGroup and one entity key is missing",
-			podGroups: []*schedulingv1alpha3.PodGroup{
+			podGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg-leaf").Namespace("test").ParentCompositePodGroup("cpg-mid2").Obj(),
 			},
 			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
@@ -185,7 +186,7 @@ func TestGetPodGroupStates(t *testing.T) {
 		},
 		{
 			name:      "root is CompositePodGroup and multiple entity keys are missing",
-			podGroups: []*schedulingv1alpha3.PodGroup{},
+			podGroups: []*schedulingv1beta1.PodGroup{},
 			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("cpg-root").Namespace("test").Obj(),
 				st.MakeCompositePodGroup().Name("cpg-mid1").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),
@@ -213,7 +214,7 @@ func TestGetPodGroupStates(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg4").Namespace("test").ParentCompositePodGroup("cpg3").Obj(),
 				st.MakeCompositePodGroup().Name("cpg2.2").Namespace("test").ParentCompositePodGroup("cpg1").Obj(),
 			},
-			podGroups: []*schedulingv1alpha3.PodGroup{
+			podGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg-root").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),
 				st.MakePodGroup().Name("pg1").Namespace("test").ParentCompositePodGroup("cpg1").Obj(),
 				st.MakePodGroup().Name("pg2.1").Namespace("test").ParentCompositePodGroup("cpg2.1").Obj(),
@@ -265,7 +266,7 @@ func TestGetPodGroupStates_EarlyBreak(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
 
-	podGroups := []*schedulingv1alpha3.PodGroup{
+	podGroups := []*schedulingv1beta1.PodGroup{
 		st.MakePodGroup().Name("pg1").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),
 		st.MakePodGroup().Name("pg2").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),
 		st.MakePodGroup().Name("pg3").Namespace("test").ParentCompositePodGroup("cpg-root").Obj(),

@@ -25,7 +25,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -277,7 +277,7 @@ func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupI
 
 // podGroupPreemptionPolicy returns the PreemptionPolicy set in the pod group, or the default policy
 // (PreemptLowerPriority) if not set.
-func podGroupPreemptionPolicy(pg *schedulingv1alpha3.PodGroup) v1.PreemptionPolicy {
+func podGroupPreemptionPolicy(pg *schedulingv1beta1.PodGroup) v1.PreemptionPolicy {
 	if pg != nil && pg.Spec.PreemptionPolicy != nil {
 		return v1.PreemptionPolicy(*pg.Spec.PreemptionPolicy)
 	}

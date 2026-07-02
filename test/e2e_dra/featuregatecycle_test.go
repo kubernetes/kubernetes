@@ -84,7 +84,7 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 			driverResourcesFunc: workloadResourceClaimsDriverResources,
 			enabledGates:        []string{"GenericWorkload"},
 			toggledGates:        []string{"DRAWorkloadResourceClaims"},
-			extraRuntimeConfig:  "scheduling.k8s.io/v1alpha3",
+			extraRuntimeConfig:  "scheduling.k8s.io/v1beta1",
 		},
 	}
 

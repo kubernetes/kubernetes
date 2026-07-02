@@ -29,7 +29,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -544,7 +545,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 				expectedStaticInformers[reflect.TypeFor[*schedulingapi.PodGroup]()] = true
 				if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-					expectedStaticInformers[reflect.TypeFor[*schedulingapi.CompositePodGroup]()] = true
+					expectedStaticInformers[reflect.TypeFor[*schedulingv1alpha3.CompositePodGroup]()] = true
 				}
 			}
 
@@ -1569,7 +1570,7 @@ func TestUpdateCompositePodGroup(t *testing.T) {
 		name          string
 		oldCPG        any
 		newCPG        any
-		expectCPG     *schedulingapi.CompositePodGroup
+		expectCPG     *schedulingv1alpha3.CompositePodGroup
 		cpgEnabled    bool
 		expectInCache bool
 	}{
@@ -1659,7 +1660,7 @@ func TestDeleteCompositePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name              string
-		initCPG           *schedulingapi.CompositePodGroup
+		initCPG           *schedulingv1alpha3.CompositePodGroup
 		cpgToDelete       any
 		cpgEnabled        bool
 		expectStillExists bool

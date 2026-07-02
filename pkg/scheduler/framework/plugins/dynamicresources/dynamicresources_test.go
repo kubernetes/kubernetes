@@ -37,7 +37,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -4189,7 +4189,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		tCtx.ExpectNoError(err, "create resource class")
 	}
 	for _, podGroup := range podGroups {
-		_, err := tc.client.SchedulingV1alpha3().PodGroups(podGroup.Namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
+		_, err := tc.client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
 		tCtx.ExpectNoError(err, "create pod group")
 	}
 

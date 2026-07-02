@@ -18,6 +18,7 @@ package workloadbuilder
 
 import (
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 )
 
 // mapWorkloadInput translates the leaf-level scheduling.k8s.io building blocks
@@ -26,7 +27,7 @@ import (
 // defaults field-by-field.
 //
 // TODO: Add mapCompositeGroupInput once the WorkloadCompositePodGroup* types
-// and CompositePodGroup resource are added to scheduling.k8s.io/v1alpha3.
+// and CompositePodGroup resource are added to scheduling.k8s.io/v1beta1.
 func mapWorkloadInput(input WorkloadInput) *SchedulingConfig {
 	cfg := &SchedulingConfig{}
 
@@ -77,8 +78,10 @@ func mapTopologyConstraints(c *schedulingv1alpha3.WorkloadPodGroupSchedulingCons
 	if len(c.Topology) == 0 {
 		return nil
 	}
-	topology := make([]schedulingv1alpha3.TopologyConstraint, len(c.Topology))
-	copy(topology, c.Topology)
+	topology := make([]schedulingv1beta1.TopologyConstraint, len(c.Topology))
+	for i, t := range c.Topology {
+		topology[i] = schedulingv1beta1.TopologyConstraint{Key: t.Key}
+	}
 	return &SchedulingConstraints{Topology: topology}
 }
 

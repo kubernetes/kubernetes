@@ -26,7 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,14 +40,14 @@ import (
 const extendedResourceName = "example.com/combined-resource"
 
 var (
-	gangPolicy = schedulingv1alpha3.PodGroupSchedulingPolicy{
-		Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 2},
+	gangPolicy = schedulingv1beta1.PodGroupSchedulingPolicy{
+		Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 2},
 	}
-	singleDisruption = schedulingv1alpha3.DisruptionMode{
-		Single: &schedulingv1alpha3.SingleDisruptionMode{},
+	singleDisruption = schedulingv1beta1.DisruptionMode{
+		Single: &schedulingv1beta1.SingleDisruptionMode{},
 	}
-	allDisruption = schedulingv1alpha3.DisruptionMode{
-		All: &schedulingv1alpha3.AllDisruptionMode{},
+	allDisruption = schedulingv1beta1.DisruptionMode{
+		All: &schedulingv1beta1.AllDisruptionMode{},
 	}
 )
 
@@ -62,10 +62,10 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 	f := framework.NewDefaultFramework("workload-aware-preemption")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	createPodGroup := func(ctx context.Context, pg *schedulingv1alpha3.PodGroup) {
+	createPodGroup := func(ctx context.Context, pg *schedulingv1beta1.PodGroup) {
 		cs := f.ClientSet
 		ns := f.Namespace.Name
-		_, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
+		_, err := cs.SchedulingV1beta1().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create PodGroup %s", pg.Name)
 	}
 
@@ -73,7 +73,7 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		cs := f.ClientSet
 		ns := f.Namespace.Name
 		ginkgo.By("Deleting PodGroup")
-		err := cs.SchedulingV1alpha3().PodGroups(ns).Delete(ctx, name, metav1.DeleteOptions{})
+		err := cs.SchedulingV1beta1().PodGroups(ns).Delete(ctx, name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete PodGroup")
 	}
 
@@ -116,12 +116,12 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		return p
 	}
 
-	makePodGroup := func(pgName string, priorityName string, schedulingPolicy schedulingv1alpha3.PodGroupSchedulingPolicy, disruptionMode schedulingv1alpha3.DisruptionMode) *schedulingv1alpha3.PodGroup {
+	makePodGroup := func(pgName string, priorityName string, schedulingPolicy schedulingv1beta1.PodGroupSchedulingPolicy, disruptionMode schedulingv1beta1.DisruptionMode) *schedulingv1beta1.PodGroup {
 		ns := f.Namespace.Name
 
-		return &schedulingv1alpha3.PodGroup{
+		return &schedulingv1beta1.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{Name: pgName, Namespace: ns},
-			Spec: schedulingv1alpha3.PodGroupSpec{
+			Spec: schedulingv1beta1.PodGroupSpec{
 				PriorityClassName: priorityName,
 				SchedulingPolicy:  schedulingPolicy,
 				DisruptionMode:    &disruptionMode,
@@ -200,7 +200,7 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 
 	type preemptionTestArgs struct {
 		preemptorType        preemptorType
-		victimDisruptionMode schedulingv1alpha3.DisruptionMode
+		victimDisruptionMode schedulingv1beta1.DisruptionMode
 		verify               func(context.Context, []*v1.Pod)
 	}
 
@@ -253,8 +253,8 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		if args.preemptorType == podGroup {
 			pgPreemptorName = "pg-preemptor-" + ns
 			ginkgo.By("Creating high-priority pod group PG-preemptor with gang policy")
-			pgPreemptor := makePodGroup(pgPreemptorName, highPriorityName, schedulingv1alpha3.PodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 1},
+			pgPreemptor := makePodGroup(pgPreemptorName, highPriorityName, schedulingv1beta1.PodGroupSchedulingPolicy{
+				Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 1},
 			}, singleDisruption)
 			createPodGroup(ctx, pgPreemptor)
 			defer deletePodGroup(ctx, pgPreemptor.Name)

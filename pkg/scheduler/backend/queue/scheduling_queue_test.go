@@ -29,6 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -213,7 +214,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 			objs := []runtime.Object{medPod, unschedPod, highPod}
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 			if tt.usePodGroups {
-				podGroups := []*schedulingv1alpha3.PodGroup{
+				podGroups := []*schedulingv1beta1.PodGroup{
 					st.MakePodGroup().Name("pg-med").Namespace(medPod.Namespace).Priority(midPriority).Obj(),
 					st.MakePodGroup().Name("pg-unsched").Namespace(unschedPod.Namespace).Priority(lowPriority).Obj(),
 					st.MakePodGroup().Name("pg-high").Namespace(highPod.Namespace).Priority(highPriority).Obj(),
@@ -352,7 +353,7 @@ func Test_InFlightPods(t *testing.T) {
 		// podGroupAttempted is the PodGroup that was attempted to schedule.
 		podGroupAttempted *framework.QueuedPodGroupInfo
 		// podGroupAdded is the PodGroup that is added/updated in the queue.
-		podGroupAdded *schedulingv1alpha3.PodGroup
+		podGroupAdded *schedulingv1beta1.PodGroup
 		callback      func(t *testing.T, q *PriorityQueue)
 	}
 
@@ -1085,7 +1086,7 @@ func Test_InFlightPods(t *testing.T) {
 				defer cancel()
 				obj := make([]runtime.Object, 0, len(test.initialPods))
 				pgNamesSeen := sets.New[string]()
-				var podGroupsToAdd []*schedulingv1alpha3.PodGroup
+				var podGroupsToAdd []*schedulingv1beta1.PodGroup
 				for _, p := range test.initialPods {
 					obj = append(obj, p)
 					if p.Spec.SchedulingGroup != nil && p.Spec.SchedulingGroup.PodGroupName != nil {
@@ -6409,7 +6410,7 @@ const (
 	stateIncomplete
 )
 
-func setupInitialPodGroupState(t *testing.T, ctx context.Context, q *PriorityQueue, initialPods []*v1.Pod, initialState initialQueueState, initialPodGroup *schedulingv1alpha3.PodGroup) {
+func setupInitialPodGroupState(t *testing.T, ctx context.Context, q *PriorityQueue, initialPods []*v1.Pod, initialState initialQueueState, initialPodGroup *schedulingv1beta1.PodGroup) {
 	t.Helper()
 
 	if initialState != stateIncomplete {
@@ -8284,7 +8285,7 @@ func TestDeletePodGroup(t *testing.T) {
 func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 	tests := []struct {
 		name                   string
-		initialPodGroups       []*schedulingv1alpha3.PodGroup
+		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
 		initialPods            []*v1.Pod
 		beforeAdd              func(ctx context.Context, q *PriorityQueue)
@@ -8295,7 +8296,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 	}{
 		{
 			name: "Root with pods",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8308,7 +8309,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Root without pods",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			cpgToAdd:               st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
@@ -8318,7 +8319,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Root when another root exists",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").Obj(),
 			},
@@ -8336,7 +8337,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent is missing",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8349,7 +8350,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent is root",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 			},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
@@ -8365,7 +8366,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent is root and is already in active queue with another pod",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -8383,7 +8384,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent exists but root is missing",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 			},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
@@ -8399,7 +8400,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Non-root when parent is root and is currently in-flight (popped)",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -8420,7 +8421,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 		},
 		{
 			name: "Root when another root is currently in-flight (popped)",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").Obj(),
 			},
@@ -8497,7 +8498,7 @@ func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 	tests := []struct {
 		name                   string
 		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
-		initialPodGroups       []*schedulingv1alpha3.PodGroup
+		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
 		cpgToUpdate            *schedulingv1alpha3.CompositePodGroup
 		expectedActiveQ        map[string][]string
@@ -8509,7 +8510,7 @@ func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").MinGroupCount(3).Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8526,7 +8527,7 @@ func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8600,7 +8601,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 	tests := []struct {
 		name                   string
 		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
-		initialPodGroups       []*schedulingv1alpha3.PodGroup
+		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
 		beforeDelete           func(ctx context.Context, q *PriorityQueue)
 		cpgToDelete            *schedulingv1alpha3.CompositePodGroup
@@ -8614,7 +8615,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -8633,7 +8634,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -8651,7 +8652,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8668,7 +8669,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -8690,7 +8691,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -8713,7 +8714,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8735,7 +8736,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("mid-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("mid-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8752,7 +8753,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 				st.MakeCompositePodGroup().Name("mid-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("mid-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -8825,10 +8826,10 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 		name                   string
 		disableCPGFeature      bool
 		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
-		initialPodGroups       []*schedulingv1alpha3.PodGroup
+		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
 		beforeAdd              func(ctx context.Context, q *PriorityQueue)
-		pgToAdd                *schedulingv1alpha3.PodGroup
+		pgToAdd                *schedulingv1beta1.PodGroup
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
@@ -8852,7 +8853,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Root when another root exists",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg2").Namespace("ns1").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8895,7 +8896,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8925,7 +8926,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8946,7 +8947,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -8963,7 +8964,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Root when another root is currently in-flight (popped)",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg2").Namespace("ns1").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9051,16 +9052,16 @@ func TestPriorityQueue_UpdatePodGroup_Hierarchical(t *testing.T) {
 		name                   string
 		disableCPGFeature      bool
 		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
-		initialPodGroups       []*schedulingv1alpha3.PodGroup
+		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
-		pgToUpdate             *schedulingv1alpha3.PodGroup
+		pgToUpdate             *schedulingv1beta1.PodGroup
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
 	}{
 		{
 			name: "Root when minCount is updated",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").MinCount(2).Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9076,7 +9077,7 @@ func TestPriorityQueue_UpdatePodGroup_Hierarchical(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9090,7 +9091,7 @@ func TestPriorityQueue_UpdatePodGroup_Hierarchical(t *testing.T) {
 		{
 			name:              "Non-root when CPG feature is disabled",
 			disableCPGFeature: true,
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").MinCount(2).Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9165,10 +9166,10 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 		name                   string
 		disableCPGFeature      bool
 		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
-		initialPodGroups       []*schedulingv1alpha3.PodGroup
+		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
 		beforeDelete           func(ctx context.Context, q *PriorityQueue)
-		pgToDelete             *schedulingv1alpha3.PodGroup
+		pgToDelete             *schedulingv1beta1.PodGroup
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
@@ -9178,7 +9179,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -9193,7 +9194,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Root with pods",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9209,7 +9210,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -9230,7 +9231,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
 			},
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
@@ -9250,7 +9251,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Root when in-flight (popped)",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9266,7 +9267,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Root with pending pods when in-flight (popped)",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9284,7 +9285,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 		},
 		{
 			name: "Root without pods",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").Obj(),
 			},
 			pgToDelete:             st.MakePodGroup().Name("pg1").Namespace("ns1").Obj(),
@@ -9295,7 +9296,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 		{
 			name:              "Non-root when CPG feature is disabled",
 			disableCPGFeature: true,
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -9433,7 +9434,7 @@ func newQueuedPodGroupInfoForLookup(namespace, name string, entityType fwk.Entit
 	}
 }
 
-func newSingleLevelPodGroupInfo(podInfo *framework.QueuedPodInfo, podGroup *schedulingv1alpha3.PodGroup) *framework.QueuedPodGroupInfo {
+func newSingleLevelPodGroupInfo(podInfo *framework.QueuedPodInfo, podGroup *schedulingv1beta1.PodGroup) *framework.QueuedPodGroupInfo {
 	pgName := *podInfo.Pod.Spec.SchedulingGroup.PodGroupName
 	key := fwk.PodGroupKey(podInfo.Pod.Namespace, pgName)
 	return &framework.QueuedPodGroupInfo{

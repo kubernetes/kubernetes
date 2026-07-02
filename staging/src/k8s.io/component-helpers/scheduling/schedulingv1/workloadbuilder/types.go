@@ -18,6 +18,7 @@ package workloadbuilder
 
 import (
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 )
 
 // SchedulingConfig is the hierarchy-agnostic intermediate representation of a
@@ -75,7 +76,7 @@ type GangSchedulingPolicy struct {
 // +k8s:deepcopy-gen=true
 type SchedulingConstraints struct {
 	// Topology lists the topology constraints applied to the group's pods.
-	Topology []schedulingv1alpha3.TopologyConstraint
+	Topology []schedulingv1beta1.TopologyConstraint
 }
 
 // DisruptionMode selects how pods are disrupted. Exactly one field must be set.

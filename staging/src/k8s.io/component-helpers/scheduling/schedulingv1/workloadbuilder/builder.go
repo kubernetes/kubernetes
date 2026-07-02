@@ -19,7 +19,7 @@ package workloadbuilder
 import (
 	"fmt"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -78,14 +78,14 @@ type Builder struct {
 
 	// workload caches the Workload compiled by BuildWorkload so multiple
 	// PodGroups can be materialized without recompiling.
-	workload *schedulingv1alpha3.Workload
+	workload *schedulingv1beta1.Workload
 
 	// existingWorkload is a persisted Workload supplied to
 	// NewBuilderFromExistingWorkload. When set, NewPodGroup materializes from it,
 	// BuildWorkload is refused so a caller can't recompile over a persisted or
 	// parent-authored Workload, and Validate is refused too because the persisted
 	// object already passed apiserver validation and there is no tree to check.
-	existingWorkload *schedulingv1alpha3.Workload
+	existingWorkload *schedulingv1beta1.Workload
 }
 
 // NewBuilder returns a Builder for the given WorkloadItem tree and options.
@@ -99,13 +99,13 @@ func NewBuilder(root *WorkloadItem, opts BuildOptions) *Builder {
 // template) owns and compiled the Workload. BuildWorkload and Validate are both
 // refused; only NewPodGroup is meaningful, using opts.Owner for the PodGroup's
 // controller ownerRef.
-func NewBuilderFromExistingWorkload(workload *schedulingv1alpha3.Workload, opts BuildOptions) *Builder {
+func NewBuilderFromExistingWorkload(workload *schedulingv1beta1.Workload, opts BuildOptions) *Builder {
 	return &Builder{opts: opts, existingWorkload: workload}
 }
 
 // BuildWorkload compiles the WorkloadItem tree into a Workload, sets its
 // identity and controllerRef, and caches the result.
-func (b *Builder) BuildWorkload() (*schedulingv1alpha3.Workload, error) {
+func (b *Builder) BuildWorkload() (*schedulingv1beta1.Workload, error) {
 	if b.existingWorkload != nil {
 		return nil, fmt.Errorf("BuildWorkload is not available on a Builder created from an existing Workload: it materializes from the supplied Workload")
 	}
@@ -122,7 +122,7 @@ func (b *Builder) BuildWorkload() (*schedulingv1alpha3.Workload, error) {
 
 // NewPodGroup materializes a runtime PodGroup from the named PodGroupTemplate of
 // the Builder's Workload.
-func (b *Builder) NewPodGroup(podGroupName, templateName string) (*schedulingv1alpha3.PodGroup, error) {
+func (b *Builder) NewPodGroup(podGroupName, templateName string) (*schedulingv1beta1.PodGroup, error) {
 	workload := b.workload
 	if b.existingWorkload != nil {
 		workload = b.existingWorkload
@@ -139,13 +139,13 @@ func (b *Builder) NewPodGroup(podGroupName, templateName string) (*schedulingv1a
 
 // build compiles the tree and sets the Workload's identity. It fails fast,
 // returning the first error it encounters.
-func (b *Builder) build() (*schedulingv1alpha3.Workload, error) {
+func (b *Builder) build() (*schedulingv1beta1.Workload, error) {
 	spec, err := compileWorkloadItemTree(b.root)
 	if err != nil {
 		return nil, err
 	}
 
-	wl := &schedulingv1alpha3.Workload{
+	wl := &schedulingv1beta1.Workload{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      b.opts.Name,
 			Namespace: b.opts.Namespace,
@@ -163,7 +163,7 @@ func (b *Builder) build() (*schedulingv1alpha3.Workload, error) {
 	}
 
 	wl.OwnerReferences = []metav1.OwnerReference{*b.opts.Owner}
-	wl.Spec.ControllerRef = &schedulingv1alpha3.TypedLocalObjectReference{
+	wl.Spec.ControllerRef = &schedulingv1beta1.TypedLocalObjectReference{
 		APIGroup: gv.Group,
 		Kind:     b.opts.Owner.Kind,
 		Name:     b.opts.Owner.Name,
@@ -176,8 +176,8 @@ func (b *Builder) build() (*schedulingv1alpha3.Workload, error) {
 // produces. Only single-level (leaf) items are supported, so the returned spec
 // carries exactly one PodGroupTemplate; Build fills in the object identity
 // separately.
-func compileWorkloadItemTree(root *WorkloadItem) (schedulingv1alpha3.WorkloadSpec, error) {
-	var spec schedulingv1alpha3.WorkloadSpec
+func compileWorkloadItemTree(root *WorkloadItem) (schedulingv1beta1.WorkloadSpec, error) {
+	var spec schedulingv1beta1.WorkloadSpec
 
 	if root == nil {
 		return spec, fmt.Errorf("root WorkloadItem must not be nil")
@@ -194,11 +194,11 @@ func compileWorkloadItemTree(root *WorkloadItem) (schedulingv1alpha3.WorkloadSpe
 
 // compilePodGroupTemplate resolves a leaf item's config, runs its callbacks,
 // then compiles it into a single PodGroupTemplate.
-func compilePodGroupTemplate(item *WorkloadItem) (schedulingv1alpha3.PodGroupTemplate, error) {
+func compilePodGroupTemplate(item *WorkloadItem) (schedulingv1beta1.PodGroupTemplate, error) {
 	// Reject an empty name before resolution and callbacks run, so defaulting or
 	// a callback cannot "recover" a name the caller never set.
 	if item.Name == "" {
-		return schedulingv1alpha3.PodGroupTemplate{}, fmt.Errorf("workload item name cannot be empty")
+		return schedulingv1beta1.PodGroupTemplate{}, fmt.Errorf("workload item name cannot be empty")
 	}
 
 	// resolveSchedulingConfig also runs the item's callbacks.
@@ -246,8 +246,8 @@ func resolveSchedulingConfig(item *WorkloadItem) *SchedulingConfig {
 }
 
 // buildLeafTemplate converts a resolved config into one PodGroupTemplate.
-func buildLeafTemplate(name string, cfg *SchedulingConfig) (schedulingv1alpha3.PodGroupTemplate, error) {
-	tmpl := schedulingv1alpha3.PodGroupTemplate{Name: name}
+func buildLeafTemplate(name string, cfg *SchedulingConfig) (schedulingv1beta1.PodGroupTemplate, error) {
+	tmpl := schedulingv1beta1.PodGroupTemplate{Name: name}
 
 	if cfg == nil {
 		cfg = &SchedulingConfig{}
@@ -257,14 +257,18 @@ func buildLeafTemplate(name string, cfg *SchedulingConfig) (schedulingv1alpha3.P
 
 	policy, err := compileSchedulingPolicy(cfg.Policy)
 	if err != nil {
-		return schedulingv1alpha3.PodGroupTemplate{}, err
+		return schedulingv1beta1.PodGroupTemplate{}, err
 	}
 	tmpl.SchedulingPolicy = policy
 
 	if cfg.Constraints != nil && len(cfg.Constraints.Topology) > 0 {
-		topology := make([]schedulingv1alpha3.TopologyConstraint, len(cfg.Constraints.Topology))
-		copy(topology, cfg.Constraints.Topology)
-		tmpl.SchedulingConstraints = &schedulingv1alpha3.PodGroupSchedulingConstraints{
+		topology := make([]schedulingv1beta1.TopologyConstraint, len(cfg.Constraints.Topology))
+		for i := range cfg.Constraints.Topology {
+			topology[i] = schedulingv1beta1.TopologyConstraint{
+				Key: cfg.Constraints.Topology[i].Key,
+			}
+		}
+		tmpl.SchedulingConstraints = &schedulingv1beta1.PodGroupSchedulingConstraints{
 			Topology: topology,
 		}
 	}
@@ -284,9 +288,9 @@ func buildLeafTemplate(name string, cfg *SchedulingConfig) (schedulingv1alpha3.P
 // policy resolves to Basic; Gang requires a MinCount resolved beforehand so it
 // can populate the non-pointer API field. The minCount>=1 bound is a structural
 // constraint enforced by declarative validation, so it is not repeated here.
-func compileSchedulingPolicy(policy *SchedulingPolicy) (schedulingv1alpha3.PodGroupSchedulingPolicy, error) {
-	basic := schedulingv1alpha3.PodGroupSchedulingPolicy{
-		Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
+func compileSchedulingPolicy(policy *SchedulingPolicy) (schedulingv1beta1.PodGroupSchedulingPolicy, error) {
+	basic := schedulingv1beta1.PodGroupSchedulingPolicy{
+		Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
 	}
 
 	if policy == nil {
@@ -299,10 +303,10 @@ func compileSchedulingPolicy(policy *SchedulingPolicy) (schedulingv1alpha3.PodGr
 	switch {
 	case policy.Gang != nil:
 		if policy.Gang.MinCount == nil {
-			return schedulingv1alpha3.PodGroupSchedulingPolicy{}, fmt.Errorf("gang scheduling requires minCount to be set after resolution")
+			return schedulingv1beta1.PodGroupSchedulingPolicy{}, fmt.Errorf("gang scheduling requires minCount to be set after resolution")
 		}
-		return schedulingv1alpha3.PodGroupSchedulingPolicy{
-			Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: *policy.Gang.MinCount},
+		return schedulingv1beta1.PodGroupSchedulingPolicy{
+			Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: *policy.Gang.MinCount},
 		}, nil
 	default:
 		// nil policy, Basic only, or an empty policy all resolve to Basic.
@@ -313,21 +317,21 @@ func compileSchedulingPolicy(policy *SchedulingPolicy) (schedulingv1alpha3.PodGr
 // compileDisruptionMode maps the IR disruption mode onto the API mode. The
 // exactly-one-of union is enforced by declarative validation when the compiled
 // Workload is submitted, so a mode with neither member set compiles to nil.
-func compileDisruptionMode(dm *DisruptionMode) *schedulingv1alpha3.DisruptionMode {
+func compileDisruptionMode(dm *DisruptionMode) *schedulingv1beta1.DisruptionMode {
 	switch {
 	case dm.All != nil:
-		return &schedulingv1alpha3.DisruptionMode{All: &schedulingv1alpha3.AllDisruptionMode{}}
+		return &schedulingv1beta1.DisruptionMode{All: &schedulingv1beta1.AllDisruptionMode{}}
 	case dm.Single != nil:
-		return &schedulingv1alpha3.DisruptionMode{Single: &schedulingv1alpha3.SingleDisruptionMode{}}
+		return &schedulingv1beta1.DisruptionMode{Single: &schedulingv1beta1.SingleDisruptionMode{}}
 	default:
 		return nil
 	}
 }
 
-func compileResourceClaims(claims []ResourceClaim) []schedulingv1alpha3.PodGroupResourceClaim {
-	result := make([]schedulingv1alpha3.PodGroupResourceClaim, len(claims))
+func compileResourceClaims(claims []ResourceClaim) []schedulingv1beta1.PodGroupResourceClaim {
+	result := make([]schedulingv1beta1.PodGroupResourceClaim, len(claims))
 	for i := range claims {
-		result[i] = schedulingv1alpha3.PodGroupResourceClaim{
+		result[i] = schedulingv1beta1.PodGroupResourceClaim{
 			Name:                      claims[i].Name,
 			ResourceClaimName:         claims[i].ResourceClaimName,
 			ResourceClaimTemplateName: claims[i].ResourceClaimTemplateName,

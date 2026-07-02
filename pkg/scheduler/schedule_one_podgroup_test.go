@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -196,7 +197,7 @@ func (mp *fakePlacementFeasiblePlugin) Permit(ctx context.Context, state fwk.Cyc
 func TestValidatePodGroup(t *testing.T) {
 	tests := []struct {
 		name                           string
-		podGroup                       *schedulingv1alpha3.PodGroup
+		podGroup                       *schedulingv1beta1.PodGroup
 		scheduledPods                  []*v1.Pod
 		pods                           []*v1.Pod
 		profiles                       profile.Map
@@ -320,7 +321,7 @@ func TestValidatePodGroup(t *testing.T) {
 		},
 		{
 			name:     "success when preemption policies match",
-			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg").PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg").PreemptionPolicy(v1.PreemptNever).Obj(),
@@ -330,7 +331,7 @@ func TestValidatePodGroup(t *testing.T) {
 		},
 		{
 			name:     "failure when different preemption policies across pods",
-			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg").PreemptionPolicy(v1.PreemptNever).Obj(),
@@ -340,7 +341,7 @@ func TestValidatePodGroup(t *testing.T) {
 		},
 		{
 			name:     "failure when different preemption policies across pods and pod group",
-			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
@@ -350,7 +351,7 @@ func TestValidatePodGroup(t *testing.T) {
 		},
 		{
 			name:     "success when preemption policies between pods and podgroup do not match but PodGroupPreemptionPolicy is disabled",
-			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
@@ -360,7 +361,7 @@ func TestValidatePodGroup(t *testing.T) {
 		},
 		{
 			name:     "failure when preemption policies do not match across pods and PodGroupPreemptionPolicy is disabled",
-			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg").PreemptionPolicy(v1.PreemptNever).Obj(),
@@ -376,7 +377,7 @@ func TestValidatePodGroup(t *testing.T) {
 				features.GenericWorkload:          true,
 				features.PodGroupPreemptionPolicy: tt.enablePodGroupPreemptionPolicy,
 			})
-			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.scheduledPods, nil, []*schedulingv1alpha3.PodGroup{tt.podGroup})
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.scheduledPods, nil, []*schedulingv1beta1.PodGroup{tt.podGroup})
 			profilesOrDefault := func(p profile.Map) profile.Map {
 				if p == nil {
 					return profile.Map{
@@ -428,7 +429,7 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
 	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}}
 
-	testPodGroup := &schedulingv1alpha3.PodGroup{
+	testPodGroup := &schedulingv1beta1.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
 	}
 
@@ -602,7 +603,7 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
 
-	testPodGroup := &schedulingv1alpha3.PodGroup{
+	testPodGroup := &schedulingv1beta1.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
 	}
 
@@ -971,7 +972,7 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 	p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 	p3 := st.MakePod().Name("p3").UID("p3").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 
-	testPodGroup := &schedulingv1alpha3.PodGroup{
+	testPodGroup := &schedulingv1beta1.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
 	}
 
@@ -1373,13 +1374,13 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 	p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 	p3 := st.MakePod().Name("p3").Namespace("default").UID("p3").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 
-	testPodGroup := &schedulingv1alpha3.PodGroup{
+	testPodGroup := &schedulingv1beta1.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
 	}
 
 	tests := []struct {
 		name             string
-		existingPodGroup *schedulingv1alpha3.PodGroup
+		existingPodGroup *schedulingv1beta1.PodGroup
 		// podResultsByPodName maps each pod name to its scheduling algorithm result.
 		// The final podResults slice is built in the order of UnscheduledPods after Pop,
 		// making the test independent of pod ordering within the pod group.
@@ -1504,9 +1505,9 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 		},
 		{
 			name: "Already Scheduled, successful cycle keeps condition",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
-				Status: schedulingv1alpha3.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{{
 						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionTrue,
@@ -1530,9 +1531,9 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 		},
 		{
 			name: "Already Scheduled, rejected cycle does not regress condition",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
-				Status: schedulingv1alpha3.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{{
 						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionTrue,
@@ -1558,9 +1559,9 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 		},
 		{
 			name: "Already Scheduled, error cycle does not regress condition",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
-				Status: schedulingv1alpha3.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{{
 						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionTrue,
@@ -1780,7 +1781,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 				}
 			}
 
-			updatedPodGroup, err := client.SchedulingV1alpha3().PodGroups("default").Get(ctx, "pg", metav1.GetOptions{})
+			updatedPodGroup, err := client.SchedulingV1beta1().PodGroups("default").Get(ctx, "pg", metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Failed to get PodGroup: %v", err)
 			}
@@ -1795,7 +1796,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 func TestUpdatePodGroupCondition(t *testing.T) {
 	tests := []struct {
 		name             string
-		existingPodGroup *schedulingv1alpha3.PodGroup
+		existingPodGroup *schedulingv1beta1.PodGroup
 		namespace        string
 		podGroupName     string
 		condition        *metav1.Condition
@@ -1806,7 +1807,7 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 	}{
 		{
 			name: "set Scheduled condition to True on empty status",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "ns1"},
 			},
 			namespace:    "ns1",
@@ -1826,7 +1827,7 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		},
 		{
 			name: "set Scheduled condition to False with Unschedulable reason",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg2", Namespace: "ns1"},
 			},
 			namespace:    "ns1",
@@ -1846,7 +1847,7 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		},
 		{
 			name: "set Scheduled condition to False with SchedulerError reason",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg3", Namespace: "ns1"},
 			},
 			namespace:    "ns1",
@@ -1866,9 +1867,9 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		},
 		{
 			name: "transition from Unschedulable to Scheduled",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg4", Namespace: "ns1"},
-				Status: schedulingv1alpha3.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:               schedulingapi.PodGroupInitiallyScheduled,
@@ -1897,9 +1898,9 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		},
 		{
 			name: "transition from SchedulerError to Scheduled",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg-se-to-true", Namespace: "ns1"},
-				Status: schedulingv1alpha3.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:               schedulingapi.PodGroupInitiallyScheduled,
@@ -1928,9 +1929,9 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		},
 		{
 			name: "do not regress Scheduled to Unschedulable",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg-true-to-unsched", Namespace: "ns1"},
-				Status: schedulingv1alpha3.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:               schedulingapi.PodGroupInitiallyScheduled,
@@ -1960,9 +1961,9 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		},
 		{
 			name: "do not regress Scheduled to SchedulerError",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg-true-to-se", Namespace: "ns1"},
-				Status: schedulingv1alpha3.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:               schedulingapi.PodGroupInitiallyScheduled,
@@ -1992,9 +1993,9 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		},
 		{
 			name: "transition from Unschedulable to SchedulerError preserves LastTransitionTime",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg-unsched-to-se", Namespace: "ns1"},
-				Status: schedulingv1alpha3.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:               schedulingapi.PodGroupInitiallyScheduled,
@@ -2024,9 +2025,9 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		},
 		{
 			name: "transition from SchedulerError to Unschedulable preserves LastTransitionTime",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg-se-to-unsched", Namespace: "ns1"},
-				Status: schedulingv1alpha3.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:               schedulingapi.PodGroupInitiallyScheduled,
@@ -2056,9 +2057,9 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		},
 		{
 			name: "Scheduled to Scheduled preserves LastTransitionTime",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg-true-to-true", Namespace: "ns1"},
-				Status: schedulingv1alpha3.PodGroupStatus{
+				Status: schedulingv1beta1.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
 							Type:               schedulingapi.PodGroupInitiallyScheduled,
@@ -2088,7 +2089,7 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		},
 		{
 			name: "ObservedGeneration is set from PodGroup generation",
-			existingPodGroup: &schedulingv1alpha3.PodGroup{
+			existingPodGroup: &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg-gen", Namespace: "ns1", Generation: 7},
 			},
 			namespace:    "ns1",
@@ -2138,7 +2139,7 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 			}
 			sched.updatePodGroupCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition)
 
-			updatedPodGroup, err := client.SchedulingV1alpha3().PodGroups(tt.namespace).Get(ctx, tt.podGroupName, metav1.GetOptions{})
+			updatedPodGroup, err := client.SchedulingV1beta1().PodGroups(tt.namespace).Get(ctx, tt.podGroupName, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Failed to get PodGroup: %v", err)
 			}
@@ -2274,7 +2275,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 		st.MakeNode().Name("node2").Obj(),
 	}
 	podGroupPod := st.MakePod().Name("foo").UID("foo").PodGroupName("pg").Obj()
-	testPodGroup := &schedulingv1alpha3.PodGroup{
+	testPodGroup := &schedulingv1beta1.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
 	}
 
@@ -2856,7 +2857,7 @@ func TestPodGroupSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 				for _, node := range nodes {
 					cache.AddNode(logger, node)
 				}
-				testPodGroup := &schedulingv1alpha3.PodGroup{
+				testPodGroup := &schedulingv1beta1.PodGroup{
 					ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
 				}
 				cache.AddPodGroup(testPodGroup)
@@ -3026,7 +3027,7 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 			for _, node := range nodes {
 				cache.AddNode(logger, node)
 			}
-			testPodGroup := &schedulingv1alpha3.PodGroup{
+			testPodGroup := &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
 			}
 			cache.AddPodGroup(testPodGroup)
@@ -4360,7 +4361,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 		nodeInfoSnapshot: internalcache.NewTestSnapshotWithPodGroups(
 			[]*v1.Pod{st.MakePod().Name("p").Namespace("default").UID("p").PodGroupName("pg").Node("node1").SchedulerName("sched1").Obj()},
 			[]*v1.Node{st.MakeNode().Name("node1").Obj()},
-			[]*schedulingv1alpha3.PodGroup{st.MakePodGroup().Name("pg").Namespace("default").UID("pg").Obj()},
+			[]*schedulingv1beta1.PodGroup{st.MakePodGroup().Name("pg").Namespace("default").UID("pg").Obj()},
 		),
 		client: client,
 		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
@@ -4369,7 +4370,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 
 	sched.scheduleOnePodGroup(ctx, podGroupInfo)
 
-	pg, err := client.SchedulingV1alpha3().PodGroups("default").Get(ctx, "pg", metav1.GetOptions{})
+	pg, err := client.SchedulingV1beta1().PodGroups("default").Get(ctx, "pg", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get PodGroup: %v", err)
 	}
@@ -4625,20 +4626,20 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 	ns := "default"
 
 	// Helper function to create PodGroups
-	createPG := func(name string, minCount int32, parentCPG string) *schedulingv1alpha3.PodGroup {
-		var policy schedulingv1alpha3.PodGroupSchedulingPolicy
+	createPG := func(name string, minCount int32, parentCPG string) *schedulingv1beta1.PodGroup {
+		var policy schedulingv1beta1.PodGroupSchedulingPolicy
 		if minCount > 0 {
-			policy = schedulingv1alpha3.PodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: minCount},
+			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
+				Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: minCount},
 			}
 		} else {
-			policy = schedulingv1alpha3.PodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
+			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
+				Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
 			}
 		}
-		pg := &schedulingv1alpha3.PodGroup{
+		pg := &schedulingv1beta1.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-			Spec: schedulingv1alpha3.PodGroupSpec{
+			Spec: schedulingv1beta1.PodGroupSpec{
 				SchedulingPolicy:            policy,
 				ParentCompositePodGroupName: new(parentCPG),
 			},
@@ -4931,20 +4932,20 @@ func TestCPGMinGroupCount_Internal(t *testing.T) {
 		return cpg
 	}
 
-	createPG := func(name string, minCount int32, parentCPG string) *schedulingv1alpha3.PodGroup {
-		var policy schedulingv1alpha3.PodGroupSchedulingPolicy
+	createPG := func(name string, minCount int32, parentCPG string) *schedulingv1beta1.PodGroup {
+		var policy schedulingv1beta1.PodGroupSchedulingPolicy
 		if minCount > 0 {
-			policy = schedulingv1alpha3.PodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: minCount},
+			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
+				Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: minCount},
 			}
 		} else {
-			policy = schedulingv1alpha3.PodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
+			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
+				Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
 			}
 		}
-		pg := &schedulingv1alpha3.PodGroup{
+		pg := &schedulingv1beta1.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-			Spec: schedulingv1alpha3.PodGroupSpec{
+			Spec: schedulingv1beta1.PodGroupSpec{
 				SchedulingPolicy:            policy,
 				ParentCompositePodGroupName: new(parentCPG),
 			},
@@ -5163,20 +5164,20 @@ func TestCPGBasicWithGangChildren_Internal(t *testing.T) {
 		return cpg
 	}
 
-	createPG := func(name string, minCount int32, parentCPG string) *schedulingv1alpha3.PodGroup {
-		var policy schedulingv1alpha3.PodGroupSchedulingPolicy
+	createPG := func(name string, minCount int32, parentCPG string) *schedulingv1beta1.PodGroup {
+		var policy schedulingv1beta1.PodGroupSchedulingPolicy
 		if minCount > 0 {
-			policy = schedulingv1alpha3.PodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: minCount},
+			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
+				Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: minCount},
 			}
 		} else {
-			policy = schedulingv1alpha3.PodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
+			policy = schedulingv1beta1.PodGroupSchedulingPolicy{
+				Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
 			}
 		}
-		pg := &schedulingv1alpha3.PodGroup{
+		pg := &schedulingv1beta1.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-			Spec: schedulingv1alpha3.PodGroupSpec{
+			Spec: schedulingv1beta1.PodGroupSpec{
 				SchedulingPolicy:            policy,
 				ParentCompositePodGroupName: new(parentCPG),
 			},

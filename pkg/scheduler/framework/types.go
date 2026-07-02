@@ -28,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -1061,7 +1062,7 @@ func (pgqi *QueuedPodGroupInfo) SetFlushTimestamp(t time.Time) {
 }
 
 // AddPodGroup adds a pod group to the queued pod group info hierarchy.
-func (pgqi *QueuedPodGroupInfo) AddPodGroup(pg *schedulingv1alpha3.PodGroup) {
+func (pgqi *QueuedPodGroupInfo) AddPodGroup(pg *schedulingv1beta1.PodGroup) {
 	// We only add non-root pod groups to the hierarchy, because the root
 	// pod group is already present in the hierarchy.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) || pg.Spec.ParentCompositePodGroupName == nil {
@@ -1087,7 +1088,7 @@ func (pgqi *QueuedPodGroupInfo) AddPodGroup(pg *schedulingv1alpha3.PodGroup) {
 }
 
 // UpdatePodGroup updates a pod group in the queued pod group info hierarchy.
-func (pgqi *QueuedPodGroupInfo) UpdatePodGroup(pg *schedulingv1alpha3.PodGroup) {
+func (pgqi *QueuedPodGroupInfo) UpdatePodGroup(pg *schedulingv1beta1.PodGroup) {
 	node, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, pg.Name)
 	if node != nil && node.GetPodGroup() != nil {
 		node.PodGroup = pg
@@ -1096,7 +1097,7 @@ func (pgqi *QueuedPodGroupInfo) UpdatePodGroup(pg *schedulingv1alpha3.PodGroup) 
 
 // RemovePodGroup removes a pod group from the queued pod group info hierarchy.
 // It returns a slice of all pods within the hierarchy of the removed pod group.
-func (pgqi *QueuedPodGroupInfo) RemovePodGroup(pg *schedulingv1alpha3.PodGroup) []*QueuedPodInfo {
+func (pgqi *QueuedPodGroupInfo) RemovePodGroup(pg *schedulingv1beta1.PodGroup) []*QueuedPodInfo {
 	node, parent := findNodeAndParent(pgqi.PodGroupInfo, nil, pg.Name)
 	if node == nil {
 		return nil
@@ -1193,7 +1194,7 @@ func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedP
 	return removedPods
 }
 
-func newQueuedPodGroupInfo(pg *schedulingv1alpha3.PodGroup) *QueuedPodGroupInfo {
+func newQueuedPodGroupInfo(pg *schedulingv1beta1.PodGroup) *QueuedPodGroupInfo {
 	return &QueuedPodGroupInfo{
 		PodGroupInfo: &PodGroupInfo{
 			Namespace: pg.Namespace,
@@ -1221,7 +1222,7 @@ type PodGroupInfo struct {
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	UnscheduledPods []*v1.Pod
 	// PodGroup is a PodGroup API object.
-	PodGroup *schedulingv1alpha3.PodGroup
+	PodGroup *schedulingv1beta1.PodGroup
 	// CompositePodGroup is a CompositePodGroup API object.
 	// It should be set only when CompositePodGroup feature is enabled.
 	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
@@ -1249,7 +1250,7 @@ func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
 	return pgi.UnscheduledPods
 }
 
-func (pgi *PodGroupInfo) GetPodGroup() *schedulingv1alpha3.PodGroup {
+func (pgi *PodGroupInfo) GetPodGroup() *schedulingv1beta1.PodGroup {
 	return pgi.PodGroup
 }
 

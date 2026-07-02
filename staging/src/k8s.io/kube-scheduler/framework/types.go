@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -678,7 +679,7 @@ type PodGroupInfo interface {
 	// GetKey returns the key uniquely identifying the pod group.
 	GetKey() string
 	// GetPodGroup returns the PodGroup API object or nil if the group is a composite pod group.
-	GetPodGroup() *schedulingv1alpha3.PodGroup
+	GetPodGroup() *schedulingv1beta1.PodGroup
 	// GetCompositePodGroup returns the associated composite pod group or nil if the group is not a composite pod group.
 	// It should only be used when the CompositePodGroup feature gate is enabled.
 	GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup

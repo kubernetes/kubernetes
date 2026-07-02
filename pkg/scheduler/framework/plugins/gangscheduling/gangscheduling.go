@@ -22,7 +22,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -160,7 +161,7 @@ func (pl *GangScheduling) isSchedulableAfterPodGroupAdded(logger klog.Logger, po
 }
 
 func (pl *GangScheduling) isSchedulableAfterCompositePodGroupAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, addedCPG, err := util.As[*schedulingapi.CompositePodGroup](oldObj, newObj)
+	_, addedCPG, err := util.As[*schedulingv1alpha3.CompositePodGroup](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}

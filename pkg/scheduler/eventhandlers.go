@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -468,9 +469,9 @@ func (sched *Scheduler) addPodGroup(obj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}
 	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
 	logger := sched.logger
-	pg, ok := obj.(*schedulingv1alpha3.PodGroup)
+	pg, ok := obj.(*schedulingv1beta1.PodGroup)
 	if !ok {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.PodGroup", "obj", obj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1beta1.PodGroup", "obj", obj)
 		return
 	}
 
@@ -484,14 +485,14 @@ func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update}
 	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
 	logger := sched.logger
-	oldPG, ok := oldObj.(*schedulingv1alpha3.PodGroup)
+	oldPG, ok := oldObj.(*schedulingv1beta1.PodGroup)
 	if !ok {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1alpha3.PodGroup", "oldObj", oldObj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1beta1.PodGroup", "oldObj", oldObj)
 		return
 	}
-	newPG, ok := newObj.(*schedulingv1alpha3.PodGroup)
+	newPG, ok := newObj.(*schedulingv1beta1.PodGroup)
 	if !ok {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1alpha3.PodGroup", "newObj", newObj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1beta1.PodGroup", "newObj", newObj)
 		return
 	}
 
@@ -510,19 +511,19 @@ func (sched *Scheduler) deletePodGroup(obj any) {
 	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
 
 	logger := sched.logger
-	var pg *schedulingv1alpha3.PodGroup
+	var pg *schedulingv1beta1.PodGroup
 	switch t := obj.(type) {
-	case *schedulingv1alpha3.PodGroup:
+	case *schedulingv1beta1.PodGroup:
 		pg = t
 	case cache.DeletedFinalStateUnknown:
 		var ok bool
-		pg, ok = t.Obj.(*schedulingv1alpha3.PodGroup)
+		pg, ok = t.Obj.(*schedulingv1beta1.PodGroup)
 		if !ok {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.PodGroup", "obj", t.Obj)
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1beta1.PodGroup", "obj", t.Obj)
 			return
 		}
 	default:
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.PodGroup", "obj", t)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1beta1.PodGroup", "obj", t)
 		return
 	}
 
@@ -658,7 +659,7 @@ func addAllEventHandlers(
 	handlers = append(handlers, handlerRegistration)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		if handlerRegistration, err = informerFactory.Scheduling().V1alpha3().PodGroups().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		if handlerRegistration, err = informerFactory.Scheduling().V1beta1().PodGroups().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.addPodGroup,
 			UpdateFunc: sched.updatePodGroup,
 			DeleteFunc: sched.deletePodGroup,
