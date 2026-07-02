@@ -243,6 +243,10 @@ is checked every 20 seconds (also configurable with a flag).`,
 				}
 			}
 
+			if err := utilfeature.DefaultMutableFeatureGate.Freeze(); err != nil {
+				return err
+			}
+
 			// Config and flags parsed, now we can initialize logging.
 			logs.InitLogs()
 			// Retrieve the logger again to reflect the updated log settings
@@ -664,11 +668,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 	kubeDeps.HealthChecker = healthChecker
 	healthChecker.Start(ctx)
-	// Set global feature gates based on the value on the initial KubeletServer
-	err = utilfeature.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
-	if err != nil {
-		return err
-	}
 	// Propagate feature gate state to the metrics subsystem. This must be called
 	// after feature gates are set and before any histogram metrics are registered.
 	metricsfeatures.ApplyFeatureGates(featureGate)
