@@ -3101,6 +3101,45 @@ func TestPrintJob(t *testing.T) {
 			// Columns: Name, Status, Completions, Duration, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"job10", "SuccessCriteriaMet", "0/1", "", "0s"}}},
 		},
+		// Active pods exist but none are ready yet (e.g. all pods Pending): do not report Running.
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job11",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: ptr.To(int32(4)),
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Active:    4,
+					Ready:     ptr.To(int32(0)),
+					StartTime: &metav1.Time{Time: now.Add(-30 * time.Minute)},
+				},
+			},
+			options:  printers.GenerateOptions{},
+			expected: []metav1.TableRow{{Cells: []interface{}{"job11", "Pending", "0/4", "30m", "0s"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job12",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: ptr.To(int32(4)),
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Active:    2,
+					Ready:     ptr.To(int32(1)),
+					StartTime: &metav1.Time{Time: now.Add(-20 * time.Minute)},
+				},
+			},
+			options:  printers.GenerateOptions{},
+			expected: []metav1.TableRow{{Cells: []interface{}{"job12", "Running", "0/4", "20m", "0s"}}},
+		},
 	}
 
 	for i, test := range tests {
