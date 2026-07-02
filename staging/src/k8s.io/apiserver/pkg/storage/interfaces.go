@@ -450,4 +450,8 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 type StorageKey string
 
 // ReverseKeyFunc recovers object identity from a storage key.
+//
+// For namespaced resources, namespace and name are both non-empty. For
+// cluster-scoped resources, namespace is empty and name is non-empty. An error
+// is returned if the key cannot be parsed into a valid object identity.
 type ReverseKeyFunc func(key StorageKey) (name string, namespace string, err error)
