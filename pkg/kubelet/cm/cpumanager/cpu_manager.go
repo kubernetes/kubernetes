@@ -25,6 +25,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -416,10 +417,19 @@ func (m *manager) removeStaleState(rootLogger klog.Logger) {
 		}
 	}
 
+	// A runtime operation may still own allocations after its Pod disappears
+	// from the active list, including across kubelet restart.
+	operationProvider, hasOperationProvider := m.podStatusProvider.(interface {
+		PodOperationMayUsePodResources(types.UID) bool
+	})
+
 	// Loop through the CPUManager state. Remove any state for containers not
 	// in the `activeContainers` list built above.
 	assignments := m.state.GetCPUAssignments()
 	for podUID := range assignments {
+		if hasOperationProvider && operationProvider.PodOperationMayUsePodResources(types.UID(podUID)) {
+			continue
+		}
 		for containerName := range assignments[podUID] {
 			logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
 
@@ -437,6 +447,9 @@ func (m *manager) removeStaleState(rootLogger klog.Logger) {
 	}
 
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
+		if hasOperationProvider && operationProvider.PodOperationMayUsePodResources(types.UID(podUID)) {
+			return
+		}
 		logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
 		if _, ok := activeContainers[podUID][containerName]; ok {
 			logger.V(5).Info("containerMap: container still active")

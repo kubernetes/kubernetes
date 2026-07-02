@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -385,10 +386,19 @@ func (m *manager) removeStaleState(logger klog.Logger) {
 		}
 	}
 
+	// A runtime operation may still own allocations after its Pod disappears
+	// from the active list, including across kubelet restart.
+	operationProvider, hasOperationProvider := m.podStatusProvider.(interface {
+		PodOperationMayUsePodResources(types.UID) bool
+	})
+
 	// Loop through the MemoryManager state. Remove any state for containers not
 	// in the `activeContainers` list built above.
 	assignments := m.state.GetMemoryAssignments()
 	for podUID := range assignments {
+		if hasOperationProvider && operationProvider.PodOperationMayUsePodResources(types.UID(podUID)) {
+			continue
+		}
 		for containerName := range assignments[podUID] {
 			if _, ok := activeContainers[podUID][containerName]; !ok {
 				logger.V(2).Info("RemoveStaleState removing state", "podUID", podUID, "containerName", containerName)
@@ -398,6 +408,9 @@ func (m *manager) removeStaleState(logger klog.Logger) {
 	}
 
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
+		if hasOperationProvider && operationProvider.PodOperationMayUsePodResources(types.UID(podUID)) {
+			return
+		}
 		if _, ok := activeContainers[podUID][containerName]; !ok {
 			logger.V(2).Info("RemoveStaleState removing state", "podUID", podUID, "containerName", containerName)
 			m.policyRemoveContainerByRef(logger, podUID, containerName)

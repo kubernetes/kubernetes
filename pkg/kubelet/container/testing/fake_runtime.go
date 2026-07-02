@@ -318,19 +318,6 @@ func (f *FakeRuntime) KillContainerInPod(container v1.Container, pod *v1.Pod) er
 	return f.Err
 }
 
-func (f *FakeRuntime) CancelPodOperation(ctx context.Context, request *runtimeapi.CancelPodOperationRequest) error {
-	f.Lock()
-	f.CalledFunctions = append(f.CalledFunctions, "CancelPodOperation")
-	f.CanceledPodOperations = append(f.CanceledPodOperations, request)
-	callback := f.CancelPodOperationFunc
-	err := f.Err
-	f.Unlock()
-	if callback != nil {
-		return callback(ctx, request)
-	}
-	return err
-}
-
 func (f *FakeRuntime) GeneratePodStatus(_ context.Context, event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
 	f.Lock()
 	defer f.Unlock()
@@ -497,6 +484,27 @@ func (f *FakeRuntime) CheckpointContainer(_ context.Context, options *runtimeapi
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "CheckpointContainer")
+	return f.Err
+}
+
+func (f *FakeRuntime) CancelPodOperation(ctx context.Context, request *runtimeapi.CancelPodOperationRequest) error {
+	f.Lock()
+	f.CalledFunctions = append(f.CalledFunctions, "CancelPodOperation")
+	f.CanceledPodOperations = append(f.CanceledPodOperations, request)
+	callback := f.CancelPodOperationFunc
+	err := f.Err
+	f.Unlock()
+	if callback != nil {
+		return callback(ctx, request)
+	}
+	return err
+}
+
+func (f *FakeRuntime) CheckpointPod(_ context.Context, options *runtimeapi.CheckpointPodRequest) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "CheckpointPod")
 	return f.Err
 }
 

@@ -678,6 +678,17 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
+			name:   "list source pod scoped to own node",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", Namespace: "ns0", FieldSelectorRequirements: mustParseFields("metadata.name=deleted-source,spec.nodeName=node0")},
+			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:         "cannot list source pod scoped to another node",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", Namespace: "ns0", FieldSelectorRequirements: mustParseFields("metadata.name=source,spec.nodeName=node1")},
+			expect:       authorizer.DecisionNoOpinion,
+			expectReason: "can only list/watch pods with spec.nodeName field selector",
+		},
+		{
 			name:   "list single related pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: "", Name: "pod0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,

@@ -636,11 +636,17 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	runtimeService internalapi.RuntimeService,
 	localStorageCapacityIsolation bool) error {
 	logger := klog.FromContext(ctx)
+	var podOperationMayUsePodResources func(types.UID) bool
+	if provider, ok := podStatusProvider.(interface {
+		PodOperationMayUsePodResources(types.UID) bool
+	}); ok {
+		podOperationMayUsePodResources = provider.PodOperationMayUsePodResources
+	}
 
 	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
 
 	// Initialize DRA manager
-	if err := cm.draManager.Start(ctx, dra.ActivePodsFunc(activePods), dra.GetNodeFunc(getNode), sourcesReady); err != nil {
+	if err := cm.draManager.Start(ctx, dra.ActivePodsFunc(activePods), dra.GetNodeFunc(getNode), sourcesReady, podOperationMayUsePodResources); err != nil {
 		return fmt.Errorf("start dra manager error: %w", err)
 	}
 
@@ -715,7 +721,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	}
 
 	// Starts device manager.
-	if err := cm.deviceManager.Start(klog.FromContext(ctx), devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap.Clone(), containerRunningSet); err != nil {
+	if err := cm.deviceManager.Start(klog.FromContext(ctx), devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap.Clone(), containerRunningSet, podOperationMayUsePodResources); err != nil {
 		return err
 	}
 

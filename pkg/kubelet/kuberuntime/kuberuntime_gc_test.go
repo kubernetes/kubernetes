@@ -17,12 +17,14 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -485,4 +487,59 @@ func TestUnknownStateContainerGC(t *testing.T) {
 	remain, err := fakeRuntime.ListContainers(tCtx, nil)
 	assert.NoError(t, err)
 	assert.Empty(t, remain)
+}
+
+func TestContainerGCDefersOperationOwnedResources(t *testing.T) {
+	for _, policy := range []kubecontainer.GCPolicy{
+		{MaxPerPodContainer: 0, MaxContainers: -1},
+		{MaxPerPodContainer: -1, MaxContainers: 0},
+	} {
+		for _, state := range []runtimeapi.ContainerState{runtimeapi.ContainerState_CONTAINER_CREATED, runtimeapi.ContainerState_CONTAINER_EXITED, runtimeapi.ContainerState_CONTAINER_UNKNOWN} {
+			t.Run(fmt.Sprintf("%v/%v", policy, state), func(t *testing.T) {
+				ctx := ktesting.Init(t)
+				runtime, _, manager, err := createTestRuntimeManager(ctx)
+				require.NoError(t, err)
+				provider := manager.containerGC.podStateProvider.(*fakePodStateProvider)
+				provider.operationPending = map[types.UID]struct{}{"pending": {}}
+				provider.removed["pending"] = struct{}{}
+				runtime.SetFakeContainers(makeFakeContainers(ctx, manager, []containerTemplate{
+					makeGCContainer("pending", "app", 0, 0, state),
+					makeGCContainer("unrelated", "app", 0, 0, state),
+				}))
+				require.NoError(t, manager.containerGC.evictContainers(ctx, policy, true, true))
+				remaining, err := runtime.ListContainers(ctx, nil)
+				require.NoError(t, err)
+				require.Len(t, remaining, 1)
+				require.Equal(t, types.UID("pending"), getContainerInfoFromLabels(ctx, remaining[0].Labels).PodUID)
+				delete(provider.operationPending, "pending")
+				require.NoError(t, manager.containerGC.evictContainers(ctx, policy, true, true))
+				remaining, err = runtime.ListContainers(ctx, nil)
+				require.NoError(t, err)
+				require.Empty(t, remaining)
+			})
+		}
+	}
+}
+
+func TestSandboxGCDefersOperationOwnedResources(t *testing.T) {
+	ctx := ktesting.Init(t)
+	runtime, _, manager, err := createTestRuntimeManager(ctx)
+	require.NoError(t, err)
+	provider := manager.containerGC.podStateProvider.(*fakePodStateProvider)
+	provider.operationPending = map[types.UID]struct{}{"pending": {}}
+	pod := makeTestPod("pending", "ns", "pending", nil)
+	runtime.SetFakeSandboxes(makeFakePodSandboxes(ctx, manager, []sandboxTemplate{
+		{pod: pod, state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY, attempt: 0, createdAt: 0},
+		{pod: pod, state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY, attempt: 1, createdAt: 1},
+	}))
+	require.NoError(t, manager.containerGC.evictSandboxes(ctx, true))
+	remaining, err := runtime.ListPodSandbox(ctx, nil)
+	require.NoError(t, err)
+	require.Len(t, remaining, 2)
+	delete(provider.operationPending, "pending")
+	provider.removed["pending"] = struct{}{}
+	require.NoError(t, manager.containerGC.evictSandboxes(ctx, true))
+	remaining, err = runtime.ListPodSandbox(ctx, nil)
+	require.NoError(t, err)
+	require.Empty(t, remaining)
 }
