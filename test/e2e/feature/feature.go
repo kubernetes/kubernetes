@@ -56,6 +56,10 @@ var (
 	// Marks test that exercise checkpointing of containers
 	CheckpointContainer = framework.WithFeature(framework.ValidFeatures.Add("CheckpointContainer"))
 
+	// Owner: sig-node
+	// Marks test that exercise pod-level checkpointing
+	PodLevelCheckpointRestore = framework.WithFeature(framework.ValidFeatures.Add("PodLevelCheckpointRestore"))
+
 	// Owner: sig-cloud-provider
 	// TODO: document the feature (when to use this feature for a test)
 	CloudProvider = framework.WithFeature(framework.ValidFeatures.Add("CloudProvider"))
