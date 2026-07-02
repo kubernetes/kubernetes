@@ -34,11 +34,23 @@ import (
 )
 
 // EndpointSliceInformer provides access to a shared informer and lister for
-// EndpointSlices.
+// EndpointSlices. Prefer using the type-safe variant (see [TypedEndpointSliceInformer]).
 type EndpointSliceInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() discoveryv1beta1.EndpointSliceLister
 }
+
+// TypedEndpointSliceInformer provides access to a shared informer and lister for
+// EndpointSlices, including the type-safe TypedInformer variant.
+type TypedEndpointSliceInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() EndpointSliceIndexInformer
+	Lister() discoveryv1beta1.EndpointSliceLister
+}
+
+// apidiscoveryv1beta1.EndpointSliceIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type EndpointSliceIndexInformer cache.TypedSharedIndexInformer[*apidiscoveryv1beta1.EndpointSlice]
 
 type endpointSliceInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type endpointSliceInformer struct {
 // NewEndpointSliceInformer constructs a new informer for EndpointSlice type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedEndpointSliceInformer]).
 func NewEndpointSliceInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewEndpointSliceInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedEndpointSliceInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedEndpointSliceInformer constructs a new informer for EndpointSlice type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedEndpointSliceInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) EndpointSliceIndexInformer {
+	return NewTypedEndpointSliceInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredEndpointSliceInformer constructs a new informer for EndpointSlice type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredEndpointSliceInformer]).
 func NewFilteredEndpointSliceInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewEndpointSliceInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredEndpointSliceInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredEndpointSliceInformer constructs a new informer for EndpointSlice type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredEndpointSliceInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) EndpointSliceIndexInformer {
+	return NewTypedEndpointSliceInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewEndpointSliceInformerWithOptions constructs a new informer for EndpointSlice type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedEndpointSliceInformerWithOptions]).
 func NewEndpointSliceInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedEndpointSliceInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedEndpointSliceInformerWithOptions constructs a new informer for EndpointSlice type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedEndpointSliceInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) EndpointSliceIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "discovery.k8s.io", Version: "v1beta1", Resource: "endpointslices"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apidiscoveryv1beta1.EndpointSlice](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewEndpointSliceInformerWithOptions(client kubernetes.Interface, namespace 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *endpointSliceInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewEndpointSliceInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedEndpointSliceInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *endpointSliceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apidiscoveryv1beta1.EndpointSlice{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *endpointSliceInformer) TypedInformer() EndpointSliceIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apidiscoveryv1beta1.EndpointSlice](f.factory.InformerFor(&apidiscoveryv1beta1.EndpointSlice{}, f.defaultInformer))
 }
 
 func (f *endpointSliceInformer) Lister() discoveryv1beta1.EndpointSliceLister {

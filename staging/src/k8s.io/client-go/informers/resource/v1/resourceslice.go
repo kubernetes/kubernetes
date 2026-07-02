@@ -34,11 +34,23 @@ import (
 )
 
 // ResourceSliceInformer provides access to a shared informer and lister for
-// ResourceSlices.
+// ResourceSlices. Prefer using the type-safe variant (see [TypedResourceSliceInformer]).
 type ResourceSliceInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() resourcev1.ResourceSliceLister
 }
+
+// TypedResourceSliceInformer provides access to a shared informer and lister for
+// ResourceSlices, including the type-safe TypedInformer variant.
+type TypedResourceSliceInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ResourceSliceIndexInformer
+	Lister() resourcev1.ResourceSliceLister
+}
+
+// apiresourcev1.ResourceSliceIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ResourceSliceIndexInformer cache.TypedSharedIndexInformer[*apiresourcev1.ResourceSlice]
 
 type resourceSliceInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type resourceSliceInformer struct {
 // NewResourceSliceInformer constructs a new informer for ResourceSlice type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedResourceSliceInformer]).
 func NewResourceSliceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewResourceSliceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedResourceSliceInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedResourceSliceInformer constructs a new informer for ResourceSlice type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedResourceSliceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) ResourceSliceIndexInformer {
+	return NewTypedResourceSliceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredResourceSliceInformer constructs a new informer for ResourceSlice type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredResourceSliceInformer]).
 func NewFilteredResourceSliceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewResourceSliceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredResourceSliceInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredResourceSliceInformer constructs a new informer for ResourceSlice type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredResourceSliceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ResourceSliceIndexInformer {
+	return NewTypedResourceSliceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewResourceSliceInformerWithOptions constructs a new informer for ResourceSlice type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedResourceSliceInformerWithOptions]).
 func NewResourceSliceInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedResourceSliceInformerWithOptions(client, options)
+}
+
+// NewTypedResourceSliceInformerWithOptions constructs a new informer for ResourceSlice type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedResourceSliceInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) ResourceSliceIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1", Resource: "resourceslices"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apiresourcev1.ResourceSlice](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewResourceSliceInformerWithOptions(client kubernetes.Interface, options in
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *resourceSliceInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewResourceSliceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedResourceSliceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *resourceSliceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiresourcev1.ResourceSlice{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *resourceSliceInformer) TypedInformer() ResourceSliceIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apiresourcev1.ResourceSlice](f.factory.InformerFor(&apiresourcev1.ResourceSlice{}, f.defaultInformer))
 }
 
 func (f *resourceSliceInformer) Lister() resourcev1.ResourceSliceLister {

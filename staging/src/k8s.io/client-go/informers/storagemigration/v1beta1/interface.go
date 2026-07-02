@@ -25,7 +25,7 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// StorageVersionMigrations returns a StorageVersionMigrationInformer.
-	StorageVersionMigrations() StorageVersionMigrationInformer
+	StorageVersionMigrations() TypedStorageVersionMigrationInformer
 }
 
 type version struct {
@@ -40,6 +40,6 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // StorageVersionMigrations returns a StorageVersionMigrationInformer.
-func (v *version) StorageVersionMigrations() StorageVersionMigrationInformer {
+func (v *version) StorageVersionMigrations() TypedStorageVersionMigrationInformer {
 	return &storageVersionMigrationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

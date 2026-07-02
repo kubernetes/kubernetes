@@ -25,15 +25,15 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// DaemonSets returns a DaemonSetInformer.
-	DaemonSets() DaemonSetInformer
+	DaemonSets() TypedDaemonSetInformer
 	// Deployments returns a DeploymentInformer.
-	Deployments() DeploymentInformer
+	Deployments() TypedDeploymentInformer
 	// Ingresses returns a IngressInformer.
-	Ingresses() IngressInformer
+	Ingresses() TypedIngressInformer
 	// NetworkPolicies returns a NetworkPolicyInformer.
-	NetworkPolicies() NetworkPolicyInformer
+	NetworkPolicies() TypedNetworkPolicyInformer
 	// ReplicaSets returns a ReplicaSetInformer.
-	ReplicaSets() ReplicaSetInformer
+	ReplicaSets() TypedReplicaSetInformer
 }
 
 type version struct {
@@ -48,26 +48,26 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // DaemonSets returns a DaemonSetInformer.
-func (v *version) DaemonSets() DaemonSetInformer {
+func (v *version) DaemonSets() TypedDaemonSetInformer {
 	return &daemonSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Deployments returns a DeploymentInformer.
-func (v *version) Deployments() DeploymentInformer {
+func (v *version) Deployments() TypedDeploymentInformer {
 	return &deploymentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Ingresses returns a IngressInformer.
-func (v *version) Ingresses() IngressInformer {
+func (v *version) Ingresses() TypedIngressInformer {
 	return &ingressInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // NetworkPolicies returns a NetworkPolicyInformer.
-func (v *version) NetworkPolicies() NetworkPolicyInformer {
+func (v *version) NetworkPolicies() TypedNetworkPolicyInformer {
 	return &networkPolicyInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ReplicaSets returns a ReplicaSetInformer.
-func (v *version) ReplicaSets() ReplicaSetInformer {
+func (v *version) ReplicaSets() TypedReplicaSetInformer {
 	return &replicaSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

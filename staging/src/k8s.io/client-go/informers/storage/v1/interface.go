@@ -25,17 +25,17 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// CSIDrivers returns a CSIDriverInformer.
-	CSIDrivers() CSIDriverInformer
+	CSIDrivers() TypedCSIDriverInformer
 	// CSINodes returns a CSINodeInformer.
-	CSINodes() CSINodeInformer
+	CSINodes() TypedCSINodeInformer
 	// CSIStorageCapacities returns a CSIStorageCapacityInformer.
-	CSIStorageCapacities() CSIStorageCapacityInformer
+	CSIStorageCapacities() TypedCSIStorageCapacityInformer
 	// StorageClasses returns a StorageClassInformer.
-	StorageClasses() StorageClassInformer
+	StorageClasses() TypedStorageClassInformer
 	// VolumeAttachments returns a VolumeAttachmentInformer.
-	VolumeAttachments() VolumeAttachmentInformer
+	VolumeAttachments() TypedVolumeAttachmentInformer
 	// VolumeAttributesClasses returns a VolumeAttributesClassInformer.
-	VolumeAttributesClasses() VolumeAttributesClassInformer
+	VolumeAttributesClasses() TypedVolumeAttributesClassInformer
 }
 
 type version struct {
@@ -50,31 +50,31 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // CSIDrivers returns a CSIDriverInformer.
-func (v *version) CSIDrivers() CSIDriverInformer {
+func (v *version) CSIDrivers() TypedCSIDriverInformer {
 	return &cSIDriverInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // CSINodes returns a CSINodeInformer.
-func (v *version) CSINodes() CSINodeInformer {
+func (v *version) CSINodes() TypedCSINodeInformer {
 	return &cSINodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // CSIStorageCapacities returns a CSIStorageCapacityInformer.
-func (v *version) CSIStorageCapacities() CSIStorageCapacityInformer {
+func (v *version) CSIStorageCapacities() TypedCSIStorageCapacityInformer {
 	return &cSIStorageCapacityInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // StorageClasses returns a StorageClassInformer.
-func (v *version) StorageClasses() StorageClassInformer {
+func (v *version) StorageClasses() TypedStorageClassInformer {
 	return &storageClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // VolumeAttachments returns a VolumeAttachmentInformer.
-func (v *version) VolumeAttachments() VolumeAttachmentInformer {
+func (v *version) VolumeAttachments() TypedVolumeAttachmentInformer {
 	return &volumeAttachmentInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // VolumeAttributesClasses returns a VolumeAttributesClassInformer.
-func (v *version) VolumeAttributesClasses() VolumeAttributesClassInformer {
+func (v *version) VolumeAttributesClasses() TypedVolumeAttributesClassInformer {
 	return &volumeAttributesClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

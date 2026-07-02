@@ -25,7 +25,7 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// PriorityClasses returns a PriorityClassInformer.
-	PriorityClasses() PriorityClassInformer
+	PriorityClasses() TypedPriorityClassInformer
 }
 
 type version struct {
@@ -40,6 +40,6 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // PriorityClasses returns a PriorityClassInformer.
-func (v *version) PriorityClasses() PriorityClassInformer {
+func (v *version) PriorityClasses() TypedPriorityClassInformer {
 	return &priorityClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

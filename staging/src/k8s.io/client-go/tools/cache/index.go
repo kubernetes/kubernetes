@@ -98,3 +98,16 @@ type Indexers map[string]IndexFunc
 
 // Indices maps a name to an Index
 type Indices map[string]index
+
+type TypedIndexers[T any] map[string]TypedIndexFunc[T]
+type TypedIndexFunc[T any] func(obj T) ([]string, error)
+type TypedIndexer[T any] interface {
+	Indexer
+
+	// TODO (?) TypedStore() TypedStore
+	TypedIndex(indexName string, obj T) ([]T, error)
+	TypedByIndex(indexName, indexedValue string) ([]T, error)
+	TypedAddIndexers(newIndexers TypedIndexers[T]) error
+
+	internal()
+}

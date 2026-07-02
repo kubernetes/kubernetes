@@ -34,11 +34,23 @@ import (
 )
 
 // ClusterTestTypeInformer provides access to a shared informer and lister for
-// ClusterTestTypes.
+// ClusterTestTypes. Prefer using the type-safe variant (see [TypedClusterTestTypeInformer]).
 type ClusterTestTypeInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() apiv1.ClusterTestTypeLister
 }
+
+// TypedClusterTestTypeInformer provides access to a shared informer and lister for
+// ClusterTestTypes, including the type-safe TypedInformer variant.
+type TypedClusterTestTypeInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ClusterTestTypeIndexInformer
+	Lister() apiv1.ClusterTestTypeLister
+}
+
+// singleapiv1.ClusterTestTypeIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ClusterTestTypeIndexInformer cache.TypedSharedIndexInformer[*singleapiv1.ClusterTestType]
 
 type clusterTestTypeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type clusterTestTypeInformer struct {
 // NewClusterTestTypeInformer constructs a new informer for ClusterTestType type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedClusterTestTypeInformer]).
 func NewClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewClusterTestTypeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedClusterTestTypeInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedClusterTestTypeInformer constructs a new informer for ClusterTestType type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) ClusterTestTypeIndexInformer {
+	return NewTypedClusterTestTypeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredClusterTestTypeInformer constructs a new informer for ClusterTestType type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredClusterTestTypeInformer]).
 func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewClusterTestTypeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredClusterTestTypeInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredClusterTestTypeInformer constructs a new informer for ClusterTestType type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ClusterTestTypeIndexInformer {
+	return NewTypedClusterTestTypeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewClusterTestTypeInformerWithOptions constructs a new informer for ClusterTestType type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedClusterTestTypeInformerWithOptions]).
 func NewClusterTestTypeInformerWithOptions(client versioned.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedClusterTestTypeInformerWithOptions(client, options)
+}
+
+// NewTypedClusterTestTypeInformerWithOptions constructs a new informer for ClusterTestType type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedClusterTestTypeInformerWithOptions(client versioned.Interface, options internalinterfaces.InformerOptions) ClusterTestTypeIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "example.crd.code-generator.k8s.io", Version: "v1", Resource: "clustertesttypes"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*singleapiv1.ClusterTestType](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewClusterTestTypeInformerWithOptions(client versioned.Interface, options i
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *clusterTestTypeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewClusterTestTypeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedClusterTestTypeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *clusterTestTypeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&singleapiv1.ClusterTestType{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *clusterTestTypeInformer) TypedInformer() ClusterTestTypeIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*singleapiv1.ClusterTestType](f.factory.InformerFor(&singleapiv1.ClusterTestType{}, f.defaultInformer))
 }
 
 func (f *clusterTestTypeInformer) Lister() apiv1.ClusterTestTypeLister {

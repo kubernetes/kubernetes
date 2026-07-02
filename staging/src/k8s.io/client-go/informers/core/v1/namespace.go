@@ -34,11 +34,23 @@ import (
 )
 
 // NamespaceInformer provides access to a shared informer and lister for
-// Namespaces.
+// Namespaces. Prefer using the type-safe variant (see [TypedNamespaceInformer]).
 type NamespaceInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.NamespaceLister
 }
+
+// TypedNamespaceInformer provides access to a shared informer and lister for
+// Namespaces, including the type-safe TypedInformer variant.
+type TypedNamespaceInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() NamespaceIndexInformer
+	Lister() corev1.NamespaceLister
+}
+
+// apicorev1.NamespaceIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type NamespaceIndexInformer cache.TypedSharedIndexInformer[*apicorev1.Namespace]
 
 type namespaceInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type namespaceInformer struct {
 // NewNamespaceInformer constructs a new informer for Namespace type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedNamespaceInformer]).
 func NewNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedNamespaceInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedNamespaceInformer constructs a new informer for Namespace type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) NamespaceIndexInformer {
+	return NewTypedNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredNamespaceInformer constructs a new informer for Namespace type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredNamespaceInformer]).
 func NewFilteredNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredNamespaceInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredNamespaceInformer constructs a new informer for Namespace type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) NamespaceIndexInformer {
+	return NewTypedNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewNamespaceInformerWithOptions constructs a new informer for Namespace type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedNamespaceInformerWithOptions]).
 func NewNamespaceInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedNamespaceInformerWithOptions(client, options)
+}
+
+// NewTypedNamespaceInformerWithOptions constructs a new informer for Namespace type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedNamespaceInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) NamespaceIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicorev1.Namespace](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewNamespaceInformerWithOptions(client kubernetes.Interface, options intern
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *namespaceInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedNamespaceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.Namespace{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *namespaceInformer) TypedInformer() NamespaceIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicorev1.Namespace](f.factory.InformerFor(&apicorev1.Namespace{}, f.defaultInformer))
 }
 
 func (f *namespaceInformer) Lister() corev1.NamespaceLister {

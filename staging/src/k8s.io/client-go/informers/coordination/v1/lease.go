@@ -34,11 +34,23 @@ import (
 )
 
 // LeaseInformer provides access to a shared informer and lister for
-// Leases.
+// Leases. Prefer using the type-safe variant (see [TypedLeaseInformer]).
 type LeaseInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() coordinationv1.LeaseLister
 }
+
+// TypedLeaseInformer provides access to a shared informer and lister for
+// Leases, including the type-safe TypedInformer variant.
+type TypedLeaseInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() LeaseIndexInformer
+	Lister() coordinationv1.LeaseLister
+}
+
+// apicoordinationv1.LeaseIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type LeaseIndexInformer cache.TypedSharedIndexInformer[*apicoordinationv1.Lease]
 
 type leaseInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type leaseInformer struct {
 // NewLeaseInformer constructs a new informer for Lease type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedLeaseInformer]).
 func NewLeaseInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewLeaseInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedLeaseInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedLeaseInformer constructs a new informer for Lease type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedLeaseInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) LeaseIndexInformer {
+	return NewTypedLeaseInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredLeaseInformer constructs a new informer for Lease type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredLeaseInformer]).
 func NewFilteredLeaseInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewLeaseInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredLeaseInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredLeaseInformer constructs a new informer for Lease type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredLeaseInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) LeaseIndexInformer {
+	return NewTypedLeaseInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewLeaseInformerWithOptions constructs a new informer for Lease type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedLeaseInformerWithOptions]).
 func NewLeaseInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedLeaseInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedLeaseInformerWithOptions constructs a new informer for Lease type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedLeaseInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) LeaseIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "coordination.k8s.io", Version: "v1", Resource: "leases"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicoordinationv1.Lease](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewLeaseInformerWithOptions(client kubernetes.Interface, namespace string, 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *leaseInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewLeaseInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedLeaseInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *leaseInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicoordinationv1.Lease{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *leaseInformer) TypedInformer() LeaseIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicoordinationv1.Lease](f.factory.InformerFor(&apicoordinationv1.Lease{}, f.defaultInformer))
 }
 
 func (f *leaseInformer) Lister() coordinationv1.LeaseLister {
