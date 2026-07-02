@@ -80,7 +80,7 @@ type preFilterState struct {
 	// See the docstring for classifyTermsBasedOnScope for more details.
 	nonHostScopedAntiAffinityTerms []fwk.AffinityTerm
 
-	hasMatchingHostScopedAffinityPodGlobally bool
+	matchingHostScopedAffinityPodsCount int64
 }
 
 // Clone the prefilter state.
@@ -100,7 +100,7 @@ func (s *preFilterState) Clone() fwk.StateData {
 	copy.nonHostScopedAntiAffinityTerms = s.nonHostScopedAntiAffinityTerms
 	copy.hostScopedAffinityTerms = s.hostScopedAffinityTerms
 	copy.hostScopedAntiAffinityTerms = s.hostScopedAntiAffinityTerms
-	copy.hasMatchingHostScopedAffinityPodGlobally = s.hasMatchingHostScopedAffinityPodGlobally
+	copy.matchingHostScopedAffinityPodsCount = s.matchingHostScopedAffinityPodsCount
 	return &copy
 }
 
@@ -124,6 +124,12 @@ func (s *preFilterState) updateWithPod(pInfo fwk.PodInfo, node *v1.Node, multipl
 	// The incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 	// here we don't lookup the updated pod's namespace labels, hence passing nil for nsLabels.
 	s.antiAffinityCounts.updateWithAntiAffinityTerms(s.nonHostScopedAntiAffinityTerms, pInfo.GetPod(), nil, node, multiplier)
+
+	if len(s.hostScopedAffinityTerms) > 0 {
+		if podMatchesAllAffinityTerms(s.hostScopedAffinityTerms, pInfo.GetPod()) {
+			s.matchingHostScopedAffinityPodsCount += multiplier
+		}
+	}
 }
 
 // classifyTermsBasedOnScope separates terms that can be checked purely locally on a single node from those that require a global scan across the cluster.
@@ -453,7 +459,7 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 
 	// Check if a pod with mastching host-scoped affinity exist on the cluster
 	if len(s.hostScopedAffinityTerms) > 0 {
-		s.hasMatchingHostScopedAffinityPodGlobally = hasMatchingHostScopedAffinityPodGlobally(ctx, allNodes, s, pl)
+		s.matchingHostScopedAffinityPodsCount = countMatchingHostScopedAffinityPodsGlobally(ctx, allNodes, s, pl)
 	}
 
 	if len(s.existingAntiAffinityCounts) == 0 && !hasHostScopedAntiAffinity && len(s.podInfo.GetRequiredAffinityTerms()) == 0 && len(s.podInfo.GetRequiredAntiAffinityTerms()) == 0 {
@@ -464,27 +470,18 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 	return nil, nil
 }
 
-func hasMatchingHostScopedAffinityPodGlobally(ctx context.Context, allNodes []fwk.NodeInfo, s *preFilterState, pl *InterPodAffinity) bool {
-	var found int32
-	cancelCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
+func countMatchingHostScopedAffinityPodsGlobally(ctx context.Context, allNodes []fwk.NodeInfo, s *preFilterState, pl *InterPodAffinity) int64 {
+	var count int64
 	processNode := func(i int) {
-		if atomic.LoadInt32(&found) != 0 {
-			return
-		}
 		nodeInfo := allNodes[i]
 		for _, existingPod := range nodeInfo.GetPods() {
 			if podMatchesAllAffinityTerms(s.hostScopedAffinityTerms, existingPod.GetPod()) {
-				if atomic.CompareAndSwapInt32(&found, 0, 1) {
-					cancel()
-				}
-				return
+				atomic.AddInt64(&count, 1)
 			}
 		}
 	}
-	pl.parallelizer.Until(cancelCtx, len(allNodes), processNode, pl.Name())
-	return atomic.LoadInt32(&found) != 0
+	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
+	return count
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -630,7 +627,7 @@ func nodeTopologyMatchesAffinity(state *preFilterState, nodeInfo fwk.NodeInfo) b
 // its own terms, and the node has all the requested topologies, then we allow the pod
 // to pass the affinity check.
 func satisfiesSelfAffinityCheck(state *preFilterState, nodeInfo fwk.NodeInfo) bool {
-	if !state.hasMatchingHostScopedAffinityPodGlobally && podMatchesAllAffinityTerms(state.podInfo.GetRequiredAffinityTerms(), state.podInfo.GetPod()) {
+	if state.matchingHostScopedAffinityPodsCount == 0 && podMatchesAllAffinityTerms(state.podInfo.GetRequiredAffinityTerms(), state.podInfo.GetPod()) {
 		for _, term := range state.podInfo.GetRequiredAffinityTerms() {
 			if _, ok := nodeInfo.Node().Labels[term.TopologyKey]; !ok {
 				return false

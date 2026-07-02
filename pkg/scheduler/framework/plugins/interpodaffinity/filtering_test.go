@@ -1552,3 +1552,64 @@ func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
 	}
 	return podInfo
 }
+
+func TestRemovePodHostScopedAffinityCount(t *testing.T) {
+	for _, fastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fastPathEnabled=%v", fastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
+
+			// Pending pod has self-affinity on hostname
+			pendingPod := st.MakePod().Name("pending").Labels(map[string]string{"foo": "bar"}).
+				PodAffinityIn("foo", v1.LabelHostname, []string{"bar"}, st.PodAffinityWithRequiredReq).Obj()
+
+			// Existing pod on nodeA that satisfies the affinity
+			existingPod := st.MakePod().Name("existing").Node("nodeA").Labels(map[string]string{"foo": "bar"}).Obj()
+
+			nodes := []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{v1.LabelHostname: "nodeB"}}},
+			}
+
+			snapshot := cache.NewSnapshot([]*v1.Pod{existingPod}, nodes)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			
+			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, nil)
+			cycleState := framework.NewCycleState()
+			
+			// 1. PreFilter
+			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, pendingPod, nodeInfos)
+			if !preFilterStatus.IsSuccess() {
+				t.Fatalf("prefilter failed with status: %v", preFilterStatus)
+			}
+
+			// NodeB should fail initially because the first pod must land on NodeA (where the existing pod is)
+			nodeInfoB := mustGetNodeInfo(t, snapshot, "nodeB")
+			status := p.(fwk.FilterPlugin).Filter(ctx, cycleState, pendingPod, nodeInfoB)
+			if status.IsSuccess() {
+				t.Errorf("expected Filter to fail on nodeB because existing pod satisfies affinity globally, but it succeeded")
+			}
+
+			// 2. Simulate Preemption (scaledown)
+			// We remove the existing pod from nodeA
+			nodeInfoA := mustGetNodeInfo(t, snapshot, "nodeA")
+			if err := p.(fwk.PreFilterExtensions).RemovePod(ctx, cycleState, pendingPod, mustNewPodInfo(t, existingPod), nodeInfoA); err != nil {
+				t.Fatalf("error removing pod: %v", err)
+			}
+
+			// 3. Filter again on NodeB
+			// Now there are NO pods matching "foo: bar" globally.
+			// The pending pod should satisfy self-affinity and be allowed on NodeB.
+			status = p.(fwk.FilterPlugin).Filter(ctx, cycleState, pendingPod, nodeInfoB)
+			if !status.IsSuccess() {
+				t.Errorf("expected Filter to succeed on nodeB after existing pod is removed, but got status: %v", status)
+			}
+		})
+	}
+}

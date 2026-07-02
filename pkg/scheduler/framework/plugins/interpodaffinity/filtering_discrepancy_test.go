@@ -95,8 +95,8 @@ func TestAffinityDiscrepancy(t *testing.T) {
 
 	// Internal check: hasMatchingHostScopedAffinityPodGlobally should be TRUE because of podC
 	s, _ := getPreFilterState(state)
-	if !s.hasMatchingHostScopedAffinityPodGlobally {
-		t.Errorf("hasMatchingHostScopedAffinityPodGlobally is FALSE, expected TRUE (since podC matches BOTH terms)")
+	if s.matchingHostScopedAffinityPodsCount == 0 {
+		t.Errorf("matchingHostScopedAffinityPodsCount is 0, expected > 0 (since podC matches BOTH terms)")
 	}
 
 	// Filter on node-1: should FAIL because no single pod matches BOTH terms
@@ -133,8 +133,8 @@ func TestAffinityDiscrepancy(t *testing.T) {
 	state = framework.NewCycleState()
 	plugin.PreFilter(ctx, state, podWithTwoAffinityTerms, plugin.sharedLister.(*mockSharedLister).nodeLister.nodes)
 	s, _ = getPreFilterState(state)
-	if s.hasMatchingHostScopedAffinityPodGlobally {
-		t.Errorf("Expected hasMatchingHostScopedAffinityPodGlobally to be FALSE after removing node-3")
+	if s.matchingHostScopedAffinityPodsCount > 0 {
+		t.Errorf("Expected matchingHostScopedAffinityPodsCount to be 0 after removing node-3")
 	}
 
 	// Now node-2 should succeed due to fallback
