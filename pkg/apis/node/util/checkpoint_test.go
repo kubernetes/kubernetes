@@ -124,6 +124,7 @@ func sourcePod() *v1.Pod {
 		Spec: v1.PodSpec{
 			NodeName:     "node-1",
 			NodeSelector: map[string]string{"disktype": "ssd"},
+			RestoreFrom:  &v1.CheckpointReference{Name: "ckpt"},
 			Containers:   []v1.Container{{Name: "main", Image: "my-app:latest"}},
 		},
 		Status: v1.PodStatus{Phase: v1.PodRunning},
@@ -155,9 +156,12 @@ func TestSanitizePodTemplate_StripsNodeLocalAndIdentityFields(t *testing.T) {
 		t.Errorf("ManagedFields not cleared: %+v", tmpl.ManagedFields)
 	}
 
-	// Node-local scheduling state must be cleared.
+	// Node-local scheduling state and restoreFrom must be cleared.
 	if tmpl.Spec.NodeName != "" {
 		t.Errorf("spec.NodeName not cleared: %q", tmpl.Spec.NodeName)
+	}
+	if tmpl.Spec.RestoreFrom != nil {
+		t.Errorf("spec.RestoreFrom not cleared: %v", *tmpl.Spec.RestoreFrom)
 	}
 
 	// User-meaningful metadata and spec must be preserved.
@@ -215,12 +219,37 @@ func TestSanitizePodTemplate_DoesNotMutateSource(t *testing.T) {
 	if pod.Spec.NodeName != "node-1" {
 		t.Errorf("source pod spec.NodeName was mutated: %q", pod.Spec.NodeName)
 	}
+	if pod.Spec.RestoreFrom == nil {
+		t.Errorf("source pod spec.RestoreFrom was mutated (cleared)")
+	} else if pod.Spec.RestoreFrom.Name != "ckpt" {
+		t.Errorf("source pod spec.RestoreFrom.Name was mutated: %q", pod.Spec.RestoreFrom.Name)
+	}
 	if pod.UID != types.UID("abc-123") {
 		t.Errorf("source pod UID was mutated: %q", pod.UID)
 	}
 	if len(pod.ManagedFields) != 1 {
 		t.Errorf("source pod ManagedFields was mutated: %+v", pod.ManagedFields)
 	}
+}
+
+func TestSanitizePodTemplatePreservesSourceRestorePin(t *testing.T) {
+	pod := sourcePod()
+	pod.Spec.Affinity = &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{{
+					MatchFields: []v1.NodeSelectorRequirement{{
+						Key:      "metadata.name",
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{"node-1"},
+					}},
+				}},
+			},
+		},
+	}
+
+	tmpl := SanitizePodTemplate(pod)
+	require.Equal(t, pod.Spec.Affinity, tmpl.Spec.Affinity)
 }
 
 func TestSanitizePodTemplatePreservesEmptyAffinity(t *testing.T) {
@@ -250,4 +279,26 @@ func TestSanitizePodTemplateExcludesNonRestoredFields(t *testing.T) {
 	require.Equal(t, pod.Spec.Containers[0].Resources, template.Spec.Containers[0].Resources)
 	require.Equal(t, pod.Spec.Tolerations, template.Spec.Tolerations)
 	require.Equal(t, original, pod)
+}
+
+func TestRestoreNodeAffinityPinIsIdempotent(t *testing.T) {
+	pin := v1.NodeSelectorRequirement{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{"node-1"}}
+	for _, selector := range []*v1.NodeSelector{
+		nil, {}, {NodeSelectorTerms: []v1.NodeSelectorTerm{{}}},
+		{NodeSelectorTerms: []v1.NodeSelectorTerm{{MatchFields: []v1.NodeSelectorRequirement{pin}}}},
+		{NodeSelectorTerms: []v1.NodeSelectorTerm{{}, {MatchExpressions: []v1.NodeSelectorRequirement{{Key: "zone", Operator: v1.NodeSelectorOpIn, Values: []string{"prod"}}}}}},
+	} {
+		pod := sourcePod()
+		pod.Spec.Affinity = &v1.Affinity{NodeAffinity: &v1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: selector}}
+		original := pod.DeepCopy()
+		template := SanitizePodTemplate(pod)
+		require.Equal(t, original.Spec.Affinity, template.Spec.Affinity, "capture must preserve the complete source expression")
+		spec := template.Spec.DeepCopy()
+		AddRestoreNodeAffinity(spec, "node-1")
+		first := spec.DeepCopy()
+		AddRestoreNodeAffinity(spec, "node-1")
+		require.Equal(t, first, spec, "reinvocation must not duplicate the pin")
+		require.Equal(t, original, pod)
+		require.Equal(t, original.Spec.Affinity, template.Spec.Affinity)
+	}
 }
