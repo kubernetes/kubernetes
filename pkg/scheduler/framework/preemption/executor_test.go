@@ -1420,6 +1420,136 @@ func TestPreemptPod(t *testing.T) {
 	}
 }
 
+func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemption(t *testing.T) {
+	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
+	waitingVictim := st.MakePod().Name("waiting-v").UID("waiting-v").Priority(midPriority).Node("node1").Obj()
+	preBindVictim := st.MakePod().Name("prebind-v").UID("prebind-v").Priority(midPriority).Node("node1").Obj()
+	apiVictim := st.MakePod().Name("api-v").UID("api-v").Priority(midPriority).Node("node1").Obj()
+
+	tests := []struct {
+		name                  string
+		victimPods            []*v1.Pod
+		inMemoryVictim        *v1.Pod
+		addVictimToPrebind    bool
+		addVictimToWaiting    bool
+		wantPreemptorActivate bool
+	}{
+		{
+			name:                  "last waiting pod",
+			victimPods:            []*v1.Pod{waitingVictim},
+			inMemoryVictim:        waitingVictim,
+			addVictimToWaiting:    true,
+			wantPreemptorActivate: true,
+		},
+		{
+			name:                  "last preBind pod",
+			victimPods:            []*v1.Pod{preBindVictim},
+			inMemoryVictim:        preBindVictim,
+			addVictimToPrebind:    true,
+			wantPreemptorActivate: true,
+		},
+		{
+			name:               "non-last waiting pod",
+			victimPods:         []*v1.Pod{waitingVictim.DeepCopy(), apiVictim.DeepCopy()},
+			inMemoryVictim:     waitingVictim.DeepCopy(),
+			addVictimToWaiting: true,
+		},
+		{
+			name:               "non-last preBind pod",
+			victimPods:         []*v1.Pod{preBindVictim.DeepCopy(), apiVictim.DeepCopy()},
+			inMemoryVictim:     preBindVictim.DeepCopy(),
+			addVictimToPrebind: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metrics.Register()
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			mu := &sync.RWMutex{}
+			fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu}
+			podsInPreBind := frameworkruntime.NewPodsInPreBindMap()
+			waitingPods := frameworkruntime.NewWaitingPodsMap()
+			registeredPlugins := append([]tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterPermitPlugin(waitingPermitPluginName, newWaitingPermitPlugin),
+			)
+			objects := []runtime.Object{preemptorPod}
+			podsForSnapshot := make([]*v1.Pod, 0, len(tt.victimPods))
+			for _, pod := range tt.victimPods {
+				objects = append(objects, pod)
+				podsForSnapshot = append(podsForSnapshot, pod)
+			}
+			cs := clientsetfake.NewClientset(objects...)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
+
+			fwk, err := tf.NewFramework(
+				ctx,
+				registeredPlugins, "",
+				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(podsForSnapshot, []*v1.Node{st.MakeNode().Name("node1").Obj()})),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithWaitingPods(waitingPods),
+				frameworkruntime.WithPodsInPreBind(podsInPreBind),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
+				frameworkruntime.WithPodActivator(fakeActivator),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var victimCtx context.Context
+			var cancelVictim context.CancelCauseFunc
+			if tt.addVictimToPrebind {
+				victimCtx, cancelVictim = context.WithCancelCause(context.Background())
+				fwk.AddPodInPreBind(tt.inMemoryVictim.UID, cancelVictim)
+			}
+			if tt.addVictimToWaiting {
+				pluginsWaitTime, status := fwk.RunPermitPlugins(ctx, framework.NewCycleState(), tt.inMemoryVictim, "node1")
+				if !status.IsWait() {
+					t.Fatalf("Failed to add a pod to waiting list")
+				}
+				fwk.AddWaitingPod(tt.inMemoryVictim, pluginsWaitTime)
+			}
+
+			executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: true})
+			candidate := &candidate{
+				name: "node1",
+				victims: &extenderv1.Victims{
+					Pods: tt.victimPods,
+				},
+			}
+			executor.prepareCandidateAsync(candidate, &podExecutorPreemptor{Pod: preemptorPod}, "test-plugin")
+
+			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+				executor.mu.RLock()
+				preempting := len(executor.preempting) != 0
+				executor.mu.RUnlock()
+				return !preempting, nil
+			}); err != nil {
+				t.Fatalf("Timed out waiting for async preemption to finish: %v", err)
+			}
+
+			mu.RLock()
+			defer mu.RUnlock()
+			_, activated := fakeActivator.activatedPods[preemptorPod.Name]
+			if activated != tt.wantPreemptorActivate {
+				t.Fatalf("Preemptor activation = %v, want %v; activated pods: %v", activated, tt.wantPreemptorActivate, fakeActivator.activatedPods)
+			}
+			if tt.addVictimToPrebind && victimCtx.Err() == nil {
+				t.Fatalf("Expected preBind victim context to be cancelled")
+			}
+		})
+	}
+}
+
 // waitingPermitPlugin is a PermitPlugin that always returns Wait.
 type waitingPermitPlugin struct{}
 
