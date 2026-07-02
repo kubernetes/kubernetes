@@ -63,7 +63,7 @@ func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcd3testing.E
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
 	}
-	storage, err := NewStorage(restOptions, nil, nil, nil, nil)
+	storage, err := NewStorage(restOptions, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -167,7 +167,7 @@ func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcd3testing.Etcd
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
 	}
-	storage, err := NewStorage(restOptions, nil, nil, nil, nil)
+	storage, err := NewStorage(restOptions, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -1519,7 +1519,7 @@ func TestEtcdUpdateDynamic(t *testing.T) {
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
 	}
-	podStorage, err := NewStorage(restOptions, nil, nil, nil, nil)
+	podStorage, err := NewStorage(restOptions, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}

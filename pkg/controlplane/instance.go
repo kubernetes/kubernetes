@@ -407,6 +407,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		},
 		EndpointSliceGetter:     c.ControlPlane.Extra.EndpointSliceGetter,
 		Authorizer:              c.ControlPlane.Generic.Authorization.Authorizer,
+		PodCheckpoints:          client.NodeV1alpha1(),
 		DisabledPodSubresources: c.Extra.DisabledPodSubresources,
 	}, c.ControlPlane.Generic.Authorization.Authorizer)
 	if err != nil {

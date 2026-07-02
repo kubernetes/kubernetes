@@ -111,6 +111,13 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
+	// Reapplying a name-only reference must retain the immutable identity that
+	// admission selected. Never resolve a replacement checkpoint during update.
+	oldRef, newRef := oldPod.Spec.RestoreFrom, newPod.Spec.RestoreFrom
+	if oldRef != nil && newRef != nil && oldRef.Name == newRef.Name && newRef.UID == "" {
+		newRef.UID = oldRef.UID
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
 		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
 			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
@@ -158,7 +165,8 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
 	errs := corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
-	return append(errs, validateCheckpointingUpdate(pod, oldPod)...)
+	errs = append(errs, validateCheckpointingUpdate(pod, oldPod)...)
+	return append(errs, validateRestoreUpdate(pod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -357,7 +365,8 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
 	errs := corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
-	return append(errs, validateCheckpointingUpdate(newPod, oldPod)...)
+	errs = append(errs, validateCheckpointingUpdate(newPod, oldPod)...)
+	return append(errs, validateRestoreUpdate(newPod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -484,7 +493,8 @@ func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
 	errs := corevalidation.ValidatePodResize(newPod, oldPod, opts)
-	return append(errs, validateCheckpointingUpdate(newPod, oldPod)...)
+	errs = append(errs, validateCheckpointingUpdate(newPod, oldPod)...)
+	return append(errs, validateRestoreUpdate(newPod, oldPod)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -580,6 +590,35 @@ func validateCheckpointingUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 	return field.ErrorList{field.Forbidden(specPath, fmt.Sprintf("%s; scheduling gates may be removed; changed fields: %s", message, strings.Join(changedFields, ", ")))}
 }
 
+// validateRestoreUpdate preserves the workload until restore succeeds. The old
+// status determines whether the restore has completed, so an update cannot set
+// PodRestored=True to bypass the check. Status updates keep the existing spec
+// and do not need the check.
+func validateRestoreUpdate(newPod, oldPod *api.Pod) field.ErrorList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) || oldPod.Spec.RestoreFrom == nil {
+		return nil
+	}
+	// Declarative validation reports a changed restoreFrom; do not report it twice.
+	if !apiequality.Semantic.DeepEqual(oldPod.Spec.RestoreFrom, newPod.Spec.RestoreFrom) {
+		return nil
+	}
+	for _, condition := range oldPod.Status.Conditions {
+		if condition.Type == api.PodRestored && condition.Status == api.ConditionTrue {
+			return nil
+		}
+	}
+
+	specPath := field.NewPath("spec")
+	changedFields, err := podSpecChangedFields(&oldPod.Spec, &newPod.Spec)
+	if err != nil {
+		return field.ErrorList{field.InternalError(specPath, err)}
+	}
+	if len(changedFields) == 0 {
+		return nil
+	}
+	return field.ErrorList{field.Forbidden(specPath, fmt.Sprintf("pod spec cannot change until restore succeeds (PodRestored=True); scheduling gates may be removed; changed fields: %s", strings.Join(changedFields, ", ")))}
+}
+
 // podSpecChangedFields lists the paths of changed fields without their values.
 // It compares versioned specs because the internal types do not have the API
 // field names and nest some fields differently.
@@ -591,7 +630,8 @@ func podSpecChangedFields(oldSpec, newSpec *api.PodSpec) ([]string, error) {
 	if err := legacyscheme.Scheme.Convert(newSpec, &got, nil); err != nil {
 		return nil, fmt.Errorf("failed to convert updated Pod spec: %w", err)
 	}
-	// Gates delay scheduling and are not part of the captured workload.
+	// Gates delay scheduling and are not part of the captured workload. Removing
+	// a gate must remain possible so that a restore Pod can be scheduled.
 	want.SchedulingGates, got.SchedulingGates = nil, nil
 	return checkpointutil.PodSpecChangedFields(&want, &got), nil
 }

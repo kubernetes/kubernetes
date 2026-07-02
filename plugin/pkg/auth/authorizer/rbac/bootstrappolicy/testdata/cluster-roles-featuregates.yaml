@@ -271,6 +271,12 @@ items:
     - patch
     - update
   - apiGroups:
+    - node.k8s.io
+    resources:
+    - podcheckpoints
+    verbs:
+    - restore
+  - apiGroups:
     - scheduling.k8s.io
     resources:
     - podgroups

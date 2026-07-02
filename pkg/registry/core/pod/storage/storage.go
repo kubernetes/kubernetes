@@ -41,6 +41,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	nodeclient "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -75,10 +76,20 @@ type PodStorage struct {
 type REST struct {
 	*genericregistry.Store
 	proxyTransport http.RoundTripper
+	restorePolicy  *restorePolicy
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter, authorizer authorizer.UnconditionalAuthorizer) (PodStorage, error) {
+func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter, authorizer authorizer.UnconditionalAuthorizer, checkpoints nodeclient.PodCheckpointsGetter) (PodStorage, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelCheckpointRestore) {
+		if authorizer == nil {
+			return PodStorage{}, fmt.Errorf("Pod restore storage requires an authorizer")
+		}
+		if checkpoints == nil {
+			return PodStorage{}, fmt.Errorf("Pod restore storage requires a PodCheckpoint client")
+		}
+	}
+	restorePolicy := &restorePolicy{authorizer: authorizer, checkpoints: checkpoints}
 
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.Pod{} },
@@ -121,11 +132,11 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 
 	bindingREST := &BindingREST{store: store}
 	return PodStorage{
-		Pod:                 &REST{store, proxyTransport},
+		Pod:                 &REST{Store: store, proxyTransport: proxyTransport, restorePolicy: restorePolicy},
 		Binding:             &BindingREST{store: store},
 		LegacyBinding:       &LegacyBindingREST{bindingREST},
 		Eviction:            newEvictionStorage(&evictionStore, podDisruptionBudgetClient),
-		Status:              &StatusREST{store: &statusStore},
+		Status:              &StatusREST{store: &statusStore, restorePolicy: restorePolicy},
 		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
 		Resize:              &ResizeREST{store: &resizeStore},
 		Dynamic:             &DynamicREST{store: &dynamicStore},
@@ -372,7 +383,8 @@ func (r *LegacyBindingREST) GetSingularName() string {
 
 // StatusREST implements the REST endpoint for changing the status of a pod.
 type StatusREST struct {
-	store *genericregistry.Store
+	store         *genericregistry.Store
+	restorePolicy *restorePolicy
 }
 
 // New creates a new pod resource
@@ -395,7 +407,7 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+	return r.store.Update(ctx, name, objInfo, createValidation, r.restorePolicy.updateValidation(updateValidation), false, options)
 }
 
 // GetResetFields implements rest.ResetFieldsStrategy

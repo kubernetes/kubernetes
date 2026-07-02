@@ -351,7 +351,7 @@ func setupPodBenchmark(b *testing.B) *podBenchmark {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "pods",
 	}
-	podStorage, err := podstore.NewStorage(restOptions, nil, nil, nil, nil)
+	podStorage, err := podstore.NewStorage(restOptions, nil, nil, nil, nil, nil)
 	if err != nil {
 		b.Fatalf("unexpected error from REST storage: %v", err)
 	}
