@@ -300,8 +300,16 @@ func processUnionValidations(structPath *field.Path, parentType *types.Type, uni
 				}
 
 				extraArgs := append([]any{supportVarName, discriminatorExtractor}, extractorArgs...)
+				// Discriminated unions report errors on the mismatched member,
+				// so coverage must track member paths rather than the parent object.
+				memberEmissions := make([]Emission, 0, len(u.members))
+				for _, member := range u.members {
+					emission := emits
+					emission.PathFragment = "." + member.fieldName
+					memberEmissions = append(memberEmissions, emission)
+				}
 				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...).
-					WithEmits(emits)
+					WithEmits(memberEmissions...)
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getMemberArgs(u, parentType, false)...))
