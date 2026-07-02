@@ -6355,7 +6355,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, fldPath.Child("annotations"), opts)...)
 
 	fldPath = field.NewPath("status")
-	allErrs = append(allErrs, validatePodConditions(newPod.Status.Conditions, fldPath.Child("conditions"))...)
+	allErrs = append(allErrs, validatePodConditions(newPod.Status.Conditions, oldPod.Status.Conditions, fldPath.Child("conditions"))...)
 
 	if newPod.Spec.NodeName != oldPod.Spec.NodeName {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nodeName"), "may not be changed directly"))
@@ -6441,15 +6441,41 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 
 // validatePodConditions tests if the custom pod conditions are valid, and that the observedGeneration
 // is a non-negative integer.
-func validatePodConditions(conditions []core.PodCondition, fldPath *field.Path) field.ErrorList {
+func validatePodConditions(conditions, oldConditions []core.PodCondition, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	systemConditions := sets.New(
 		core.PodScheduled,
 		core.PodReady,
 		core.PodInitialized)
+	// Before PodCheckpointing became a built-in type, any client could set a
+	// condition with that name, so stored Pods may already carry invalid ones.
+	// Only validate PodCheckpointing conditions that change.
 	for i, condition := range conditions {
 		if condition.ObservedGeneration < 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("observedGeneration"), condition.ObservedGeneration, "must be a non-negative integer"))
+		}
+		if condition.Type == core.PodCheckpointing {
+			path := fldPath.Index(i)
+			if slices.ContainsFunc(oldConditions, func(old core.PodCondition) bool {
+				return apiequality.Semantic.DeepEqual(old, condition)
+			}) {
+				continue
+			}
+			// Apply metav1.Condition rules to this type only; other Pod condition
+			// types keep their existing, looser validation.
+			errs := unversionedvalidation.ValidateCondition(metav1.Condition{
+				Type:               string(condition.Type),
+				Status:             metav1.ConditionStatus(condition.Status),
+				LastTransitionTime: condition.LastTransitionTime,
+				Reason:             condition.Reason,
+				Message:            condition.Message,
+			}, path)
+			for _, err := range errs {
+				// PodCondition does not use metav1.Condition's declarative tags.
+				err.CoveredByDeclarative = false
+			}
+			allErrs = append(allErrs, errs...)
+			continue
 		}
 		if systemConditions.Has(condition.Type) {
 			continue

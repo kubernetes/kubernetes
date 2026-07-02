@@ -3911,6 +3911,11 @@ const (
 	SchedulerEvaluationCompleted PodConditionType = "SchedulerEvaluationCompleted"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+	// PodCheckpointing indicates that a Pod checkpoint window is active. The
+	// kubelet sets it before suspending probes and removes it after probes resume.
+	// Workload spec updates are rejected while it is true. It does not change
+	// readiness or prevent disruption. It is set only when PodLevelCheckpointRestore is enabled.
+	PodCheckpointing PodConditionType = "PodCheckpointing"
 )
 
 // These are reasons for a pod's transition to a condition.
