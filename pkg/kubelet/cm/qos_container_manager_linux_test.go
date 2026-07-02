@@ -34,8 +34,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
@@ -285,6 +288,59 @@ func TestQoSContainerCgroupWithMemoryReservationPolicyNone(t *testing.T) {
 
 	assert.Equal(t, "0", qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
 	assert.Equal(t, "0", qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
+}
+
+// TestQoSContainerCgroupClearsWhenMemoryQoSFeatureGateDisabled verifies that
+// setMemoryQoS zeros QoS-level memory.min / memory.low even when the
+// MemoryQoS feature gate is disabled. This prevents stale kernel values from
+// persisting on nodes that previously ran with the gate enabled; without this
+// guarantee, operators rolling back the alpha feature would leave non-zero
+// memory.min / memory.low under /sys/fs/cgroup/kubepods.slice/... where the
+// kernel continues to honor them.
+func TestQoSContainerCgroupClearsWhenMemoryQoSFeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.MemoryQoS, false)
+
+	logger, _ := ktesting.NewTestContext(t)
+	fakeCM := &fakeCgroupManager{}
+	cgroupRoot := ParseCgroupfsToCgroupName("/")
+	cgroupRoot = NewCgroupName(cgroupRoot, defaultNodeAllocatableCgroupName)
+	m := &qosContainerManagerImpl{
+		cgroupManager: fakeCM,
+		cgroupRoot:    cgroupRoot,
+		activePods:    activeTestPods,
+		// TieredReservation would otherwise skip the zero-out branch via the
+		// policy check. With the gate off the zero-out branch must run
+		// regardless of the configured policy, so we deliberately exercise
+		// the TieredReservation case here.
+		memoryReservationPolicy: kubeletconfig.TieredReservationMemoryReservationPolicy,
+		qosContainersInfo: QOSContainersInfo{
+			Guaranteed: cgroupRoot,
+			Burstable:  NewCgroupName(cgroupRoot, "burstable"),
+			BestEffort: NewCgroupName(cgroupRoot, "besteffort"),
+		},
+	}
+
+	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
+		v1.PodQOSGuaranteed: {
+			Name:               m.qosContainersInfo.Guaranteed,
+			ResourceParameters: &ResourceConfig{},
+		},
+		v1.PodQOSBurstable: {
+			Name:               m.qosContainersInfo.Burstable,
+			ResourceParameters: &ResourceConfig{},
+		},
+		v1.PodQOSBestEffort: {
+			Name:               m.qosContainersInfo.BestEffort,
+			ResourceParameters: &ResourceConfig{},
+		},
+	}
+
+	m.setMemoryQoS(logger, qosConfigs)
+
+	assert.Equal(t, "0", qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin],
+		"memory.min must be zeroed when MemoryQoS is disabled to clear stale values")
+	assert.Equal(t, "0", qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow],
+		"memory.low must be zeroed when MemoryQoS is disabled to clear stale values")
 }
 
 // fakeCgroupManager is used because Start() requires a functional
