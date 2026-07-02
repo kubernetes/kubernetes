@@ -262,6 +262,10 @@ linters:
       # Validation makes this require at least one of the fields within to be set.
       - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate).SchedulingPolicy is a non-pointer struct with no required fields."
         path: "staging/src/k8s.io/api/scheduling/v1alpha3/types.go"
+      
+      # Dependenttags - pre-existing listType/listMapKey violations to be resolved later
+      - text: "dependenttags: field .* with marker \\+(?:listType|listMapKey) is missing required marker\\(s\\): \\+k8s:(?:listType|listMapKey)"
+        path: "staging/src/k8s.io/api/(admission|admissionregistration|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|core|extensions|flowcontrol|imagepolicy|networking|node|rbac|resource|scheduling|storage|storagemigration)/"
 
       - linters:
         - forbidigo
@@ -428,6 +432,14 @@ linters:
                   type: "All"
                   dependsOn:
                     - "k8s:optional"
+                - identifier: "listType"
+                  type: "All"
+                  dependsOn:
+                    - "k8s:listType"
+                - identifier: "listMapKey"
+                  type: "All"
+                  dependsOn:
+                    - "k8s:listMapKey"
             # jsonTags:
             #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
             # nomaps:
