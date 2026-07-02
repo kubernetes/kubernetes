@@ -25,12 +25,14 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	metricsv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1"
 	metricsv1alpha1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1"
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterfaces
+	MetricsV1() metricsv1.MetricsV1Interface
 	MetricsV1alpha1() metricsv1alpha1.MetricsV1alpha1Interface
 	MetricsV1beta1() metricsv1beta1.MetricsV1beta1Interface
 }
@@ -38,8 +40,14 @@ type Interface interface {
 // Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
+	metricsV1       *metricsv1.MetricsV1Client
 	metricsV1alpha1 *metricsv1alpha1.MetricsV1alpha1Client
 	metricsV1beta1  *metricsv1beta1.MetricsV1beta1Client
+}
+
+// MetricsV1 retrieves the MetricsV1Client
+func (c *Clientset) MetricsV1() metricsv1.MetricsV1Interface {
+	return c.metricsV1
 }
 
 // MetricsV1alpha1 retrieves the MetricsV1alpha1Client
@@ -96,6 +104,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 
 	var cs Clientset
 	var err error
+	cs.metricsV1, err = metricsv1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.metricsV1alpha1, err = metricsv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -125,6 +137,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
+	cs.metricsV1 = metricsv1.New(c)
 	cs.metricsV1alpha1 = metricsv1alpha1.New(c)
 	cs.metricsV1beta1 = metricsv1beta1.New(c)
 
