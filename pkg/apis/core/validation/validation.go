@@ -3715,7 +3715,7 @@ func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules [
 
 // validateEphemeralContainers is called by pod spec and template validation to validate the list of ephemeral containers.
 // Note that this is called for pod template even though ephemeral containers aren't allowed in pod templates.
-func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, containers, initContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
+func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, containers, initContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool, hasRestoreFrom bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if len(ephemeralContainers) == 0 {
@@ -3736,7 +3736,7 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		idxPath := fldPath.Index(i)
 
 		c := (*core.Container)(&ec.EphemeralContainerCommon)
-		allErrs = append(allErrs, validateContainerCommon(c, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers)...)
+		allErrs = append(allErrs, validateContainerCommon(c, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers, hasRestoreFrom)...)
 		// Ephemeral containers don't need looser constraints for pod templates, so it's convenient to apply both validations
 		// here where we've already converted EphemeralContainerCommon to Container.
 		allErrs = append(allErrs, validateContainerOnlyForPod(c, idxPath)...)
@@ -3798,7 +3798,7 @@ func validateFieldAllowList(value interface{}, allowedFields map[string]bool, er
 }
 
 // validateInitContainers is called by pod spec and template validation to validate the list of init containers
-func validateInitContainers(containers []core.Container, os *core.PodOS, regularContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
+func validateInitContainers(containers []core.Container, os *core.PodOS, regularContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool, hasRestoreFrom bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allNames := sets.Set[string]{}
@@ -3809,7 +3809,7 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 		idxPath := fldPath.Index(i)
 
 		// Apply the validation common to all container types
-		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers)...)
+		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers, hasRestoreFrom)...)
 
 		restartAlways := false
 		// Apply the validation specific to init containers
@@ -3872,7 +3872,7 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 
 // validateContainerCommon applies validation common to all container types. It's called by regular, init, and ephemeral
 // container list validation to require a properly formatted name, image, etc.
-func validateContainerCommon(ctr *core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], path *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
+func validateContainerCommon(ctr *core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], path *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool, hasRestoreFrom bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	namePath := path.Child("name")
@@ -3885,7 +3885,8 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	// TODO: do not validate leading and trailing whitespace to preserve backward compatibility.
 	// for example: https://github.com/openshift/origin/issues/14659 image = " " is special token in pod template
 	// others may have done similar
-	if len(ctr.Image) == 0 {
+	// When restoreFrom is set, container images are restored from checkpoint and should not be specified
+	if len(ctr.Image) == 0 && !hasRestoreFrom {
 		allErrs = append(allErrs, field.Required(path.Child("image"), ""))
 	}
 
@@ -4020,7 +4021,7 @@ func validatePodHostName(spec *core.PodSpec, fldPath *field.Path) field.ErrorLis
 }
 
 // validateContainers is called by pod spec and template validation to validate the list of regular containers.
-func validateContainers(containers []core.Container, os *core.PodOS, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
+func validateContainers(containers []core.Container, os *core.PodOS, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool, hasRestoreFrom bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(containers) == 0 {
@@ -4032,7 +4033,7 @@ func validateContainers(containers []core.Container, os *core.PodOS, volumes map
 		path := fldPath.Index(i)
 
 		// Apply validation common to all containers
-		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, path, opts, podRestartPolicy, hostUsers)...)
+		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, path, opts, podRestartPolicy, hostUsers, hasRestoreFrom)...)
 
 		// Container names must be unique within the list of regular containers.
 		// Collisions with init or ephemeral container names will be detected by the init or ephemeral
@@ -4504,6 +4505,9 @@ type PodValidationOptions struct {
 	AllowImageVolumeWithDigest bool
 	// Allow empty image volume reference for backward compatibility
 	AllowEmptyImageVolumeReference bool
+	// Allow spec.restoreFrom to be set (gated by the PodLevelCheckpointRestore
+	// feature gate, with ratcheting for objects that already set it).
+	AllowRestoreFrom bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4663,9 +4667,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, vErrs...)
 	podClaimNames := gatherPodResourceClaimNames(spec.ResourceClaims)
 	allErrs = append(allErrs, validatePodResourceClaims(podMeta, spec.ResourceClaims, fldPath.Child("resourceClaims"))...)
-	allErrs = append(allErrs, validateContainers(spec.Containers, spec.OS, vols, podClaimNames, gracePeriod, fldPath.Child("containers"), opts, &spec.RestartPolicy, hostUsers)...)
-	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.OS, spec.Containers, vols, podClaimNames, gracePeriod, fldPath.Child("initContainers"), opts, &spec.RestartPolicy, hostUsers)...)
-	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, podClaimNames, fldPath.Child("ephemeralContainers"), opts, &spec.RestartPolicy, hostUsers)...)
+	hasRestoreFrom := spec.RestoreFrom != nil && *spec.RestoreFrom != ""
+	allErrs = append(allErrs, validateContainers(spec.Containers, spec.OS, vols, podClaimNames, gracePeriod, fldPath.Child("containers"), opts, &spec.RestartPolicy, hostUsers, hasRestoreFrom)...)
+	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.OS, spec.Containers, vols, podClaimNames, gracePeriod, fldPath.Child("initContainers"), opts, &spec.RestartPolicy, hostUsers, hasRestoreFrom)...)
+	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, podClaimNames, fldPath.Child("ephemeralContainers"), opts, &spec.RestartPolicy, hostUsers, hasRestoreFrom)...)
 
 	if opts.PodLevelResourcesEnabled {
 		allErrs = append(allErrs, validatePodResources(spec, podClaimNames, fldPath, opts)...)
@@ -4756,6 +4761,14 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	if spec.SchedulingGroup != nil {
 		allErrs = append(allErrs, validateSchedulingGroup(spec.SchedulingGroup, fldPath.Child("schedulingGroup"))...)
+	}
+
+	if spec.RestoreFrom != nil && *spec.RestoreFrom != "" {
+		if !opts.AllowRestoreFrom {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("restoreFrom"), "spec.restoreFrom may not be set: the PodLevelCheckpointRestore feature gate is disabled"))
+		} else {
+			allErrs = append(allErrs, validateRestoreFrom(spec, fldPath.Child("restoreFrom"))...)
+		}
 	}
 
 	allErrs = append(allErrs, validateFileKeyRefVolumes(spec, fldPath)...)
@@ -5608,7 +5621,7 @@ func validateShareProcessNamespace(spec *core.PodSpec, fldPath *field.Path) (all
 	return allErrs
 }
 
-func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fldPath *field.Path) (allErrs field.ErrorList, stop bool) {
+func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fldPath *field.Path, hasRestoreFrom bool) (allErrs field.ErrorList, stop bool) {
 	allErrs = field.ErrorList{}
 	if len(newContainers) != len(oldContainers) {
 		// TODO: Pinpoint the specific container that causes the invalid error after we have strategic merge diff
@@ -5618,7 +5631,9 @@ func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fld
 
 	// validate updated container images
 	for i, ctr := range newContainers {
-		if len(ctr.Image) == 0 {
+		// When restoreFrom is set the image is restored from the checkpoint, so
+		// an empty image is expected here (matches the create-path validation).
+		if len(ctr.Image) == 0 && !hasRestoreFrom {
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("image"), ""))
 		}
 		// this is only called from ValidatePodUpdate so its safe to check leading/trailing whitespace.
@@ -5720,6 +5735,7 @@ var updatablePodSpecFields = []string{
 	"`spec.activeDeadlineSeconds`",
 	"`spec.tolerations` (only additions to existing tolerations)",
 	"`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)",
+	"`spec.restoreFrom`",
 }
 
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
@@ -5738,12 +5754,13 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// 4.  spec.terminationGracePeriodSeconds
 	// 5.  spec.schedulingGates
 
-	containerErrs, stop := ValidateContainerUpdates(newPod.Spec.Containers, oldPod.Spec.Containers, specPath.Child("containers"))
+	hasRestoreFrom := newPod.Spec.RestoreFrom != nil && *newPod.Spec.RestoreFrom != ""
+	containerErrs, stop := ValidateContainerUpdates(newPod.Spec.Containers, oldPod.Spec.Containers, specPath.Child("containers"), hasRestoreFrom)
 	allErrs = append(allErrs, containerErrs...)
 	if stop {
 		return allErrs
 	}
-	containerErrs, stop = ValidateContainerUpdates(newPod.Spec.InitContainers, oldPod.Spec.InitContainers, specPath.Child("initContainers"))
+	containerErrs, stop = ValidateContainerUpdates(newPod.Spec.InitContainers, oldPod.Spec.InitContainers, specPath.Child("initContainers"), hasRestoreFrom)
 	allErrs = append(allErrs, containerErrs...)
 	if stop {
 		return allErrs
@@ -5807,6 +5824,11 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	mungedPodSpec.SchedulingGates = oldPod.Spec.SchedulingGates // +k8s:verify-mutation:reason=clone
 	// tolerations are checked before the deep copy, so munge those too
 	mungedPodSpec.Tolerations = oldPod.Spec.Tolerations // +k8s:verify-mutation:reason=clone
+	// munge spec.restoreFrom: it is mutable so a running pod can be re-restored
+	// from a different checkpoint (e.g. sequential rollback points). The
+	// swap-to-foreign-checkpoint attack is defended against by pod-spec equality
+	// validation against the checkpoint, not by field immutability.
+	mungedPodSpec.RestoreFrom = oldPod.Spec.RestoreFrom // +k8s:verify-mutation:reason=clone
 
 	// Relax validation of immutable fields to allow it to be set to 1 if it was previously negative.
 	if oldPod.Spec.TerminationGracePeriodSeconds != nil && *oldPod.Spec.TerminationGracePeriodSeconds < 0 &&
@@ -9732,6 +9754,48 @@ func validateSchedulingGroup(schedulingGroup *core.PodSchedulingGroup, fldPath *
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("podGroupName"), name, detail))
 		}
 	}
+	return allErrs
+}
+
+func validateRestoreFrom(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if spec.RestoreFrom == nil || *spec.RestoreFrom == "" {
+		return allErrs
+	}
+
+	// restoreFrom is the name of a PodCheckpoint in this pod's namespace, so it
+	// must be a valid object name.
+	for _, msg := range apimachineryvalidation.NameIsDNSSubdomain(*spec.RestoreFrom, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *spec.RestoreFrom, msg))
+	}
+
+	// When restoreFrom is set, container images must NOT be specified
+	// because they will be restored from the checkpoint
+	for i, container := range spec.Containers {
+		if container.Image != "" {
+			allErrs = append(allErrs, field.Forbidden(
+				fldPath.Root().Child("spec", "containers").Index(i).Child("image"),
+				"container image must not be specified when spec.restoreFrom is set; images will be restored from checkpoint"))
+		}
+	}
+
+	for i, container := range spec.InitContainers {
+		if container.Image != "" {
+			allErrs = append(allErrs, field.Forbidden(
+				fldPath.Root().Child("spec", "initContainers").Index(i).Child("image"),
+				"init container image must not be specified when spec.restoreFrom is set; images will be restored from checkpoint"))
+		}
+	}
+
+	for i, container := range spec.EphemeralContainers {
+		if container.Image != "" {
+			allErrs = append(allErrs, field.Forbidden(
+				fldPath.Root().Child("spec", "ephemeralContainers").Index(i).Child("image"),
+				"ephemeral container image must not be specified when spec.restoreFrom is set; images will be restored from checkpoint"))
+		}
+	}
+
 	return allErrs
 }
 

@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	"k8s.io/kubernetes/plugin/pkg/admission/podresize"
+	"k8s.io/kubernetes/plugin/pkg/admission/podrestoreauthorization"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtopologylabels"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
@@ -105,6 +106,7 @@ var AllOrderedPlugins = []string{
 	nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator
 	jobadmission.PluginName,                 // JobValidation, only active when feature gate WorkloadWithJob is enabled.
 	podresize.PluginName,                    // PodResizeValidator
+	podrestoreauthorization.PluginName,      // PodRestoreAuthorization, only active when feature gate PodLevelCheckpointRestore is enabled.
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -161,6 +163,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	nodedeclaredfeatures.Register(plugins)
 	jobadmission.Register(plugins)
 	podresize.Register(plugins)
+	podrestoreauthorization.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
@@ -192,6 +195,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator, only active when feature gate NodeDeclaredFeatures is enabled
 		jobadmission.PluginName,                 // JobValidation, only active when feature gate WorkloadWithJob is enabled
 		podresize.PluginName,                    // PodResizeValidator, only active when feature gate InPlacePodVerticalScaling is enabled
+		podrestoreauthorization.PluginName,      // PodRestoreAuthorization, only active when feature gate PodLevelCheckpointRestore is enabled
 	)
 
 	return sets.New(AllOrderedPlugins...).Difference(defaultOnPlugins)

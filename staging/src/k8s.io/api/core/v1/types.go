@@ -4498,6 +4498,18 @@ type PodSpec struct {
 	// +featureGate=GenericWorkload
 	// +optional
 	SchedulingGroup *PodSchedulingGroup `json:"schedulingGroup,omitempty" protobuf:"bytes,43,opt,name=schedulingGroup"`
+	// RestoreFrom is the name of a PodCheckpoint, in this pod's namespace, to
+	// restore this pod from. When set, the pod is restored from that checkpoint's
+	// archive instead of being created from scratch; the kubelet resolves the name
+	// to the on-node archive via the PodCheckpoint's status.
+	// This field is mutable: a running pod may be re-restored from a different
+	// checkpoint (for example, sequential rollback points). It is not the field's
+	// immutability that protects against pointing a pod at a foreign checkpoint;
+	// that is enforced by validating pod-spec equality against the referenced
+	// checkpoint. Resolving the name in this pod's own namespace also prevents
+	// referencing a checkpoint in another namespace.
+	// +optional
+	RestoreFrom *string `json:"restoreFrom,omitempty" protobuf:"bytes,44,opt,name=restoreFrom"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly

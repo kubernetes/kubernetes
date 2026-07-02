@@ -67,6 +67,7 @@ const (
 	admissionRegistrationGroup   = "admissionregistration.k8s.io"
 	storageVersionMigrationGroup = "storagemigration.k8s.io"
 	schedulingGroup              = "scheduling.k8s.io"
+	checkpointGroup              = "checkpoint.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -141,6 +142,8 @@ func viewRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets", "poddisruptionbudgets/status").RuleOrDie(),
 
 		rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses", "ingresses/status").RuleOrDie(),
+
+		rbacv1helpers.NewRule(Read...).Groups(checkpointGroup).Resources("podcheckpoints", "podcheckpoints/status").RuleOrDie(),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
@@ -186,6 +189,12 @@ func editRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
 
 		rbacv1helpers.NewRule(ReadWrite...).Groups(coordinationGroup).Resources("leases").RuleOrDie(),
+
+		rbacv1helpers.NewRule(Write...).Groups(checkpointGroup).Resources("podcheckpoints").RuleOrDie(),
+		// The "restore" verb gates creating a Pod with spec.restoreFrom set
+		// (consuming a checkpoint's captured state), separately from reading the
+		// PodCheckpoint object. Enforced by the PodRestoreAuthorization plugin.
+		rbacv1helpers.NewRule("restore").Groups(checkpointGroup).Resources("podcheckpoints").RuleOrDie(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaimtemplates").RuleOrDie())
@@ -235,6 +244,20 @@ func NodeRules() []rbacv1.PolicyRule {
 		// Needed for persistent volumes
 		// Use the Node authorization mode to limit a node to get pv/pvc objects referenced by pods bound to itself.
 		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
+
+		// Needed for pod-level checkpoint/restore (KEP-5823): the kubelet watches
+		// PodCheckpoint objects to execute checkpoints for pods it runs, and reads
+		// them to resolve a restoring pod's spec.restoreFrom (a PodCheckpoint name)
+		// to the on-node archive path.
+		// TODO: graph-scope this to PodCheckpoints whose source pod is bound to
+		// the node in the Node authorizer.
+		rbacv1helpers.NewRule("get", "list", "watch").Groups(checkpointGroup).Resources("podcheckpoints").RuleOrDie(),
+		// Needed for the asynchronous checkpoint flow (KEP-5823): the kubelet
+		// writes the checkpoint result to the PodCheckpoint status. The
+		// NodeRestriction admission plugin limits a node to finalizing
+		// PodCheckpoints whose source pod is bound to itself, so this broad RBAC
+		// grant is narrowed at admission.
+		rbacv1helpers.NewRule("update", "patch").Groups(checkpointGroup).Resources("podcheckpoints/status").RuleOrDie(),
 
 		// TODO: add to the Node authorizer and restrict to endpoints referenced by pods or PVs bound to the node
 		// Needed for glusterfs volumes

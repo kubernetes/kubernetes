@@ -124,6 +124,12 @@ func SetActiveDeadlineSeconds(deadline int64) Tweak {
 	}
 }
 
+func SetRestoreFrom(checkpoint string) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.RestoreFrom = &checkpoint
+	}
+}
+
 func SetServiceAccountName(name string) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.ServiceAccountName = name

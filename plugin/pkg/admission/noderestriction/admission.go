@@ -46,6 +46,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	certapi "k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/apis/checkpoint"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -177,6 +178,7 @@ var (
 	resourceSliceResource         = resource.Resource("resourceslices")
 	csrResource                   = certapi.Resource("certificatesigningrequests")
 	podCertificateRequestResource = certapi.Resource("podcertificaterequests")
+	podCheckpointResource         = checkpoint.Resource("podcheckpoints")
 )
 
 // Admit checks the admission policy and triggers corresponding actions
@@ -242,9 +244,60 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 			return nil
 		}
 		return p.admitCSR(nodeName, a)
+
+	case podCheckpointResource:
+		switch a.GetSubresource() {
+		case "status":
+			return p.admitPodCheckpointStatus(nodeName, a)
+		default:
+			return admission.NewForbidden(a, fmt.Errorf("node %q may only update the status subresource of podcheckpoints", nodeName))
+		}
+
 	default:
 		return nil
 	}
+}
+
+// admitPodCheckpointStatus restricts a node to finalizing the status of
+// PodCheckpoints whose source pod is bound to that node (KEP-5823, asynchronous
+// checkpoint flow). The kubelet that runs the pod is the one that executes the
+// checkpoint and writes its status, recording its own identity in
+// status.nodeName on the first write. So: once status.nodeName is set, only that
+// node may make further writes (the source pod may since have terminated, e.g. a
+// stop-after-checkpoint, so it need not still exist); before it is set, a node
+// may claim the checkpoint only if its source pod is currently bound to that
+// node. This prevents a node from writing the status of checkpoints for pods on
+// other nodes.
+func (p *Plugin) admitPodCheckpointStatus(nodeName string, a admission.Attributes) error {
+	if a.GetOperation() != admission.Update {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q on podcheckpoints/status", a.GetOperation()))
+	}
+	oldPC, ok := a.GetOldObject().(*checkpoint.PodCheckpoint)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
+	}
+
+	// Subsequent writes: a node already owns this checkpoint's status.
+	if oldPC.Status.NodeName != "" {
+		if oldPC.Status.NodeName != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update PodCheckpoint %q status recorded on node %q", nodeName, oldPC.Name, oldPC.Status.NodeName))
+		}
+		return nil
+	}
+
+	// First write: only the node running the source pod may claim it.
+	podName := oldPC.Spec.SourcePodName
+	if podName == "" {
+		return admission.NewForbidden(a, fmt.Errorf("node %q cannot update PodCheckpoint %q status: no source pod recorded", nodeName, oldPC.Name))
+	}
+	pod, err := p.podsGetter.Pods(a.GetNamespace()).Get(podName)
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("node %q cannot update PodCheckpoint %q status: %v", nodeName, oldPC.Name, err))
+	}
+	if pod.Spec.NodeName != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node %q cannot update PodCheckpoint %q status: source pod %q is assigned to node %q", nodeName, oldPC.Name, podName, pod.Spec.NodeName))
+	}
+	return nil
 }
 
 // admitPod allows creating or deleting a pod if it is assigned to the

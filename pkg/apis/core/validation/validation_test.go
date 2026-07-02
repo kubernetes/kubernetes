@@ -8163,17 +8163,17 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	} {
 		var PodRestartPolicy core.RestartPolicy
 		PodRestartPolicy = "Never"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, false); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 
 		PodRestartPolicy = "Always"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, false); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 
 		PodRestartPolicy = "OnFailure"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, false); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 	}
@@ -8498,19 +8498,19 @@ func TestValidateEphemeralContainers(t *testing.T) {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
 
 			PodRestartPolicy = "Never"
-			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, false)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
 			PodRestartPolicy = "Always"
-			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, false)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
 			PodRestartPolicy = "OnFailure"
-			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, false)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -8828,7 +8828,7 @@ func TestValidateContainers(t *testing.T) {
 	}
 
 	var PodRestartPolicy core.RestartPolicy = "Always"
-	if errs := validateContainers(successCase, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateContainers(successCase, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, false); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9443,7 +9443,7 @@ func TestValidateContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateContainers(tc.containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateContainers(tc.containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, false)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -9558,7 +9558,7 @@ func TestValidateInitContainers(t *testing.T) {
 	}}
 
 	var PodRestartPolicy core.RestartPolicy = "Always"
-	if errs := validateInitContainers(successCase, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: true}, &PodRestartPolicy, noUserNamespace, false); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9971,7 +9971,7 @@ func TestValidateInitContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateInitContainers(tc.initContainers, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateInitContainers(tc.initContainers, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, false)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -14734,6 +14734,19 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "pod updates may not change fields other than",
 			test: "updated restartPolicyRules",
+		}, {
+			// restoreFrom is mutable: a running pod can be re-restored from a
+			// different checkpoint (sequential rollback points). Containers carry
+			// no image because they are restored from the checkpoint.
+			new: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage(""))),
+				podtest.SetRestoreFrom("checkpoint-v2")),
+			old: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage(""))),
+				podtest.SetRestoreFrom("checkpoint-v1")),
+			err:  "",
+			opts: PodValidationOptions{AllowRestoreFrom: true},
+			test: "restoreFrom is mutable (sequential restores)",
 		},
 	}
 
@@ -23561,6 +23574,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ResourceClaims[*].ResourceClaimTemplateName",
 		"Resources",
 		"RestartPolicy",
+		"RestoreFrom",
 		"RuntimeClassName",
 		"SchedulerName",
 		"SchedulingGates[*].Name",
@@ -30023,7 +30037,7 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 				AllowContainerRestartPolicyRules: true,
 				AllowRestartAllContainers:        tc.AllowRestartAllContainers,
 			}
-			errs := validateContainers(containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), opts, &podRestartPolicyAlways, noUserNamespace)
+			errs := validateContainers(containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), opts, &podRestartPolicyAlways, noUserNamespace, false)
 			if len(errs) > 0 {
 				t.Errorf("Unexpected error(s): %v", errs)
 			}
@@ -30196,7 +30210,7 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 			opts := PodValidationOptions{
 				AllowContainerRestartPolicyRules: true,
 			}
-			errs := validateContainers(containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), opts, &podRestartPolicyAlways, noUserNamespace)
+			errs := validateContainers(containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), opts, &podRestartPolicyAlways, noUserNamespace, false)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -30285,7 +30299,7 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 				RestartPolicy:            tc.restartPolicy,
 				RestartPolicyRules:       tc.restartPolicyRules,
 			}}
-			errs := validateInitContainers(containers, podOS, nil, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), tc.opts, &podRestartPolicyAlways, noUserNamespace)
+			errs := validateInitContainers(containers, podOS, nil, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), tc.opts, &podRestartPolicyAlways, noUserNamespace, false)
 			if tc.expectedErrors == nil {
 				if len(errs) > 0 {
 					t.Errorf("unexpected errors: %v", prettyErrorList(errs))
@@ -31012,5 +31026,50 @@ func TestValidatePodSchedulingGroup(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("Expected failure for %q", name)
 		}
+	}
+}
+
+func TestValidateRestoreFrom(t *testing.T) {
+	tests := []struct {
+		name      string
+		spec      core.PodSpec
+		expectErr bool
+	}{
+		{
+			name:      "unset",
+			spec:      core.PodSpec{},
+			expectErr: false,
+		},
+		{
+			name:      "valid checkpoint name",
+			spec:      core.PodSpec{RestoreFrom: ptr.To("my-checkpoint"), Containers: []core.Container{{Name: "c"}}},
+			expectErr: false,
+		},
+		{
+			name:      "invalid name (slash)",
+			spec:      core.PodSpec{RestoreFrom: ptr.To("bad/name"), Containers: []core.Container{{Name: "c"}}},
+			expectErr: true,
+		},
+		{
+			name:      "invalid name (uppercase)",
+			spec:      core.PodSpec{RestoreFrom: ptr.To("Bad")},
+			expectErr: true,
+		},
+		{
+			name:      "container image must be empty",
+			spec:      core.PodSpec{RestoreFrom: ptr.To("my-checkpoint"), Containers: []core.Container{{Name: "c", Image: "busybox"}}},
+			expectErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateRestoreFrom(&tc.spec, field.NewPath("spec", "restoreFrom"))
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("expected an error, got none")
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Errorf("expected no error, got %v", errs)
+			}
+		})
 	}
 }
