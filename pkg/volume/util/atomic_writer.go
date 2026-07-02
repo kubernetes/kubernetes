@@ -267,7 +267,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 	return nil
 }
 
-// validatePayload returns an error if any path in the payload returns a copy of the payload with the paths cleaned.
+// validatePayload returns a copy of the payload with the paths cleaned, or an error if any path is invalid.
 func validatePayload(payload map[string]FileProjection) (map[string]FileProjection, error) {
 	cleanPayload := make(map[string]FileProjection)
 	for k, content := range payload {
