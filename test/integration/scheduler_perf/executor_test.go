@@ -515,6 +515,137 @@ func TestRunOp(t *testing.T) {
 			},
 			expectedFailure: true,
 		},
+		{
+			name: "Create Namespaces",
+			op: &createNamespacesOp{
+				Opcode: createNamespacesOpcode,
+				Prefix: "test-namespace",
+				Count:  2,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(2),
+				verifyNamespaceCreated("test-namespace-0"),
+				verifyNamespaceCreated("test-namespace-1"),
+			},
+		},
+		{
+			name: "Create Namespaces with Zero Count",
+			op: &createNamespacesOp{
+				Opcode: createNamespacesOpcode,
+				Prefix: "zero-namespace",
+				Count:  0,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(0),
+			},
+		},
+		{
+			name: "Create Namespaces with Empty Prefix",
+			op: &createNamespacesOp{
+				Opcode: createNamespacesOpcode,
+				Count:  1,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(1),
+				verifyNamespaceCreated("-0"),
+			},
+		},
+		{
+			name: "Create Namespaces with Invalid Count",
+			op: &createNamespacesOp{
+				Opcode: createNamespacesOpcode,
+				Prefix: "invalid-count-namespace",
+				Count:  -1,
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create Namespaces with Invalid CountParam",
+			op: &createNamespacesOp{
+				Opcode:     createNamespacesOpcode,
+				Prefix:     "invalid-count-param-namespace",
+				CountParam: "$NAMESPACE_COUNT",
+			},
+			workload: &Workload{
+				Name: "test-workload",
+				Params: params{
+					params: map[string]any{
+						"NAMESPACE_COUNT": "invalid",
+					},
+					isUsed: map[string]bool{},
+				},
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create Namespaces with CountParam",
+			op: &createNamespacesOp{
+				Opcode:     createNamespacesOpcode,
+				Prefix:     "param-namespace",
+				CountParam: "$NAMESPACE_COUNT",
+			},
+			workload: &Workload{
+				Name: "test-workload",
+				Params: params{
+					params: map[string]any{
+						"NAMESPACE_COUNT": float64(3),
+					},
+					isUsed: map[string]bool{},
+				},
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(3),
+				verifyNamespaceCreated("param-namespace-0"),
+				verifyNamespaceCreated("param-namespace-1"),
+				verifyNamespaceCreated("param-namespace-2"),
+			},
+		},
+		{
+			name: "Create Namespaces with Custom Template",
+			op: &createNamespacesOp{
+				Opcode: createNamespacesOpcode,
+				Prefix: "template-namespace",
+				Count:  2,
+				NamespaceTemplatePath: createObjTemplateFile(t,
+					&v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "namespace-name-gets-overwritten",
+							Labels: map[string]string{
+								"test-label": "test-value",
+							},
+							Annotations: map[string]string{
+								"test-annotation": "test-value",
+							},
+						},
+					},
+				),
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(2),
+				verifyObj(
+					&v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"test-label": "test-value",
+							},
+							Annotations: map[string]string{
+								"test-annotation": "test-value",
+							},
+						},
+					},
+				),
+			},
+		},
+		{
+			name: "Invalid Namespace Template Path",
+			op: &createNamespacesOp{
+				Opcode:                createNamespacesOpcode,
+				Prefix:                "invalid-template-namespace",
+				Count:                 1,
+				NamespaceTemplatePath: new("non-existent-namespace-template.json"),
+			},
+			expectedFailure: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -613,6 +744,14 @@ func verifyCount(expectedCount int) verifyFunc {
 			}
 			if got := len(pgs.Items); got != expectedCount {
 				return fmt.Errorf("unexpected pod group count: got %d, want %d", got, expectedCount)
+			}
+		case *createNamespacesOp:
+			namespaces, err := tCtx.Client().CoreV1().Namespaces().List(tCtx, metav1.ListOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to list namespaces: %w", err)
+			}
+			if got := len(namespaces.Items); got != expectedCount {
+				return fmt.Errorf("unexpected namespace count: got %d, want %d", got, expectedCount)
 			}
 		default:
 			return fmt.Errorf("verifyCount doesn't support this operation type: %T", op)
@@ -806,6 +945,37 @@ func verifyObj(expectedObj any) verifyFunc {
 			}
 			got = gotPodGroups
 			want = wantPodGroups
+		case *createNamespacesOp:
+			expectedNamespaceTemplate, ok := expectedObj.(*v1.Namespace)
+			if !ok {
+				return fmt.Errorf("expectedObj must be *v1.Namespace when op is *createNamespacesOp, got %T", expectedObj)
+			}
+
+			namespacesList, listErr := tCtx.Client().CoreV1().Namespaces().List(tCtx, metav1.ListOptions{})
+			if listErr != nil {
+				return fmt.Errorf("failed to list namespaces: %w", listErr)
+			}
+			gotNamespaces := namespacesList.Items
+
+			if opDetails.Count < 0 {
+				return fmt.Errorf("opDetails.Count must be non-negative, got %d", opDetails.Count)
+			}
+			wantNamespaces := make([]v1.Namespace, opDetails.Count)
+			for i := 0; i < opDetails.Count; i++ {
+				wantNamespace := expectedNamespaceTemplate.DeepCopy()
+				wantNamespace.Name = fmt.Sprintf("%s-%d", opDetails.Prefix, i)
+				wantNamespaces[i] = *wantNamespace
+			}
+
+			cmpOpts = []cmp.Option{
+				cmpopts.EquateEmpty(),
+				cmpopts.IgnoreFields(metav1.ObjectMeta{},
+					"UID", "ResourceVersion", "Generation", "CreationTimestamp", "ManagedFields", "SelfLink",
+				),
+				cmpopts.IgnoreFields(v1.NamespaceStatus{}, "Phase", "Conditions"),
+			}
+			got = gotNamespaces
+			want = wantNamespaces
 		default:
 			return fmt.Errorf("verifyObj doesn't support this operation type for cmp.Diff: %T", opDetails)
 		}
@@ -843,7 +1013,7 @@ func createObjTemplateFile(t *testing.T, obj any) *string {
 	}()
 
 	switch obj := obj.(type) {
-	case *v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim, *schedulingapi.PodGroup:
+	case *v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim, *schedulingapi.PodGroup, *v1.Namespace:
 		if err := json.NewEncoder(f).Encode(obj); err != nil {
 			t.Fatalf("Failed to encode the template to %s: %v", templateFile, err)
 		}
