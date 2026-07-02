@@ -1504,6 +1504,53 @@ func TestControllerSyncPool(t *testing.T) {
 	}
 }
 
+func TestControllerSyncPoolResyncsAfterUpdate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	const (
+		driverName = "driver"
+		poolName   = "pool"
+	)
+	mutationCacheTTL := time.Minute
+	syncDelay := 2 * mutationCacheTTL
+	generateName := encodeIndex(0, resourceSliceIndexMinLength) + "-" + driverName + "-"
+	sliceName := generateName + "0"
+
+	kubeClient := createTestClient(features{}, metav1.Time{},
+		MakeResourceSlice().Name(sliceName).GenerateName(generateName).ResourceVersion("1").
+			Driver(driverName).AllNodes(true).Devices([]resourceapi.Device{newDevice("old-device")}).
+			Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+	)
+	var queue workqueue.Mock[string]
+	ctrl, err := newController(ctx, Options{
+		DriverName: driverName,
+		KubeClient: kubeClient,
+		Resources: &DriverResources{
+			Pools: map[string]Pool{
+				poolName: {
+					AllNodes:   true,
+					Generation: 1,
+					Slices:     []Slice{{Devices: []resourceapi.Device{newDevice("new-device")}}},
+				},
+			},
+		},
+		Queue:            &queue,
+		MutationCacheTTL: &mutationCacheTTL,
+		SyncDelay:        &syncDelay,
+	})
+	require.NoError(t, err, "create controller")
+	defer ctrl.Stop()
+
+	require.NoError(t, ctrl.syncPool(ctx, poolName), "sync pool")
+	assert.Equal(t, Stats{NumUpdates: 1}, ctrl.GetStats())
+
+	state := queue.State()
+	require.Len(t, state.Later, 1, "one delayed re-sync should be scheduled")
+	assert.Equal(t, poolName, state.Later[0].Item)
+	assert.Positive(t, state.Later[0].Duration)
+	assert.LessOrEqual(t, state.Later[0].Duration, mutationCacheTTL)
+}
+
 // TestControllerUpdateReconcilePoolWithNameValidation verifies that Update rejects
 // invalid pool sets when ReconcilePoolWithName is set
 func TestControllerUpdateReconcilePoolWithNameValidation(t *testing.T) {

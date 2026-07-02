@@ -378,6 +378,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 	var gotDroppedFieldError atomic.Bool
 	var gotValidationError atomic.Bool
 	var validationErrorsOkay atomic.Bool
+	var notFoundErrorsOkay atomic.Bool
 
 	setup := func(tCtx ktesting.TContext) (*resourceslice.Controller, func(tCtx ktesting.TContext) resourceslice.Stats, resourceslice.Stats) {
 		tCtx.Helper()
@@ -387,6 +388,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		gotDroppedFieldError.Store(false)
 		gotValidationError.Store(false)
 		validationErrorsOkay.Store(false)
+		notFoundErrorsOkay.Store(false)
 
 		opts := resourceslice.Options{
 			DriverName:       driverName,
@@ -396,6 +398,9 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 			SyncDelay:        &syncDelay,
 			ErrorHandler: func(ctx context.Context, err error, msg string) {
 				klog.FromContext(ctx).Info("ErrorHandler called", "err", err, "msg", msg)
+				if notFoundErrorsOkay.Load() && apierrors.IsNotFound(err) {
+					return
+				}
 				if !validationErrorsOkay.Load() && len(disabledFeatures) == 0 {
 					assert.NoError(tCtx, err, msg)
 					return
@@ -485,7 +490,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 	runSubTest(tCtx, "fix-after-update", func(tCtx ktesting.TContext) {
 		_, getStats, expectedStats := setup(tCtx)
 
-		// Stress the controller by repeatedly updatings the slices.
+		// Stress the controller by repeatedly updating the slices.
 		for range 2 {
 			slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listDriverSlices)
 			tCtx.ExpectNoError(err, "list slices")
@@ -502,6 +507,45 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 			}
 			expectedStats.NumUpdates += int64(len(expectedSlices))
 			tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+			expectSlices(tCtx)
+		}
+	})
+
+	runSubTest(tCtx, "recreate-after-update-delete", func(tCtx ktesting.TContext) {
+		_, getStats, expectedStats := setup(tCtx)
+
+		for range 2 {
+			slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listDriverSlices)
+			tCtx.ExpectNoError(err, "list slices")
+
+			updated := false
+			for _, slice := range slices.Items {
+				if len(slice.Spec.Devices) == 0 {
+					continue
+				}
+				if slice.Spec.Devices[0].Attributes == nil {
+					slice.Spec.Devices[0].Attributes = make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
+				}
+				trueValue := true
+				slice.Spec.Devices[0].Attributes["someUnwantedAttribute"] = resourceapi.DeviceAttribute{BoolValue: &trueValue}
+				_, err := tCtx.Client().ResourceV1().ResourceSlices().Update(tCtx, &slice, metav1.UpdateOptions{})
+				tCtx.ExpectNoError(err, "update slice")
+				updated = true
+				break
+			}
+			if !updated {
+				tCtx.Fatal("expected at least one ResourceSlice with devices")
+			}
+
+			expectedStats.NumUpdates++
+			tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+			expectSlices(tCtx)
+
+			tCtx.Log("deleting ResourceSlices after update")
+			notFoundErrorsOkay.Store(true)
+			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceSlices().DeleteCollection(tCtx, metav1.DeleteOptions{}, listDriverSlices), "delete driver slices")
+			expectedStats.NumCreates += int64(len(expectedSlices))
+			tCtx.Eventually(getStats).WithTimeout(mutationCacheTTL + syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
 			expectSlices(tCtx)
 		}
 	})
