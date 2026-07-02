@@ -2626,11 +2626,24 @@ func (kl *Kubelet) deletePod(ctx context.Context, pod *v1.Pod) error {
 func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message string) {
 	logger := klog.FromContext(ctx)
 	kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, reason, "%s", message)
-	kl.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+	podStatus := v1.PodStatus{
 		QOSClass: v1qos.GetPodQOS(pod), // keep it as is
 		Phase:    v1.PodFailed,
 		Reason:   reason,
-		Message:  "Pod was rejected: " + message})
+		Message:  "Pod was rejected: " + message,
+	}
+	addRejectCondition(&podStatus, message)
+	kl.statusManager.SetPodStatus(logger, pod, podStatus)
+}
+
+func addRejectCondition(podStatus *v1.PodStatus, message string) {
+	podStatus.Conditions = []v1.PodCondition{
+		{
+			Type:    v1.PodRejected,
+			Status:  v1.ConditionTrue,
+			Message: "Pod was rejected: " + message,
+		},
+	}
 }
 
 func recordAdmissionRejection(reason string) {

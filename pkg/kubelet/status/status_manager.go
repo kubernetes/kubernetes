@@ -885,6 +885,9 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	// Set PodScheduledCondition.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.PodScheduled)
 
+	// Set PodRejectedCondition.LastTransitionTime.
+	updateLastTransitionTime(&status, &oldStatus, v1.PodRejected)
+
 	// Set DisruptionTarget.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.DisruptionTarget)
 
