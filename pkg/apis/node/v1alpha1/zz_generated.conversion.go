@@ -37,6 +37,26 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*nodev1alpha1.CheckpointSource)(nil), (*node.CheckpointSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CheckpointSource_To_node_CheckpointSource(a.(*nodev1alpha1.CheckpointSource), b.(*node.CheckpointSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*node.CheckpointSource)(nil), (*nodev1alpha1.CheckpointSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_CheckpointSource_To_v1alpha1_CheckpointSource(a.(*node.CheckpointSource), b.(*nodev1alpha1.CheckpointSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*nodev1alpha1.NodeLocalCheckpointSource)(nil), (*node.NodeLocalCheckpointSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_NodeLocalCheckpointSource_To_node_NodeLocalCheckpointSource(a.(*nodev1alpha1.NodeLocalCheckpointSource), b.(*node.NodeLocalCheckpointSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*node.NodeLocalCheckpointSource)(nil), (*nodev1alpha1.NodeLocalCheckpointSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_NodeLocalCheckpointSource_To_v1alpha1_NodeLocalCheckpointSource(a.(*node.NodeLocalCheckpointSource), b.(*nodev1alpha1.NodeLocalCheckpointSource), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*nodev1alpha1.Overhead)(nil), (*node.Overhead)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_Overhead_To_node_Overhead(a.(*nodev1alpha1.Overhead), b.(*node.Overhead), scope)
 	}); err != nil {
@@ -44,6 +64,66 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*node.Overhead)(nil), (*nodev1alpha1.Overhead)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_node_Overhead_To_v1alpha1_Overhead(a.(*node.Overhead), b.(*nodev1alpha1.Overhead), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*nodev1alpha1.PodCheckpoint)(nil), (*node.PodCheckpoint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodCheckpoint_To_node_PodCheckpoint(a.(*nodev1alpha1.PodCheckpoint), b.(*node.PodCheckpoint), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*node.PodCheckpoint)(nil), (*nodev1alpha1.PodCheckpoint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_PodCheckpoint_To_v1alpha1_PodCheckpoint(a.(*node.PodCheckpoint), b.(*nodev1alpha1.PodCheckpoint), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*nodev1alpha1.PodCheckpointContainerStatus)(nil), (*node.PodCheckpointContainerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodCheckpointContainerStatus_To_node_PodCheckpointContainerStatus(a.(*nodev1alpha1.PodCheckpointContainerStatus), b.(*node.PodCheckpointContainerStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*node.PodCheckpointContainerStatus)(nil), (*nodev1alpha1.PodCheckpointContainerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_PodCheckpointContainerStatus_To_v1alpha1_PodCheckpointContainerStatus(a.(*node.PodCheckpointContainerStatus), b.(*nodev1alpha1.PodCheckpointContainerStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*nodev1alpha1.PodCheckpointList)(nil), (*node.PodCheckpointList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodCheckpointList_To_node_PodCheckpointList(a.(*nodev1alpha1.PodCheckpointList), b.(*node.PodCheckpointList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*node.PodCheckpointList)(nil), (*nodev1alpha1.PodCheckpointList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_PodCheckpointList_To_v1alpha1_PodCheckpointList(a.(*node.PodCheckpointList), b.(*nodev1alpha1.PodCheckpointList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*nodev1alpha1.PodCheckpointSpec)(nil), (*node.PodCheckpointSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodCheckpointSpec_To_node_PodCheckpointSpec(a.(*nodev1alpha1.PodCheckpointSpec), b.(*node.PodCheckpointSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*node.PodCheckpointSpec)(nil), (*nodev1alpha1.PodCheckpointSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_PodCheckpointSpec_To_v1alpha1_PodCheckpointSpec(a.(*node.PodCheckpointSpec), b.(*nodev1alpha1.PodCheckpointSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*nodev1alpha1.PodCheckpointStatus)(nil), (*node.PodCheckpointStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodCheckpointStatus_To_node_PodCheckpointStatus(a.(*nodev1alpha1.PodCheckpointStatus), b.(*node.PodCheckpointStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*node.PodCheckpointStatus)(nil), (*nodev1alpha1.PodCheckpointStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_PodCheckpointStatus_To_v1alpha1_PodCheckpointStatus(a.(*node.PodCheckpointStatus), b.(*nodev1alpha1.PodCheckpointStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*nodev1alpha1.PodReference)(nil), (*node.PodReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodReference_To_node_PodReference(a.(*nodev1alpha1.PodReference), b.(*node.PodReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*node.PodReference)(nil), (*nodev1alpha1.PodReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_node_PodReference_To_v1alpha1_PodReference(a.(*node.PodReference), b.(*nodev1alpha1.PodReference), scope)
 	}); err != nil {
 		return err
 	}
@@ -80,6 +160,46 @@ func RegisterConversions(s *runtime.Scheme) error {
 	return nil
 }
 
+func autoConvert_v1alpha1_CheckpointSource_To_node_CheckpointSource(in *nodev1alpha1.CheckpointSource, out *node.CheckpointSource, s conversion.Scope) error {
+	*out = *(*node.CheckpointSource)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1alpha1_CheckpointSource_To_node_CheckpointSource is an autogenerated conversion function.
+func Convert_v1alpha1_CheckpointSource_To_node_CheckpointSource(in *nodev1alpha1.CheckpointSource, out *node.CheckpointSource, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CheckpointSource_To_node_CheckpointSource(in, out, s)
+}
+
+func autoConvert_node_CheckpointSource_To_v1alpha1_CheckpointSource(in *node.CheckpointSource, out *nodev1alpha1.CheckpointSource, s conversion.Scope) error {
+	*out = *(*nodev1alpha1.CheckpointSource)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_node_CheckpointSource_To_v1alpha1_CheckpointSource is an autogenerated conversion function.
+func Convert_node_CheckpointSource_To_v1alpha1_CheckpointSource(in *node.CheckpointSource, out *nodev1alpha1.CheckpointSource, s conversion.Scope) error {
+	return autoConvert_node_CheckpointSource_To_v1alpha1_CheckpointSource(in, out, s)
+}
+
+func autoConvert_v1alpha1_NodeLocalCheckpointSource_To_node_NodeLocalCheckpointSource(in *nodev1alpha1.NodeLocalCheckpointSource, out *node.NodeLocalCheckpointSource, s conversion.Scope) error {
+	*out = *(*node.NodeLocalCheckpointSource)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1alpha1_NodeLocalCheckpointSource_To_node_NodeLocalCheckpointSource is an autogenerated conversion function.
+func Convert_v1alpha1_NodeLocalCheckpointSource_To_node_NodeLocalCheckpointSource(in *nodev1alpha1.NodeLocalCheckpointSource, out *node.NodeLocalCheckpointSource, s conversion.Scope) error {
+	return autoConvert_v1alpha1_NodeLocalCheckpointSource_To_node_NodeLocalCheckpointSource(in, out, s)
+}
+
+func autoConvert_node_NodeLocalCheckpointSource_To_v1alpha1_NodeLocalCheckpointSource(in *node.NodeLocalCheckpointSource, out *nodev1alpha1.NodeLocalCheckpointSource, s conversion.Scope) error {
+	*out = *(*nodev1alpha1.NodeLocalCheckpointSource)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_node_NodeLocalCheckpointSource_To_v1alpha1_NodeLocalCheckpointSource is an autogenerated conversion function.
+func Convert_node_NodeLocalCheckpointSource_To_v1alpha1_NodeLocalCheckpointSource(in *node.NodeLocalCheckpointSource, out *nodev1alpha1.NodeLocalCheckpointSource, s conversion.Scope) error {
+	return autoConvert_node_NodeLocalCheckpointSource_To_v1alpha1_NodeLocalCheckpointSource(in, out, s)
+}
+
 func autoConvert_v1alpha1_Overhead_To_node_Overhead(in *nodev1alpha1.Overhead, out *node.Overhead, s conversion.Scope) error {
 	*out = *(*node.Overhead)(unsafe.Pointer(in))
 	return nil
@@ -98,6 +218,140 @@ func autoConvert_node_Overhead_To_v1alpha1_Overhead(in *node.Overhead, out *node
 // Convert_node_Overhead_To_v1alpha1_Overhead is an autogenerated conversion function.
 func Convert_node_Overhead_To_v1alpha1_Overhead(in *node.Overhead, out *nodev1alpha1.Overhead, s conversion.Scope) error {
 	return autoConvert_node_Overhead_To_v1alpha1_Overhead(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodCheckpoint_To_node_PodCheckpoint(in *nodev1alpha1.PodCheckpoint, out *node.PodCheckpoint, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1alpha1_PodCheckpointSpec_To_node_PodCheckpointSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_PodCheckpointStatus_To_node_PodCheckpointStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_PodCheckpoint_To_node_PodCheckpoint is an autogenerated conversion function.
+func Convert_v1alpha1_PodCheckpoint_To_node_PodCheckpoint(in *nodev1alpha1.PodCheckpoint, out *node.PodCheckpoint, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodCheckpoint_To_node_PodCheckpoint(in, out, s)
+}
+
+func autoConvert_node_PodCheckpoint_To_v1alpha1_PodCheckpoint(in *node.PodCheckpoint, out *nodev1alpha1.PodCheckpoint, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_node_PodCheckpointSpec_To_v1alpha1_PodCheckpointSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_node_PodCheckpointStatus_To_v1alpha1_PodCheckpointStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_node_PodCheckpoint_To_v1alpha1_PodCheckpoint is an autogenerated conversion function.
+func Convert_node_PodCheckpoint_To_v1alpha1_PodCheckpoint(in *node.PodCheckpoint, out *nodev1alpha1.PodCheckpoint, s conversion.Scope) error {
+	return autoConvert_node_PodCheckpoint_To_v1alpha1_PodCheckpoint(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodCheckpointContainerStatus_To_node_PodCheckpointContainerStatus(in *nodev1alpha1.PodCheckpointContainerStatus, out *node.PodCheckpointContainerStatus, s conversion.Scope) error {
+	*out = *(*node.PodCheckpointContainerStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1alpha1_PodCheckpointContainerStatus_To_node_PodCheckpointContainerStatus is an autogenerated conversion function.
+func Convert_v1alpha1_PodCheckpointContainerStatus_To_node_PodCheckpointContainerStatus(in *nodev1alpha1.PodCheckpointContainerStatus, out *node.PodCheckpointContainerStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodCheckpointContainerStatus_To_node_PodCheckpointContainerStatus(in, out, s)
+}
+
+func autoConvert_node_PodCheckpointContainerStatus_To_v1alpha1_PodCheckpointContainerStatus(in *node.PodCheckpointContainerStatus, out *nodev1alpha1.PodCheckpointContainerStatus, s conversion.Scope) error {
+	*out = *(*nodev1alpha1.PodCheckpointContainerStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_node_PodCheckpointContainerStatus_To_v1alpha1_PodCheckpointContainerStatus is an autogenerated conversion function.
+func Convert_node_PodCheckpointContainerStatus_To_v1alpha1_PodCheckpointContainerStatus(in *node.PodCheckpointContainerStatus, out *nodev1alpha1.PodCheckpointContainerStatus, s conversion.Scope) error {
+	return autoConvert_node_PodCheckpointContainerStatus_To_v1alpha1_PodCheckpointContainerStatus(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodCheckpointList_To_node_PodCheckpointList(in *nodev1alpha1.PodCheckpointList, out *node.PodCheckpointList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]node.PodCheckpoint)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1alpha1_PodCheckpointList_To_node_PodCheckpointList is an autogenerated conversion function.
+func Convert_v1alpha1_PodCheckpointList_To_node_PodCheckpointList(in *nodev1alpha1.PodCheckpointList, out *node.PodCheckpointList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodCheckpointList_To_node_PodCheckpointList(in, out, s)
+}
+
+func autoConvert_node_PodCheckpointList_To_v1alpha1_PodCheckpointList(in *node.PodCheckpointList, out *nodev1alpha1.PodCheckpointList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]nodev1alpha1.PodCheckpoint)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_node_PodCheckpointList_To_v1alpha1_PodCheckpointList is an autogenerated conversion function.
+func Convert_node_PodCheckpointList_To_v1alpha1_PodCheckpointList(in *node.PodCheckpointList, out *nodev1alpha1.PodCheckpointList, s conversion.Scope) error {
+	return autoConvert_node_PodCheckpointList_To_v1alpha1_PodCheckpointList(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodCheckpointSpec_To_node_PodCheckpointSpec(in *nodev1alpha1.PodCheckpointSpec, out *node.PodCheckpointSpec, s conversion.Scope) error {
+	*out = *(*node.PodCheckpointSpec)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1alpha1_PodCheckpointSpec_To_node_PodCheckpointSpec is an autogenerated conversion function.
+func Convert_v1alpha1_PodCheckpointSpec_To_node_PodCheckpointSpec(in *nodev1alpha1.PodCheckpointSpec, out *node.PodCheckpointSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodCheckpointSpec_To_node_PodCheckpointSpec(in, out, s)
+}
+
+func autoConvert_node_PodCheckpointSpec_To_v1alpha1_PodCheckpointSpec(in *node.PodCheckpointSpec, out *nodev1alpha1.PodCheckpointSpec, s conversion.Scope) error {
+	*out = *(*nodev1alpha1.PodCheckpointSpec)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_node_PodCheckpointSpec_To_v1alpha1_PodCheckpointSpec is an autogenerated conversion function.
+func Convert_node_PodCheckpointSpec_To_v1alpha1_PodCheckpointSpec(in *node.PodCheckpointSpec, out *nodev1alpha1.PodCheckpointSpec, s conversion.Scope) error {
+	return autoConvert_node_PodCheckpointSpec_To_v1alpha1_PodCheckpointSpec(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodCheckpointStatus_To_node_PodCheckpointStatus(in *nodev1alpha1.PodCheckpointStatus, out *node.PodCheckpointStatus, s conversion.Scope) error {
+	*out = *(*node.PodCheckpointStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1alpha1_PodCheckpointStatus_To_node_PodCheckpointStatus is an autogenerated conversion function.
+func Convert_v1alpha1_PodCheckpointStatus_To_node_PodCheckpointStatus(in *nodev1alpha1.PodCheckpointStatus, out *node.PodCheckpointStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodCheckpointStatus_To_node_PodCheckpointStatus(in, out, s)
+}
+
+func autoConvert_node_PodCheckpointStatus_To_v1alpha1_PodCheckpointStatus(in *node.PodCheckpointStatus, out *nodev1alpha1.PodCheckpointStatus, s conversion.Scope) error {
+	*out = *(*nodev1alpha1.PodCheckpointStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_node_PodCheckpointStatus_To_v1alpha1_PodCheckpointStatus is an autogenerated conversion function.
+func Convert_node_PodCheckpointStatus_To_v1alpha1_PodCheckpointStatus(in *node.PodCheckpointStatus, out *nodev1alpha1.PodCheckpointStatus, s conversion.Scope) error {
+	return autoConvert_node_PodCheckpointStatus_To_v1alpha1_PodCheckpointStatus(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodReference_To_node_PodReference(in *nodev1alpha1.PodReference, out *node.PodReference, s conversion.Scope) error {
+	*out = *(*node.PodReference)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1alpha1_PodReference_To_node_PodReference is an autogenerated conversion function.
+func Convert_v1alpha1_PodReference_To_node_PodReference(in *nodev1alpha1.PodReference, out *node.PodReference, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodReference_To_node_PodReference(in, out, s)
+}
+
+func autoConvert_node_PodReference_To_v1alpha1_PodReference(in *node.PodReference, out *nodev1alpha1.PodReference, s conversion.Scope) error {
+	*out = *(*nodev1alpha1.PodReference)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_node_PodReference_To_v1alpha1_PodReference is an autogenerated conversion function.
+func Convert_node_PodReference_To_v1alpha1_PodReference(in *node.PodReference, out *nodev1alpha1.PodReference, s conversion.Scope) error {
+	return autoConvert_node_PodReference_To_v1alpha1_PodReference(in, out, s)
 }
 
 func autoConvert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *nodev1alpha1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
