@@ -133,7 +133,8 @@ func NewExpandController(
 		expc.recorder,
 		blkutil)
 
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	logger := klog.FromContext(ctx)
+	_, err := pvcInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: expc.enqueuePVC,
 		UpdateFunc: func(old, new interface{}) {
 			oldPVC, ok := old.(*v1.PersistentVolumeClaim)
@@ -157,7 +158,10 @@ func NewExpandController(
 			}
 		},
 		DeleteFunc: expc.enqueuePVC,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add pvc event handler: %w", err)
+	}
 
 	return expc, nil
 }
