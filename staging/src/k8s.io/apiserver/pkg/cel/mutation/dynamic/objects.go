@@ -128,7 +128,11 @@ func (v *ObjectVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	// an arbitrary JSON value, such as our MutatingAdmissionPolicy JSON Patch valueExpression
 	// field, so we support the conversion here, for Object data literals, as well.
 	if typeDesc == reflect.TypeOf(&structpb.Value{}) {
-		return structpb.NewStruct(result)
+		s, err := structpb.NewStruct(result)
+		if err != nil {
+			return nil, err
+		}
+		return structpb.NewStructValue(s), nil
 	}
 	return nil, fmt.Errorf("unable to convert to %v", typeDesc)
 }
