@@ -51,6 +51,10 @@
 - text: "optionalfields: field LeaseCandidateSpec.EmulationVersion should be a pointer."
   path: "staging/src/k8s.io/api/coordination/(v1beta1|v1alpha2)/types.go"
 
+# optionalfields - PodCheckpoint.Status follows the universal built-in object
+# convention of a value (non-pointer) status struct.
+- text: "optionalfields: field PodCheckpoint.Status should (?:be a pointer|have the omitempty tag)\\."
+  path: "staging/src/k8s.io/api/node/v1alpha1/types.go"
 # Pre-existing issues from the conflictmarkers linter
 # The Error field in some older API types is marked as both optional and required.
 # This is incorrect, but cannot be changed without breaking changes.

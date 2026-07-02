@@ -19,6 +19,7 @@ package pod
 import (
 	"fmt"
 	"iter"
+	"slices"
 	"strings"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -1031,6 +1032,16 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	// the new status is always be non-nil
 	if podStatus == nil {
 		podStatus = &api.PodStatus{}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		for _, conditionType := range []api.PodConditionType{api.PodCheckpointing} {
+			if _, oldCondition := GetPodCondition(oldPodStatus, conditionType); oldCondition == nil {
+				podStatus.Conditions = slices.DeleteFunc(podStatus.Conditions, func(condition api.PodCondition) bool {
+					return condition.Type == conditionType
+				})
+			}
+		}
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && !podLevelStatusResourcesInUse(oldPodStatus) {
