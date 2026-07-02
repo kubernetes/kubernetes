@@ -99,7 +99,7 @@ func (sched *Scheduler) handlePodGroupFailureBeforeScheduling(ctx context.Contex
 			sched.SchedulingQueue.Done(podInfo.Pod.UID)
 			continue
 		}
-		sched.FailureHandler(ctx, podFwk, podInfo, fwk.AsStatus(err), clearNominatedNode, time.Now())
+		sched.FailureHandler(ctx, podFwk, podInfo, false /*patchWithPodResourceVersion*/, fwk.AsStatus(err), clearNominatedNode, time.Now())
 	}
 	err = sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle())
 	if err != nil {
@@ -521,11 +521,11 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 		if podGroupResult.status.IsError() {
 			if podResult.status.IsError() {
 				// If this exact pod failed with an error, use its status instead.
-				sched.FailureHandler(ctx, schedFwk, pInfo, podResult.status, clearNominatedNode, podSchedulingStart)
+				sched.FailureHandler(ctx, schedFwk, pInfo, false /*patchWithPodResourceVersion*/, podResult.status, clearNominatedNode, podSchedulingStart)
 				continue
 			}
 			// Pod group failed with an error. Reject all pods with its status.
-			sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status, clearNominatedNode, podSchedulingStart)
+			sched.FailureHandler(ctx, schedFwk, pInfo, false /*patchWithPodResourceVersion*/, podGroupResult.status, clearNominatedNode, podSchedulingStart)
 			continue
 		}
 		if podResult.status.IsSuccess() {
@@ -541,7 +541,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 				assumedPodInfo, status := sched.prepareForBindingCycle(ctx, podCtx.state, schedFwk, pInfo, podCtx.podsToActivate, podResult.scheduleResult)
 				if !status.IsSuccess() {
 					// In such unlikely situation just reject this pod.
-					sched.FailureHandler(ctx, schedFwk, pInfo, status, clearNominatedNode, podSchedulingStart)
+					sched.FailureHandler(ctx, schedFwk, pInfo, false /*patchWithPodResourceVersion*/, status, clearNominatedNode, podSchedulingStart)
 					unschedulablePods++
 					continue
 				}
@@ -550,17 +550,17 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			case podGroupResult.status.IsRejected():
 				if podGroupResult.waitingOnPreemption {
 					// Pod has to come back to the scheduling queue as unschedulable, waiting for preemption to complete.
-					sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status, nominatingInfo, podSchedulingStart)
+					sched.FailureHandler(ctx, schedFwk, pInfo, false /*patchWithPodResourceVersion*/, podGroupResult.status, nominatingInfo, podSchedulingStart)
 				} else {
 					// Pod group is unschedulable, so the pod has to be marked as unschedulable.
 					// Its rejection status is set to the pod group's status message.
 					status := fwk.NewStatus(fwk.Unschedulable, podGroupResult.status.Message()).WithError(errPodGroupUnschedulable)
-					sched.FailureHandler(ctx, schedFwk, pInfo, status, clearNominatedNode, podSchedulingStart)
+					sched.FailureHandler(ctx, schedFwk, pInfo, false /*patchWithPodResourceVersion*/, status, clearNominatedNode, podSchedulingStart)
 				}
 				unschedulablePods++
 			default:
 				err := fmt.Errorf("received unexpected pod group scheduling algorithm status code: %s", podGroupResult.status.Code())
-				sched.FailureHandler(ctx, schedFwk, pInfo, fwk.AsStatus(err), clearNominatedNode, podSchedulingStart)
+				sched.FailureHandler(ctx, schedFwk, pInfo, false /*patchWithPodResourceVersion*/, fwk.AsStatus(err), clearNominatedNode, podSchedulingStart)
 				unschedulablePods++
 			}
 		} else {
@@ -570,10 +570,10 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 				// Pod group is unschedulable, so the pod has to be marked as unschedulable, even if it just required preemption.
 				// Its rejection status is set to the pod group's status message, as the preemption message is no longer relevant.
 				status := fwk.NewStatus(fwk.Unschedulable, podGroupResult.status.Message()).WithError(errPodGroupUnschedulable)
-				sched.FailureHandler(ctx, schedFwk, pInfo, status, clearNominatedNode, podSchedulingStart)
+				sched.FailureHandler(ctx, schedFwk, pInfo, false /*patchWithPodResourceVersion*/, status, clearNominatedNode, podSchedulingStart)
 			} else {
 				// When a pod is unschedulable or preemption is required, just call the FailureHandler.
-				sched.FailureHandler(ctx, schedFwk, pInfo, podResult.status, podResult.scheduleResult.nominatingInfo, podSchedulingStart)
+				sched.FailureHandler(ctx, schedFwk, pInfo, false /*patchWithPodResourceVersion*/, podResult.status, podResult.scheduleResult.nominatingInfo, podSchedulingStart)
 			}
 			unschedulablePods++
 		}

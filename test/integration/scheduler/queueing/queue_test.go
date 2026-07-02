@@ -339,7 +339,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 	}
-	testCtx.Scheduler.FailureHandler(ctx, schedFramework, podInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fitError), nil, time.Now())
+	testCtx.Scheduler.FailureHandler(ctx, schedFramework, podInfo, false, fwk.NewStatus(fwk.Unschedulable).WithError(fitError), nil, time.Now())
 
 	// Trigger a Custom Resource event.
 	// We expect this event to trigger moving the test Pod from unschedulableEntities to activeQ.

@@ -440,7 +440,7 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 		SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 		Cache:           cache,
 		client:          client,
-		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, _ bool, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 			failureHandlerCalled = true
 			if updateSnapshotErr.Error() != status.AsError().Error() {
 				t.Errorf("Expected status error %q, got %q", updateSnapshotErr, status.AsError())
@@ -534,7 +534,7 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 		Cache:            cache,
 		client:           client,
 		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
-		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, _ bool, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 			lock.Lock()
 			defer lock.Unlock()
 			handledPods[p.Pod.Name] = status
@@ -709,7 +709,7 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 				client:                 client,
 				nodeInfoSnapshot:       internalcache.NewEmptySnapshot(),
 				genericWorkloadEnabled: tt.genericWorkloadEnabled,
-				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, _ bool, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 				},
 			}
 
@@ -1683,7 +1683,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 				Cache:           cache,
 				Profiles:        profile.Map{"test-scheduler": schedFwk},
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
-				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, _ bool, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 					lock.Lock()
 					if ni != nil && ni.NominatedNodeName != "" {
 						preemptingPods.Insert(p.Pod.Name)
@@ -3069,7 +3069,7 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 		return ScheduleResult{}, fmt.Errorf("unexpected pod")
 	}
 	capturedFailureHandler := make(map[string]*fwk.NominatingInfo)
-	sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
+	sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, _ bool, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
 		capturedFailureHandler[podInfo.Pod.Name] = nominatingInfo
 	}
 

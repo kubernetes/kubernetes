@@ -1163,12 +1163,12 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
 			return item.mockScheduleResult, item.injectSchedulingError
 		}
-		sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+		sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, withRV bool, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 			gotPod = p.Pod
 			gotError = status.AsError()
 			gotNominatingInfo = ni
 
-			sched.handleSchedulingFailure(ctx, fwk, p, status, ni, start)
+			sched.handleSchedulingFailure(ctx, fwk, p, withRV, status, ni, start)
 		}
 		called := make(chan struct{})
 		stopFunc, err := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
@@ -1363,7 +1363,7 @@ func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 
 	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
 	poppedPod := popped.(*framework.QueuedPodInfo)
-	sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
+	sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, false, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
 
 	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
 		return len(queue.InFlightPods()) == 0, nil
@@ -1860,7 +1860,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
 					return item.mockScheduleResult, item.injectSchedulingError
 				}
-				sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
+				sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, _ bool, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 					gotCallsToFailureHandler++
 					gotPodIsInFlightAtFailureHandler = podListContainsPod(queue.InFlightPods(), p.Pod)
 
@@ -2645,7 +2645,7 @@ func TestUpdatePodStatus(t *testing.T) {
 					apiCacher = apicache.New(queue, nil)
 				}
 
-				if err := updatePod(ctx, cs, apiCacher, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
+				if err := updatePod(ctx, cs, apiCacher, pod, false, test.newPodCondition, test.newNominatingInfo); err != nil {
 					t.Fatalf("Error calling update: %v", err)
 				}
 
@@ -4738,7 +4738,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Inte
 	}
 
 	sched.SchedulePod = sched.schedulePod
-	sched.FailureHandler = func(ctx context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
+	sched.FailureHandler = func(ctx context.Context, _ framework.Framework, p *framework.QueuedPodInfo, _ bool, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 		err := status.AsError()
 		errChan <- err
 

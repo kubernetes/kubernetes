@@ -133,7 +133,7 @@ func (sched *Scheduler) scheduleOnePod(ctx context.Context, podInfo *framework.Q
 
 	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
 	if !status.IsSuccess() {
-		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
+		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, false /*patchWithPodResourceVersion*/, status, scheduleResult.nominatingInfo, start)
 		return
 	}
 
@@ -411,7 +411,7 @@ func (sched *Scheduler) bindingCycle(
 		if preFlightStatus.IsSuccess() || schedFramework.WillWaitOnPermit(ctx, assumedPod) {
 			// Add NominatedNodeName to tell the external components (e.g., the cluster autoscaler) that the pod is about to be bound to the node.
 			// We only do this when any of WaitOnPermit or PreBind will work because otherwise the pod will be soon bound anyway.
-			if err := updatePod(ctx, sched.client, schedFramework.APICacher(), assumedPod, nil, &fwk.NominatingInfo{
+			if err := updatePod(ctx, sched.client, schedFramework.APICacher(), assumedPod, false /*patchWithPodResourceVersion*/, nil, &fwk.NominatingInfo{
 				NominatedNodeName: scheduleResult.SuggestedHost,
 				NominatingMode:    fwk.ModeOverride,
 			}); err != nil {
@@ -526,7 +526,7 @@ func (sched *Scheduler) handleBindingCycleError(
 		}
 	}
 
-	sched.FailureHandler(ctx, fwk, podInfo, status, clearNominatedNode, start)
+	sched.FailureHandler(ctx, fwk, podInfo, false /* patchWithPodResourceVersion*/, status, clearNominatedNode, start)
 }
 
 func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error) {
@@ -1191,7 +1191,7 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
-func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
+func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, patchWithPodResourceVersion bool, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
 	calledDone := false
 	defer func() {
 		if !calledDone {
@@ -1281,7 +1281,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 
 	msg := truncateMessage(errMsg)
 	podFwk.EventRecorder().WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
-	if err := updatePod(ctx, sched.client, podFwk.APICacher(), pod, &v1.PodCondition{
+	if err := updatePod(ctx, sched.client, podFwk.APICacher(), pod, patchWithPodResourceVersion, &v1.PodCondition{
 		Type:               v1.PodScheduled,
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionFalse,
@@ -1302,7 +1302,7 @@ func truncateMessage(message string) string {
 	return message[:max-len(suffix)] + suffix
 }
 
-func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.APICacher, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) error {
+func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.APICacher, pod *v1.Pod, patchWithPodResourceVersion bool, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) error {
 	if apiCacher != nil {
 		// When API cacher is available, use it to patch the status.
 		var conditions []*v1.PodCondition
