@@ -405,6 +405,11 @@ const (
 	// Enables generation tracking for HorizontalPodAutoscaler
 	HPAGeneration featuregate.Feature = "HPAGeneration"
 
+	// owner: @hakuna-matatah
+	//
+	// Enables an optimized selector store for HPA overlap detection.
+	HPAOptimizedSelectorStore featuregate.Feature = "HPAOptimizedSelectorStore"
+
 	// owner: @johanneswuerbach
 	// kep: https://kep.k8s.io/2021
 	//
@@ -1441,6 +1446,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	HPAOptimizedSelectorStore: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	HPAScaleToZero: {
 		{Version: version.MustParse("1.16"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
@@ -2355,6 +2364,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	HPAConfigurableTolerance: {},
 
 	HPAGeneration: {},
+
+	HPAOptimizedSelectorStore: {},
 
 	HPAScaleToZero: {},
 
