@@ -547,17 +547,29 @@ func makeUID() string {
 
 // getTerminationMessage looks on the filesystem for the provided termination message path, returning a limited
 // amount of those bytes, or returns true if the logs should be checked.
-func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessagePath string, fallbackToLogs bool) (string, bool) {
+//
+// hostBasePath is the directory on the host under which kubelet created the termination
+// message file at container start. The HostPath reported by the CRI runtime in
+// status.Mounts is rejected if it does not resolve to a path under hostBasePath, so a
+// runtime that echoes back a different mount table cannot cause kubelet to read an
+// arbitrary host file into the pod status.
+func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessagePath string, hostBasePath string, fallbackToLogs bool) (string, bool) {
 	if len(terminationMessagePath) == 0 {
 		return "", fallbackToLogs
 	}
 	// Volume Mounts fail on Windows if it is not of the form C:/
 	terminationMessagePath = volumeutil.MakeAbsolutePath(goruntime.GOOS, terminationMessagePath)
+	hostBasePath = filepath.Clean(hostBasePath) + string(os.PathSeparator)
 	for _, mount := range status.Mounts {
 		if mount.ContainerPath != terminationMessagePath {
 			continue
 		}
-		path := mount.HostPath
+		path := filepath.Clean(mount.HostPath)
+		if hostBasePath == string(os.PathSeparator) || !strings.HasPrefix(path+string(os.PathSeparator), hostBasePath) {
+			klog.InfoS("Skipping termination message: CRI-reported HostPath is outside the pod container directory",
+				"hostPath", mount.HostPath, "expectedBase", hostBasePath, "containerID", status.GetId())
+			continue
+		}
 		data, _, err := tail.ReadAtMost(path, kubecontainer.MaxContainerTerminationMessageLength)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -589,7 +601,10 @@ func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(ctx context.Con
 		// If a container cannot even be started, it certainly does not have logs, so no need to fallbackToLogs.
 		fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError &&
 			cStatus.ExitCode != 0 && cStatus.Reason != "ContainerCannotRun"
-		tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
+		// Kubelet creates termination-message files under {podDir}/containers/{containerName}/.
+		// Bound the CRI-reported HostPath to the pod's containers directory.
+		hostBasePath := filepath.Join(m.runtimeHelper.GetPodDir(podUID), "containers")
+		tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, hostBasePath, fallbackToLogs)
 		if checkLogs {
 			tMessage = m.readLastStringFromContainerLogs(ctx, status.GetLogPath())
 		}
