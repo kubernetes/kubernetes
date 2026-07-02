@@ -122,6 +122,8 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		logManager:         logs.NewStubContainerLogManager(),
 		podLogsDirectory:   fakePodLogsDirectory,
 		actuatedState:      state.NewStateMemory(logger, nil, KeepOnlyResourceValues),
+		podRestoreTimeout:  time.Minute,
+		restoresInFlight:   make(map[string]struct{}),
 	}
 
 	// Initialize swap controller availability check (always false for tests)

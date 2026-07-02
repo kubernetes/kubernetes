@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -73,6 +74,24 @@ func (kl *Kubelet) podOperationMayUsePodResources(uid types.UID) bool {
 	if _, owned := kl.checkpointOperationOwners.Load(uid); owned {
 		return true
 	}
+	if _, owned := kl.restoreOperationOwners.Load(uid); owned {
+		return true
+	}
+	if _, err := checkpointOperationKey(uid); err != nil {
+		return true
+	}
+	state, err := kl.ReadPodRestoreState(uid)
+	if err != nil {
+		return true
+	}
+	switch state {
+	case kubecontainer.PodRestoreStarted, kubecontainer.PodRestoreCleanupPending:
+		return true
+	}
+	return kl.checkpointOperationMayUsePodResources(uid)
+}
+
+func (kl *Kubelet) checkpointOperationMayUsePodResources(uid types.UID) bool {
 	podKey, err := checkpointOperationKey(uid)
 	if err != nil {
 		return true

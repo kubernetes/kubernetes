@@ -33,6 +33,7 @@ import (
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type operationResourceCgroups struct {
@@ -92,4 +93,14 @@ func testOrphanPodResourcesWaitForOperation(t *testing.T, writeState func(*Kubel
 			}
 		})
 	}
+}
+
+func TestOrphanPodResourcesWaitForRestoreCompletion(t *testing.T) {
+	testOrphanPodResourcesWaitForOperation(t, func(kl *Kubelet, uid types.UID, completed bool) error {
+		state := kubecontainer.PodRestoreCleanupPending
+		if completed {
+			state = kubecontainer.PodRestoreCleanupCompleted
+		}
+		return kl.SetPodRestoreState(uid, state)
+	})
 }

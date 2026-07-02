@@ -19,6 +19,8 @@ package testing
 import (
 	"context"
 	"fmt"
+	"slices"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,18 +35,36 @@ import (
 
 // FakeRuntimeHelper implements RuntimeHelper interfaces for testing purposes.
 type FakeRuntimeHelper struct {
-	DNSServers      []string
-	DNSSearches     []string
-	DNSOptions      []string
-	HostName        string
-	HostDomain      string
-	PodContainerDir string
-	RuntimeHandlers map[string]kubecontainer.RuntimeHandler
-	Err             error
-	PodStats        map[kubetypes.UID]*statsapi.PodStats
+	mu sync.Mutex
+
+	DNSServers              []string
+	DNSSearches             []string
+	DNSOptions              []string
+	HostName                string
+	HostDomain              string
+	PodContainerDir         string
+	RuntimeHandlers         map[string]kubecontainer.RuntimeHandler
+	Err                     error
+	PodStats                map[kubetypes.UID]*statsapi.PodStats
+	PodRestoreIPs           map[kubetypes.UID][]string
+	PodRestoreStates        map[kubetypes.UID]kubecontainer.PodRestoreState
+	PodRestoreContainers    map[kubetypes.UID][]string
+	PodRestoreStateWriteErr error
+	ContainerImageVolumes   map[kubetypes.UID]map[string]kubecontainer.ImageVolumes
 }
 
 func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.ContainerImageVolumes == nil {
+		f.ContainerImageVolumes = make(map[kubetypes.UID]map[string]kubecontainer.ImageVolumes)
+	}
+	if f.ContainerImageVolumes[pod.UID] == nil {
+		f.ContainerImageVolumes[pod.UID] = make(map[string]kubecontainer.ImageVolumes)
+	}
+	f.ContainerImageVolumes[pod.UID][container.Name] = imageVolumes
+
 	var opts kubecontainer.RunContainerOptions
 	if len(container.TerminationMessagePath) != 0 {
 		opts.PodContainerDir = f.PodContainerDir
@@ -70,6 +90,68 @@ func (f *FakeRuntimeHelper) GeneratePodHostNameAndDomain(logger klog.Logger, _ *
 
 func (f *FakeRuntimeHelper) GetPodDir(podUID kubetypes.UID) string {
 	return "/poddir/" + string(podUID)
+}
+
+func (f *FakeRuntimeHelper) ValidateRestoreCheckpoint(_ context.Context, pod *v1.Pod) (string, error) {
+	return "/fake/pod-checkpoints/checkpoint", nil
+}
+
+func (f *FakeRuntimeHelper) UpdatePodRestoreHosts(_ context.Context, pod *v1.Pod, podIPs []string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.PodRestoreIPs == nil {
+		f.PodRestoreIPs = make(map[kubetypes.UID][]string)
+	}
+	f.PodRestoreIPs[pod.UID] = append([]string(nil), podIPs...)
+	return f.Err
+}
+
+func (f *FakeRuntimeHelper) MarkPodRestoreStarted(podUID kubetypes.UID) error {
+	return f.SetPodRestoreState(podUID, kubecontainer.PodRestoreStarted)
+}
+
+func (f *FakeRuntimeHelper) SetPodRestoreState(podUID kubetypes.UID, state kubecontainer.PodRestoreState) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.PodRestoreStateWriteErr != nil {
+		return f.PodRestoreStateWriteErr
+	}
+	if f.PodRestoreStates == nil {
+		f.PodRestoreStates = make(map[kubetypes.UID]kubecontainer.PodRestoreState)
+	}
+	f.PodRestoreStates[podUID] = state
+	return nil
+}
+
+func (f *FakeRuntimeHelper) ReadPodRestoreState(podUID kubetypes.UID) (kubecontainer.PodRestoreState, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if state, ok := f.PodRestoreStates[podUID]; ok {
+		return state, nil
+	}
+	return kubecontainer.PodRestoreNotStarted, nil
+}
+
+func (f *FakeRuntimeHelper) RecordPodRestoreContainers(podUID kubetypes.UID, containerIDs []string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.PodRestoreStateWriteErr != nil {
+		return f.PodRestoreStateWriteErr
+	}
+	if f.PodRestoreContainers == nil {
+		f.PodRestoreContainers = make(map[kubetypes.UID][]string)
+	}
+	f.PodRestoreContainers[podUID] = append(f.PodRestoreContainers[podUID], containerIDs...)
+	slices.Sort(f.PodRestoreContainers[podUID])
+	f.PodRestoreContainers[podUID] = slices.Compact(f.PodRestoreContainers[podUID])
+	return nil
+}
+
+func (f *FakeRuntimeHelper) ReadPodRestoreContainers(podUID kubetypes.UID) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.PodRestoreContainers[podUID]), nil
 }
 
 func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
@@ -142,4 +224,8 @@ func (f *FakeRuntimeHelper) OnPodSandboxReady(_ context.Context, _ *v1.Pod) erro
 // ResizeEphemeralVolume is not implemented
 func (f *FakeRuntimeHelper) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
 	return nil
+}
+
+func (f *FakeRuntimeHelper) SetPodRestoreBlocked(_ kubetypes.UID, _ bool) {
+	// Not implemented
 }
