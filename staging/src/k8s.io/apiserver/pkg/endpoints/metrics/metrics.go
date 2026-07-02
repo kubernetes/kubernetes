@@ -167,6 +167,18 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 	)
+	// HTTP2ServerErrors counts HTTP/2 server errors by type, as reported by the
+	// golang.org/x/net/http2 CountError hook. Useful for tracking ping timeouts
+	// and protocol violations that cause connection closes.
+	HTTP2ServerErrors = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Subsystem:      APIServerComponent,
+			Name:           "http2_server_errors_total",
+			Help:           "Number of HTTP/2 server errors by error type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"type"},
+	)
 	WatchEvents = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Subsystem:      APIServerComponent,
@@ -304,6 +316,7 @@ var (
 		fieldValidationRequestLatencies,
 		responseSizes,
 		TLSHandshakeErrors,
+		HTTP2ServerErrors,
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,

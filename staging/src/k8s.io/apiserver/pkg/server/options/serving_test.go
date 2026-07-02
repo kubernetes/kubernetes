@@ -38,6 +38,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
@@ -381,6 +383,65 @@ func TestServerRunWithSNI(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSecureServingOptionsHTTP2Timeouts verifies that the HTTP/2 write-byte and
+// read-idle timeout options default to disabled, are parsed from their flags, and
+// are propagated to the SecureServingInfo by ApplyTo.
+func TestSecureServingOptionsHTTP2Timeouts(t *testing.T) {
+	t.Run("defaults are disabled", func(t *testing.T) {
+		o := NewSecureServingOptions()
+		if o.HTTP2WriteByteTimeout != 0 {
+			t.Errorf("expected --http2-write-byte-timeout to default to 0 (disabled), got %s", o.HTTP2WriteByteTimeout)
+		}
+		if o.HTTP2ReadIdleTimeout != 0 {
+			t.Errorf("expected --http2-read-idle-timeout to default to 0 (disabled), got %s", o.HTTP2ReadIdleTimeout)
+		}
+	})
+
+	t.Run("flags are parsed", func(t *testing.T) {
+		o := NewSecureServingOptions()
+		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		o.AddFlags(fs)
+		if err := fs.Parse([]string{"--http2-write-byte-timeout=1m", "--http2-read-idle-timeout=30s"}); err != nil {
+			t.Fatalf("failed to parse flags: %v", err)
+		}
+		if want := time.Minute; o.HTTP2WriteByteTimeout != want {
+			t.Errorf("expected HTTP2WriteByteTimeout %s, got %s", want, o.HTTP2WriteByteTimeout)
+		}
+		if want := 30 * time.Second; o.HTTP2ReadIdleTimeout != want {
+			t.Errorf("expected HTTP2ReadIdleTimeout %s, got %s", want, o.HTTP2ReadIdleTimeout)
+		}
+	})
+
+	t.Run("ApplyTo propagates to SecureServingInfo", func(t *testing.T) {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("failed to listen: %v", err)
+		}
+		defer func() {
+			_ = ln.Close()
+		}()
+
+		o := NewSecureServingOptions()
+		o.Listener = ln
+		o.HTTP2WriteByteTimeout = time.Minute
+		o.HTTP2ReadIdleTimeout = 30 * time.Second
+
+		var info *server.SecureServingInfo
+		if err := o.ApplyTo(&info); err != nil {
+			t.Fatalf("failed applying the SecureServingOptions: %v", err)
+		}
+		if info == nil {
+			t.Fatal("expected a non-nil SecureServingInfo")
+		}
+		if want := time.Minute; info.HTTP2WriteByteTimeout != want {
+			t.Errorf("expected HTTP2WriteByteTimeout %s, got %s", want, info.HTTP2WriteByteTimeout)
+		}
+		if want := 30 * time.Second; info.HTTP2ReadIdleTimeout != want {
+			t.Errorf("expected HTTP2ReadIdleTimeout %s, got %s", want, info.HTTP2ReadIdleTimeout)
+		}
+	})
 }
 
 func parseIPList(ips []string) []net.IP {
