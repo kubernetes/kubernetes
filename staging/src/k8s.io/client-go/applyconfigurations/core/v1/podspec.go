@@ -287,6 +287,17 @@ type PodSpecApplyConfiguration struct {
 	// recreated with different policies. Doing this during pod scheduling
 	// may result in the placement not conforming to the expected policies.
 	SchedulingGroup *PodSchedulingGroupApplyConfiguration `json:"schedulingGroup,omitempty"`
+	// RestoreFrom is the name of a PodCheckpoint, in this pod's namespace, to
+	// restore this pod from. When set, the pod is restored from that checkpoint's
+	// archive instead of being created from scratch; the kubelet resolves the name
+	// to the on-node archive via the PodCheckpoint's status.
+	// This field is mutable: a running pod may be re-restored from a different
+	// checkpoint (for example, sequential rollback points). It is not the field's
+	// immutability that protects against pointing a pod at a foreign checkpoint;
+	// that is enforced by validating pod-spec equality against the referenced
+	// checkpoint. Resolving the name in this pod's own namespace also prevents
+	// referencing a checkpoint in another namespace.
+	RestoreFrom *string `json:"restoreFrom,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -689,5 +700,13 @@ func (b *PodSpecApplyConfiguration) WithHostnameOverride(value string) *PodSpecA
 // If called multiple times, the SchedulingGroup field is set to the value of the last call.
 func (b *PodSpecApplyConfiguration) WithSchedulingGroup(value *PodSchedulingGroupApplyConfiguration) *PodSpecApplyConfiguration {
 	b.SchedulingGroup = value
+	return b
+}
+
+// WithRestoreFrom sets the RestoreFrom field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RestoreFrom field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithRestoreFrom(value string) *PodSpecApplyConfiguration {
+	b.RestoreFrom = &value
 	return b
 }

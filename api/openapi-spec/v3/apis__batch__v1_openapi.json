@@ -3079,6 +3079,10 @@
             "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
             "type": "string"
           },
+          "restoreFrom": {
+            "description": "RestoreFrom is the name of a PodCheckpoint, in this pod's namespace, to restore this pod from. When set, the pod is restored from that checkpoint's archive instead of being created from scratch; the kubelet resolves the name to the on-node archive via the PodCheckpoint's status. This field is mutable: a running pod may be re-restored from a different checkpoint (for example, sequential rollback points). It is not the field's immutability that protects against pointing a pod at a foreign checkpoint; that is enforced by validating pod-spec equality against the referenced checkpoint. Resolving the name in this pod's own namespace also prevents referencing a checkpoint in another namespace.",
+            "type": "string"
+          },
           "runtimeClassName": {
             "description": "RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class",
             "type": "string"

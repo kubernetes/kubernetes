@@ -7068,6 +7068,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *corev1.PodSpec, out *core.PodSpe
 	out.Resources = (*core.ResourceRequirements)(unsafe.Pointer(in.Resources))
 	out.HostnameOverride = (*string)(unsafe.Pointer(in.HostnameOverride))
 	out.SchedulingGroup = (*core.PodSchedulingGroup)(unsafe.Pointer(in.SchedulingGroup))
+	out.RestoreFrom = (*string)(unsafe.Pointer(in.RestoreFrom))
 	return nil
 }
 
@@ -7119,6 +7120,7 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *corev1.PodSpe
 	out.Resources = (*corev1.ResourceRequirements)(unsafe.Pointer(in.Resources))
 	out.HostnameOverride = (*string)(unsafe.Pointer(in.HostnameOverride))
 	out.SchedulingGroup = (*corev1.PodSchedulingGroup)(unsafe.Pointer(in.SchedulingGroup))
+	out.RestoreFrom = (*string)(unsafe.Pointer(in.RestoreFrom))
 	return nil
 }
 

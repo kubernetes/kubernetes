@@ -970,6 +970,7 @@ spec:
             requests:
               requestsKey: "0"
           restartPolicy: restartPolicyValue
+          restoreFrom: restoreFromValue
           runtimeClassName: runtimeClassNameValue
           schedulerName: schedulerNameValue
           schedulingGates:

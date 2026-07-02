@@ -4123,6 +4123,113 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: notBefore
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+- name: io.k8s.api.checkpoint.v1alpha1.CheckpointSource
+  map:
+    fields:
+    - name: nodeLocal
+      type:
+        namedType: io.k8s.api.checkpoint.v1alpha1.NodeLocalCheckpointSource
+    - name: type
+      type:
+        scalar: string
+      default: ""
+    unions:
+    - discriminator: type
+      fields:
+      - fieldName: nodeLocal
+        discriminatorValue: NodeLocal
+- name: io.k8s.api.checkpoint.v1alpha1.NodeLocalCheckpointSource
+  map:
+    fields:
+    - name: path
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.checkpoint.v1alpha1.PodCheckpoint
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.checkpoint.v1alpha1.PodCheckpointSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.checkpoint.v1alpha1.PodCheckpointStatus
+      default: {}
+- name: io.k8s.api.checkpoint.v1alpha1.PodCheckpointContainerStatus
+  map:
+    fields:
+    - name: image
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.checkpoint.v1alpha1.PodCheckpointSpec
+  map:
+    fields:
+    - name: sourcePodName
+      type:
+        scalar: string
+    - name: sourcePodUID
+      type:
+        scalar: string
+    - name: timeoutSeconds
+      type:
+        scalar: numeric
+- name: io.k8s.api.checkpoint.v1alpha1.PodCheckpointStatus
+  map:
+    fields:
+    - name: checkpointLocation
+      type:
+        namedType: io.k8s.api.checkpoint.v1alpha1.CheckpointSource
+    - name: checkpointedContainers
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.checkpoint.v1alpha1.PodCheckpointContainerStatus
+          elementRelationship: associative
+          keys:
+          - name
+    - name: checkpointedInitContainers
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.checkpoint.v1alpha1.PodCheckpointContainerStatus
+          elementRelationship: associative
+          keys:
+          - name
+    - name: checkpointedPodTemplate
+      type:
+        namedType: io.k8s.api.core.v1.PodTemplateSpec
+    - name: completionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: nodeName
+      type:
+        scalar: string
+    - name: sourcePodUID
+      type:
+        scalar: string
 - name: io.k8s.api.coordination.v1.Lease
   map:
     fields:
@@ -7075,6 +7182,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
     - name: restartPolicy
+      type:
+        scalar: string
+    - name: restoreFrom
       type:
         scalar: string
     - name: runtimeClassName

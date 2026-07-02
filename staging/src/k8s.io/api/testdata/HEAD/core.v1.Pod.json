@@ -1791,7 +1791,8 @@
     "hostnameOverride": "hostnameOverrideValue",
     "schedulingGroup": {
       "podGroupName": "podGroupNameValue"
-    }
+    },
+    "restoreFrom": "restoreFromValue"
   },
   "status": {
     "observedGeneration": 17,

@@ -43,6 +43,7 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	checkpointv1alpha1 "k8s.io/api/checkpoint/v1alpha1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
@@ -456,6 +457,13 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		certificatesv1beta1.PodCertificateRequestList{}.OpenAPIModelName():                                              schema_k8sio_api_certificates_v1beta1_PodCertificateRequestList(ref),
 		certificatesv1beta1.PodCertificateRequestSpec{}.OpenAPIModelName():                                              schema_k8sio_api_certificates_v1beta1_PodCertificateRequestSpec(ref),
 		certificatesv1beta1.PodCertificateRequestStatus{}.OpenAPIModelName():                                            schema_k8sio_api_certificates_v1beta1_PodCertificateRequestStatus(ref),
+		checkpointv1alpha1.CheckpointSource{}.OpenAPIModelName():                                                        schema_k8sio_api_checkpoint_v1alpha1_CheckpointSource(ref),
+		checkpointv1alpha1.NodeLocalCheckpointSource{}.OpenAPIModelName():                                               schema_k8sio_api_checkpoint_v1alpha1_NodeLocalCheckpointSource(ref),
+		checkpointv1alpha1.PodCheckpoint{}.OpenAPIModelName():                                                           schema_k8sio_api_checkpoint_v1alpha1_PodCheckpoint(ref),
+		checkpointv1alpha1.PodCheckpointContainerStatus{}.OpenAPIModelName():                                            schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointContainerStatus(ref),
+		checkpointv1alpha1.PodCheckpointList{}.OpenAPIModelName():                                                       schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointList(ref),
+		checkpointv1alpha1.PodCheckpointSpec{}.OpenAPIModelName():                                                       schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointSpec(ref),
+		checkpointv1alpha1.PodCheckpointStatus{}.OpenAPIModelName():                                                     schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointStatus(ref),
 		coordinationv1.Lease{}.OpenAPIModelName():                                                                       schema_k8sio_api_coordination_v1_Lease(ref),
 		coordinationv1.LeaseList{}.OpenAPIModelName():                                                                   schema_k8sio_api_coordination_v1_LeaseList(ref),
 		coordinationv1.LeaseSpec{}.OpenAPIModelName():                                                                   schema_k8sio_api_coordination_v1_LeaseSpec(ref),
@@ -18629,6 +18637,343 @@ func schema_k8sio_api_certificates_v1beta1_PodCertificateRequestStatus(ref commo
 	}
 }
 
+func schema_k8sio_api_checkpoint_v1alpha1_CheckpointSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CheckpointSource describes where a checkpoint's data is stored. Discriminated union: the member matching Type is set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Possible enum values:\n - `\"NodeLocal\"`",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NodeLocal"},
+						},
+					},
+					"nodeLocal": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref(checkpointv1alpha1.NodeLocalCheckpointSource{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"type"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"discriminator": "type",
+							"fields-to-discriminateBy": map[string]interface{}{
+								"nodeLocal": "NodeLocal",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			checkpointv1alpha1.NodeLocalCheckpointSource{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_checkpoint_v1alpha1_NodeLocalCheckpointSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeLocalCheckpointSource locates a checkpoint stored on the node that took it.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"path": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Path relative to the kubelet's configured checkpoint root directory.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"path"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_checkpoint_v1alpha1_PodCheckpoint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCheckpoint represents a checkpoint of a running pod.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "spec defines the desired checkpoint operation.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(checkpointv1alpha1.PodCheckpointSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status represents the current status of the checkpoint.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(checkpointv1alpha1.PodCheckpointStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			checkpointv1alpha1.PodCheckpointSpec{}.OpenAPIModelName(), checkpointv1alpha1.PodCheckpointStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointContainerStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCheckpointContainerStatus identifies a container captured in a checkpoint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the name of the checkpointed container.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"image": {
+						SchemaProps: spec.SchemaProps{
+							Description: "image is the image the container was running at checkpoint time.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCheckpointList is a list of PodCheckpoint objects.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is a list of PodCheckpoint objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(checkpointv1alpha1.PodCheckpoint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			checkpointv1alpha1.PodCheckpoint{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCheckpointSpec defines the desired state of a PodCheckpoint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"sourcePodName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "sourcePodName is the name of the pod to checkpoint. The pod must exist in the same namespace as the PodCheckpoint resource. Required in alpha (validation rejects an empty value); it is marked optional in the schema so a future selector-based or controller-populated mode can relax it without an incompatible API change.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"sourcePodUID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "sourcePodUID, if set, pins the checkpoint to a specific pod instance: the controller checkpoints the pod only if the live pod named sourcePodName has this exact UID, and fails the checkpoint otherwise (reason SourcePodReplaced). A pod name can be reused (the original pod may be deleted and a controller may recreate a new pod with the same name), so a name alone does not identify an instance. This matters most when the controller is unavailable for a while (for example during a leader-election change): by the time it reconciles, sourcePodName may resolve to a different pod. To close that window the UID must be captured at creation time, so callers that need instance pinning set this field when creating the PodCheckpoint. Immutable.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"timeoutSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "timeoutSeconds is the maximum number of seconds the checkpoint operation may take before the container runtime aborts it. If unset or 0, the container runtime default is used. The kubelet clamps this to its configured checkpoint timeout ceiling (a KubeletConfiguration field), which bounds how long the Pod can stay frozen.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_checkpoint_v1alpha1_PodCheckpointStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCheckpointStatus represents the current status of a PodCheckpoint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodeName is the name of the node where the checkpoint was created.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"sourcePodUID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "sourcePodUID is the UID of the pod instance the controller actually checkpointed (or is checkpointing). It is recorded on the first reconcile for visibility and so that a later UID change for the same name is detected and fails the checkpoint. This guards only changes observed after the first reconcile; to also cover a controller that was down for the entire window, set spec.sourcePodUID at creation time.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"checkpointLocation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "checkpointLocation describes where the checkpoint's data is stored. It is a discriminated union over storage backends; in alpha only the node-local backend (nodeLocal) is set, recording a path relative to the kubelet's configured checkpoint root directory.",
+							Ref:         ref(checkpointv1alpha1.CheckpointSource{}.OpenAPIModelName()),
+						},
+					},
+					"completionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "completionTime is the time the checkpoint completed (archive written / became Ready), set by the kubelet. Used for freshness and retention/GC. Distinct from metadata.creationTimestamp (when the object was created).",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"checkpointedPodTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "checkpointedPodTemplate is a sanitized PodTemplateSpec (object metadata plus the pod spec) captured from the source pod at checkpoint time. It is the authoritative record a restore is validated against: a pod restoring from this checkpoint must match this template. Because it is part of status it is controller-written and immutable to users, which makes it a tamper-proof anchor for the equality check. Node-local and cluster-specific fields (for example spec.nodeName, uid, resourceVersion, managedFields) are excluded so the record stays portable.",
+							Ref:         ref(corev1.PodTemplateSpec{}.OpenAPIModelName()),
+						},
+					},
+					"checkpointedContainers": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "checkpointedContainers lists the regular (non-init) containers captured in the checkpoint as a convenience for clients. The authoritative set is recorded in checkpointedPodTemplate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(checkpointv1alpha1.PodCheckpointContainerStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"checkpointedInitContainers": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "checkpointedInitContainers lists the init containers captured in the checkpoint, kept separate from checkpointedContainers to mirror PodStatus. It records completed non-restartable init containers and any running restartable init containers (sidecars). On restore, completed init containers are reflected as completed and not re-run; running sidecars are restored like regular containers.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(checkpointv1alpha1.PodCheckpointContainerStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions represent the latest available observations of the checkpoint's state. The \"Ready\" condition summarizes whether the checkpoint archive has been created and is ready to restore from; its reason and message carry the detail previously exposed via phase/message.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			checkpointv1alpha1.CheckpointSource{}.OpenAPIModelName(), checkpointv1alpha1.PodCheckpointContainerStatus{}.OpenAPIModelName(), corev1.PodTemplateSpec{}.OpenAPIModelName(), metav1.Condition{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_coordination_v1_Lease(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -28586,6 +28931,13 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						SchemaProps: spec.SchemaProps{
 							Description: "SchedulingGroup provides a reference to the immediate scheduling runtime grouping object that this Pod belongs to. This field is used by the scheduler to identify the group and apply the correct group scheduling policies. The association with a group also impacts other lifecycle aspects of a Pod that are relevant in a wider context of scheduling like preemption, resource attachment, etc. If not specified, the Pod is treated as a single unit in all of these aspects. The group object referenced by this field may not exist at the time the Pod is created. This field is immutable, but a group object with the same name may be recreated with different policies. Doing this during pod scheduling may result in the placement not conforming to the expected policies.",
 							Ref:         ref(corev1.PodSchedulingGroup{}.OpenAPIModelName()),
+						},
+					},
+					"restoreFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RestoreFrom is the name of a PodCheckpoint, in this pod's namespace, to restore this pod from. When set, the pod is restored from that checkpoint's archive instead of being created from scratch; the kubelet resolves the name to the on-node archive via the PodCheckpoint's status. This field is mutable: a running pod may be re-restored from a different checkpoint (for example, sequential rollback points). It is not the field's immutability that protects against pointing a pod at a foreign checkpoint; that is enforced by validating pod-spec equality against the referenced checkpoint. Resolving the name in this pod's own namespace also prevents referencing a checkpoint in another namespace.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -71585,6 +71937,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					"runtimeRequestTimeout": {
 						SchemaProps: spec.SchemaProps{
 							Description: "runtimeRequestTimeout is the timeout for all runtime requests except long running requests - pull, logs, exec and attach. Default: \"2m\"",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
+					"podCheckpointTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podCheckpointTimeout is the maximum duration the kubelet allows a Pod checkpoint operation (KEP-5823) to run before it aborts the operation. It bounds how long the Pod's containers can stay frozen: the kubelet applies it as the deadline on the CheckpointPod CRI call, and clamps a PodCheckpoint's spec.timeoutSeconds to this ceiling. Default: \"15s\"",
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},

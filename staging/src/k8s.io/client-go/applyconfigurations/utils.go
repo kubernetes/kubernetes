@@ -33,6 +33,7 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	checkpointv1alpha1 "k8s.io/api/checkpoint/v1alpha1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
@@ -86,6 +87,7 @@ import (
 	applyconfigurationscertificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
 	applyconfigurationscertificatesv1alpha1 "k8s.io/client-go/applyconfigurations/certificates/v1alpha1"
 	applyconfigurationscertificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
+	applyconfigurationscheckpointv1alpha1 "k8s.io/client-go/applyconfigurations/checkpoint/v1alpha1"
 	applyconfigurationscoordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
 	coordinationv1alpha2 "k8s.io/client-go/applyconfigurations/coordination/v1alpha2"
 	applyconfigurationscoordinationv1beta1 "k8s.io/client-go/applyconfigurations/coordination/v1beta1"
@@ -576,6 +578,20 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscertificatesv1beta1.PodCertificateRequestSpecApplyConfiguration{}
 	case certificatesv1beta1.SchemeGroupVersion.WithKind("PodCertificateRequestStatus"):
 		return &applyconfigurationscertificatesv1beta1.PodCertificateRequestStatusApplyConfiguration{}
+
+		// Group=checkpoint.k8s.io, Version=v1alpha1
+	case checkpointv1alpha1.SchemeGroupVersion.WithKind("CheckpointSource"):
+		return &applyconfigurationscheckpointv1alpha1.CheckpointSourceApplyConfiguration{}
+	case checkpointv1alpha1.SchemeGroupVersion.WithKind("NodeLocalCheckpointSource"):
+		return &applyconfigurationscheckpointv1alpha1.NodeLocalCheckpointSourceApplyConfiguration{}
+	case checkpointv1alpha1.SchemeGroupVersion.WithKind("PodCheckpoint"):
+		return &applyconfigurationscheckpointv1alpha1.PodCheckpointApplyConfiguration{}
+	case checkpointv1alpha1.SchemeGroupVersion.WithKind("PodCheckpointContainerStatus"):
+		return &applyconfigurationscheckpointv1alpha1.PodCheckpointContainerStatusApplyConfiguration{}
+	case checkpointv1alpha1.SchemeGroupVersion.WithKind("PodCheckpointSpec"):
+		return &applyconfigurationscheckpointv1alpha1.PodCheckpointSpecApplyConfiguration{}
+	case checkpointv1alpha1.SchemeGroupVersion.WithKind("PodCheckpointStatus"):
+		return &applyconfigurationscheckpointv1alpha1.PodCheckpointStatusApplyConfiguration{}
 
 		// Group=coordination.k8s.io, Version=v1
 	case coordinationv1.SchemeGroupVersion.WithKind("Lease"):

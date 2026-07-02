@@ -1849,7 +1849,8 @@
         "hostnameOverride": "hostnameOverrideValue",
         "schedulingGroup": {
           "podGroupName": "podGroupNameValue"
-        }
+        },
+        "restoreFrom": "restoreFromValue"
       }
     },
     "updateStrategy": {

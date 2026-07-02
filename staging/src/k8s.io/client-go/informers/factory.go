@@ -34,6 +34,7 @@ import (
 	autoscaling "k8s.io/client-go/informers/autoscaling"
 	batch "k8s.io/client-go/informers/batch"
 	certificates "k8s.io/client-go/informers/certificates"
+	checkpoint "k8s.io/client-go/informers/checkpoint"
 	coordination "k8s.io/client-go/informers/coordination"
 	core "k8s.io/client-go/informers/core"
 	discovery "k8s.io/client-go/informers/discovery"
@@ -350,6 +351,7 @@ type SharedInformerFactory interface {
 	Autoscaling() autoscaling.Interface
 	Batch() batch.Interface
 	Certificates() certificates.Interface
+	Checkpoint() checkpoint.Interface
 	Coordination() coordination.Interface
 	Core() core.Interface
 	Discovery() discovery.Interface
@@ -388,6 +390,10 @@ func (f *sharedInformerFactory) Batch() batch.Interface {
 
 func (f *sharedInformerFactory) Certificates() certificates.Interface {
 	return certificates.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Checkpoint() checkpoint.Interface {
+	return checkpoint.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Coordination() coordination.Interface {

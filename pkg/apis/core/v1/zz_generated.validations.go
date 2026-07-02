@@ -218,6 +218,7 @@ func Validate_PodSpec(
 	// field corev1.PodSpec.Resources has no validation
 	// field corev1.PodSpec.HostnameOverride has no validation
 	// field corev1.PodSpec.SchedulingGroup has no validation
+	// field corev1.PodSpec.RestoreFrom has no validation
 	return errs
 }
 
