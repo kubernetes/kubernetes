@@ -338,16 +338,16 @@ func (c *MetaAllocator) AllocateService(service *api.Service, ip net.IP) error {
 	if err != nil {
 		return err
 	}
+	if err := allocator.AllocateService(service, ip); err != nil {
+		return err
+	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
 		cidr := c.bitmapAllocator.CIDR()
 		if cidr.Contains(ip) {
-			err := c.bitmapAllocator.Allocate(ip)
-			if err != nil {
-				return err
-			}
+			_ = c.bitmapAllocator.Allocate(ip)
 		}
 	}
-	return allocator.AllocateService(service, ip)
+	return nil
 }
 
 // Allocate attempts to reserve the provided IP. ErrNotInRange or
