@@ -1332,7 +1332,7 @@ func Validate_PodGroupSpec(
 				return false
 			}
 			return obj.WorkloadRef != nil
-		}); len(e) != 0 {
+		}).MarkAlpha(); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 

@@ -122,17 +122,17 @@
 # The (PodGroupSpec|PodGroupTemplate|CompositePodGroupSpec|CompositePodGroupTemplate).SchedulingPolicy field is a union type, but nonpointerstructs does not understand unions today.
 # Validation makes this require at least one of the fields within to be set.
 - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate|CompositePodGroupSpec|CompositePodGroupTemplate)\\.SchedulingPolicy is a non-pointer struct with no required fields\\..*"
-  path: "staging/src/k8s.io/api/scheduling/v1alpha3/types\\.go"
+  path: "staging/src/k8s.io/api/scheduling/(v1alpha3|v1beta1)/types\\.go"
 
 # Workload.Spec no longer has any strictly required fields due to the introduction of the
 # CompositePodGroup API. The template fields have been refactored into a union where either
 # podGroupTemplates or compositePodGroupTemplates must be provided (enforced via validation).
 - text: "nonpointerstructs: field Workload\\.Spec is a non-pointer struct with no required fields\\..*"
-  path: "staging/src/k8s.io/api/scheduling/v1alpha3/types\\.go"
+  path: "staging/src/k8s.io/api/scheduling/(v1alpha3|v1beta1)/types\\.go"
 
 # WorkloadSpec.CompositePodGroupTemplates is a union member that is conditionally optional (+k8s:ifEnabled("CompositePodGroup")=+k8s:optional), but the linter requires a static +k8s:optional tag.
 - text: "dependenttags: field WorkloadSpec\\.CompositePodGroupTemplates with marker \\+k8s:unionMember is missing required marker.*"
-  path: "staging/src/k8s.io/api/scheduling/v1alpha3/types\\.go"
+  path: "staging/src/k8s.io/api/scheduling/(v1alpha3|v1beta1)/types\\.go"
 
 # NoReferences - Existing fields that use Reference/References suffixes instead of Ref/Refs.
 # These fields use the Reference suffix, but renaming them would be a breaking change, so they are allowlisted.

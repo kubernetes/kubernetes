@@ -514,7 +514,7 @@ message PodGroupSpec {
   // +k8s:ifEnabled(CompositePodGroup)=+k8s:optional
   // +k8s:immutable
   // +k8s:format=k8s-long-name
-  // +k8s:dependentRequired("workloadRef")
+  // +k8s:alpha(since: "1.37")=+k8s:dependentRequired("workloadRef")
   optional string parentCompositePodGroupName = 1;
 
   // workloadRef references an optional PodGroup template within the Workload

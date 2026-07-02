@@ -525,7 +525,7 @@ type PodGroupSpec struct {
 	// +k8s:ifEnabled(CompositePodGroup)=+k8s:optional
 	// +k8s:immutable
 	// +k8s:format=k8s-long-name
-	// +k8s:dependentRequired("workloadRef")
+	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("workloadRef")
 	ParentCompositePodGroupName *string `json:"parentCompositePodGroupName,omitempty" protobuf:"bytes,1,opt,name=parentCompositePodGroupName"`
 
 	// workloadRef references an optional PodGroup template within the Workload

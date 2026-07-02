@@ -36,7 +36,7 @@
       "name": "podgroups",
       "namespaced": true,
       "singularName": "podgroup",
-      "storageVersionHash": "+IqLvfKIVq0=",
+      "storageVersionHash": "QjOl2H5qPs0=",
       "verbs": [
         "create",
         "delete",
@@ -64,7 +64,7 @@
       "name": "workloads",
       "namespaced": true,
       "singularName": "workload",
-      "storageVersionHash": "7hyTuOh4tJA=",
+      "storageVersionHash": "Fgcxusx6IUo=",
       "verbs": [
         "create",
         "delete",
