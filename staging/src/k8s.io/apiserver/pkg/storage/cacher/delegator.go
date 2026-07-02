@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -134,7 +135,7 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 	// It's guaranteed that the returned value is at least that
 	// fresh as the given resourceVersion.
 	if _, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
-		return err
+		return errors.NewBadRequest(fmt.Sprintf("invalid resourceVersion: %v", err))
 	}
 	span.AddEvent("About to fetch object from cache")
 	return c.cacher.Get(ctx, key, opts, objPtr)
@@ -154,7 +155,7 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	}
 
 	if _, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
-		return err
+		return errors.NewBadRequest(fmt.Sprintf("invalid resourceVersion: %v", err))
 	}
 
 	if !c.cacher.Ready() && shouldDelegateListOnNotReadyCache(opts) {
