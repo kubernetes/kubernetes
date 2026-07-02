@@ -50,6 +50,14 @@ func TestAdmit(t *testing.T) {
 	extendedResource1 := "example.com/device-ek"
 	extendedResource2 := "example.com/device-do"
 
+	containerRequestingZeroResource1 := core.Container{
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(extendedResource1): *resource.NewQuantity(0, resource.DecimalSI),
+			},
+		},
+	}
+
 	containerRequestingExtendedResource1 := core.Container{
 		Resources: core.ResourceRequirements{
 			Requests: core.ResourceList{
@@ -133,6 +141,40 @@ func TestAdmit(t *testing.T) {
 							Operator: core.TolerationOpExists,
 							Effect:   core.TaintEffectNoSchedule,
 						},
+					},
+				},
+			},
+		},
+		{
+			description: "pod with container with zero extended resource, expect no change in tolerations",
+			requestedPod: core.Pod{
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						containerRequestingZeroResource1,
+					},
+				},
+			},
+			expectedPod: core.Pod{
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						containerRequestingZeroResource1,
+					},
+				},
+			},
+		},
+		{
+			description: "pod with  init container with zero extended resource, expect no change in tolerations",
+			requestedPod: core.Pod{
+				Spec: core.PodSpec{
+					InitContainers: []core.Container{
+						containerRequestingZeroResource1,
+					},
+				},
+			},
+			expectedPod: core.Pod{
+				Spec: core.PodSpec{
+					InitContainers: []core.Container{
+						containerRequestingZeroResource1,
 					},
 				},
 			},
