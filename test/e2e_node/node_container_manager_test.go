@@ -74,7 +74,6 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	f.Describe("Validate Node Allocatable", feature.NodeAllocatable, func() {
 		ginkgo.It("sets up the node and runs the test", func(ctx context.Context) {
-			ginkgo.Skip("currently broken")
 			framework.ExpectNoError(runTest(ctx, f))
 		})
 	})
