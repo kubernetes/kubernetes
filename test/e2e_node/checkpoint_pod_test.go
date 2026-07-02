@@ -16,7 +16,58 @@ limitations under the License.
 
 package e2enode
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestPodCheckpointSecurity(t *testing.T) {
+	const status = `Pid: 1
+Uid: 1000 1000 1000 1000
+Gid: 2000 2000 2000 2000
+Groups: 3000
+CapInh: 0000000000000000
+CapPrm: 0000000000000000
+CapEff: 0000000000000000
+CapBnd: 0000000000000000
+CapAmb: 0000000000000000
+NoNewPrivs: 1
+Seccomp: 2
+workload-lsm: system_u:system_r:container_t:s0:c1,c2
+exec-lsm: system_u:system_r:container_t:s0:c1,c2`
+	for _, tc := range []struct {
+		name, old, replacement, wantError string
+	}{
+		{name: "restricted workload"},
+		{name: "primary group included", old: "Groups: 3000", replacement: "Groups: 2000 3000"},
+		{name: "root credentials", old: "Uid: 1000 1000 1000 1000", replacement: "Uid: 0 0 0 0", wantError: "Uid"},
+		{name: "effective privilege", old: "CapEff: 0000000000000000", replacement: "CapEff: 0000000000000001", wantError: "CapEff"},
+		{name: "permitted privilege", old: "CapPrm: 0000000000000000", replacement: "CapPrm: 0000000000000001", wantError: "CapPrm"},
+		{name: "bounding privilege", old: "CapBnd: 0000000000000000", replacement: "CapBnd: 0000000000000001", wantError: "CapBnd"},
+		{name: "ambient privilege", old: "CapAmb: 0000000000000000", replacement: "CapAmb: 0000000000000001", wantError: "CapAmb"},
+		{name: "unexpected group", old: "Groups: 3000", replacement: "Groups: 0 3000", wantError: "supplementary groups"},
+		{name: "privilege escalation", old: "NoNewPrivs: 1", replacement: "NoNewPrivs: 0", wantError: "NoNewPrivs"},
+		{name: "missing seccomp", old: "Seccomp: 2", replacement: "Seccomp: 0", wantError: "Seccomp"},
+		{name: "malformed capability", old: "CapBnd: 0000000000000000", replacement: "CapBnd: invalid", wantError: "CapBnd"},
+		{name: "wrong workload label", old: "workload-lsm: system_u:system_r:container_t:s0:c1,c2", replacement: "workload-lsm: unconfined", wantError: "LSM label"},
+		{name: "kernel without active LSM", old: "system_u:system_r:container_t:s0:c1,c2", replacement: "unavailable"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			observed := status
+			if tc.old != "" {
+				observed = strings.ReplaceAll(observed, tc.old, tc.replacement)
+			}
+			err := validatePodCheckpointSecurity(observed)
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("security check returned %v, want error mentioning %q", err, tc.wantError)
+			}
+		})
+	}
+}
 
 func TestPodCheckpointRuntimeUnsupported(t *testing.T) {
 	for _, test := range []struct {
