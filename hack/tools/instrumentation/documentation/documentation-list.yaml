@@ -6245,6 +6245,15 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: route_corrections_total
+  subsystem: route_controller
+  help: A metric counting the number of periodically-triggered reconciles that resulted
+    in at least one route being created or deleted.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
 - name: route_sync_total
   subsystem: route_controller
   help: A metric counting the amount of times routes have been synced with the cloud
