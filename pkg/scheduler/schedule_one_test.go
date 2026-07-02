@@ -1155,6 +1155,9 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		informerFactory.Start(ctx.Done())
 		informerFactory.WaitForCacheSync(ctx.Done())
 
+		if scheduleAsPodGroup {
+			queue.AddPodGroup(logger, podGroup)
+		}
 		queue.Add(ctx, item.sendPod)
 
 		sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {

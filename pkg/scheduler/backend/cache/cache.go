@@ -900,6 +900,8 @@ func (cache *cacheImpl) removePodGroupMember(pod *v1.Pod) {
 	}
 	podGroupState.deletePod(pod.UID)
 	if podGroupState.empty() {
+		// podGroupState can exist without the member pods, but when the PodGroup object exists.
+		// Only when there are no member pods and the PodGroup object is removed, the podGroupState can be removed.
 		delete(cache.podGroupStates, key)
 	}
 }
@@ -1068,6 +1070,8 @@ func (cache *cacheImpl) RemovePodGroup(podGroup *schedulingv1alpha3.PodGroup) {
 	}
 	pgs.removePodGroup()
 	if pgs.empty() {
+		// podGroupState can exist without the PodGroup object, but when any of the member pods exists.
+		// Only when there are no member pods and the PodGroup object is removed, the podGroupState can be removed.
 		delete(cache.podGroupStates, key)
 	}
 }
