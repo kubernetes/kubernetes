@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -196,6 +197,7 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
+	dropDisabledDRASharedConsumableCapacityFields(newSlice, oldSlice)
 	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
 	dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice)
@@ -307,6 +309,64 @@ func draConsumableCapacityFeatureInUse(slice *resource.ResourceSlice) bool {
 	}
 
 	return false
+}
+
+func draSharedConsumableCapacityFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, counterSet := range slice.Spec.SharedCounters {
+		for _, counter := range counterSet.Counters {
+			if counter.RequestPolicy != nil {
+				return true
+			}
+		}
+	}
+	for _, device := range slice.Spec.Devices {
+		for _, consumption := range device.ConsumesCounters {
+			for _, counter := range consumption.Counters {
+				if counter.ValueFrom != nil {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// dropDisabledDRASharedConsumableCapacityFields drops shared counter RequestPolicy
+// and consumed counter ValueFrom if they were not used in the old slice.
+func dropDisabledDRASharedConsumableCapacityFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRASharedConsumableCapacity) ||
+		draSharedConsumableCapacityFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.SharedCounters {
+		for name, counter := range newSlice.Spec.SharedCounters[i].Counters {
+			counter.RequestPolicy = nil
+			newSlice.Spec.SharedCounters[i].Counters[name] = counter
+		}
+	}
+	for i := range newSlice.Spec.Devices {
+		filtered := newSlice.Spec.Devices[i].ConsumesCounters[:0]
+		for j := range newSlice.Spec.Devices[i].ConsumesCounters {
+			for name, counter := range newSlice.Spec.Devices[i].ConsumesCounters[j].Counters {
+				counter.ValueFrom = nil
+				if counter.Value.Cmp(apiresource.Quantity{}) == 0 {
+					delete(newSlice.Spec.Devices[i].ConsumesCounters[j].Counters, name)
+					continue
+				}
+				newSlice.Spec.Devices[i].ConsumesCounters[j].Counters[name] = counter
+			}
+			if len(newSlice.Spec.Devices[i].ConsumesCounters[j].Counters) > 0 {
+				filtered = append(filtered, newSlice.Spec.Devices[i].ConsumesCounters[j])
+			}
+		}
+		newSlice.Spec.Devices[i].ConsumesCounters = filtered
+	}
 }
 
 // dropDisabledDRAConsumableCapacityFields drops AllowMultipleAllocations and RequestPolicy

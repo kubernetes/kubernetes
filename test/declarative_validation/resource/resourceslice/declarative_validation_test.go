@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -573,7 +574,7 @@ func mkResourceSliceWithSharedCounters(mutators ...func(*resource.ResourceSlice)
 				{
 					Name: "shared-counter-set",
 					Counters: map[string]resource.Counter{
-						"valid-key": {},
+						"valid-key": {Value: apiresource.MustParse("1")},
 					},
 				},
 			},
@@ -631,7 +632,7 @@ func tweakSharedCountersName(names ...string) func(*resource.ResourceSlice) {
 			sharedCounters = append(sharedCounters, resource.CounterSet{
 				Name: name,
 				Counters: map[string]resource.Counter{
-					"valid-key": {},
+					"valid-key": {Value: apiresource.MustParse("1")},
 				},
 			})
 		}
@@ -646,7 +647,7 @@ func tweakSharedCounters(count int) func(*resource.ResourceSlice) {
 			counterSets = append(counterSets, resource.CounterSet{
 				Name: fmt.Sprintf("shared-counter-set-%d", i),
 				Counters: map[string]resource.Counter{
-					"valid-key": {},
+					"valid-key": {Value: apiresource.MustParse("1")},
 				},
 			})
 		}
@@ -661,7 +662,7 @@ func tweakDeviceConsumesCounters(count int) func(*resource.ResourceSlice) {
 			consumesCounters = append(consumesCounters, resource.DeviceCounterConsumption{
 				CounterSet: fmt.Sprintf("shared-counter-set-%d", i),
 				Counters: map[string]resource.Counter{
-					"valid-key": {},
+					"valid-key": {Value: apiresource.MustParse("1")},
 				},
 			})
 		}
@@ -676,7 +677,7 @@ func tweakDeviceConsumesCountersCounterSetName(counterSets ...string) func(*reso
 			consumesCounters = append(consumesCounters, resource.DeviceCounterConsumption{
 				CounterSet: counterSet,
 				Counters: map[string]resource.Counter{
-					"valid-key": {},
+					"valid-key": {Value: apiresource.MustParse("1")},
 				},
 			})
 		}
@@ -708,6 +709,6 @@ func tweakDeviceCounter(counters map[string]resource.Counter) func(*resource.Res
 
 func counters(key string) map[string]resource.Counter {
 	return map[string]resource.Counter{
-		key: {},
+		key: {Value: apiresource.MustParse("1")},
 	}
 }

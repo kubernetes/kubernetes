@@ -86,6 +86,7 @@ type AllocatedState struct {
 	AllocatedDevices         sets.Set[DeviceID]
 	AllocatedSharedDeviceIDs sets.Set[SharedDeviceID]
 	AggregatedCapacity       ConsumedCapacityCollection
+	AllocatedClaims          []*resourceapi.ResourceClaim
 }
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.

@@ -810,7 +810,7 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 	} else {
 		// The size limit is enforced for across all sets by the caller.
 		allErrs = append(allErrs, validateMap(counterSet.Counters, resource.ResourceSliceMaxCountersPerCounterSet, validation.DNS1123LabelMaxLength,
-			validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
+			validateCounterName, validateSharedCounter, fldPath.Child("counters"), keysCovered)...)
 	}
 
 	return allErrs
@@ -966,7 +966,7 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
 	} else {
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
-			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
+			validation.DNS1123LabelMaxLength, validateCounterName, validateConsumedCounter, fldPath.Child("counters"), keysCovered)...)
 	}
 	return allErrs
 }
@@ -1204,9 +1204,47 @@ func validateRequestPolicyRangeStep(value, min, step apiresource.Quantity, fldPa
 	return allErrs
 }
 
-func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
-	// Any parsed quantity is valid.
-	return nil
+// validateSharedCounter validates counters used in ResourceSlice.sharedCounters.
+func validateSharedCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if counter.Value.Cmp(apiresource.Quantity{}) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("value"), ""))
+	}
+	if counter.ValueFrom != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("valueFrom"), "may only be set for consumesCounters"))
+	}
+	if counter.RequestPolicy != nil {
+		if counter.Value.Cmp(apiresource.Quantity{}) != 0 {
+			allErrs = append(allErrs, validateRequestPolicy(counter.Value, counter.RequestPolicy, fldPath.Child("requestPolicy"))...)
+		}
+	}
+	return allErrs
+}
+
+// validateConsumedCounter validates counters used in DeviceCounterConsumption.
+func validateConsumedCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	hasValue := counter.Value.Cmp(apiresource.Quantity{}) != 0
+	hasValueFrom := counter.ValueFrom != nil
+
+	switch {
+	case hasValue && hasValueFrom:
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "exactly one of value or valueFrom must be set"))
+	case !hasValue && !hasValueFrom:
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of value or valueFrom must be set"))
+	}
+
+	if counter.RequestPolicy != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("requestPolicy"), "may only be set for sharedCounters"))
+	}
+	if counter.ValueFrom != nil {
+		if counter.ValueFrom.CapacityKey == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("valueFrom", "capacityKey"), ""))
+		} else {
+			allErrs = append(allErrs, validateQualifiedName(counter.ValueFrom.CapacityKey, fldPath.Child("valueFrom", "capacityKey"))...)
+		}
+	}
+	return allErrs
 }
 
 func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) field.ErrorList {

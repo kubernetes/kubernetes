@@ -12420,9 +12420,15 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1.Counter
   map:
     fields:
+    - name: requestPolicy
+      type:
+        namedType: io.k8s.api.resource.v1.CapacityRequestPolicy
     - name: value
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: valueFrom
+      type:
+        namedType: io.k8s.api.resource.v1.CounterValueFrom
 - name: io.k8s.api.resource.v1.CounterSet
   map:
     fields:
@@ -12432,6 +12438,13 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.Counter
     - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1.CounterValueFrom
+  map:
+    fields:
+    - name: capacityKey
       type:
         scalar: string
       default: ""
@@ -13351,9 +13364,15 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta1.Counter
   map:
     fields:
+    - name: requestPolicy
+      type:
+        namedType: io.k8s.api.resource.v1beta1.CapacityRequestPolicy
     - name: value
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: valueFrom
+      type:
+        namedType: io.k8s.api.resource.v1beta1.CounterValueFrom
 - name: io.k8s.api.resource.v1beta1.CounterSet
   map:
     fields:
@@ -13363,6 +13382,13 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.Counter
     - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta1.CounterValueFrom
+  map:
+    fields:
+    - name: capacityKey
       type:
         scalar: string
       default: ""
@@ -14009,9 +14035,15 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta2.Counter
   map:
     fields:
+    - name: requestPolicy
+      type:
+        namedType: io.k8s.api.resource.v1beta2.CapacityRequestPolicy
     - name: value
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: valueFrom
+      type:
+        namedType: io.k8s.api.resource.v1beta2.CounterValueFrom
 - name: io.k8s.api.resource.v1beta2.CounterSet
   map:
     fields:
@@ -14021,6 +14053,13 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.Counter
     - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.CounterValueFrom
+  map:
+    fields:
+    - name: capacityKey
       type:
         scalar: string
       default: ""

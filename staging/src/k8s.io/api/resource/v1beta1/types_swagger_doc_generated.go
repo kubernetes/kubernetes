@@ -114,8 +114,10 @@ func (CapacityRequirements) SwaggerDoc() map[string]string {
 }
 
 var map_Counter = map[string]string{
-	"":      "Counter describes a quantity associated with a device.",
-	"value": "Value defines how much of a certain device counter is available.",
+	"":              "Counter describes a quantity associated with a device.",
+	"value":         "Value defines how much of a certain device counter is available.\n\nWhen used in sharedCounters, this is the total amount available. When used in consumesCounters, this is the statically consumed amount.\n\nEither Value or ValueFrom must be specified in consumesCounters.",
+	"requestPolicy": "RequestPolicy defines how this Counter must be consumed when used as a shared counter and referenced through ValueFrom.",
+	"valueFrom":     "ValueFrom maps a capacity.requests key from a ResourceClaim to this counter, making device counter consumption request-driven.",
 }
 
 func (Counter) SwaggerDoc() map[string]string {
@@ -130,6 +132,15 @@ var map_CounterSet = map[string]string{
 
 func (CounterSet) SwaggerDoc() map[string]string {
 	return map_CounterSet
+}
+
+var map_CounterValueFrom = map[string]string{
+	"":            "CounterValueFrom maps a ResourceClaim capacity request to a counter.",
+	"capacityKey": "CapacityKey is the capacity.requests key from the ResourceClaim that feeds into this counter.",
+}
+
+func (CounterValueFrom) SwaggerDoc() map[string]string {
+	return map_CounterValueFrom
 }
 
 var map_Device = map[string]string{

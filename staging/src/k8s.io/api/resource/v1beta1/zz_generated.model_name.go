@@ -67,6 +67,11 @@ func (in CounterSet) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CounterValueFrom) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta1.CounterValueFrom"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Device) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta1.Device"
 }

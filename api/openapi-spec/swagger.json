@@ -15432,14 +15432,19 @@
     "io.k8s.api.resource.v1.Counter": {
       "description": "Counter describes a quantity associated with a device.",
       "properties": {
+        "requestPolicy": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1.CapacityRequestPolicy",
+          "description": "RequestPolicy defines how this Counter must be consumed when used as a shared counter and referenced through ValueFrom."
+        },
         "value": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
-          "description": "Value defines how much of a certain device counter is available."
+          "description": "Value defines how much of a certain device counter is available.\n\nWhen used in sharedCounters, this is the total amount available. When used in consumesCounters, this is the statically consumed amount.\n\nEither Value or ValueFrom must be specified in consumesCounters."
+        },
+        "valueFrom": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1.CounterValueFrom",
+          "description": "ValueFrom maps a capacity.requests key from a ResourceClaim to this counter, making device counter consumption request-driven."
         }
       },
-      "required": [
-        "value"
-      ],
       "type": "object"
     },
     "io.k8s.api.resource.v1.CounterSet": {
@@ -15460,6 +15465,19 @@
       "required": [
         "name",
         "counters"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1.CounterValueFrom": {
+      "description": "CounterValueFrom maps a ResourceClaim capacity request to a counter.",
+      "properties": {
+        "capacityKey": {
+          "description": "CapacityKey is the capacity.requests key from the ResourceClaim that feeds into this counter.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "capacityKey"
       ],
       "type": "object"
     },
@@ -17076,14 +17094,19 @@
     "io.k8s.api.resource.v1beta1.Counter": {
       "description": "Counter describes a quantity associated with a device.",
       "properties": {
+        "requestPolicy": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta1.CapacityRequestPolicy",
+          "description": "RequestPolicy defines how this Counter must be consumed when used as a shared counter and referenced through ValueFrom."
+        },
         "value": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
-          "description": "Value defines how much of a certain device counter is available."
+          "description": "Value defines how much of a certain device counter is available.\n\nWhen used in sharedCounters, this is the total amount available. When used in consumesCounters, this is the statically consumed amount.\n\nEither Value or ValueFrom must be specified in consumesCounters."
+        },
+        "valueFrom": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta1.CounterValueFrom",
+          "description": "ValueFrom maps a capacity.requests key from a ResourceClaim to this counter, making device counter consumption request-driven."
         }
       },
-      "required": [
-        "value"
-      ],
       "type": "object"
     },
     "io.k8s.api.resource.v1beta1.CounterSet": {
@@ -17104,6 +17127,19 @@
       "required": [
         "name",
         "counters"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1beta1.CounterValueFrom": {
+      "description": "CounterValueFrom maps a ResourceClaim capacity request to a counter.",
+      "properties": {
+        "capacityKey": {
+          "description": "CapacityKey is the capacity.requests key from the ResourceClaim that feeds into this counter.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "capacityKey"
       ],
       "type": "object"
     },
@@ -18222,14 +18258,19 @@
     "io.k8s.api.resource.v1beta2.Counter": {
       "description": "Counter describes a quantity associated with a device.",
       "properties": {
+        "requestPolicy": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta2.CapacityRequestPolicy",
+          "description": "RequestPolicy defines how this Counter must be consumed when used as a shared counter and referenced through ValueFrom."
+        },
         "value": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
-          "description": "Value defines how much of a certain device counter is available."
+          "description": "Value defines how much of a certain device counter is available.\n\nWhen used in sharedCounters, this is the total amount available. When used in consumesCounters, this is the statically consumed amount.\n\nEither Value or ValueFrom must be specified in consumesCounters."
+        },
+        "valueFrom": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta2.CounterValueFrom",
+          "description": "ValueFrom maps a capacity.requests key from a ResourceClaim to this counter, making device counter consumption request-driven."
         }
       },
-      "required": [
-        "value"
-      ],
       "type": "object"
     },
     "io.k8s.api.resource.v1beta2.CounterSet": {
@@ -18250,6 +18291,19 @@
       "required": [
         "name",
         "counters"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1beta2.CounterValueFrom": {
+      "description": "CounterValueFrom maps a ResourceClaim capacity request to a counter.",
+      "properties": {
+        "capacityKey": {
+          "description": "CapacityKey is the capacity.requests key from the ResourceClaim that feeds into this counter.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "capacityKey"
       ],
       "type": "object"
     },

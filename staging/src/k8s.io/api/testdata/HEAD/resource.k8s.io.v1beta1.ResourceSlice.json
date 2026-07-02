@@ -121,7 +121,21 @@
               "counterSet": "counterSetValue",
               "counters": {
                 "countersKey": {
-                  "value": "0"
+                  "value": "0",
+                  "requestPolicy": {
+                    "default": "0",
+                    "validValues": [
+                      "0"
+                    ],
+                    "validRange": {
+                      "min": "0",
+                      "max": "0",
+                      "step": "0"
+                    }
+                  },
+                  "valueFrom": {
+                    "capacityKey": "capacityKeyValue"
+                  }
                 }
               }
             }
@@ -183,7 +197,21 @@
         "name": "nameValue",
         "counters": {
           "countersKey": {
-            "value": "0"
+            "value": "0",
+            "requestPolicy": {
+              "default": "0",
+              "validValues": [
+                "0"
+              ],
+              "validRange": {
+                "min": "0",
+                "max": "0",
+                "step": "0"
+              }
+            },
+            "valueFrom": {
+              "capacityKey": "capacityKeyValue"
+            }
           }
         }
       }
