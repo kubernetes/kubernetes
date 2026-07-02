@@ -5934,7 +5934,9 @@ func validateContainerImage(image string, fldPath *field.Path) field.ErrorList {
 // validatePodUpdateCommon holds update checks that apply to the main Pod
 // resource and to every subresource that can change the spec.
 func validatePodUpdateCommon(newPod, oldPod *core.Pod) field.ErrorList {
-	return validatePodCheckpointingUpdate(newPod, oldPod)
+	allErrs := validatePodCheckpointingUpdate(newPod, oldPod)
+	allErrs = append(allErrs, validatePodRestoreUpdate(newPod, oldPod)...)
+	return allErrs
 }
 
 func validatePodCheckpointingUpdate(newPod, oldPod *core.Pod) field.ErrorList {
@@ -5950,14 +5952,7 @@ func validatePodCheckpointingUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 			break
 		}
 	}
-	if checkpointing == nil {
-		return nil
-	}
-
-	// Scheduling gates only delay scheduling; they do not change the captured workload.
-	oldSpec, newSpec := oldPod.Spec, newPod.Spec
-	oldSpec.SchedulingGates, newSpec.SchedulingGates = nil, nil // +k8s:verify-mutation:reason=clone
-	if apiequality.Semantic.DeepEqual(oldSpec, newSpec) {
+	if checkpointing == nil || podSpecsEqualIgnoringSchedulingGates(&oldPod.Spec, &newPod.Spec) {
 		return nil
 	}
 	message := "pod spec cannot change while PodCheckpointing=True"
@@ -5965,6 +5960,35 @@ func validatePodCheckpointingUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 		message += ": " + checkpointing.Message
 	}
 	return field.ErrorList{field.Forbidden(field.NewPath("spec"), message+"; scheduling gates may be removed")}
+}
+
+// validatePodRestoreUpdate keeps the spec of a restoring Pod equal to the
+// captured template until the restore succeeds.
+func validatePodRestoreUpdate(newPod, oldPod *core.Pod) field.ErrorList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) || oldPod.Spec.RestoreFrom == nil {
+		return nil
+	}
+	// Declarative validation reports a changed restoreFrom; do not report it twice.
+	if !apiequality.Semantic.DeepEqual(oldPod.Spec.RestoreFrom, newPod.Spec.RestoreFrom) {
+		return nil
+	}
+	for _, condition := range oldPod.Status.Conditions {
+		if condition.Type == core.PodRestored && condition.Status == core.ConditionTrue {
+			return nil
+		}
+	}
+	if podSpecsEqualIgnoringSchedulingGates(&oldPod.Spec, &newPod.Spec) {
+		return nil
+	}
+	return field.ErrorList{field.Forbidden(field.NewPath("spec"), "pod spec cannot change until restore succeeds (PodRestored=True); scheduling gates may be removed")}
+}
+
+// podSpecsEqualIgnoringSchedulingGates compares two specs of the same Pod.
+// Scheduling gates only delay scheduling; they do not change the workload.
+func podSpecsEqualIgnoringSchedulingGates(oldSpec, newSpec *core.PodSpec) bool {
+	a, b := *oldSpec, *newSpec
+	a.SchedulingGates, b.SchedulingGates = nil, nil
+	return apiequality.Semantic.DeepEqual(a, b)
 }
 
 // ValidatePodCreate validates a pod in the context of its initial create

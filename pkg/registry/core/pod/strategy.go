@@ -110,6 +110,13 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
+	// Reapplying a name-only reference must retain the immutable identity that
+	// admission selected. Never resolve a replacement checkpoint during update.
+	oldRef, newRef := oldPod.Spec.RestoreFrom, newPod.Spec.RestoreFrom
+	if oldRef != nil && newRef != nil && oldRef.Name == newRef.Name && newRef.UID == "" {
+		newRef.UID = oldRef.UID
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
 		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
 			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
@@ -159,7 +166,8 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+	errs := corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -357,7 +365,8 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
+	errs := corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -483,7 +492,8 @@ func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodResize(newPod, oldPod, opts)
+	errs := corevalidation.ValidatePodResize(newPod, oldPod, opts)
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -534,7 +544,8 @@ func (podDynamicStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	oldPod := old.(*api.Pod)
 	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return corevalidation.ValidatePodDynamicUpdate(newPod, oldPod, opts)
+	errs := corevalidation.ValidatePodDynamicUpdate(newPod, oldPod, opts)
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
