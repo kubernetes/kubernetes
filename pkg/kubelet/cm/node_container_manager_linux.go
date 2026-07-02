@@ -199,14 +199,33 @@ func (cm *containerManagerImpl) getCgroupConfig(rl v1.ResourceList, compressible
 		return nil
 	}
 
-	// In the case of a None policy, cgroupv2 and systemd cgroup manager, we must make sure systemd is aware of the cpuset cgroup.
-	// By default, systemd will not create it, as we've not chosen to delegate it, and we haven't included it in the Apply() request.
-	// However, this causes a bug where kubelet restarts unnecessarily (cpuset cgroup is created in the cgroupfs, but systemd
-	// doesn't know about it and deletes it, and then kubelet doesn't continue because the cgroup isn't configured as expected).
-	// An alternative is to delegate the `cpuset` cgroup to the kubelet, but that would require some plumbing in libcontainer,
-	// and this is sufficient.
-	// Only do so on None policy, as Static policy will do its own updating of the cpuset.
-	// Please see the comment on policy none's GetAllocatableCPUs
+	// On cgroupv2, CPUShares is converted to cpu.weight via getCPUWeight().
+	// The default conversion uses absolute milliCPU which scales with core
+	// count, causing kubepods.slice to get disproportionately high cpu.weight
+	// compared to system.slice (default 100) on high-core machines.
+	// Fix: scale CPUShares proportionally to (allocatable / total capacity)
+	// so that kubepods.slice gets a weight proportional to its CPU share.
+	// See: https://github.com/kubernetes/kubernetes/issues/139790
+	if libcontainercgroups.IsCgroup2UnifiedMode() && rc.CPUShares != nil {
+		if totalCPU, exists := cm.capacity[v1.ResourceCPU]; exists {
+			totalMilliCPU := totalCPU.MilliValue()
+			if totalMilliCPU > 0 {
+				if allocCPU, exists := rl[v1.ResourceCPU]; exists {
+					allocMilliCPU := allocCPU.MilliValue()
+					// Compute proportional shares:
+					// proportionalShares = (allocatable / total) * SharesPerCPU
+					// This keeps kubepods.slice weight proportional to its
+					// actual CPU fraction, matching system.slice default of 100
+					proportionalShares := uint64((allocMilliCPU * SharesPerCPU) / totalMilliCPU)
+					if proportionalShares < MinShares {
+						proportionalShares = MinShares
+					}
+					rc.CPUShares = &proportionalShares
+				}
+			}
+		}
+	}
+
 	if cm.cpuManager.GetAllocatableCPUs().IsEmpty() {
 		rc.CPUSet = cm.cpuManager.GetAllCPUs()
 	}
