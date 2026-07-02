@@ -210,7 +210,10 @@ func TestCompleteWithOptionsDefaultsStoreKeyFuncs(t *testing.T) {
 			if got != tc.expectKey {
 				t.Fatalf("KeyFunc returned %q, expect %q", got, tc.expectKey)
 			}
-			keyFuncs := defaultStoreKeyFuncs("/pods", "/registry/pods", tc.namespaced)
+			keyFuncs, err := defaultStoreKeyFuncs("/pods", "/registry/pods/", tc.namespaced)
+			if err != nil {
+				t.Fatalf("defaultStoreKeyFuncs failed: %v", err)
+			}
 			if keyFuncs.storageReverseKeyFunc == nil {
 				t.Fatal("ReverseKeyFunc was not defaulted")
 			}
@@ -320,7 +323,10 @@ func TestDefaultStoreKeyFuncs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keyFuncs := defaultStoreKeyFuncs("/pods", "/registry/pods", tc.namespaced)
+			keyFuncs, err := defaultStoreKeyFuncs("/pods", "/registry/pods/", tc.namespaced)
+			if err != nil {
+				t.Fatalf("defaultStoreKeyFuncs failed: %v", err)
+			}
 
 			if got := keyFuncs.requestKeyRootFunc(tc.ctx); got != tc.expectRootKey {
 				t.Fatalf("requestKeyRootFunc returned %q, expect %q", got, tc.expectRootKey)
@@ -367,7 +373,7 @@ func TestDefaultStoreKeyFuncs(t *testing.T) {
 }
 
 func TestReverseKeyFunc(t *testing.T) {
-	keyPrefix := "/registry/pods"
+	keyPrefix := "/registry/pods/"
 	testCases := []struct {
 		name           string
 		reverseKeyFunc storage.ReverseKeyFunc
@@ -378,38 +384,50 @@ func TestReverseKeyFunc(t *testing.T) {
 	}{
 		{
 			name:           "namespaced",
-			reverseKeyFunc: NamespaceReverseKeyFunc(keyPrefix),
+			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, keyPrefix),
 			key:            "/registry/pods/ns1/pod1",
 			expectName:     "pod1",
 			expectNS:       "ns1",
 		},
 		{
 			name:           "cluster scoped",
-			reverseKeyFunc: NoNamespaceReverseKeyFunc(keyPrefix),
+			reverseKeyFunc: mustReverseKeyFunc(t, NoNamespaceReverseKeyFunc, keyPrefix),
 			key:            "/registry/pods/pod1",
 			expectName:     "pod1",
 		},
 		{
-			name:           "invalid prefix",
-			reverseKeyFunc: NamespaceReverseKeyFunc(keyPrefix),
+			name:           "invalid key prefix",
+			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, keyPrefix),
 			key:            "/registry/services/ns1/pod1",
 			expectErr:      true,
 		},
 		{
 			name:           "invalid namespaced key",
-			reverseKeyFunc: NamespaceReverseKeyFunc(keyPrefix),
+			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, keyPrefix),
 			key:            "/registry/pods/ns1/pod1/extra",
 			expectErr:      true,
 		},
 		{
+			name:           "empty namespace",
+			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, keyPrefix),
+			key:            "/registry/pods//pod1",
+			expectErr:      true,
+		},
+		{
+			name:           "empty namespaced name",
+			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, keyPrefix),
+			key:            "/registry/pods/ns1/",
+			expectErr:      true,
+		},
+		{
 			name:           "invalid cluster scoped key",
-			reverseKeyFunc: NoNamespaceReverseKeyFunc(keyPrefix),
+			reverseKeyFunc: mustReverseKeyFunc(t, NoNamespaceReverseKeyFunc, keyPrefix),
 			key:            "/registry/pods/pod1/extra",
 			expectErr:      true,
 		},
 		{
 			name:           "empty cluster scoped name",
-			reverseKeyFunc: NoNamespaceReverseKeyFunc(keyPrefix),
+			reverseKeyFunc: mustReverseKeyFunc(t, NoNamespaceReverseKeyFunc, keyPrefix),
 			key:            "/registry/pods/",
 			expectErr:      true,
 		},
@@ -3236,5 +3254,153 @@ func TestValidateIndexers(t *testing.T) {
 		if !tc.expectedError && err != nil {
 			t.Errorf("%v: expected no error, but got %v", tc.name, err)
 		}
+	}
+}
+
+func mustReverseKeyFunc(t *testing.T, factory func(string) (storage.ReverseKeyFunc, error), prefix string) storage.ReverseKeyFunc {
+	t.Helper()
+	reverseKeyFunc, err := factory(prefix)
+	if err != nil {
+		t.Fatalf("failed to create reverse key func: %v", err)
+	}
+	return reverseKeyFunc
+}
+
+func TestReverseKeyFuncInvalidPrefixes(t *testing.T) {
+	testcases := []struct {
+		name    string
+		factory func(string) (storage.ReverseKeyFunc, error)
+		prefix  string
+	}{
+		{
+			name:    "cluster scoped prefix must end with slash",
+			factory: NoNamespaceReverseKeyFunc,
+			prefix:  "/registry/pods",
+		},
+		{
+			name:    "namespaced prefix must end with slash",
+			factory: NamespaceReverseKeyFunc,
+			prefix:  "/registry/pods",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if reverseKeyFunc, err := tc.factory(tc.prefix); err == nil {
+				t.Fatalf("factory(%q) returned reverseKeyFunc=%v, expected error", tc.prefix, reverseKeyFunc)
+			}
+		})
+	}
+}
+
+func TestReverseKeyFuncInvalidInputs(t *testing.T) {
+	testcases := []struct {
+		name           string
+		reverseKeyFunc storage.ReverseKeyFunc
+		key            string
+	}{
+		{
+			name:           "cluster scoped name is required",
+			reverseKeyFunc: mustReverseKeyFunc(t, NoNamespaceReverseKeyFunc, "/registry/pods/"),
+			key:            "/registry/pods/",
+		},
+		{
+			name:           "cluster scoped name cannot contain slash",
+			reverseKeyFunc: mustReverseKeyFunc(t, NoNamespaceReverseKeyFunc, "/registry/pods/"),
+			key:            "/registry/pods/ns/foo",
+		},
+		{
+			name:           "namespace is required",
+			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, "/registry/pods/"),
+			key:            "/registry/pods//foo",
+		},
+		{
+			name:           "name is required",
+			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, "/registry/pods/"),
+			key:            "/registry/pods/ns/",
+		},
+		{
+			name:           "namespaced key has only namespace and name",
+			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, "/registry/pods/"),
+			key:            "/registry/pods/ns/foo/extra",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if name, namespace, err := tc.reverseKeyFunc(storage.StorageKey(tc.key)); err == nil {
+				t.Fatalf("reverseKeyFunc(%q) returned name=%q namespace=%q, expected error", tc.key, name, namespace)
+			}
+		})
+	}
+}
+
+func TestNormalizeStorageConfigPrefix(t *testing.T) {
+	testcases := []struct {
+		name                string
+		storageConfigPrefix string
+		want                string
+		wantErr             bool
+	}{
+		{
+			name:                "empty storage config prefix",
+			storageConfigPrefix: "",
+			want:                "/",
+		},
+		{
+			name:                "storage config prefix starts with slash",
+			storageConfigPrefix: "/registry",
+			want:                "/registry/",
+		},
+		{
+			name:                "storage config prefix does not start with slash",
+			storageConfigPrefix: "registry",
+			want:                "/registry/",
+		},
+		{
+			name:                "storage config prefix ends with slash",
+			storageConfigPrefix: "registry/",
+			want:                "/registry/",
+		},
+		{
+			name:                "storage config prefix contains repeated slash",
+			storageConfigPrefix: "registry//foo",
+			wantErr:             true,
+		},
+		{
+			name:                "storage config prefix contains repeated slash between segments",
+			storageConfigPrefix: "registry/foo//bar",
+			wantErr:             true,
+		},
+		{
+			name:                "storage config prefix contains parent traversal",
+			storageConfigPrefix: "registry/foo/../bar",
+			wantErr:             true,
+		},
+		{
+			name:                "storage config prefix contains parent traversal between segments",
+			storageConfigPrefix: "registry/baz/foo/../bar/qux",
+			wantErr:             true,
+		},
+		{
+			name:                "storage config prefix contains current directory",
+			storageConfigPrefix: "registry/./foo",
+			wantErr:             true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := normalizeStorageConfigPrefix(tc.storageConfigPrefix)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("normalizeStorageConfigPrefix(%q) error = %v, wantErr %t", tc.storageConfigPrefix, err, tc.wantErr)
+			}
+			if err != nil {
+				return
+			}
+			if got != tc.want {
+				t.Fatalf("normalizeStorageConfigPrefix(%q) = %q, want %q", tc.storageConfigPrefix, got, tc.want)
+			}
+		})
 	}
 }
