@@ -752,6 +752,7 @@ func NewMainKubelet(ctx context.Context,
 		klet.resyncInterval,
 		backOffPeriod,
 		klet.podCache,
+		klet.statusManager,
 		klet.allocationManager,
 	)
 
