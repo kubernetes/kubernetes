@@ -35,6 +35,9 @@ type DiscriminatedRule[Tfield any, Tdisc comparable] struct {
 //
 // It performs ratcheting: if the operation is an Update, and neither the discriminator
 // nor the value (checked via equiv) have changed, validation is skipped.
+//
+// The equiv function can be called with nil arguments in the case of nilable
+// fields.
 func Discriminated[Tfield any, Tdisc comparable, Tstruct any](ctx context.Context, op operation.Operation, structPath *field.Path,
 	obj, oldObj *Tstruct, fieldName string, getMemberValue func(*Tstruct) Tfield, getDiscriminator func(*Tstruct) Tdisc,
 	equiv MatchFunc[Tfield], defaultValidation ValidateFunc[Tfield], rules []DiscriminatedRule[Tfield, Tdisc],
