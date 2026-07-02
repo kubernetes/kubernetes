@@ -106,7 +106,7 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 
 // Run starts the workers to clean up Jobs.
 func (tc *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting TTL after finished controller")

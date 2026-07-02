@@ -325,7 +325,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	jm.broadcaster.StartStructuredLogging(3)
