@@ -242,21 +242,32 @@ func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDe
 		// Recursively walk through the decision DAG in a depth-first manner.
 		// The logic in this function should be the same as in the union authorizer's ConditionsAwareAuthorize.
 
+		collectTailAfterConditionalDecision := false
 		for authorizerName, unevaluatedSubDecision := range unevaluatedDecision.UnionedDecisions() {
-			// Try evaluating or refining the leaf ConditionsMaps in this tree of decisions. However,
-			// do not try to evaluate unevaluatedSubDecision when newDecisionChain is already conditional,
-			// as this might be wasted work. Just add the unevaluatedSubDecision as-is to newDecisionChain to
-			// copy the tail of the chain.
-			possiblyEvaluatedSubDecision := unevaluatedSubDecision
-			if newDecisionChainConditional := newDecisionChain.PossibleDecisions().Len() > 1; !newDecisionChainConditional {
-				possiblyEvaluatedSubDecision = PartiallyEvaluateConditionsAwareDecision(ctx, unevaluatedSubDecision, data, evaluateConditionFn)
+			// If collectAndShortcircuitOnly == true, a conditional decision that couldn't
+			// be evaluated to Allow/Deny/NoOpinion was encountered during a previous
+			// loop iteration. Then all latter decisions stay unevaluated.
+			if collectTailAfterConditionalDecision {
+				newDecisionChain.Add(authorizerName, unevaluatedSubDecision)
+				continue
 			}
-			// Always preserve the ordering of the decisions, even for NoOpinions, as we might use their reasons/errors
+
+			// When !collectTailAfterConditionalDecision: All decisions so far in newDecisionChain are NoOpinions,
+			// as if there existed a previous decision of type ConditionsMap or Union, collectTailAfterConditionalDecision == true,
+			// and if there existed an Allow or Deny earlier, the function would have returned.
+
+			// Try evaluating or refining the leaf ConditionsMaps in this tree of decisions.
+			possiblyEvaluatedSubDecision := PartiallyEvaluateConditionsAwareDecision(ctx, unevaluatedSubDecision, data, evaluateConditionFn)
 			newDecisionChain.Add(authorizerName, possiblyEvaluatedSubDecision)
 
 			// If there is any Allow/Deny decision leaf, no need to walk the chain further.
 			if possiblyEvaluatedSubDecision.ContainsUnconditionalAllowOrDeny() {
 				return newDecisionChain.ToDecision()
+			}
+
+			// Stop partially evaluating after encountering a conditional decision
+			if possiblyEvaluatedSubDecision.IsConditionsMap() || possiblyEvaluatedSubDecision.IsUnion() {
+				collectTailAfterConditionalDecision = true
 			}
 		}
 		// If we reached here, all leaf decisions were either of NoOpinion or ConditionsMap type.
