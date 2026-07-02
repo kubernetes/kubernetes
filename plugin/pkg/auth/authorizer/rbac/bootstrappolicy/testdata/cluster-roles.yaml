@@ -562,6 +562,23 @@ items:
       rbac.authorization.kubernetes.io/autoupdate: "true"
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:cluster-trust-bundle-discovery
+  rules:
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - clustertrustbundles
+    verbs:
+    - get
+    - list
+    - watch
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:discovery
   rules:
   - nonResourceURLs:
@@ -1215,6 +1232,14 @@ items:
     - resourceslices
     verbs:
     - deletecollection
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - clustertrustbundles
+    verbs:
+    - get
+    - list
+    - watch
   - apiGroups:
     - ""
     resources:

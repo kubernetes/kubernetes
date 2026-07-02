@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -315,6 +316,7 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 	schemaControllerMapping := map[schema.GroupVersion]controllerConstructor{
 		certificatesv1alpha1.SchemeGroupVersion: ctbpublisher.NewAlphaClusterTrustBundlePublisher,
 		certificatesv1beta1.SchemeGroupVersion:  ctbpublisher.NewBetaClusterTrustBundlePublisher,
+		certificatesv1.SchemeGroupVersion:       ctbpublisher.NewGAClusterTrustBundlePublisher,
 	}
 
 	apiserverSignerClient, err := controllerContext.NewClient("kube-apiserver-serving-clustertrustbundle-publisher")
@@ -323,7 +325,11 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 	}
 
 	var runner ctbpublisher.PublisherRunner
-	for _, gv := range []schema.GroupVersion{certificatesv1beta1.SchemeGroupVersion, certificatesv1alpha1.SchemeGroupVersion} {
+	for _, gv := range []schema.GroupVersion{
+		certificatesv1.SchemeGroupVersion,
+		certificatesv1beta1.SchemeGroupVersion,
+		certificatesv1alpha1.SchemeGroupVersion,
+	} {
 		ctbAvailable, err := clusterTrustBundlesAvailable(apiserverSignerClient, gv)
 		if err != nil {
 			return nil, fmt.Errorf("discovery failed for ClusterTrustBundle: %w", err)

@@ -867,6 +867,42 @@ items:
       rbac.authorization.kubernetes.io/autoupdate: "true"
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:kube-apiserver-serving-clustertrustbundle-publisher
+  rules:
+  - apiGroups:
+    - certificates.k8s.io
+    resourceNames:
+    - kubernetes.io/kube-apiserver-serving
+    resources:
+    - signers
+    verbs:
+    - attest
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - clustertrustbundles
+    verbs:
+    - create
+    - delete
+    - list
+    - update
+    - watch
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:legacy-service-account-token-cleaner
   rules:
   - apiGroups:

@@ -29,7 +29,7 @@ import (
 	coverage "k8s.io/apimachinery/pkg/test/coverage"
 )
 
-var apiVersions = []string{"v1alpha1", "v1beta1"}
+var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
 
 func TestMain(m *testing.M) {
 	code := m.Run()
