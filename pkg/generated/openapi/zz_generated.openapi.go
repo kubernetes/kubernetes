@@ -57515,21 +57515,21 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigration(ref commo
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the migration.",
+							Description: "spec is the specification of the migration.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(storagemigrationv1beta1.StorageVersionMigrationSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status of the migration.",
+							Description: "status is the status of the migration.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(storagemigrationv1beta1.StorageVersionMigrationStatus{}.OpenAPIModelName()),
 						},
@@ -57565,14 +57565,14 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationList(ref c
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of StorageVersionMigration",
+							Description: "items is the list of StorageVersionMigration.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -57601,7 +57601,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationSpec(ref c
 				Properties: map[string]spec.Schema{
 					"resource": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
+							Description: "resource is the resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.GroupResource{}.OpenAPIModelName()),
 						},
@@ -57634,7 +57634,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationStatus(ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The latest available observations of the migration's current state.",
+							Description: "conditions is the latest available observations of the migration's current state.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -57647,7 +57647,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationStatus(ref
 					},
 					"resourceVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceVersion to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
+							Description: "resourceVersion to compare with the GC cache for performing the migration. This is the current resource version of given group, version and resource when kube-controller-manager first observes this StorageVersionMigration resource.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
