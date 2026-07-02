@@ -69,7 +69,7 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 	ttlPolicy := &cache.TTLPolicy{TTL: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
-	return &ControllerExpectations{ttlStore}, fakeClock
+	return &ControllerExpectations{Store: ttlStore, metrics: nil}, fakeClock
 }
 
 func newReplicationController(replicas int) *v1.ReplicationController {
@@ -258,7 +258,7 @@ func TestControllerExpectations(t *testing.T) {
 
 func TestUIDExpectations(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	uidExp := NewUIDTrackingControllerExpectations(NewControllerExpectations())
+	uidExp := NewUIDTrackingControllerExpectations(NewControllerExpectations(nil))
 	type test struct {
 		name        string
 		numReplicas int

@@ -210,7 +210,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		podControl:       podControl,
 		eventBroadcaster: eventBroadcaster,
 		burstReplicas:    burstReplicas,
-		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
+		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations(expectationsMetrics{})),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: queueName},
@@ -993,4 +993,10 @@ func getPodKeys(pods []*v1.Pod) []string {
 		podKeys = append(podKeys, controller.PodKey(pod))
 	}
 	return podKeys
+}
+
+type expectationsMetrics struct{}
+
+func (expectationsMetrics) ObserveExpectationsWaiting(expType string) {
+	metrics.ExpectationsWaiting.WithLabelValues(expType).Inc()
 }
