@@ -166,9 +166,10 @@ var (
 			"scheduler_podgroup_scheduling_attempt_duration_seconds": {
 				{
 					Label:  resultLabelName,
-					Values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
+					Values: []string{metrics.WaitingOnPreemptionResult, metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
 				},
 			},
+			"scheduler_podgroup_scheduling_algorithm_duration_seconds": nil,
 		},
 	}
 
