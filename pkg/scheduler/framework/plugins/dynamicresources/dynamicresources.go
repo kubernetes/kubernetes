@@ -942,6 +942,25 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 	}
 	extendedResourceClaim := state.claims.extendedResourceClaim()
 
+	podGroup, err := pl.getPodGroup(pod)
+	if err != nil {
+		return nil, statusError(logger, err)
+	}
+	podGroupActive := false
+	if podGroup != nil {
+		logger = logger.WithValues("podgroup", klog.KObj(podGroup))
+		// The podGroupState lister is based on the live cache and does not consider
+		// pods assumed within the PodGroup scheduling cycle, but the ones that
+		// happened before or outside the scheduling cycle. We use it to check
+		// whether there were no assumed or assigned pods that would use the
+		// ResourceClaim.
+		podGroupState, err := pl.fh.PodGroupManager().PodGroupStates().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+		if err != nil {
+			return nil, statusError(logger, err)
+		}
+		podGroupActive = podGroupState.ScheduledPodsCount() > 0
+	}
+
 	// Iterating over a map is random. This is intentional here, we want to
 	// pick one claim randomly because there is no better heuristic.
 	for index := range state.unavailableClaims {
@@ -954,8 +973,16 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 			continue
 		}
 
-		if len(claim.Status.ReservedFor) == 0 ||
-			len(claim.Status.ReservedFor) == 1 && claim.Status.ReservedFor[0].UID == pod.UID {
+		reservedForNobody := len(claim.Status.ReservedFor) == 0
+		reservedForOnlyThisPod := len(claim.Status.ReservedFor) == 1 && claim.Status.ReservedFor[0].UID == pod.UID
+		reservedForOnlyThisPodGroup := podGroup != nil &&
+			!podGroupActive &&
+			len(claim.Status.ReservedFor) == 1 &&
+			claim.Status.ReservedFor[0].UID == podGroup.UID
+
+		if reservedForNobody ||
+			reservedForOnlyThisPod ||
+			reservedForOnlyThisPodGroup {
 			claim := claim.DeepCopy()
 			claim.Status.ReservedFor = nil
 			claim.Status.Allocation = nil
@@ -978,87 +1005,7 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 		return nil, fwk.NewStatus(fwk.Unschedulable, "deletion of ResourceClaim completed")
 	}
 
-	// If we make it here we know that not all pods of the PodGroup could be scheduled.
-	// To let the scheduler try to find new devices in case binding the current allocation
-	// failed in some previous cycle, remove the PodGroup from its claims' status.reservedFor.
-	// Note that more Pods may exist than a PodGroup's minCount, but performing
-	// a cleanup after a previous cycle is safe as long as there are no assumed
-	// nor assigned pods yet.
-	if pl.fts.EnableDRAWorkloadResourceClaims {
-		status := pl.unreservePodGroupClaims(ctx, pod)
-		if status != nil {
-			return nil, status
-		}
-	}
-
 	return nil, fwk.NewStatus(fwk.Unschedulable, "still not schedulable")
-}
-
-func (pl *DynamicResources) unreservePodGroupClaims(ctx context.Context, pod *v1.Pod) *fwk.Status {
-	if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
-		return nil
-	}
-
-	logger := klog.FromContext(ctx)
-
-	// The podGroupState lister is based on the live cache and does not consider
-	// pods assumed within the PodGroup scheduling cycle, but the ones that
-	// happened before or outside the scheduling cycle. We use it to check
-	// whether there were no assumed or assigned pods that would use the
-	// ResourceClaim.
-	podGroupState, err := pl.fh.PodGroupManager().PodGroupStates().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-	if err != nil {
-		return statusError(logger, err)
-	}
-	if podGroupState.ScheduledPodsCount() > 0 {
-		return nil
-	}
-	podGroup, err := pl.getPodGroup(pod)
-	if err != nil {
-		return statusError(logger, err)
-	}
-
-	for _, podGroupClaim := range podGroup.Spec.ResourceClaims {
-		claimName, mustCheckOwner, err := resourceclaim.NameFromPodGroup(podGroup, &podGroupClaim)
-		if err != nil {
-			return statusError(logger, err)
-		}
-		if claimName == nil {
-			continue
-		}
-		claim, err := pl.draManager.ResourceClaims().Get(podGroup.Namespace, *claimName)
-		if err != nil {
-			return statusError(logger, err)
-		}
-		if mustCheckOwner {
-			if err := resourceclaim.IsForPodGroup(podGroup, claim); err != nil {
-				continue
-			}
-		}
-
-		if claim.Status.Allocation != nil {
-			if resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) {
-				// Remove PodGroup from ReservedFor. A strategic-merge-patch is used
-				// because that allows removing an individual entry without having
-				// the latest ResourceClaim.
-				patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": { "reservedFor": [ {"$patch": "delete", "uid": %q} ] }}`,
-					claim.UID,
-					podGroup.UID,
-				)
-				logger.V(5).Info("postfilter unreserved claim", "resourceclaim", klog.KObj(claim), "pod", klog.KObj(pod), "podgroup", klog.KObj(podGroup))
-				claim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
-				if err != nil {
-					// We will get here again when pod scheduling is retried.
-					logger.Error(err, "postfilter unreserving claim", "resourceclaim", klog.KObj(claim))
-					continue
-				} else {
-					return statusUnschedulable(logger, "ResourceClaim unreserved for PodGroup")
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 func (pl *DynamicResources) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
@@ -1272,6 +1219,10 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	if err != nil {
 		return
 	}
+	podGroup, err := pl.getPodGroup(pod)
+	if err != nil {
+		return
+	}
 
 	logger := klog.FromContext(ctx)
 
@@ -1297,20 +1248,40 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 			}
 		}
 
-		// Ignore claims reserved for the PodGroup because other Pods in the
-		// group may still need this claim. The PodGroup may be unreserved and
-		// dellocated (in api-server) in the next scheduling cycle if the
-		// PodGroup is not schedulable (in PostFilter) and not used yet.
-		if claim.Status.Allocation != nil &&
-			resourceclaim.IsReservedForPod(pod, claim, false /* acceptPodGroupReservation */) {
-			// Remove pod from ReservedFor. A strategic-merge-patch is used
+		if claim.Status.Allocation != nil {
+			var reservedUID types.UID
+			unreservedLogValues := []any{"resourceclaim", klog.KObj(claim)}
+			if resourceclaim.IsReservedForPod(pod, claim, false /* acceptPodGroupReservation */) {
+				reservedUID = pod.UID
+				unreservedLogValues = append(unreservedLogValues, "pod", klog.KObj(pod))
+			} else if pl.fts.EnableDRAWorkloadResourceClaims && resourceclaim.IsReservedForPod(pod, claim, true /* acceptPodGroupReservation */) {
+				// The podGroupState lister is based on the live cache and does not consider
+				// pods assumed within the PodGroup scheduling cycle, but the ones that
+				// happened before or outside the scheduling cycle. We use it to check
+				// whether there were no assumed or assigned pods that would use the
+				// ResourceClaim.
+				podGroupState, err := pl.fh.PodGroupManager().PodGroupStates().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+				if err != nil {
+					logger.V(5).Info("Error getting scheduler state for PodGroup, not unreserving claim for PodGroup", "err", err, "resourceclaim", klog.KObj(claim), "podgroup", klog.KObj(podGroup))
+					continue
+				}
+				if podGroupState.ScheduledPodsCount() > 0 {
+					logger.V(6).Info("Not unreserving claim for PodGroup with other scheduled Pods", "resourceclaim", klog.KObj(claim), "podgroup", klog.KObj(podGroup))
+					continue
+				}
+				reservedUID = podGroup.UID
+				unreservedLogValues = append(unreservedLogValues, "podgroup", klog.KObj(podGroup))
+			} else {
+				continue
+			}
+			// Remove Pod or PodGroup from ReservedFor. A strategic-merge-patch is used
 			// because that allows removing an individual entry without having
 			// the latest ResourceClaim.
 			patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": { "reservedFor": [ {"$patch": "delete", "uid": %q} ] }}`,
 				claim.UID,
-				pod.UID,
+				reservedUID,
 			)
-			logger.V(5).Info("unreserve", "resourceclaim", klog.KObj(claim), "pod", klog.KObj(pod))
+			logger.V(5).Info("unreserve", unreservedLogValues...)
 			claim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
 			if err != nil {
 				// We will get here again when pod scheduling is retried.
