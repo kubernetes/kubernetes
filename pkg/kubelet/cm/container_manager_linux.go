@@ -1076,8 +1076,8 @@ func (cm *containerManagerImpl) GetDynamicResources(logger klog.Logger, pod *v1.
 	return containerDynamicResources
 }
 
-func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
-	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
+func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity(extendedResource v1.ResourceName) bool {
+	return cm.deviceManager.ShouldResetExtendedResourceCapacity(extendedResource)
 }
 
 func (cm *containerManagerImpl) UpdateAllocatedDevices() {

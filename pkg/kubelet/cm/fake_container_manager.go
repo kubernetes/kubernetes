@@ -210,7 +210,7 @@ func (cm *FakeContainerManager) GetAllocatableDevices() []*podresourcesapi.Conta
 	return nil
 }
 
-func (cm *FakeContainerManager) ShouldResetExtendedResourceCapacity() bool {
+func (cm *FakeContainerManager) ShouldResetExtendedResourceCapacity(_ v1.ResourceName) bool {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "ShouldResetExtendedResourceCapacity")
