@@ -334,10 +334,16 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		}
 		shouldCreateObjectValidationFn := func(t *types.Type) bool {
 			// opt-out
+			if checkMainTag(t.CommentLines, "false") {
+				return false
+			}
 			if checkMainTag(t.SecondClosestCommentLines, "false") {
 				return false
 			}
 			// opt-in
+			if checkMainTag(t.CommentLines, "true") {
+				return true
+			}
 			if checkMainTag(t.SecondClosestCommentLines, "true") {
 				return true
 			}
