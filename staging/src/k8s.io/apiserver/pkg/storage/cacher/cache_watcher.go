@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -465,21 +466,18 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	for {
 		event, err := cacheInterval.Next()
 		if err != nil {
-			// An error indicates that the cache interval
-			// has been invalidated and can no longer serve
-			// events.
-			//
-			// Initially we considered sending an "out-of-history"
-			// Error event in this case, but because historically
-			// such events weren't sent out of the watchCache, we
-			// decided not to. This is still ok, because on watch
-			// closure, the watcher will try to re-instantiate the
-			// watch and then will get an explicit "out-of-history"
-			// window. There is potential for optimization, but for
-			// now, in order to be on the safe side and not break
-			// custom clients, the cost of it is something that we
-			// are fully accepting.
+			// The cache interval has been invalidated: the circular
+			// buffer overflowed and evicted events this watch was
+			// still positioned at. Send an explicit 410 Gone error
+			// event so clients (e.g. reflectors) receive a meaningful
+			// signal and can re-list, instead of observing a silent
+			// connection close with HTTP 200.
 			klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
+			expiredErr := apierrors.NewResourceExpired(fmt.Sprintf("watch cache invalidated: %v", err))
+			select {
+			case c.result <- watch.Event{Type: watch.Error, Object: &expiredErr.ErrStatus}:
+			case <-c.done:
+			}
 			return
 		}
 		if event == nil {
