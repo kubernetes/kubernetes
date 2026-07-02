@@ -66,6 +66,7 @@ var (
 		MaxParallelImagePulls:                  nil,
 		HairpinMode:                            kubeletconfig.PromiscuousBridge,
 		NodeLeaseDurationSeconds:               1,
+		PodCheckpointTimeout:                   metav1.Duration{Duration: 15 * time.Second},
 		CPUCFSQuotaPeriod:                      metav1.Duration{Duration: 25 * time.Millisecond},
 		TopologyManagerScope:                   kubeletconfig.PodTopologyManagerScope,
 		TopologyManagerPolicy:                  kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
@@ -125,6 +126,13 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: nodeLeaseDurationSeconds must be greater than 0",
+	}, {
+		name: "invalid PodCheckpointTimeout",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.PodCheckpointTimeout = metav1.Duration{Duration: -time.Second}
+			return conf
+		},
+		errMsg: "invalid configuration: podCheckpointTimeout must be greater than 0",
 	}, {
 		name: "specify EnforceNodeAllocatable without enabling CgroupsPerQOS",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
