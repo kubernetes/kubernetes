@@ -526,7 +526,10 @@ func (sched *Scheduler) handleBindingCycleError(
 		}
 	}
 
-	sched.FailureHandler(ctx, fwk, podInfo, false /* patchWithPodResourceVersion*/, status, clearNominatedNode, start)
+	// Resource version is included here to prevent an update during binding
+	// setting the PodScheduled=False condition from overwriting a
+	// PodScheduled=True update if a subsequent retry succeeds first.
+	sched.FailureHandler(ctx, fwk, podInfo, true /* patchWithPodResourceVersion*/, status, clearNominatedNode, start)
 }
 
 func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error) {
@@ -1206,6 +1209,17 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	reason := v1.PodReasonSchedulerError
 	if status.IsRejected() {
 		reason = v1.PodReasonUnschedulable
+
+		// The resource version only guards against a PodScheduled=False update
+		// from overwriting an authoritative PodScheduled=True update in a
+		// subsequent binding attempt. Since this Pod won't bind this cycle,
+		// there's no PodScheduled=True update to race with. The upcoming
+		// PodScheduled=False update is authoritative, so the resource version
+		// doesn't need to be checked.
+		// If the NominatedNodeName was updated, then this Pod is out of date
+		// anyway and including the resource version will cause a conflict that
+		// won't be retried.
+		patchWithPodResourceVersion = false
 	}
 
 	switch reason {
@@ -1333,8 +1347,9 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 	if nnnNeedsUpdate {
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
-	// Resource version is included here to prevent an update during binding
-	// setting the PodScheduled=False condition from overwriting a
-	// PodScheduled=True update if a subsequent retry succeeds first.
-	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, pod.ResourceVersion, &pod.Status, podStatusCopy)
+	var podResourceVersion string
+	if patchWithPodResourceVersion {
+		podResourceVersion = pod.ResourceVersion
+	}
+	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, podResourceVersion, &pod.Status, podStatusCopy)
 }

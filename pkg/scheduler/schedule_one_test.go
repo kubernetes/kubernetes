@@ -2422,13 +2422,16 @@ func TestSchedulerBinding(t *testing.T) {
 
 func TestUpdatePodStatus(t *testing.T) {
 	tests := []struct {
-		name                     string
-		currentPodConditions     []v1.PodCondition
-		newPodCondition          *v1.PodCondition
-		currentNominatedNodeName string
-		newNominatingInfo        *fwk.NominatingInfo
-		expectPatchRequest       bool
-		expectedPatchDataPattern string
+		name                      string
+		asyncAPICallsEnabled      *bool
+		currentPodConditions      []v1.PodCondition
+		newPodCondition           *v1.PodCondition
+		currentNominatedNodeName  string
+		newNominatingInfo         *fwk.NominatingInfo
+		podResourceVersion        string
+		updateWithResourceVersion bool
+		expectPatchRequest        bool
+		expectedPatchDataPattern  string
 	}{
 		{
 			name:                 "Should make patch request to add pod condition when there are none currently",
@@ -2609,9 +2612,46 @@ func TestUpdatePodStatus(t *testing.T) {
 			newNominatingInfo:        nil,
 			expectPatchRequest:       false,
 		},
+		{
+			name:                      "Should include resource version when the flag is set",
+			asyncAPICallsEnabled:      new(false),
+			podResourceVersion:        "123",
+			updateWithResourceVersion: true,
+			currentPodConditions:      []v1.PodCondition{},
+			newPodCondition: &v1.PodCondition{
+				Type:               "newType",
+				Status:             "newStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 1, 1, 1, 1, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 1, 1, 1, 1, time.UTC)),
+				Reason:             "newReason",
+				Message:            "newMessage",
+			},
+			expectPatchRequest:       true,
+			expectedPatchDataPattern: `{"metadata":{"resourceVersion":"123"},"status":{"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
+		},
+		{
+			name:                      "Should omit resource version when the flag is not set",
+			asyncAPICallsEnabled:      new(false),
+			podResourceVersion:        "123",
+			updateWithResourceVersion: false,
+			currentPodConditions:      []v1.PodCondition{},
+			newPodCondition: &v1.PodCondition{
+				Type:               "newType",
+				Status:             "newStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 1, 1, 1, 1, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 1, 1, 1, 1, time.UTC)),
+				Reason:             "newReason",
+				Message:            "newMessage",
+			},
+			expectPatchRequest:       true,
+			expectedPatchDataPattern: `{"status":{"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
+		},
 	}
 	for _, asyncAPICallsEnabled := range []bool{true, false} {
 		for _, test := range tests {
+			if test.asyncAPICallsEnabled != nil && *test.asyncAPICallsEnabled != asyncAPICallsEnabled {
+				continue
+			}
 			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", test.name, asyncAPICallsEnabled), func(t *testing.T) {
 				actualPatchRequests := 0
 				var actualPatchData string
@@ -2627,7 +2667,7 @@ func TestUpdatePodStatus(t *testing.T) {
 					return true, &v1.Pod{}, nil
 				})
 
-				pod := st.MakePod().Name("foo").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
+				pod := st.MakePod().Name("foo").ResourceVersion(test.podResourceVersion).NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
 
 				logger, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)
@@ -2645,7 +2685,7 @@ func TestUpdatePodStatus(t *testing.T) {
 					apiCacher = apicache.New(queue, nil)
 				}
 
-				if err := updatePod(ctx, cs, apiCacher, pod, false, test.newPodCondition, test.newNominatingInfo); err != nil {
+				if err := updatePod(ctx, cs, apiCacher, pod, test.updateWithResourceVersion, test.newPodCondition, test.newNominatingInfo); err != nil {
 					t.Fatalf("Error calling update: %v", err)
 				}
 
