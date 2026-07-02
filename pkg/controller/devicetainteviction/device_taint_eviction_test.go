@@ -59,7 +59,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -115,7 +114,7 @@ func l[T any](items ...T) []T {
 func setup(tCtx ktesting.TContext, workloadResourceClaimsEnabled bool) *testContext {
 	fakeClientset := fake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := New(fakeClientset,
+	controller := newWithFeatures(fakeClientset,
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1().ResourceClaims(),
 		informerFactory.Resource().V1().ResourceSlices(),
@@ -390,7 +389,7 @@ var (
 
 		Spec: resourcebeta.DeviceTaintRuleSpec{
 			DeviceSelector: &resourcebeta.DeviceTaintSelector{
-				Driver: ptr.To(driver),
+				Driver: new(driver),
 			},
 			Taint: resourcebeta.DeviceTaint{
 				Key:       taint.Key,
@@ -408,8 +407,8 @@ var (
 
 		Spec: resourcebeta.DeviceTaintRuleSpec{
 			DeviceSelector: &resourcebeta.DeviceTaintSelector{
-				Driver: ptr.To(driver),
-				Device: ptr.To("instance"),
+				Driver: new(driver),
+				Device: new("instance"),
 			},
 			Taint: resourcebeta.DeviceTaint{
 				Key:       taint.Key,
@@ -428,8 +427,8 @@ var (
 
 		Spec: resourcebeta.DeviceTaintRuleSpec{
 			DeviceSelector: &resourcebeta.DeviceTaintSelector{
-				Driver: ptr.To(driver),
-				Device: ptr.To("instance-no-execute"),
+				Driver: new(driver),
+				Device: new("instance-no-execute"),
 			},
 			Taint: resourcebeta.DeviceTaint{
 				Key:       taint.Key,
@@ -447,7 +446,7 @@ var (
 
 		Spec: resourcebeta.DeviceTaintRuleSpec{
 			DeviceSelector: &resourcebeta.DeviceTaintSelector{
-				Driver: ptr.To(driver),
+				Driver: new(driver),
 			},
 			Taint: resourcebeta.DeviceTaint{
 				Key:       taint.Key,
@@ -465,7 +464,7 @@ var (
 
 		Spec: resourcebeta.DeviceTaintRuleSpec{
 			DeviceSelector: &resourcebeta.DeviceTaintSelector{
-				Device: ptr.To("instance"),
+				Device: new("instance"),
 			},
 			Taint: resourcebeta.DeviceTaint{
 				Key:       taint.Key,
@@ -545,7 +544,7 @@ var (
 			Operator:          resourceapi.DeviceTolerationOpEqual,
 			Value:             taintValue,
 			Effect:            resourceapi.DeviceTaintEffectNoExecute,
-			TolerationSeconds: ptr.To(int64(tolerationDuration.Seconds())),
+			TolerationSeconds: new(int64(tolerationDuration.Seconds())),
 		}}
 		return claim
 	}()
@@ -1359,17 +1358,17 @@ func testController(tCtx ktesting.TContext) {
 							Operator:          resourceapi.DeviceTolerationOpEqual,
 							Value:             taintValue,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(20)),
+							TolerationSeconds: new(int64(20)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(30)),
+							TolerationSeconds: new(int64(30)),
 						},
 					}
 					return claim
@@ -1386,17 +1385,17 @@ func testController(tCtx ktesting.TContext) {
 							Operator:          resourceapi.DeviceTolerationOpEqual,
 							Value:             taintValue,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(20)),
+							TolerationSeconds: new(int64(20)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(30)),
+							TolerationSeconds: new(int64(30)),
 						},
 					}
 					return claim
@@ -1428,7 +1427,7 @@ func testController(tCtx ktesting.TContext) {
 						Operator:          resourceapi.DeviceTolerationOpEqual,
 						Value:             taintValue,
 						Effect:            resourceapi.DeviceTaintEffectNoExecute,
-						TolerationSeconds: ptr.To(int64(60)),
+						TolerationSeconds: new(int64(60)),
 					}}
 					return claim
 				}()),
@@ -1443,7 +1442,7 @@ func testController(tCtx ktesting.TContext) {
 						Operator:          resourceapi.DeviceTolerationOpEqual,
 						Value:             taintValue,
 						Effect:            resourceapi.DeviceTaintEffectNoExecute,
-						TolerationSeconds: ptr.To(int64(60)),
+						TolerationSeconds: new(int64(60)),
 					}}
 					return claim
 				}(), newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
@@ -1489,7 +1488,7 @@ func testController(tCtx ktesting.TContext) {
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator: resourceapi.DeviceTolerationOpExists,
@@ -1508,7 +1507,7 @@ func testController(tCtx ktesting.TContext) {
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator: resourceapi.DeviceTolerationOpExists,
@@ -1564,13 +1563,13 @@ func testController(tCtx ktesting.TContext) {
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Key:               taint1.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Key:               taint2.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(30)),
+							TolerationSeconds: new(int64(30)),
 						},
 					}
 					return claim
@@ -1586,13 +1585,13 @@ func testController(tCtx ktesting.TContext) {
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Key:               taint1.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Key:               taint2.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(30)),
+							TolerationSeconds: new(int64(30)),
 						},
 					}
 					return claim
@@ -1859,7 +1858,7 @@ func testController(tCtx ktesting.TContext) {
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Operator:          resourceapi.DeviceTolerationOpExists,
 						Effect:            resourceapi.DeviceTaintEffectNoExecute,
-						TolerationSeconds: ptr.To(int64(60)),
+						TolerationSeconds: new(int64(60)),
 					}}
 					return claim
 				}(), newEvictionTime(metav1Time(taintTime.Add(60*time.Second))))),
@@ -1875,7 +1874,7 @@ func testController(tCtx ktesting.TContext) {
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Operator:          resourceapi.DeviceTolerationOpExists,
 						Effect:            resourceapi.DeviceTaintEffectNoExecute,
-						TolerationSeconds: ptr.To(int64(60)),
+						TolerationSeconds: new(int64(60)),
 					}}
 					return claim
 				}(), newEvictionTime(metav1Time(taintTime.Add(60*time.Second))))),
@@ -1971,7 +1970,7 @@ func testController(tCtx ktesting.TContext) {
 				if depth >= numEvents {
 					// Define a sub-test which runs the current permutation of events.
 					events := make([]any, numEvents)
-					for i := 0; i < numEvents; i++ {
+					for i := range numEvents {
 						events[i] = tc.events[permutation[i]]
 					}
 					tc := tc
@@ -1986,7 +1985,7 @@ func testController(tCtx ktesting.TContext) {
 					})
 					return
 				}
-				for i := 0; i < numEvents; i++ {
+				for i := range numEvents {
 					if slices.Index(permutation[0:depth], i) != -1 {
 						// Already taken.
 						continue
@@ -2203,7 +2202,6 @@ func newTestController(tCtx ktesting.TContext) *Controller {
 		informerFactory.Resource().V1beta2().DeviceTaintRules(),
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
-		utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 	)
 	controller.metrics = metrics.New()
 	// Always log, not matter what the -v value is.
@@ -2393,11 +2391,9 @@ func testEviction(tCtx ktesting.TContext) {
 				tCtx.Cancel("time to stop")
 				wg.Wait()
 			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-			}()
+			})
 
 			// Eventually the controller should have synced it's informers.
 			tCtx.Wait()
@@ -2697,11 +2693,9 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 		tCtx.Cancel("time to stop")
 		wg.Wait()
 	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-	}()
+	})
 
 	// Eventually the pod gets scheduled for eviction.
 	tCtx.Wait()
@@ -2796,11 +2790,9 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		tCtx.Cancel("time to stop")
 		wg.Wait()
 	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-	}()
+	})
 
 	// We don't want any events.
 	tCtx.Wait()
@@ -2865,11 +2857,9 @@ func synctestRetry(tCtx ktesting.TContext) {
 		tCtx.Cancel("time to stop")
 		wg.Wait()
 	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-	}()
+	})
 
 	expectLatencies := []time.Duration{5 * time.Millisecond /* default exponential retry */}
 
