@@ -511,7 +511,7 @@ func InitMetrics() {
 		},
 		[]string{"profile"})
 
-	// The below (podGroupScheduleAttempts, podGroupSchedulingLatency and PodGroupSchedulingAlgorithmLatency) are only available when the GenericWorkload feature gate is enabled.
+	// The below (podGroupScheduleAttempts, podGroupSchedulingLatency, PodGroupSchedulingAlgorithmLatency and PodGroupCacheMissedEvents) are only available when the GenericWorkload feature gate is enabled.
 	podGroupScheduleAttempts = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
