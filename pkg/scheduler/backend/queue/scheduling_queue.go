@@ -107,7 +107,9 @@ type SchedulingQueue interface {
 	AddUnschedulablePodIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error
 	// AddAttemptedPodGroupIfNeeded adds an attempted pod group back to scheduling queue.
 	// If there are no pending pods, it will not add the pod group back to the queue.
-	AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo *framework.QueuedPodGroupInfo, schedulingCycle int64) error
+	// Should be called synchronously to the pod group scheduling cycle.
+	// If requeueWithoutBackoff is true, the pod group retains its previous timestamp and enters active queue directly.
+	AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo *framework.QueuedPodGroupInfo, schedulingCycle int64, requeueWithoutBackoff bool) error
 	// SchedulingCycle returns the current number of scheduling cycle which is
 	// cached by scheduling queue. Normally, incrementing this number whenever
 	// a pod is popped (e.g. called Pop()) is enough.
@@ -135,6 +137,7 @@ type SchedulingQueue interface {
 	PatchPodStatus(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error)
 
 	// The following functions are supposed to be used only for testing or debugging.
+	GetPodGroup(name, namespace string) (*framework.QueuedPodGroupInfo, bool)
 	GetPod(name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool)
 	PendingPods() ([]*v1.Pod, string)
 	InFlightPods() []*v1.Pod
@@ -1053,7 +1056,8 @@ func (p *PriorityQueue) addUnschedulablePodGroupMember(logger klog.Logger, pInfo
 // AddAttemptedPodGroupIfNeeded adds an attempted pod group back to scheduling queue.
 // If there are no pending pods, it will not add the pod group back to the queue.
 // Should be called synchronously to the pod group scheduling cycle.
-func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo *framework.QueuedPodGroupInfo, schedulingCycle int64) error {
+// If requeueWithoutBackoff is true, the pod group retains its previous timestamp and enters active queue directly.
+func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo *framework.QueuedPodGroupInfo, schedulingCycle int64, requeueWithoutBackoff bool) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -1094,11 +1098,17 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 		// We should reset the error count because the error is gone.
 		pgInfo.ConsecutiveErrorsCount = 0
 	}
-	// Refresh the timestamp since the pod is re-added.
-	pgInfo.Timestamp = p.clock.Now()
 	// We changed ConsecutiveErrorsCount or UnschedulableCount plus Timestamp, and now the calculated backoff time should be different,
 	// removing the cached backoff time.
 	pgInfo.BackoffExpiration = time.Time{}
+
+	// If pod group is requeued into active queue directly, it should retain its old timestamp,
+	// so that the subsequent scheduling and preemption attempt should start immediately after
+	// the current cycle, unless a higher-priority pod or pod group comes in between.
+	// Otherwise refresh the timestamp since the pod is re-added.
+	if !requeueWithoutBackoff {
+		pgInfo.Timestamp = p.clock.Now()
+	}
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pgInfo.WasFlushedFromUnschedulable = false
 	pgInfo.FlushTimestamp = time.Time{}
@@ -1108,7 +1118,7 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 	// Try to requeue this pod group to activeQ or backoffQ.
 	// If the PreEnqueue fails for this pod group, it will be moved to the unschedulableEntities.
 	queue := unschedulableQ
-	if p.backoffQ.isEntityBackingoff(pgInfo) {
+	if !requeueWithoutBackoff && p.backoffQ.isEntityBackingoff(pgInfo) {
 		if added := p.moveToBackoffQ(logger, pgInfo, framework.ScheduleAttemptFailure); added {
 			queue = backoffQ
 		}
@@ -1537,6 +1547,29 @@ func (p *PriorityQueue) GetPod(name, namespace string, schedulingGroup *v1.PodSc
 		pInfo = p.getPod(pod, unlockedActiveQ)
 	})
 	return pInfo, pInfo != nil
+}
+
+// GetPodGroup searches for a pod group in the activeQ, backoffQ, and unschedulableEntities.
+func (p *PriorityQueue) GetPodGroup(name, namespace string) (*framework.QueuedPodGroupInfo, bool) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	pgInfo := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	var foundPgInfo *framework.QueuedPodGroupInfo
+	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
+		entity := p.getEntityFromAnyQueue(unlockedActiveQ, pgInfo)
+		if entity != nil {
+			if pg, ok := entity.(*framework.QueuedPodGroupInfo); ok {
+				foundPgInfo = pg
+			}
+		}
+	})
+	return foundPgInfo, foundPgInfo != nil
 }
 
 func (p *PriorityQueue) getPod(podLookup *v1.Pod, unlockedActiveQ unlockedActiveQueueReader) *framework.QueuedPodInfo {

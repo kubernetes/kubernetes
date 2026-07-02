@@ -101,7 +101,7 @@ func (sched *Scheduler) handlePodGroupFailureBeforeScheduling(ctx context.Contex
 		}
 		sched.FailureHandler(ctx, podFwk, podInfo, fwk.AsStatus(err), clearNominatedNode, time.Now())
 	}
-	err = sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle())
+	err = sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle(), false)
 	if err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Failed to add pod group back to scheduling queue", "podGroup", klog.KObj(podGroupInfo))
 	}
@@ -618,7 +618,8 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 	}
 	sched.updatePodGroupCondition(ctx, podGroupInfo, condition)
 
-	err := sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle())
+	requeueWithoutBackoff := podGroupResult.status.IsSuccess()
+	err := sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle(), requeueWithoutBackoff)
 	if err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Failed to add attempted pod group to scheduling queue", "podGroup", klog.KObj(podGroupInfo))
 	}

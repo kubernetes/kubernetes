@@ -1060,7 +1060,7 @@ func Test_InFlightPods(t *testing.T) {
 							t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 						}
 					case action.podGroupAttempted != nil:
-						err := q.AddAttemptedPodGroupIfNeeded(logger, action.podGroupAttempted, q.SchedulingCycle())
+						err := q.AddAttemptedPodGroupIfNeeded(logger, action.podGroupAttempted, q.SchedulingCycle(), false)
 						if err != nil {
 							t.Fatalf("unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
 						}
@@ -3712,12 +3712,14 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 		setup                           func(t ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo)
 		disableBackoff                  bool
 		blockOnPreEnqueue               bool
+		requeueWithoutBackoff           bool
 		expectedUnschedulableCount      int
 		expectedConsecutiveErrorsCount  int
 		expectedInActiveQ               bool
 		expectedInBackoffQ              bool
 		expectedInUnschedulableEntities bool
 		expectedPodsInGroup             int
+		expectPreservedTimestamp        bool
 	}{
 		{
 			name: "No pending pods, pod group is not enqueued",
@@ -3830,6 +3832,20 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			expectedInUnschedulableEntities: true,
 			expectedPodsInGroup:             2,
 		},
+		{
+			name: "Pods present, with unschedulable plugins, requeue without backoff will preserve timestamp and requeue pod to active queue",
+			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
+				pInfo1 := q.newQueuedPodInfo(tCtx, pod1, "fakePlugin")
+				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
+				q.pendingPodGroupPods.add(pgLookup, pInfo1)
+				q.pendingPodGroupPods.add(pgLookup, pInfo2)
+			},
+			requeueWithoutBackoff:      true,
+			expectedUnschedulableCount: 1,
+			expectedInActiveQ:          true,
+			expectedPodsInGroup:        2,
+			expectPreservedTimestamp:   true,
+		},
 	}
 
 	for _, test := range tests {
@@ -3852,14 +3868,19 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			q := NewTestQueue(tCtx, newDefaultQueueSort(), opts...)
 
 			pgInfo := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(tCtx, pod1))
+			oldTimestamp := pgInfo.Timestamp
 
 			test.setup(tCtx, q, pgInfo)
+			c.Step(time.Second)
 
-			err := q.AddAttemptedPodGroupIfNeeded(tCtx.Logger(), pgInfo, q.SchedulingCycle())
+			err := q.AddAttemptedPodGroupIfNeeded(tCtx.Logger(), pgInfo, q.SchedulingCycle(), test.requeueWithoutBackoff)
 			if err != nil {
 				tCtx.Fatalf("Unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
 			}
 
+			if test.expectPreservedTimestamp && !pgInfo.Timestamp.Equal(oldTimestamp) {
+				tCtx.Errorf("Expected timestamp to be preserved (%v), but got %v", oldTimestamp, pgInfo.Timestamp)
+			}
 			if pgInfo.UnschedulableCount != test.expectedUnschedulableCount {
 				tCtx.Errorf("Expected UnschedulableCount to be %v, got %v", test.expectedUnschedulableCount, pgInfo.UnschedulableCount)
 			}
