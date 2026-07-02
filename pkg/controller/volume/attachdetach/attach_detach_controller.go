@@ -590,7 +590,13 @@ func (adc *attachDetachController) nodeDelete(logger klog.Logger, obj interface{
 		logger.Info("Error removing node from desired-state-of-world", "node", klog.KObj(node), "err", err)
 	}
 
-	adc.processVolumesInUse(logger, nodeName, node.Status.VolumesInUse)
+	// When a node is deleted, we clear MountedByNode immediately to allow
+	// detach to proceed without waiting for force-detach.
+	// Node deletion typically means the underlying node is gone, there is no point to wait.
+	// If the node is deleted by accident, it is still acceptable because
+	// detach is still gated by pod deletion (typically by PodGC controller),
+	// and once pods are deleted, kubelet cannot clean up anyway (CNI/CSI pods are likely deleted together).
+	adc.processVolumesInUse(logger, nodeName, nil)
 }
 
 func (adc *attachDetachController) enqueuePVC(obj interface{}) {
