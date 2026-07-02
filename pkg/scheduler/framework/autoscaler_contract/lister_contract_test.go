@@ -23,6 +23,7 @@ package contract
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
@@ -34,6 +35,7 @@ var _ fwk.StorageInfoLister = &storageInfoListerContract{}
 var _ fwk.SharedLister = &shareListerContract{}
 var _ fwk.ResourceSliceLister = &resourceSliceListerContract{}
 var _ fwk.PodGroupStateLister = &podGroupStateListerContract{}
+var _ fwk.PodGroupLister = &podGroupListerContract{}
 var _ fwk.PodGroupState = &podGroupStateContract{}
 var _ fwk.DeviceClassLister = &deviceClassListerContract{}
 var _ fwk.ResourceClaimTracker = &resourceClaimTrackerContract{}
@@ -76,6 +78,16 @@ func (c *shareListerContract) StorageInfos() fwk.StorageInfoLister {
 
 func (c *shareListerContract) PodGroupStates() fwk.PodGroupStateLister {
 	return nil
+}
+
+func (c *shareListerContract) PodGroups() fwk.PodGroupLister {
+	return nil
+}
+
+type podGroupListerContract struct{}
+
+func (c *podGroupListerContract) Get(_ string, _ string) (*schedulingapi.PodGroup, error) {
+	return nil, nil
 }
 
 type podGroupStateListerContract struct{}
@@ -182,10 +194,6 @@ func (s *sharedDRAManagerContract) DeviceClasses() fwk.DeviceClassLister {
 }
 
 func (s *sharedDRAManagerContract) DeviceClassResolver() fwk.DeviceClassResolver {
-	return nil
-}
-
-func (s *sharedDRAManagerContract) PodGroups() fwk.PodGroupLister {
 	return nil
 }
 

@@ -389,7 +389,7 @@ func (pl *DynamicResources) podResourceClaimBindings(pod *v1.Pod) ([]resourceapi
 	}
 
 	bindings := make([]resourceapi.ResourceClaimConsumerReference, 0, len(pod.Spec.ResourceClaims))
-	podGroup, err := pl.getPodGroup(pod)
+	podGroup, err := pl.getPodGroupSnapshot(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -1013,7 +1013,7 @@ func (pl *DynamicResources) unreservePodGroupClaims(ctx context.Context, pod *v1
 	if podGroupState.ScheduledPodsCount() > 0 {
 		return nil
 	}
-	podGroup, err := pl.getPodGroup(pod)
+	podGroup, err := pl.getPodGroupSnapshot(pod)
 	if err != nil {
 		return statusError(logger, err)
 	}
@@ -1736,12 +1736,12 @@ func (pl *DynamicResources) isPodReadyForBinding(state *stateData) (bool, error)
 	return true, nil
 }
 
-func (pl *DynamicResources) getPodGroup(pod *v1.Pod) (*schedulingapi.PodGroup, error) {
+func (pl *DynamicResources) getPodGroupSnapshot(pod *v1.Pod) (*schedulingapi.PodGroup, error) {
 	if !pl.fts.EnableDRAWorkloadResourceClaims ||
 		pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
 		return nil, nil
 	}
-	return pl.draManager.PodGroups().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	return pl.fh.SnapshotSharedLister().PodGroups().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 }
 
 // hasBindingConditions checks whether any of the claims in the state

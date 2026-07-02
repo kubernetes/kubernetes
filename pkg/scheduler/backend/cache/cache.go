@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -291,8 +292,10 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 		return errors.New(errMsg)
 	}
 
-	// Take a snapshot of pod group states for this scheduling cycle.
-	cache.updatePodGroupStateSnapshot(nodeSnapshot)
+	if cache.genericWorkloadEnabled {
+		// Take a snapshot of pod group states for this scheduling cycle.
+		cache.updatePodGroupStateSnapshot(nodeSnapshot)
+	}
 
 	return nil
 }
@@ -945,6 +948,35 @@ func (cache *cacheImpl) Get(namespace string, podGroupName string) (fwk.PodGroup
 	return podGroupState, nil
 }
 
+// PodGroups returns the PodGroupLister for this cache.
+func (cache *cacheImpl) PodGroups() fwk.PodGroupLister {
+	return &podGroupListerImpl{cache: cache}
+}
+
+type podGroupListerImpl struct {
+	cache *cacheImpl
+}
+
+// Get returns the cached pod group object.
+func (l *podGroupListerImpl) Get(namespace, name string) (*schedulingv1alpha3.PodGroup, error) {
+	if !l.cache.genericWorkloadEnabled {
+		return nil, fmt.Errorf("generic workload feature gate is disabled")
+	}
+	l.cache.mu.RLock()
+	defer l.cache.mu.RUnlock()
+
+	key := newPodGroupKey(namespace, name)
+	pgs, exists := l.cache.podGroupStates[key]
+	if !exists {
+		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
+	}
+	pg := pgs.PodGroup()
+	if pg == nil {
+		return nil, fmt.Errorf("pod group object not found for pod group %s", key)
+	}
+	return pg, nil
+}
+
 // BindPod handles the pod binding by adding a bind API call to the dispatcher.
 // This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
 func (cache *cacheImpl) BindPod(binding *v1.Binding) (<-chan error, error) {
@@ -984,4 +1016,58 @@ func (cache *cacheImpl) applyPVCRefCountDelta(snapshot *Snapshot) error {
 	}
 	cache.pvcRefCountsDelta = map[string]int{}
 	return nil
+}
+
+// AddPodGroup adds a pod group object to the cache.
+func (cache *cacheImpl) AddPodGroup(podGroup *schedulingv1alpha3.PodGroup) {
+	if !cache.genericWorkloadEnabled {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	key := newPodGroupKey(podGroup.Namespace, podGroup.Name)
+	pgs, exists := cache.podGroupStates[key]
+	if !exists {
+		pgs = newPodGroupState()
+		cache.podGroupStates[key] = pgs
+	}
+	pgs.setPodGroup(podGroup)
+}
+
+// UpdatePodGroup updates a pod group object in the cache.
+func (cache *cacheImpl) UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1alpha3.PodGroup) {
+	if !cache.genericWorkloadEnabled {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	key := newPodGroupKey(newPodGroup.Namespace, newPodGroup.Name)
+	pgs, exists := cache.podGroupStates[key]
+	if !exists {
+		// This should not happen: the pod group state should have been already created by a prior pod group add action.
+		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "podGroup", klog.KObj(newPodGroup))
+		return
+	}
+	pgs.setPodGroup(newPodGroup)
+}
+
+// RemovePodGroup removes a pod group object from the cache.
+func (cache *cacheImpl) RemovePodGroup(podGroup *schedulingv1alpha3.PodGroup) {
+	if !cache.genericWorkloadEnabled {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	key := newPodGroupKey(podGroup.Namespace, podGroup.Name)
+	pgs, exists := cache.podGroupStates[key]
+	if !exists {
+		return
+	}
+	pgs.removePodGroup()
+	if pgs.empty() {
+		delete(cache.podGroupStates, key)
+	}
 }

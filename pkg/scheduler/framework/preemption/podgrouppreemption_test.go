@@ -28,7 +28,6 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -37,21 +36,10 @@ import (
 )
 
 type mockPodGroupLister struct {
-	schedulinglisters.PodGroupLister
 	podGroups map[string]*schedulingapi.PodGroup
 }
 
-func (m *mockPodGroupLister) PodGroups(namespace string) schedulinglisters.PodGroupNamespaceLister {
-	return &mockPodGroupNamespaceLister{podGroups: m.podGroups, namespace: namespace}
-}
-
-type mockPodGroupNamespaceLister struct {
-	schedulinglisters.PodGroupNamespaceLister
-	podGroups map[string]*schedulingapi.PodGroup
-	namespace string
-}
-
-func (m *mockPodGroupNamespaceLister) Get(name string) (*schedulingapi.PodGroup, error) {
+func (m *mockPodGroupLister) Get(namespace, name string) (*schedulingapi.PodGroup, error) {
 	if pg, ok := m.podGroups[name]; ok {
 		return pg, nil
 	}
@@ -1280,7 +1268,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			}
 
 			pl := &PodGroupEvaluator{
-				podGroupLister: pgLister,
+				podGroupSnapshot: pgLister,
 			}
 
 			res, gotStatus := pl.selectVictimsOnDomain(ctx, tt.preemptor, domain, tt.pdbs, mockSchedulingFunc)

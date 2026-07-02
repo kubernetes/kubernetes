@@ -50,6 +50,14 @@ type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
 	PodGroupStates() PodGroupStateLister
+	// PodGroups provides access to cached pod group objects.
+	PodGroups() PodGroupLister
+}
+
+// PodGroupLister provides read access to cached pod group objects.
+type PodGroupLister interface {
+	// Get returns the PodGroup with the given namespace and name.
+	Get(namespace, name string) (*schedulingapi.PodGroup, error)
 }
 
 // PodGroupStateLister provides read access to pod group states.
@@ -138,12 +146,6 @@ type DeviceClassResolver interface {
 	GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass
 }
 
-// PodGroupLister can be used to obtain PodGroups.
-type PodGroupLister interface {
-	// Get returns the PodGroup with the given podGroupName.
-	Get(namespace, podGroupName string) (*schedulingapi.PodGroup, error)
-}
-
 // SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.
 // The plugin's default implementation obtains the objects from the API. A different implementation can be
 // plugged into the framework in order to simulate the state of DRA objects. For example, Cluster Autoscaler
@@ -153,7 +155,6 @@ type SharedDRAManager interface {
 	ResourceSlices() ResourceSliceLister
 	DeviceClasses() DeviceClassLister
 	DeviceClassResolver() DeviceClassResolver
-	PodGroups() PodGroupLister
 }
 
 // CSIManager can be used to obtain CSINode objects, and track changes to CSINode objects in-memory.
@@ -168,6 +169,8 @@ type CSIManager interface {
 type PodGroupManager interface {
 	// PodGroupStates returns the PodGroupStateLister.
 	PodGroupStates() PodGroupStateLister
+	// PodGroups returns the PodGroupLister.
+	PodGroups() PodGroupLister
 }
 
 // PodGroupState provides an interface to view the state of a single pod group.

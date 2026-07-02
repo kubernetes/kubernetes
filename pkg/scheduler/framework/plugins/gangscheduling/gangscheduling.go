@@ -23,9 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -47,7 +45,6 @@ const (
 // belonging to a PodGroup with a Gang scheduling policy.
 type GangScheduling struct {
 	handle          fwk.Handle
-	podGroupLister  schedulinglisters.PodGroupLister
 	podGroupManager fwk.PodGroupManager
 	snapshotLister  fwk.SharedLister
 }
@@ -61,7 +58,6 @@ var _ framework.PlacementFeasiblePlugin = &GangScheduling{}
 func New(_ context.Context, _ runtime.Object, fh fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &GangScheduling{
 		handle:          fh,
-		podGroupLister:  fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister(),
 		podGroupManager: fh.PodGroupManager(),
 		snapshotLister:  fh.SnapshotSharedLister(),
 	}, nil
@@ -165,14 +161,10 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 	namespace := pod.Namespace
 	schedulingGroup := pod.Spec.SchedulingGroup
 
-	podGroup, err := pl.podGroupLister.PodGroups(namespace).Get(*schedulingGroup.PodGroupName)
+	podGroup, err := pl.podGroupManager.PodGroups().Get(namespace, *schedulingGroup.PodGroupName)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// The pod is unschedulable until its PodGroup object is created.
-			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for pods's pod group %q to appear in scheduling queue", *schedulingGroup.PodGroupName))
-		}
-		klog.FromContext(ctx).Error(err, "Failed to get pod group", "pod", klog.KObj(pod), "schedulingGroup", schedulingGroup)
-		return fwk.AsStatus(fmt.Errorf("failed to get pod group %s/%s", namespace, *schedulingGroup.PodGroupName))
+		// The pod is unschedulable until its PodGroup object is created.
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for pods's pod group %q to appear in scheduling queue", *schedulingGroup.PodGroupName))
 	}
 
 	policy := podGroup.Spec.SchedulingPolicy
@@ -205,11 +197,11 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 	namespace := pod.Namespace
 	schedulingGroup := pod.Spec.SchedulingGroup
 
-	podGroup, err := pl.podGroupLister.PodGroups(namespace).Get(*schedulingGroup.PodGroupName)
+	podGroup, err := pl.snapshotLister.PodGroups().Get(namespace, *schedulingGroup.PodGroupName)
 	if err != nil {
 		// It's likely that the pod group was removed or another error happened.
 		// Returning error to retry the Pod when the pod group is added again.
-		return fwk.AsStatus(fmt.Errorf("failed to get podGroup %s/%s: %w", namespace, *schedulingGroup.PodGroupName, err)), 0
+		return fwk.AsStatus(fmt.Errorf("failed to get podGroup %s/%s from snapshot: %w", namespace, *schedulingGroup.PodGroupName, err)), 0
 	}
 
 	policy := podGroup.Spec.SchedulingPolicy

@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/listers/scheduling/v1alpha3"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -71,7 +70,7 @@ type DefaultPreemption struct {
 
 	Executor          *preemption.Executor
 	Evaluator         *preemption.Evaluator
-	pgLister          v1alpha3.PodGroupLister
+	pgLister          fwk.PodGroupLister
 	podGroupEvaluator *preemption.PodGroupEvaluator
 
 	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.
@@ -114,7 +113,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, pl.Executor)
 
 	if pl.fts.EnableGenericWorkload {
-		pl.pgLister = fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister()
+		pl.pgLister = fh.PodGroupManager().PodGroups()
 		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor, pl.fts.EnablePodGroupPreemptionPolicy)
 	}
 
@@ -155,7 +154,7 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 		return nil
 	}
 	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload {
-		pg, err := pl.pgLister.PodGroups(p.Namespace).Get(*p.Spec.SchedulingGroup.PodGroupName)
+		pg, err := pl.pgLister.Get(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
 		// If the pg is not found do not block the pod. It's not a default preemption responsibility
 		// to block pods from pod group without pg from entering the queue.
 		if err != nil {

@@ -519,6 +519,11 @@ func TestPostFilter(t *testing.T) {
 					defer apiDispatcher.Close()
 				}
 
+				cache := internalcache.New(ctx, apiDispatcher, tt.features.EnableGenericWorkload)
+				for _, podGroup := range tt.podGroups {
+					cache.AddPodGroup(podGroup)
+				}
+
 				f, err := tf.NewFramework(ctx, registeredPlugins, "",
 					frameworkruntime.WithClientSet(cs),
 					frameworkruntime.WithAPIDispatcher(apiDispatcher),
@@ -526,16 +531,16 @@ func TestPostFilter(t *testing.T) {
 					frameworkruntime.WithInformerFactory(informerFactory),
 					frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 					frameworkruntime.WithExtenders(extenders),
-					frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
+					frameworkruntime.WithSnapshotSharedLister(internalcache.NewTestSnapshotWithPodGroups(tt.pods, tt.nodes, tt.podGroups)),
 					frameworkruntime.WithLogger(logger),
 					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 					frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+					frameworkruntime.WithPodGroupManager(cache),
 				)
 				if err != nil {
 					t.Fatal(err)
 				}
 				if asyncAPICallsEnabled {
-					cache := internalcache.New(ctx, apiDispatcher, false)
 					f.SetAPICacher(apicache.New(nil, cache))
 				}
 
@@ -2556,15 +2561,21 @@ func TestPreEnqueue(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
+			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload)
+			for _, podGroup := range tt.pgs {
+				cache.AddPodGroup(podGroup)
+			}
+
 			f, err := tf.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(pods, []*v1.Node{st.MakeNode().Name("node1").Capacity(onePodRes).Obj()})),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewTestSnapshotWithPodGroups(pods, []*v1.Node{st.MakeNode().Name("node1").Capacity(onePodRes).Obj()}, tt.pgs)),
 				frameworkruntime.WithLogger(logger),
 				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+				frameworkruntime.WithPodGroupManager(cache),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -2650,11 +2661,17 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
+
+	preemptorPG := st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj()
+	cache := internalcache.New(ctx, nil, true)
+	cache.AddPodGroup(preemptorPG)
+
 	f, err := tf.NewFramework(ctx, registeredPlugins, "",
 		frameworkruntime.WithClientSet(client),
-		frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(testPods, nodes)),
+		frameworkruntime.WithSnapshotSharedLister(internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, []*v1alpha3.PodGroup{preemptorPG})),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithPodGroupManager(cache),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2668,7 +2685,6 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preemptorPG := st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj()
 	preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()}
 	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 		return nil, fwk.NewStatus(fwk.Unschedulable)

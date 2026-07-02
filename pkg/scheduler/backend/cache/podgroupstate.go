@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -63,6 +64,10 @@ func newPodGroupKey(namespace string, name string) podGroupKey {
 }
 
 // podGroupStateData holds data and functionality shared between podGroupState and podGroupStateSnapshot.
+// Note that the podGroup field is populated from the observed PodGroup API object,
+// while other fields are populated from observed Pod objects. This means podGroupStateData
+// can exist without a corresponding PodGroup API object as long as at least one
+// Pod references it.
 type podGroupStateData struct {
 	// generation gets bumped whenever the data is changed.
 	// It's used to detect changes and avoid unnecessary cloning when taking a snapshot.
@@ -77,6 +82,8 @@ type podGroupStateData struct {
 	assumedPods map[types.UID]*v1.Pod
 	// assignedPods tracks all pods belonging to the group that are assigned (bound).
 	assignedPods sets.Set[types.UID]
+	// podGroup is the cached API object of the PodGroup.
+	podGroup *schedulingv1alpha3.PodGroup
 }
 
 func newPodGroupStateData() podGroupStateData {
@@ -183,7 +190,7 @@ func (d *podGroupStateData) scheduledPods() []*v1.Pod {
 
 // empty returns true when the pod group state contains no pods.
 func (d *podGroupStateData) empty() bool {
-	return len(d.allPods) == 0
+	return len(d.allPods) == 0 && d.podGroup == nil
 }
 
 // allPodsCount returns the number of all pods known to the scheduler for this group.
@@ -196,15 +203,32 @@ func (d *podGroupStateData) scheduledPodsCount() int {
 	return len(d.assumedPods) + len(d.assignedPods)
 }
 
-// deepCopy returns a deep copy of the pod group state data.
-func (d *podGroupStateData) deepCopy() podGroupStateData {
+// clone returns a clone of the pod group state data.
+// It does not deep copy the inner Pod and PodGroup objects
+// as they should not be mutated by the scheduler.
+// Cache's and snapshot's objects are read-only from the outside,
+// unless mutated explicitly by the methods.
+func (d *podGroupStateData) clone() podGroupStateData {
 	return podGroupStateData{
 		generation:      d.generation,
 		allPods:         maps.Clone(d.allPods),
 		unscheduledPods: d.unscheduledPods.Clone(),
 		assumedPods:     maps.Clone(d.assumedPods),
 		assignedPods:    d.assignedPods.Clone(),
+		podGroup:        d.podGroup,
 	}
+}
+
+// setPodGroup sets the PodGroup object.
+func (d *podGroupStateData) setPodGroup(podGroup *schedulingv1alpha3.PodGroup) {
+	d.generation = nextPodGroupGeneration()
+	d.podGroup = podGroup
+}
+
+// removePodGroup removes the PodGroup object.
+func (d *podGroupStateData) removePodGroup() {
+	d.generation = nextPodGroupGeneration()
+	d.podGroup = nil
 }
 
 // unscheduledPodsMap returns all unscheduled pods for this pod group.
@@ -230,10 +254,10 @@ func newPodGroupState() *podGroupState {
 // snapshot returns a deep copy of the live pod group state as an immutable snapshot.
 // It must be called under the cache lock.
 func (pgs *podGroupState) snapshot() *podGroupStateSnapshot {
-	return &podGroupStateSnapshot{podGroupStateData: pgs.podGroupStateData.deepCopy()}
+	return &podGroupStateSnapshot{podGroupStateData: pgs.podGroupStateData.clone()}
 }
 
-// empty returns true when the group contains no pods.
+// empty returns true when the group contains no pods and the cached PodGroup object is nil.
 // It must be called under the cache lock.
 func (pgs *podGroupState) empty() bool {
 	pgs.lock.RLock()
@@ -287,6 +311,24 @@ func (pgs *podGroupState) forgetPod(podUID types.UID) {
 	defer pgs.lock.Unlock()
 
 	pgs.podGroupStateData.forgetPod(podUID)
+}
+
+// setPodGroup sets the PodGroup object.
+// It must be called under the cache lock.
+func (pgs *podGroupState) setPodGroup(podGroup *schedulingv1alpha3.PodGroup) {
+	pgs.lock.Lock()
+	defer pgs.lock.Unlock()
+
+	pgs.podGroupStateData.setPodGroup(podGroup)
+}
+
+// removePodGroup removes the PodGroup object.
+// It must be called under the cache lock.
+func (pgs *podGroupState) removePodGroup() {
+	pgs.lock.Lock()
+	defer pgs.lock.Unlock()
+
+	pgs.podGroupStateData.removePodGroup()
 }
 
 // AllPods returns the UIDs of all pods known to the scheduler for this group.
@@ -346,6 +388,14 @@ func (pgs *podGroupState) ScheduledPodsCount() int {
 	defer pgs.lock.RUnlock()
 
 	return pgs.podGroupStateData.scheduledPodsCount()
+}
+
+// PodGroup returns the PodGroup API object.
+func (pgs *podGroupState) PodGroup() *schedulingv1alpha3.PodGroup {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	return pgs.podGroupStateData.podGroup
 }
 
 // podGroupStateSnapshot is an immutable, point-in-time copy of a podGroupState.

@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -693,9 +694,11 @@ func Test_AddPodGroupMember(t *testing.T) {
 	podWithNoPodGroup := st.MakePod().Namespace("namespace").Name("non-workload-pod").Obj()
 	unscheduledPodGroupMember := st.MakePod().Namespace("namespace").Name("unscheduled-pod").PodGroupName("pg").Obj()
 	assignedPodGroupMember := st.MakePod().Namespace("namespace").Name("assigned-pod").Node("node1").PodGroupName("pg").Obj()
+	podGroup := st.MakePodGroup().Namespace("namespace").Name("pg").Obj()
 
 	tests := []struct {
 		name                    string
+		initPodGroup            *schedulingv1alpha3.PodGroup
 		pod                     *v1.Pod
 		genericWorkloadEnabled  bool
 		expectInUnscheduledPods bool
@@ -723,11 +726,22 @@ func Test_AddPodGroupMember(t *testing.T) {
 			genericWorkloadEnabled: true,
 			expectInAssignedPods:   true,
 		},
+		{
+			name:                   "add assigned pod group member when state already exists (from PodGroup object)",
+			initPodGroup:           podGroup,
+			pod:                    assignedPodGroupMember,
+			genericWorkloadEnabled: true,
+			expectInAssignedPods:   true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled)
+			if tt.initPodGroup != nil {
+				cache.AddPodGroup(tt.initPodGroup)
+			}
+
 			cache.AddPodGroupMember(tt.pod)
 
 			if !tt.genericWorkloadEnabled || tt.pod.Spec.SchedulingGroup == nil {
@@ -862,10 +876,12 @@ func Test_RemovePodGroupMember(t *testing.T) {
 		PodGroupName(podGroupName).Obj()
 	pod2 := st.MakePod().Namespace("namespace").Name("assigned-pod").UID("pod2").Node("node").
 		PodGroupName(podGroupName).Obj()
+	podGroup := st.MakePodGroup().Namespace("namespace").Name(podGroupName).Obj()
 
 	tests := []struct {
 		name                     string
 		initPods                 []*v1.Pod
+		initPodGroup             *schedulingv1alpha3.PodGroup
 		podToDelete              *v1.Pod
 		expectPodGroupStateCount int
 		genericWorkloadEnabled   bool
@@ -882,6 +898,14 @@ func Test_RemovePodGroupMember(t *testing.T) {
 			initPods:                 []*v1.Pod{pod1},
 			podToDelete:              pod1,
 			expectPodGroupStateCount: 0,
+			genericWorkloadEnabled:   true,
+		},
+		{
+			name:                     "remove a last pod from a group when PodGroup object still exists shouldn't remove the state",
+			initPods:                 []*v1.Pod{pod1},
+			initPodGroup:             podGroup,
+			podToDelete:              pod1,
+			expectPodGroupStateCount: 1,
 			genericWorkloadEnabled:   true,
 		},
 		{
@@ -902,6 +926,10 @@ func Test_RemovePodGroupMember(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled)
+
+			if tt.initPodGroup != nil {
+				cache.AddPodGroup(tt.initPodGroup)
+			}
 
 			for _, pod := range tt.initPods {
 				cache.AddPodGroupMember(pod)
@@ -925,6 +953,182 @@ func Test_RemovePodGroupMember(t *testing.T) {
 
 			if podGroupState.AllPods().Has(tt.podToDelete.UID) {
 				t.Errorf("Expected pod %s to be deleted from pod group but it still exists", tt.podToDelete.UID)
+			}
+		})
+	}
+}
+
+func Test_AddPodGroup(t *testing.T) {
+	podGroup := st.MakePodGroup().Namespace("ns").Name("pg").Obj()
+	pod := st.MakePod().Namespace("ns").Name("pod1").PodGroupName("pg").Obj()
+
+	tests := []struct {
+		name                   string
+		initPod                *v1.Pod
+		podGroup               *schedulingv1alpha3.PodGroup
+		genericWorkloadEnabled bool
+		expectPodGroup         *schedulingv1alpha3.PodGroup
+	}{
+		{
+			name:                   "add pod group with GenericWorkload disabled should be no-op",
+			podGroup:               podGroup,
+			genericWorkloadEnabled: false,
+			expectPodGroup:         nil,
+		},
+		{
+			name:                   "add pod group",
+			podGroup:               podGroup,
+			genericWorkloadEnabled: true,
+			expectPodGroup:         podGroup,
+		},
+		{
+			name:                   "add pod group when state already exists (from pod group members)",
+			initPod:                pod,
+			podGroup:               podGroup,
+			genericWorkloadEnabled: true,
+			expectPodGroup:         podGroup,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
+			if tt.initPod != nil {
+				cache.AddPodGroupMember(tt.initPod)
+			}
+			cache.AddPodGroup(tt.podGroup)
+
+			gotPodGroup, err := cache.PodGroups().Get(tt.podGroup.Namespace, tt.podGroup.Name)
+			if tt.expectPodGroup != nil {
+				if err != nil {
+					t.Fatalf("Expected pod group to exist, but got error: %v", err)
+				}
+				if diff := cmp.Diff(tt.expectPodGroup, gotPodGroup); diff != "" {
+					t.Errorf("Unexpected pod group (-want, +got):\n%s", diff)
+				}
+			} else if err == nil {
+				t.Error("Expected error getting pod group, but got none")
+			}
+		})
+	}
+}
+
+func Test_UpdatePodGroup(t *testing.T) {
+	oldPodGroup := st.MakePodGroup().Namespace("ns").Name("pg").MinCount(1).Obj()
+	newPodGroup := st.MakePodGroup().Namespace("ns").Name("pg").MinCount(2).Obj()
+
+	tests := []struct {
+		name                   string
+		initPodGroup           *schedulingv1alpha3.PodGroup
+		oldPodGroup            *schedulingv1alpha3.PodGroup
+		newPodGroup            *schedulingv1alpha3.PodGroup
+		genericWorkloadEnabled bool
+		expectPodGroup         *schedulingv1alpha3.PodGroup
+	}{
+		{
+			name:                   "update pod group with GenericWorkload disabled should be no-op",
+			oldPodGroup:            oldPodGroup,
+			newPodGroup:            newPodGroup,
+			genericWorkloadEnabled: false,
+			expectPodGroup:         nil,
+		},
+		{
+			name:                   "update pod group with GenericWorkload enabled",
+			oldPodGroup:            oldPodGroup,
+			newPodGroup:            newPodGroup,
+			genericWorkloadEnabled: true,
+			expectPodGroup:         newPodGroup,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
+			cache.AddPodGroup(tt.oldPodGroup)
+
+			cache.UpdatePodGroup(logger, tt.oldPodGroup, tt.newPodGroup)
+
+			gotPodGroup, err := cache.PodGroups().Get(tt.newPodGroup.Namespace, tt.newPodGroup.Name)
+			if tt.expectPodGroup != nil {
+				if err != nil {
+					t.Fatalf("Expected pod group to exist, but got error: %v", err)
+				}
+				if diff := cmp.Diff(tt.expectPodGroup, gotPodGroup); diff != "" {
+					t.Errorf("Unexpected pod group (-want, +got):\n%s", diff)
+				}
+			} else if err == nil {
+				t.Error("Expected error getting pod group, but got none")
+			}
+		})
+	}
+}
+
+func Test_RemovePodGroup(t *testing.T) {
+	podGroup := st.MakePodGroup().Namespace("ns").Name("pg").Obj()
+	pod := st.MakePod().Namespace("ns").Name("pod1").PodGroupName("pg").Obj()
+
+	tests := []struct {
+		name                   string
+		initPod                *v1.Pod
+		podGroup               *schedulingv1alpha3.PodGroup
+		genericWorkloadEnabled bool
+		expectPodGroupExists   bool
+		expectStateExists      bool
+		expectPodsCount        int
+	}{
+		{
+			name:                   "remove pod group with GenericWorkload disabled should be no-op",
+			podGroup:               podGroup,
+			genericWorkloadEnabled: false,
+		},
+		{
+			name:                   "remove pod group with GenericWorkload enabled",
+			podGroup:               podGroup,
+			genericWorkloadEnabled: true,
+			expectStateExists:      false,
+		},
+		{
+			name:                   "remove pod group when it still has pod members",
+			initPod:                pod,
+			podGroup:               podGroup,
+			genericWorkloadEnabled: true,
+			expectStateExists:      true,
+			expectPodsCount:        1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
+			if tt.initPod != nil {
+				cache.AddPodGroupMember(tt.initPod)
+			}
+			cache.AddPodGroup(tt.podGroup)
+
+			cache.RemovePodGroup(tt.podGroup)
+
+			_, err := cache.PodGroups().Get(tt.podGroup.Namespace, tt.podGroup.Name)
+			if err == nil {
+				t.Error("Expected error getting pod group, but got none")
+			}
+
+			key := newPodGroupKey(tt.podGroup.Namespace, tt.podGroup.Name)
+			pgs, exists := cache.podGroupStates[key]
+			if tt.expectStateExists {
+				if !exists {
+					t.Fatalf("Expected pod group state to exist")
+				}
+				if pgs.PodGroup() != nil {
+					t.Error("Expected pod group object inside state to be nil, but it was not")
+				}
+				if len(pgs.allPods) != tt.expectPodsCount {
+					t.Errorf("Expected %d pods in state, got %d", tt.expectPodsCount, len(pgs.allPods))
+				}
+			} else if exists {
+				t.Error("Expected pod group state to be deleted, but it still exists")
 			}
 		})
 	}
