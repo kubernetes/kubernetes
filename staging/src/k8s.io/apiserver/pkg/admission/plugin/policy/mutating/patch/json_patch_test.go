@@ -469,6 +469,110 @@ func TestJSONPatch(t *testing.T) {
 				Spec:       appsv1.DeploymentSpec{},
 			},
 		},
+		{
+			name: "jsonPatch with scalar int and bool as values",
+			expression: `[
+					JSONPatch{op: "replace", path: "/spec/replicas", value: object.spec.replicas + 2},
+					JSONPatch{op: "replace", path: "/spec/paused", value: !object.spec.paused},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](3), Paused: true},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](5), Paused: false},
+			},
+		},
+		{
+			name: "jsonPatch with quantity and duration as values",
+			expression: `[
+					JSONPatch{op: "add", path: "/metadata/labels/cpu", value: quantity("100m").isGreaterThan(quantity("0")) ? "100m" : "0"},
+					JSONPatch{op: "add", path: "/spec/minReadySeconds", value: int(duration("30s")) / 1000000000},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"existing": "val"}},
+				Spec:       appsv1.DeploymentSpec{},
+			},
+			expectedResult: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"existing": "val", "cpu": "100m"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					MinReadySeconds: 30,
+				},
+			},
+		},
+		{
+			name: "jsonPatch with slice of scalars as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/command", value: ["sh", "-c", "echo hello"]},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{Name: "c1"}},
+						},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    "c1",
+									Command: []string{"sh", "-c", "echo hello"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with map of scalars as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/metadata/labels", value: {"env": "prod", "tier": "frontend"}},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec:       appsv1.DeploymentSpec{},
+			},
+			expectedResult: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"env": "prod", "tier": "frontend"},
+				},
+				Spec: appsv1.DeploymentSpec{},
+			},
+		},
+		{
+			name: "jsonPatch with map of struct as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/nodeSelector", value: {"disktype": "ssd"}},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							NodeSelector: map[string]string{"disktype": "ssd"},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	compiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))

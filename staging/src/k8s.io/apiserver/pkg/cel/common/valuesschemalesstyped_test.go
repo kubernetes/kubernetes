@@ -214,6 +214,12 @@ func assertEquivalence(t *testing.T, val interface{}) {
 			unstrMap, expectedCEL, expectedCEL.Type(), gotCEL.Value(), gotCEL, gotCEL.Type())
 	}
 
+	// Verify reverse-direction equivalence (expectedCEL.Equal(gotCEL)).
+	if expectedCEL.Equal(gotCEL) != types.True {
+		t.Errorf("Reverse equivalence mismatch!\nExpected: %v (Type: %T, CEL: %v)\nGot:      %v (Type: %T, CEL: %v)",
+			unstrMap, expectedCEL, expectedCEL.Type(), gotCEL.Value(), gotCEL, gotCEL.Type())
+	}
+
 	// Verify ConvertToNative(structpbValueType) matches the result of converting unstrMap via expectedCEL.ConvertToNative(structpbValueType).
 	gotPB, err := gotCEL.ConvertToNative(structpbValueType)
 	if err != nil {
@@ -1001,6 +1007,7 @@ func TestSchemalessTypedMap_Equal(t *testing.T) {
 }
 
 func TestSchemalessTyped_ConvertToNative(t *testing.T) {
+	type CustomString string
 	type SimpleStruct struct {
 		Name  string `json:"name"`
 		Value int    `json:"value"`
@@ -1077,6 +1084,15 @@ func TestSchemalessTyped_ConvertToNative(t *testing.T) {
 		{
 			name:       "map to mapStringAnyType",
 			val:        SchemalessTypedToVal(sampleMap),
+			targetType: mapStringAnyType,
+			expected: map[string]interface{}{
+				"name":  "foo",
+				"value": int64(42),
+			},
+		},
+		{
+			name:       "custom string key map to mapStringAnyType",
+			val:        SchemalessTypedToVal(map[CustomString]interface{}{"name": "foo", "value": int64(42)}),
 			targetType: mapStringAnyType,
 			expected: map[string]interface{}{
 				"name":  "foo",
