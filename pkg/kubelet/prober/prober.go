@@ -164,13 +164,16 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 			logger.V(4).Info("HTTP-Probe failed to create request", "error", err)
 			return probe.Unknown, "", err
 		}
-		if loggerV4 := logger.V(4); logger.Enabled() {
+		if loggerV4 := logger.V(4); loggerV4.Enabled() {
 			port := req.URL.Port()
 			host := req.URL.Hostname()
 			path := req.URL.Path
 			scheme := req.URL.Scheme
-			headers := p.HTTPGet.HTTPHeaders
-			loggerV4.Info("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers, "probeType", probeType)
+			headerNames := make([]string, 0, len(p.HTTPGet.HTTPHeaders))
+			for _, header := range p.HTTPGet.HTTPHeaders {
+				headerNames = append(headerNames, header.Name)
+			}
+			loggerV4.Info("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headerNames, "probeType", probeType)
 		}
 		return pb.http.Probe(req, timeout)
 

@@ -18,18 +18,23 @@ package prober
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -273,6 +278,62 @@ func TestProbe(t *testing.T) {
 			}
 		}
 	}
+}
+
+// captureSink is a minimal logr.LogSink that records every Info call so
+// tests can assert on the exact structured fields that were logged.
+type captureSink struct {
+	buf *bytes.Buffer
+}
+
+func (s *captureSink) Init(logr.RuntimeInfo) {}
+func (s *captureSink) Enabled(int) bool      { return true }
+func (s *captureSink) WithName(string) logr.LogSink {
+	return s
+}
+func (s *captureSink) WithValues(...interface{}) logr.LogSink {
+	return s
+}
+func (s *captureSink) Info(_ int, msg string, kv ...interface{}) {
+	fmt.Fprintln(s.buf, append([]interface{}{msg}, kv...)...)
+}
+func (s *captureSink) Error(err error, msg string, kv ...interface{}) {
+	fmt.Fprintln(s.buf, append([]interface{}{msg, err}, kv...)...)
+}
+
+type fakeSuccessHTTPProber struct{}
+
+func (fakeSuccessHTTPProber) Probe(_ *http.Request, _ time.Duration) (probe.Result, string, error) {
+	return probe.Success, "", nil
+}
+
+// TestRunProbeHTTPHeaderLogRedaction is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/140174: the HTTP-Probe
+// V(4) log line must not leak configured header values (e.g. Authorization
+// tokens), only the header names.
+func TestRunProbeHTTPHeaderLogRedaction(t *testing.T) {
+	const secretValue = "Bearer super-secret-token"
+	var logs bytes.Buffer
+	ctx := klog.NewContext(context.Background(), logr.New(&captureSink{buf: &logs}))
+
+	pb := &prober{http: fakeSuccessHTTPProber{}}
+	httpProbe := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/healthz",
+				Port: intstr.FromInt32(8080),
+				HTTPHeaders: []v1.HTTPHeader{
+					{Name: "Authorization", Value: secretValue},
+				},
+			},
+		},
+	}
+
+	_, _, err := pb.runProbe(ctx, liveness, httpProbe, &v1.Pod{}, v1.PodStatus{PodIP: "127.0.0.1"}, v1.Container{Name: "app"}, kubecontainer.ContainerID{Type: "test", ID: "container"})
+	require.NoError(t, err)
+
+	require.NotContains(t, logs.String(), secretValue, "HTTP-Probe log must not contain the raw header value")
+	require.Contains(t, logs.String(), "Authorization", "HTTP-Probe log should still contain the header name for debuggability")
 }
 
 func TestNewExecInContainer(t *testing.T) {
