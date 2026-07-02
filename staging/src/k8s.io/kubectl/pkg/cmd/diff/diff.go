@@ -17,6 +17,7 @@ limitations under the License.
 package diff
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -71,14 +72,22 @@ var (
 		 >1
 		Kubectl or diff failed with an error.
 
-		Note: KUBECTL_EXTERNAL_DIFF, if used, is expected to follow that convention.`))
+		Note: KUBECTL_EXTERNAL_DIFF, if used, is expected to follow that convention.
+
+		KUBECTL_APPLYSET (ALPHA - default disabled)
+		If set, enables the use of ApplySet-based pruning with --applyset.
+		ApplySets track which resources are managed, allowing accurate
+		preview of what would be pruned without the need for --prune-allowlist.`))
 
 	diffExample = templates.Examples(i18n.T(`
 		# Diff resources included in pod.json
 		kubectl diff -f pod.json
 
 		# Diff file read from stdin
-		cat service.yaml | kubectl diff -f -`))
+		cat service.yaml | kubectl diff -f -
+
+		# Diff resources and show what would be pruned with ApplySet (alpha; requires KUBECTL_APPLYSET=true)
+		kubectl diff -f manifest.yaml --prune --applyset=secret/my-set`))
 )
 
 // Number of times we try to diff before giving-up
@@ -118,6 +127,9 @@ type DiffOptions struct {
 	EnforceNamespace bool
 	Builder          *resource.Builder
 	Diff             *DiffProgram
+
+	ApplySetRef string
+	ApplySet    *apply.ApplySet
 
 	pruner  *pruner
 	tracker *tracker
@@ -169,6 +181,9 @@ func NewCmdDiff(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 	usage := "contains the configuration to diff"
 	cmd.Flags().StringArray("prune-allowlist", []string{}, "Overwrite the default allowlist with <group/version/kind> for --prune")
 	cmd.Flags().Bool("prune", false, "Include resources that would be deleted by pruning. Can be used with -l and default shows all resources would be pruned")
+	if cmdutil.ApplySet.IsEnabled() {
+		cmd.Flags().StringVar(&options.ApplySetRef, "applyset", "", "[alpha] The name of the ApplySet that tracks which resources are being managed, for the purposes of determining what to prune. Format: [RESOURCE][.GROUP]/NAME")
+	}
 	cmd.Flags().BoolVar(&options.ShowManagedFields, "show-managed-fields", options.ShowManagedFields, "If true, include managed fields in the diff.")
 	cmd.Flags().BoolVar(&options.ShowSecrets, "show-secrets", false, "If true, do not mask secret values in the diff.")
 	cmd.Flags().IntVar(&options.Concurrency, "concurrency", 1, "Number of objects to process in parallel when diffing against the live version. Larger number = faster, but more memory, I/O and CPU over that shorter period of time.")
@@ -668,12 +683,32 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 			return err
 		}
 
-		resources, err := prune.ParseResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-allowlist"))
-		if err != nil {
-			return err
-		}
 		o.tracker = newTracker()
-		o.pruner = newPruner(o.DynamicClient, mapper, resources, o.Selector)
+
+		if o.ApplySetRef != "" {
+			if pruneAllowlist := cmdutil.GetFlagStringArray(cmd, "prune-allowlist"); len(pruneAllowlist) > 0 {
+				return fmt.Errorf("--prune-allowlist is incompatible with --applyset")
+			}
+			parent, err := apply.ParseApplySetParentRef(o.ApplySetRef, mapper)
+			if err != nil {
+				return fmt.Errorf("invalid parent reference %q: %w", o.ApplySetRef, err)
+			}
+			if o.EnforceNamespace && parent.IsNamespaced() {
+				parent.Namespace = o.CmdNamespace
+			}
+			tooling := apply.ApplySetTooling{Name: "kubectl", Version: apply.ApplySetToolVersion}
+			restClient, err := f.UnstructuredClientForMapping(parent.RESTMapping)
+			if err != nil {
+				return fmt.Errorf("failed to initialize RESTClient for ApplySet: %w", err)
+			}
+			o.ApplySet = apply.NewApplySet(parent, tooling, mapper, restClient)
+		} else {
+			resources, err := prune.ParseResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-allowlist"))
+			if err != nil {
+				return err
+			}
+			o.pruner = newPruner(o.DynamicClient, mapper, resources, o.Selector)
+		}
 	}
 
 	o.Builder = f.NewBuilder()
@@ -704,9 +739,21 @@ func (o *DiffOptions) Run() error {
 		return err
 	}
 
+	if o.ApplySet != nil {
+		if err := o.ApplySet.FetchParent(); err != nil {
+			return err
+		}
+	}
+
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
+		}
+
+		if o.ApplySet != nil {
+			if err := o.ApplySet.AddLabels(info); err != nil {
+				return err
+			}
 		}
 
 		local := info.Object.DeepCopyObject()
@@ -772,6 +819,22 @@ func (o *DiffOptions) Run() error {
 				return err
 			}
 		}
+	} else if o.ApplySet != nil {
+		prunedObjs, pruneErr := o.ApplySet.FindAllObjectsToPrune(context.TODO(), o.DynamicClient, o.tracker.VisitedUids())
+		if pruneErr != nil {
+			klog.Warningf("pruning failed and could not be evaluated err: %v", pruneErr)
+		}
+
+		for _, p := range prunedObjs {
+			name, err := getObjectName(p.Object)
+			if err != nil {
+				klog.Warningf("pruning failed and object name could not be retrieved: %v", err)
+				continue
+			}
+			if err := differ.From.Print(name, p.Object, printer); err != nil {
+				return err
+			}
+		}
 	}
 
 	if err != nil {
@@ -783,6 +846,17 @@ func (o *DiffOptions) Run() error {
 
 // Validate makes sure provided values for DiffOptions are valid
 func (o *DiffOptions) Validate() error {
+	if o.ApplySetRef != "" && o.ApplySet == nil && o.tracker == nil {
+		return fmt.Errorf("--applyset requires --prune")
+	}
+	if o.ApplySet != nil {
+		if o.Selector != "" {
+			return fmt.Errorf("--selector is incompatible with --applyset")
+		}
+		if err := o.ApplySet.Validate(context.TODO(), o.DynamicClient); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
