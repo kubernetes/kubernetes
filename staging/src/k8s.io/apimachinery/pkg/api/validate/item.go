@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// MatchItemFunc takes a pointer to an item and returns true if it matches the criteria.
-type MatchItemFunc[T any] func(*T) bool
+// MatchItemFunc takes an item and returns true if it matches the criteria.
+type MatchItemFunc[T any] func(T) bool
 
 // SliceItem finds the first item in newList that satisfies the match function,
 // and if found, also looks for a matching item in oldList. If the value of the
@@ -46,7 +46,7 @@ type MatchItemFunc[T any] func(*T) bool
 func SliceItem[TList ~[]TItem, TItem any](
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	newList, oldList TList,
-	match MatchItemFunc[TItem],
+	match MatchItemFunc[*TItem],
 	equiv MatchFunc[*TItem],
 	itemValidator func(ctx context.Context, op operation.Operation, fldPath *field.Path, newObj, oldObj *TItem) field.ErrorList,
 ) field.ErrorList {
