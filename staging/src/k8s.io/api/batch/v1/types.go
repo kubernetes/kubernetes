@@ -60,6 +60,10 @@ const (
 	// JobControllerName reserved value for the managedBy field for the built-in
 	// Job controller.
 	JobControllerName = "kubernetes.io/job-controller"
+	// Annotation marking a Workload or PodGroup as created and managed by the
+	// built-in Job controller. It distinguishes controller-created scheduling
+	// objects from user-provided (BYO) objects.
+	JobWorkloadManagedByAnnotation = labelPrefix + "job-workload-managed-by"
 )
 
 // +genclient

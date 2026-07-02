@@ -2681,6 +2681,22 @@ func TestValidateJobUpdate(t *testing.T) {
 			opts: JobValidationOptions{AllowSchedulingConfiguration: true},
 			err:  field.Invalid(field.NewPath("spec", "scheduling"), nil, ""),
 		},
+		"gate disabled but scheduling already set: immutable change still rejected": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:    validGeneratedSelector,
+					Template:    validPodTemplateSpecForGenerated,
+					Parallelism: new(int32(4)),
+					Scheduling:  &batch.JobSchedulingConfiguration{Policy: &scheduling.PodGroupSchedulingPolicy{Basic: &scheduling.BasicSchedulingPolicy{}}},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling.Policy = &scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: 4}}
+			},
+			opts: JobValidationOptions{AllowSchedulingConfiguration: false},
+			err:  field.Invalid(field.NewPath("spec", "scheduling"), nil, ""),
+		},
 		"immutable scheduling: change disruptionMode while changing minCount": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -2707,20 +2723,20 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:    validGeneratedSelector,
 					Template:    validPodTemplateSpecForGenerated,
-					Parallelism: ptr.To[int32](4),
+					Parallelism: new(int32(4)),
 					Scheduling: &batch.JobSchedulingConfiguration{
 						Policy:         &scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: 4}},
-						ResourceClaims: []scheduling.PodGroupResourceClaim{{Name: "claim-a"}},
+						ResourceClaims: []scheduling.PodGroupResourceClaim{{Name: "claim-a", ResourceClaimName: new("rc-a")}},
 					},
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Scheduling.ResourceClaims = []scheduling.PodGroupResourceClaim{{Name: "claim-b"}}
+				job.Spec.Scheduling.ResourceClaims = []scheduling.PodGroupResourceClaim{{Name: "claim-b", ResourceClaimName: new("rc-b")}}
 			},
 			opts: JobValidationOptions{AllowSchedulingConfiguration: true},
 			err:  field.Invalid(field.NewPath("spec", "scheduling"), nil, ""),
 		},
-		"feature disabled: removing scheduling is allowed": {
+		"feature disabled but scheduling in use: removing scheduling is still immutable": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: batch.JobSpec{
@@ -2730,20 +2746,22 @@ func TestValidateJobUpdate(t *testing.T) {
 				},
 			},
 			update: func(job *batch.Job) { job.Spec.Scheduling = nil },
+			err:    field.Invalid(field.NewPath("spec", "scheduling"), nil, ""),
 		},
-		"feature disabled: switching policy is allowed": {
+		"feature disabled but scheduling in use: switching policy is still rejected": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: batch.JobSpec{
 					Selector:    validGeneratedSelector,
 					Template:    validPodTemplateSpecForGenerated,
-					Parallelism: ptr.To[int32](4),
+					Parallelism: new(int32(4)),
 					Scheduling:  &batch.JobSchedulingConfiguration{Policy: &scheduling.PodGroupSchedulingPolicy{Basic: &scheduling.BasicSchedulingPolicy{}}},
 				},
 			},
 			update: func(job *batch.Job) {
 				job.Spec.Scheduling.Policy = &scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: 4}}
 			},
+			err: field.Invalid(field.NewPath("spec", "scheduling"), nil, ""),
 		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
@@ -3638,6 +3656,14 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 		"nil parallelism defaults to 1, minCount 2 is rejected": {
 			sched: gang(2),
 			err:   field.Invalid(minCountPath, nil, ""),
+		},
+		"semantic check via workloadbuilder: both disruption modes set is rejected": {
+			parallelism: ptr.To[int32](4),
+			sched: &batch.JobSchedulingConfiguration{
+				Policy:         &scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: 2}},
+				DisruptionMode: &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}, All: &scheduling.AllDisruptionMode{}},
+			},
+			err: field.Invalid(field.NewPath("spec", "scheduling", "disruptionMode"), nil, ""),
 		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")

@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryapivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -278,6 +280,11 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	// create and update, and for Jobs embedded in a CronJob jobTemplate. It is a
 	// no-op when spec.scheduling is unset.
 	allErrs = append(allErrs, validateGangMinCount(spec, fldPath)...)
+
+	// Semantic validation via the shared workloadbuilder library, so the API
+	// server only accepts spec.scheduling configurations the Job controller can
+	// compile into a Workload. No-op when spec.scheduling is unset.
+	allErrs = append(allErrs, validateJobScheduling(spec, fldPath)...)
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
 
@@ -631,7 +638,10 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.BackoffLimitPerIndex, oldSpec.BackoffLimitPerIndex, fldPath.Child("backoffLimitPerIndex"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.ManagedBy, oldSpec.ManagedBy, fldPath.Child("managedBy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SuccessPolicy, oldSpec.SuccessPolicy, fldPath.Child("successPolicy"))...)
-	if opts.AllowSchedulingConfiguration {
+	// Enforce spec.scheduling immutability whenever the field is already in use,
+	// even if the gate is off: with the gate disabled the apiserver preserves a
+	// stored spec.scheduling, so it must stay immutable-except-gang.minCount.
+	if opts.AllowSchedulingConfiguration || oldSpec.Scheduling != nil {
 		allErrs = append(allErrs, validateJobSchedulingUpdate(spec.Scheduling, oldSpec.Scheduling, fldPath.Child("scheduling"))...)
 	}
 	return allErrs
@@ -699,6 +709,100 @@ func validateGangMinCount(spec *batch.JobSpec, fldPath *field.Path) field.ErrorL
 		fldPath.Child("scheduling", "policy", "gang", "minCount"),
 		spec.Scheduling.Policy.Gang.MinCount,
 		fmt.Sprintf("must not be greater than parallelism (%d)", parallelism))}
+}
+
+// validateJobScheduling runs the workloadbuilder's semantic validation over
+// spec.scheduling, so the API server only accepts configurations the Job
+// controller can compile into a Workload. It complements (does not replace) the
+// structural/declarative checks (union, minimum, maxItems). It is a no-op when
+// spec.scheduling is unset (an absent block resolves to Basic).
+func validateJobScheduling(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	if spec.Scheduling == nil {
+		return nil
+	}
+	base := fldPath.Child("scheduling")
+	root := &workloadbuilder.WorkloadItem{
+		Name: "job",
+		DefaultConfig: &workloadbuilder.SchedulingConfig{
+			Policy: &workloadbuilder.SchedulingPolicy{Basic: &workloadbuilder.BasicSchedulingPolicy{}},
+		},
+		UserConfig: mapInternalSchedulingConfig(spec.Scheduling),
+		Callbacks:  []workloadbuilder.WorkloadItemFunc{defaultGangMinCount(spec)},
+		FieldPaths: &workloadbuilder.FieldPaths{
+			Policy:         base.Child("policy"),
+			GangMinCount:   base.Child("policy", "gang", "minCount"),
+			Constraints:    base.Child("constraints"),
+			DisruptionMode: base.Child("disruptionMode"),
+			ResourceClaims: base.Child("resourceClaims"),
+		},
+	}
+	return workloadbuilder.Validate(root)
+}
+
+// defaultGangMinCount defaults an unset gang minCount to the Job's parallelism,
+// mirroring the controller's compile-time resolution so validation matches what
+// the controller produces. It only mutates the resolved config.
+func defaultGangMinCount(spec *batch.JobSpec) workloadbuilder.WorkloadItemFunc {
+	return func(item *workloadbuilder.WorkloadItem) {
+		c := item.ResolvedConfig
+		if c == nil || c.Policy == nil || 
+		c.Policy.Gang == nil || 
+		c.Policy.Gang.MinCount != nil {
+			return
+		}
+		c.Policy.Gang.MinCount = new(ptr.Deref(spec.Parallelism, 1))
+	}
+}
+
+// mapInternalSchedulingConfig translates the internal spec.scheduling block into
+// the workloadbuilder IR (the controller does the same from the external types).
+// A zero gang minCount is treated as unset so defaultGangMinCount can resolve it,
+// avoiding a duplicate minimum-value error already reported by declarative
+// validation.
+func mapInternalSchedulingConfig(cfg *batch.JobSchedulingConfiguration) *workloadbuilder.SchedulingConfig {
+	if cfg == nil {
+		return nil
+	}
+	out := &workloadbuilder.SchedulingConfig{}
+	if p := cfg.Policy; p != nil {
+		switch {
+		case p.Gang != nil:
+			gang := &workloadbuilder.GangSchedulingPolicy{}
+			if p.Gang.MinCount > 0 {
+				mc := p.Gang.MinCount
+				gang.MinCount = &mc
+			}
+			out.Policy = &workloadbuilder.SchedulingPolicy{Gang: gang}
+		case p.Basic != nil:
+			out.Policy = &workloadbuilder.SchedulingPolicy{Basic: &workloadbuilder.BasicSchedulingPolicy{}}
+		}
+	}
+	if c := cfg.Constraints; c != nil && len(c.Topology) > 0 {
+		topology := make([]schedulingv1alpha3.TopologyConstraint, len(c.Topology))
+		for i := range c.Topology {
+			topology[i] = schedulingv1alpha3.TopologyConstraint{Key: c.Topology[i].Key}
+		}
+		out.Constraints = &workloadbuilder.SchedulingConstraints{Topology: topology}
+	}
+	if d := cfg.DisruptionMode; d != nil {
+		dm := &workloadbuilder.DisruptionMode{}
+		if d.All != nil {
+			dm.All = &workloadbuilder.AllDisruptionMode{}
+		}
+		if d.Single != nil {
+			dm.Single = &workloadbuilder.SingleDisruptionMode{}
+		}
+		out.DisruptionMode = dm
+	}
+	for i := range cfg.ResourceClaims {
+		rc := cfg.ResourceClaims[i]
+		out.ResourceClaims = append(out.ResourceClaims, workloadbuilder.ResourceClaim{
+			Name:                      rc.Name,
+			ResourceClaimName:         rc.ResourceClaimName,
+			ResourceClaimTemplateName: rc.ResourceClaimTemplateName,
+		})
+	}
+	return out
 }
 
 func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
