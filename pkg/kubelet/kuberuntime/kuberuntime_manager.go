@@ -1480,7 +1480,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 
 		if podContainerChanges.CreateSandbox {
-			m.purgeInitContainers(ctx, pod, podStatus)
+			purgeResult := m.purgeInitContainers(ctx, pod, podStatus)
+			result.AddPodSyncResult(purgeResult)
+			if purgeResult.Error() != nil {
+				logger.Error(purgeResult.Error(), "purgeInitContainers failed")
+				return
+			}
 		}
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.

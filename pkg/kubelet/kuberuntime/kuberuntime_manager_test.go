@@ -796,6 +796,121 @@ func TestPruneInitContainers(t *testing.T) {
 	}
 }
 
+func TestSyncPodWithPurgeInitContainersError(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManagerWithErrors(tCtx, map[string][]error{
+		"RemoveContainer": {fmt.Errorf("runtime remove container failed")},
+	})
+	require.NoError(t, err)
+
+	initContainers := []v1.Container{
+		{
+			Name:            "init1",
+			Image:           "init",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		{
+			Name:            "init2",
+			Image:           "init2",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+	containers := []v1.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers:     containers,
+			InitContainers: initContainers,
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+
+	// 1. should only create the first init container.
+	runtimePod, err := m.GetPod(tCtx, pod.UID)
+	if err != nil {
+		runtimePod = &kubecontainer.Pod{
+			ID:        pod.UID,
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+		}
+	}
+	podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+	require.NoError(t, err)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+	expected := []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "start the first init container")
+
+	// 2. should create the second init container because the first init container finished.
+	sandboxIDs, err := m.getSandboxIDByPodUID(tCtx, pod.UID)
+	require.NoError(t, err)
+	sandboxID := sandboxIDs[0]
+	initID0, err := fakeRuntime.GetContainerID(sandboxID, initContainers[0].Name, 0)
+	require.NoError(t, err)
+	err = fakeRuntime.StopContainer(tCtx, initID0, 0)
+	require.NoError(t, err)
+	// Sync again.
+	runtimePod, err = m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	podStatus, err = m.GetPodStatus(tCtx, runtimePod)
+	require.NoError(t, err)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+	expected = []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: initContainers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "start the second init container")
+
+	// 3. should create all app containers because all init containers finished.
+	// Stop init container instance 1.
+	initID1, err := fakeRuntime.GetContainerID(sandboxID, initContainers[1].Name, 0)
+	require.NoError(t, err)
+	err = fakeRuntime.StopContainer(tCtx, initID1, 0)
+	require.NoError(t, err)
+	// Sync again.
+	runtimePod, err = m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	podStatus, err = m.GetPodStatus(tCtx, runtimePod)
+	require.NoError(t, err)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+	expected = []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: initContainers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: containers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "init containers completed; app container should be running")
+
+	// 4. should restart the init container if needed to create a new podsandbox
+	// Stop the pod sandbox.
+	err = fakeRuntime.StopPodSandbox(tCtx, sandboxID)
+	require.NoError(t, err)
+	// Sync again.
+	runtimePod, err = m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	podStatus, err = m.GetPodStatus(tCtx, runtimePod)
+	require.NoError(t, err)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	// Should fail as remove init containers error
+	if result.Error() == nil {
+		t.Error("should get error as purgeInitContainers failed")
+	}
+}
+
 func TestSyncPodWithInitContainers(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
