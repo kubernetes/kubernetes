@@ -174,6 +174,10 @@ func (sched *Scheduler) schedulingCycle(
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
 ) (ScheduleResult, *framework.QueuedPodInfo, *fwk.Status) {
+	if err := sched.SchedulingQueue.CheckFailureCache(podInfo); err != nil {
+		return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, fwk.AsStatus(err)
+	}
+
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
 		return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, fwk.AsStatus(err)
 	}
@@ -1230,6 +1234,11 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	} else if fitError, ok := err.(*framework.FitError); ok { // Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
 		podInfo.PendingPlugins = fitError.Diagnosis.PendingPlugins
+		// Cache the failure for same-spec pods to fast-fail future scheduling attempts.
+		// Don't cache if preemption nominated a node (pod expected to schedule after eviction).
+		if nominatingInfo == nil || nominatingInfo.NominatedNodeName == "" {
+			sched.SchedulingQueue.CacheFailure(podInfo.PodSignature, fitError)
+		}
 		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
 	} else if errors.Is(err, errPodGroupUnschedulable) {
 		logger.V(2).Info("Unable to schedule pod belonging to a pod group; waiting", "pod", klog.KObj(pod), "err", errMsg)
