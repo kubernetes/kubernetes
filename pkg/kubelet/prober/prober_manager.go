@@ -91,6 +91,14 @@ type Manager interface {
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
 	UpdatePodStatus(context.Context, *v1.Pod, *v1.PodStatus)
+
+	// SuspendProbes pauses all probes for the pod (e.g. while it is being
+	// checkpointed and its containers are frozen) so a probe failure cannot act
+	// on a frozen container. Workers stay alive but skip probing until resumed.
+	SuspendProbes(podUID types.UID)
+
+	// ResumeProbes resumes probes previously paused via SuspendProbes.
+	ResumeProbes(podUID types.UID)
 }
 
 type manager struct {
@@ -115,6 +123,12 @@ type manager struct {
 	prober *prober
 
 	start time.Time
+
+	// suspendLock guards suspendedPods.
+	suspendLock sync.RWMutex
+	// suspendedPods holds the UIDs of pods whose probes are currently paused
+	// (e.g. during a checkpoint). Workers for these pods skip probing.
+	suspendedPods sets.Set[types.UID]
 }
 
 // NewManager creates a Manager for pod probing.
@@ -135,7 +149,29 @@ func NewManager(
 		startupManager:   startupManager,
 		workers:          make(map[probeKey]*worker),
 		start:            clock.RealClock{}.Now(),
+		suspendedPods:    sets.New[types.UID](),
 	}
+}
+
+// SuspendProbes pauses all probes for the pod until ResumeProbes is called.
+func (m *manager) SuspendProbes(podUID types.UID) {
+	m.suspendLock.Lock()
+	defer m.suspendLock.Unlock()
+	m.suspendedPods.Insert(podUID)
+}
+
+// ResumeProbes resumes probes previously paused via SuspendProbes.
+func (m *manager) ResumeProbes(podUID types.UID) {
+	m.suspendLock.Lock()
+	defer m.suspendLock.Unlock()
+	m.suspendedPods.Delete(podUID)
+}
+
+// isSuspended reports whether probes for the pod are currently paused.
+func (m *manager) isSuspended(podUID types.UID) bool {
+	m.suspendLock.RLock()
+	defer m.suspendLock.RUnlock()
+	return m.suspendedPods.Has(podUID)
 }
 
 // Key uniquely identifying container probes
@@ -259,6 +295,11 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 			}
 		}
 	}
+
+	// Clear any lingering probe-suspension marker so a removed pod's UID does
+	// not leak in suspendedPods (e.g. if a checkpoint was interrupted before
+	// ResumeProbes ran).
+	m.ResumeProbes(pod.UID)
 }
 
 func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
@@ -268,6 +309,15 @@ func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
 	for key, worker := range m.workers {
 		if _, ok := desiredPods[key.podUID]; !ok {
 			worker.stop()
+		}
+	}
+
+	// Drop suspension markers for pods that are no longer desired.
+	m.suspendLock.Lock()
+	defer m.suspendLock.Unlock()
+	for uid := range m.suspendedPods {
+		if _, ok := desiredPods[uid]; !ok {
+			m.suspendedPods.Delete(uid)
 		}
 	}
 }

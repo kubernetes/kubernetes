@@ -54,6 +54,23 @@ func TestPodConditionByKubelet(t *testing.T) {
 	}
 }
 
+func TestPodConditionByKubeletRestoring(t *testing.T) {
+	// The Restoring condition is owned by the kubelet only while the
+	// PodLevelCheckpointRestore feature gate is enabled (KEP-5823).
+	t.Run("gate enabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+		if !PodConditionByKubelet(PodRestoring) {
+			t.Errorf("expected %q to be owned by kubelet when the feature gate is enabled", PodRestoring)
+		}
+	})
+	t.Run("gate disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, false)
+		if PodConditionByKubelet(PodRestoring) {
+			t.Errorf("expected %q NOT to be owned by kubelet when the feature gate is disabled", PodRestoring)
+		}
+	})
+}
+
 func TestPodConditionSharedByKubelet(t *testing.T) {
 	trueCases := []v1.PodConditionType{
 		v1.DisruptionTarget,
