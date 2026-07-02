@@ -359,7 +359,7 @@ type StatefulSetStatus struct {
 	// sequence [0,currentReplicas).
 	CurrentRevision string `json:"currentRevision,omitempty" protobuf:"bytes,6,opt,name=currentRevision"`
 
-	// updateRevision – if not empty – indicates the version of the StatefulSet used to generate Pods in the sequence
+	// updateRevision indicates the version of the StatefulSet used to generate Pods in the sequence
 	// [replicas-updatedReplicas,replicas)
 	UpdateRevision string `json:"updateRevision,omitempty" protobuf:"bytes,7,opt,name=updateRevision"`
 
