@@ -54,6 +54,22 @@ type OtherStruct struct {
 	MapField     map[string]string `json:"mapField"`
 }
 
+type SetByServerOtherStruct struct {
+	// +k8s:setByServer
+	SetByServerField string `json:"setByServerField"`
+}
+
 type SmallStruct struct {
 	StringField string `json:"stringField"`
+}
+
+type SetByServerStruct struct {
+	TypeMeta int `json:"typeMeta"`
+
+	// +k8s:subfield(setByServerField)=+k8s:optional
+	StructField SetByServerOtherStruct `json:"structField"`
+
+	// +k8s:subfield(setByServerField)=+k8s:optional
+	// +k8s:opaqueType
+	OpaqueStructField SetByServerOtherStruct `json:"opaqueStructField"`
 }

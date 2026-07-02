@@ -18,10 +18,26 @@ package deep
 
 import (
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
+
+	st.Value(&SetByServerStruct{
+		StructField: SetByServerOtherStruct{
+			StructField: SetByServerSmallStruct{SetByServerField: "xyz"},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{})
+
+	st.Value(&SetByServerStruct{
+		StructField: SetByServerOtherStruct{
+			StructField: SetByServerSmallStruct{SetByServerField: ""},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{
+		field.Required(field.NewPath("structField", "structField", "setByServerField"), ""),
+	})
 
 	st.Value(&Struct{
 		StructField: OtherStruct{

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 
+	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
@@ -37,12 +38,10 @@ type linter struct {
 }
 
 // lintRule is a function that validates a slice of comments.
-// container is the type containing the element being linted (e.g. the Struct when linting a Field).
-// It may be nil if the element is top-level (e.g. a Type definition).
-// t is the type of the element being linted (e.g. the Field's type, or the Type itself).
+// context provides details about the type or field being linted.
 // It returns a string as an error message if the comments are invalid,
 // and an error there is an error happened during the linting process.
-type lintRule func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error)
+type lintRule func(context validators.Context, tags []codetags.Tag) (string, error)
 
 func (l *linter) AddError(t *types.Type, field, msg string) {
 	var err error
@@ -77,7 +76,7 @@ func (l *linter) lintType(t *types.Type) error {
 			return nil
 		}
 		klog.V(5).Infof("linting type %s", t.Name.String())
-		lintErrs, err := l.lintComments(t, t, t.CommentLines)
+		lintErrs, err := l.lintComments(validators.Context{Scope: validators.ScopeType, Type: t}, t.CommentLines)
 		if err != nil {
 			return err
 		}
@@ -93,9 +92,10 @@ func (l *linter) lintType(t *types.Type) error {
 		}
 	case types.Struct:
 		// Recursively lint each member of the struct.
-		for _, member := range t.Members {
+		for i := range t.Members {
+			member := &t.Members[i]
 			klog.V(5).Infof("linting comments for field %s of type %s", member.String(), t.Name.String())
-			lintErrs, err := l.lintComments(t, member.Type, member.CommentLines)
+			lintErrs, err := l.lintComments(validators.Context{Scope: validators.ScopeField, Type: member.Type, Member: member, ParentType: t}, member.CommentLines)
 			if err != nil {
 				return err
 			}
@@ -124,7 +124,7 @@ func (l *linter) lintType(t *types.Type) error {
 }
 
 // lintComments runs all registered rules on a slice of comments.
-func (l *linter) lintComments(container *types.Type, t *types.Type, comments []string) ([]string, error) {
+func (l *linter) lintComments(context validators.Context, comments []string) ([]string, error) {
 	var lintErrs []string
 	var tags []codetags.Tag
 
@@ -146,7 +146,7 @@ func (l *linter) lintComments(container *types.Type, t *types.Type, comments []s
 	}
 
 	for _, rule := range l.rules {
-		if msg, err := rule(container, t, tags); err != nil {
+		if msg, err := rule(context, tags); err != nil {
 			return nil, err
 		} else if msg != "" {
 			lintErrs = append(lintErrs, msg)
