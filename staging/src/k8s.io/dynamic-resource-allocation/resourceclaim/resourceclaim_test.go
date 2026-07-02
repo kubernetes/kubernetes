@@ -30,6 +30,82 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+func TestResourceStatusName(t *testing.T) {
+	testCases := []struct {
+		name        string
+		claimName   string
+		requestName string
+		want        v1.ResourceName
+	}{
+		{
+			name:      "claim without request",
+			claimName: "claim-name",
+			want:      "claim:claim-name",
+		},
+		{
+			name:        "claim with request",
+			claimName:   "claim-name",
+			requestName: "request-name",
+			want:        "claim:claim-name/request-name",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ResourceStatusName(tc.claimName, tc.requestName)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestParseResourceStatusName(t *testing.T) {
+	testCases := []struct {
+		name            string
+		resourceName    string
+		wantClaimName   string
+		wantRequestName string
+		wantOK          bool
+	}{
+		{
+			name:          "claim without request",
+			resourceName:  "claim:claim-name",
+			wantClaimName: "claim-name",
+			wantOK:        true,
+		},
+		{
+			name:            "claim with request",
+			resourceName:    "claim:claim-name/request-name",
+			wantClaimName:   "claim-name",
+			wantRequestName: "request-name",
+			wantOK:          true,
+		},
+		{
+			name:         "resource name",
+			resourceName: "example.com/gpu",
+			wantOK:       false,
+		},
+		{
+			name:         "empty claim name",
+			resourceName: "claim:",
+			wantOK:       false,
+		},
+		{
+			name:         "empty request name",
+			resourceName: "claim:claim-name/",
+			wantOK:       false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotClaimName, gotRequestName, gotOK := ParseResourceStatusName(tc.resourceName)
+			assert.Equal(t, tc.wantClaimName, gotClaimName)
+			assert.Equal(t, tc.wantRequestName, gotRequestName)
+			assert.Equal(t, tc.wantOK, gotOK)
+		})
+	}
+}
+
 func TestResourceClaimIsFor(t *testing.T) {
 	uid := 0
 	newUID := func() types.UID {

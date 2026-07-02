@@ -37,6 +37,7 @@ import (
 )
 
 const schedulingAPIGroupPrefix = schedulingapi.GroupName + "/"
+const resourceStatusClaimPrefix = "claim:"
 
 var (
 	// ErrAPIUnsupported is wrapped by the actual errors returned by Name and
@@ -47,6 +48,35 @@ var (
 	// indicates that the claim has not been created yet.
 	ErrClaimNotFound = errors.New("ResourceClaim not created yet")
 )
+
+// ResourceStatusName returns the DRA ResourceStatus.Name for a ResourceClaim.
+// The format is defined by the ResourceHealthStatus API/KEP:
+// https://kep.k8s.io/4680
+//
+// ResourceClaim.Request is optional, so the encoded form is either
+// "claim:<claimName>" or "claim:<claimName>/<requestName>".
+func ResourceStatusName(claimName, requestName string) v1.ResourceName {
+	if requestName == "" {
+		return v1.ResourceName(resourceStatusClaimPrefix + claimName)
+	}
+	return v1.ResourceName(resourceStatusClaimPrefix + claimName + "/" + requestName)
+}
+
+// ParseResourceStatusName parses a resource status name produced by ResourceStatusName.
+func ParseResourceStatusName(resourceStatusName string) (claimName, requestName string, ok bool) {
+	claimRef, ok := strings.CutPrefix(resourceStatusName, resourceStatusClaimPrefix)
+	if !ok {
+		return "", "", false
+	}
+	claimName, requestName, hasRequest := strings.Cut(claimRef, "/")
+	if claimName == "" {
+		return "", "", false
+	}
+	if hasRequest && requestName == "" {
+		return "", "", false
+	}
+	return claimName, requestName, true
+}
 
 // Name returns the name of the ResourceClaim object that gets referenced by or
 // created for the PodResourceClaim. Three different results are possible:
