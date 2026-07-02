@@ -603,7 +603,9 @@ func (p *concurrentOrderedEventProcessing) scheduleEventProcessing(ctx context.C
 		wg.Add(1)
 		go func(e *event, response chan<- *processingResult) {
 			defer wg.Done()
+			startTime := time.Now()
 			responseEvent, err := p.wc.transform(e)
+			metrics.RecordWatchDecodeDuration(p.groupResource, startTime)
 			select {
 			case <-ctx.Done():
 			case response <- &processingResult{event: responseEvent, err: err}:
