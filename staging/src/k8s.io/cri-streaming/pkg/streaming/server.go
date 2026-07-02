@@ -90,6 +90,15 @@ type Config struct {
 
 	// The config for serving over TLS. If nil, TLS will not be used.
 	TLSConfig *tls.Config
+
+	// AuthorizeStream, if non-nil, is called after a stream URL token has been
+	// validated and before the stream is served. Implementations can authenticate
+	// the HTTP request and authorize access to the cached CRI stream request.
+	//
+	// A nil AuthorizeStream means the server relies on the caller only issuing
+	// short-lived, single-use stream URLs after authorizing the original CRI
+	// Exec, Attach, or PortForward request.
+	AuthorizeStream func(req *http.Request, streamRequest any) error
 }
 
 // DefaultConfig provides default values for server Config. The DefaultConfig is partial, so
@@ -102,7 +111,6 @@ var DefaultConfig = Config{
 }
 
 // NewServer creates a new Server for stream requests.
-// TODO(tallclair): Add auth(n/z) interface & handling.
 func NewServer(config Config, runtime Runtime) (Server, error) {
 	s := &server{
 		config:  config,
@@ -260,6 +268,13 @@ func (s *server) buildURL(method, token string) string {
 	}).String()
 }
 
+func (s *server) authorize(req *http.Request, streamRequest any) bool {
+	if s.config.AuthorizeStream == nil {
+		return true
+	}
+	return s.config.AuthorizeStream(req, streamRequest) == nil
+}
+
 func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 	token := req.PathParameter("token")
 	cachedRequest, ok := s.cache.Consume(token)
@@ -270,6 +285,10 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 	exec, ok := cachedRequest.(*runtimeapi.ExecRequest)
 	if !ok {
 		http.NotFound(resp.ResponseWriter, req.Request)
+		return
+	}
+	if !s.authorize(req.Request, exec) {
+		http.Error(resp.ResponseWriter, "forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -306,6 +325,10 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 		http.NotFound(resp.ResponseWriter, req.Request)
 		return
 	}
+	if !s.authorize(req.Request, attach) {
+		http.Error(resp.ResponseWriter, "forbidden", http.StatusForbidden)
+		return
+	}
 
 	streamOpts := &remotecommandserver.Options{
 		Stdin:  attach.Stdin,
@@ -336,6 +359,10 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 	pf, ok := cachedRequest.(*runtimeapi.PortForwardRequest)
 	if !ok {
 		http.NotFound(resp.ResponseWriter, req.Request)
+		return
+	}
+	if !s.authorize(req.Request, pf) {
+		http.Error(resp.ResponseWriter, "forbidden", http.StatusForbidden)
 		return
 	}
 
