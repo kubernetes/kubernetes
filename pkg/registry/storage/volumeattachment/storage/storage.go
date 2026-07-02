@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -56,10 +57,18 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (*VolumeAttachmentStorage,
 		DeleteStrategy:      volumeattachment.Strategy,
 		ResetFieldsStrategy: volumeattachment.Strategy,
 		ReturnDeletedObject: true,
+		PredicateFunc:       volumeattachment.MatchVolumeAttachment,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter}
+	options := &generic.StoreOptions{
+		RESTOptions: optsGetter,
+		AttrFunc:    volumeattachment.GetAttrs,
+		TriggerFunc: map[string]storage.IndexerFunc{
+			"spec.nodeName": volumeattachment.NodeNameTriggerFunc,
+		},
+		Indexers: volumeattachment.Indexers(),
+	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
 	}
