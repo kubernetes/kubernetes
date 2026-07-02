@@ -44,7 +44,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "event_total",
 			Help:           "Counter of audit events generated and sent to the audit backend.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		})
 	errorCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -52,7 +52,7 @@ var (
 			Name:      "error_total",
 			Help: "Counter of audit events that failed to be audited properly. " +
 				"Plugin identifies the plugin affected by the error.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"plugin"},
 	)
@@ -61,7 +61,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "level_total",
 			Help:           "Counter of policy levels for audit events (1 per request).",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"level"},
 	)
