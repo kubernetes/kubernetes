@@ -76,6 +76,7 @@ import (
 	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
 	batchrest "k8s.io/kubernetes/pkg/registry/batch/rest"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
+	checkpointrest "k8s.io/kubernetes/pkg/registry/checkpoint/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
 	lifecyclerest "k8s.io/kubernetes/pkg/registry/lifecycle/rest"
@@ -554,6 +555,7 @@ func TestGenericStorageProviders(t *testing.T) {
 		switch kube[k].(type) {
 		case autoscalingrest.RESTStorageProvider,
 			batchrest.RESTStorageProvider,
+			checkpointrest.RESTStorageProvider,
 			discoveryrest.StorageProvider,
 			networkingrest.RESTStorageProvider,
 			noderest.RESTStorageProvider,
