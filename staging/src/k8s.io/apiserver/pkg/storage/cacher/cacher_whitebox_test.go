@@ -2429,6 +2429,63 @@ func BenchmarkCacher_GetList(b *testing.B) {
 	}
 }
 
+func benchmarkPods(n int, nodeName string) []example.Pod {
+	pods := make([]example.Pod, n)
+	for i := range pods {
+		pods[i].Namespace = "default"
+		pods[i].Name = fmt.Sprintf("pod-%d", i)
+		pods[i].ResourceVersion = strconv.Itoa(i)
+		pods[i].Spec.NodeName = nodeName
+		data := make([]byte, 1024*2) // 2k labels
+		rand.Read(data)
+		pods[i].Spec.NodeSelector = map[string]string{
+			"key": string(data),
+		}
+	}
+	return pods
+}
+
+func newBenchmarkDelegator(b *testing.B, pods []example.Pod) *CacheDelegator {
+	store := &cachertesting.MockStorage{
+		GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+			podList := listObj.(*example.PodList)
+			podList.ListMeta = metav1.ListMeta{ResourceVersion: "12345"}
+			podList.Items = pods
+			return nil
+		},
+		GetRVFn: func(_ context.Context) (uint64, error) { return 12345, nil },
+	}
+	cacher, _, err := newTestCacher(store)
+	if err != nil {
+		b.Fatalf("new cacher: %v", err)
+	}
+	b.Cleanup(cacher.Stop)
+	delegator := NewCacheDelegator(cacher, store)
+	b.Cleanup(delegator.Stop)
+	return delegator
+}
+
+func BenchmarkCacher_GetList_AllPods(b *testing.B) {
+	totalObjectNum := 10_000
+	delegator := newBenchmarkDelegator(b, benchmarkPods(totalObjectNum, ""))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		result := &example.PodList{}
+		err := delegator.GetList(context.TODO(), "/pods/", storage.ListOptions{
+			Predicate:       storage.Everything,
+			Recursive:       true,
+			ResourceVersion: "12345",
+		}, result)
+		if err != nil {
+			b.Fatalf("GetList cache: %v", err)
+		}
+		if len(result.Items) != totalObjectNum {
+			b.Fatalf("expect %d but got %d", totalObjectNum, len(result.Items))
+		}
+	}
+}
+
 // TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived makes sure that
 // a bookmark event will be delivered even if the cacher has not received an event.
 func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {

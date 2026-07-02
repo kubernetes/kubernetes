@@ -780,45 +780,69 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return err
 	}
 	span.AddEvent("Listed items from cache", attribute.Int("count", len(resp.Items)))
-	// store pointer of eligible objects,
-	// Why not directly put object in the items of listObj?
-	//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
-	//   so we try to delay this action as much as possible
-	var selectedObjects []runtime.Object
 	var lastSelectedObjectKey string
 	var hasMoreListItems bool
 	limit := computeListLimit(opts)
-	for i, obj := range resp.Items {
-		elem, ok := obj.(*store.Element)
-		if !ok {
-			return fmt.Errorf("non *store.Element returned from storage: %v", obj)
+	matchesAll := (opts.Predicate.Label == nil || opts.Predicate.Label.Empty()) &&
+		(opts.Predicate.Field == nil || opts.Predicate.Field.Empty())
+	if matchesAll && utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+		matchesAll = opts.Predicate.ShardSelector == nil || opts.Predicate.ShardSelector.Empty()
+	}
+	if matchesAll {
+		// Every item matches, so the result size is known upfront and items can be
+		// copied directly into the result list without an intermediate slice.
+		count := len(resp.Items)
+		if limit > 0 && int64(count) > limit {
+			count = int(limit)
+			hasMoreListItems = true
 		}
-		shardMatch := true
-		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-			var err error
-			shardMatch, err = opts.Predicate.MatchesSharding(elem.Object)
-			if err != nil {
-				return fmt.Errorf("shard matching failed: %w", err)
+		listVal.Set(reflect.MakeSlice(listVal.Type(), count, count))
+		for i, obj := range resp.Items[:count] {
+			elem, ok := obj.(*store.Element)
+			if !ok {
+				return fmt.Errorf("non *store.Element returned from storage: %v", obj)
 			}
-		}
-		if shardMatch && opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
-			selectedObjects = append(selectedObjects, elem.Object)
+			listVal.Index(i).Set(reflect.ValueOf(elem.Object).Elem())
 			lastSelectedObjectKey = elem.Key
 		}
-		if limit > 0 && int64(len(selectedObjects)) >= limit {
-			hasMoreListItems = i < len(resp.Items)-1
-			break
-		}
-	}
-	if len(selectedObjects) == 0 {
-		// Ensure that we never return a nil Items pointer in the result for consistency.
-		listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))
 	} else {
-		// Resize the slice appropriately, since we already know that size of result set
-		listVal.Set(reflect.MakeSlice(listVal.Type(), len(selectedObjects), len(selectedObjects)))
-		span.AddEvent("Resized result")
-		for i, o := range selectedObjects {
-			listVal.Index(i).Set(reflect.ValueOf(o).Elem())
+		// store pointer of eligible objects,
+		// Why not directly put object in the items of listObj?
+		//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
+		//   so we try to delay this action as much as possible
+		var selectedObjects []runtime.Object
+		for i, obj := range resp.Items {
+			elem, ok := obj.(*store.Element)
+			if !ok {
+				return fmt.Errorf("non *store.Element returned from storage: %v", obj)
+			}
+			shardMatch := true
+			if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+				var err error
+				shardMatch, err = opts.Predicate.MatchesSharding(elem.Object)
+				if err != nil {
+					return fmt.Errorf("shard matching failed: %w", err)
+				}
+			}
+			if shardMatch && opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
+				selectedObjects = append(selectedObjects, elem.Object)
+				lastSelectedObjectKey = elem.Key
+			}
+			if limit > 0 && int64(len(selectedObjects)) >= limit {
+				hasMoreListItems = i < len(resp.Items)-1
+				break
+			}
+		}
+		if len(selectedObjects) == 0 {
+			// Ensure that we never return a nil Items pointer in the result for consistency.
+			listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))
+		} else {
+			// Resize the slice appropriately, since we already know that size of result set
+			listVal.Set(reflect.MakeSlice(listVal.Type(), len(selectedObjects), len(selectedObjects)))
+			span.AddEvent("Resized result")
+			for i, o := range selectedObjects {
+				listVal.Index(i).Set(reflect.ValueOf(o).Elem())
+			}
 		}
 	}
 	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
