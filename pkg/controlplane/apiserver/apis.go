@@ -55,6 +55,7 @@ func (c *CompletedConfig) NewCoreGenericConfig() *corerest.GenericConfig {
 		ServiceAccountMaxExpiration: c.Extra.ServiceAccountMaxExpiration,
 		MaxExtendedExpiration:       c.Extra.ServiceAccountExtendedMaxExpiration,
 		APIAudiences:                c.Generic.Authentication.APIAudiences,
+		Authorizer:                  c.Generic.Authorization.Authorizer,
 		Informers:                   c.Extra.VersionedInformers,
 	}
 }

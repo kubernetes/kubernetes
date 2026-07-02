@@ -18,9 +18,11 @@ package storage
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"time"
 
+	admissionregistration "k8s.io/api/admissionregistration/v1"
 	authenticationapiv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,11 +35,14 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
+	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	"k8s.io/klog/v2"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	authenticationvalidation "k8s.io/kubernetes/pkg/apis/authentication/validation"
@@ -57,16 +62,19 @@ func (r *TokenREST) Destroy() {
 }
 
 type TokenREST struct {
-	svcaccts                     rest.Getter
-	pods                         rest.Getter
-	secrets                      rest.Getter
-	nodes                        rest.Getter
-	issuer                       token.TokenGenerator
-	auds                         authenticator.Audiences
-	audsSet                      sets.String
-	maxExpirationSeconds         int64
-	extendExpiration             bool
-	maxExtendedExpirationSeconds int64
+	svcaccts                        rest.Getter
+	pods                            rest.Getter
+	secrets                         rest.Getter
+	nodes                           rest.Getter
+	validatingWebhookConfigurations admissionregistrationv1.ValidatingWebhookConfigurationInterface
+	mutatingWebhookConfigurations   admissionregistrationv1.MutatingWebhookConfigurationInterface
+	authorizer                      authorizer.Authorizer
+	issuer                          token.TokenGenerator
+	auds                            authenticator.Audiences
+	audsSet                         sets.String
+	maxExpirationSeconds            int64
+	extendExpiration                bool
+	maxExtendedExpirationSeconds    int64
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
@@ -104,6 +112,8 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		return nil, err
 	}
 	svcacct := svcacctObj.(*api.ServiceAccount)
+
+	attestationClaims := req.Spec.AttestationClaims
 
 	if len(req.UID) > 0 && req.UID != svcacct.UID {
 		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.TokenRequestServiceAccountUIDValidation) {
@@ -149,9 +159,11 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 
 	var (
-		pod    *api.Pod
-		node   *api.Node
-		secret *api.Secret
+		pod        *api.Pod
+		node       *api.Node
+		secret     *api.Secret
+		validating *admissionregistration.ValidatingWebhookConfiguration
+		mutating   *admissionregistration.MutatingWebhookConfiguration
 	)
 
 	if ref := req.Spec.BoundObjectRef; ref != nil {
@@ -211,6 +223,34 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 			}
 			secret = secretObj.(*api.Secret)
 			uid = secret.UID
+		case gvk.Group == "admissionregistration" && gvk.Kind == "ValidatingWebhookConfiguration":
+			// shared logic in function call
+			newCtx := newContext(ctx, "validatingWebhookConfigurations", ref.Name, "", gvk)
+			attestationAPIGroupSlice, ok := attestationClaims[authenticationapi.ClaimAllowedAPIGroup]
+			if !ok {
+				return nil, errors.NewBadRequest("allowedAPIGroup must be a requested attestationClaim")
+			}
+			if len(attestationAPIGroupSlice) != 1 {
+				return nil, errors.NewBadRequest("allowedAPIGroup claim value must be a string slice of length 1")
+			}
+
+			if err := authorize(newCtx, r, req.Namespace, req.Name, attestationAPIGroupSlice[0]); err != nil {
+				return nil, err
+			}
+
+			valObj, err := r.validatingWebhookConfigurations.Get(newCtx, ref.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+
+			validating = valObj
+		case gvk.Group == "admissionregistration" && gvk.Kind == "MutatingWebhookConfiguration":
+			newCtx := newContext(ctx, "mutatingWebhookConfigurations", ref.Name, "", gvk)
+			mutObj, err := r.mutatingWebhookConfigurations.Get(newCtx, ref.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			mutating = mutObj
 		default:
 			return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token to object of type %s", gvk.String()))
 		}
@@ -236,7 +276,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		exp = r.maxExtendedExpirationSeconds
 	}
 
-	sc, pc, err := token.Claims(*svcacct, pod, secret, node, exp, warnAfter, req.Spec.Audiences)
+	sc, pc, err := token.Claims(*svcacct, pod, secret, node, validating, mutating, exp, warnAfter, req.Spec.Audiences, attestationClaims)
 	if err != nil {
 		return nil, err
 	}
@@ -255,6 +295,28 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		audit.AddAuditAnnotation(ctx, serviceaccount.IssuedCredentialIDAuditAnnotationKey, authenticationtokenjwt.CredentialIDForJTI(sc.ID))
 	}
 	return out, nil
+}
+
+func authorize(newCtx context.Context, r *TokenREST, namespace, name, attestationAPIGroup string) error {
+	authorized, reason, err := r.authorizer.Authorize(newCtx, authorizer.AttributesRecord{
+		User: &user.DefaultInfo{
+			Name: serviceaccount.MakeUsername(namespace, name),
+		},
+		Verb:     "attest",
+		APIGroup: "webhook-authentication.k8s.io",
+		Resource: "apigroups",
+		Name:     attestationAPIGroup,
+	})
+
+	if err != nil && !errors.IsUnauthorized(err) {
+		return errors.NewBadRequest(err.Error())
+	}
+
+	if authorized != authorizer.DecisionAllow && authorized != authorizer.DecisionNoOpinion {
+		return errors.NewUnauthorized(goerrors.Join(fmt.Errorf("%s", reason), err).Error())
+	}
+
+	return nil
 }
 
 func (r *TokenREST) GroupVersionKind(schema.GroupVersion) schema.GroupVersionKind {

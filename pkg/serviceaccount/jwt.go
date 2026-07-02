@@ -31,6 +31,7 @@ import (
 	jose "gopkg.in/go-jose/go-jose.v2"
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/audit"
@@ -44,6 +45,8 @@ type ServiceAccountTokenGetter interface {
 	GetPod(ctx context.Context, namespace, name string) (*v1.Pod, error)
 	GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error)
 	GetNode(ctx context.Context, name string) (*v1.Node, error)
+	GetValidatingWebhookConfiguration(ctx context.Context, name string) (*admissionregistrationv1.ValidatingWebhookConfiguration, error)
+	GetMutatingWebhookConfiguration(ctx context.Context, name string) (*admissionregistrationv1.MutatingWebhookConfiguration, error)
 }
 
 type TokenGenerator interface {

@@ -39,6 +39,13 @@ const (
 	// It can be repeated multiplied times for multiple map keys and the same key can be repeated multiple
 	// times to have multiple elements in the slice under a single key
 	ImpersonateUserExtraHeaderPrefix = "Impersonate-Extra-"
+
+	// ClaimAllowedAPIGroups is the map key for the allowedAPIGroups claim. It
+	// represents the APIGroup that a token authorizes its bearer to query
+	// admission webhooks about. The value corresponding to this key must
+	// be a slice of length 1, and the first and only element of this slice
+	// must indicate the api group.
+	ClaimAllowedAPIGroup = "allowedAPIGroup"
 )
 
 // +genclient
@@ -132,6 +139,11 @@ type UserInfo struct {
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 type ExtraValue []string
 
+// AttestationClaimValue masks the value so protobuf can generate
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type AttestationClaimValue []string
+
 func (t ExtraValue) String() string {
 	return fmt.Sprintf("%v", []string(t))
 }
@@ -181,6 +193,14 @@ type TokenRequestSpec struct {
 	// small if you want prompt revocation.
 	// +optional
 	BoundObjectRef *BoundObjectReference `json:"boundObjectRef" protobuf:"bytes,3,opt,name=boundObjectRef"`
+
+	// AttestationClaims is map of well-known keys to string-slice values.
+	// The values for each key have a specific semantic meaning, which is
+	// documented on the key definition. Requesters of tokens may ask
+	// the Kubernetes API Server to attest to certain claims. The API Server
+	// may perform authorization checks depending on the contents of this field.
+	// +optional
+	AttestationClaims map[string]AttestationClaimValue `json:"attestationClaims,omitempty" protobuf:"bytes,5,rep,name=attestationClaims"`
 }
 
 // TokenRequestStatus is the result of a token request.
