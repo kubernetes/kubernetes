@@ -77741,6 +77741,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},
+					"podCheckpointTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podCheckpointTimeout is the maximum duration the kubelet allows a Pod checkpoint operation to run before it aborts the operation. It bounds how long the Pod's containers can stay frozen: the kubelet applies it as the deadline on the CheckpointPod CRI call, and clamps a PodCheckpoint's spec.timeoutSeconds to this ceiling. Checkpoint time grows with the Pod's memory and depends on disk throughput, so raise this value on nodes that checkpoint Pods with large memory footprints. Requires the PodLevelCheckpointRestore feature gate to be enabled. Default: \"5m\"",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
 					"hairpinMode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "hairpinMode specifies how the Kubelet should configure the container bridge for hairpin packets. Setting this flag allows endpoints in a Service to loadbalance back to themselves if they should try to access their own Service. Values:\n\n- \"promiscuous-bridge\": make the container bridge promiscuous. - \"hairpin-veth\":       set the hairpin flag on container veth interfaces. - \"none\":               do nothing.\n\nGenerally, one must set `--hairpin-mode=hairpin-veth to` achieve hairpin NAT, because promiscuous-bridge assumes the existence of a container bridge named cbr0. Default: \"promiscuous-bridge\"",

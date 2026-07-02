@@ -34,6 +34,7 @@ func TestPodConditionByKubelet(t *testing.T) {
 		v1.PodInitialized,
 		v1.ContainersReady,
 		v1.PodReadyToStartContainers,
+		v1.PodCheckpointing,
 	}
 
 	for _, tc := range trueCases {
@@ -51,6 +52,13 @@ func TestPodConditionByKubelet(t *testing.T) {
 		if PodConditionByKubelet(tc) {
 			t.Errorf("Expect %q NOT to be condition owned by kubelet.", tc)
 		}
+	}
+}
+
+func TestPodCheckpointingOwnedDuringGateRollback(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, false)
+	if !PodConditionByKubelet(v1.PodCheckpointing) {
+		t.Fatal("kubelet must remove a stale Checkpointing condition when the feature is disabled")
 	}
 }
 

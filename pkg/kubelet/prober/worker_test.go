@@ -17,6 +17,8 @@ limitations under the License.
 package prober
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
@@ -673,6 +675,47 @@ func resultsManager(m *manager, probeType probeType) results.Manager {
 	panic(fmt.Errorf("Unhandled case: %v", probeType))
 }
 
+func TestSuspendProbes(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	// A normal probe would fail (and, for liveness, record Failure).
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(true))
+
+	// Suspend probes for the pod: doProbe should keep the worker alive and skip
+	// probing, leaving no recorded result.
+	if err := m.SuspendProbes(ctx, w.pod.UID); err != nil {
+		t.Fatal(err)
+	}
+	if !m.isSuspended(w.pod.UID) {
+		t.Fatal("expected pod to be suspended")
+	}
+	if c := w.doProbe(ctx); !c {
+		t.Errorf("expected doProbe to keep going while suspended")
+	}
+	if _, ok := resultsManager(m, liveness).Get(testContainerID); ok {
+		t.Errorf("expected no probe result to be recorded while suspended")
+	}
+
+	// Resume: probing runs again and records the (failing) result.
+	m.ResumeProbes(w.pod.UID)
+	if m.isSuspended(w.pod.UID) {
+		t.Fatal("expected pod to no longer be suspended")
+	}
+	if c := w.doProbe(ctx); !c {
+		t.Errorf("expected doProbe to keep going after resume")
+	}
+	result, ok := resultsManager(m, liveness).Get(testContainerID)
+	if !ok {
+		t.Fatalf("expected a probe result to be recorded after resume")
+	}
+	if result != results.Failure {
+		t.Errorf("expected Failure result after resume, got %v", result)
+	}
+}
+
 func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
@@ -1253,5 +1296,96 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
 			}
 		})
+	}
+}
+
+func TestSuspendProbesDrainsInFlightProbe(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+	m.workers[probeKey{podUID: w.pod.UID, containerName: w.container.Name, probeType: liveness}] = w
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(true))
+	probeStarted, finishProbe := make(chan struct{}), make(chan struct{})
+	m.prober.exec = blockingCheckpointProbe{started: probeStarted, finish: finishProbe}
+	probeDone := make(chan struct{})
+	go func() { w.doProbe(ctx); close(probeDone) }()
+	select {
+	case <-probeStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("probe did not start")
+	}
+	suspended := make(chan struct{})
+	go func() {
+		if err := m.SuspendProbes(ctx, w.pod.UID); err != nil {
+			t.Error(err)
+		}
+		close(suspended)
+	}()
+	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		return m.isSuspended(w.pod.UID), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-suspended:
+		t.Fatal("suspension returned while a probe was running")
+	default:
+	}
+	close(finishProbe)
+	select {
+	case <-suspended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("suspension did not finish after the probe")
+	}
+	<-probeDone
+	if !w.doProbe(ctx) {
+		t.Fatal("suspended worker stopped")
+	}
+	m.ResumeProbes(w.pod.UID)
+}
+
+func TestSuspendProbesCancellation(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+	m.workers[probeKey{podUID: w.pod.UID, containerName: w.container.Name, probeType: liveness}] = w
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(true))
+	probeStarted, finishProbe := make(chan struct{}), make(chan struct{})
+	m.prober.exec = blockingCheckpointProbe{started: probeStarted, finish: finishProbe}
+	probeDone := make(chan struct{})
+	go func() { w.doProbe(ctx); close(probeDone) }()
+	defer func() { close(finishProbe); <-probeDone }()
+	select {
+	case <-probeStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("probe did not start")
+	}
+
+	drainCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	drained := make(chan error, 1)
+	go func() { drained <- m.SuspendProbes(drainCtx, w.pod.UID) }()
+	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		return m.isSuspended(w.pod.UID), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	select {
+	case err := <-drained:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected cancellation, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("probe draining did not stop on cancellation")
+	}
+	select {
+	case <-probeDone:
+		t.Fatal("cancelling drain should not terminate the running probe")
+	default:
+	}
+	m.ResumeProbes(w.pod.UID)
+	if m.isSuspended(w.pod.UID) {
+		t.Fatal("probes remain suspended after cancellation cleanup")
 	}
 }

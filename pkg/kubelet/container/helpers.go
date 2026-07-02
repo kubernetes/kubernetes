@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"iter"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -532,4 +533,21 @@ func HasAnyActiveRegularContainerStarted(spec *v1.PodSpec, podStatus *PodStatus)
 	}
 
 	return false
+}
+
+// CheckpointContainers yields the containers that a Pod-level checkpoint
+// captures and a restore recreates: restartable init (sidecar) containers in
+// spec order, followed by regular containers. Completed init containers and
+// ephemeral containers are not part of a checkpoint.
+func CheckpointContainers(spec *v1.PodSpec) iter.Seq2[*v1.Container, podutil.ContainerType] {
+	return func(yield func(*v1.Container, podutil.ContainerType) bool) {
+		for container, containerType := range podutil.ContainerIter(spec, podutil.InitContainers|podutil.Containers) {
+			if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(container) {
+				continue
+			}
+			if !yield(container, containerType) {
+				return
+			}
+		}
+	}
 }
