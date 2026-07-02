@@ -50,7 +50,10 @@ func (c *PodCheckpointController) Start(ctx context.Context) error {
 		return err
 	}
 	factory := informers.NewSharedInformerFactory(client, 0)
-	controller := podcheckpoint.NewController(client, factory.Core().V1().Pods())
+	controller, err := podcheckpoint.NewController(client, factory.Core().V1().Pods())
+	if err != nil {
+		return err
+	}
 	ctx, c.cancel = context.WithCancel(ctx)
 	c.done = make(chan struct{})
 	factory.Start(ctx.Done())

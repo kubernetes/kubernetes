@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -49,7 +51,7 @@ func newTestController(t *testing.T, client clientset.Interface, checkpoints []*
 	for _, checkpoint := range checkpoints {
 		require.NoError(t, store.Add(checkpoint))
 	}
-	podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podRestoreFromIndex: podRestoreFromIndexFunc})
 	for _, pod := range pods {
 		require.NoError(t, podIndexer.Add(pod))
 	}
@@ -58,6 +60,82 @@ func newTestController(t *testing.T, client clientset.Interface, checkpoints []*
 		recorder:   testutil.NewFakeRecorder(),
 		store:      store,
 		podLister:  corelisters.NewPodLister(podIndexer),
+		podIndexer: podIndexer,
+	}
+}
+
+// apiCalls returns the verb and resource of each client request.
+func apiCalls(client *fake.Clientset) []string {
+	var calls []string
+	for _, action := range client.Actions() {
+		calls = append(calls, action.GetVerb()+" "+action.GetResource().Resource)
+	}
+	return calls
+}
+
+func TestSyncHandlerRestoreLock(t *testing.T) {
+	// pod builds a Pod that restores from checkpoint "cp" in the given phase.
+	pod := func(name string, phase v1.PodPhase) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
+			Spec:       v1.PodSpec{RestoreFrom: &v1.CheckpointReference{Name: "cp"}},
+			Status:     v1.PodStatus{Phase: phase},
+		}
+	}
+	// checkpoint builds the "cp" PodCheckpoint, optionally carrying the finalizer.
+	checkpoint := func(withFinalizer bool) *nodev1alpha1.PodCheckpoint {
+		checkpoint := &nodev1alpha1.PodCheckpoint{
+			ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "ns"},
+		}
+		if withFinalizer {
+			checkpoint.Finalizers = []string{RestoreLockFinalizer}
+		}
+		return checkpoint
+	}
+	otherPod := pod("other", v1.PodPending)
+	otherPod.Spec.RestoreFrom.Name = "other-cp"
+
+	tests := []struct {
+		name          string
+		withFinalizer bool
+		pods          []*v1.Pod
+		deleting      bool
+		livePods      []*v1.Pod
+		wantFinalizer bool
+		wantCalls     []string
+	}{
+		{name: "creation installs protection", wantFinalizer: true, wantCalls: []string{"update podcheckpoints"}},
+		{name: "inactive checkpoint stays protected", withFinalizer: true, wantFinalizer: true},
+		{name: "deleting unused checkpoint releases protection", withFinalizer: true, deleting: true, wantCalls: []string{"list pods", "update podcheckpoints"}},
+		{name: "cached pending Pod retains protection", withFinalizer: true, deleting: true, pods: []*v1.Pod{pod("restore", v1.PodPending)}, wantFinalizer: true},
+		{name: "cached Pod for another checkpoint does not retain protection", withFinalizer: true, deleting: true, pods: []*v1.Pod{otherPod}, wantCalls: []string{"list pods", "update podcheckpoints"}},
+		{name: "live Pod missing from cache retains protection", withFinalizer: true, deleting: true, livePods: []*v1.Pod{pod("restore", v1.PodPending)}, wantFinalizer: true, wantCalls: []string{"list pods"}},
+		{name: "newly admitted Pod retains protection", withFinalizer: true, deleting: true, livePods: []*v1.Pod{pod("restore", "")}, wantFinalizer: true, wantCalls: []string{"list pods"}},
+		{name: "terminal Pod releases protection", withFinalizer: true, deleting: true, livePods: []*v1.Pod{pod("restore", v1.PodFailed)}, wantCalls: []string{"list pods", "update podcheckpoints"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			pc := checkpoint(tc.withFinalizer)
+			if tc.deleting {
+				pc.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+			}
+			objects := []runtime.Object{pc}
+			for _, pod := range tc.livePods {
+				objects = append(objects, pod)
+			}
+			client := fake.NewSimpleClientset(objects...)
+			c := newTestController(t, client, []*nodev1alpha1.PodCheckpoint{pc}, tc.pods)
+
+			require.NoError(t, c.syncHandler(ctx, "ns/cp"))
+			require.Equal(t, tc.wantCalls, apiCalls(client))
+
+			obj, err := client.NodeV1alpha1().PodCheckpoints("ns").Get(ctx, "cp", metav1.GetOptions{})
+			require.NoError(t, err)
+			require.Equal(t, tc.wantFinalizer, slices.Contains(obj.Finalizers, RestoreLockFinalizer))
+		})
 	}
 }
 
@@ -106,7 +184,7 @@ func TestSyncHandlerAssignsCheckpoint(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			pc := &nodev1alpha1.PodCheckpoint{
-				ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns", UID: "checkpoint-uid", Generation: 3},
+				ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns", UID: "checkpoint-uid", Generation: 3, Finalizers: []string{RestoreLockFinalizer}},
 				Spec:       nodev1alpha1.PodCheckpointSpec{SourcePod: &nodev1alpha1.PodReference{Name: "source", UID: tc.requestedUID}},
 				Status:     tc.status,
 			}
@@ -197,7 +275,7 @@ func TestCheckpointAssignmentRetriesWithoutReplacingClaims(t *testing.T) {
 		t.Run(change, func(t *testing.T) {
 			ctx := context.Background()
 			pc := &nodev1alpha1.PodCheckpoint{
-				ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns", UID: "checkpoint-uid"},
+				ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns", UID: "checkpoint-uid", Finalizers: []string{RestoreLockFinalizer}},
 				Spec:       nodev1alpha1.PodCheckpointSpec{SourcePod: &nodev1alpha1.PodReference{Name: "source"}},
 			}
 			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "source", Namespace: "ns", UID: "source-uid"}, Spec: v1.PodSpec{NodeName: "node-a"}}
@@ -256,8 +334,8 @@ func TestSyncHandlerBoundsAPIRequests(t *testing.T) {
 	requests := 0
 	httpClient := restfake.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 		requests++
-		require.Equal(t, http.MethodGet, request.Method)
-		require.Equal(t, "/api/v1/namespaces/ns/pods/source", request.URL.Path)
+		require.Equal(t, http.MethodPut, request.Method)
+		require.Equal(t, "/apis/node.k8s.io/v1alpha1/namespaces/ns/podcheckpoints/checkpoint", request.URL.Path)
 		deadline, ok := request.Context().Deadline()
 		require.True(t, ok, "the API request must have a deadline")
 		require.LessOrEqual(t, time.Until(deadline), 10*time.Second)
@@ -267,12 +345,16 @@ func TestSyncHandlerBoundsAPIRequests(t *testing.T) {
 	})
 	client, err := clientset.NewForConfigAndClient(&rest.Config{Host: "https://checkpoint.test"}, httpClient)
 	require.NoError(t, err)
-	// The source Pod is not cached, so assignment reads it from the API server.
-	pc := &nodev1alpha1.PodCheckpoint{
-		ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns"},
-		Spec:       nodev1alpha1.PodCheckpointSpec{SourcePod: &nodev1alpha1.PodReference{Name: "source"}},
-	}
+	pc := &nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns"}}
 	c := newTestController(t, client, []*nodev1alpha1.PodCheckpoint{pc}, nil)
 	require.ErrorIs(t, c.syncHandler(ctx, "ns/checkpoint"), context.Canceled)
 	require.Equal(t, 1, requests)
+}
+
+func TestNewControllerSharesPodIndex(t *testing.T) {
+	factory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+	for range 2 {
+		_, err := NewController(fake.NewClientset(), factory.Core().V1().Pods())
+		require.NoError(t, err, "controllers sharing a Pod informer must reuse its index")
+	}
 }

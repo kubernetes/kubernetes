@@ -17,6 +17,8 @@ limitations under the License.
 package podcheckpoint
 
 import (
+	"context"
+	"slices"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -137,5 +139,17 @@ func TestStatusStrategyResetFields(t *testing.T) {
 		if !reset.Has(fieldpath.MakePathOrDie(path)) {
 			t.Errorf("expected status reset fields to include %q", path)
 		}
+	}
+}
+
+func TestCheckpointRestoreProtectionOnCreate(t *testing.T) {
+	pc := newPodCheckpoint()
+	Strategy.PrepareForCreate(context.Background(), pc)
+	if !slices.Contains(pc.Finalizers, checkpoint.PodCheckpointRestoreProtectionFinalizer) {
+		t.Fatal("checkpoint was created without restore protection")
+	}
+	Strategy.PrepareForCreate(context.Background(), pc)
+	if len(pc.Finalizers) != 1 {
+		t.Fatal("restore protection was duplicated")
 	}
 }

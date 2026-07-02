@@ -19,6 +19,7 @@ package podcheckpoint
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -64,6 +65,9 @@ func (podCheckpointStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpat
 func (podCheckpointStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pc := obj.(*checkpoint.PodCheckpoint)
 	pc.Status = checkpoint.PodCheckpointStatus{}
+	if !slices.Contains(pc.Finalizers, checkpoint.PodCheckpointRestoreProtectionFinalizer) {
+		pc.Finalizers = append(pc.Finalizers, checkpoint.PodCheckpointRestoreProtectionFinalizer)
+	}
 	pc.Generation = 1
 }
 
