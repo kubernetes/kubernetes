@@ -121,6 +121,10 @@ type controller struct {
 
 // Controller is a low-level controller that is parameterized by a
 // Config and used in sharedIndexInformer.
+//
+// This is an interface which is implemented only by this package itself;
+// it may get extended in the future without causing an API break.
+// Consumers who need a similar one should define their own variant.
 type Controller interface {
 	// RunWithContext does two things.  One is to construct and run a Reflector
 	// to pump objects/notifications from the Config's ListerWatcher
@@ -150,6 +154,11 @@ type Controller interface {
 	// LastSyncResourceVersion delegates to the Reflector when there
 	// is one, otherwise returns the empty string
 	LastSyncResourceVersion() string
+
+	// A private method to prevent users implementing the
+	// interface and so future additions to it will not
+	// cause apidiff warnings.
+	private()
 }
 
 // New makes a new Controller from the given Config.
@@ -160,6 +169,8 @@ func New(c *Config) Controller {
 	}
 	return ctlr
 }
+
+func (c *controller) private() {}
 
 // Run implements [Controller.Run].
 func (c *controller) Run(stopCh <-chan struct{}) {
