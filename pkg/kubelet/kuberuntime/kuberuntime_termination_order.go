@@ -117,6 +117,21 @@ func (o *terminationOrdering) waitForTurn(name string, gracePeriod int64) float6
 	return time.Since(start).Seconds()
 }
 
+// allPrereqsMet returns true if all prereq channels for the named container are
+// already closed, meaning its SIGTERM turn has arrived. Non-blocking.
+// Safe without locking: o.prereqs is immutable after construction.
+func (o *terminationOrdering) allPrereqsMet(name string) bool {
+	for _, c := range o.prereqs[name] {
+		select {
+		case <-c:
+			// channel is closed, prereq met
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // containerTerminated should be called once the container with the specified name has exited.
 func (o *terminationOrdering) containerTerminated(name string) {
 	o.lock.Lock()

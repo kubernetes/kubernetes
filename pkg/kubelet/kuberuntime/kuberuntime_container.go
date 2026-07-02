@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
@@ -927,7 +928,9 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 }
 
 // killContainersWithSyncResult kills all pod's containers with sync results.
-func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
+// terminating indicates whether the pod is genuinely being terminated (true) vs
+// undergoing sandbox replacement during SyncPod (false).
+func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64, terminating bool) (syncResults []*kubecontainer.SyncResult) {
 	logger := klog.FromContext(ctx)
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
 	wg := sync.WaitGroup{}
@@ -941,7 +944,36 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 		}
 		termOrdering = newTerminationOrdering(pod, runningContainerNames)
 	}
+
+	// When the pod is genuinely terminating (not sandbox replacement), a
+	// restartable init container (sidecar) must keep running until its ordered
+	// termination turn arrives. If it exits on its own before then, it is
+	// restarted to preserve the KEP-753 lifetime guarantee (KEP-4438). For such
+	// containers the watch-restart-and-ordered-kill is handled as one unit by
+	// killRestartableInitContainerWithSyncResult instead of the generic kill
+	// goroutine below.
+	sidecarSpecs := map[string]*v1.Container{}
+	if terminating &&
+		utilfeature.DefaultFeatureGate.Enabled(features.SidecarsRestartableDuringPodTermination) &&
+		types.HasRestartableInitContainer(pod) &&
+		gracePeriodOverride != nil && *gracePeriodOverride > 1 {
+		for i := range pod.Spec.InitContainers {
+			ic := &pod.Spec.InitContainers[i]
+			if podutil.IsRestartableInitContainer(ic) {
+				sidecarSpecs[ic.Name] = ic
+			}
+		}
+	}
+
 	for _, container := range runningPod.Containers {
+		if spec, ok := sidecarSpecs[container.Name]; ok {
+			go func(container *kubecontainer.Container, spec *v1.Container) {
+				defer utilruntime.HandleCrashWithContext(ctx)
+				defer wg.Done()
+				containerResults <- m.killRestartableInitContainerWithSyncResult(ctx, pod, &runningPod, container, spec, *gracePeriodOverride, termOrdering)
+			}(container, spec)
+			continue
+		}
 		go func(container *kubecontainer.Container) {
 			defer utilruntime.HandleCrashWithContext(ctx)
 			defer wg.Done()
@@ -963,6 +995,179 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 		syncResults = append(syncResults, containerResult)
 	}
 	return
+}
+
+// sidecarTerminationRestartPollPeriod is how often, during pod termination, a
+// restartable init container (sidecar) is polled for premature exit while it
+// waits for its ordered termination turn.
+const sidecarTerminationRestartPollPeriod = time.Second
+
+// killRestartableInitContainerWithSyncResult terminates a restartable init
+// container (sidecar) during pod termination while honoring the KEP-753 ordering.
+// Until the sidecar's ordered turn arrives, it is restarted whenever it exits on
+// its own, so it keeps running for the duration of the pod's graceful shutdown
+// (KEP-4438). Once the turn arrives, the instance that is currently live (which
+// may be a restarted one) is gracefully terminated within the remaining grace
+// budget — so a restarted sidecar still receives an ordered SIGTERM rather than
+// being SIGKILLed only when the sandbox is torn down.
+func (m *kubeGenericRuntimeManager) killRestartableInitContainerWithSyncResult(
+	ctx context.Context, pod *v1.Pod, runningPod *kubecontainer.Pod,
+	snapshot *kubecontainer.Container, spec *v1.Container,
+	gracePeriod int64, ordering *terminationOrdering,
+) *kubecontainer.SyncResult {
+	logger := klog.FromContext(ctx)
+	result := kubecontainer.NewSyncResult(kubecontainer.KillContainer, spec.Name)
+
+	// Mirror killContainer's grace accounting: the preStop hook, the wait for this
+	// container's ordered turn, and the final stop all draw from the same budget so
+	// the pod stays within its termination grace period.
+
+	// Run the preStop hook up front, exactly as the generic kill path does, so its
+	// timing is unchanged for sidecars. It runs once, on the instance that is live
+	// at the start of termination.
+	if spec.Lifecycle != nil && spec.Lifecycle.PreStop != nil && gracePeriod > 0 {
+		gracePeriod -= m.executePreStopHook(ctx, pod, snapshot.ID, spec, gracePeriod)
+	}
+
+	// Wait for this sidecar's ordered turn, restarting it if it exits prematurely so
+	// it keeps running until then. allPrereqsMet is checked up front so an
+	// already-due sidecar is not delayed by a full poll period. The wait is bounded
+	// by the remaining grace period (as the generic waitForTurn path is), so the
+	// pod cannot get stuck terminating if a prerequisite container never reports as
+	// terminated (e.g. its stop errored).
+	waitStart := time.Now()
+	deadline := time.NewTimer(time.Duration(gracePeriod) * time.Second)
+	defer deadline.Stop()
+	ticker := time.NewTicker(sidecarTerminationRestartPollPeriod)
+	defer ticker.Stop()
+	// Tracks the exited instance we last restarted, so we restart at most once per
+	// exit despite the lag before a new instance becomes visible in GetPodStatus.
+	var lastHandledExitedID kubecontainer.ContainerID
+waitLoop:
+	for !ordering.allPrereqsMet(spec.Name) {
+		select {
+		case <-ctx.Done():
+			// Pod-level context cancelled; stop waiting and terminate best-effort.
+			break waitLoop
+		case <-deadline.C:
+			// Grace period expired before our turn arrived; proceed to stop.
+			break waitLoop
+		case <-ticker.C:
+			if !ordering.allPrereqsMet(spec.Name) {
+				lastHandledExitedID = m.restartSidecarDuringTerminationIfExited(ctx, pod, runningPod, spec, gracePeriod, lastHandledExitedID)
+			}
+		}
+	}
+	gracePeriod -= int64(time.Since(waitStart).Seconds())
+
+	// always give the container a minimal shutdown window to avoid unnecessary SIGKILLs
+	if gracePeriod < minimumGracePeriodInSeconds {
+		gracePeriod = minimumGracePeriodInSeconds
+	}
+
+	// Our turn has arrived: gracefully stop whatever instance is currently live.
+	// Resolving the live container ID here (rather than reusing the snapshot taken
+	// before any restart) is what lets a restarted sidecar receive an ordered
+	// SIGTERM instead of being SIGKILLed only when the sandbox is torn down. The
+	// preStop hook already ran above, so it is not repeated here.
+	liveID := m.liveContainerID(ctx, runningPod, spec.Name, snapshot.ID)
+	m.recordContainerEvent(ctx, pod, spec, liveID.ID, v1.EventTypeNormal, events.KillingContainer, "%v", fmt.Sprintf("Stopping container %s", spec.Name))
+	logger.V(2).Info("Killing restartable init container with a grace period", "pod", klog.KObj(pod), "podUID", runningPod.ID,
+		"containerName", spec.Name, "containerID", liveID.String(), "gracePeriod", gracePeriod)
+	if err := m.runtimeService.StopContainer(ctx, liveID.ID, gracePeriod); err != nil && !crierror.IsNotFound(err) {
+		result.Fail(kubecontainer.ErrKillContainer, err.Error())
+		logger.Error(err, "Kill restartable init container failed", "pod", klog.KRef(runningPod.Namespace, runningPod.Name),
+			"podUID", runningPod.ID, "containerName", spec.Name, "containerID", liveID.String())
+		return result
+	}
+	ordering.containerTerminated(spec.Name)
+	return result
+}
+
+// restartSidecarDuringTerminationIfExited restarts the named restartable init
+// container (sidecar) if its most recent instance has exited. It restarts at
+// most once per exited instance: lastHandledExitedID is the ID of the exited
+// instance the previous call already acted on, and the (possibly updated) handled
+// ID is returned for the next call.
+//
+// This deduplication is required because there is a visibility lag between
+// starting a container and GetPodStatus reflecting it as running. Without it, the
+// poll loop would re-observe the same exited instance as "newest" and issue
+// duplicate restarts, which collide on the container name reservation
+// (CreateContainerError) and never converge.
+//
+// It is a best-effort operation: failures are logged but the exited instance is
+// still marked handled, so a failed start is not retried in a tight loop. The
+// start is bounded by a timeout so it cannot stall the caller's wait-for-turn loop.
+func (m *kubeGenericRuntimeManager) restartSidecarDuringTerminationIfExited(
+	ctx context.Context, pod *v1.Pod, runningPod *kubecontainer.Pod, spec *v1.Container, gracePeriod int64,
+	lastHandledExitedID kubecontainer.ContainerID,
+) kubecontainer.ContainerID {
+	logger := klog.FromContext(ctx)
+	podStatus, err := m.GetPodStatus(ctx, runningPod)
+	if err != nil {
+		logger.V(4).Info("Failed to get pod status for sidecar restart during termination", "err", err,
+			"pod", klog.KObj(pod), "container", spec.Name)
+		return lastHandledExitedID
+	}
+	cs := podStatus.FindContainerStatusByName(spec.Name)
+	if cs == nil || cs.State != kubecontainer.ContainerStateExited {
+		return lastHandledExitedID
+	}
+	if cs.ID == lastHandledExitedID {
+		// Already restarted in response to this exited instance; the replacement
+		// is just not visible in GetPodStatus yet. Avoid a duplicate restart.
+		return lastHandledExitedID
+	}
+	if len(podStatus.SandboxStatuses) == 0 {
+		return lastHandledExitedID
+	}
+	sandboxID := podStatus.SandboxStatuses[0].GetId()
+	attempt := podStatus.SandboxStatuses[0].GetMetadata().GetAttempt()
+	sandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, attempt)
+	if err != nil {
+		logger.V(4).Info("Failed to generate sandbox config for sidecar restart during termination", "err", err,
+			"pod", klog.KObj(pod), "container", spec.Name)
+		return lastHandledExitedID
+	}
+	var podIP string
+	var podIPs []string
+	if len(podStatus.IPs) > 0 {
+		podIP = podStatus.IPs[0]
+		podIPs = podStatus.IPs
+	}
+	timeoutSecs := max(1, min(gracePeriod/4, 5))
+	startCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSecs)*time.Second)
+	defer cancel()
+	logger.V(2).Info("Restarting sidecar during pod termination", "pod", klog.KObj(pod), "container", spec.Name)
+	if _, err := m.startContainer(startCtx, sandboxID, sandboxConfig,
+		containerStartSpec(spec), pod, podStatus, nil, podIP, podIPs, kubecontainer.ImageVolumes{}); err != nil {
+		logger.V(4).Info("Failed to restart sidecar during termination", "err", err,
+			"pod", klog.KObj(pod), "container", spec.Name)
+	} else {
+		metrics.SidecarRestartsDuringTerminationTotal.Inc()
+	}
+	// Mark this exited instance handled regardless of the start outcome, so a
+	// failed start is not retried in a tight loop and a successful one is not
+	// duplicated while it is still becoming visible in GetPodStatus.
+	return cs.ID
+}
+
+// liveContainerID returns the container ID of the most recent instance of the
+// named container, falling back to the provided ID when status cannot be
+// resolved. During termination a sidecar may have been restarted, so the live
+// instance differs from the one captured in runningPod.
+func (m *kubeGenericRuntimeManager) liveContainerID(
+	ctx context.Context, runningPod *kubecontainer.Pod, name string, fallback kubecontainer.ContainerID,
+) kubecontainer.ContainerID {
+	podStatus, err := m.GetPodStatus(ctx, runningPod)
+	if err != nil {
+		return fallback
+	}
+	if cs := podStatus.FindContainerStatusByName(name); cs != nil && !cs.ID.IsEmpty() {
+		return cs.ID
+	}
+	return fallback
 }
 
 // pruneInitContainersBeforeStart ensures that before we begin creating init

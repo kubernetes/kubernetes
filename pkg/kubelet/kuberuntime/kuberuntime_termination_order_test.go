@@ -283,6 +283,85 @@ func TestTerminationOrderingObeysGrace(t *testing.T) {
 	}
 }
 
+func TestAllPrereqsMet(t *testing.T) {
+	restartPolicy := v1.ContainerRestartPolicyAlways
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name:          "sc1",
+					Image:         "busybox",
+					RestartPolicy: &restartPolicy,
+				},
+				{
+					Name:          "sc2",
+					Image:         "busybox",
+					RestartPolicy: &restartPolicy,
+				},
+			},
+			Containers: []v1.Container{
+				{Name: "main", Image: "busybox"},
+			},
+		},
+	}
+	// Termination order: sc2 waits for main; sc1 waits for main + sc2.
+
+	t.Run("main_has_no_prereqs", func(t *testing.T) {
+		to := newTerminationOrdering(pod, getContainerNames(pod))
+		if !to.allPrereqsMet("main") {
+			t.Error("main has no prereqs, expected allPrereqsMet=true")
+		}
+	})
+
+	t.Run("sidecar_prereqs_not_met_while_main_running", func(t *testing.T) {
+		to := newTerminationOrdering(pod, getContainerNames(pod))
+		if to.allPrereqsMet("sc2") {
+			t.Error("main still running, expected allPrereqsMet=false for sc2")
+		}
+		if to.allPrereqsMet("sc1") {
+			t.Error("main still running, expected allPrereqsMet=false for sc1")
+		}
+	})
+
+	t.Run("sc2_prereqs_met_after_main_terminates", func(t *testing.T) {
+		to := newTerminationOrdering(pod, getContainerNames(pod))
+		to.containerTerminated("main")
+		if !to.allPrereqsMet("sc2") {
+			t.Error("main terminated, expected allPrereqsMet=true for sc2")
+		}
+		// sc1 still waits for sc2
+		if to.allPrereqsMet("sc1") {
+			t.Error("sc2 still running, expected allPrereqsMet=false for sc1")
+		}
+	})
+
+	t.Run("sc1_prereqs_met_after_main_and_sc2_terminate", func(t *testing.T) {
+		to := newTerminationOrdering(pod, getContainerNames(pod))
+		to.containerTerminated("main")
+		to.containerTerminated("sc2")
+		if !to.allPrereqsMet("sc1") {
+			t.Error("main and sc2 terminated, expected allPrereqsMet=true for sc1")
+		}
+	})
+
+	t.Run("main_not_running_preclosed_channel_counts_as_met", func(t *testing.T) {
+		// main not in running list → its channel is pre-closed
+		to := newTerminationOrdering(pod, []string{"sc1", "sc2"})
+		if !to.allPrereqsMet("sc2") {
+			t.Error("main not running (pre-closed), expected allPrereqsMet=true for sc2")
+		}
+		// sc2 is still running
+		if to.allPrereqsMet("sc1") {
+			t.Error("sc2 still running, expected allPrereqsMet=false for sc1")
+		}
+	})
+}
+
 func getContainerNames(p *v1.Pod) []string {
 	var running []string
 	for _, ic := range p.Spec.InitContainers {

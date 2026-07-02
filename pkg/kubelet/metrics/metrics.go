@@ -776,6 +776,17 @@ var (
 		},
 		[]string{"container_type", "exit_code", "reason"},
 	)
+	// SidecarRestartsDuringTerminationTotal tracks how many times a restartable
+	// init container (sidecar) was restarted during pod termination because it
+	// exited before its ordered termination turn (KEP-4438).
+	SidecarRestartsDuringTerminationTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "sidecar_restarts_during_termination_total",
+			Help:           "Cumulative number of times a restartable init container (sidecar) was restarted during pod termination because it exited before its ordered termination turn.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 	// StartedContainersTotal is a counter that tracks the number of errors creating containers
 	StartedContainersErrorsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -1367,6 +1378,7 @@ func Register() {
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
+		legacyregistry.MustRegister(SidecarRestartsDuringTerminationTotal)
 		legacyregistry.MustRegister(TerminatedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersTotal)
