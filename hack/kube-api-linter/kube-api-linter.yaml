@@ -24,6 +24,7 @@ linters:
     - "duplicatemarkers" #Prevent identical markers from being present on types and fields
     - "dependenttags" # Ensure markers dependent on other markers are present.
     - "nodurations" # Ensure duration types are not used.
+    - "noreferences" # Ensure field names use Ref/Refs suffixes instead of Reference/References.
 lintersConfig:
   conditions:
     isFirstField: Ignore
