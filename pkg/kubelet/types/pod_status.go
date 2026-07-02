@@ -49,6 +49,11 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 			return true
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		if conditionType == v1.PodRestored {
+			return true
+		}
+	}
 	return false
 }
 
