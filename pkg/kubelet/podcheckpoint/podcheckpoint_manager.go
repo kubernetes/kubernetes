@@ -124,6 +124,12 @@ type manager struct {
 	// not mark failed. The watch fails them instead of capturing them again.
 	checkpointsInterrupted sets.Set[types.UID]
 	mounter                mount.Interface
+	// checkpointDataLock orders restore use of checkpoint data against its
+	// removal by the data sweeper.
+	checkpointDataLock sync.Mutex
+	// restoreDataUsers counts the restores reading the data of each
+	// PodCheckpoint. Guarded by checkpointDataLock.
+	restoreDataUsers map[types.UID]int
 }
 
 // podCheckpointPhase is the stage of a checkpoint in flight for a Pod.
@@ -166,6 +172,13 @@ type Manager interface {
 	// AbandonPod fails the checkpoint requested for a terminating Pod if
 	// SyncPod has not started it.
 	AbandonPod(pod *v1.Pod)
+	// CheckpointMissingFromNode reports whether the synced watch of this
+	// node's PodCheckpoints confirms that the checkpoint does not exist.
+	CheckpointMissingFromNode(namespace, name string) bool
+	// UseCheckpointData keeps the data of a PodCheckpoint while a restore
+	// reads it. The caller must call release once the runtime no longer reads
+	// the data.
+	UseCheckpointData(checkpointUID types.UID) (release func())
 }
 
 // NewManager returns the Manager for the Pods of this node. It returns a no-op
@@ -209,6 +222,18 @@ func (m *manager) AbandonPod(pod *v1.Pod) {
 	m.abandonPodCheckpointRequest(pod)
 }
 
+// CheckpointMissingFromNode reports whether the synced PodCheckpoint watch,
+// which holds every checkpoint assigned to this node, lacks the checkpoint. It
+// reports false while the watch has not synced.
+func (m *manager) CheckpointMissingFromNode(namespace, name string) bool {
+	state := m.podCheckpointWatch
+	if state == nil || state.hasSynced == nil || !state.hasSynced() {
+		return false
+	}
+	_, err := state.lister.PodCheckpoints(namespace).Get(name)
+	return apierrors.IsNotFound(err)
+}
+
 // noopManager is the Manager when PodLevelCheckpointRestore is disabled.
 type noopManager struct{}
 
@@ -217,6 +242,12 @@ func (noopManager) Run(context.Context) {}
 func (noopManager) SyncPod(context.Context, *v1.Pod, *kubecontainer.PodStatus) bool { return false }
 
 func (noopManager) AbandonPod(*v1.Pod) {}
+
+// CheckpointMissingFromNode reports false: without the feature there is no
+// watch to confirm that a checkpoint is missing.
+func (noopManager) CheckpointMissingFromNode(string, string) bool { return false }
+
+func (noopManager) UseCheckpointData(types.UID) func() { return func() {} }
 
 // podCheckpointRequest is a PodCheckpoint that the watch handed to the pod
 // worker of its source Pod (KEP-5823).
