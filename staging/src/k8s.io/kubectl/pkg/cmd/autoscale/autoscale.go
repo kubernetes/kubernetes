@@ -259,8 +259,12 @@ func (o *AutoscaleOptions) Run() error {
 			klog.V(1).Infof("Encountered an error with the autoscaling/v2 HorizontalPodAutoscaler: %v. "+
 				"Falling back to try the autoscaling/v1 HorizontalPodAutoscaler", err)
 			// check if the HPA can be created using v1 API.
-			if ok, err := o.canCreateHPAV1(); !ok {
-				return fmt.Errorf("failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1: %w", err)
+			ok, compatErr := o.canCreateHPAV1()
+			if !ok {
+				if compatErr != nil {
+					return fmt.Errorf("failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1: %w", compatErr)
+				}
+				return fmt.Errorf("failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1")
 			}
 			hpaV1 := o.createHorizontalPodAutoscalerV1(info.Name, mapping)
 			if err := o.handleHPA(hpaV1); err != nil {
@@ -282,13 +286,22 @@ func (o *AutoscaleOptions) Run() error {
 func (o *AutoscaleOptions) canCreateHPAV1() (bool, error) {
 	// Allow fallback to v1 HPA only if:
 	// 1. CPUPercent is set and Memory is not set.
-	// 2. Or, Memory is not set and the metric type is UtilizationMetricType.
+	// 2. Or, Memory is not set and the CPU metric type is UtilizationMetricType.
+	if o.Memory != "" {
+		return false, nil
+	}
+	if o.CPUPercent >= 0 {
+		return true, nil
+	}
+	if o.CPU == "" {
+		return false, nil
+	}
+
 	_, _, metricsType, err := parseResourceInput(o.CPU, corev1.ResourceCPU)
 	if err != nil {
 		return false, err
 	}
-	return (o.CPUPercent >= 0 && o.Memory == "") ||
-		(o.Memory == "" && metricsType == autoscalingv2.UtilizationMetricType), nil
+	return metricsType == autoscalingv2.UtilizationMetricType, nil
 }
 
 // handleHPA handles the creation and management of a single HPA object.
