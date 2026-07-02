@@ -72,14 +72,15 @@ func newGetTemplateFn(nodeName types.NodeName, getAddresses func() []v1.NodeAddr
 
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
-func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, getAddresses func() []v1.NodeAddress, certDirectory string) (certificate.Manager, error) {
+func NewKubeletServerCertificateManager(logger klog.Logger, kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, getAddresses func() []v1.NodeAddress, certDirectory string) (certificate.Manager, error) {
 	var clientsetFn certificate.ClientsetFunc
 	if kubeClient != nil {
 		clientsetFn = func(current *tls.Certificate) (clientset.Interface, error) {
 			return kubeClient, nil
 		}
 	}
-	certificateStore, err := certificate.NewFileStore(
+	certificateStore, err := certificate.NewFileStoreWithLogger(
+		logger,
 		"kubelet-server",
 		certDirectory,
 		certDirectory,
@@ -197,6 +198,7 @@ func addressesToHostnamesAndIPs(addresses []v1.NodeAddress) (dnsNames []string, 
 // client that can be used to sign new certificates (or rotate). If a CSR
 // client is set later, it may begin rotating/renewing the client cert.
 func NewKubeletClientCertificateManager(
+	logger klog.Logger,
 	certDirectory string,
 	nodeName types.NodeName,
 	bootstrapCertData []byte,
@@ -206,7 +208,8 @@ func NewKubeletClientCertificateManager(
 	clientsetFn certificate.ClientsetFunc,
 ) (certificate.Manager, error) {
 
-	certificateStore, err := certificate.NewFileStore(
+	certificateStore, err := certificate.NewFileStoreWithLogger(
+		logger,
 		"kubelet-client",
 		certDirectory,
 		certDirectory,
