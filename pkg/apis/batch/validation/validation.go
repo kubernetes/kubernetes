@@ -745,9 +745,9 @@ func validateJobScheduling(spec *batch.JobSpec, fldPath *field.Path) field.Error
 func defaultGangMinCount(spec *batch.JobSpec) workloadbuilder.WorkloadItemFunc {
 	return func(item *workloadbuilder.WorkloadItem) {
 		c := item.ResolvedConfig
-		if c == nil || c.Policy == nil || 
-		c.Policy.Gang == nil || 
-		c.Policy.Gang.MinCount != nil {
+		if c == nil || c.Policy == nil ||
+			c.Policy.Gang == nil ||
+			c.Policy.Gang.MinCount != nil {
 			return
 		}
 		c.Policy.Gang.MinCount = new(ptr.Deref(spec.Parallelism, 1))
