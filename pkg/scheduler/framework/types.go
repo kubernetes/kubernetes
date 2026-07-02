@@ -897,10 +897,8 @@ func (pgqi *QueuedPodGroupInfo) Gated() bool {
 }
 
 // GetPriority returns the pod group's priority.
-// It returns the priority of the first member pod, because all member pods should have the same priority.
 func (pgqi *QueuedPodGroupInfo) GetPriority() int32 {
-	// TODO(macsko): Update this to return PodGroup object's priority instead.
-	return pgqi.QueuedPodInfos[0].GetPriority()
+	return schedutil.PodGroupPriority(pgqi.PodGroup)
 }
 
 func (pgqi *QueuedPodGroupInfo) Size() int {

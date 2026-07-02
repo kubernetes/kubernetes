@@ -126,12 +126,16 @@ func TestPodGroupQueueing(t *testing.T) {
 
 	podGroupGang := st.MakePodGroup().Name("pg").MinCount(2).Obj()
 	podGroupGangSingle := st.MakePodGroup().Name("pg").MinCount(1).Obj()
+	podGroupGangTriple := st.MakePodGroup().Name("pg").MinCount(3).Obj()
 	podGroupBasic := st.MakePodGroup().Name("pg").BasicPolicy().Obj()
 
 	p1 := st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg").Obj()
 	p2 := st.MakePod().Name("p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg").Obj()
 	p3 := st.MakePod().Name("p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg").Obj()
 	p4 := st.MakePod().Name("p4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg").Obj()
+
+	smallP1 := st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg").Obj()
+	smallP2 := st.MakePod().Name("p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg").Obj()
 
 	p1Gated := st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg").SchedulingGates([]string{"foo-gate"}).Obj()
 	p3Gated := st.MakePod().Name("p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg").SchedulingGates([]string{"foo-gate"}).Obj()
@@ -628,8 +632,8 @@ func TestPodGroupQueueing(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2Large},
 				},
 				{
-					Name:                               "Verify pods are gated at PreEnqueue (no PodGroup object)",
-					WaitForPodsInUnschedulableEntities: []string{"p1", "p2"},
+					Name:                                "Verify pods are gated at PreEnqueue (no PodGroup object)",
+					WaitForPodsInIncompletePodGroupPods: []string{"p1", "p2"},
 				},
 				{
 					Name:           "Create Gang Policy PodGroup with MinCount 1",
@@ -682,6 +686,147 @@ func TestPodGroupQueueing(t *testing.T) {
 				{
 					Name:                 "Verify all pods scheduled successfully",
 					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+			},
+		},
+		{
+			name: "gang is scheduled, then pod group is deleted, and new enqueued pods belong to it end up in incompletePodGroupPods",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object",
+					CreatePodGroup: podGroupGang,
+				},
+				{
+					Name:       "Create gang pods",
+					CreatePods: []*v1.Pod{smallP1, smallP2},
+				},
+				{
+					Name:                 "Verify gang pods are scheduled successfully",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name:           "Delete the PodGroup",
+					DeletePodGroup: "pg",
+				},
+				{
+					Name:       "Create a new pod belonging to the deleted gang",
+					CreatePods: []*v1.Pod{p3},
+				},
+				{
+					Name:                                "Verify the new pod ends up in incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: []string{"p3"},
+				},
+			},
+		},
+		{
+			name: "basic group is scheduled, then pod group is deleted, and new enqueued pods belong to it end up in incompletePodGroupPods",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object with Basic policy",
+					CreatePodGroup: podGroupBasic,
+				},
+				{
+					Name:       "Create basic group pods",
+					CreatePods: []*v1.Pod{smallP1, smallP2},
+				},
+				{
+					Name:                 "Verify group pods are scheduled successfully",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name:           "Delete the PodGroup",
+					DeletePodGroup: "pg",
+				},
+				{
+					Name:       "Create a new pod belonging to the deleted basic group",
+					CreatePods: []*v1.Pod{p3},
+				},
+				{
+					Name:                                "Verify the new pod ends up in incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: []string{"p3"},
+				},
+			},
+		},
+		{
+			name: "gang is partially scheduled, then pod group is deleted, unschedulable pods end up in incompletePodGroupPods",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object",
+					CreatePodGroup: podGroupGang,
+				},
+				{
+					Name:       "Create gang pods",
+					CreatePods: []*v1.Pod{smallP1, smallP2, p3},
+				},
+				{
+					Name:                 "Verify gang pods are scheduled successfully",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name:                     "Verify p3 is unschedulable",
+					WaitForPodsUnschedulable: []string{"p3"},
+				},
+				{
+					Name:           "Delete the PodGroup",
+					DeletePodGroup: "pg",
+				},
+				{
+					Name:                                "Verify p3 ends up in incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: []string{"p3"},
+				},
+			},
+		},
+		{
+			name: "basic group is partially scheduled, then pod group is deleted, unschedulable pods end up in incompletePodGroupPods",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object with Basic policy",
+					CreatePodGroup: podGroupBasic,
+				},
+				{
+					Name:       "Create basic group pods",
+					CreatePods: []*v1.Pod{smallP1, smallP2, p3},
+				},
+				{
+					Name:                 "Verify group pods are scheduled successfully",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name:                     "Verify p3 is unschedulable",
+					WaitForPodsUnschedulable: []string{"p3"},
+				},
+				{
+					Name:           "Delete the PodGroup",
+					DeletePodGroup: "pg",
+				},
+				{
+					Name:                                "Verify p3 ends up in incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: []string{"p3"},
+				},
+			},
+		},
+		{
+			name: "gang is unschedulable, then pod group is deleted, unschedulable pods end up in incompletePodGroupPods",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object",
+					CreatePodGroup: podGroupGangTriple,
+				},
+				{
+					Name:       "Create gang pods",
+					CreatePods: []*v1.Pod{smallP1, smallP2, p3},
+				},
+				{
+					Name:                     "Verify gang pods are unschedulable",
+					WaitForPodsUnschedulable: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name:           "Delete the PodGroup",
+					DeletePodGroup: "pg",
+				},
+				{
+					Name:                                "Verify gang pods end up in incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: []string{"p1", "p2", "p3"},
 				},
 			},
 		},

@@ -448,6 +448,7 @@ func (sched *Scheduler) addPodGroup(obj any) {
 
 	logger.V(3).Info("Add event for pod group", "podGroup", klog.KObj(pg))
 	sched.Cache.AddPodGroup(pg)
+	sched.SchedulingQueue.AddPodGroup(logger, pg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, pg, nil)
 }
 
@@ -472,6 +473,7 @@ func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 
 	logger.V(4).Info("Update event for pod group", "podGroup", klog.KObj(newPG))
 	sched.Cache.UpdatePodGroup(logger, oldPG, newPG)
+	sched.SchedulingQueue.UpdatePodGroup(logger, newPG)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldPG, newPG, nil)
 }
 
@@ -498,6 +500,7 @@ func (sched *Scheduler) deletePodGroup(obj any) {
 
 	logger.V(3).Info("Delete event for pod group", "podGroup", klog.KObj(pg))
 	sched.Cache.RemovePodGroup(pg)
+	sched.SchedulingQueue.DeletePodGroup(logger, pg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, pg, nil, nil)
 }
 

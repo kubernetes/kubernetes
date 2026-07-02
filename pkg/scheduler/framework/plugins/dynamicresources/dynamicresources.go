@@ -491,13 +491,11 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		}
 
 		if claim.Status.Allocation != nil {
-			if claim.Status.Allocation.NodeSelector != nil {
-				nodeSelector, err := nodeaffinity.NewNodeSelector(claim.Status.Allocation.NodeSelector)
-				if err != nil {
-					return nil, statusError(logger, err)
-				}
-				s.informationsForClaim[index].availableOnNodes = nodeSelector
+			nodeSelector, err := nodeSelectorFromAllocation(claim.Status.Allocation)
+			if err != nil {
+				return nil, statusError(logger, err)
 			}
+			s.informationsForClaim[index].availableOnNodes = nodeSelector
 		} else {
 			numClaimsToAllocate++
 
@@ -524,7 +522,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			if podGroupState != nil && podGroupState.pendingAllocations.Has(claim.UID) {
 				if pendingAllocation := pl.draManager.ResourceClaims().GetPendingAllocation(claim.UID); pendingAllocation != nil {
 					s.informationsForClaim[index].allocation = pendingAllocation
-					nodeSelector, err := nodeaffinity.NewNodeSelector(pendingAllocation.NodeSelector)
+					nodeSelector, err := nodeSelectorFromAllocation(pendingAllocation)
 					if err != nil {
 						return nil, statusError(logger, err)
 					}
@@ -1921,4 +1919,13 @@ func formatBCStatusOneLine(devs []BindingConditionsStatus) string {
 		parts = append(parts, base)
 	}
 	return strings.Join(parts, "; ")
+}
+
+// nodeSelectorFromAllocation returns a NodeSelector for the given allocation,
+// or nil if the allocation has no NodeSelector (meaning available on all nodes).
+func nodeSelectorFromAllocation(allocation *resourceapi.AllocationResult) (*nodeaffinity.NodeSelector, error) {
+	if allocation.NodeSelector == nil {
+		return nil, nil
+	}
+	return nodeaffinity.NewNodeSelector(allocation.NodeSelector)
 }

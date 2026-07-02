@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -176,6 +177,16 @@ func TestPriorityQueue_Add(t *testing.T) {
 
 			objs := []runtime.Object{medPod, unschedPod, highPod}
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
+			if tt.usePodGroups {
+				podGroups := []*schedulingv1alpha3.PodGroup{
+					st.MakePodGroup().Name("pg-med").Namespace(medPod.Namespace).Priority(midPriority).Obj(),
+					st.MakePodGroup().Name("pg-unsched").Namespace(unschedPod.Namespace).Priority(lowPriority).Obj(),
+					st.MakePodGroup().Name("pg-high").Namespace(highPod.Namespace).Priority(highPriority).Obj(),
+				}
+				for _, podGroup := range podGroups {
+					q.AddPodGroup(logger, podGroup)
+				}
+			}
 			q.Add(ctx, medPod)
 			q.Add(ctx, unschedPod)
 			q.Add(ctx, highPod)
@@ -1032,6 +1043,10 @@ func Test_InFlightPods(t *testing.T) {
 				fakeClock := testingclock.NewFakeClock(time.Now())
 				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), obj, WithQueueingHintMapPerProfile(test.queueingHintMap), WithClock(fakeClock))
 				sortOpt := cmpopts.SortSlices(func(a, b string) bool { return a < b })
+				if genericWorkloadEnabled {
+					podGroup := st.MakePodGroup().Name(pgName).Namespace(pgPod1.Namespace).Obj()
+					q.AddPodGroup(logger, podGroup)
+				}
 
 				// When a Pod is added to the queue, the QueuedPodInfo will have a new timestamp.
 				// On Windows, time.Now() is not as precise, 2 consecutive calls may return the same timestamp.
@@ -1411,12 +1426,12 @@ func TestPriorityQueue_Pop(t *testing.T) {
 
 			var medEntity, backoffEntity, errorBackoffEntity, unschedEntity framework.QueuedEntityInfo
 			if tt.usePodGroups {
-				medEntity = q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, medPod))
-				backoffPodGroup := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, backoffPod, "plugin"))
+				medEntity = q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, medPod), nil)
+				backoffPodGroup := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, backoffPod, "plugin"), nil)
 				backoffPodGroup.UnschedulablePlugins = sets.New("plugin")
 				backoffEntity = backoffPodGroup
-				errorBackoffEntity = q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, errorBackoffPod))
-				unschedPodGroup := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, unschedPod, "plugin"))
+				errorBackoffEntity = q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, errorBackoffPod), nil)
+				unschedPodGroup := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, unschedPod, "plugin"), nil)
 				unschedPodGroup.UnschedulablePlugins = sets.New("plugin")
 				unschedEntity = unschedPodGroup
 			} else {
@@ -3712,11 +3727,13 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 		setup                           func(t ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo)
 		disableBackoff                  bool
 		blockOnPreEnqueue               bool
+		skipAddPodGroup                 bool
 		expectedUnschedulableCount      int
 		expectedConsecutiveErrorsCount  int
 		expectedInActiveQ               bool
 		expectedInBackoffQ              bool
 		expectedInUnschedulableEntities bool
+		expectedInIncomplete            []*v1.Pod
 		expectedPodsInGroup             int
 	}{
 		{
@@ -3830,6 +3847,18 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			expectedInUnschedulableEntities: true,
 			expectedPodsInGroup:             2,
 		},
+		{
+			name: "Pods present, but pod group is not observed, pods move to incompletePodGroupPods",
+			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
+				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
+				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
+				q.pendingPodGroupPods.add(pInfo1)
+				q.pendingPodGroupPods.add(pInfo2)
+			},
+			skipAddPodGroup:      true,
+			expectedInIncomplete: []*v1.Pod{pod1, pod2},
+			expectedPodsInGroup:  2,
+		},
 	}
 
 	for _, test := range tests {
@@ -3850,8 +3879,12 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 				opts = append(opts, WithPodInitialBackoffDuration(0), WithPodMaxBackoffDuration(0))
 			}
 			q := NewTestQueue(tCtx, newDefaultQueueSort(), opts...)
+			podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
+			if !test.skipAddPodGroup {
+				q.AddPodGroup(tCtx.Logger(), podGroup)
+			}
 
-			pgInfo := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(tCtx, pod1))
+			pgInfo := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(tCtx, pod1), podGroup)
 
 			test.setup(tCtx, q, pgInfo)
 
@@ -3877,6 +3910,11 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			}
 			if q.pendingPodGroupPods.len() != 0 {
 				tCtx.Errorf("Expected pendingPodGroupPods to be cleared")
+			}
+			for _, pod := range test.expectedInIncomplete {
+				if !q.incompletePodGroupPods.has(pod) {
+					tCtx.Errorf("Expected pod %v to be in incompletePodGroupPods", pod.Name)
+				}
 			}
 			if len(pgInfo.QueuedPodInfos) != test.expectedPodsInGroup {
 				tCtx.Errorf("Expected QueuedPodInfos to have %v elements, got %v", test.expectedPodsInGroup, len(pgInfo.QueuedPodInfos))
@@ -5957,10 +5995,17 @@ const (
 	stateBackoff
 	stateUnschedulable
 	stateGated
+	stateIncomplete
 )
 
-func setupInitialPodGroupState(t *testing.T, ctx context.Context, q *PriorityQueue, initialPods []*v1.Pod, initialState initialQueueState) {
+func setupInitialPodGroupState(t *testing.T, ctx context.Context, q *PriorityQueue, initialPods []*v1.Pod, initialState initialQueueState, initialPodGroup *schedulingv1alpha3.PodGroup) {
 	t.Helper()
+
+	if initialState != stateIncomplete {
+		logger := klog.FromContext(ctx)
+		q.AddPodGroup(logger, initialPodGroup)
+	}
+
 	if len(initialPods) == 0 {
 		return
 	}
@@ -6020,6 +6065,7 @@ func TestAddPodGroupMember(t *testing.T) {
 		expectedInUnschedulable       bool
 		expectedInBackoffQ            bool
 		expectedInPendingPodGroupPods bool
+		expectedInIncomplete          []*v1.Pod
 		expectedGated                 bool
 		expectedGroupSize             int
 	}{
@@ -6111,6 +6157,19 @@ func TestAddPodGroupMember(t *testing.T) {
 			expectedGated:           true,
 			expectedGroupSize:       2,
 		},
+		{
+			name:                 "first member added before pod group exists, goes to incompletePodGroupPods",
+			initialState:         stateIncomplete,
+			incomingPod:          p1,
+			expectedInIncomplete: []*v1.Pod{p1},
+		},
+		{
+			name:                 "existing pod in incompletePodGroupPods, stays in incompletePodGroupPods",
+			initialPod:           p1,
+			initialState:         stateIncomplete,
+			incomingPod:          p2,
+			expectedInIncomplete: []*v1.Pod{p1, p2},
+		},
 	}
 
 	for _, tt := range tests {
@@ -6129,13 +6188,15 @@ func TestAddPodGroupMember(t *testing.T) {
 					"preEnqueuePlugin": &preEnqueuePlugin{allowlists: []string{"allow"}},
 				},
 			}
+
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+			podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
 
 			var initialPods []*v1.Pod
 			if tt.initialPod != nil {
 				initialPods = []*v1.Pod{tt.initialPod}
 			}
-			setupInitialPodGroupState(t, ctx, q, initialPods, tt.initialState)
+			setupInitialPodGroupState(t, ctx, q, initialPods, tt.initialState, podGroup)
 
 			// Add incoming pod
 			q.Add(ctx, tt.incomingPod)
@@ -6192,6 +6253,15 @@ func TestAddPodGroupMember(t *testing.T) {
 			if inPending != tt.expectedInPendingPodGroupPods {
 				t.Errorf("Expected incoming pod in pendingPodGroupPods: %v, got %v", tt.expectedInPendingPodGroupPods, inPending)
 			}
+
+			for _, pod := range tt.expectedInIncomplete {
+				if !q.incompletePodGroupPods.has(pod) {
+					t.Errorf("Expected pod %v in incompletePodGroupPods", pod.Name)
+				}
+			}
+			if q.incompletePodGroupPods.len() != len(tt.expectedInIncomplete) {
+				t.Errorf("Expected incompletePodGroupPods size to be %v, got %v", len(tt.expectedInIncomplete), q.incompletePodGroupPods.len())
+			}
 		})
 	}
 }
@@ -6215,6 +6285,7 @@ func TestDeletePodGroupMember(t *testing.T) {
 		expectedInUnschedulable bool
 		expectedInBackoffQ      bool
 		expectedPodsInPending   int
+		expectedInIncomplete    []*v1.Pod
 		expectedGated           bool
 		expectedGroupSize       int
 	}{
@@ -6305,6 +6376,20 @@ func TestDeletePodGroupMember(t *testing.T) {
 			expectedGated:           true,
 			expectedGroupSize:       2,
 		},
+		{
+			name:                 "delete from incompletePodGroupPods",
+			initialPods:          []*v1.Pod{p1},
+			initialState:         stateIncomplete,
+			podToDelete:          p1,
+			expectedInIncomplete: nil,
+		},
+		{
+			name:                 "delete one pod from incompletePodGroupPods with multiple pods",
+			initialPods:          []*v1.Pod{p1, p2},
+			initialState:         stateIncomplete,
+			podToDelete:          p1,
+			expectedInIncomplete: []*v1.Pod{p2},
+		},
 	}
 
 	for _, tt := range tests {
@@ -6323,8 +6408,9 @@ func TestDeletePodGroupMember(t *testing.T) {
 				},
 			}
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+			podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
 
-			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
+			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 			// Add pending pods
 			for _, pod := range tt.pendingPods {
 				q.Add(ctx, pod)
@@ -6379,6 +6465,15 @@ func TestDeletePodGroupMember(t *testing.T) {
 			if q.pendingPodGroupPods.has(tt.podToDelete) {
 				t.Errorf("Deleted pod %s is still present in pendingPodGroupPods map", tt.podToDelete.Name)
 			}
+
+			for _, pod := range tt.expectedInIncomplete {
+				if !q.incompletePodGroupPods.has(pod) {
+					t.Errorf("Expected pod %s in incompletePodGroupPods", pod.Name)
+				}
+			}
+			if q.incompletePodGroupPods.len() != len(tt.expectedInIncomplete) {
+				t.Errorf("Expected incompletePodGroupPods size to be %d, got %d", len(tt.expectedInIncomplete), q.incompletePodGroupPods.len())
+			}
 		})
 	}
 }
@@ -6407,6 +6502,7 @@ func TestUpdatePodGroupMember(t *testing.T) {
 		expectedInUnschedulable bool
 		expectedInBackoffQ      bool
 		expectedPodsInPending   int
+		expectedInIncomplete    *v1.Pod
 		expectedGated           bool
 		expectedGroupSize       int
 		expectedNominatedPods   map[types.UID]string
@@ -6535,6 +6631,22 @@ func TestUpdatePodGroupMember(t *testing.T) {
 				"pod2": "node1",
 			},
 		},
+		{
+			name:                 "update pod in incompletePodGroupPods",
+			initialPods:          []*v1.Pod{p2},
+			initialState:         stateIncomplete,
+			oldPod:               p2,
+			newPod:               updatedP2,
+			expectedInIncomplete: updatedP2,
+		},
+		{
+			name:                 "updating incomplete pod that doesn't exist in any queue, adds the pod to incompletePodGroupPods",
+			initialPods:          nil,
+			initialState:         stateIncomplete,
+			oldPod:               notFoundPod,
+			newPod:               updatedNotFoundPod,
+			expectedInIncomplete: updatedNotFoundPod,
+		},
 	}
 
 	for _, tt := range tests {
@@ -6553,8 +6665,9 @@ func TestUpdatePodGroupMember(t *testing.T) {
 				},
 			}
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.newPod}, WithPreEnqueuePluginMap(preEnqueueMap))
+			podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
 
-			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
+			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 			// Add pending pods
 			for _, pod := range tt.pendingPods {
 				q.Add(ctx, pod)
@@ -6623,6 +6736,16 @@ func TestUpdatePodGroupMember(t *testing.T) {
 					t.Errorf("Pending member pod differs from newPod (-want +got):\n%s", diff)
 				}
 			}
+
+			if tt.expectedInIncomplete != nil {
+				pInfo := q.incompletePodGroupPods.get(tt.expectedInIncomplete)
+				if diff := cmp.Diff(tt.expectedInIncomplete, pInfo.Pod); diff != "" {
+					t.Errorf("Unexpected pod in incompletePodGroupPods (-want +got):\n%s", diff)
+				}
+			} else if incompleteLen := q.incompletePodGroupPods.len(); incompleteLen != 0 {
+				t.Errorf("Expected no pods in incompletePodGroupPods, got %v", incompleteLen)
+			}
+
 			if diff := cmp.Diff(tt.expectedNominatedPods, q.nominatedPodToNode, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Unexpected nominated pods (-want +got):\n%s", diff)
 			}
@@ -6646,6 +6769,7 @@ func TestActivatePodGroupMember(t *testing.T) {
 		expectedInActiveQ          bool
 		expectedInUnschedulable    bool
 		expectedPodsInPending      int
+		expectedInIncomplete       []*v1.Pod
 		expectedGated              bool
 		expectedForceActivateEvent bool
 	}{
@@ -6692,6 +6816,13 @@ func TestActivatePodGroupMember(t *testing.T) {
 		// 	expectedForceActivateEvent:     true,
 		// 	expectedPodsInPending:          1,
 		// },
+		{
+			name:                 "activate pod in incompletePodGroupPods is a no-op",
+			initialPods:          []*v1.Pod{p1, p2},
+			initialState:         stateIncomplete,
+			podToActivate:        p1,
+			expectedInIncomplete: []*v1.Pod{p1, p2},
+		},
 	}
 
 	for _, tt := range tests {
@@ -6710,8 +6841,9 @@ func TestActivatePodGroupMember(t *testing.T) {
 				},
 			}
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+			podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
 
-			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
+			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 			// Add pending pods
 			for _, pod := range tt.pendingPods {
 				q.Add(ctx, pod)
@@ -6755,6 +6887,15 @@ func TestActivatePodGroupMember(t *testing.T) {
 			}
 			if tt.expectedPodsInPending > 0 && !q.pendingPodGroupPods.has(tt.podToActivate) {
 				t.Errorf("Pod %s was not found in pendingPodGroupPods map", tt.podToActivate.Name)
+			}
+
+			for _, pod := range tt.expectedInIncomplete {
+				if !q.incompletePodGroupPods.has(pod) {
+					t.Errorf("Expected pod %s in incompletePodGroupPods", pod.Name)
+				}
+			}
+			if q.incompletePodGroupPods.len() != len(tt.expectedInIncomplete) {
+				t.Errorf("Expected incompletePodGroupPods size to be %d, got %d", len(tt.expectedInIncomplete), q.incompletePodGroupPods.len())
 			}
 
 			if tt.expectedForceActivateEvent {
@@ -6884,8 +7025,9 @@ func TestMoveAllToActiveOrBackoffQueuePodGroupMember(t *testing.T) {
 			}
 
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap), WithQueueingHintMapPerProfile(m))
+			podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
 
-			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
+			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 
 			// MoveAllToActiveOrBackoffQueue with the given event
 			q.MoveAllToActiveOrBackoffQueue(logger, tt.event, nil, nil, tt.preCheck)
@@ -7007,8 +7149,9 @@ func TestFlushBackoffQCompletedPodGroupMember(t *testing.T) {
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap), WithClock(fakeClock))
+			podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
 
-			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
+			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 
 			if tt.advanceClock > 0 {
 				fakeClock.Step(tt.advanceClock)
@@ -7109,8 +7252,9 @@ func TestFlushUnschedulableEntitiesLeftoverPodGroupMember(t *testing.T) {
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap), WithClock(fakeClock))
+			podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
 
-			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
+			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 
 			if tt.advanceClock > 0 {
 				fakeClock.Step(tt.advanceClock)
@@ -7189,11 +7333,13 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 		initialPods             []*v1.Pod
 		initialState            initialQueueState
 		clearLastPopped         bool
+		deletePodGroup          bool
 		podsToAdd               []*framework.QueuedPodInfo
 		expectedPodsInPending   int
 		expectedInActiveQ       bool
 		expectedInUnschedulable bool
 		expectedInBackoffQ      bool
+		expectedInIncomplete    []*v1.Pod
 		expectedGated           bool
 		expectedGroupSize       int
 	}{
@@ -7262,6 +7408,23 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 			expectedGated:           true,
 			expectedGroupSize:       2,
 		},
+		{
+			name:                 "requeuing a pod group members after PodGroup was deleted moves them to incompletePodGroupPods",
+			initialPods:          []*v1.Pod{p1, p2},
+			initialState:         statePopped,
+			deletePodGroup:       true,
+			podsToAdd:            []*framework.QueuedPodInfo{pInfo1, pInfo2},
+			expectedInIncomplete: []*v1.Pod{p1, p2},
+		},
+		{
+			name:                 "requeuing a pod group members after PodGroup was deleted and is not last popped entity moves them to incompletePodGroupPods",
+			initialPods:          []*v1.Pod{p1, p2},
+			initialState:         statePopped,
+			clearLastPopped:      true,
+			deletePodGroup:       true,
+			podsToAdd:            []*framework.QueuedPodInfo{pInfo1, pInfo2},
+			expectedInIncomplete: []*v1.Pod{p1, p2},
+		},
 	}
 
 	for _, tt := range tests {
@@ -7281,11 +7444,16 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 			}
 
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+			podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
 
-			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
+			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 
 			if tt.clearLastPopped {
 				q.activeQ.clearPoppedEntity()
+			}
+
+			if tt.deletePodGroup {
+				q.DeletePodGroup(logger, podGroup)
 			}
 
 			// Add unschedulable pods
@@ -7334,6 +7502,371 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 
 			if pendingLen := q.pendingPodGroupPods.len(); pendingLen != tt.expectedPodsInPending {
 				t.Errorf("Expected pod group to have %d pods in pendingPodGroupPods, got %d", tt.expectedPodsInPending, pendingLen)
+			}
+
+			for _, pod := range tt.expectedInIncomplete {
+				if !q.incompletePodGroupPods.has(pod) {
+					t.Errorf("Expected pod %s in incompletePodGroupPods", pod.Name)
+				}
+			}
+			if q.incompletePodGroupPods.len() != len(tt.expectedInIncomplete) {
+				t.Errorf("Expected incompletePodGroupPods size to be %d, got %d", len(tt.expectedInIncomplete), q.incompletePodGroupPods.len())
+			}
+		})
+	}
+}
+
+func TestAddPodGroup(t *testing.T) {
+	pgName := "pg-test"
+	p1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Label("allow", "").PodGroupName(pgName).Obj()
+	p2 := st.MakePod().Name("pod2").Namespace("ns1").UID("pod2").Label("allow", "").PodGroupName(pgName).Obj()
+	gatedP1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").PodGroupName(pgName).Obj()
+	podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
+
+	tests := []struct {
+		name                    string
+		initialPods             []*v1.Pod
+		initialState            initialQueueState
+		expectedInActiveQ       bool
+		expectedInUnschedulable bool
+		expectedGated           bool
+		expectedGroupSize       int
+	}{
+		{
+			name:              "add pod group without waiting pods",
+			initialState:      stateIncomplete,
+			expectedInActiveQ: false,
+		},
+		{
+			name:              "add pod group moves pods from incompletePodGroupPods to activeQ",
+			initialPods:       []*v1.Pod{p1, p2},
+			initialState:      stateIncomplete,
+			expectedInActiveQ: true,
+			expectedGroupSize: 2,
+		},
+		{
+			name:                    "add pod group moves gated pods from incompletePodGroupPods to unschedulableEntities",
+			initialPods:             []*v1.Pod{gatedP1, p2},
+			initialState:            stateIncomplete,
+			expectedInUnschedulable: true,
+			expectedGated:           true,
+			expectedGroupSize:       2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: true,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			// Configure a PreEnqueue plugin that allows pods with label "allow", but gates others.
+			preEnqueueMap := map[string]map[string]fwk.PreEnqueuePlugin{
+				"": {
+					"preEnqueuePlugin": &preEnqueuePlugin{allowlists: []string{"allow"}},
+				},
+			}
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+
+			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
+
+			q.AddPodGroup(logger, podGroup)
+
+			pgLookup := &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{
+					Namespace: podGroup.Namespace,
+					Name:      podGroup.Name,
+				},
+			}
+			gotPodGroup, ok := q.workloadForest.getPodGroup(podGroup)
+			if !ok {
+				t.Fatalf("Expected pod group to be in workloadForest")
+			}
+			if diff := cmp.Diff(podGroup, gotPodGroup); diff != "" {
+				t.Errorf("Unexpected pod group object (-want +got):\n%s", diff)
+			}
+
+			if inActive := q.activeQ.has(pgLookup); inActive != tt.expectedInActiveQ {
+				t.Errorf("Expected incoming pod in activeQ: %v, got %v", tt.expectedInActiveQ, inActive)
+			}
+			var entity framework.QueuedEntityInfo
+			if tt.expectedInActiveQ {
+				entity, _ = q.activeQ.get(pgLookup)
+			}
+
+			unschedulableEntity := q.unschedulableEntities.get(pgLookup)
+			inUnschedulable := unschedulableEntity != nil
+			if inUnschedulable != tt.expectedInUnschedulable {
+				t.Errorf("Expected incoming pod in unschedulableEntities: %v, got %v", tt.expectedInUnschedulable, inUnschedulable)
+			}
+			if tt.expectedInUnschedulable {
+				entity = unschedulableEntity
+			}
+
+			if entity != nil {
+				if isGated := entity.Gated(); isGated != tt.expectedGated {
+					t.Errorf("Expected pod group to be gated: %v, got %v", tt.expectedGated, isGated)
+				}
+				if size := entity.Size(); size != tt.expectedGroupSize {
+					t.Errorf("Expected pod group to be of size: %d, got %d", tt.expectedGroupSize, size)
+				}
+				pgInfo := entity.(*framework.QueuedPodGroupInfo)
+				if diff := cmp.Diff(podGroup, pgInfo.PodGroup); diff != "" {
+					t.Errorf("Unexpected pod group object in QueuedPodGroupInfo (-want +got):\n%s", diff)
+				}
+			}
+
+			for _, pod := range tt.initialPods {
+				if q.incompletePodGroupPods.has(pod) {
+					t.Errorf("Expected pod %s not to be present in incompletePodGroupPods", pod.Name)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdatePodGroup(t *testing.T) {
+	pgName := "pg-test"
+	p1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Label("allow", "").PodGroupName(pgName).Obj()
+	p2 := st.MakePod().Name("pod2").Namespace("ns1").UID("pod2").Label("allow", "").PodGroupName(pgName).Obj()
+	gatedP1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").PodGroupName(pgName).Obj()
+	podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").MinCount(1).Obj()
+	updatedPodGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").MinCount(2).Obj()
+
+	tests := []struct {
+		name                          string
+		initialPods                   []*v1.Pod
+		initialState                  initialQueueState
+		expectedInActiveQ             bool
+		expectedInBackoffQ            bool
+		expectedInUnschedulable       bool
+		expectedInPendingPodGroupPods bool
+		expectedGated                 bool
+	}{
+		{
+			name:         "update pod group without pods",
+			initialState: stateActive, // will just add the PodGroup
+		},
+		{
+			name:              "update active pod group",
+			initialPods:       []*v1.Pod{p1, p2},
+			initialState:      stateActive,
+			expectedInActiveQ: true,
+		},
+		{
+			name:               "update backoff pod group",
+			initialPods:        []*v1.Pod{p1, p2},
+			initialState:       stateBackoff,
+			expectedInBackoffQ: true,
+		},
+		{
+			name:                    "update unschedulable pod group",
+			initialPods:             []*v1.Pod{p1, p2},
+			initialState:            stateUnschedulable,
+			expectedInUnschedulable: true,
+		},
+		{
+			name:                    "update gated pod group",
+			initialPods:             []*v1.Pod{gatedP1, p2},
+			initialState:            stateGated,
+			expectedInUnschedulable: true,
+			expectedGated:           true,
+		},
+		{
+			name:                          "update in-flight pod group",
+			initialPods:                   []*v1.Pod{p1, p2},
+			initialState:                  statePopped,
+			expectedInPendingPodGroupPods: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: true,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			preEnqueueMap := map[string]map[string]fwk.PreEnqueuePlugin{
+				"": {
+					"preEnqueuePlugin": &preEnqueuePlugin{allowlists: []string{"allow"}},
+				},
+			}
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+
+			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
+
+			q.UpdatePodGroup(logger, updatedPodGroup)
+
+			gotPodGroup, ok := q.workloadForest.getPodGroup(podGroup)
+			if !ok {
+				t.Fatalf("Expected pod group to be in workloadForest")
+			}
+			if diff := cmp.Diff(updatedPodGroup, gotPodGroup); diff != "" {
+				t.Errorf("Unexpected pod group object (-want +got):\n%s", diff)
+			}
+
+			pgLookup := &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{
+					Namespace: podGroup.Namespace,
+					Name:      podGroup.Name,
+				},
+			}
+			if inActive := q.activeQ.has(pgLookup); inActive != tt.expectedInActiveQ {
+				t.Errorf("Expected target pod group in activeQ: %v, got %v", tt.expectedInActiveQ, inActive)
+			}
+			var entity framework.QueuedEntityInfo
+			if tt.expectedInActiveQ {
+				entity, _ = q.activeQ.get(pgLookup)
+			}
+
+			if inBackoff := q.backoffQ.has(pgLookup); inBackoff != tt.expectedInBackoffQ {
+				t.Errorf("Expected target pod group in backoffQ: %v, got %v", tt.expectedInBackoffQ, inBackoff)
+			}
+			if tt.expectedInBackoffQ {
+				entity, _ = q.backoffQ.get(pgLookup)
+			}
+
+			unschedulableEntity := q.unschedulableEntities.get(pgLookup)
+			inUnschedulable := unschedulableEntity != nil
+			if inUnschedulable != tt.expectedInUnschedulable {
+				t.Errorf("Expected target pod group in unschedulableEntities: %v, got %v", tt.expectedInUnschedulable, inUnschedulable)
+			}
+			if tt.expectedInUnschedulable {
+				entity = unschedulableEntity
+			}
+
+			if entity != nil {
+				if isGated := entity.Gated(); isGated != tt.expectedGated {
+					t.Errorf("Expected pod group to be gated: %v, got %v", tt.expectedGated, isGated)
+				}
+				pgInfo := entity.(*framework.QueuedPodGroupInfo)
+				if diff := cmp.Diff(updatedPodGroup, pgInfo.PodGroup); diff != "" {
+					t.Errorf("Unexpected pod group object in QueuedPodGroupInfo (-want +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestDeletePodGroup(t *testing.T) {
+	pgName := "pg-test"
+	p1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Label("allow", "").PodGroupName(pgName).Obj()
+	p2 := st.MakePod().Name("pod2").Namespace("ns1").UID("pod2").Label("allow", "").PodGroupName(pgName).Obj()
+	gatedP1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").PodGroupName(pgName).Obj()
+	podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
+
+	tests := []struct {
+		name                 string
+		initialPods          []*v1.Pod
+		initialState         initialQueueState
+		pendingPods          []*v1.Pod
+		expectedInIncomplete []*v1.Pod
+	}{
+		{
+			name:                 "delete active pod group moves pods to incompletePodGroupPods",
+			initialPods:          []*v1.Pod{p1, p2},
+			initialState:         stateActive,
+			expectedInIncomplete: []*v1.Pod{p1, p2},
+		},
+		{
+			name:                 "delete backoff pod group moves pods to incompletePodGroupPods",
+			initialPods:          []*v1.Pod{p1, p2},
+			initialState:         stateBackoff,
+			expectedInIncomplete: []*v1.Pod{p1, p2},
+		},
+		{
+			name:                 "delete unschedulable pod group moves pods to incompletePodGroupPods",
+			initialPods:          []*v1.Pod{p1, p2},
+			initialState:         stateUnschedulable,
+			expectedInIncomplete: []*v1.Pod{p1, p2},
+		},
+		{
+			name:                 "delete gated pod group moves pods to incompletePodGroupPods",
+			initialPods:          []*v1.Pod{gatedP1, p2},
+			initialState:         stateGated,
+			expectedInIncomplete: []*v1.Pod{gatedP1, p2},
+		},
+		{
+			name:                 "delete in-flight pod group moves pending pods to incompletePodGroupPods",
+			initialPods:          []*v1.Pod{p1, p2},
+			initialState:         statePopped,
+			pendingPods:          []*v1.Pod{p1, p2},
+			expectedInIncomplete: []*v1.Pod{p1, p2},
+		},
+		{
+			name:                 "delete in-flight pod group with no pending pods",
+			initialPods:          []*v1.Pod{p1, p2},
+			initialState:         statePopped,
+			expectedInIncomplete: []*v1.Pod{},
+		},
+		{
+			name:                 "delete pod group with no pods",
+			expectedInIncomplete: []*v1.Pod{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: true,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			preEnqueueMap := map[string]map[string]fwk.PreEnqueuePlugin{
+				"": {
+					"preEnqueuePlugin": &preEnqueuePlugin{allowlists: []string{"allow"}},
+				},
+			}
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+
+			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
+
+			for _, pod := range tt.pendingPods {
+				q.Add(ctx, pod)
+			}
+
+			q.DeletePodGroup(logger, podGroup)
+
+			_, ok := q.workloadForest.getPodGroup(podGroup)
+			if ok {
+				t.Errorf("Expected pod group not to be present in workloadForest")
+			}
+
+			pgLookup := newQueuedPodGroupInfoForLookup(p1)
+			if q.activeQ.has(pgLookup) {
+				t.Errorf("Expected pod group not to be in activeQ")
+			}
+			if q.backoffQ.has(pgLookup) {
+				t.Errorf("Expected pod group not to be in backoffQ")
+			}
+			if q.unschedulableEntities.get(pgLookup) != nil {
+				t.Errorf("Expected pod group not to be in unschedulableEntities")
+			}
+
+			for _, pod := range tt.pendingPods {
+				if q.pendingPodGroupPods.has(pod) {
+					t.Errorf("Expected pod %s not to be in pendingPodGroupPods", pod.Name)
+				}
+			}
+
+			for _, pod := range tt.expectedInIncomplete {
+				if !q.incompletePodGroupPods.has(pod) {
+					t.Errorf("Expected pod %s in incompletePodGroupPods", pod.Name)
+				}
+			}
+			if q.incompletePodGroupPods.len() != len(tt.expectedInIncomplete) {
+				t.Errorf("Expected incompletePodGroupPods size to be %d, got %d", len(tt.expectedInIncomplete), q.incompletePodGroupPods.len())
 			}
 		})
 	}
