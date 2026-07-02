@@ -4506,7 +4506,7 @@ func TestAllocatorSelection(t *testing.T) {
 		},
 		"CompatibilityGroups": {
 			features:             "AllAlpha=false,AllBeta=false,DRADeviceCompatibilityGroups=true",
-			expectImplementation: "incubating",
+			expectImplementation: "experimental",
 		},
 		"ConsumableCapacity": {
 			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true",
