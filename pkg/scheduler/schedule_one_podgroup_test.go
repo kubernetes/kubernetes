@@ -1007,6 +1007,26 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 			},
 		},
 		{
+			name: "PlacementFeasible returns UnschedulableAndUnresolvable, breaks and returns UnschedulableAndUnresolvable",
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": nil,
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: []fwk.Code{
+				fwk.Success,
+				fwk.UnschedulableAndUnresolvable,
+			},
+			expectedGroupStatusCode: fwk.UnschedulableAndUnresolvable,
+			expectedPodStatus: map[string]*fwk.Status{
+				"p1": nil,
+				"p2": nil,
+				// The algorithm stopped evaluating the pods after UnschedulableAndUnresolvable occurred, so a "p3" status is not expected.
+			},
+		},
+		{
 			name: "Any filter returned Error while waiting on preemption",
 			plugin: &fakePodGroupPlugin{
 				filterStatus: map[string]*fwk.Status{

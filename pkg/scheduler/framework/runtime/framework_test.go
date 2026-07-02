@@ -988,6 +988,15 @@ func TestRunPlacementFeasiblePlugins(t *testing.T) {
 			expectedStatus: fwk.AsStatus(fmt.Errorf("unexpected status from PlacementFeasible plugin: Skip")).WithPlugin("p1"),
 			expectedCalled: []bool{true, false},
 		},
+		{
+			name: "First plugin returns UnschedulableAndUnresolvable, breaks",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable").WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
 	}
 
 	for _, tc := range tests {
