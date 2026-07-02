@@ -28,6 +28,10 @@ type FakeNodeV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeNodeV1alpha1) PodCheckpoints(namespace string) v1alpha1.PodCheckpointInterface {
+	return newFakePodCheckpoints(c, namespace)
+}
+
 func (c *FakeNodeV1alpha1) RuntimeClasses() v1alpha1.RuntimeClassInterface {
 	return newFakeRuntimeClasses(c)
 }

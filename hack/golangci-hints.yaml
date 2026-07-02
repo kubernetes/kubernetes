@@ -352,6 +352,10 @@ linters:
       # EvictionRequestSpec.Requester has the same reserved-domain rule as EvictionResponder.Name.
       - text: 'forbiddenmarkers: field EvictionRequestSpec.Requester has forbidden marker "k8s:customValidation"'
         path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
+      # PodCheckpointStatus.CheckpointedPodTemplate is opaque to declarative validation, and
+      # PodTemplateSpec validation is partly hand-written, so it runs on the converted template.
+      - text: 'forbiddenmarkers: field PodCheckpointStatus.CheckpointedPodTemplate has forbidden marker "k8s:customValidation"'
+        path: "staging/src/k8s.io/api/node/v1alpha1/types.go"
 
       - linters:
         - forbidigo
