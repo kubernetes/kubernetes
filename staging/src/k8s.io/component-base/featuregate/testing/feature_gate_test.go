@@ -723,3 +723,31 @@ func cleanup() {
 	versionsOverride = ""
 	versionsOverrideValue = ""
 }
+
+func TestSetFeatureGatesDuringTest_Determinism(t *gotest.T) {
+	gate := featuregate.NewFeatureGate()
+	const betaFeature featuregate.Feature = "BetaFeature"
+	
+	err := gate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
+		betaFeature: {PreRelease: featuregate.Beta, Default: true},
+	})
+	require.NoError(t, err)
+
+	// Run 100 times to ensure Go's random map iteration doesn't cause flakiness.
+	// Without sorting, AllBeta=false would randomly be applied AFTER 
+	// BetaFeature=true, causing the feature to be disabled.
+	for i := 0; i < 100; i++ {
+		overrides := FeatureOverrides{
+			"AllBeta":   false,
+			betaFeature: true,
+		}
+
+		SetFeatureGatesDuringTest(t, gate, overrides)
+
+		// With sorting, BetaFeature (starts with B) is applied after AllBeta (starts with A),
+		// so the specific 'true' setting must always win.
+		if !gate.Enabled(betaFeature) {
+			t.Fatalf("Iteration %d: expected %s to be enabled, but was disabled. Deterministic sorting failed.", i, betaFeature)
+		}
+	}
+}
