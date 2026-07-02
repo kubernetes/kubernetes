@@ -18,67 +18,67 @@ package verify
 
 import (
 	"errors"
-	"fmt"
 )
 
-// ErrVerificationFailed is the generic, anti-enumeration sentinel that every
-// verification failure satisfies (errors.Is(err, ErrVerificationFailed) == true).
+// ErrVerificationFailed is the single, generic sentinel that every verification
+// failure satisfies (errors.Is(err, ErrVerificationFailed) == true). It is the
+// ONLY error value callers may inspect.
 //
-// Callers surfacing an error to an external client SHOULD return only this
-// message (or a fixed 401/403) and log the specific typed sentinel internally.
-// None of the sentinels below interpolate claim values (webhook name, UID,
-// subject, or API group), so leaking their raw strings still does not reveal
-// whether a specific webhook, group, or object exists.
+// The verifier deliberately exposes no per-check error taxonomy: clients must
+// not branch on why verification failed (that is an authentication-level
+// concern). The specific reason is available ONLY as a non-sensitive log string
+// via [Reason], for operators and debugging — never as a typed value to switch
+// on. None of the reason strings interpolate claim values (webhook name, UID,
+// subject, or API group), so logging them still does not reveal whether a
+// specific webhook, group, or object exists.
 var ErrVerificationFailed = errors.New("webhook token verification failed")
 
-// Typed sentinels. Each wraps ErrVerificationFailed, so errors.Is against either
-// the specific sentinel or the generic one works. Note that ErrBothBoundObjects
-// and ErrNoBoundObject deliberately share the same human-readable category
-// ("invalid webhook binding") so the external string does not reveal which side
-// of the bound-object rule was violated; they remain distinct values for
-// programmatic branching.
-var (
-	// ErrInvalidSignature indicates the JWS signature did not verify against any
-	// known issuer key. It also stands in for malformed compact-serialized JWTs
-	// so a caller cannot distinguish "bad signature" from "not a JWT".
-	ErrInvalidSignature = fmt.Errorf("%w: invalid signature", ErrVerificationFailed)
-
-	// ErrInvalidToken indicates the verified payload was not well-formed JSON.
-	ErrInvalidToken = fmt.Errorf("%w: malformed token", ErrVerificationFailed)
-
-	// ErrAudienceMismatch indicates the token audience did not include any of the
-	// verifier's expected audiences.
-	ErrAudienceMismatch = fmt.Errorf("%w: audience mismatch", ErrVerificationFailed)
-
-	// ErrIssuerMismatch indicates the token "iss" claim was absent, or did not
-	// equal the verifier's expected issuer. RFC 7519 / OIDC require the issuer to
-	// be validated; a token from an unexpected (or unstated) issuer is rejected.
-	ErrIssuerMismatch = fmt.Errorf("%w: issuer mismatch", ErrVerificationFailed)
-
-	// ErrExpired indicates the token is past its exp instant (accounting for leeway).
-	ErrExpired = fmt.Errorf("%w: token expired", ErrVerificationFailed)
-
-	// ErrMissingExpiry indicates the token carried no "exp" claim. A token without
-	// an expiry would never expire, so its absence is rejected rather than treated
-	// as "valid forever".
-	ErrMissingExpiry = fmt.Errorf("%w: token missing expiry", ErrVerificationFailed)
-
-	// ErrNotYetValid indicates the token is before its nbf instant (accounting for leeway).
-	ErrNotYetValid = fmt.Errorf("%w: token not yet valid", ErrVerificationFailed)
-
-	// ErrBothBoundObjects indicates both validating- and mutating-webhook refs
-	// were present, violating the exactly-one bound-object rule.
-	ErrBothBoundObjects = fmt.Errorf("%w: invalid webhook binding", ErrVerificationFailed)
-
-	// ErrNoBoundObject indicates neither webhook ref was present, violating the
-	// exactly-one bound-object rule.
-	ErrNoBoundObject = fmt.Errorf("%w: invalid webhook binding", ErrVerificationFailed)
-
-	// ErrMissingAllowedAPIGroup indicates the allowedAPIGroup attestation claim
-	// was absent, or did not carry exactly one value.
-	ErrMissingAllowedAPIGroup = fmt.Errorf("%w: invalid attestation claim", ErrVerificationFailed)
-
-	// ErrAPIGroupNotAuthorized indicates the allowedAPIGroup claim neither
-	// wildcarded nor matched the AdmissionReview resource's API group.
-	ErrAPIGroupNotAuthorized = fmt.Errorf("%w: not authorized", ErrVerificationFailed)
+// reason strings describe which check failed. They are surfaced ONLY through
+// [Reason] for logging; they are never returned as distinct error values and
+// never embed claim values.
+const (
+	reasonInvalidSignature       = "signature verification failed"
+	reasonMalformedToken         = "token payload is not valid JSON"
+	reasonAudienceMismatch       = "token audience does not match the expected audience"
+	reasonIssuerMismatch         = "token issuer does not match the expected issuer"
+	reasonExpired                = "token is expired"
+	reasonMissingExpiry          = "token is missing the exp claim"
+	reasonNotYetValid            = "token is not yet valid (nbf is in the future)"
+	reasonBothBoundObjects       = "token is bound to both a validating and a mutating webhook configuration"
+	reasonNoBoundObject          = "token is not bound to any webhook configuration"
+	reasonMissingAllowedAPIGroup = "token is missing a single allowedAPIGroup attestation claim"
+	reasonAPIGroupNotAuthorized  = "token allowedAPIGroup does not authorize the review's API group"
 )
+
+// verificationError is the internal error every failure returns. Its Error()
+// yields only the generic message, so stringifying it never leaks the reason or
+// any claim value; the reason is reachable solely through [Reason].
+type verificationError struct {
+	reason string
+}
+
+func (e *verificationError) Error() string { return ErrVerificationFailed.Error() }
+
+// Unwrap makes errors.Is(err, ErrVerificationFailed) succeed for every failure.
+func (e *verificationError) Unwrap() error { return ErrVerificationFailed }
+
+// Fail returns a generic verification failure carrying reason for logging. The
+// returned error satisfies errors.Is(err, ErrVerificationFailed) and its
+// Error() is the generic message. Adapters use this to report pre-verification
+// denials (for example a missing bearer token or an undecodable body) with the
+// same generic surface, and the same log-only reason mechanism, as the core
+// contract checks. reason MUST NOT contain claim values.
+func Fail(reason string) error {
+	return &verificationError{reason: reason}
+}
+
+// Reason returns the non-sensitive log string describing why verification
+// failed, or "" if err is nil or is not a verification failure. The reason is
+// for operator logging and metrics ONLY; callers MUST NOT branch on it.
+func Reason(err error) string {
+	var ve *verificationError
+	if errors.As(err, &ve) {
+		return ve.reason
+	}
+	return ""
+}

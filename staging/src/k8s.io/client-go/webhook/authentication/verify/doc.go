@@ -34,11 +34,12 @@ limitations under the License.
 //     equals the API group of the resource in the incoming AdmissionReview.
 //  6. The token is within its exp / nbf validity window.
 //
-// Anti-enumeration: all verification failures surface the generic
-// [ErrVerificationFailed] message and never echo webhook names, UIDs, subjects,
-// or API-group values, so a caller cannot probe for the existence of a specific
-// webhook, group, or object. Typed sentinel errors are still available via
-// errors.Is for internal logging and branching.
+// Anti-enumeration: all verification failures surface the single generic
+// [ErrVerificationFailed] and never echo webhook names, UIDs, subjects, or
+// API-group values, so a caller cannot probe for the existence of a specific
+// webhook, group, or object. Callers must not branch on why verification
+// failed; the specific reason is available only as a non-sensitive log string
+// via [Reason] for operators and debugging.
 //
 // This first cut deliberately omits the http.Handler adapter and the
 // controller-runtime decorator; callers wire [Verifier.Verify] into their own

@@ -171,9 +171,9 @@ func TestNewVerifier_Validation(t *testing.T) {
 
 // TestVerify exercises the core Verify contract as a table of happy and sad
 // paths. Each case starts from baseToken(), optionally mutates it, and asserts
-// either a specific sentinel error (sad path) or a successful Result (happy
-// path). Every sad case is checked against both its specific sentinel and the
-// generic ErrVerificationFailed via assertSentinel.
+// either a successful Result (happy path) or, for a sad path, that the failure
+// (a) satisfies the single generic ErrVerificationFailed and (b) reports the
+// expected reason string via Reason so we still prove the right check fired.
 func TestVerify(t *testing.T) {
 	// leewayExpiry is the fixed exp instant used by the clock-skew cases so the
 	// token boundary is deterministic relative to the injected clock.
@@ -192,8 +192,8 @@ func TestVerify(t *testing.T) {
 		opts []Option
 		// group is the reviewAPIGroup argument; empty defaults to testGroup.
 		group string
-		// wantErr is the expected sentinel; nil means the happy path is expected.
-		wantErr error
+		// wantReason is the expected log reason; empty means the happy path is expected.
+		wantReason string
 		// check runs extra assertions on the Result of a happy-path case.
 		check func(t *testing.T, res *Result)
 	}{
@@ -272,102 +272,102 @@ func TestVerify(t *testing.T) {
 			},
 		},
 		{
-			name: "both bound objects set -> ErrBothBoundObjects",
+			name: "both bound objects set -> reasonBothBoundObjects",
 			mutate: func(b *tokenBuilder) {
 				b.k8s.MutatingWebhookConfiguration = &ObjectRef{Name: "mwc", UID: "mwc-uid"}
 			},
-			wantErr: ErrBothBoundObjects,
+			wantReason: reasonBothBoundObjects,
 		},
 		{
-			name: "neither bound object set -> ErrNoBoundObject",
+			name: "neither bound object set -> reasonNoBoundObject",
 			mutate: func(b *tokenBuilder) {
 				b.k8s.ValidatingWebhookConfiguration = nil
 			},
-			wantErr: ErrNoBoundObject,
+			wantReason: reasonNoBoundObject,
 		},
 		{
-			name: "missing kubernetes.io claims -> ErrNoBoundObject",
+			name: "missing kubernetes.io claims -> reasonNoBoundObject",
 			mutate: func(b *tokenBuilder) {
 				b.k8s = nil
 			},
-			wantErr: ErrNoBoundObject,
+			wantReason: reasonNoBoundObject,
 		},
 		{
-			name: "audience does not include expected -> ErrAudienceMismatch",
+			name: "audience does not include expected -> reasonAudienceMismatch",
 			mutate: func(b *tokenBuilder) {
 				b.aud = audience{"someone.else.example.com"}
 			},
-			wantErr: ErrAudienceMismatch,
+			wantReason: reasonAudienceMismatch,
 		},
 		{
-			name: "issuer differs from expected -> ErrIssuerMismatch",
+			name: "issuer differs from expected -> reasonIssuerMismatch",
 			mutate: func(b *tokenBuilder) {
 				b.iss = "https://attacker.example.com"
 			},
-			wantErr: ErrIssuerMismatch,
+			wantReason: reasonIssuerMismatch,
 		},
 		{
-			name: "issuer absent -> ErrIssuerMismatch",
+			name: "issuer absent -> reasonIssuerMismatch",
 			mutate: func(b *tokenBuilder) {
 				b.iss = ""
 			},
-			wantErr: ErrIssuerMismatch,
+			wantReason: reasonIssuerMismatch,
 		},
 		{
-			name: "expiry claim absent -> ErrMissingExpiry",
+			name: "expiry claim absent -> reasonMissingExpiry",
 			mutate: func(b *tokenBuilder) {
 				b.exp = nil
 			},
-			wantErr: ErrMissingExpiry,
+			wantReason: reasonMissingExpiry,
 		},
 		{
-			name: "allowedAPIGroup claim absent -> ErrMissingAllowedAPIGroup",
+			name: "allowedAPIGroup claim absent -> reasonMissingAllowedAPIGroup",
 			mutate: func(b *tokenBuilder) {
 				b.k8s.AttestationClaims = map[string][]string{}
 			},
-			wantErr: ErrMissingAllowedAPIGroup,
+			wantReason: reasonMissingAllowedAPIGroup,
 		},
 		{
-			name: "bare allowedAPIGroup key -> treated as missing -> ErrMissingAllowedAPIGroup",
+			name: "bare allowedAPIGroup key -> treated as missing -> reasonMissingAllowedAPIGroup",
 			// A spec-violating issuer emitting the bare "allowedAPIGroup" key (not
 			// the namespaced form) must be treated as missing, never accepted.
 			mutate: func(b *tokenBuilder) {
 				b.k8s.AttestationClaims = map[string][]string{"allowedAPIGroup": {testGroup}}
 			},
-			wantErr: ErrMissingAllowedAPIGroup,
+			wantReason: reasonMissingAllowedAPIGroup,
 		},
 		{
-			name: "allowedAPIGroup with more than one value -> ErrMissingAllowedAPIGroup",
+			name: "allowedAPIGroup with more than one value -> reasonMissingAllowedAPIGroup",
 			mutate: func(b *tokenBuilder) {
 				b.k8s.AttestationClaims = map[string][]string{AllowedAPIGroupClaimKey: {testGroup, "extensions"}}
 			},
-			wantErr: ErrMissingAllowedAPIGroup,
+			wantReason: reasonMissingAllowedAPIGroup,
 		},
 		{
-			name:    "review group not authorized by claim -> ErrAPIGroupNotAuthorized",
-			group:   "batch",
-			wantErr: ErrAPIGroupNotAuthorized,
+			name:       "review group not authorized by claim -> reasonAPIGroupNotAuthorized",
+			group:      "batch",
+			wantReason: reasonAPIGroupNotAuthorized,
 		},
 		{
-			name: "token past exp -> ErrExpired",
+			name: "token past exp -> reasonExpired",
 			mutate: func(b *tokenBuilder) {
 				past := time.Now().Add(-1 * time.Hour).Unix()
 				b.exp = &past
 			},
-			wantErr: ErrExpired,
+			wantReason: reasonExpired,
 		},
 		{
-			name: "expired beyond leeway window -> ErrExpired",
+			name: "expired beyond leeway window -> reasonExpired",
 			// exp is 2m in the past; a 60s leeway is not enough to tolerate it.
 			mutate: func(b *tokenBuilder) { b.exp = unixPtr(leewayExpiry) },
 			opts: []Option{
 				WithClock(fixedClock(leewayExpiry.Add(2 * time.Minute))),
 				WithLeeway(60 * time.Second),
 			},
-			wantErr: ErrExpired,
+			wantReason: reasonExpired,
 		},
 		{
-			name: "leeway request above the cap is clamped -> ErrExpired",
+			name: "leeway request above the cap is clamped -> reasonExpired",
 			// exp is 6m in the past. An over-large 10m leeway is clamped to the 5m
 			// maximum, which is not enough to tolerate the skew, so the token is
 			// still rejected. This proves WithLeeway cannot neuter expiry.
@@ -376,25 +376,25 @@ func TestVerify(t *testing.T) {
 				WithClock(fixedClock(leewayExpiry.Add(6 * time.Minute))),
 				WithLeeway(10 * time.Minute),
 			},
-			wantErr: ErrExpired,
+			wantReason: reasonExpired,
 		},
 		{
-			name: "token before nbf -> ErrNotYetValid",
+			name: "token before nbf -> reasonNotYetValid",
 			mutate: func(b *tokenBuilder) {
 				future := time.Now().Add(1 * time.Hour).Unix()
 				b.nbf = &future
 			},
-			wantErr: ErrNotYetValid,
+			wantReason: reasonNotYetValid,
 		},
 		{
-			name:    "signature does not verify -> ErrInvalidSignature",
-			keySet:  fakeKeySet{err: errors.New("no matching key")},
-			wantErr: ErrInvalidSignature,
+			name:       "signature does not verify -> reasonInvalidSignature",
+			keySet:     fakeKeySet{err: errors.New("no matching key")},
+			wantReason: reasonInvalidSignature,
 		},
 		{
-			name:     "payload is not JSON -> ErrInvalidToken",
-			rawToken: "this is not json",
-			wantErr:  ErrInvalidToken,
+			name:       "payload is not JSON -> reasonMalformedToken",
+			rawToken:   "this is not json",
+			wantReason: reasonMalformedToken,
 		},
 	}
 
@@ -421,8 +421,8 @@ func TestVerify(t *testing.T) {
 			}
 
 			res, err := v.Verify(context.Background(), tok, group)
-			if tc.wantErr != nil {
-				assertSentinel(t, err, tc.wantErr)
+			if tc.wantReason != "" {
+				assertFailure(t, err, tc.wantReason)
 				return
 			}
 			if err != nil {
@@ -456,18 +456,19 @@ func TestVerify_ErrorsAreGenericAndAntiEnumeration(t *testing.T) {
 	}
 }
 
-// assertSentinel checks that err matches both the specific sentinel and the
-// generic ErrVerificationFailed.
-func assertSentinel(t *testing.T, err, want error) {
+// assertFailure checks that err is a verification failure: it satisfies the
+// single generic ErrVerificationFailed and its Reason contains wantReason, so
+// we prove the right check fired without asserting a distinct exported sentinel.
+func assertFailure(t *testing.T, err error, wantReason string) {
 	t.Helper()
 	if err == nil {
-		t.Fatalf("expected error %v, got nil", want)
-	}
-	if !errors.Is(err, want) {
-		t.Errorf("error %v is not %v", err, want)
+		t.Fatalf("expected failure with reason %q, got nil", wantReason)
 	}
 	if !errors.Is(err, ErrVerificationFailed) {
 		t.Errorf("error %v does not satisfy generic ErrVerificationFailed", err)
+	}
+	if got := Reason(err); !containsSubstring(got, wantReason) {
+		t.Errorf("reason = %q, want it to contain %q", got, wantReason)
 	}
 }
 

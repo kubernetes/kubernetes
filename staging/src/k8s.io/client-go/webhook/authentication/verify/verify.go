@@ -162,33 +162,34 @@ func NewVerifier(keySet KeySet, expectedIssuer string, expectedAudiences []strin
 // the AdmissionReview being processed; it is matched against the token's
 // allowedAPIGroup claim.
 //
-// On any failure Verify returns an error that satisfies
-// errors.Is(err, ErrVerificationFailed); the specific typed sentinel is
-// available via errors.Is for internal logging. Errors never embed claim values,
-// so they are safe to surface (or, preferably, collapse to a single generic
-// response) without enabling enumeration.
+// On any failure Verify returns a single generic error that satisfies
+// errors.Is(err, ErrVerificationFailed) and nothing else: there is no per-check
+// error taxonomy for callers to branch on. The specific reason is available
+// only as a non-sensitive log string via Reason(err). Errors never embed claim
+// values, so they are safe to surface (or, preferably, collapse to a single
+// generic response) without enabling enumeration.
 func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup string) (*Result, error) {
 	// 1. Signature. Any failure (bad signature or malformed JWS) collapses to a
 	// single generic error so a caller cannot distinguish the two.
 	payload, err := v.keySet.VerifySignature(ctx, rawToken)
 	if err != nil {
-		return nil, ErrInvalidSignature
+		return nil, Fail(reasonInvalidSignature)
 	}
 
 	var claims tokenClaims
 	if err := json.Unmarshal(payload, &claims); err != nil {
-		return nil, ErrInvalidToken
+		return nil, Fail(reasonMalformedToken)
 	}
 
 	// 2. Audience: the token must be intended for this webhook.
 	if !v.audienceMatches(claims.Audience) {
-		return nil, ErrAudienceMismatch
+		return nil, Fail(reasonAudienceMismatch)
 	}
 
 	// 3. Issuer: the token must assert the issuer this verifier trusts. An absent
 	// "iss" is treated as a mismatch, never accepted.
 	if claims.Issuer == "" || claims.Issuer != v.issuer {
-		return nil, ErrIssuerMismatch
+		return nil, Fail(reasonIssuerMismatch)
 	}
 
 	// 4. Time validity (checked early; ordering relative to other checks is not
@@ -199,7 +200,7 @@ func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup s
 
 	k := claims.Kubernetes
 	if k == nil {
-		return nil, ErrNoBoundObject
+		return nil, Fail(reasonNoBoundObject)
 	}
 
 	// 5. Bound-object rule: exactly one of validating / mutating.
@@ -212,13 +213,13 @@ func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup s
 	// under the fully-namespaced key.
 	groups, ok := k.AttestationClaims[AllowedAPIGroupClaimKey]
 	if !ok || len(groups) != 1 {
-		return nil, ErrMissingAllowedAPIGroup
+		return nil, Fail(reasonMissingAllowedAPIGroup)
 	}
 	allowed := groups[0]
 
 	// 7. Wildcard matches all; otherwise it must exactly equal the review group.
 	if allowed != WildcardAPIGroup && allowed != reviewAPIGroup {
-		return nil, ErrAPIGroupNotAuthorized
+		return nil, Fail(reasonAPIGroupNotAuthorized)
 	}
 
 	return &Result{
@@ -248,13 +249,13 @@ func (v *Verifier) audienceMatches(tokenAud audience) bool {
 func (v *Verifier) checkTimeValidity(claims tokenClaims) error {
 	now := v.now()
 	if claims.Expiry == nil {
-		return ErrMissingExpiry
+		return Fail(reasonMissingExpiry)
 	}
 	if now.After(claims.Expiry.time().Add(v.leeway)) {
-		return ErrExpired
+		return Fail(reasonExpired)
 	}
 	if claims.NotBefore != nil && now.Add(v.leeway).Before(claims.NotBefore.time()) {
-		return ErrNotYetValid
+		return Fail(reasonNotYetValid)
 	}
 	return nil
 }
@@ -267,9 +268,9 @@ func boundObject(k *kubernetesClaims) (kind, name, uid string, err error) {
 
 	switch {
 	case hasValidating && hasMutating:
-		return "", "", "", ErrBothBoundObjects
+		return "", "", "", Fail(reasonBothBoundObjects)
 	case !hasValidating && !hasMutating:
-		return "", "", "", ErrNoBoundObject
+		return "", "", "", Fail(reasonNoBoundObject)
 	case hasValidating:
 		ref := k.ValidatingWebhookConfiguration
 		return KindValidatingWebhookConfiguration, ref.Name, ref.UID, nil
