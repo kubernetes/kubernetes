@@ -19,7 +19,6 @@ package registry
 import (
 	"context"
 	"fmt"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -318,16 +317,25 @@ type storeKeyFuncs struct {
 	// objectKeyFunc returns the same resource-relative key as requestKeyFunc,
 	// deriving namespace and name from object metadata for watch-cache callers.
 	objectKeyFunc func(obj runtime.Object) (string, error)
-	// storageReverseKeyFunc reverses a storage key that includes the storage
-	// backend prefix, for example "/registry/pods/<namespace>/<name>". It is
-	// not the inverse of requestKeyFunc; the storage backend prefix is added
-	// between the resource-relative requestKeyFunc output and the storage key
-	// passed here.
+	// storageReverseKeyFunc reverses a storage key rooted at storageKeyPrefix.
+	//
+	// storageKeyPrefix includes both the storage backend prefix and the
+	// resource-relative prefix and must end with "/". For example, with a
+	// storage backend prefix "/registry" and a resource-relative prefix
+	// "/pods", storageKeyPrefix is "/registry/pods/".
+	//
+	// storageReverseKeyFunc is not the inverse of requestKeyFunc; the storage
+	// backend prefix is added between the resource-relative requestKeyFunc
+	// output and the storage key passed here.
 	storageReverseKeyFunc storage.ReverseKeyFunc
 }
 
-func defaultStoreKeyFuncs(prefix, storageKeyPrefix string, isNamespaced bool) storeKeyFuncs {
+func defaultStoreKeyFuncs(prefix, storageKeyPrefix string, isNamespaced bool) (storeKeyFuncs, error) {
 	if isNamespaced {
+		storageReverseKeyFunc, err := NamespaceReverseKeyFunc(storageKeyPrefix)
+		if err != nil {
+			return storeKeyFuncs{}, err
+		}
 		return newStoreKeyFuncs(
 			isNamespaced,
 			func(ctx context.Context) string {
@@ -336,10 +344,14 @@ func defaultStoreKeyFuncs(prefix, storageKeyPrefix string, isNamespaced bool) st
 			func(ctx context.Context, name string) (string, error) {
 				return NamespaceKeyFunc(ctx, prefix, name)
 			},
-			NamespaceReverseKeyFunc(storageKeyPrefix),
-		)
+			storageReverseKeyFunc,
+		), nil
 	}
 
+	storageReverseKeyFunc, err := NoNamespaceReverseKeyFunc(storageKeyPrefix)
+	if err != nil {
+		return storeKeyFuncs{}, err
+	}
 	return newStoreKeyFuncs(
 		isNamespaced,
 		func(ctx context.Context) string {
@@ -348,8 +360,8 @@ func defaultStoreKeyFuncs(prefix, storageKeyPrefix string, isNamespaced bool) st
 		func(ctx context.Context, name string) (string, error) {
 			return NoNamespaceKeyFunc(ctx, prefix, name)
 		},
-		NoNamespaceReverseKeyFunc(storageKeyPrefix),
-	)
+		storageReverseKeyFunc,
+	), nil
 }
 
 func newStoreKeyFuncs(
@@ -377,44 +389,83 @@ func newStoreKeyFuncs(
 	}
 }
 
-// NoNamespaceReverseKeyFunc recovers the name for cluster-scoped resources.
-func NoNamespaceReverseKeyFunc(prefix string) storage.ReverseKeyFunc {
-	if !strings.HasSuffix(prefix, "/") {
-		prefix += "/"
+// NoNamespaceReverseKeyFunc parses storage keys for cluster-scoped resources.
+//
+// It expects keys in the form "$prefix$name", where prefix must end with "/",
+// and name must be non-empty and must not contain "/" characters.
+func NoNamespaceReverseKeyFunc(prefix string) (storage.ReverseKeyFunc, error) {
+	if err := validateStorageKeyPrefix(prefix); err != nil {
+		return nil, err
 	}
 	return func(key storage.StorageKey) (name string, namespace string, err error) {
 		keyString := string(key)
 		if !strings.HasPrefix(keyString, prefix) {
-			err = fmt.Errorf("invalid key %q, expecting prefix %q", keyString, prefix)
-			return
+			return "", "", fmt.Errorf("invalid key %q, expecting prefix %q", keyString, prefix)
 		}
 		name = keyString[len(prefix):]
 		if len(name) == 0 || strings.Contains(name, "/") {
-			err = fmt.Errorf("invalid key %q, expected name after prefix %q", keyString, prefix)
-			return
+			return "", "", fmt.Errorf("invalid key %q, expected name after prefix %q", keyString, prefix)
 		}
 		return name, "", nil
-	}
+	}, nil
 }
 
-// NamespaceReverseKeyFunc recovers the namespace and name for namespaced resources.
-func NamespaceReverseKeyFunc(prefix string) storage.ReverseKeyFunc {
-	if !strings.HasSuffix(prefix, "/") {
-		prefix += "/"
+// NamespaceReverseKeyFunc parses storage keys for namespaced resources.
+//
+// It expects keys in the form "$prefix$namespace/$name", where prefix must end
+// with "/", and namespace and name must be non-empty and must not contain "/"
+// characters.
+func NamespaceReverseKeyFunc(prefix string) (storage.ReverseKeyFunc, error) {
+	if err := validateStorageKeyPrefix(prefix); err != nil {
+		return nil, err
 	}
 	return func(key storage.StorageKey) (name string, namespace string, err error) {
 		keyString := string(key)
 		if !strings.HasPrefix(keyString, prefix) {
-			err = fmt.Errorf("invalid key %q, expecting prefix %q", keyString, prefix)
-			return
+			return "", "", fmt.Errorf("invalid key %q, expecting prefix %q", keyString, prefix)
 		}
-		tokens := strings.Split(keyString[len(prefix):], "/")
+
+		tokens := strings.SplitN(keyString[len(prefix):], "/", 3)
 		if len(tokens) != 2 {
-			err = fmt.Errorf("invalid key %q, expected namespace/name after prefix %q", keyString, prefix)
-			return
+			return "", "", fmt.Errorf("invalid key %q, expected <namespace>/<name> after prefix %q", keyString, prefix)
 		}
-		return tokens[1], tokens[0], nil
+		namespace, name = tokens[0], tokens[1]
+		if len(namespace) == 0 || len(name) == 0 {
+			return "", "", fmt.Errorf("invalid key %q, expected non-empty namespace and name after prefix %q", keyString, prefix)
+		}
+		return name, namespace, nil
+	}, nil
+}
+
+func validateStorageKeyPrefix(prefix string) error {
+	if len(prefix) == 0 {
+		return fmt.Errorf("storage key prefix cannot be empty")
 	}
+	if !strings.HasPrefix(prefix, "/") {
+		return fmt.Errorf("storage key prefix %q must start with /", prefix)
+	}
+	if !strings.HasSuffix(prefix, "/") {
+		return fmt.Errorf("storage key prefix %q must end with /", prefix)
+	}
+	return nil
+}
+
+func normalizeStorageConfigPrefix(prefix string) (string, error) {
+	if prefix == "" || prefix == "/" {
+		return "/", nil
+	}
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	for segment := range strings.SplitSeq(strings.Trim(prefix, "/"), "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			return "", fmt.Errorf("invalid storage config prefix %q", prefix)
+		}
+	}
+	return prefix, nil
 }
 
 // New implements RESTStorage.New.
@@ -1701,12 +1752,20 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	}
 
 	var keyFuncs storeKeyFuncs
-	storageKeyPrefix := prefix
+	storageConfigPrefix := ""
 	if opts.StorageConfig != nil {
-		storageKeyPrefix = path.Join("/", opts.StorageConfig.Prefix, prefix)
+		storageConfigPrefix = opts.StorageConfig.Prefix
 	}
+	storageKeyPrefix, err := normalizeStorageConfigPrefix(storageConfigPrefix)
+	if err != nil {
+		return err
+	}
+	storageKeyPrefix += strings.TrimPrefix(prefix, "/") + "/"
 	if e.KeyRootFunc == nil && e.KeyFunc == nil {
-		keyFuncs = defaultStoreKeyFuncs(prefix, storageKeyPrefix, isNamespaced)
+		keyFuncs, err = defaultStoreKeyFuncs(prefix, storageKeyPrefix, isNamespaced)
+		if err != nil {
+			return err
+		}
 	} else {
 		keyFuncs = newStoreKeyFuncs(isNamespaced, e.KeyRootFunc, e.KeyFunc, nil)
 	}
