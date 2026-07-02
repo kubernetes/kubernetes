@@ -17,6 +17,7 @@ limitations under the License.
 package podcheckpoint
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,13 +32,14 @@ import (
 	nodeapply "k8s.io/client-go/applyconfigurations/node/v1alpha1"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/ptr"
 )
 
-func TestPodCheckpointStatusValidation(t *testing.T) {
+func TestPodCheckpointAndRestoreStatusValidation(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
 	tCtx := ktesting.Init(t)
 	client, _, closeFn := startAPIServer(tCtx, t, true)
@@ -69,6 +71,59 @@ func TestPodCheckpointStatusValidation(t *testing.T) {
 	checkpoint.Status.NodeName = new("node-1")
 	if _, err := checkpoints.UpdateStatus(tCtx, checkpoint, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("record checkpoint node: %v", err)
+	}
+
+	pods := client.CoreV1().Pods(ns.Name)
+	for _, terminal := range []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse} {
+		t.Run(string(terminal), func(t *testing.T) {
+			pod, err := pods.Create(tCtx, &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "restore-" + strings.ToLower(string(terminal))},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Name: "app", Image: "pause"}},
+					RestoreFrom: &v1.CheckpointReference{Name: checkpoint.Name},
+				},
+			}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("create restore pod: %v", err)
+			}
+			for _, state := range []v1.ConditionStatus{v1.ConditionUnknown, terminal} {
+				pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodRestored, Status: state, Reason: "Recorded", LastTransitionTime: metav1.Now(), ObservedGeneration: pod.Generation}}
+				pod, err = pods.UpdateStatus(tCtx, pod, metav1.UpdateOptions{})
+				if err != nil {
+					t.Fatalf("record restore state %q: %v", state, err)
+				}
+			}
+			// Status clients must not erase the durable outcome when replacing conditions.
+			pod.Status.Conditions = nil
+			pod, err = pods.UpdateStatus(tCtx, pod, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatalf("update from an older status client: %v", err)
+			}
+			if _, got := podutil.GetPodCondition(&pod.Status, v1.PodRestored); got == nil || got.Status != terminal || got.ObservedGeneration != pod.Generation {
+				t.Fatalf("lost terminal status on update: %#v", got)
+			}
+			pod, err = pods.Patch(tCtx, pod.Name, types.MergePatchType, []byte(`{"status":{"conditions":null}}`), metav1.PatchOptions{}, "status")
+			if err != nil {
+				t.Fatalf("patch omitted restore status: %v", err)
+			}
+			for _, state := range []v1.ConditionStatus{"", "Invalid", v1.ConditionUnknown, v1.ConditionTrue, v1.ConditionFalse} {
+				if state == terminal {
+					continue
+				}
+				update := pod.DeepCopy()
+				update.Status.Conditions[0].Status = state
+				if _, err := pods.UpdateStatus(tCtx, update, metav1.UpdateOptions{}); !apierrors.IsInvalid(err) {
+					t.Fatalf("expected transition %s -> %q to be invalid, got %v", terminal, state, err)
+				}
+			}
+			stored, err := pods.Get(tCtx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, got := podutil.GetPodCondition(&stored.Status, v1.PodRestored); got == nil || got.Status != terminal {
+				t.Fatalf("lost persisted terminal status: %#v", got)
+			}
+		})
 	}
 }
 
@@ -133,6 +188,33 @@ func TestPodCheckpointTemplateSetOnce(t *testing.T) {
 	}
 	if !equality.Semantic.DeepEqual(expectedTemplate, stored.Status.CheckpointedPodTemplate) {
 		t.Fatal("persisted template changed after rejected updates")
+	}
+}
+
+func TestPodRestoredConditionDroppedWhenDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, false)
+	tCtx := ktesting.Init(t)
+	client, _, closeFn := startAPIServer(tCtx, t, false)
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(client, "restore-status-disabled", t)
+	pods := client.CoreV1().Pods(ns.Name)
+	pod, err := pods.Create(tCtx, &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "ordinary"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "app", Image: "pause"}}},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodRestored, Status: v1.ConditionUnknown, Reason: "RestoreInProgress", LastTransitionTime: metav1.Now()}}
+	if _, err := pods.UpdateStatus(tCtx, pod, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := pods.Get(tCtx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, restored := podutil.GetPodCondition(&stored.Status, v1.PodRestored); restored != nil {
+		t.Fatalf("restore condition persisted with feature disabled: %#v", restored)
 	}
 }
 
