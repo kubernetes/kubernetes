@@ -43,7 +43,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drahealthv1beta1 "k8s.io/kubelet/pkg/apis/dra-health/v1beta1"
 )
 
 type Options struct {
@@ -63,7 +63,7 @@ type deviceHealthInfo struct {
 }
 
 type ExamplePlugin struct {
-	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
+	drahealthv1beta1.UnimplementedDRAResourceHealthServer
 	stopCh         <-chan struct{}
 	logger         klog.Logger
 	resourceClient cgoresource.ResourceV1Interface
@@ -100,7 +100,7 @@ type ExamplePlugin struct {
 }
 
 var _ kubeletplugin.DRAPlugin = &ExamplePlugin{}
-var _ drahealthv1alpha1.DRAResourceHealthServer = &ExamplePlugin{}
+var _ drahealthv1beta1.DRAResourceHealthServer = &ExamplePlugin{}
 
 //nolint:unused
 func (ex *ExamplePlugin) mustEmbedUnimplementedDRAResourceHealthServer() {}
@@ -621,7 +621,7 @@ func (ex *ExamplePlugin) SetNotifyRegistrationStatusError(err error) {
 	ex.d.SetNotifyRegistrationStatusError(err)
 }
 
-func (ex *ExamplePlugin) NodeWatchResources(req *drahealthv1alpha1.NodeWatchResourcesRequest, srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
+func (ex *ExamplePlugin) NodeWatchResources(req *drahealthv1beta1.NodeWatchResourcesRequest, srv drahealthv1beta1.DRAResourceHealth_NodeWatchResourcesServer) error {
 	logger := klog.FromContext(srv.Context())
 	logger.V(3).Info("Starting dynamic NodeWatchResources stream")
 
@@ -668,9 +668,9 @@ func (ex *ExamplePlugin) NodeWatchResources(req *drahealthv1alpha1.NodeWatchReso
 }
 
 // sendHealthUpdate dynamically builds the health report from the current state of the deviceHealth map.
-func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
+func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1beta1.DRAResourceHealth_NodeWatchResourcesServer) error {
 	logger := klog.FromContext(srv.Context())
-	healthUpdates := []*drahealthv1alpha1.DeviceHealth{}
+	healthUpdates := []*drahealthv1beta1.DeviceHealth{}
 
 	ex.healthMutex.Lock()
 	for key, healthInfo := range ex.deviceHealth {
@@ -681,18 +681,18 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealt
 		poolName := parts[0]
 		deviceName := parts[1]
 
-		var healthEnum drahealthv1alpha1.HealthStatus
+		var healthEnum drahealthv1beta1.HealthStatus
 		switch healthInfo.status {
 		case "Healthy":
-			healthEnum = drahealthv1alpha1.HealthStatus_HEALTHY
+			healthEnum = drahealthv1beta1.HealthStatus_HEALTHY
 		case "Unhealthy":
-			healthEnum = drahealthv1alpha1.HealthStatus_UNHEALTHY
+			healthEnum = drahealthv1beta1.HealthStatus_UNHEALTHY
 		default:
-			healthEnum = drahealthv1alpha1.HealthStatus_UNKNOWN
+			healthEnum = drahealthv1beta1.HealthStatus_UNKNOWN
 		}
 
-		healthUpdates = append(healthUpdates, &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		healthUpdates = append(healthUpdates, &drahealthv1beta1.DeviceHealth{
+			Device: &drahealthv1beta1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: deviceName,
 			},
@@ -711,7 +711,7 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealt
 		return healthUpdates[i].GetDevice().GetDeviceName() < healthUpdates[j].GetDevice().GetDeviceName()
 	})
 
-	resp := &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: healthUpdates}
+	resp := &drahealthv1beta1.NodeWatchResourcesResponse{Devices: healthUpdates}
 	logger.V(5).Info("Test driver sending health update", "response", resp)
 	return srv.Send(resp)
 }

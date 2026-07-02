@@ -38,7 +38,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drahealthv1beta1 "k8s.io/kubelet/pkg/apis/dra-health/v1beta1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
@@ -984,18 +984,18 @@ func buildResourceHealth(driverName string, device state.Device, healthInfo stat
 	return resourceHealth
 }
 
-func toDeviceHealthStatus(health drahealthv1alpha1.HealthStatus) state.DeviceHealthStatus {
+func toDeviceHealthStatus(health drahealthv1beta1.HealthStatus) state.DeviceHealthStatus {
 	switch health {
-	case drahealthv1alpha1.HealthStatus_HEALTHY:
+	case drahealthv1beta1.HealthStatus_HEALTHY:
 		return state.DeviceHealthStatusHealthy
-	case drahealthv1alpha1.HealthStatus_UNHEALTHY:
+	case drahealthv1beta1.HealthStatus_UNHEALTHY:
 		return state.DeviceHealthStatusUnhealthy
 	default:
 		return state.DeviceHealthStatusUnknown
 	}
 }
 
-func buildDeviceHealth(logger klog.Logger, device *drahealthv1alpha1.DeviceHealth) state.DeviceHealth {
+func buildDeviceHealth(logger klog.Logger, device *drahealthv1beta1.DeviceHealth) state.DeviceHealth {
 	// Extract the health check timeout from the gRPC response
 	// If not specified, zero, or negative, use the default timeout
 	timeout := DefaultHealthTimeout
@@ -1021,7 +1021,7 @@ func buildDeviceHealth(logger klog.Logger, device *drahealthv1alpha1.DeviceHealt
 }
 
 // HandleWatchResourcesStream processes health updates from the DRA plugin.
-func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, pluginName string) error {
+func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1beta1.DRAResourceHealth_NodeWatchResourcesClient, pluginName string) error {
 	logger := klog.FromContext(ctx).WithName("dra-manager")
 	logger = klog.LoggerWithValues(logger, "pluginName", pluginName)
 
@@ -1051,7 +1051,7 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 			return err
 		}
 
-		// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
+		// Convert drahealthv1beta1.DeviceHealth to state.DeviceHealth
 		devices := make([]state.DeviceHealth, len(resp.GetDevices()))
 		for i, d := range resp.GetDevices() {
 			devices[i] = buildDeviceHealth(logger, d)

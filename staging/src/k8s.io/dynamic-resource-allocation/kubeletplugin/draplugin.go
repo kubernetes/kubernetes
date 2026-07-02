@@ -41,6 +41,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drahealthv1beta1 "k8s.io/kubelet/pkg/apis/dra-health/v1beta1"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
@@ -562,6 +563,20 @@ func DRAService(enabled bool) Option {
 	}
 }
 
+// HealthService controls whether the optional DRAResourceHealth gRPC service
+// is advertised to the kubelet and served. It only has an effect if the
+// [DRAPlugin] implementation also implements the v1beta1
+// [drahealthv1beta1.DRAResourceHealthServer] interface. It's on by default.
+//
+// Disabling it allows a driver to ship the health interface but turn off
+// device health reporting, for example behind its own configuration flag.
+func HealthService(enabled bool) Option {
+	return func(o *options) error {
+		o.healthService = enabled
+		return nil
+	}
+}
+
 // ReconcilePoolWithName limits reconciliation to slices with Spec.Pool.Name
 // equal to name.
 //
@@ -657,7 +672,7 @@ type options struct {
 	nodeV1                     bool
 	registrationService        bool
 	draService                 bool
-	healthService              *bool
+	healthService              bool
 	reconcilePoolWithName      string
 	enableDeviceMetadata       bool
 	metadataVersions           []schema.GroupVersion
@@ -717,6 +732,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		},
 		draService:          true,
 		registrationService: true,
+		healthService:       true,
 	}
 	for _, option := range opts {
 		if err := option(&o); err != nil {
@@ -815,11 +831,31 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	if o.nodeV1beta1 {
 		supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
 	}
-	// Check if the plugin implements the DRAResourceHealth service.
-	if _, ok := plugin.(drahealthv1alpha1.DRAResourceHealthServer); ok {
-		// If it does, add it to the list of services this plugin supports.
-		logger.V(5).Info("detected v1alpha1.DRAResourceHealth gRPC service")
-		supportedServices = append(supportedServices, drahealthv1alpha1.DRAResourceHealth_ServiceDesc.ServiceName)
+	// Check if the plugin implements the DRAResourceHealth service. Drivers
+	// only implement the newest (v1beta1) health server; the helper also serves
+	// the older v1alpha1 API via a conversion wrapper. Both versions are
+	// advertised so that the kubelet can pick the most recent one it supports.
+	// This enables graceful migration of DRA drivers from v1alpha1 to v1beta1.
+	//
+	// Advertisement is intentionally independent of o.draService: in split
+	// deployments the registrar instance (DRAService(false)) advertises
+	// services which a separate service instance provides on the shared
+	// endpoint.
+	if o.healthService {
+		switch plugin.(type) {
+		case drahealthv1beta1.DRAResourceHealthServer:
+			logger.V(5).Info("detected v1beta1.DRAResourceHealth gRPC service")
+			supportedServices = append(supportedServices,
+				drahealthv1beta1.DRAResourceHealthService,
+				drahealthv1alpha1.DRAResourceHealthService)
+		case drahealthv1alpha1.DRAResourceHealthServer:
+			// Fail loudly instead of silently dropping health reporting for
+			// drivers which still implement the old Go interface. This only
+			// affects drivers recompiled against this helper; deployed
+			// v1alpha1 drivers and older kubelets keep working via the
+			// conversion wrappers.
+			return nil, errors.New("implement the v1beta1 DRAResourceHealth interface from k8s.io/kubelet/pkg/apis/dra-health/v1beta1 instead of v1alpha1 (identical types, older kubelets remain supported via automatic conversion), or disable health reporting with HealthService(false)")
+		}
 	}
 	if len(supportedServices) == 0 {
 		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
@@ -852,11 +888,13 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 					drapbv1beta1.RegisterDRAPluginServer(grpcServer, drapbv1beta1.V1ServerWrapper{DRAPluginServer: &nodePluginImplementation{Helper: d}})
 				}
 
-				if heatlhServer, ok := d.plugin.(drahealthv1alpha1.DRAResourceHealthServer); ok {
-					if o.healthService == nil || *o.healthService {
-						logger.V(5).Info("registering v1alpha1.DRAResourceHealth gRPC service")
-						drahealthv1alpha1.RegisterDRAResourceHealthServer(grpcServer, heatlhServer)
-					}
+				if healthServer, ok := d.plugin.(drahealthv1beta1.DRAResourceHealthServer); ok && o.healthService {
+					logger.V(5).Info("registering v1beta1.DRAResourceHealth gRPC service")
+					drahealthv1beta1.RegisterDRAResourceHealthServer(grpcServer, healthServer)
+					// Also serve the older v1alpha1 API by converting
+					// the driver's v1beta1 responses on the fly.
+					logger.V(5).Info("registering v1alpha1.DRAResourceHealth gRPC service")
+					drahealthv1alpha1.RegisterDRAResourceHealthServer(grpcServer, drahealthv1beta1.V1Beta1ServerWrapper{Server: healthServer})
 				}
 			},
 		)

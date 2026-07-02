@@ -53,7 +53,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/ptr"
 
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drahealthv1beta1 "k8s.io/kubelet/pkg/apis/dra-health/v1beta1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
@@ -76,7 +76,7 @@ var (
 
 type fakeDRADriverGRPCServer struct {
 	drapb.UnimplementedDRAPluginServer
-	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
+	drahealthv1beta1.UnimplementedDRAResourceHealthServer
 	driverName                 string
 	timeout                    *time.Duration
 	prepareResourceCalls       atomic.Uint32
@@ -84,7 +84,7 @@ type fakeDRADriverGRPCServer struct {
 	watchResourcesCalls        atomic.Uint32
 	prepareResourcesResponse   *drapb.NodePrepareResourcesResponse
 	unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse
-	watchResourcesResponses    chan *drahealthv1alpha1.NodeWatchResourcesResponse
+	watchResourcesResponses    chan *drahealthv1beta1.NodeWatchResourcesResponse
 	watchResourcesError        error
 }
 
@@ -151,7 +151,7 @@ func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, re
 	return s.unprepareResourcesResponse, nil
 }
 
-func (s *fakeDRADriverGRPCServer) NodeWatchResources(req *drahealthv1alpha1.NodeWatchResourcesRequest, stream drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
+func (s *fakeDRADriverGRPCServer) NodeWatchResources(req *drahealthv1beta1.NodeWatchResourcesRequest, stream drahealthv1beta1.DRAResourceHealth_NodeWatchResourcesServer) error {
 	s.watchResourcesCalls.Add(1)
 	logger := klog.FromContext(stream.Context())
 	logger.V(4).Info("Fake Server: WatchResources stream started")
@@ -189,13 +189,13 @@ func (s *fakeDRADriverGRPCServer) NodeWatchResources(req *drahealthv1alpha1.Node
 type mockWatchResourcesClient struct {
 	mock.Mock
 	RecvChan chan struct {
-		Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+		Resp *drahealthv1beta1.NodeWatchResourcesResponse
 		Err  error
 	}
 	Ctx context.Context
 }
 
-func (m *mockWatchResourcesClient) Recv() (*drahealthv1alpha1.NodeWatchResourcesResponse, error) {
+func (m *mockWatchResourcesClient) Recv() (*drahealthv1beta1.NodeWatchResourcesResponse, error) {
 	logger := klog.FromContext(m.Ctx)
 	select {
 	case <-m.Ctx.Done():
@@ -271,7 +271,7 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 		driverName:                 driverName,
 		prepareResourcesResponse:   prepareResourcesResponse,
 		unprepareResourcesResponse: unprepareResourcesResponse,
-		watchResourcesResponses:    make(chan *drahealthv1alpha1.NodeWatchResourcesResponse, 10),
+		watchResourcesResponses:    make(chan *drahealthv1beta1.NodeWatchResourcesResponse, 10),
 		watchResourcesError:        watchResourcesError,
 	}
 	if shouldTimeout {
@@ -279,7 +279,7 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
-	drahealthv1alpha1.RegisterDRAResourceHealthServer(s, fakeDRADriverGRPCServer)
+	drahealthv1beta1.RegisterDRAResourceHealthServer(s, fakeDRADriverGRPCServer)
 	drapb.RegisterDRAPluginServer(s, fakeDRADriverGRPCServer)
 
 	go func() {
@@ -1845,7 +1845,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 	) (
 		managerInstance *Manager,
 		runTestStreamFunc func(context.Context, chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}) (<-chan resourceupdates.Update, chan struct{}, chan error),
 	) {
@@ -1863,7 +1863,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		runTestStreamFunc = func(
 			streamCtx context.Context,
 			responses chan struct {
-				Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+				Resp *drahealthv1beta1.NodeWatchResourcesResponse
 				Err  error
 			},
 		) (<-chan resourceupdates.Update, chan struct{}, chan error) {
@@ -1911,26 +1911,26 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		t.Log("HealthChangeForAllocatedDevice: Test Case Started")
 
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
 
 		// Send the health update message
-		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		unhealthyDeviceMsg := &drahealthv1beta1.DeviceHealth{
+			Device: &drahealthv1beta1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: deviceName,
 			},
-			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			Health:          drahealthv1beta1.HealthStatus_UNHEALTHY,
 			LastUpdatedTime: time.Now().Unix(),
 		}
 		t.Logf("HealthChangeForAllocatedDevice: Sending health update: %+v", unhealthyDeviceMsg)
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}{
-			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+			Resp: &drahealthv1beta1.NodeWatchResourcesResponse{Devices: []*drahealthv1beta1.DeviceHealth{unhealthyDeviceMsg}},
 		}
 
 		t.Log("HealthChangeForAllocatedDevice: Waiting for update on manager channel")
@@ -1972,24 +1972,24 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 
 		t.Log("NonAllocatedDeviceChange: Test Case Started")
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
 
-		otherDeviceMsg := &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		otherDeviceMsg := &drahealthv1beta1.DeviceHealth{
+			Device: &drahealthv1beta1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: "other-device",
 			},
-			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			Health:          drahealthv1beta1.HealthStatus_UNHEALTHY,
 			LastUpdatedTime: time.Now().Unix(),
 		}
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}{
-			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{otherDeviceMsg}},
+			Resp: &drahealthv1beta1.NodeWatchResourcesResponse{Devices: []*drahealthv1beta1.DeviceHealth{otherDeviceMsg}},
 		}
 
 		select {
@@ -2032,25 +2032,25 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 
 		t.Log("NoActualStateChange: Test Case Started")
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
 
 		// Send the same "Unhealthy" state again
-		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		unhealthyDeviceMsg := &drahealthv1beta1.DeviceHealth{
+			Device: &drahealthv1beta1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: deviceName,
 			},
-			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			Health:          drahealthv1beta1.HealthStatus_UNHEALTHY,
 			LastUpdatedTime: time.Now().Unix(),
 		}
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}{
-			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+			Resp: &drahealthv1beta1.NodeWatchResourcesResponse{Devices: []*drahealthv1beta1.DeviceHealth{unhealthyDeviceMsg}},
 		}
 
 		select {
@@ -2082,14 +2082,14 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		t.Log("StreamError: Test Case Started")
 
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		_, done, streamErrChan := runStreamTest(stCtx, responses)
 
 		expectedStreamErr := errors.New("simulated mock stream error")
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}{Err: expectedStreamErr}
 
@@ -2117,7 +2117,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		t.Log("ContextCanceled: Test Case Started")
 
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		})
 		_, done, streamErrChan := runStreamTest(stCtx, responses)
@@ -2153,26 +2153,26 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		t.Log("HealthChangeForDeviceWithShareID: Test Case Started")
 
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
 
 		// Send health update for the device (same device that has ShareID in the claim)
-		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		unhealthyDeviceMsg := &drahealthv1beta1.DeviceHealth{
+			Device: &drahealthv1beta1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: deviceName,
 			},
-			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			Health:          drahealthv1beta1.HealthStatus_UNHEALTHY,
 			LastUpdatedTime: time.Now().Unix(),
 		}
 		t.Logf("HealthChangeForDeviceWithShareID: Sending health update: %+v", unhealthyDeviceMsg)
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}{
-			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+			Resp: &drahealthv1beta1.NodeWatchResourcesResponse{Devices: []*drahealthv1beta1.DeviceHealth{unhealthyDeviceMsg}},
 		}
 
 		t.Log("HealthChangeForDeviceWithShareID: Waiting for update on manager channel")
@@ -2273,26 +2273,26 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		t.Log("HealthChangeForMultiplePodsWithSharedDevice: Test Case Started")
 
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
 
 		// Send health update for the shared device
-		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		unhealthyDeviceMsg := &drahealthv1beta1.DeviceHealth{
+			Device: &drahealthv1beta1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: deviceName,
 			},
-			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			Health:          drahealthv1beta1.HealthStatus_UNHEALTHY,
 			LastUpdatedTime: time.Now().Unix(),
 		}
 		t.Logf("HealthChangeForMultiplePodsWithSharedDevice: Sending health update: %+v", unhealthyDeviceMsg)
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1beta1.NodeWatchResourcesResponse
 			Err  error
 		}{
-			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+			Resp: &drahealthv1beta1.NodeWatchResourcesResponse{Devices: []*drahealthv1beta1.DeviceHealth{unhealthyDeviceMsg}},
 		}
 
 		t.Log("HealthChangeForMultiplePodsWithSharedDevice: Waiting for update on manager channel")
@@ -2878,23 +2878,23 @@ func TestToResourceHealthStatus(t *testing.T) {
 
 func TestToDeviceHealthStatus(t *testing.T) {
 	testCases := map[string]struct {
-		input    drahealthv1alpha1.HealthStatus
+		input    drahealthv1beta1.HealthStatus
 		expected state.DeviceHealthStatus
 	}{
 		"healthy": {
-			input:    drahealthv1alpha1.HealthStatus_HEALTHY,
+			input:    drahealthv1beta1.HealthStatus_HEALTHY,
 			expected: state.DeviceHealthStatusHealthy,
 		},
 		"unhealthy": {
-			input:    drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			input:    drahealthv1beta1.HealthStatus_UNHEALTHY,
 			expected: state.DeviceHealthStatusUnhealthy,
 		},
 		"unknown": {
-			input:    drahealthv1alpha1.HealthStatus_UNKNOWN,
+			input:    drahealthv1beta1.HealthStatus_UNKNOWN,
 			expected: state.DeviceHealthStatusUnknown,
 		},
 		"unexpected": {
-			input:    drahealthv1alpha1.HealthStatus(99),
+			input:    drahealthv1beta1.HealthStatus(99),
 			expected: state.DeviceHealthStatusUnknown,
 		},
 	}
@@ -2911,7 +2911,7 @@ func TestBuildDeviceHealth(t *testing.T) {
 	longMessage := strings.Repeat("a", v1.ResourceHealthMessageMaxLength+5)
 
 	testCases := map[string]struct {
-		health         drahealthv1alpha1.HealthStatus
+		health         drahealthv1beta1.HealthStatus
 		timeoutSeconds int64
 		message        string
 		wantHealth     state.DeviceHealthStatus
@@ -2919,7 +2919,7 @@ func TestBuildDeviceHealth(t *testing.T) {
 		wantMessage    string
 	}{
 		"healthy with positive timeout": {
-			health:         drahealthv1alpha1.HealthStatus_HEALTHY,
+			health:         drahealthv1beta1.HealthStatus_HEALTHY,
 			timeoutSeconds: 12,
 			message:        "ok",
 			wantHealth:     state.DeviceHealthStatusHealthy,
@@ -2927,7 +2927,7 @@ func TestBuildDeviceHealth(t *testing.T) {
 			wantMessage:    "ok",
 		},
 		"unhealthy with zero timeout": {
-			health:         drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			health:         drahealthv1beta1.HealthStatus_UNHEALTHY,
 			timeoutSeconds: 0,
 			message:        "fail",
 			wantHealth:     state.DeviceHealthStatusUnhealthy,
@@ -2935,7 +2935,7 @@ func TestBuildDeviceHealth(t *testing.T) {
 			wantMessage:    "fail",
 		},
 		"unknown with negative timeout": {
-			health:         drahealthv1alpha1.HealthStatus_UNKNOWN,
+			health:         drahealthv1beta1.HealthStatus_UNKNOWN,
 			timeoutSeconds: -1,
 			message:        longMessage,
 			wantHealth:     state.DeviceHealthStatusUnknown,
@@ -2946,8 +2946,8 @@ func TestBuildDeviceHealth(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			grpcDevice := &drahealthv1alpha1.DeviceHealth{
-				Device: &drahealthv1alpha1.DeviceIdentifier{
+			grpcDevice := &drahealthv1beta1.DeviceHealth{
+				Device: &drahealthv1beta1.DeviceIdentifier{
 					PoolName:   "pool",
 					DeviceName: "device",
 				},
