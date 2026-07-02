@@ -341,14 +341,30 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 
 // generateContainerConfig generates container config for kubelet runtime v1.
 func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID, imageVolumes kubecontainer.ImageVolumes) (*runtimeapi.ContainerConfig, func(), error) {
+	return m.generateContainerConfigWithImageUserLookup(ctx, container, pod, restartCount, podIP, imageRef, podIPs, nsTarget, imageVolumes, true)
+}
+
+// generateContainerConfigForRestore generates the expected restore-time
+// container config without querying the local image store. The checkpoint is
+// authoritative for the restored process credentials, while explicit Pod
+// securityContext values are still validated and included in the CRI config.
+func (m *kubeGenericRuntimeManager) generateContainerConfigForRestore(ctx context.Context, container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*runtimeapi.ContainerConfig, func(), error) {
+	return m.generateContainerConfigWithImageUserLookup(ctx, container, pod, restartCount, podIP, imageRef, podIPs, nil, imageVolumes, false)
+}
+
+func (m *kubeGenericRuntimeManager) generateContainerConfigWithImageUserLookup(ctx context.Context, container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID, imageVolumes kubecontainer.ImageVolumes, lookupImageUser bool) (*runtimeapi.ContainerConfig, func(), error) {
 	opts, cleanupAction, err := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, podIPs, imageVolumes)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	uid, username, err := m.getImageUser(ctx, container.Image)
-	if err != nil {
-		return nil, cleanupAction, err
+	var uid *int64
+	username := ""
+	if lookupImageUser {
+		uid, username, err = m.getImageUser(ctx, container.Image)
+		if err != nil {
+			return nil, cleanupAction, err
+		}
 	}
 
 	// Verify RunAsNonRoot. Non-root verification only supports numeric user.
