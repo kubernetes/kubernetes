@@ -44,7 +44,7 @@ func TestJobAdmissionParallelismUpdate(t *testing.T) {
 		waitForPodGroup bool
 		startController bool
 	}{
-		"parallelism update blocked for gang-scheduled job": {
+		"parallelism update allowed for gang-scheduled job (elastic scaling)": {
 			featureGates: enabledFeatureGates,
 			jobSpec: batchv1.JobSpec{
 				Parallelism:    ptr.To[int32](4),
@@ -52,8 +52,7 @@ func TestJobAdmissionParallelismUpdate(t *testing.T) {
 				CompletionMode: ptr.To(batchv1.IndexedCompletion),
 			},
 			newParallelism:  2,
-			wantForbidden:   true,
-			wantErrContains: "cannot change parallelism",
+			wantForbidden:   false,
 			waitForPodGroup: true,
 			startController: true,
 		},
@@ -125,7 +124,7 @@ func TestJobAdmissionParallelismUpdate(t *testing.T) {
 			}
 
 			_, err = updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), jobObj.Name, func(j *batchv1.Job) {
-				j.Spec.Parallelism = ptr.To(tc.newParallelism)
+				j.Spec.Parallelism = new(tc.newParallelism)
 			})
 
 			if tc.wantForbidden {
