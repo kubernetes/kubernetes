@@ -342,6 +342,7 @@ type Cacher struct {
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
+	watcherMetrics          *metrics.WatcherMetricsObservers
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -414,6 +415,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		clock:            config.Clock,
 		timer:            time.NewTimer(time.Duration(0)),
 		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
+		watcherMetrics:   metrics.NewWatcherMetricsObservers(config.GroupResource),
 	}
 
 	// Ensure that timer is stopped.
@@ -592,6 +594,8 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, pred.Label, pred.Field)
 
+	auditID, _ := audit.AuditIDFrom(ctx)
+
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
@@ -604,7 +608,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		deadline,
 		pred.AllowWatchBookmarks,
 		c.groupResource,
+		c.watcherMetrics,
 		identifier,
+		auditID,
 	)
 
 	// note that c.waitUntilWatchCacheFreshAndForceAllEvents must be called without
@@ -965,6 +971,10 @@ func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
 }
 
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
+	// Mark the start of fan-out. This is the last shared, pre-fanout timestamp;
+	// the shallow copy made below for non-bookmark events preserves it, so all
+	// watchers see the same dispatched time.
+	event.timeline.dispatched = c.clock.Now()
 	c.startDispatching(event)
 	defer c.finishDispatching()
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,

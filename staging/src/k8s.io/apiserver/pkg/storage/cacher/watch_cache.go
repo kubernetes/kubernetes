@@ -66,7 +66,25 @@ type watchCacheEvent struct {
 	PrevObjFields   fields.Set
 	Key             string
 	ResourceVersion uint64
-	RecordTime      time.Time
+	// RecordTime is when the event was decoded from etcd; the origin of the
+	// dispatch timeline.
+	RecordTime time.Time
+	// timeline holds the pre-fanout lifecycle timestamps of this event. They
+	// are shared across all watchers receiving it (set once, before fan-out).
+	// Post-fanout, per-watcher stages are measured as locals in the watcher's
+	// process goroutine, since one event fans out to many watchers.
+	timeline eventTimeline
+}
+
+// eventTimeline captures the shared, pre-fanout timestamps of a watch event.
+type eventTimeline struct {
+	// cacheReceived is when the reflector handed the event to the watch cache.
+	cacheReceived time.Time
+	// ringBuffered is when the event was appended to the ring buffer and
+	// enqueued onto the cacher's incoming channel for fan-out.
+	ringBuffered time.Time
+	// dispatched is when the dispatcher dequeued the event to begin fan-out.
+	dispatched time.Time
 }
 
 // watchCache implements a Store interface.
@@ -191,6 +209,16 @@ func (w *watchCache) Delete(obj interface{}) error {
 	return w.processEvent(event, resourceVersion)
 }
 
+// ProcessWatchEvent takes a watch.Event as an argument and processes it.
+// This implements the WatchEventReceiver interface.
+func (w *watchCache) ProcessWatchEvent(event watch.Event) error {
+	_, resourceVersion, err := w.objectToVersionedRuntimeObject(event.Object)
+	if err != nil {
+		return err
+	}
+	return w.processEvent(event, resourceVersion)
+}
+
 func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, error) {
 	object, ok := obj.(runtime.Object)
 	if !ok {
@@ -206,6 +234,7 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) error {
+	cacheReceived := w.config.clock.Now()
 	metrics.EventsReceivedCounter.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Inc()
 
 	key, err := w.config.keyFunc(event.Object)
@@ -218,6 +247,11 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		return err
 	}
 
+	recordTime := event.RecordTime
+	if recordTime.IsZero() {
+		recordTime = w.config.clock.Now()
+	}
+
 	wcEvent := &watchCacheEvent{
 		Type:            event.Type,
 		Object:          elem.Object,
@@ -225,7 +259,8 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		ObjFields:       elem.Fields,
 		Key:             key,
 		ResourceVersion: resourceVersion,
-		RecordTime:      w.config.clock.Now(),
+		RecordTime:      recordTime,
+		timeline:        eventTimeline{cacheReceived: cacheReceived},
 	}
 
 	// We can call w.storage.Get() outside of a critical section,
@@ -269,6 +304,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 	// UpdateResourceVersion in flight at any point in time, which is true now,
 	// because reflector calls them synchronously from its main thread.
 	if w.config.eventHandler != nil {
+		wcEvent.timeline.ringBuffered = w.config.clock.Now()
 		w.config.eventHandler(wcEvent)
 	}
 	metrics.RecordResourceVersion(w.config.groupResource, resourceVersion)
