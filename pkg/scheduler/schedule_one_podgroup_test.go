@@ -3158,14 +3158,14 @@ func TestScheduleOnePodGroup_PodGroupNotFound(t *testing.T) {
 
 	sched.scheduleOnePodGroup(ctx, podGroupInfo)
 
-	// Verify that the pods are put back into the scheduling queue.
-	pendingPods, _ := queue.PendingPods()
-	gotPendingPods := sets.New[string]()
-	for _, pod := range pendingPods {
-		gotPendingPods.Insert(pod.Name)
+	// Verify that the pods are put back into the scheduling queue's incompletePodGroupPods.
+	incompletePods := queue.IncompletePodGroupPodsPods()
+	gotIncompletePods := sets.New[string]()
+	for _, pod := range incompletePods {
+		gotIncompletePods.Insert(pod.Name)
 	}
 	expectedPods := sets.New("p1", "p2")
-	if diff := cmp.Diff(expectedPods, gotPendingPods); diff != "" {
-		t.Errorf("Unexpected pods in scheduling queue (-want,+got)\n%s", diff)
+	if diff := cmp.Diff(expectedPods, gotIncompletePods); diff != "" {
+		t.Errorf("Unexpected pods in incompletePodGroupPods (-want,+got)\n%s", diff)
 	}
 }

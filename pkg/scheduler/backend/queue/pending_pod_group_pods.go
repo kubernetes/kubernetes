@@ -17,8 +17,6 @@ limitations under the License.
 package queue
 
 import (
-	"fmt"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -36,12 +34,12 @@ func newPendingPodGroupMemberPods() *pendingPodGroupMemberPods {
 
 // add adds a pod info.
 func (p *pendingPodGroupMemberPods) add(pInfo *framework.QueuedPodInfo) {
-	p.keyToPod[pendingPodKey(pInfo.Pod)] = pInfo
+	p.keyToPod[podKey(pInfo.Pod)] = pInfo
 }
 
 // has checks if the pod is tracked.
 func (p *pendingPodGroupMemberPods) has(podLookup *v1.Pod) bool {
-	_, ok := p.keyToPod[pendingPodKey(podLookup)]
+	_, ok := p.keyToPod[podKey(podLookup)]
 	return ok
 }
 
@@ -52,12 +50,12 @@ func (p *pendingPodGroupMemberPods) len() int {
 
 // get returns the queued pod info for the given pod.
 func (p *pendingPodGroupMemberPods) get(podLookup *v1.Pod) *framework.QueuedPodInfo {
-	return p.keyToPod[pendingPodKey(podLookup)]
+	return p.keyToPod[podKey(podLookup)]
 }
 
 // update refreshes the pod object and returns the updated pod info if found.
 func (p *pendingPodGroupMemberPods) update(newPod *v1.Pod) *framework.QueuedPodInfo {
-	pInfo, ok := p.keyToPod[pendingPodKey(newPod)]
+	pInfo, ok := p.keyToPod[podKey(newPod)]
 	if !ok {
 		return nil
 	}
@@ -67,11 +65,11 @@ func (p *pendingPodGroupMemberPods) update(newPod *v1.Pod) *framework.QueuedPodI
 
 // delete removes a specific pod and returns its pod info if found.
 func (p *pendingPodGroupMemberPods) delete(podLookup *v1.Pod) *framework.QueuedPodInfo {
-	pInfo, ok := p.keyToPod[pendingPodKey(podLookup)]
+	pInfo, ok := p.keyToPod[podKey(podLookup)]
 	if !ok {
 		return nil
 	}
-	delete(p.keyToPod, pendingPodKey(podLookup))
+	delete(p.keyToPod, podKey(podLookup))
 	return pInfo
 }
 
@@ -83,8 +81,4 @@ func (p *pendingPodGroupMemberPods) clear() []*framework.QueuedPodInfo {
 	}
 	p.keyToPod = make(map[string]*framework.QueuedPodInfo)
 	return pods
-}
-
-func pendingPodKey(pod *v1.Pod) string {
-	return fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 }

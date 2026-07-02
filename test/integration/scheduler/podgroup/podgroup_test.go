@@ -187,15 +187,15 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2, p3},
 				},
 				{
-					Name:                               "Verify pods are gated at PreEnqueue (no PodGroup object)",
-					WaitForPodsInUnschedulableEntities: []string{"p1", "p2", "p3"},
+					Name:                                "Verify pods are waiting in incompletePodGroupPods (no PodGroup object)",
+					WaitForPodsInIncompletePodGroupPods: []string{"p1", "p2", "p3"},
 				},
 				{
-					Name:           "Create the PodGroup to unblock PreEnqueue",
+					Name:           "Create the PodGroup to unblock the pods",
 					CreatePodGroup: gangPodGroup,
 				},
 				{
-					Name:                     "Verify pods become unschedulable (Permit timeout due to resource blocker)",
+					Name:                     "Verify pods become unschedulable due to resource blocker pod",
 					WaitForPodsUnschedulable: []string{"p1", "p2", "p3"},
 				},
 				{
@@ -240,7 +240,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2, p3, p4},
 				},
 				{
-					Name:           "Create the PodGroup to unblock PreEnqueue",
+					Name:           "Create the PodGroup to unblock pods",
 					CreatePodGroup: gangPodGroup,
 				},
 				{
@@ -352,11 +352,11 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2, p3},
 				},
 				{
-					Name:                               "Verify pods are gated at PreEnqueue (no PodGroup object)",
-					WaitForPodsInUnschedulableEntities: []string{"p1", "p2", "p3"},
+					Name:                                "Verify pods are waiting in incompletePodGroupPods (no PodGroup object)",
+					WaitForPodsInIncompletePodGroupPods: []string{"p1", "p2", "p3"},
 				},
 				{
-					Name:           "Create the PodGroup to unblock PreEnqueue",
+					Name:           "Create the PodGroup to unblock pods",
 					CreatePodGroup: basicPodGroup,
 				},
 				{
