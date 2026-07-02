@@ -171,6 +171,11 @@ linters:
       - text: "optionalfields: field StorageVersion.(Spec|Status) should (?:be a pointer|have the omitempty tag)\\."
         path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
       
+      # optionalfields - PodCheckpoint.Status follows the universal built-in object
+      # convention of a value (non-pointer) status struct.
+      - text: "optionalfields: field PodCheckpoint.Status should (?:be a pointer|have the omitempty tag)\\."
+        path: "staging/src/k8s.io/api/checkpoint/v1alpha1/types.go"
+      
       # Pre-existing issues from the conflictmarkers linter
       # The Error field in some older API types is marked as both optional and required.
       # This is incorrect, but cannot be changed without breaking changes.
@@ -248,6 +253,12 @@ linters:
       # Validation makes this require at least one of the fields within to be set.
       - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate|CompositePodGroupSpec|CompositePodGroupTemplate)\\.SchedulingPolicy is a non-pointer struct with no required fields\\..*"
         path: "staging/src/k8s.io/api/scheduling/(v1alpha3|v1beta1)/types\\.go"
+      
+      # PodCheckpointSpec.SourcePod is required by validation in alpha, but is marked optional in the
+      # schema so a future selector-based or controller-populated mode can relax it without an
+      # incompatible API change, leaving the spec with no schema-required fields.
+      - text: "nonpointerstructs: field PodCheckpoint\\.Spec is a non-pointer struct with no required fields\\..*"
+        path: "staging/src/k8s.io/api/checkpoint/v1alpha1/types\\.go"
       
       # Workload.Spec no longer has any strictly required fields due to the introduction of the
       # CompositePodGroup API. The template fields have been refactored into a union where either
