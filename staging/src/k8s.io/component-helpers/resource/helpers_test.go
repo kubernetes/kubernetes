@@ -1976,6 +1976,122 @@ func TestPodLevelResourceRequests(t *testing.T) {
 	}
 }
 
+func TestPodLevelResourceRequestsWithStatusResourcesDoesNotDoubleCountOverhead(t *testing.T) {
+	testCases := []struct {
+		name             string
+		statusRequests   v1.ResourceList
+		allocated        v1.ResourceList
+		expectedRequests v1.ResourceList
+	}{
+		{
+			name: "status resources include overhead for all pod-level resources",
+			statusRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+		},
+		{
+			name: "status resources include overhead for only one pod-level resource",
+			statusRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("1100m"),
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("1100m"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+		},
+		{
+			name: "status resources without overhead still receive overhead",
+			statusRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+		},
+		{
+			name: "allocated resources include overhead when status requests do not",
+			statusRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+		},
+		{
+			name: "allocated resources include stale overhead during resize",
+			statusRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1050m"),
+				v1.ResourceMemory: resource.MustParse("105Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("10Mi"),
+					},
+				},
+				Status: v1.PodStatus{
+					Resources: &v1.ResourceRequirements{
+						Requests: tc.statusRequests,
+					},
+					AllocatedResources: tc.allocated,
+				},
+			}
+
+			requests := PodRequests(pod, PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			})
+			if diff := diff.Diff(tc.expectedRequests, requests); diff != "" {
+				t.Errorf("PodRequests() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestIsSupportedPodLevelResource(t *testing.T) {
 	testCases := []struct {
 		name     string

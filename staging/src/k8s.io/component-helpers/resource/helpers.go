@@ -159,10 +159,16 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		var effectiveReqs v1.ResourceList
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
 			if pod.Status.Resources != nil {
+				statusRequests := pod.Status.Resources.Requests.DeepCopy()
+				allocatedRequests := pod.Status.AllocatedResources.DeepCopy()
+				if pod.Spec.Overhead != nil {
+					subtractResourceList(statusRequests, pod.Spec.Overhead)
+					subtractResourceList(allocatedRequests, pod.Spec.Overhead)
+				}
 				effectiveReqs = determineEffectiveRequests(pod, &ResourceState{
 					Spec:      pod.Spec.Resources.Requests,
-					Actuated:  pod.Status.Resources.Requests,
-					Allocated: pod.Status.AllocatedResources,
+					Actuated:  statusRequests,
+					Allocated: allocatedRequests,
 				})
 			}
 		}
@@ -477,6 +483,20 @@ func addResourceList(list, newList v1.ResourceList) {
 			list[name] = quantity.DeepCopy()
 		} else {
 			value.Add(quantity)
+			list[name] = value
+		}
+	}
+}
+
+// subtractResourceList subtracts the resources in newList from list.
+// If the subtraction results in a value less than zero, it sets it to zero.
+func subtractResourceList(list, newList v1.ResourceList) {
+	for name, quantity := range newList {
+		if value, ok := list[name]; ok {
+			value.Sub(quantity)
+			if value.Sign() < 0 {
+				value.Set(0)
+			}
 			list[name] = value
 		}
 	}
