@@ -229,16 +229,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
 	s.podCIDRs = s.NodeManager.PodCIDRs()
 
-	if len(config.NodePortAddresses) == 1 && config.NodePortAddresses[0] == kubeproxyconfig.NodePortAddressesPrimary {
-		var nodePortAddresses []string
-		if nodeIP := s.NodeIPs[v1.IPv4Protocol]; nodeIP != nil && !nodeIP.IsLoopback() {
-			nodePortAddresses = append(nodePortAddresses, fmt.Sprintf("%s/32", nodeIP.String()))
-		}
-		if nodeIP := s.NodeIPs[v1.IPv6Protocol]; nodeIP != nil && !nodeIP.IsLoopback() {
-			nodePortAddresses = append(nodePortAddresses, fmt.Sprintf("%s/128", nodeIP.String()))
-		}
-		config.NodePortAddresses = nodePortAddresses
-	}
+	config.NodePortAddresses = expandNodePortAddressKeywords(config.NodePortAddresses, s.NodeIPs)
 
 	s.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: s.Client.EventsV1()})
 	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, kubeProxy)
@@ -646,6 +637,44 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 
 func (s *ProxyServer) birthCry() {
 	s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeNormal, "Starting", "StartKubeProxy", "")
+}
+
+func expandNodePortAddressKeywords(nodePortAddresses []string, nodeIPs map[v1.IPFamily]net.IP) []string {
+	// nodeIPs maps each IP family to the node's IP, or to a loopback address when the
+	// node has no IP of that family (see detectNodeIPs), so a non-loopback entry is
+	// what marks a family as present on the node.
+	hasIPv4 := nodeIPs[v1.IPv4Protocol] != nil && !nodeIPs[v1.IPv4Protocol].IsLoopback()
+	hasIPv6 := nodeIPs[v1.IPv6Protocol] != nil && !nodeIPs[v1.IPv6Protocol].IsLoopback()
+
+	var expanded []string
+	for _, addr := range nodePortAddresses {
+		switch addr {
+		case kubeproxyconfig.NodePortAddressesPrimary:
+			if hasIPv4 {
+				expanded = append(expanded, fmt.Sprintf("%s/32", nodeIPs[v1.IPv4Protocol].String()))
+			}
+			if hasIPv6 {
+				expanded = append(expanded, fmt.Sprintf("%s/128", nodeIPs[v1.IPv6Protocol].String()))
+			}
+		case kubeproxyconfig.NodePortAddressesLocalhost:
+			if hasIPv4 {
+				expanded = append(expanded, "127.0.0.0/8")
+			}
+			if hasIPv6 {
+				expanded = append(expanded, "::1/128")
+			}
+		case kubeproxyconfig.NodePortAddressesAll:
+			if hasIPv4 {
+				expanded = append(expanded, proxyutil.IPv4ZeroCIDR)
+			}
+			if hasIPv6 {
+				expanded = append(expanded, proxyutil.IPv6ZeroCIDR)
+			}
+		default:
+			expanded = append(expanded, addr)
+		}
+	}
+	return expanded
 }
 
 // detectNodeIPs returns the proxier's "node IP" or IPs, and the IP family to use if the
