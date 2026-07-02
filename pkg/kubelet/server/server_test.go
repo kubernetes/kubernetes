@@ -111,7 +111,6 @@ type fakeKubelet struct {
 	loopEntryTime     time.Time
 	plegHealth        bool
 	streamingRuntime  streaming.Server
-
 }
 
 func (fk *fakeKubelet) LatestLoopEntryTime() time.Time {
