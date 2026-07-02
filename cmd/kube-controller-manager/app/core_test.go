@@ -160,7 +160,7 @@ func TestController_DiscoveryError(t *testing.T) {
 
 			namespaceController, err := newModifiedNamespaceController(
 				ctx, controllerContext, names.NamespaceController,
-				testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
+				testClientset, testClientBuilder.ConfigOrDie(names.NamespaceController))
 			if err != nil {
 				t.Fatal(err)
 			}
