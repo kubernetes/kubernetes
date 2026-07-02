@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,87 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
+
+func TestPodSpecChangedFields(t *testing.T) {
+	base := &v1.PodSpec{
+		Containers: []v1.Container{{
+			Name: "app", Image: "image:original",
+			Args: []string{"original-secret-argument"},
+			Env:  []v1.EnvVar{{Name: "PASSWORD", Value: "original-secret-value"}},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			},
+			ReadinessProbe: &v1.Probe{ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{Port: intstr.FromInt32(80)},
+			}},
+		}},
+		NodeSelector: map[string]string{"disk": "ssd", "zone": "a"},
+		Volumes:      []v1.Volume{{Name: "data", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}},
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*v1.PodSpec)
+		paths  []string
+	}{
+		{name: "equal", mutate: func(*v1.PodSpec) {}},
+		{name: "equivalent quantities and empty collections", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("1000m")
+			spec.Containers[0].Ports = []v1.ContainerPort{}
+			spec.Containers[0].Resources.Limits = v1.ResourceList{}
+		}},
+		{name: "multiple fields", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].Image = "image:changed"
+			spec.Containers[0].Args[0] = "changed-secret-argument"
+			spec.Containers[0].Env[0].Value = "changed-secret-value"
+		}, paths: []string{"spec.containers[0].args[0]", "spec.containers[0].env[0].value", "spec.containers[0].image"}},
+		{name: "changed quantity", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+		}, paths: []string{"spec.containers[0].resources.requests[cpu]"}},
+		{name: "JSON scalar", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromString("http")
+		}, paths: []string{"spec.containers[0].readinessProbe.httpGet.port"}},
+		{name: "map additions removals and changes", mutate: func(spec *v1.PodSpec) {
+			delete(spec.NodeSelector, "disk")
+			spec.NodeSelector["region"] = "private-region"
+			spec.NodeSelector["zone"] = "private-zone"
+		}, paths: []string{"spec.nodeSelector[disk]", "spec.nodeSelector[region]", "spec.nodeSelector[zone]"}},
+		{name: "added list element", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].Env = append(spec.Containers[0].Env, v1.EnvVar{Name: "TOKEN", Value: "changed-secret-value"})
+		}, paths: []string{"spec.containers[0].env[1]"}},
+		{name: "removed list element", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].Args = nil
+		}, paths: []string{"spec.containers[0].args[0]"}},
+		{name: "added pointer", mutate: func(spec *v1.PodSpec) {
+			spec.SecurityContext = &v1.PodSecurityContext{RunAsNonRoot: new(true)}
+		}, paths: []string{"spec.securityContext"}},
+		{name: "removed pointer", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].ReadinessProbe = nil
+		}, paths: []string{"spec.containers[0].readinessProbe"}},
+		{name: "embedded fields", mutate: func(spec *v1.PodSpec) {
+			spec.Volumes[0].EmptyDir.Medium = v1.StorageMediumMemory
+		}, paths: []string{"spec.volumes[0].emptyDir.medium"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			want, got := base.DeepCopy(), base.DeepCopy()
+			tc.mutate(got)
+			wantBefore, gotBefore := want.DeepCopy(), got.DeepCopy()
+			paths := PodSpecChangedFields(want, got)
+			require.Equal(t, tc.paths, paths)
+			require.Equal(t, wantBefore, want)
+			require.Equal(t, gotBefore, got)
+			for _, value := range []string{"original-secret", "changed-secret", "private-region", "private-zone"} {
+				require.NotContains(t, strings.Join(paths, ", "), value)
+			}
+		})
+	}
+	t.Run("nil specs", func(t *testing.T) {
+		require.Empty(t, PodSpecChangedFields(nil, nil))
+		require.Equal(t, []string{"spec"}, PodSpecChangedFields(nil, base))
+		require.Equal(t, []string{"spec"}, PodSpecChangedFields(base, nil))
+	})
+}
 
 func sourcePod() *v1.Pod {
 	return &v1.Pod{
