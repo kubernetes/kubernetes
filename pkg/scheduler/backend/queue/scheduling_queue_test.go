@@ -7338,3 +7338,132 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 		})
 	}
 }
+
+func TestPriorityQueue_PreQueueingHint(t *testing.T) {
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		pods           []*v1.Pod
+		hintPods       []types.NamespacedName
+		allPods        bool
+		allPodsHint    bool // second plugin returns AllPods
+		wantMoved      []string
+	}{
+		{
+			name:           "gate enabled, hint narrows to one pod",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+				st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj(),
+			},
+			hintPods:  []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}},
+			wantMoved: []string{"pod1_ns1"},
+		},
+		{
+			name:           "gate enabled, hint AllPods evaluates all",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+			},
+			allPods:   true,
+			wantMoved: []string{"pod1_ns1", "pod2_ns1"},
+		},
+		{
+			name:           "gate enabled, one plugin AllPods means its hint evaluates all pods for that plugin",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+				st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj(),
+			},
+			hintPods:    []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}},
+			allPodsHint: true,
+			wantMoved:   []string{"pod1_ns1", "pod2_ns1", "pod3_ns1"},
+		},
+		{
+			name:           "gate disabled, hint ignored, all pods evaluated",
+			featureEnabled: false,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+				st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj(),
+			},
+			hintPods:  []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}},
+			wantMoved: []string{"pod1_ns1", "pod2_ns1", "pod3_ns1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPreQueueingHints, tt.featureEnabled)
+			logger, ctx := ktesting.NewTestContext(t)
+
+			var preQueueingHintFn fwk.PreQueueingHintFn
+			if !tt.allPods {
+				pods := tt.hintPods
+				preQueueingHintFn = func(logger klog.Logger, oldObj, newObj interface{}) fwk.PreQueueingHintResult {
+					return fwk.PreQueueingHintResult{Pods: pods}
+				}
+			}
+
+			m := makeEmptyQueueingHintMapPerProfile()
+			hints := []*QueueingHintFunction{
+				{
+					PluginName:        "foo",
+					QueueingHintFn:    queueHintReturnQueue,
+					PreQueueingHintFn: preQueueingHintFn,
+				},
+			}
+			if tt.allPodsHint {
+				hints = append(hints, &QueueingHintFunction{
+					PluginName:     "bar",
+					QueueingHintFn: queueHintReturnQueue,
+					PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) fwk.PreQueueingHintResult {
+						return fwk.PreQueueingHintResult{AllPods: true}
+					},
+				})
+			}
+			m[""][nodeAdd] = hints
+
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
+
+			for _, pod := range tt.pods {
+				q.Add(ctx, pod)
+				entity, err := q.Pop(logger)
+				if err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+				pInfo := entity.(*framework.QueuedPodInfo)
+				pInfo.UnschedulablePlugins = sets.New[string]("foo", "bar")
+				if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+					t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
+				}
+			}
+
+			q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
+
+			moved := sets.New[string]()
+			unschedPods := q.UnschedulablePods()
+			for _, pod := range tt.pods {
+				key := pod.Name + "_" + pod.Namespace
+				found := false
+				for _, up := range unschedPods {
+					if up.Name == pod.Name && up.Namespace == pod.Namespace {
+						found = true
+						break
+					}
+				}
+				if !found {
+					moved.Insert(key)
+				}
+			}
+
+			wantMoved := sets.New(tt.wantMoved...)
+			if !moved.Equal(wantMoved) {
+				t.Errorf("moved pods = %v, want %v", moved, wantMoved)
+			}
+		})
+	}
+}
