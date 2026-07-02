@@ -6262,9 +6262,30 @@ func validatePodConditions(conditions []core.PodCondition, fldPath *field.Path) 
 		core.PodScheduled,
 		core.PodReady,
 		core.PodInitialized)
+	seenCheckpointConditions := sets.New[core.PodConditionType]()
 	for i, condition := range conditions {
 		if condition.ObservedGeneration < 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("observedGeneration"), condition.ObservedGeneration, "must be a non-negative integer"))
+		}
+		if condition.Type == core.PodCheckpointing {
+			path := fldPath.Index(i)
+			if seenCheckpointConditions.Has(condition.Type) {
+				allErrs = append(allErrs, field.Duplicate(path.Child("type"), condition.Type))
+			}
+			seenCheckpointConditions.Insert(condition.Type)
+			// Apply standard rules to new checkpoint conditions without tightening
+			// validation for existing Pod condition types.
+			errs := unversionedvalidation.ValidateCondition(metav1.Condition{
+				Type: string(condition.Type), Status: metav1.ConditionStatus(condition.Status),
+				LastTransitionTime: condition.LastTransitionTime,
+				Reason:             condition.Reason, Message: condition.Message,
+			}, path)
+			for _, err := range errs {
+				// PodCondition does not use metav1.Condition's declarative tags.
+				err.CoveredByDeclarative = false
+			}
+			allErrs = append(allErrs, errs...)
+			continue
 		}
 		if systemConditions.Has(condition.Type) {
 			continue

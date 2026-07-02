@@ -15590,6 +15590,76 @@ func TestValidatePodTemplateUpdate(t *testing.T) {
 	}
 }
 
+func TestValidatePodCheckpointConditionStatusUpdate(t *testing.T) {
+	condition := core.PodCondition{
+		Type: core.PodCheckpointing, Status: core.ConditionTrue, Reason: "CheckpointingPod",
+		LastTransitionTime: metav1.NewTime(time.Unix(1, 0)), ObservedGeneration: 1,
+	}
+	other := core.PodCondition{Type: "example.com/Other"}
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("gate=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+			for _, tc := range []struct {
+				name       string
+				conditions []core.PodCondition
+				mutate     func(*core.PodCondition)
+				errType    field.ErrorType
+				errField   string
+			}{
+				{name: "valid", conditions: []core.PodCondition{condition}},
+				{name: "another condition before", conditions: []core.PodCondition{other, condition}},
+				{name: "another condition after", conditions: []core.PodCondition{condition, other}},
+				{name: "legacy duplicates remain allowed", conditions: []core.PodCondition{other, other, condition}},
+				{name: "duplicate", conditions: []core.PodCondition{condition, condition}, errType: field.ErrorTypeDuplicate, errField: "status.conditions[1].type"},
+				{name: "contradictory duplicate", conditions: []core.PodCondition{condition, condition}, mutate: func(c *core.PodCondition) { c.Status = core.ConditionFalse }, errType: field.ErrorTypeDuplicate, errField: "status.conditions[1].type"},
+				{name: "invalid status", conditions: []core.PodCondition{condition}, mutate: func(c *core.PodCondition) { c.Status = "Maybe" }, errType: field.ErrorTypeNotSupported, errField: "status.conditions[0].status"},
+				{name: "missing reason", conditions: []core.PodCondition{condition}, mutate: func(c *core.PodCondition) { c.Reason = "" }, errType: field.ErrorTypeRequired, errField: "status.conditions[0].reason"},
+				{name: "invalid reason", conditions: []core.PodCondition{condition}, mutate: func(c *core.PodCondition) { c.Reason = "not a reason" }, errType: field.ErrorTypeInvalid, errField: "status.conditions[0].reason"},
+				{name: "missing transition time", conditions: []core.PodCondition{condition}, mutate: func(c *core.PodCondition) { c.LastTransitionTime = metav1.Time{} }, errType: field.ErrorTypeRequired, errField: "status.conditions[0].lastTransitionTime"},
+				{name: "oversized message", conditions: []core.PodCondition{condition}, mutate: func(c *core.PodCondition) { c.Message = strings.Repeat("x", 32769) }, errType: field.ErrorTypeTooLong, errField: "status.conditions[0].message"},
+				{name: "negative generation", conditions: []core.PodCondition{condition}, mutate: func(c *core.PodCondition) { c.ObservedGeneration = -1 }, errType: field.ErrorTypeInvalid, errField: "status.conditions[0].observedGeneration"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					oldPod := podtest.MakePod("pod", podtest.SetResourceVersion("1"))
+					newPod := oldPod.DeepCopy()
+					newPod.Status.Conditions = append([]core.PodCondition(nil), tc.conditions...)
+					if tc.mutate != nil {
+						tc.mutate(&newPod.Status.Conditions[len(newPod.Status.Conditions)-1])
+					}
+					errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
+					if tc.errField == "" {
+						require.Empty(t, errs)
+						return
+					}
+					require.Len(t, errs, 1)
+					assert.Equal(t, tc.errType, errs[0].Type)
+					assert.Equal(t, tc.errField, errs[0].Field)
+					assert.False(t, errs[0].CoveredByDeclarative)
+				})
+			}
+		})
+	}
+}
+
+func TestValidatePodCheckpointingConditionTransitions(t *testing.T) {
+	for _, state := range []core.ConditionStatus{core.ConditionTrue, core.ConditionFalse, core.ConditionUnknown} {
+		for _, remove := range []bool{false, true} {
+			t.Run(fmt.Sprintf("status=%s/remove=%t", state, remove), func(t *testing.T) {
+				oldPod := podtest.MakePod("pod", podtest.SetResourceVersion("1"))
+				oldPod.Status.Conditions = []core.PodCondition{{Type: core.PodCheckpointing, Status: core.ConditionTrue, Reason: "CheckpointingPod", LastTransitionTime: metav1.NewTime(time.Unix(1, 0)), ObservedGeneration: 1}}
+				newPod := oldPod.DeepCopy()
+				if remove {
+					newPod.Status.Conditions = nil
+				} else {
+					newPod.Status.Conditions[0].Status = state
+					newPod.Status.Conditions[0].ObservedGeneration++
+				}
+				require.Empty(t, ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{}))
+			})
+		}
+	}
+}
+
 func TestValidatePodStatusUpdate(t *testing.T) {
 	linuxContainerUserMaxUID := int64(math.MaxUint32)
 	linuxContainerUserInvalidUID := linuxContainerUserMaxUID + 1

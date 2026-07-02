@@ -6313,6 +6313,77 @@ func TestPrintRuntimeClass(t *testing.T) {
 	}
 }
 
+func TestPrintPodCheckpoint(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		nodeName   *string
+		condition  *metav1.Condition
+		wantNode   string
+		wantStatus string
+	}{
+		{name: "pending", wantNode: "<none>", wantStatus: "Pending"},
+		{name: "assigned", nodeName: new("node-a"), wantNode: "node-a", wantStatus: "Pending"},
+		{name: "in progress", nodeName: new("node-a"), condition: &metav1.Condition{Type: nodeapi.PodCheckpointConditionReady, Status: metav1.ConditionFalse, Reason: nodeapi.PodCheckpointReasonInProgress}, wantNode: "node-a", wantStatus: "CheckpointInProgress"},
+		{name: "completed", nodeName: new("node-a"), condition: &metav1.Condition{Type: nodeapi.PodCheckpointConditionReady, Status: metav1.ConditionTrue, Reason: nodeapi.PodCheckpointReasonCompleted}, wantNode: "node-a", wantStatus: "CheckpointCompleted"},
+		{name: "failed", nodeName: new("node-a"), condition: &metav1.Condition{Type: nodeapi.PodCheckpointConditionReady, Status: metav1.ConditionFalse, Reason: nodeapi.PodCheckpointReasonFailed}, wantNode: "node-a", wantStatus: "CheckpointFailed"},
+		{name: "failed before assignment", condition: &metav1.Condition{Type: nodeapi.PodCheckpointConditionReady, Status: metav1.ConditionFalse, Reason: nodeapi.PodCheckpointReasonSourcePodReplaced}, wantNode: "<none>", wantStatus: "SourcePodReplaced"},
+		{name: "status is not printed", nodeName: new("node-a"), condition: &metav1.Condition{Type: nodeapi.PodCheckpointConditionReady, Status: metav1.ConditionUnknown, Reason: "Restarting"}, wantNode: "node-a", wantStatus: "Restarting"},
+		{name: "unrelated condition", condition: &metav1.Condition{Type: "Other", Status: metav1.ConditionTrue, Reason: "OtherReason"}, wantNode: "<none>", wantStatus: "Pending"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			checkpoint := &nodeapi.PodCheckpoint{
+				ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", CreationTimestamp: metav1.NewTime(time.Now().Add(-5 * time.Minute))},
+				Spec:       nodeapi.PodCheckpointSpec{SourcePod: nodeapi.PodReference{Name: "source"}},
+				Status:     nodeapi.PodCheckpointStatus{NodeName: tc.nodeName},
+			}
+			if tc.condition != nil {
+				checkpoint.Status.Conditions = []metav1.Condition{*tc.condition}
+			}
+			table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(checkpoint, printers.GenerateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := []interface{}{"checkpoint", "source", tc.wantNode, tc.wantStatus, "5m"}
+			if len(table.Rows) != 1 || !reflect.DeepEqual(table.Rows[0].Cells, want) {
+				t.Fatalf("unexpected table rows: %#v, want cells %#v", table.Rows, want)
+			}
+			if table.Rows[0].Object.Object != checkpoint {
+				t.Error("table row does not contain the checkpoint object")
+			}
+		})
+	}
+}
+
+func TestPrintPodCheckpointList(t *testing.T) {
+	list := &nodeapi.PodCheckpointList{Items: []nodeapi.PodCheckpoint{
+		{ObjectMeta: metav1.ObjectMeta{Name: "first"}, Spec: nodeapi.PodCheckpointSpec{SourcePod: nodeapi.PodReference{Name: "source"}}},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "second"},
+			Spec:       nodeapi.PodCheckpointSpec{SourcePod: nodeapi.PodReference{Name: "other-source"}},
+			Status: nodeapi.PodCheckpointStatus{
+				NodeName:   new("node-a"),
+				Conditions: []metav1.Condition{{Type: nodeapi.PodCheckpointConditionReady, Status: metav1.ConditionTrue, Reason: nodeapi.PodCheckpointReasonCompleted}},
+			},
+		},
+	}}
+	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(list, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][]interface{}{
+		{"first", "source", "<none>", "Pending", "<unknown>"},
+		{"second", "other-source", "node-a", "CheckpointCompleted", "<unknown>"},
+	}
+	if len(table.Rows) != len(want) {
+		t.Fatalf("got %d rows, want %d", len(table.Rows), len(want))
+	}
+	for i := range want {
+		if !reflect.DeepEqual(table.Rows[i].Cells, want[i]) {
+			t.Errorf("row %d: got %#v, want %#v", i, table.Rows[i].Cells, want[i])
+		}
+	}
+}
+
 func TestPrintEndpoint(t *testing.T) {
 
 	tests := []struct {
