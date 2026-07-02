@@ -98,6 +98,8 @@ type Args struct {
 	// kind/path/errorType/origin) plus a required reason.
 	TestAllowlist string
 
+	EmitRegisterFuncs bool
+
 	apidefinitions.LintArgs
 }
 
@@ -117,6 +119,8 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"prefix prepended to every emitted test fixture filename; useful for marking files via a linguist-generated gitattributes pattern (e.g. \"zz_generated.\")")
 	fs.StringVar(&args.TestAllowlist, "test-allowlist", "",
 		"path to a YAML config file of rule-level filters to exclude from coverage fixture generation; only meaningful with --test-output-root")
+	fs.BoolVar(&args.EmitRegisterFuncs, "emit-register-funcs", true,
+		"if true, emit the registration function")
 	apidefinitions.AddFlags(&args.LintArgs, fs)
 }
 
