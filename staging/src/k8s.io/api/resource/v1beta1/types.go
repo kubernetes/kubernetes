@@ -195,7 +195,29 @@ type ResourceSliceSpec struct {
 	// +zeroOrOneOf=ResourceSliceType
 	// +k8s:alpha(since: "1.36")=+k8s:maxItems=8
 	SharedCounters []CounterSet `json:"sharedCounters,omitempty" protobuf:"bytes,8,name=sharedCounters"`
+
+	// SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls)
+	// should be skipped for the devices in this slice. When nil, neither operation is skipped.
+	//
+	// +optional
+	// +featureGate=DRAOptionalNodeOperations
+	// +k8s:optional
+	SkipNodeOperations *SkipNodeOperations `json:"skipNodeOperations,omitempty" protobuf:"bytes,9,opt,name=skipNodeOperations,casttype=SkipNodeOperations"`
 }
+
+// +enum
+// +k8s:enum
+type SkipNodeOperations string
+
+const (
+	// SkipNodeOperationsAll indicates that node-local resource operations (NodePrepareResources
+	// and NodeUnprepareResources gRPC calls) are not required.
+	SkipNodeOperationsAll SkipNodeOperations = "All"
+
+	// SkipNodeOperationsUnprepare indicates that only NodeUnprepareResources
+	// gRPC calls are not required. NodePrepareResources gRPC calls are required.
+	SkipNodeOperationsUnprepare SkipNodeOperations = "UnprepareOnly"
+)
 
 // CounterSet defines a named set of counters
 // that are available to be used by devices defined in the
@@ -1874,6 +1896,14 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	ConsumedCapacity map[QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty" protobuf:"bytes,10,rep,name=consumedCapacity"`
+
+	// SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls)
+	// should be skipped for this allocated device. When nil, neither operation is skipped.
+	//
+	// +optional
+	// +featureGate=DRAOptionalNodeOperations
+	// +k8s:optional
+	SkipNodeOperations *SkipNodeOperations `json:"skipNodeOperations,omitempty" protobuf:"bytes,11,opt,name=skipNodeOperations,casttype=SkipNodeOperations"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.

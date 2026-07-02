@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -381,14 +382,15 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				}
 			}
 			allocationResult.Devices.Results[i] = resourceapi.DeviceRequestAllocationResult{
-				Request:          internal.requestName(),
-				Driver:           internal.id.Driver.String(),
-				Pool:             internal.id.Pool.String(),
-				Device:           internal.id.Device.String(),
-				AdminAccess:      internal.adminAccess,
-				Tolerations:      internal.lookupRequest(claim).tolerations(),
-				ShareID:          internal.shareID,
-				ConsumedCapacity: consumedCapacity,
+				Request:            internal.requestName(),
+				Driver:             internal.id.Driver.String(),
+				Pool:               internal.id.Pool.String(),
+				Device:             internal.id.Device.String(),
+				AdminAccess:        internal.adminAccess,
+				Tolerations:        internal.lookupRequest(claim).tolerations(),
+				ShareID:            internal.shareID,
+				ConsumedCapacity:   consumedCapacity,
+				SkipNodeOperations: internal.slice.Spec.SkipNodeOperations,
 			}
 			// Performance optimization: skip the for loop if the feature is off.
 			// Not needed for correctness because if the feature is off, the selected
@@ -1479,6 +1481,12 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	}
 	if !request.adminAccess() && alloc.deviceInUse(device.id) {
 		alloc.logger.V(7).Info("Device in use", "device", device.id)
+		return false, nil, nil
+	}
+
+	if device.slice.Spec.SkipNodeOperations != nil &&
+		!slices.Contains(alloc.node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate) {
+		alloc.logger.V(7).Info("Device requires DRAOptionalNodeOperations but node lacks it", "device", device.id)
 		return false, nil, nil
 	}
 

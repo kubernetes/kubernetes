@@ -2010,6 +2010,37 @@ func Validate_DeviceRequestAllocationResult(
 	}
 
 	// field resourcev1beta1.DeviceRequestAllocationResult.ConsumedCapacity has no validation
+
+	{ // field resourcev1beta1.DeviceRequestAllocationResult.SkipNodeOperations
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1beta1.SkipNodeOperations,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SkipNodeOperations(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) *resourcev1beta1.SkipNodeOperations {
+				return oldObj.SkipNodeOperations
+			})
+		errs = append(errs, fn(fldPath.Child("skipNodeOperations"), obj.SkipNodeOperations, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -2891,6 +2922,51 @@ func Validate_ResourceSliceSpec(
 				return oldObj.SharedCounters
 			})
 		errs = append(errs, fn(fldPath.Child("sharedCounters"), obj.SharedCounters, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1beta1.ResourceSliceSpec.SkipNodeOperations
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1beta1.SkipNodeOperations,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SkipNodeOperations(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta1.ResourceSliceSpec) *resourcev1beta1.SkipNodeOperations {
+				return oldObj.SkipNodeOperations
+			})
+		errs = append(errs, fn(fldPath.Child("skipNodeOperations"), obj.SkipNodeOperations, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var symbolsForSkipNodeOperations = sets.New(resourcev1beta1.SkipNodeOperationsAll, resourcev1beta1.SkipNodeOperationsUnprepare)
+
+// Validate_SkipNodeOperations validates an instance of SkipNodeOperations according
+// to declarative validation rules in the API schema.
+func Validate_SkipNodeOperations(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1beta1.SkipNodeOperations) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForSkipNodeOperations, nil); len(e) != 0 {
+		errs = append(errs, e...)
 	}
 
 	return errs

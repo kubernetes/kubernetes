@@ -25,6 +25,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
@@ -3282,6 +3285,334 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, tt.pod.Namespace, tt.pod.Name))
 				if err != nil {
 					t.Errorf("Expected pod to be unschedulable, but it was not: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestDRAOptionalNodeOperationsSchedulingFilter(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAWorkloadResourceClaims, true)
+
+	tests := []struct {
+		name        string
+		claimName   string
+		isAllocated bool
+		usePodGroup bool
+		pgName      string
+		podName     string
+	}{
+		{
+			name:        "pod with unallocated claim",
+			claimName:   "claim-pod-unallocated",
+			isAllocated: false,
+			usePodGroup: false,
+			podName:     "pod-unallocated",
+		},
+		{
+			name:        "pod with allocated claim",
+			claimName:   "claim-pod-allocated",
+			isAllocated: true,
+			usePodGroup: false,
+			podName:     "pod-allocated",
+		},
+		{
+			name:        "podgroup with unallocated claim",
+			claimName:   "claim-pg-unallocated",
+			isAllocated: false,
+			usePodGroup: true,
+			pgName:      "pg-unallocated",
+			podName:     "pod-pg-unallocated",
+		},
+		{
+			name:        "podgroup with allocated claim",
+			claimName:   "claim-pg-allocated",
+			isAllocated: true,
+			usePodGroup: true,
+			pgName:      "pg-allocated",
+			podName:     "pod-pg-allocated",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := testutils.InitTestSchedulerWithNS(t, "dra-optional-node-ops")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			nodeWithFeature := st.MakeNode().Name("node-with-dra-opt").Obj()
+			nodeWithFeature.Status.DeclaredFeatures = []string{draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate}
+			if _, err := testutils.CreateNode(cs, nodeWithFeature); err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
+			nodeWithoutFeature := st.MakeNode().Name("node-without-dra-opt").Obj()
+			nodeWithoutFeature.Status.DeclaredFeatures = []string{}
+			if _, err := testutils.CreateNode(cs, nodeWithoutFeature); err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 2); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
+			}
+
+			class := &resourceapi.DeviceClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "class"},
+			}
+			if _, err := cs.ResourceV1().DeviceClasses().Create(testCtx.Ctx, class, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create device class: %v", err)
+			}
+
+			// Single ResourceSlice shared across all nodes to verify that allocation correctly filters out
+			// nodes lacking DRAOptionalNodeOperations even when both nodes have access to the same pool/devices.
+			sharedSlice := &resourceapi.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "shared-slice"},
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver: "driver.com",
+					Pool: resourceapi.ResourcePool{
+						Name:               "shared-pool",
+						ResourceSliceCount: 1,
+					},
+					AllNodes:           new(true),
+					SkipNodeOperations: new(resourceapi.SkipNodeOperationsAll),
+					Devices: []resourceapi.Device{
+						{Name: "d"},
+					},
+				},
+			}
+			if _, err := cs.ResourceV1().ResourceSlices().Create(testCtx.Ctx, sharedSlice, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create resource slice: %v", err)
+			}
+
+			claim := &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: tt.claimName, Namespace: ns},
+				Spec:       resourceapi.ResourceClaimSpec{Devices: resourceapi.DeviceClaim{Requests: []resourceapi.DeviceRequest{{Name: "req", Exactly: &resourceapi.ExactDeviceRequest{DeviceClassName: "class"}}}}},
+			}
+			createdClaim, err := cs.ResourceV1().ResourceClaims(ns).Create(testCtx.Ctx, claim, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create claim: %v", err)
+			}
+
+			if tt.isAllocated {
+				createdClaim.Status = resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{
+						AllocationTimestamp: &metav1.Time{Time: time.Now()},
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{Request: "req", Driver: "driver.com", Pool: "shared-pool", Device: "d", SkipNodeOperations: new(resourceapi.SkipNodeOperationsAll)},
+							},
+						},
+					},
+				}
+				_, err = cs.ResourceV1().ResourceClaims(ns).UpdateStatus(testCtx.Ctx, createdClaim, metav1.UpdateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to update claim status: %v", err)
+				}
+			}
+
+			if tt.usePodGroup {
+				pg := st.MakePodGroup().Name(tt.pgName).Namespace(ns).BasicPolicy().
+					ResourceClaims(schedulingapi.PodGroupResourceClaim{Name: "claim-ref", ResourceClaimName: new(tt.claimName)}).
+					Obj()
+				if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create PodGroup: %v", err)
+				}
+			}
+
+			numPods := 1
+			if tt.usePodGroup {
+				numPods = 2
+			}
+
+			podNames := make([]string, 0, numPods)
+			for i := 1; i <= numPods; i++ {
+				podName := tt.podName
+				if tt.usePodGroup {
+					podName = fmt.Sprintf("%s-%d", tt.podName, i)
+				}
+				podNames = append(podNames, podName)
+
+				podBuilder := st.MakePod().Name(podName).Namespace(ns).
+					Containers([]v1.Container{{Name: "c", Image: imageutils.GetPauseImageName(), Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim-ref", Request: "req"}}}}}).
+					PodResourceClaims(v1.PodResourceClaim{Name: "claim-ref", ResourceClaimName: new(tt.claimName)})
+
+				if tt.usePodGroup {
+					podBuilder = podBuilder.PodGroupName(tt.pgName)
+				}
+
+				pod := podBuilder.Obj()
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create pod %s: %v", podName, err)
+				}
+			}
+
+			for _, podName := range podNames {
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodScheduledIn(cs, ns, podName, []string{"node-with-dra-opt"}))
+				if err != nil {
+					t.Errorf("Expected pod %s to be scheduled to node-with-dra-opt, got err: %v", podName, err)
+				}
+			}
+		})
+	}
+}
+
+func TestDRAOptionalNodeOperationsSchedulingFilterRejection(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAWorkloadResourceClaims, true)
+
+	tests := []struct {
+		name        string
+		claimName   string
+		isAllocated bool
+		usePodGroup bool
+		pgName      string
+	}{
+		{
+			name:        "pod with pre-allocated claim forced to node without feature gate",
+			claimName:   "claim-pod-allocated",
+			isAllocated: true,
+			usePodGroup: false,
+		},
+		{
+			name:        "pod with unallocated claim forced to node without feature gate",
+			claimName:   "claim-pod-unallocated",
+			isAllocated: false,
+			usePodGroup: false,
+		},
+		{
+			name:        "podgroup with pre-allocated claim forced to node without feature gate",
+			claimName:   "claim-pg-allocated",
+			isAllocated: true,
+			usePodGroup: true,
+			pgName:      "pg-allocated",
+		},
+		{
+			name:        "podgroup with unallocated claim where second pod is forced to node without feature gate",
+			claimName:   "claim-pg-unallocated",
+			isAllocated: false,
+			usePodGroup: true,
+			pgName:      "pg-unallocated",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := testutils.InitTestSchedulerWithNS(t, "dra-opt-node-ops-rejection")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			nodeWithFeature := st.MakeNode().Name("node-with-dra-opt").Label("kubernetes.io/hostname", "node-with-dra-opt").Obj()
+			nodeWithFeature.Status.DeclaredFeatures = []string{draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate}
+			if _, err := testutils.CreateNode(cs, nodeWithFeature); err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
+			nodeWithoutFeature := st.MakeNode().Name("node-without-dra-opt").Label("kubernetes.io/hostname", "node-without-dra-opt").Obj()
+			nodeWithoutFeature.Status.DeclaredFeatures = []string{}
+			if _, err := testutils.CreateNode(cs, nodeWithoutFeature); err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 2); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
+			}
+
+			class := &resourceapi.DeviceClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "class"},
+			}
+			if _, err := cs.ResourceV1().DeviceClasses().Create(testCtx.Ctx, class, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create device class: %v", err)
+			}
+
+			sharedSlice := &resourceapi.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "shared-slice"},
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver: "driver.com",
+					Pool: resourceapi.ResourcePool{
+						Name:               "shared-pool",
+						ResourceSliceCount: 1,
+					},
+					AllNodes:           new(true),
+					SkipNodeOperations: new(resourceapi.SkipNodeOperationsAll),
+					Devices: []resourceapi.Device{
+						{Name: "d"},
+					},
+				},
+			}
+			if _, err := cs.ResourceV1().ResourceSlices().Create(testCtx.Ctx, sharedSlice, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create resource slice: %v", err)
+			}
+
+			claim := &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: tt.claimName, Namespace: ns},
+				Spec:       resourceapi.ResourceClaimSpec{Devices: resourceapi.DeviceClaim{Requests: []resourceapi.DeviceRequest{{Name: "req", Exactly: &resourceapi.ExactDeviceRequest{DeviceClassName: "class"}}}}},
+			}
+			createdClaim, err := cs.ResourceV1().ResourceClaims(ns).Create(testCtx.Ctx, claim, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create claim: %v", err)
+			}
+
+			if tt.isAllocated {
+				createdClaim.Status = resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{
+						AllocationTimestamp: &metav1.Time{Time: time.Now()},
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{
+								{Request: "req", Driver: "driver.com", Pool: "shared-pool", Device: "d", SkipNodeOperations: new(resourceapi.SkipNodeOperationsAll)},
+							},
+						},
+					},
+				}
+				_, err = cs.ResourceV1().ResourceClaims(ns).UpdateStatus(testCtx.Ctx, createdClaim, metav1.UpdateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to update claim status: %v", err)
+				}
+			}
+
+			if tt.usePodGroup {
+				pg := st.MakePodGroup().Name(tt.pgName).Namespace(ns).BasicPolicy().
+					ResourceClaims(schedulingapi.PodGroupResourceClaim{Name: "claim-ref", ResourceClaimName: new(tt.claimName)}).
+					Obj()
+				if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create PodGroup: %v", err)
+				}
+			}
+
+			if !tt.usePodGroup {
+				pod := st.MakePod().Name("pod-rejected").Namespace(ns).
+					NodeSelector(map[string]string{"kubernetes.io/hostname": "node-without-dra-opt"}).
+					Containers([]v1.Container{{Name: "c", Image: imageutils.GetPauseImageName(), Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim-ref", Request: "req"}}}}}).
+					PodResourceClaims(v1.PodResourceClaim{Name: "claim-ref", ResourceClaimName: new(tt.claimName)}).
+					Obj()
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create pod: %v", err)
+				}
+				if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, pod); err != nil {
+					t.Errorf("Expected pod to be unschedulable on node-without-dra-opt, got err: %v", err)
+				}
+			} else {
+				pod1 := st.MakePod().Name("pod-pg-1").Namespace(ns).
+					PodGroupName(tt.pgName).
+					Containers([]v1.Container{{Name: "c", Image: imageutils.GetPauseImageName(), Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim-ref", Request: "req"}}}}}).
+					PodResourceClaims(v1.PodResourceClaim{Name: "claim-ref", ResourceClaimName: new(tt.claimName)}).
+					Obj()
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod1, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create pod1: %v", err)
+				}
+				pod2 := st.MakePod().Name("pod-pg-2").Namespace(ns).
+					NodeSelector(map[string]string{"kubernetes.io/hostname": "node-without-dra-opt"}).
+					PodGroupName(tt.pgName).
+					Containers([]v1.Container{{Name: "c", Image: imageutils.GetPauseImageName(), Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim-ref", Request: "req"}}}}}).
+					PodResourceClaims(v1.PodResourceClaim{Name: "claim-ref", ResourceClaimName: new(tt.claimName)}).
+					Obj()
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod2, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create pod2: %v", err)
+				}
+				if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, pod2); err != nil {
+					t.Errorf("Expected pod2 to be unschedulable on node-without-dra-opt, got err: %v", err)
 				}
 			}
 		})

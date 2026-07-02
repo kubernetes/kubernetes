@@ -74,6 +74,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.skipNodeOperations": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 		},
 	)
 }

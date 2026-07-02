@@ -24,10 +24,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/resource/resourceslice"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
@@ -43,12 +46,14 @@ func TestDeclarativeValidate(t *testing.T) {
 				IsResourceRequest: true,
 				Verb:              "create",
 			})
-
 			strategy := registry.Strategy
 
+			skipNodeOperationsPath := field.NewPath("spec", "skipNodeOperations")
+
 			testCases := map[string]struct {
-				input        resource.ResourceSlice
-				expectedErrs field.ErrorList
+				input                           resource.ResourceSlice
+				expectedErrs                    field.ErrorList
+				enableDRAOptionalNodeOperations *bool
 			}{
 				"valid": {
 					input: mkResourceSliceWithDevices(),
@@ -266,11 +271,40 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "").MarkAlpha(),
 					},
 				},
+				// spec.skipNodeOperations
+				"valid: spec.skipNodeOperations All": {
+					input:                           mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationsAll)),
+					enableDRAOptionalNodeOperations: new(true),
+				},
+				"valid: spec.skipNodeOperations UnprepareOnly": {
+					input:                           mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationsUnprepare)),
+					enableDRAOptionalNodeOperations: new(true),
+				},
+				"invalid: spec.skipNodeOperations invalid option": {
+					input:                           mkResourceSliceWithDevices(tweakSkipNodeOperations("InvalidOption")),
+					enableDRAOptionalNodeOperations: new(true),
+					expectedErrs: field.ErrorList{
+						field.NotSupported(skipNodeOperationsPath, resource.SkipNodeOperations("InvalidOption"), []string{"All", "UnprepareOnly"}),
+					},
+				},
+				"invalid: spec.skipNodeOperations feature gate disabled": {
+					input:                           mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationsAll)),
+					enableDRAOptionalNodeOperations: new(false),
+					expectedErrs: field.ErrorList{
+						field.Forbidden(skipNodeOperationsPath, "feature gate DRAOptionalNodeOperations is disabled").MarkFromImperative(),
+					},
+				},
 				// TODO: Add more test cases
+
 			}
 
 			for k, tc := range testCases {
 				t.Run(k, func(t *testing.T) {
+					if tc.enableDRAOptionalNodeOperations != nil {
+						featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+							features.DRAOptionalNodeOperations: *tc.enableDRAOptionalNodeOperations,
+						})
+					}
 					apitesting.VerifyValidationEquivalence(
 						t, ctx, &tc.input, strategy, tc.expectedErrs,
 						apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...),
@@ -295,13 +329,15 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				IsResourceRequest: true,
 				Verb:              "update",
 			})
-
 			strategy := registry.Strategy
 
+			skipNodeOperationsPath := field.NewPath("spec", "skipNodeOperations")
+
 			testCases := map[string]struct {
-				old          resource.ResourceSlice
-				update       resource.ResourceSlice
-				expectedErrs field.ErrorList
+				old                             resource.ResourceSlice
+				update                          resource.ResourceSlice
+				expectedErrs                    field.ErrorList
+				enableDRAOptionalNodeOperations *bool
 			}{
 				"valid no changes": {
 					old:    mkResourceSliceWithDevices(),
@@ -509,10 +545,42 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name").MarkAlpha(),
 					},
 				},
+				// spec.skipNodeOperations
+				"valid update: spec.skipNodeOperations All": {
+					old:                             mkResourceSliceWithDevices(),
+					update:                          mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationsAll)),
+					enableDRAOptionalNodeOperations: new(true),
+				},
+				"valid update: spec.skipNodeOperations UnprepareOnly": {
+					old:                             mkResourceSliceWithDevices(),
+					update:                          mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationsUnprepare)),
+					enableDRAOptionalNodeOperations: new(true),
+				},
+				"invalid update: spec.skipNodeOperations invalid option": {
+					old:                             mkResourceSliceWithDevices(),
+					update:                          mkResourceSliceWithDevices(tweakSkipNodeOperations("InvalidOption")),
+					enableDRAOptionalNodeOperations: new(true),
+					expectedErrs: field.ErrorList{
+						field.NotSupported(skipNodeOperationsPath, resource.SkipNodeOperations("InvalidOption"), []string{"All", "UnprepareOnly"}),
+					},
+				},
+				"invalid update: spec.skipNodeOperations feature gate disabled": {
+					old:                             mkResourceSliceWithDevices(),
+					update:                          mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationsAll)),
+					enableDRAOptionalNodeOperations: new(false),
+					expectedErrs: field.ErrorList{
+						field.Forbidden(skipNodeOperationsPath, "feature gate DRAOptionalNodeOperations is disabled").MarkFromImperative(),
+					},
+				},
 			}
 			for k, tc := range testCases {
 
 				t.Run(k, func(t *testing.T) {
+					if tc.enableDRAOptionalNodeOperations != nil {
+						featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+							features.DRAOptionalNodeOperations: *tc.enableDRAOptionalNodeOperations,
+						})
+					}
 					tc.old.ResourceVersion = "1"
 					tc.update.ResourceVersion = "1"
 					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
@@ -709,5 +777,11 @@ func tweakDeviceCounter(counters map[string]resource.Counter) func(*resource.Res
 func counters(key string) map[string]resource.Counter {
 	return map[string]resource.Counter{
 		key: {},
+	}
+}
+
+func tweakSkipNodeOperations(skipNodeOperations resource.SkipNodeOperations) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.SkipNodeOperations = &skipNodeOperations
 	}
 }
