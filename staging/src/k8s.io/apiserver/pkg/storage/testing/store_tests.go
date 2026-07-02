@@ -2802,43 +2802,35 @@ func RunTestGetListRecursivePrefix(ctx context.Context, t *testing.T, store stor
 	}
 }
 
-const (
-	// if the following annotation is present, the object is marked to become corrupt
-	corruptErrKey = "testing.transformer.k8s.io/corrupt-error"
+// errorInjector decides, per object storage key, whether transformation should
+// fail and with which error. Returning nil delegates to default behavior.
+type errorInjector func(key string) error
 
-	// if the following annotation is present, the object is marked
-	// to fail with an unexpected non-corrupt error
-	unexpectedErrKey = "testing.transformer.k8s.io/unexpected-error"
-)
+// idOf extracts the numeric suffix from an object key like ".../foo-000002" -> 2.
+func idOf(key string) int {
+	name := key[strings.LastIndex(key, "/")+1:]
+	n, _ := strconv.Atoi(strings.TrimPrefix(name, "foo-"))
+	return n
+}
 
-// errInjectingTransformer wraps an existing transformer and injects errors
-// for objects whose raw data contains specific marker strings. This lets the
-// shared test code own both the markers (annotations on test objects) and the
-// transformer behavior (error injection), keeping the full test fixture in one place.
+// errInjectingTransformer wraps an existing transformer and lets an errorInjector
+// fail transformation for selected keys on read. Writes (TransformToStorage)
+// delegate to the embedded transformer.
 type errInjectingTransformer struct {
 	value.Transformer
-	// corruptErr is the error returned for objects marked with corruptErrKey.
-	// The caller provides this because the concrete error type (e.g. corruptObjectError)
-	// may be unexported in the storage backend package.
-	corruptErr error
+	inject errorInjector
 }
 
 func (t *errInjectingTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
-	out, stale, err = t.Transformer.TransformFromStorage(ctx, data, dataCtx)
-	switch {
-	case err != nil:
-		return out, stale, err
-	case strings.Contains(string(data), corruptErrKey):
-		return out, stale, t.corruptErr
-	case strings.Contains(string(data), unexpectedErrKey):
-		return out, stale, fmt.Errorf("bits flipped")
+	if injErr := t.inject(string(dataCtx.AuthenticatedData())); injErr != nil {
+		return nil, false, injErr
 	}
-	return out, stale, err
+	return t.Transformer.TransformFromStorage(ctx, data, dataCtx)
 }
 
-func newErrInjectingModifier(corruptErr error) TransformerModifier {
+func newErrInjectingModifier(inject errorInjector) TransformerModifier {
 	return func(orig value.Transformer) value.Transformer {
-		return &errInjectingTransformer{Transformer: orig, corruptErr: corruptErr}
+		return &errInjectingTransformer{Transformer: orig, inject: inject}
 	}
 }
 
@@ -2854,15 +2846,18 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 		return fmt.Sprintf("%s%s", prefix, objNameFn(id))
 	}
 
+	// errUnexpected is a non-corrupt transform error. The aggregator treats it as
+	// fatal and aborts the list, unlike corruptErr which is collected.
+	errUnexpected := errors.New("bits flipped")
+
 	tests := []struct {
 		name string
 		// number of Pod objects to be created when the test starts, the
 		// objects are named as "foo-{i}" where 1 <= i <= n
 		n int
-		// the function decides whether the object represented
-		// by the given id should be marked to become corrupt or
-		// fail to transform with an unexpected error
-		corrupter func(id int) string
+		// inject decides, per object key, whether transformation fails and with
+		// which error. Returning nil means the object transforms normally.
+		inject errorInjector
 		// verifies the result from GetList
 		// list: result of GetList operation is saved into list
 		// err: error returned from GetList
@@ -2875,14 +2870,14 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			// - unexpected: {2}, this object is marked to yield an unexpected error (not corruptObjErr)
 			// - corrupt: {4, 6}, these objects are marked to become corrupt
 			n: 7,
-			corrupter: func(i int) string {
-				switch {
-				case i == 2:
-					return unexpectedErrKey
-				case i%2 == 0:
-					return corruptErrKey
+			inject: func(key string) error {
+				switch id := idOf(key); {
+				case id == 2:
+					return errUnexpected
+				case id%2 == 0:
+					return corruptErr
 				default:
-					return ""
+					return nil
 				}
 			},
 			// the following sequence of events are expected to occur in order while retrieving the n objects:
@@ -2917,11 +2912,11 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			// - good: {1, 3, 5, 7}, these objects will never become corrupt
 			// - corrupt: {2, 4, 6}, these objects are marked to become corrupt
 			n: 7,
-			corrupter: func(i int) string {
-				if i%2 == 0 {
-					return corruptErrKey
+			inject: func(key string) error {
+				if idOf(key)%2 == 0 {
+					return corruptErr
 				}
-				return ""
+				return nil
 			},
 			// while retrieving the n objects, we expect the following from GetList:
 			//  a) GetList encounters corruptObjErr while retrieving objects in the corrupt set
@@ -2965,14 +2960,14 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			// - unexpected: {4}, this object is marked to yield an unexpected error (not corruptObjErr)
 			// - corrupt: {2, 6}, these objects are marked to become corrupt
 			n: 7,
-			corrupter: func(i int) string {
-				switch {
-				case i == 4:
-					return unexpectedErrKey
-				case i%2 == 0:
-					return corruptErrKey
+			inject: func(key string) error {
+				switch id := idOf(key); {
+				case id == 4:
+					return errUnexpected
+				case id%2 == 0:
+					return corruptErr
 				default:
-					return ""
+					return nil
 				}
 			},
 			// the following sequence of events are expected to occur in order while retrieving the n objects:
@@ -3026,11 +3021,11 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			// - good: {1, 3, 5 ... 195, 197, 199, ... 207, 209}, these 105 objects will never become corrupt
 			// - corrupt: {2, 4, 6 ... 196, 198, 200, ... 208, 210}, these 105 objects are marked to become corrupt
 			n: 210,
-			corrupter: func(i int) string {
-				if i%2 == 0 {
-					return corruptErrKey
+			inject: func(key string) error {
+				if idOf(key)%2 == 0 {
+					return corruptErr
 				}
-				return ""
+				return nil
 			},
 			// while listing the n objects, we expect the following:
 			//  a) GetList continues to aggregate the corruptObjErr errors
@@ -3069,8 +3064,8 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			// we initially create n=100 objects with ids {1, 2, 3 ... 100}, they are put in the following disjoint sets:
 			// - good: {}, all the objects are marked to become corrupt
 			// - corrupt: {1, 2, 3 ... 99, 100}, these objects are marked to become corrupt
-			n:         100,
-			corrupter: func(i int) string { return corruptErrKey },
+			n:      100,
+			inject: func(key string) error { return corruptErr },
 			//  while listing the n objects, we expect the following:
 			//  a) GetList continues to aggregate the corruptObjErr errors
 			//  until it reaches the maximum limit, and then it immediately aborts
@@ -3117,13 +3112,7 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 					Name:      objNameFn(j),
 					Namespace: ns,
 				}}
-				// add the annotation that will mark the object to become corrupt
-				if marker := test.corrupter(j); len(marker) > 0 {
-					obj.Annotations = map[string]string{
-						marker: "",
-					}
-				}
-				testPropagateStore(ctx, t, store, obj)
+				_, _ = testPropagateStore(ctx, t, store, obj)
 			}
 
 			// step 2: list the N objects, we expect no error
@@ -3141,7 +3130,7 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			}
 
 			// step 3: change the transformer so the marked objects appear corrupt
-			revertTransformer := store.UpdateTransformer(newErrInjectingModifier(corruptErr))
+			revertTransformer := store.UpdateTransformer(newErrInjectingModifier(test.inject))
 			defer revertTransformer()
 
 			// step 4: invoke GetList again, this time it should encounter the corrupt object(s)
@@ -3177,11 +3166,6 @@ func RunTestGetListWithoutErrorAggregation(ctx context.Context, t *testing.T, st
 			Name:      objNameFn(i),
 			Namespace: "ns",
 		}}
-		if i%2 == 0 {
-			obj.Annotations = map[string]string{
-				corruptErrKey: "",
-			}
-		}
 		testPropagateStore(ctx, t, store, obj)
 	}
 
@@ -3199,8 +3183,13 @@ func RunTestGetListWithoutErrorAggregation(ctx context.Context, t *testing.T, st
 		t.Fatalf("Expected length: %d, but got: %d", want, got)
 	}
 
-	// Step 3: corrupt the transformer so marked objects fail to decode
-	revertTransformer := store.UpdateTransformer(newErrInjectingModifier(corruptErr))
+	// Step 3: corrupt the transformer so even-numbered objects fail to decode
+	revertTransformer := store.UpdateTransformer(newErrInjectingModifier(func(key string) error {
+		if idOf(key)%2 == 0 {
+			return corruptErr
+		}
+		return nil
+	}))
 	defer revertTransformer()
 
 	// Step 4: list again, expect GetList to abort on the first corrupt object
