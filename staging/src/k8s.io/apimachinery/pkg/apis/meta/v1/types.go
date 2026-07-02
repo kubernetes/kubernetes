@@ -186,7 +186,6 @@ type ObjectMeta struct {
 	//
 	// Populated by the system.
 	// Read-only.
-	// Value must be treated as opaque by clients and .
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,6,opt,name=resourceVersion"`
