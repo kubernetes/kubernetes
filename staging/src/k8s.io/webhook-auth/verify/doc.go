@@ -45,4 +45,4 @@ limitations under the License.
 // controller-runtime decorator; callers wire [Verifier.Verify] into their own
 // admission entry point. See the package README / KEP-6060 §9 for the intended
 // integration points.
-package verify // import "k8s.io/client-go/webhook/authentication/verify"
+package verify // import "k8s.io/webhook-auth/verify"

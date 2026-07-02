@@ -45,8 +45,9 @@ const (
 // carries no third-party crypto dependency: it can be relocated freely, and
 // tests can exercise every contract check with a trivial in-memory fake.
 //
-// Implementations back this with a static key set (see the josekeyset
-// subpackage) or, in a follow-up, an OIDC-discovery / JWKS-fetching client.
+// Concrete implementations (for example an OIDC-discovery / JWKS-fetching key
+// set) are provided outside this package so that JOSE/JWT dependencies stay out
+// of the core verifier.
 type KeySet interface {
 	// VerifySignature verifies the JWS signature of rawToken and returns the
 	// decoded, signature-verified JWT payload bytes. It returns a non-nil error
@@ -124,9 +125,10 @@ type Verifier struct {
 //
 // expectedIssuer must be non-empty: an unvalidated issuer would let a token
 // minted by any trusted-key holder for a different issuer pass. When keySet is a
-// network-fetching key set (for example josekeyset.RemoteKeySet), expectedIssuer
-// MUST equal the issuer configured on that key set, so the keys used to verify
-// the signature and the issuer asserted in the token cannot disagree.
+// network-fetching key set (for example an OIDC-discovery / JWKS client),
+// expectedIssuer MUST equal the issuer configured on that key set, so the keys
+// used to verify the signature and the issuer asserted in the token cannot
+// disagree.
 //
 // It returns an error for obvious misconfiguration (nil key set, empty issuer,
 // or empty audience list) so callers fail fast at startup rather than silently

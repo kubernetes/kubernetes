@@ -14,13 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// The tests below exercise the admissionhttp adapter's BEHAVIOR — HTTP status
+// codes, whether the downstream handler is reached, deny reasons, body limits,
+// and fail-closed decoding — using a stdlib fake KeySet. Real end-to-end
+// SIGNATURE verification is not exercised here; it is covered against the
+// go-oidc-backed KeySet in a later step. A token here is simply the JSON claims
+// payload the fake KeySet returns verbatim as "already verified".
 package admissionhttp_test
 
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"io"
@@ -31,67 +35,30 @@ import (
 	"testing"
 	"time"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/webhook/authentication/verify"
-	"k8s.io/client-go/webhook/authentication/verify/admissionhttp"
-	"k8s.io/client-go/webhook/authentication/verify/josekeyset"
+	"k8s.io/webhook-auth/verify"
+	"k8s.io/webhook-auth/verify/admissionhttp"
 )
 
 const (
 	testAudience = "webhook.example.com"
 	testGroup    = "apps"
 	testIssuer   = "https://issuer.example.com"
-	testKeyID    = "admissionhttp-test-key"
 	reviewUID    = "req-uid-1"
 )
 
-// signingHarness mints RS256-signed KEP-6060 tokens and exposes the matching
-// JWKS so a StaticKeySet can verify them. It mirrors the harness used by the
-// josekeyset tests but is local so this end-to-end demo stays self-contained.
-type signingHarness struct {
-	signer jose.Signer
-	jwks   jose.JSONWebKeySet
-}
+// fakeKeySet is a stand-in verify.KeySet that performs no real crypto: it treats
+// the raw token string as the already-verified JSON claims payload. This mirrors
+// the fake used by the core verify package tests and keeps the adapter tests
+// dependency-minimal — signing is just JSON marshaling and the module needs only
+// k8s.io/api. Real signature verification is covered separately (see the
+// file-level comment above).
+type fakeKeySet struct{}
 
-func newSigningHarness(t *testing.T) *signingHarness {
-	t.Helper()
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-	signer, err := jose.NewSigner(
-		jose.SigningKey{Algorithm: jose.RS256, Key: jose.JSONWebKey{Key: priv, KeyID: testKeyID}},
-		(&jose.SignerOptions{}).WithType("JWT"),
-	)
-	if err != nil {
-		t.Fatalf("new signer: %v", err)
-	}
-	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{
-		{Key: priv.Public(), KeyID: testKeyID, Algorithm: string(jose.RS256), Use: "sig"},
-	}}
-	return &signingHarness{signer: signer, jwks: jwks}
-}
-
-// mint signs claims into a compact JWS.
-func (h *signingHarness) mint(t *testing.T, claims map[string]interface{}) string {
-	t.Helper()
-	payload, err := json.Marshal(claims)
-	if err != nil {
-		t.Fatalf("marshal claims: %v", err)
-	}
-	jws, err := h.signer.Sign(payload)
-	if err != nil {
-		t.Fatalf("sign: %v", err)
-	}
-	compact, err := jws.CompactSerialize()
-	if err != nil {
-		t.Fatalf("serialize: %v", err)
-	}
-	return compact
+func (fakeKeySet) VerifySignature(_ context.Context, rawToken string) ([]byte, error) {
+	return []byte(rawToken), nil
 }
 
 // baseClaims returns a valid validating-webhook-bound token claim set for
@@ -112,9 +79,22 @@ func baseClaims() map[string]interface{} {
 	}
 }
 
-func newVerifier(t *testing.T, h *signingHarness) *verify.Verifier {
+// mintToken serializes claims into the token string the fake KeySet returns
+// verbatim as the verified payload. It replaces real JWS signing: because the
+// fake KeySet passes the raw token through untouched, "signing" is just JSON
+// marshaling of the claim set.
+func mintToken(t *testing.T, claims map[string]interface{}) string {
 	t.Helper()
-	v, err := verify.NewVerifier(josekeyset.NewStaticKeySet(h.jwks), testIssuer, []string{testAudience})
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshal claims: %v", err)
+	}
+	return string(payload)
+}
+
+func newVerifier(t *testing.T) *verify.Verifier {
+	t.Helper()
+	v, err := verify.NewVerifier(fakeKeySet{}, testIssuer, []string{testAudience})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -210,17 +190,19 @@ func newRequest(t *testing.T, body []byte, token string) *http.Request {
 	return r
 }
 
-// TestWithTokenVerification_EndToEnd exercises the full offline flow: a real
-// signed token, a StaticKeySet-backed verifier, the enforce-only adapter, and a
-// spy downstream ReviewHandler. Each case asserts the HTTP status, whether the
-// downstream was reached, the observed reason string, and that no response leaks
-// claim identifiers. There is no permissive mode: every failure is a uniform
-// 401 and the downstream is never reached.
+// TestWithTokenVerification_EndToEnd exercises the adapter's full behavior: a
+// fake-KeySet-backed verifier, the enforce-only adapter, and a spy downstream
+// ReviewHandler. Each case asserts the HTTP status, whether the downstream was
+// reached, the observed reason string, and that no response leaks claim
+// identifiers. There is no permissive mode: every failure is a uniform 401 and
+// the downstream is never reached. Signature verification itself is faked here
+// (see the file-level comment); these cases cover the contract and adapter
+// checks layered on top of it.
 func TestWithTokenVerification_EndToEnd(t *testing.T) {
 	tests := []struct {
 		name string
-		// token builds the presented token from the harness; nil omits the header.
-		token func(t *testing.T, h *signingHarness) string
+		// token builds the presented token; nil omits the header.
+		token func(t *testing.T) string
 		// reviewGroup is the API group of the AdmissionReview resource.
 		reviewGroup string
 		// wantStatus is the expected HTTP status code.
@@ -232,7 +214,7 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 	}{
 		{
 			name:            "valid token, group matches -> next reached, 200 allow",
-			token:           func(t *testing.T, h *signingHarness) string { return h.mint(t, baseClaims()) },
+			token:           func(t *testing.T) string { return mintToken(t, baseClaims()) },
 			reviewGroup:     testGroup,
 			wantStatus:      http.StatusOK,
 			wantNextReached: true,
@@ -247,10 +229,10 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 		},
 		{
 			name: "expired token -> 401, next not reached",
-			token: func(t *testing.T, h *signingHarness) string {
+			token: func(t *testing.T) string {
 				c := baseClaims()
 				c["exp"] = time.Now().Add(-1 * time.Minute).Unix()
-				return h.mint(t, c)
+				return mintToken(t, c)
 			},
 			reviewGroup:     testGroup,
 			wantStatus:      http.StatusUnauthorized,
@@ -259,10 +241,10 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 		},
 		{
 			name: "wrong audience -> 401, next not reached",
-			token: func(t *testing.T, h *signingHarness) string {
+			token: func(t *testing.T) string {
 				c := baseClaims()
 				c["aud"] = []string{"someone.else.example.com"}
-				return h.mint(t, c)
+				return mintToken(t, c)
 			},
 			reviewGroup:     testGroup,
 			wantStatus:      http.StatusUnauthorized,
@@ -271,9 +253,9 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 		},
 		{
 			name: "allowedAPIGroup mismatch vs review group -> 401, next not reached",
-			token: func(t *testing.T, h *signingHarness) string {
+			token: func(t *testing.T) string {
 				// Token authorizes testGroup, but the review is for another group.
-				return h.mint(t, baseClaims())
+				return mintToken(t, baseClaims())
 			},
 			reviewGroup:     "batch",
 			wantStatus:      http.StatusUnauthorized,
@@ -282,13 +264,13 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 		},
 		{
 			name: "wildcard allowedAPIGroup -> allowed for any review group",
-			token: func(t *testing.T, h *signingHarness) string {
+			token: func(t *testing.T) string {
 				c := baseClaims()
 				k8s := c["kubernetes.io"].(map[string]interface{})
 				k8s["attestationClaims"] = map[string][]string{
 					verify.AllowedAPIGroupClaimKey: {verify.WildcardAPIGroup},
 				}
-				return h.mint(t, c)
+				return mintToken(t, c)
 			},
 			reviewGroup:     "any.group.example.com",
 			wantStatus:      http.StatusOK,
@@ -298,8 +280,7 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newSigningHarness(t)
-			v := newVerifier(t, h)
+			v := newVerifier(t)
 			spy := newSpyHandler()
 
 			var (
@@ -317,7 +298,7 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 
 			var token string
 			if tc.token != nil {
-				token = tc.token(t, h)
+				token = tc.token(t)
 			}
 			body := admissionReviewBody(t, tc.reviewGroup)
 			req := newRequest(t, body, token)
@@ -364,13 +345,12 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 // the downstream both receives the correct decoded review and finds the body
 // already fully consumed (nothing left for a second decode).
 func TestWithTokenVerification_DecodesOnce(t *testing.T) {
-	h := newSigningHarness(t)
-	v := newVerifier(t, h)
+	v := newVerifier(t)
 	spy := newSpyHandler()
 	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
 
 	body := admissionReviewBody(t, testGroup)
-	token := h.mint(t, baseClaims())
+	token := mintToken(t, baseClaims())
 	req := newRequest(t, body, token)
 	rec := httptest.NewRecorder()
 
@@ -398,14 +378,13 @@ func TestWithTokenVerification_DecodesOnce(t *testing.T) {
 // httptest.Server to demonstrate the end-to-end wire path, including the
 // Authorization header travelling over an actual HTTP round trip.
 func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
-	h := newSigningHarness(t)
-	v := newVerifier(t, h)
+	v := newVerifier(t)
 	spy := newSpyHandler()
 	srv := httptest.NewServer(admissionhttp.WithTokenVerification(v, spy.serve))
 	defer srv.Close()
 
 	body := admissionReviewBody(t, testGroup)
-	token := h.mint(t, baseClaims())
+	token := mintToken(t, baseClaims())
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, srv.URL, bytes.NewReader(body))
 	if err != nil {
@@ -456,11 +435,10 @@ func coreGroupClaims() map[string]interface{} {
 // downstream handler is never reached, even when the presented token is
 // otherwise valid and authorized for the core group.
 func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
-	h := newSigningHarness(t)
-	token := h.mint(t, coreGroupClaims())
+	token := mintToken(t, coreGroupClaims())
 	undecodable := []byte("{ this is not a valid AdmissionReview")
 
-	v := newVerifier(t, h)
+	v := newVerifier(t)
 	spy := newSpyHandler()
 	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
 
@@ -481,8 +459,7 @@ func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
 // with a generic 401 instead of decoding truncated bytes or reaching the
 // downstream handler.
 func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
-	h := newSigningHarness(t)
-	v := newVerifier(t, h)
+	v := newVerifier(t)
 	spy := newSpyHandler()
 	// A tiny limit guarantees the AdmissionReview body exceeds it.
 	adapter := admissionhttp.WithTokenVerification(v, spy.serve, admissionhttp.WithMaxBodyBytes(16))
@@ -491,7 +468,7 @@ func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 	if int64(len(body)) <= 16 {
 		t.Fatalf("test body must exceed the limit, got %d bytes", len(body))
 	}
-	token := h.mint(t, baseClaims())
+	token := mintToken(t, baseClaims())
 
 	rec := httptest.NewRecorder()
 	adapter.ServeHTTP(rec, newRequest(t, body, token))
@@ -511,18 +488,17 @@ func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 // generic failure with a useful log reason, and a review with no Request fails
 // closed.
 func TestVerifyAdmissionReview(t *testing.T) {
-	h := newSigningHarness(t)
-	v := newVerifier(t, h)
+	v := newVerifier(t)
 
 	t.Run("valid token and matching group -> nil", func(t *testing.T) {
-		token := h.mint(t, baseClaims())
+		token := mintToken(t, baseClaims())
 		if err := admissionhttp.VerifyAdmissionReview(context.Background(), v, admissionReview(testGroup), token); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
 
 	t.Run("group not authorized -> generic failure", func(t *testing.T) {
-		token := h.mint(t, baseClaims())
+		token := mintToken(t, baseClaims())
 		err := admissionhttp.VerifyAdmissionReview(context.Background(), v, admissionReview("batch"), token)
 		if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
 			t.Fatalf("want generic verification failure, got %v", err)
@@ -533,7 +509,7 @@ func TestVerifyAdmissionReview(t *testing.T) {
 	})
 
 	t.Run("nil request -> fails closed", func(t *testing.T) {
-		token := h.mint(t, baseClaims())
+		token := mintToken(t, baseClaims())
 		err := admissionhttp.VerifyAdmissionReview(context.Background(), v, &admissionv1.AdmissionReview{}, token)
 		if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
 			t.Fatalf("want generic verification failure for a review with no Request, got %v", err)

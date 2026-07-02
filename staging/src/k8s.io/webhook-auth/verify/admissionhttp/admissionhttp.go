@@ -31,12 +31,12 @@ limitations under the License.
 // controller-runtime) should use [VerifyAdmissionReview] directly so the body
 // is never decoded twice.
 //
-// The adapter imports only the core verify package (not its go-jose-backed
-// josekeyset subpackage), so JOSE/JWT dependencies stay confined to the caller
-// that constructs the KeySet. Decoding the AdmissionReview to extract the
-// resource API group pulls in k8s.io/api/admission/v1 and k8s.io/apimachinery,
-// both already available to the client-go module.
-package admissionhttp // import "k8s.io/client-go/webhook/authentication/verify/admissionhttp"
+// The adapter imports only the core verify package, so JOSE/JWT dependencies
+// stay confined to the caller that constructs the KeySet. Decoding the
+// AdmissionReview to extract the resource API group pulls in
+// k8s.io/api/admission/v1 and k8s.io/apimachinery, the module's only
+// Kubernetes dependencies.
+package admissionhttp // import "k8s.io/webhook-auth/verify/admissionhttp"
 
 import (
 	"context"
@@ -46,7 +46,7 @@ import (
 	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/client-go/webhook/authentication/verify"
+	"k8s.io/webhook-auth/verify"
 )
 
 // defaultMaxBodyBytes bounds how much of the request body the adapter reads
