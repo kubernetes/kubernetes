@@ -228,6 +228,19 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newPod.Status.QOSClass = oldPod.Status.QOSClass
 	}
 
+	// Preserve DRA-related status fields when an old or misbehaving client
+	// strips fields that it does not know about during a pods/status update.
+	// For the slice fields, a non-nil empty slice can still clear the field.
+	if newPod.Status.ResourceClaimStatuses == nil && oldPod.Status.ResourceClaimStatuses != nil {
+		newPod.Status.ResourceClaimStatuses = oldPod.Status.ResourceClaimStatuses
+	}
+	if newPod.Status.ExtendedResourceClaimStatus == nil && oldPod.Status.ExtendedResourceClaimStatus != nil {
+		newPod.Status.ExtendedResourceClaimStatus = oldPod.Status.ExtendedResourceClaimStatus
+	}
+	if newPod.Status.NodeAllocatableResourceClaimStatuses == nil && oldPod.Status.NodeAllocatableResourceClaimStatuses != nil {
+		newPod.Status.NodeAllocatableResourceClaimStatuses = oldPod.Status.NodeAllocatableResourceClaimStatuses
+	}
+
 	preserveOldObservedGeneration(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
