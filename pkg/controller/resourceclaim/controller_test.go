@@ -869,6 +869,76 @@ func TestSyncHandler(t *testing.T) {
 	}
 }
 
+// TestControllerCreateDeleteRecreate verifies that a ResourceClaim which is
+// deleted immediately after being created by the controller gets recreated on
+// the next sync. Without the OnDelete call in enqueueResourceClaim the
+// MutationCache keeps the stale "just-created" entry for up to its TTL
+// (one hour), causing findPodResourceClaim to return it and skipping the
+// recreate for that entire duration.
+func TestControllerCreateDeleteRecreate(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testControllerCreateDeleteRecreate)
+}
+func testControllerCreateDeleteRecreate(tCtx ktesting.TContext) {
+	setupMetrics()
+
+	fakeKubeClient := createTestClient(testPodWithResource, template)
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	podInformer := informerFactory.Core().V1().Pods()
+	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+	claimInformer := informerFactory.Resource().V1().ResourceClaims()
+	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
+
+	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer)
+	tCtx.ExpectNoError(err, "creating controller")
+	tCtx.Cleanup(ec.queue.ShutDown)
+
+	informerFactory.Start(tCtx.Done())
+	tCtx.Cleanup(func() {
+		tCtx.Cancel("stopping informers")
+		informerFactory.Shutdown()
+	})
+
+	// Let informer goroutines process the initial list so the cache is warm.
+	tCtx.Wait()
+
+	// First sync: finds no existing claim, creates one, stores it in the
+	// mutation cache via claimCache.Mutation.
+	tCtx.ExpectNoError(ec.syncHandler(tCtx, podKey(testPodWithResource)))
+
+	claims, err := fakeKubeClient.ResourceV1().ResourceClaims(testNamespace).List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err)
+	if len(claims.Items) != 1 {
+		tCtx.Fatalf("expected 1 claim after first sync, got %d", len(claims.Items))
+	}
+	createdClaimName := claims.Items[0].Name
+
+	// Simulate an unexpected deletion (e.g. the claim was removed by an
+	// admin or a race between controller and GC).
+	tCtx.ExpectNoError(fakeKubeClient.ResourceV1().ResourceClaims(testNamespace).Delete(tCtx, createdClaimName, metav1.DeleteOptions{}))
+
+	// Wait for the informer goroutines to process the watch event and call
+	// enqueueResourceClaim with deleted=true. That call must invoke
+	// claimCache.OnDelete to clear the stale mutation — the code path under test.
+	tCtx.Wait()
+
+	// The mutation cache must be clear now.
+	mutClaims, err := ec.claimCache.ByIndex(claimPodOwnerIndex, string(testPodWithResource.UID))
+	tCtx.ExpectNoError(err)
+	if len(mutClaims) != 0 {
+		tCtx.Fatalf("expected empty mutation cache after delete, got %d entries", len(mutClaims))
+	}
+
+	// Second sync: must create a new claim because the mutation cache no
+	// longer holds the stale entry for the deleted claim.
+	tCtx.ExpectNoError(ec.syncHandler(tCtx, podKey(testPodWithResource)))
+
+	claims, err = fakeKubeClient.ResourceV1().ResourceClaims(testNamespace).List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err)
+	if len(claims.Items) != 1 {
+		tCtx.Fatalf("expected 1 claim after second sync (recreate), got %d", len(claims.Items))
+	}
+}
+
 func TestResourceClaimTemplateEventHandler(t *testing.T) {
 	tCtx := ktesting.Init(t)
 

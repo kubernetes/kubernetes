@@ -1504,6 +1504,74 @@ func TestControllerSyncPool(t *testing.T) {
 	}
 }
 
+// TestControllerUpdateDeleteRecreate reproduces the bug where a ResourceSlice
+// that was updated by the controller (leaving a mutation in the MutationCache)
+// and then deleted on the apiserver was not being recreated.
+//
+// The root cause was that the MutationCache kept the stale updated object, so
+// the controller believed the slice still existed and skipped the create.
+// The fix calls OnDelete in the informer's delete event handler, which clears
+// the mutation before the work queue item is processed.
+func TestControllerUpdateDeleteRecreate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	const (
+		driverName = "driver"
+		poolName   = "pool"
+	)
+	generateName := encodeIndex(0, resourceSliceIndexMinLength) + "-" + driverName + "-"
+	sliceName := generateName + "0"
+
+	initialSlice := MakeResourceSlice().
+		Name(sliceName).
+		UID("original-uid").
+		GenerateName(generateName).
+		ResourceVersion("1").
+		Driver(driverName).
+		AllNodes(true).
+		Devices([]resourceapi.Device{newDevice("old-device")}).
+		Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+		Obj()
+
+	kubeClient := createTestClient(features{}, metav1.Time{}, initialSlice)
+	syncDelay := time.Duration(0)
+
+	ctrl, err := StartController(ctx, Options{
+		DriverName: driverName,
+		KubeClient: kubeClient,
+		Resources: &DriverResources{
+			Pools: map[string]Pool{
+				poolName: {
+					AllNodes:   true,
+					Generation: 1,
+					Slices:     []Slice{{Devices: []resourceapi.Device{newDevice("new-device")}}},
+				},
+			},
+		},
+		SyncDelay: &syncDelay,
+	})
+	require.NoError(t, err)
+	defer ctrl.Stop()
+
+	// Wait for the controller to update the initial slice to reflect the
+	// desired "new-device" state.
+	require.Eventually(t, func() bool {
+		return ctrl.GetStats().NumUpdates >= 1
+	}, 5*time.Second, 10*time.Millisecond, "controller should update the initial slice")
+
+	// Simulate what happens when the DRA driver restarts and kubelet deletes
+	// the slice before the driver can reclaim it.  The informer's delete
+	// handler calls OnDelete, which clears the stale mutation from the cache
+	// before the work-queue item is processed.  Without that call the
+	// MutationCache would serve the stale updated copy and syncPool would
+	// skip the necessary create.
+	require.NoError(t, kubeClient.ResourceV1().ResourceSlices().Delete(ctx, sliceName, metav1.DeleteOptions{}))
+
+	require.Eventually(t, func() bool {
+		return ctrl.GetStats().NumCreates >= 1
+	}, 5*time.Second, 10*time.Millisecond, "controller should recreate the deleted slice")
+}
+
 // TestControllerUpdateReconcilePoolWithNameValidation verifies that Update rejects
 // invalid pool sets when ReconcilePoolWithName is set
 func TestControllerUpdateReconcilePoolWithNameValidation(t *testing.T) {
