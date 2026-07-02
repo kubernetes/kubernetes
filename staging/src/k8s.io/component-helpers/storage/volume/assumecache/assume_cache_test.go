@@ -440,6 +440,35 @@ func TestAssumeWritten(t *testing.T) {
 	}
 }
 
+// TestGetAssumed verifies that GetAssumed reports whether the served object
+// came from an assumption or from the informer store.
+func TestGetAssumed(t *testing.T) {
+	informer, cache := newTestCache(t)
+
+	base := makeObj("pvc1", "5", "ns1")
+	informer.add(base)
+
+	// Informer object: assumed is false.
+	if obj, assumed, err := cache.GetAssumed(keyOf(base)); err != nil || assumed || obj != base {
+		t.Fatalf("GetAssumed(informer) = (%v, %v, %v), want (%v, false, nil)", obj, assumed, err, base)
+	}
+
+	// Written object not yet observed by the informer: assumed is true.
+	newer := makeObj("pvc1", "7", "ns1")
+	if err := cache.AssumeWritten(newer); err != nil {
+		t.Fatalf("AssumeWritten(newer) returned error: %v", err)
+	}
+	if obj, assumed, err := cache.GetAssumed(keyOf(newer)); err != nil || !assumed || obj != newer {
+		t.Fatalf("GetAssumed(assumed) = (%v, %v, %v), want (%v, true, nil)", obj, assumed, err, newer)
+	}
+
+	// Informer catches up: the assumption expires, assumed is false again.
+	informer.add(newer)
+	if obj, assumed, err := cache.GetAssumed(keyOf(newer)); err != nil || assumed || obj != newer {
+		t.Fatalf("GetAssumed(caught up) = (%v, %v, %v), want (%v, false, nil)", obj, assumed, err, newer)
+	}
+}
+
 // TestAssumeWrittenNotRevertedByIntermediateEvent verifies that when the
 // controller writes an object several times in a row (e.g. spec then status)
 // and assumes each server-returned version, a later informer event for an

@@ -170,6 +170,32 @@ func (c *AssumeCache[T]) delete(obj any) {
 	c.mayExpire(key)
 }
 
+// Indexer returns the underlying informer indexer that backs the cache. It is
+// the raw source of truth and does NOT apply the assumption overlay.
+// Only use for test.
+func (c *AssumeCache[T]) Indexer() cache.Indexer {
+	return c.store
+}
+
+// List returns all objects in the cache, with any active assumption applied in
+// place of the informer's version. The returned objects are shared; callers
+// must not mutate them.
+func (c *AssumeCache[T]) List() []T {
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
+
+	return c.replaceAssumed(c.store.List())
+}
+
+// ListIndexFuncValues returns the distinct values of the named index across the
+// informer's objects. Assumptions do not affect the index (see [AssumeCache.ByIndex]).
+func (c *AssumeCache[T]) ListIndexFuncValues(indexName string) []string {
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
+
+	return c.store.ListIndexFuncValues(indexName)
+}
+
 // ByIndex returns the stored objects whose set of indexed values for the named index includes the given indexed value
 //
 // The index is evaluated on the object from store. Objects from [Assume] will present in the result but will not affect the index.
@@ -186,20 +212,27 @@ func (c *AssumeCache[T]) ByIndex(indexName, indexedValue string) ([]T, error) {
 
 // Get the object by its key.
 func (c *AssumeCache[T]) Get(key string) (T, error) {
+	obj, _, err := c.GetAssumed(key)
+	return obj, err
+}
+
+// GetAssumed behaves like Get but also reports whether the returned object came
+// from an in-memory assumption rather than the informer store.
+func (c *AssumeCache[T]) GetAssumed(key string) (obj T, assumed bool, err error) {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
-	obj, err := c.GetAPIObj(key)
+	obj, err = c.GetAPIObj(key)
 	if err != nil {
-		return obj, err
+		return obj, false, err
 	}
 
-	assumed, ok := c.assumed[key]
-	if !ok || !assumed.preferOver(obj.GetResourceVersion()) {
-		// not assumed, or the informer object is preferred
-		return obj, nil
+	a, ok := c.assumed[key]
+	if ok && a.preferOver(obj.GetResourceVersion()) {
+		return a.object, true, nil
 	}
-	return assumed.object, nil
+	// not assumed, or the informer object is preferred
+	return obj, false, nil
 }
 
 // GetAPIObj gets the informer cache's version by its key.
