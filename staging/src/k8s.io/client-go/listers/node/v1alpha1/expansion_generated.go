@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+// PodCheckpointListerExpansion allows custom methods to be added to
+// PodCheckpointLister.
+type PodCheckpointListerExpansion interface{}
+
+// PodCheckpointNamespaceListerExpansion allows custom methods to be added to
+// PodCheckpointNamespaceLister.
+type PodCheckpointNamespaceListerExpansion interface{}
+
 // RuntimeClassListerExpansion allows custom methods to be added to
 // RuntimeClassLister.
 type RuntimeClassListerExpansion interface{}

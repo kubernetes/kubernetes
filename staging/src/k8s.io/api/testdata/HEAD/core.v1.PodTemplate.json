@@ -1887,7 +1887,10 @@
           "name": "nameValue",
           "priority": 2
         }
-      ]
+      ],
+      "restoreFrom": {
+        "name": "nameValue"
+      }
     }
   }
 }

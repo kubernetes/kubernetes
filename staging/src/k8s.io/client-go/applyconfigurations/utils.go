@@ -636,6 +636,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.CephFSPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CephFSVolumeSource"):
 		return &applyconfigurationscorev1.CephFSVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("CheckpointReference"):
+		return &applyconfigurationscorev1.CheckpointReferenceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderPersistentVolumeSource"):
 		return &applyconfigurationscorev1.CinderPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderVolumeSource"):
@@ -1530,8 +1532,22 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnodev1.SchedulingApplyConfiguration{}
 
 		// Group=node.k8s.io, Version=v1alpha1
+	case nodev1alpha1.SchemeGroupVersion.WithKind("CheckpointSource"):
+		return &applyconfigurationsnodev1alpha1.CheckpointSourceApplyConfiguration{}
+	case nodev1alpha1.SchemeGroupVersion.WithKind("NodeLocalCheckpointSource"):
+		return &applyconfigurationsnodev1alpha1.NodeLocalCheckpointSourceApplyConfiguration{}
 	case nodev1alpha1.SchemeGroupVersion.WithKind("Overhead"):
 		return &applyconfigurationsnodev1alpha1.OverheadApplyConfiguration{}
+	case nodev1alpha1.SchemeGroupVersion.WithKind("PodCheckpoint"):
+		return &applyconfigurationsnodev1alpha1.PodCheckpointApplyConfiguration{}
+	case nodev1alpha1.SchemeGroupVersion.WithKind("PodCheckpointContainerStatus"):
+		return &applyconfigurationsnodev1alpha1.PodCheckpointContainerStatusApplyConfiguration{}
+	case nodev1alpha1.SchemeGroupVersion.WithKind("PodCheckpointSpec"):
+		return &applyconfigurationsnodev1alpha1.PodCheckpointSpecApplyConfiguration{}
+	case nodev1alpha1.SchemeGroupVersion.WithKind("PodCheckpointStatus"):
+		return &applyconfigurationsnodev1alpha1.PodCheckpointStatusApplyConfiguration{}
+	case nodev1alpha1.SchemeGroupVersion.WithKind("PodReference"):
+		return &applyconfigurationsnodev1alpha1.PodReferenceApplyConfiguration{}
 	case nodev1alpha1.SchemeGroupVersion.WithKind("RuntimeClass"):
 		return &applyconfigurationsnodev1alpha1.RuntimeClassApplyConfiguration{}
 	case nodev1alpha1.SchemeGroupVersion.WithKind("RuntimeClassSpec"):
