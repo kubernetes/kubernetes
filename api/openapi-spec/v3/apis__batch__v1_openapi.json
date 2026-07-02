@@ -4300,6 +4300,14 @@
       "io.k8s.api.core.v1.VolumeMount": {
         "description": "VolumeMount describes a mounting of a Volume within a container.",
         "properties": {
+          "bindMountOptions": {
+            "description": "bindMountOptions is the list of additional bind mount options to apply when mounting this volume into the container. Allowed values are noexec, nodev, and nosuid.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "set"
+          },
           "mountPath": {
             "default": "",
             "description": "Path within the container at which the volume should be mounted.",

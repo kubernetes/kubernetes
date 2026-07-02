@@ -2421,6 +2421,13 @@ type VolumeMount struct {
 	// SubPathExpr and SubPath are mutually exclusive.
 	// +optional
 	SubPathExpr string `json:"subPathExpr,omitempty" protobuf:"bytes,6,opt,name=subPathExpr"`
+	// bindMountOptions is the list of additional bind mount options to apply when
+	// mounting this volume into the container. Allowed values are noexec,
+	// nodev, and nosuid.
+	// +featureGate=VolumeBindMountOptions
+	// +optional
+	// +listType=set
+	BindMountOptions []string `json:"bindMountOptions,omitempty" protobuf:"bytes,8,rep,name=bindMountOptions"`
 }
 
 // MountPropagationMode describes mount propagation.

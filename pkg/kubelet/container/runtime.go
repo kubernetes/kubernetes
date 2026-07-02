@@ -508,6 +508,9 @@ type Mount struct {
 	// ImageSubPath is set if an image volume sub path should get mounted. This
 	// field is only required if the above Image is set.
 	ImageSubPath string
+	// BindMountOptions are additional bind mount options (noexec, nodev, nosuid)
+	// to apply when mounting this volume into the container.
+	BindMountOptions []string
 }
 
 // ImageVolumes is a map of image specs by volume name.
@@ -667,6 +670,7 @@ func (c *RuntimeCondition) String() string {
 type RuntimeFeatures struct {
 	SupplementalGroupsPolicy  bool
 	UserNamespacesHostNetwork bool
+	MountOptions              bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -674,7 +678,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v MountOptions: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork, f.MountOptions)
 }
 
 // Pods represents the list of pods
