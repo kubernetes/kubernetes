@@ -5890,20 +5890,20 @@ func TestOnPodSandboxReadyInvocation(t *testing.T) {
 			onPodSandboxReadyShouldErr:      false,
 			deviceAllocationShouldErr:       true,
 			expectOnPodSandboxReady:         false,
-			expectSyncPodSuccess:            true, // SyncPod doesn't return error, just returns early if `PrepareDynamicResources` call ends up failing
+			expectSyncPodSuccess:            false,
 			expectDeviceAllocation:          true,
 			enablePodReadyToStartContainers: true,
-			description:                     "Verifies PrepareDynamicResources failure causes early return in case of pod with ResourceClaims with PodReadyToStartContainersCondition feature gate enabled",
+			description:                     "Verifies PrepareDynamicResources failure is reported in SyncResult in case of pod with ResourceClaims with PodReadyToStartContainersCondition feature gate enabled",
 		},
 		{
 			name:                            "PrepareDynamicResources (device allocation) failure prevents sandbox creation with feature disabled",
 			onPodSandboxReadyShouldErr:      false,
 			deviceAllocationShouldErr:       true,
 			expectOnPodSandboxReady:         false,
-			expectSyncPodSuccess:            true, // SyncPod doesn't return error, just returns early if `PrepareDynamicResources` call ends up failing
+			expectSyncPodSuccess:            false,
 			expectDeviceAllocation:          true,
 			enablePodReadyToStartContainers: false,
-			description:                     "Verifies PrepareDynamicResources failure causes early return in case of pod with ResourceClaims with PodReadyToStartContainersCondition feature gate disabled",
+			description:                     "Verifies PrepareDynamicResources failure is reported in SyncResult in case of pod with ResourceClaims with PodReadyToStartContainersCondition feature gate disabled",
 		},
 	}
 
