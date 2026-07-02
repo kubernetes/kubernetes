@@ -336,7 +336,7 @@ func ParseQuantity(str string) (Quantity, error) {
 						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
 					}
 				default:
-					if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
+					if len(denom) == 0 && scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
 						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
 					}
 				}
