@@ -127,6 +127,7 @@ func matchEventResources(r, resource fwk.EventResource) bool {
 		r == fwk.Pod && (resource == fwk.AssignedPod || resource == fwk.UnscheduledPod || resource == fwk.TargetPod)
 }
 
+// MatchAnyClusterEvent returns true if the given ClusterEvent matches any event in the provided list.
 func MatchAnyClusterEvent(ce fwk.ClusterEvent, incomingEvents []fwk.ClusterEvent) bool {
 	for _, e := range incomingEvents {
 		if MatchClusterEvents(e, ce) {
@@ -136,6 +137,7 @@ func MatchAnyClusterEvent(ce fwk.ClusterEvent, incomingEvents []fwk.ClusterEvent
 	return false
 }
 
+// UnrollWildCardResource expands the wildcard resource into a list of all supported ClusterEvents.
 func UnrollWildCardResource() []fwk.ClusterEventWithHint {
 	events := []fwk.ClusterEventWithHint{
 		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.All}},
