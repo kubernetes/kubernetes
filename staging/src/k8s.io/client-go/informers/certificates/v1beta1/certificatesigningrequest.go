@@ -34,11 +34,23 @@ import (
 )
 
 // CertificateSigningRequestInformer provides access to a shared informer and lister for
-// CertificateSigningRequests.
+// CertificateSigningRequests. Prefer using the type-safe variant (see [TypedCertificateSigningRequestInformer]).
 type CertificateSigningRequestInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() certificatesv1beta1.CertificateSigningRequestLister
 }
+
+// TypedCertificateSigningRequestInformer provides access to a shared informer and lister for
+// CertificateSigningRequests, including the type-safe TypedInformer variant.
+type TypedCertificateSigningRequestInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CertificateSigningRequestIndexInformer
+	Lister() certificatesv1beta1.CertificateSigningRequestLister
+}
+
+// apicertificatesv1beta1.CertificateSigningRequestIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CertificateSigningRequestIndexInformer cache.TypedSharedIndexInformer[*apicertificatesv1beta1.CertificateSigningRequest]
 
 type certificateSigningRequestInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type certificateSigningRequestInformer struct {
 // NewCertificateSigningRequestInformer constructs a new informer for CertificateSigningRequest type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCertificateSigningRequestInformer]).
 func NewCertificateSigningRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewCertificateSigningRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedCertificateSigningRequestInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedCertificateSigningRequestInformer constructs a new informer for CertificateSigningRequest type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCertificateSigningRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) CertificateSigningRequestIndexInformer {
+	return NewTypedCertificateSigningRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredCertificateSigningRequestInformer constructs a new informer for CertificateSigningRequest type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCertificateSigningRequestInformer]).
 func NewFilteredCertificateSigningRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewCertificateSigningRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredCertificateSigningRequestInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredCertificateSigningRequestInformer constructs a new informer for CertificateSigningRequest type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCertificateSigningRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CertificateSigningRequestIndexInformer {
+	return NewTypedCertificateSigningRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewCertificateSigningRequestInformerWithOptions constructs a new informer for CertificateSigningRequest type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCertificateSigningRequestInformerWithOptions]).
 func NewCertificateSigningRequestInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCertificateSigningRequestInformerWithOptions(client, options)
+}
+
+// NewTypedCertificateSigningRequestInformerWithOptions constructs a new informer for CertificateSigningRequest type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCertificateSigningRequestInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) CertificateSigningRequestIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicertificatesv1beta1.CertificateSigningRequest](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewCertificateSigningRequestInformerWithOptions(client kubernetes.Interface
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *certificateSigningRequestInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewCertificateSigningRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedCertificateSigningRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *certificateSigningRequestInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicertificatesv1beta1.CertificateSigningRequest{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *certificateSigningRequestInformer) TypedInformer() CertificateSigningRequestIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicertificatesv1beta1.CertificateSigningRequest](f.factory.InformerFor(&apicertificatesv1beta1.CertificateSigningRequest{}, f.defaultInformer))
 }
 
 func (f *certificateSigningRequestInformer) Lister() certificatesv1beta1.CertificateSigningRequestLister {

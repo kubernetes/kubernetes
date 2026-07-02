@@ -34,11 +34,23 @@ import (
 )
 
 // SecretInformer provides access to a shared informer and lister for
-// Secrets.
+// Secrets. Prefer using the type-safe variant (see [TypedSecretInformer]).
 type SecretInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.SecretLister
 }
+
+// TypedSecretInformer provides access to a shared informer and lister for
+// Secrets, including the type-safe TypedInformer variant.
+type TypedSecretInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() SecretIndexInformer
+	Lister() corev1.SecretLister
+}
+
+// apicorev1.SecretIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type SecretIndexInformer cache.TypedSharedIndexInformer[*apicorev1.Secret]
 
 type secretInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type secretInformer struct {
 // NewSecretInformer constructs a new informer for Secret type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedSecretInformer]).
 func NewSecretInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewSecretInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedSecretInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedSecretInformer constructs a new informer for Secret type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedSecretInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) SecretIndexInformer {
+	return NewTypedSecretInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredSecretInformer constructs a new informer for Secret type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredSecretInformer]).
 func NewFilteredSecretInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewSecretInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredSecretInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredSecretInformer constructs a new informer for Secret type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredSecretInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) SecretIndexInformer {
+	return NewTypedSecretInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewSecretInformerWithOptions constructs a new informer for Secret type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedSecretInformerWithOptions]).
 func NewSecretInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedSecretInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedSecretInformerWithOptions constructs a new informer for Secret type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedSecretInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) SecretIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicorev1.Secret](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewSecretInformerWithOptions(client kubernetes.Interface, namespace string,
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *secretInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewSecretInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedSecretInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *secretInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.Secret{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *secretInformer) TypedInformer() SecretIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicorev1.Secret](f.factory.InformerFor(&apicorev1.Secret{}, f.defaultInformer))
 }
 
 func (f *secretInformer) Lister() corev1.SecretLister {

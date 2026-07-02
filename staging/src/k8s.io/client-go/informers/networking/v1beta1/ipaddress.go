@@ -34,11 +34,23 @@ import (
 )
 
 // IPAddressInformer provides access to a shared informer and lister for
-// IPAddresses.
+// IPAddresses. Prefer using the type-safe variant (see [TypedIPAddressInformer]).
 type IPAddressInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() networkingv1beta1.IPAddressLister
 }
+
+// TypedIPAddressInformer provides access to a shared informer and lister for
+// IPAddresses, including the type-safe TypedInformer variant.
+type TypedIPAddressInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() IPAddressIndexInformer
+	Lister() networkingv1beta1.IPAddressLister
+}
+
+// apinetworkingv1beta1.IPAddressIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type IPAddressIndexInformer cache.TypedSharedIndexInformer[*apinetworkingv1beta1.IPAddress]
 
 type iPAddressInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type iPAddressInformer struct {
 // NewIPAddressInformer constructs a new informer for IPAddress type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedIPAddressInformer]).
 func NewIPAddressInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewIPAddressInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedIPAddressInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedIPAddressInformer constructs a new informer for IPAddress type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedIPAddressInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) IPAddressIndexInformer {
+	return NewTypedIPAddressInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredIPAddressInformer constructs a new informer for IPAddress type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredIPAddressInformer]).
 func NewFilteredIPAddressInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewIPAddressInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredIPAddressInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredIPAddressInformer constructs a new informer for IPAddress type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredIPAddressInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) IPAddressIndexInformer {
+	return NewTypedIPAddressInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewIPAddressInformerWithOptions constructs a new informer for IPAddress type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedIPAddressInformerWithOptions]).
 func NewIPAddressInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedIPAddressInformerWithOptions(client, options)
+}
+
+// NewTypedIPAddressInformerWithOptions constructs a new informer for IPAddress type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedIPAddressInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) IPAddressIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "ipaddresss"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apinetworkingv1beta1.IPAddress](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewIPAddressInformerWithOptions(client kubernetes.Interface, options intern
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *iPAddressInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewIPAddressInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedIPAddressInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *iPAddressInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apinetworkingv1beta1.IPAddress{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *iPAddressInformer) TypedInformer() IPAddressIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apinetworkingv1beta1.IPAddress](f.factory.InformerFor(&apinetworkingv1beta1.IPAddress{}, f.defaultInformer))
 }
 
 func (f *iPAddressInformer) Lister() networkingv1beta1.IPAddressLister {

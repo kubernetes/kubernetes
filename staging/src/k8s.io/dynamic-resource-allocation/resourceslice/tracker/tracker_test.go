@@ -142,7 +142,7 @@ func applyEventPair(tCtx *testContext, event any) {
 		case pair[0] != nil:
 			err := store.Delete(pair[0])
 			require.NoError(tCtx, err)
-			tCtx.deviceClassDelete(tCtx.Context)(pair[0])
+			tCtx.deviceClassDelete(tCtx.Context)(pair[0], nil)
 		default:
 			err := store.Add(pair[1])
 			require.NoError(tCtx, err)

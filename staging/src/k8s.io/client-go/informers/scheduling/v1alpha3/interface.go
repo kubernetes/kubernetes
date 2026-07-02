@@ -25,9 +25,9 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// PodGroups returns a PodGroupInformer.
-	PodGroups() PodGroupInformer
+	PodGroups() TypedPodGroupInformer
 	// Workloads returns a WorkloadInformer.
-	Workloads() WorkloadInformer
+	Workloads() TypedWorkloadInformer
 }
 
 type version struct {
@@ -42,11 +42,11 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // PodGroups returns a PodGroupInformer.
-func (v *version) PodGroups() PodGroupInformer {
+func (v *version) PodGroups() TypedPodGroupInformer {
 	return &podGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Workloads returns a WorkloadInformer.
-func (v *version) Workloads() WorkloadInformer {
+func (v *version) Workloads() TypedWorkloadInformer {
 	return &workloadInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

@@ -25,7 +25,7 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// RuntimeClasses returns a RuntimeClassInformer.
-	RuntimeClasses() RuntimeClassInformer
+	RuntimeClasses() TypedRuntimeClassInformer
 }
 
 type version struct {
@@ -40,6 +40,6 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // RuntimeClasses returns a RuntimeClassInformer.
-func (v *version) RuntimeClasses() RuntimeClassInformer {
+func (v *version) RuntimeClasses() TypedRuntimeClassInformer {
 	return &runtimeClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

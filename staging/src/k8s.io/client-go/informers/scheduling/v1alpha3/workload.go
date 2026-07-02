@@ -34,11 +34,23 @@ import (
 )
 
 // WorkloadInformer provides access to a shared informer and lister for
-// Workloads.
+// Workloads. Prefer using the type-safe variant (see [TypedWorkloadInformer]).
 type WorkloadInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() schedulingv1alpha3.WorkloadLister
 }
+
+// TypedWorkloadInformer provides access to a shared informer and lister for
+// Workloads, including the type-safe TypedInformer variant.
+type TypedWorkloadInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() WorkloadIndexInformer
+	Lister() schedulingv1alpha3.WorkloadLister
+}
+
+// apischedulingv1alpha3.WorkloadIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type WorkloadIndexInformer cache.TypedSharedIndexInformer[*apischedulingv1alpha3.Workload]
 
 type workloadInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type workloadInformer struct {
 // NewWorkloadInformer constructs a new informer for Workload type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedWorkloadInformer]).
 func NewWorkloadInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewWorkloadInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedWorkloadInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedWorkloadInformer constructs a new informer for Workload type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedWorkloadInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) WorkloadIndexInformer {
+	return NewTypedWorkloadInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredWorkloadInformer constructs a new informer for Workload type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredWorkloadInformer]).
 func NewFilteredWorkloadInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewWorkloadInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredWorkloadInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredWorkloadInformer constructs a new informer for Workload type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredWorkloadInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) WorkloadIndexInformer {
+	return NewTypedWorkloadInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewWorkloadInformerWithOptions constructs a new informer for Workload type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedWorkloadInformerWithOptions]).
 func NewWorkloadInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedWorkloadInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedWorkloadInformerWithOptions constructs a new informer for Workload type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedWorkloadInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) WorkloadIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "scheduling.k8s.io", Version: "v1alpha3", Resource: "workloads"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apischedulingv1alpha3.Workload](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewWorkloadInformerWithOptions(client kubernetes.Interface, namespace strin
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *workloadInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewWorkloadInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedWorkloadInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *workloadInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apischedulingv1alpha3.Workload{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *workloadInformer) TypedInformer() WorkloadIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apischedulingv1alpha3.Workload](f.factory.InformerFor(&apischedulingv1alpha3.Workload{}, f.defaultInformer))
 }
 
 func (f *workloadInformer) Lister() schedulingv1alpha3.WorkloadLister {

@@ -34,11 +34,23 @@ import (
 )
 
 // VolumeAttachmentInformer provides access to a shared informer and lister for
-// VolumeAttachments.
+// VolumeAttachments. Prefer using the type-safe variant (see [TypedVolumeAttachmentInformer]).
 type VolumeAttachmentInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() storagev1alpha1.VolumeAttachmentLister
 }
+
+// TypedVolumeAttachmentInformer provides access to a shared informer and lister for
+// VolumeAttachments, including the type-safe TypedInformer variant.
+type TypedVolumeAttachmentInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() VolumeAttachmentIndexInformer
+	Lister() storagev1alpha1.VolumeAttachmentLister
+}
+
+// apistoragev1alpha1.VolumeAttachmentIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type VolumeAttachmentIndexInformer cache.TypedSharedIndexInformer[*apistoragev1alpha1.VolumeAttachment]
 
 type volumeAttachmentInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type volumeAttachmentInformer struct {
 // NewVolumeAttachmentInformer constructs a new informer for VolumeAttachment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedVolumeAttachmentInformer]).
 func NewVolumeAttachmentInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewVolumeAttachmentInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedVolumeAttachmentInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedVolumeAttachmentInformer constructs a new informer for VolumeAttachment type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedVolumeAttachmentInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) VolumeAttachmentIndexInformer {
+	return NewTypedVolumeAttachmentInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredVolumeAttachmentInformer constructs a new informer for VolumeAttachment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredVolumeAttachmentInformer]).
 func NewFilteredVolumeAttachmentInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewVolumeAttachmentInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredVolumeAttachmentInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredVolumeAttachmentInformer constructs a new informer for VolumeAttachment type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredVolumeAttachmentInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) VolumeAttachmentIndexInformer {
+	return NewTypedVolumeAttachmentInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewVolumeAttachmentInformerWithOptions constructs a new informer for VolumeAttachment type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedVolumeAttachmentInformerWithOptions]).
 func NewVolumeAttachmentInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedVolumeAttachmentInformerWithOptions(client, options)
+}
+
+// NewTypedVolumeAttachmentInformerWithOptions constructs a new informer for VolumeAttachment type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedVolumeAttachmentInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) VolumeAttachmentIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1alpha1", Resource: "volumeattachments"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apistoragev1alpha1.VolumeAttachment](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewVolumeAttachmentInformerWithOptions(client kubernetes.Interface, options
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *volumeAttachmentInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewVolumeAttachmentInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedVolumeAttachmentInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *volumeAttachmentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistoragev1alpha1.VolumeAttachment{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *volumeAttachmentInformer) TypedInformer() VolumeAttachmentIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apistoragev1alpha1.VolumeAttachment](f.factory.InformerFor(&apistoragev1alpha1.VolumeAttachment{}, f.defaultInformer))
 }
 
 func (f *volumeAttachmentInformer) Lister() storagev1alpha1.VolumeAttachmentLister {

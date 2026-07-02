@@ -34,11 +34,23 @@ import (
 )
 
 // CSIStorageCapacityInformer provides access to a shared informer and lister for
-// CSIStorageCapacities.
+// CSIStorageCapacities. Prefer using the type-safe variant (see [TypedCSIStorageCapacityInformer]).
 type CSIStorageCapacityInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() storagev1beta1.CSIStorageCapacityLister
 }
+
+// TypedCSIStorageCapacityInformer provides access to a shared informer and lister for
+// CSIStorageCapacities, including the type-safe TypedInformer variant.
+type TypedCSIStorageCapacityInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CSIStorageCapacityIndexInformer
+	Lister() storagev1beta1.CSIStorageCapacityLister
+}
+
+// apistoragev1beta1.CSIStorageCapacityIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CSIStorageCapacityIndexInformer cache.TypedSharedIndexInformer[*apistoragev1beta1.CSIStorageCapacity]
 
 type cSIStorageCapacityInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type cSIStorageCapacityInformer struct {
 // NewCSIStorageCapacityInformer constructs a new informer for CSIStorageCapacity type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCSIStorageCapacityInformer]).
 func NewCSIStorageCapacityInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewCSIStorageCapacityInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedCSIStorageCapacityInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedCSIStorageCapacityInformer constructs a new informer for CSIStorageCapacity type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCSIStorageCapacityInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) CSIStorageCapacityIndexInformer {
+	return NewTypedCSIStorageCapacityInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredCSIStorageCapacityInformer constructs a new informer for CSIStorageCapacity type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCSIStorageCapacityInformer]).
 func NewFilteredCSIStorageCapacityInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewCSIStorageCapacityInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredCSIStorageCapacityInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredCSIStorageCapacityInformer constructs a new informer for CSIStorageCapacity type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCSIStorageCapacityInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CSIStorageCapacityIndexInformer {
+	return NewTypedCSIStorageCapacityInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewCSIStorageCapacityInformerWithOptions constructs a new informer for CSIStorageCapacity type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCSIStorageCapacityInformerWithOptions]).
 func NewCSIStorageCapacityInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCSIStorageCapacityInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedCSIStorageCapacityInformerWithOptions constructs a new informer for CSIStorageCapacity type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCSIStorageCapacityInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) CSIStorageCapacityIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "csistoragecapacitys"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apistoragev1beta1.CSIStorageCapacity](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewCSIStorageCapacityInformerWithOptions(client kubernetes.Interface, names
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *cSIStorageCapacityInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewCSIStorageCapacityInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedCSIStorageCapacityInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *cSIStorageCapacityInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistoragev1beta1.CSIStorageCapacity{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *cSIStorageCapacityInformer) TypedInformer() CSIStorageCapacityIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apistoragev1beta1.CSIStorageCapacity](f.factory.InformerFor(&apistoragev1beta1.CSIStorageCapacity{}, f.defaultInformer))
 }
 
 func (f *cSIStorageCapacityInformer) Lister() storagev1beta1.CSIStorageCapacityLister {

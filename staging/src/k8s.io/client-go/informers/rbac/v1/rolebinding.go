@@ -34,11 +34,23 @@ import (
 )
 
 // RoleBindingInformer provides access to a shared informer and lister for
-// RoleBindings.
+// RoleBindings. Prefer using the type-safe variant (see [TypedRoleBindingInformer]).
 type RoleBindingInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() rbacv1.RoleBindingLister
 }
+
+// TypedRoleBindingInformer provides access to a shared informer and lister for
+// RoleBindings, including the type-safe TypedInformer variant.
+type TypedRoleBindingInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() RoleBindingIndexInformer
+	Lister() rbacv1.RoleBindingLister
+}
+
+// apirbacv1.RoleBindingIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type RoleBindingIndexInformer cache.TypedSharedIndexInformer[*apirbacv1.RoleBinding]
 
 type roleBindingInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type roleBindingInformer struct {
 // NewRoleBindingInformer constructs a new informer for RoleBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedRoleBindingInformer]).
 func NewRoleBindingInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewRoleBindingInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedRoleBindingInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedRoleBindingInformer constructs a new informer for RoleBinding type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedRoleBindingInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) RoleBindingIndexInformer {
+	return NewTypedRoleBindingInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredRoleBindingInformer constructs a new informer for RoleBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredRoleBindingInformer]).
 func NewFilteredRoleBindingInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewRoleBindingInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredRoleBindingInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredRoleBindingInformer constructs a new informer for RoleBinding type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredRoleBindingInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) RoleBindingIndexInformer {
+	return NewTypedRoleBindingInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewRoleBindingInformerWithOptions constructs a new informer for RoleBinding type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedRoleBindingInformerWithOptions]).
 func NewRoleBindingInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedRoleBindingInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedRoleBindingInformerWithOptions constructs a new informer for RoleBinding type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedRoleBindingInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) RoleBindingIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "rolebindings"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apirbacv1.RoleBinding](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewRoleBindingInformerWithOptions(client kubernetes.Interface, namespace st
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *roleBindingInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewRoleBindingInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedRoleBindingInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apirbacv1.RoleBinding{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *roleBindingInformer) TypedInformer() RoleBindingIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apirbacv1.RoleBinding](f.factory.InformerFor(&apirbacv1.RoleBinding{}, f.defaultInformer))
 }
 
 func (f *roleBindingInformer) Lister() rbacv1.RoleBindingLister {

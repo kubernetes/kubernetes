@@ -34,11 +34,23 @@ import (
 )
 
 // NetworkPolicyInformer provides access to a shared informer and lister for
-// NetworkPolicies.
+// NetworkPolicies. Prefer using the type-safe variant (see [TypedNetworkPolicyInformer]).
 type NetworkPolicyInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() networkingv1.NetworkPolicyLister
 }
+
+// TypedNetworkPolicyInformer provides access to a shared informer and lister for
+// NetworkPolicies, including the type-safe TypedInformer variant.
+type TypedNetworkPolicyInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() NetworkPolicyIndexInformer
+	Lister() networkingv1.NetworkPolicyLister
+}
+
+// apinetworkingv1.NetworkPolicyIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type NetworkPolicyIndexInformer cache.TypedSharedIndexInformer[*apinetworkingv1.NetworkPolicy]
 
 type networkPolicyInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type networkPolicyInformer struct {
 // NewNetworkPolicyInformer constructs a new informer for NetworkPolicy type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedNetworkPolicyInformer]).
 func NewNetworkPolicyInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewNetworkPolicyInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedNetworkPolicyInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedNetworkPolicyInformer constructs a new informer for NetworkPolicy type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedNetworkPolicyInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) NetworkPolicyIndexInformer {
+	return NewTypedNetworkPolicyInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredNetworkPolicyInformer constructs a new informer for NetworkPolicy type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredNetworkPolicyInformer]).
 func NewFilteredNetworkPolicyInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewNetworkPolicyInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredNetworkPolicyInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredNetworkPolicyInformer constructs a new informer for NetworkPolicy type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredNetworkPolicyInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) NetworkPolicyIndexInformer {
+	return NewTypedNetworkPolicyInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewNetworkPolicyInformerWithOptions constructs a new informer for NetworkPolicy type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedNetworkPolicyInformerWithOptions]).
 func NewNetworkPolicyInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedNetworkPolicyInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedNetworkPolicyInformerWithOptions constructs a new informer for NetworkPolicy type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedNetworkPolicyInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) NetworkPolicyIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "networking.k8s.io", Version: "v1", Resource: "networkpolicys"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apinetworkingv1.NetworkPolicy](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewNetworkPolicyInformerWithOptions(client kubernetes.Interface, namespace 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *networkPolicyInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewNetworkPolicyInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedNetworkPolicyInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *networkPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apinetworkingv1.NetworkPolicy{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *networkPolicyInformer) TypedInformer() NetworkPolicyIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apinetworkingv1.NetworkPolicy](f.factory.InformerFor(&apinetworkingv1.NetworkPolicy{}, f.defaultInformer))
 }
 
 func (f *networkPolicyInformer) Lister() networkingv1.NetworkPolicyLister {

@@ -34,11 +34,23 @@ import (
 )
 
 // ResourceClaimTemplateInformer provides access to a shared informer and lister for
-// ResourceClaimTemplates.
+// ResourceClaimTemplates. Prefer using the type-safe variant (see [TypedResourceClaimTemplateInformer]).
 type ResourceClaimTemplateInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() resourcev1.ResourceClaimTemplateLister
 }
+
+// TypedResourceClaimTemplateInformer provides access to a shared informer and lister for
+// ResourceClaimTemplates, including the type-safe TypedInformer variant.
+type TypedResourceClaimTemplateInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ResourceClaimTemplateIndexInformer
+	Lister() resourcev1.ResourceClaimTemplateLister
+}
+
+// apiresourcev1.ResourceClaimTemplateIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ResourceClaimTemplateIndexInformer cache.TypedSharedIndexInformer[*apiresourcev1.ResourceClaimTemplate]
 
 type resourceClaimTemplateInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type resourceClaimTemplateInformer struct {
 // NewResourceClaimTemplateInformer constructs a new informer for ResourceClaimTemplate type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedResourceClaimTemplateInformer]).
 func NewResourceClaimTemplateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewResourceClaimTemplateInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedResourceClaimTemplateInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedResourceClaimTemplateInformer constructs a new informer for ResourceClaimTemplate type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedResourceClaimTemplateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) ResourceClaimTemplateIndexInformer {
+	return NewTypedResourceClaimTemplateInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredResourceClaimTemplateInformer constructs a new informer for ResourceClaimTemplate type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredResourceClaimTemplateInformer]).
 func NewFilteredResourceClaimTemplateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewResourceClaimTemplateInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredResourceClaimTemplateInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredResourceClaimTemplateInformer constructs a new informer for ResourceClaimTemplate type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredResourceClaimTemplateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ResourceClaimTemplateIndexInformer {
+	return NewTypedResourceClaimTemplateInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewResourceClaimTemplateInformerWithOptions constructs a new informer for ResourceClaimTemplate type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedResourceClaimTemplateInformerWithOptions]).
 func NewResourceClaimTemplateInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedResourceClaimTemplateInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedResourceClaimTemplateInformerWithOptions constructs a new informer for ResourceClaimTemplate type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedResourceClaimTemplateInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) ResourceClaimTemplateIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1", Resource: "resourceclaimtemplates"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apiresourcev1.ResourceClaimTemplate](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewResourceClaimTemplateInformerWithOptions(client kubernetes.Interface, na
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *resourceClaimTemplateInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewResourceClaimTemplateInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedResourceClaimTemplateInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *resourceClaimTemplateInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiresourcev1.ResourceClaimTemplate{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *resourceClaimTemplateInformer) TypedInformer() ResourceClaimTemplateIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apiresourcev1.ResourceClaimTemplate](f.factory.InformerFor(&apiresourcev1.ResourceClaimTemplate{}, f.defaultInformer))
 }
 
 func (f *resourceClaimTemplateInformer) Lister() resourcev1.ResourceClaimTemplateLister {

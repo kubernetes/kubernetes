@@ -34,11 +34,23 @@ import (
 )
 
 // ConfigMapInformer provides access to a shared informer and lister for
-// ConfigMaps.
+// ConfigMaps. Prefer using the type-safe variant (see [TypedConfigMapInformer]).
 type ConfigMapInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.ConfigMapLister
 }
+
+// TypedConfigMapInformer provides access to a shared informer and lister for
+// ConfigMaps, including the type-safe TypedInformer variant.
+type TypedConfigMapInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ConfigMapIndexInformer
+	Lister() corev1.ConfigMapLister
+}
+
+// apicorev1.ConfigMapIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ConfigMapIndexInformer cache.TypedSharedIndexInformer[*apicorev1.ConfigMap]
 
 type configMapInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type configMapInformer struct {
 // NewConfigMapInformer constructs a new informer for ConfigMap type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedConfigMapInformer]).
 func NewConfigMapInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewConfigMapInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedConfigMapInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedConfigMapInformer constructs a new informer for ConfigMap type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedConfigMapInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) ConfigMapIndexInformer {
+	return NewTypedConfigMapInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredConfigMapInformer constructs a new informer for ConfigMap type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredConfigMapInformer]).
 func NewFilteredConfigMapInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewConfigMapInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredConfigMapInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredConfigMapInformer constructs a new informer for ConfigMap type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredConfigMapInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ConfigMapIndexInformer {
+	return NewTypedConfigMapInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewConfigMapInformerWithOptions constructs a new informer for ConfigMap type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedConfigMapInformerWithOptions]).
 func NewConfigMapInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedConfigMapInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedConfigMapInformerWithOptions constructs a new informer for ConfigMap type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedConfigMapInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) ConfigMapIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicorev1.ConfigMap](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewConfigMapInformerWithOptions(client kubernetes.Interface, namespace stri
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *configMapInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewConfigMapInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedConfigMapInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *configMapInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.ConfigMap{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *configMapInformer) TypedInformer() ConfigMapIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicorev1.ConfigMap](f.factory.InformerFor(&apicorev1.ConfigMap{}, f.defaultInformer))
 }
 
 func (f *configMapInformer) Lister() corev1.ConfigMapLister {

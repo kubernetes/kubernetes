@@ -34,11 +34,23 @@ import (
 )
 
 // CronJobInformer provides access to a shared informer and lister for
-// CronJobs.
+// CronJobs. Prefer using the type-safe variant (see [TypedCronJobInformer]).
 type CronJobInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() batchv1beta1.CronJobLister
 }
+
+// TypedCronJobInformer provides access to a shared informer and lister for
+// CronJobs, including the type-safe TypedInformer variant.
+type TypedCronJobInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CronJobIndexInformer
+	Lister() batchv1beta1.CronJobLister
+}
+
+// apibatchv1beta1.CronJobIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CronJobIndexInformer cache.TypedSharedIndexInformer[*apibatchv1beta1.CronJob]
 
 type cronJobInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type cronJobInformer struct {
 // NewCronJobInformer constructs a new informer for CronJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCronJobInformer]).
 func NewCronJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewCronJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedCronJobInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedCronJobInformer constructs a new informer for CronJob type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCronJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) CronJobIndexInformer {
+	return NewTypedCronJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredCronJobInformer constructs a new informer for CronJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCronJobInformer]).
 func NewFilteredCronJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewCronJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredCronJobInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredCronJobInformer constructs a new informer for CronJob type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCronJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CronJobIndexInformer {
+	return NewTypedCronJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewCronJobInformerWithOptions constructs a new informer for CronJob type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCronJobInformerWithOptions]).
 func NewCronJobInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCronJobInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedCronJobInformerWithOptions constructs a new informer for CronJob type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCronJobInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) CronJobIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apibatchv1beta1.CronJob](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewCronJobInformerWithOptions(client kubernetes.Interface, namespace string
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *cronJobInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewCronJobInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedCronJobInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *cronJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apibatchv1beta1.CronJob{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *cronJobInformer) TypedInformer() CronJobIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apibatchv1beta1.CronJob](f.factory.InformerFor(&apibatchv1beta1.CronJob{}, f.defaultInformer))
 }
 
 func (f *cronJobInformer) Lister() batchv1beta1.CronJobLister {
