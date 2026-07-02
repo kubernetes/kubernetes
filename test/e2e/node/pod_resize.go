@@ -46,10 +46,15 @@ import (
 )
 
 func doPodResizeResourceQuotaTests(f *framework.Framework) {
+	// NOTE: These values are intentionally small (rather than e.g. 300m/300Mi) so that
+	// CreateBatch can schedule the 2 Guaranteed-QoS setup pods on resource-constrained
+	// nodes (e.g. compact control-plane nodes). All quota/entry values below are derived
+	// from the base container size by a consistent scale factor, so the admission math
+	// (requested/used/limited) stays internally consistent across entries.
 	originalContainers := []podresize.ResizableContainerInfo{
 		{
 			Name:      "c1",
-			Resources: &cgroups.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
+			Resources: &cgroups.ContainerResources{CPUReq: "60m", CPULim: "60m", MemReq: "60Mi", MemLim: "60Mi"},
 		},
 	}
 
@@ -61,8 +66,8 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 			},
 			Spec: v1.ResourceQuotaSpec{
 				Hard: v1.ResourceList{
-					v1.ResourceCPU:    resource.MustParse("800m"),
-					v1.ResourceMemory: resource.MustParse("800Mi"),
+					v1.ResourceCPU:    resource.MustParse("160m"),
+					v1.ResourceMemory: resource.MustParse("160Mi"),
 				},
 			},
 		}
@@ -137,46 +142,46 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "600m", CPULim: "600m", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "120m", CPULim: "120m", MemReq: "80Mi", MemLim: "80Mi"},
 				},
 			},
 			originalContainers,
-			"exceeded quota: resize-resource-quota, requested: cpu=300m, used: cpu=600m, limited: cpu=800m",
+			"exceeded quota: resize-resource-quota, requested: cpu=60m, used: cpu=120m, limited: cpu=160m",
 		),
 
 		ginkgo.Entry("exceed maximum Memory",
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "250m", CPULim: "250m", MemReq: "750Mi", MemLim: "750Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "150Mi", MemLim: "150Mi"},
 				},
 			},
 			originalContainers,
-			"exceeded quota: resize-resource-quota, requested: memory=450Mi, used: memory=600Mi, limited: memory=800Mi",
+			"exceeded quota: resize-resource-quota, requested: memory=90Mi, used: memory=120Mi, limited: memory=160Mi",
 		),
 
 		ginkgo.Entry("exceed maximum CPU and Memory",
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "600m", CPULim: "600m", MemReq: "750Mi", MemLim: "750Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "120m", CPULim: "120m", MemReq: "150Mi", MemLim: "150Mi"},
 				},
 			},
 			originalContainers,
-			"exceeded quota: resize-resource-quota, requested: cpu=300m,memory=450Mi, used: cpu=600m,memory=600Mi, limited: cpu=800m,memory=800Mi",
+			"exceeded quota: resize-resource-quota, requested: cpu=60m,memory=90Mi, used: cpu=120m,memory=120Mi, limited: cpu=160m,memory=160Mi",
 		),
 
 		ginkgo.Entry("valid increase of CPU",
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "300Mi", MemLim: "300Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "70m", CPULim: "70m", MemReq: "60Mi", MemLim: "60Mi"},
 				},
 			},
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "300Mi", MemLim: "300Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "70m", CPULim: "70m", MemReq: "60Mi", MemLim: "60Mi"},
 				},
 			},
 			"",
@@ -186,13 +191,13 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "350Mi", MemLim: "350Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "70m", CPULim: "70m", MemReq: "70Mi", MemLim: "70Mi"},
 				},
 			},
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "350Mi", MemLim: "350Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "70m", CPULim: "70m", MemReq: "70Mi", MemLim: "70Mi"},
 				},
 			},
 			"",
@@ -202,13 +207,13 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "80m", CPULim: "80m", MemReq: "80Mi", MemLim: "80Mi"},
 				},
 			},
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "80m", CPULim: "80m", MemReq: "80Mi", MemLim: "80Mi"},
 				},
 			},
 			"",
@@ -217,10 +222,17 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 }
 
 func doPodResizeLimitRangerTests(f *framework.Framework) {
+	// NOTE: These values are intentionally small (rather than e.g. 300m/300Mi) so that
+	// CreateBatch can schedule the 2 Guaranteed-QoS setup pods on resource-constrained
+	// nodes (e.g. compact control-plane nodes). Every value below (base container size,
+	// LimitRange bounds, and each Entry) is derived by a consistent scale factor from the
+	// original constants, so Min < DefaultRequest <= Default <= Max still holds and every
+	// "exceed"/"below min"/"valid" Entry still crosses (or stays within) the same relative
+	// boundaries.
 	originalContainers := []podresize.ResizableContainerInfo{
 		{
 			Name:      "c1",
-			Resources: &cgroups.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
+			Resources: &cgroups.ContainerResources{CPUReq: "60m", CPULim: "60m", MemReq: "60Mi", MemLim: "60Mi"},
 		},
 	}
 
@@ -236,20 +248,20 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 					{
 						Type: v1.LimitTypeContainer,
 						Max: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("500m"),
-							v1.ResourceMemory: resource.MustParse("500Mi"),
-						},
-						Min: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("50m"),
-							v1.ResourceMemory: resource.MustParse("50Mi"),
-						},
-						Default: v1.ResourceList{
 							v1.ResourceCPU:    resource.MustParse("100m"),
 							v1.ResourceMemory: resource.MustParse("100Mi"),
 						},
+						Min: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("10m"),
+							v1.ResourceMemory: resource.MustParse("10Mi"),
+						},
+						Default: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("20m"),
+							v1.ResourceMemory: resource.MustParse("20Mi"),
+						},
 						DefaultRequest: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("50m"),
-							v1.ResourceMemory: resource.MustParse("50Mi"),
+							v1.ResourceCPU:    resource.MustParse("10m"),
+							v1.ResourceMemory: resource.MustParse("10Mi"),
 						},
 					},
 				},
@@ -332,79 +344,79 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "600m", CPULim: "600m", MemReq: "250Mi", MemLim: "250Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "120m", CPULim: "120m", MemReq: "50Mi", MemLim: "50Mi"},
 				},
 			},
 			originalContainers,
-			[]string{"forbidden: maximum cpu usage per Container is 500m, but limit is 600m"},
+			[]string{"forbidden: maximum cpu usage per Container is 100m, but limit is 120m"},
 		),
 
 		ginkgo.Entry("exceed maximum Memory",
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "250m", CPULim: "250m", MemReq: "750Mi", MemLim: "750Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "150Mi", MemLim: "150Mi"},
 				},
 			},
 			originalContainers,
-			[]string{"forbidden: maximum memory usage per Container is 500Mi, but limit is 750Mi"},
+			[]string{"forbidden: maximum memory usage per Container is 100Mi, but limit is 150Mi"},
 		),
 
 		ginkgo.Entry("exceed maximum Memory and CPU",
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "600m", CPULim: "600m", MemReq: "600Mi", MemLim: "600Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "120m", CPULim: "120m", MemReq: "120Mi", MemLim: "120Mi"},
 				},
 			},
 			originalContainers,
-			[]string{"maximum cpu usage per Container is 500m, but limit is 600m", "maximum memory usage per Container is 500Mi, but limit is 600Mi"},
+			[]string{"maximum cpu usage per Container is 100m, but limit is 120m", "maximum memory usage per Container is 100Mi, but limit is 120Mi"},
 		),
 
 		ginkgo.Entry("request below min CPU",
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "10m", CPULim: "10m", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "2m", CPULim: "2m", MemReq: "80Mi", MemLim: "80Mi"},
 				},
 			},
 			originalContainers,
-			[]string{"forbidden: minimum cpu usage per Container is 50m, but request is 10m"},
+			[]string{"forbidden: minimum cpu usage per Container is 10m, but request is 2m"},
 		),
 
 		ginkgo.Entry("request below min Memory",
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "250m", CPULim: "250m", MemReq: "10Mi", MemLim: "10Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "2Mi", MemLim: "2Mi"},
 				},
 			},
 			originalContainers,
-			[]string{"forbidden: minimum memory usage per Container is 50Mi, but request is 10Mi"},
+			[]string{"forbidden: minimum memory usage per Container is 10Mi, but request is 2Mi"},
 		),
 
 		ginkgo.Entry("request below min CPU and min Memory",
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "10m", CPULim: "10m", MemReq: "10Mi", MemLim: "10Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "2m", CPULim: "2m", MemReq: "2Mi", MemLim: "2Mi"},
 				},
 			},
 			originalContainers,
-			[]string{"minimum cpu usage per Container is 50m, but request is 10m", "minimum memory usage per Container is 50Mi, but request is 10Mi"},
+			[]string{"minimum cpu usage per Container is 10m, but request is 2m", "minimum memory usage per Container is 10Mi, but request is 2Mi"},
 		),
 
 		ginkgo.Entry("valid increase of CPU",
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "300Mi", MemLim: "300Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "70m", CPULim: "70m", MemReq: "60Mi", MemLim: "60Mi"},
 				},
 			},
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "300Mi", MemLim: "300Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "70m", CPULim: "70m", MemReq: "60Mi", MemLim: "60Mi"},
 				},
 			},
 			nil,
@@ -414,13 +426,13 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "350Mi", MemLim: "350Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "70m", CPULim: "70m", MemReq: "70Mi", MemLim: "70Mi"},
 				},
 			},
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "350Mi", MemLim: "350Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "70m", CPULim: "70m", MemReq: "70Mi", MemLim: "70Mi"},
 				},
 			},
 			nil,
@@ -430,13 +442,13 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "80m", CPULim: "80m", MemReq: "80Mi", MemLim: "80Mi"},
 				},
 			},
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "80m", CPULim: "80m", MemReq: "80Mi", MemLim: "80Mi"},
 				},
 			},
 			nil,
@@ -446,13 +458,13 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "350Mi", MemLim: "350Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "80m", CPULim: "80m", MemReq: "70Mi", MemLim: "70Mi"},
 				},
 			},
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "350Mi", MemLim: "350Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "80m", CPULim: "80m", MemReq: "70Mi", MemLim: "70Mi"},
 				},
 			},
 			nil,
@@ -462,13 +474,13 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "350Mi", MemLim: "350Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "70m", CPULim: "70m", MemReq: "70Mi", MemLim: "70Mi"},
 				},
 			},
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "350m", CPULim: "350m", MemReq: "350Mi", MemLim: "350Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "70m", CPULim: "70m", MemReq: "70Mi", MemLim: "70Mi"},
 				},
 			},
 			nil,
@@ -478,13 +490,13 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "250m", CPULim: "250m", MemReq: "250Mi", MemLim: "250Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "50Mi", MemLim: "50Mi"},
 				},
 			},
 			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "250m", CPULim: "250m", MemReq: "250Mi", MemLim: "250Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "50Mi", MemLim: "50Mi"},
 				},
 			},
 			nil,
