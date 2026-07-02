@@ -500,3 +500,58 @@ func makePodWithNodeAllocatableResourceClaimStatuses(claimName string, statuses 
 	pod.Status.NodeAllocatableResourceClaimStatuses = statuses
 	return pod
 }
+
+// TestDeclarativeValidateUpdateRestoreFrom covers the declarative immutability of
+// spec.restoreFrom (KEP-5823): a Pod cannot be re-pointed at a different
+// checkpoint after creation.
+func TestDeclarativeValidateUpdateRestoreFrom(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIPrefix:         "api",
+			APIGroup:          "",
+			APIVersion:        apiVersion,
+			Name:              "foo",
+			IsResourceRequest: true,
+			Verb:              "update",
+		})
+		testCases := map[string]struct {
+			old          *api.Pod
+			update       *api.Pod
+			expectedErrs field.ErrorList
+		}{
+			"restoreFrom: unchanged": {
+				old:    podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a")),
+				update: podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a")),
+			},
+			"restoreFrom: changed": {
+				old:    podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a")),
+				update: podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-b")),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "restoreFrom"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+			"restoreFrom: set from unset": {
+				old:    podtest.MakePod("foo"),
+				update: podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a")),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "restoreFrom"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+			"restoreFrom: unset from set": {
+				old:    podtest.MakePod("foo", podtest.SetRestoreFrom("checkpoint-a")),
+				update: podtest.MakePod("foo"),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "restoreFrom"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				},
+			},
+		}
+		for k, tc := range testCases {
+			t.Run(k, func(t *testing.T) {
+				tc.old.ResourceVersion = "1"
+				tc.update.ResourceVersion = "1"
+				apitesting.VerifyUpdateValidationEquivalence(t, ctx, tc.update, tc.old, registry.Strategy, tc.expectedErrs)
+			})
+		}
+	}
+}

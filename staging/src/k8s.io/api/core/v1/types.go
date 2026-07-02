@@ -4742,6 +4742,26 @@ type PodSpec struct {
 	// +k8s:maxItems=10
 	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+	// RestoreFrom specifies a PodCheckpoint in this Pod's namespace to restore
+	// this Pod from. When set, the Pod is restored from that checkpoint's archive
+	// instead of being created from scratch; the kubelet resolves the reference to
+	// the on-node archive via the PodCheckpoint's status.
+	// This field is immutable. Restoring from another checkpoint requires creating
+	// a new Pod; in-place restore of an existing Pod is not supported.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	RestoreFrom *CheckpointReference `json:"restoreFrom,omitempty" protobuf:"bytes,45,opt,name=restoreFrom"`
+}
+
+// CheckpointReference identifies a PodCheckpoint to restore a Pod from.
+// +structType=atomic
+type CheckpointReference struct {
+	// Name is the name of a PodCheckpoint in the Pod's namespace.
+	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:required
+	// +k8s:alpha(since: "1.37")=+k8s:format=k8s-long-name
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly
@@ -4840,6 +4860,30 @@ type PodExtendedResourceClaimStatus struct {
 	// ResourceClaimName is the name of the ResourceClaim that was
 	// generated for the Pod in the namespace of the Pod.
 	ResourceClaimName string `json:"resourceClaimName" protobuf:"bytes,2,name=resourceClaimName"`
+}
+
+// PodRestoreState describes the lifecycle state of restoring a Pod from a
+// checkpoint. Restore is a one-time operation; once it completes, subsequent
+// container, sandbox, Pod, Kubelet, and node restarts use normal reconciliation.
+// +enum
+type PodRestoreState string
+
+const (
+	PodRestoreStateInProgress PodRestoreState = "InProgress"
+	PodRestoreStateCompleted  PodRestoreState = "Completed"
+	PodRestoreStateFailed     PodRestoreState = "Failed"
+)
+
+// PodRestoreStatus records the outcome of the one-time restore operation.
+type PodRestoreStatus struct {
+	// RestoreState is the current state of the restore operation.
+	RestoreState PodRestoreState `json:"restoreState" protobuf:"bytes,1,opt,name=restoreState,casttype=PodRestoreState"`
+	// Reason is a brief CamelCase reason for a failed restore.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
+	// Message explains the current restore state.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 }
 
 // ContainerExtendedResourceRequest has the mapping of container name,
@@ -5615,6 +5659,11 @@ type PodStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	Conditions []PodCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
+	// RestoreStatus records the one-time restore operation for a Pod created
+	// with spec.restoreFrom. Once Completed or Failed, this status is not reset.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	RestoreStatus *PodRestoreStatus `json:"restoreStatus,omitempty" protobuf:"bytes,24,opt,name=restoreStatus"`
 	// A human readable message indicating details about why the pod is in this condition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
@@ -5798,6 +5847,7 @@ type Pod struct {
 	// Specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:subfield(restoreFrom)=+k8s:immutable
 	Spec PodSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Most recently observed status of the pod.

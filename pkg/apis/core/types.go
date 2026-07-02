@@ -4209,6 +4209,22 @@ type PodSpec struct {
 	// +featureGate=EvictionRequestAPI
 	// +optional
 	EvictionResponders []EvictionResponder
+	// RestoreFrom specifies a PodCheckpoint in this Pod's namespace to restore
+	// this Pod from. When set, the Pod is restored from that checkpoint's archive
+	// instead of being created from scratch; the kubelet resolves the reference to
+	// the on-node archive via the PodCheckpoint's status.
+	// This field is immutable. Restoring from another checkpoint requires creating
+	// a new Pod; in-place restore of an existing Pod is not supported.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	RestoreFrom *CheckpointReference
+}
+
+// CheckpointReference identifies a PodCheckpoint to restore a Pod from.
+type CheckpointReference struct {
+	// Name is the name of a PodCheckpoint in the Pod's namespace.
+	// +required
+	Name string
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
@@ -4296,6 +4312,27 @@ type PodExtendedResourceClaimStatus struct {
 	// ResourceClaimName is the name of the ResourceClaim that was
 	// generated for the Pod in the namespace of the Pod.
 	ResourceClaimName string
+}
+
+// PodRestoreState describes the lifecycle state of restoring a Pod from a
+// checkpoint. Restore is a one-time operation; once it completes, subsequent
+// container, sandbox, Pod, Kubelet, and node restarts use normal reconciliation.
+// +enum
+type PodRestoreState string
+
+const (
+	PodRestoreStateInProgress PodRestoreState = "InProgress"
+	PodRestoreStateCompleted  PodRestoreState = "Completed"
+	PodRestoreStateFailed     PodRestoreState = "Failed"
+)
+
+// PodRestoreStatus records the outcome of the one-time restore operation.
+type PodRestoreStatus struct {
+	RestoreState PodRestoreState
+	// +optional
+	Reason string
+	// +optional
+	Message string
 }
 
 type ContainerExtendedResourceRequest struct {
@@ -4820,6 +4857,11 @@ type PodStatus struct {
 	Phase PodPhase
 	// +optional
 	Conditions []PodCondition
+	// RestoreStatus records the one-time restore operation for a Pod created
+	// with spec.restoreFrom. Once Completed or Failed, this status is not reset.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	RestoreStatus *PodRestoreStatus
 	// A human readable message indicating details about why the pod is in this state.
 	// +optional
 	Message string
