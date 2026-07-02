@@ -5927,6 +5927,42 @@ func validateContainerImage(image string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// validatePodUpdateCommon holds update checks that apply to the main Pod
+// resource and to every subresource that can change the spec.
+func validatePodUpdateCommon(newPod, oldPod *core.Pod) field.ErrorList {
+	return validatePodCheckpointingUpdate(newPod, oldPod)
+}
+
+func validatePodCheckpointingUpdate(newPod, oldPod *core.Pod) field.ErrorList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		return nil
+	}
+
+	var checkpointing *core.PodCondition
+	for i := range oldPod.Status.Conditions {
+		condition := &oldPod.Status.Conditions[i]
+		if condition.Type == core.PodCheckpointing && condition.Status == core.ConditionTrue {
+			checkpointing = condition
+			break
+		}
+	}
+	if checkpointing == nil {
+		return nil
+	}
+
+	// Scheduling gates only delay scheduling; they do not change the captured workload.
+	oldSpec, newSpec := oldPod.Spec, newPod.Spec
+	oldSpec.SchedulingGates, newSpec.SchedulingGates = nil, nil // +k8s:verify-mutation:reason=clone
+	if apiequality.Semantic.DeepEqual(oldSpec, newSpec) {
+		return nil
+	}
+	message := "pod spec cannot change while PodCheckpointing=True"
+	if checkpointing.Message != "" {
+		message += ": " + checkpointing.Message
+	}
+	return field.ErrorList{field.Forbidden(field.NewPath("spec"), message+"; scheduling gates may be removed")}
+}
+
 // ValidatePodCreate validates a pod in the context of its initial create
 func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	allErrs := validatePodMetadataAndSpec(pod, opts)
@@ -6033,6 +6069,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodUpdateCommon(newPod, oldPod)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, fldPath.Child("annotations"), opts)...)
 	allErrs = append(allErrs, validatePodSpecUpdate(newPod, oldPod, opts)...)
 	return allErrs
@@ -6664,6 +6701,7 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodUpdateCommon(newPod, oldPod)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, fldPath.Child("annotations"), opts)...)
 
 	// static pods don't support ephemeral containers #113935
@@ -6704,6 +6742,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodUpdateCommon(newPod, oldPod)...)
 
 	// static pods cannot be resized.
 	if _, ok := oldPod.Annotations[core.MirrorPodAnnotationKey]; ok {
@@ -6880,6 +6919,7 @@ func ValidatePodDynamicUpdate(newPod, oldPod *core.Pod, opts PodValidationOption
 	specPath := field.NewPath("spec")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, metaPath)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodUpdateCommon(newPod, oldPod)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, metaPath.Child("annotations"), opts)...)
 
 	containerErrs, containersChanged := validateDynamicContainerChanges(newPod, oldPod, specPath, opts)

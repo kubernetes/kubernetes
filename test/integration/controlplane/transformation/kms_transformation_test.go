@@ -666,6 +666,9 @@ resources:
 				t.Fatal(err)
 			}
 
+			if err := etcd.CreatePrerequisites(context.TODO(), client, testNamespace, etcdStorageData[gvr].Prerequisites); err != nil {
+				t.Fatal(err)
+			}
 			_, err = dynamicClient.Create(context.TODO(), obj, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
