@@ -661,6 +661,103 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	assert.GreaterOrEqual(t, destroyCount, 1, "Expect 1 or more destroys")
 }
 
+func TestSyncPodPodCgroupValidationBehavior(t *testing.T) {
+	testCases := []struct {
+		name                string
+		podStatus           *kubecontainer.PodStatus
+		validateErr         error
+		expectedValidateCnt int
+		expectedExistsCnt   int
+		expectedKilledPods  []string
+	}{
+		{
+			name:                "first sync skips validation",
+			podStatus:           newPodStatusForSyncPodValidationTest(false),
+			validateErr:         errors.New("should not be used"),
+			expectedValidateCnt: 0,
+			expectedExistsCnt:   1,
+			expectedKilledPods:  nil,
+		},
+		{
+			name:                "running pod is killed when validation fails",
+			podStatus:           newPodStatusForSyncPodValidationTest(true),
+			validateErr:         errors.New("pod cgroup validation failed"),
+			expectedValidateCnt: 1,
+			expectedExistsCnt:   1,
+			expectedKilledPods:  []string{"12345678"},
+		},
+		{
+			name:                "running pod is not killed when validation succeeds",
+			podStatus:           newPodStatusForSyncPodValidationTest(true),
+			expectedValidateCnt: 1,
+			expectedExistsCnt:   1,
+			expectedKilledPods:  nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+
+			kubelet := testKubelet.kubelet
+			kubelet.cgroupsPerQOS = true
+
+			pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "bar", Image: "test:latest"},
+				},
+			})
+			kubelet.podManager.SetPods([]*v1.Pod{pod})
+
+			fakePCM := testKubelet.fakeContainerManager.PodContainerManager
+			fakePCM.ValidateError = tc.validateErr
+			fakePCM.ExistsResult = ptr.To(true)
+
+			isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, tc.podStatus)
+			require.NoError(t, err)
+			require.False(t, isTerminal)
+
+			fakePCM.Lock()
+			validateCount := 0
+			existsCount := 0
+			for _, fn := range fakePCM.CalledFunctions {
+				switch fn {
+				case "Validate":
+					validateCount++
+				case "Exists":
+					existsCount++
+				}
+			}
+			fakePCM.Unlock()
+
+			require.Equal(t, tc.expectedValidateCnt, validateCount)
+			require.Equal(t, tc.expectedExistsCnt, existsCount)
+			require.True(t, testKubelet.fakeRuntime.AssertKilledPods(tc.expectedKilledPods))
+		})
+	}
+}
+
+func newPodStatusForSyncPodValidationTest(hasRunningContainer bool) *kubecontainer.PodStatus {
+	if !hasRunningContainer {
+		return &kubecontainer.PodStatus{}
+	}
+
+	return &kubecontainer.PodStatus{
+		ID:        types.UID("12345678"),
+		Name:      "foo",
+		Namespace: "new",
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:    kubecontainer.ContainerID{Type: "test", ID: "container-1"},
+				Name:  "bar",
+				State: kubecontainer.ContainerStateRunning,
+			},
+		},
+	}
+}
+
 func TestDispatchWorkOfCompletedPod(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)

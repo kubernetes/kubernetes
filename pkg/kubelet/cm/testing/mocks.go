@@ -2527,3 +2527,54 @@ func (_c *MockPodContainerManager_SetPodCgroupConfig_Call) RunAndReturn(run func
 	_c.Call.Return(run)
 	return _c
 }
+
+// Validate provides a mock function for the type MockPodContainerManager
+func (_mock *MockPodContainerManager) Validate(pod *v1.Pod) error {
+	ret := _mock.Called(pod)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Validate")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*v1.Pod) error); ok {
+		r0 = returnFunc(pod)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockPodContainerManager_Validate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Validate'
+type MockPodContainerManager_Validate_Call struct {
+	*mock.Call
+}
+
+// Validate is a helper method to define mock.On call
+//   - pod *v1.Pod
+func (_e *MockPodContainerManager_Expecter) Validate(pod interface{}) *MockPodContainerManager_Validate_Call {
+	return &MockPodContainerManager_Validate_Call{Call: _e.mock.On("Validate", pod)}
+}
+
+func (_c *MockPodContainerManager_Validate_Call) Run(run func(pod *v1.Pod)) *MockPodContainerManager_Validate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *v1.Pod
+		if args[0] != nil {
+			arg0 = args[0].(*v1.Pod)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPodContainerManager_Validate_Call) Return(err error) *MockPodContainerManager_Validate_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockPodContainerManager_Validate_Call) RunAndReturn(run func(pod *v1.Pod) error) *MockPodContainerManager_Validate_Call {
+	_c.Call.Return(run)
+	return _c
+}
