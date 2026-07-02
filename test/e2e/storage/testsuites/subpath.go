@@ -1141,6 +1141,7 @@ func testSubpathStaleBindMountRemount(ctx context.Context, f *framework.Framewor
 				for _, cs := range p.Status.ContainerStatuses {
 					if cs.Name == containerName && cs.RestartCount >= 1 {
 						framework.Logf("crictl stop returned %v, but container already restarted (count=%d); treating as success", err, cs.RestartCount)
+						stopResult = "container already restarted"
 						return true, nil
 					}
 				}
