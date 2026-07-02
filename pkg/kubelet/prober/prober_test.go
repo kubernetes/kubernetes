@@ -18,11 +18,14 @@ package prober
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,6 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
+	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -273,6 +278,47 @@ func TestProbe(t *testing.T) {
 			}
 		}
 	}
+}
+
+type fakeSuccessHTTPProber struct{}
+
+func (fakeSuccessHTTPProber) Probe(_ *http.Request, _ time.Duration) (probe.Result, string, error) {
+	return probe.Success, "", nil
+}
+
+// TestRunProbeHTTPHeaderLogRedaction is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/140174: the HTTP-Probe
+// V(4) log line must not leak configured header values (e.g. Authorization
+// tokens), only the header names.
+func TestRunProbeHTTPHeaderLogRedaction(t *testing.T) {
+	const secretValue = "Bearer super-secret-token"
+
+	// Use a buffered logger because this test asserts log output.
+	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(4)))
+	ctx := klog.NewContext(context.Background(), logger)
+
+	pb := &prober{http: fakeSuccessHTTPProber{}}
+	httpProbe := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/healthz",
+				Port: intstr.FromInt32(8080),
+				HTTPHeaders: []v1.HTTPHeader{
+					{Name: "Authorization", Value: secretValue},
+				},
+			},
+		},
+	}
+
+	_, _, err := pb.runProbe(ctx, liveness, httpProbe, &v1.Pod{}, v1.PodStatus{PodIP: "127.0.0.1"}, v1.Container{Name: "app"}, kubecontainer.ContainerID{Type: "test", ID: "container"})
+	require.NoError(t, err)
+
+	underlier, ok := logger.GetSink().(klogtesting.Underlier)
+	require.True(t, ok, "should have had a ktesting LogSink, got %T", logger.GetSink())
+	logs := underlier.GetBuffer().String()
+
+	require.NotContains(t, logs, secretValue, "HTTP-Probe log must not contain the raw header value")
+	require.Contains(t, logs, "Authorization", "HTTP-Probe log should still contain the header name for debuggability")
 }
 
 func TestNewExecInContainer(t *testing.T) {
