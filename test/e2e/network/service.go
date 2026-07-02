@@ -2232,7 +2232,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execAffinityTestForNonLBService(ctx, f, cs, svc)
 	})
 
-	ginkgo.It("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", framework.WithSlow(), func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-clusterip-timeout")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForSessionAffinityTimeout(ctx, f, cs, svc)
@@ -2269,7 +2269,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execAffinityTestForNonLBService(ctx, f, cs, svc)
 	})
 
-	ginkgo.It("should have session affinity timeout work for NodePort service [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should have session affinity timeout work for NodePort service [LinuxOnly]", framework.WithSlow(), func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-nodeport-timeout")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForSessionAffinityTimeout(ctx, f, cs, svc)
