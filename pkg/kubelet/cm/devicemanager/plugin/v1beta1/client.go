@@ -64,17 +64,34 @@ func NewPluginClient(r string, socketPath string, h ClientHandler) Client {
 }
 
 // Connect is for establishing a gRPC connection between device manager and device plugin.
-func (c *client) Connect(ctx context.Context) error {
+// If the connection is established but PluginConnected fails, the gRPC connection
+// is closed to prevent goroutine and descriptor leaks.
+func (c *client) Connect(ctx context.Context) (err error) {
 	logger := klog.FromContext(ctx)
 	client, conn, err := dial(ctx, c.socket)
 	if err != nil {
-		logger.Error(err, "Unable to connect to device plugin client with socket path", "path", c.socket)
 		return err
 	}
+
 	c.mutex.Lock()
 	c.grpc = conn
 	c.client = client
 	c.mutex.Unlock()
+
+	defer func() {
+		if err == nil {
+			return
+		}
+		logger.Error(err, "Unable to connect to device plugin client with socket path", "path", c.socket)
+		c.mutex.Lock()
+		if c.grpc != nil {
+			c.grpc.Close()
+			c.grpc = nil
+		}
+		c.client = nil
+		c.mutex.Unlock()
+	}()
+
 	return c.handler.PluginConnected(ctx, c.resource, c)
 }
 
