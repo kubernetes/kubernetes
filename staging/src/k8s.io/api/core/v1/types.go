@@ -4720,6 +4720,26 @@ type PodSpec struct {
 	// +k8s:maxItems=10
 	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+	// RestoreFrom specifies a PodCheckpoint in this Pod's namespace to restore
+	// this Pod from. When set, the Pod is restored from that checkpoint's archive
+	// instead of being created from scratch; the kubelet resolves the reference to
+	// the on-node archive via the PodCheckpoint's status.
+	// This field is immutable. Restoring from another checkpoint requires creating
+	// a new Pod; in-place restore of an existing Pod is not supported.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	RestoreFrom *CheckpointReference `json:"restoreFrom,omitempty" protobuf:"bytes,45,opt,name=restoreFrom"`
+}
+
+// CheckpointReference identifies a PodCheckpoint to restore a Pod from.
+// +structType=atomic
+type CheckpointReference struct {
+	// Name is the name of a PodCheckpoint in the Pod's namespace.
+	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:required
+	// +k8s:alpha(since: "1.37")=+k8s:format=k8s-long-name
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly
@@ -5776,6 +5796,7 @@ type Pod struct {
 	// Specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:subfield(restoreFrom)=+k8s:immutable
 	Spec PodSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Most recently observed status of the pod.

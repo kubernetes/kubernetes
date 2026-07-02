@@ -166,6 +166,38 @@ func TestSanitizePodTemplate_DoesNotMutateSource(t *testing.T) {
 	}
 }
 
+func TestSanitizePodTemplate_DropsAffinityCreatedOnlyForRestoreNode(t *testing.T) {
+	pod := sourcePod()
+	pod.Spec.Affinity = &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{{
+					MatchFields: []v1.NodeSelectorRequirement{{
+						Key:      "metadata.name",
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{"node-1"},
+					}},
+				}},
+			},
+		},
+	}
+
+	tmpl := SanitizePodTemplate(pod)
+	if tmpl.Spec.Affinity != nil {
+		t.Fatalf("expected empty affinity wrappers to be removed, got %+v", tmpl.Spec.Affinity)
+	}
+}
+
+func TestSanitizePodTemplate_DropsEmptyAffinity(t *testing.T) {
+	pod := sourcePod()
+	pod.Spec.Affinity = &v1.Affinity{}
+
+	tmpl := SanitizePodTemplate(pod)
+	if tmpl.Spec.Affinity != nil {
+		t.Fatalf("expected empty affinity to be removed, got %+v", tmpl.Spec.Affinity)
+	}
+}
+
 func TestSanitizePodTemplate_NilPod(t *testing.T) {
 	if got := SanitizePodTemplate(nil); got != nil {
 		t.Errorf("expected nil for nil pod, got %+v", got)

@@ -15490,6 +15490,34 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "pod updates may not change fields other than",
 			test: "updated eviction interceptors",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox"))),
+				podtest.SetRestoreFrom("checkpoint-v2")),
+			old: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox"))),
+				podtest.SetRestoreFrom("checkpoint-v1")),
+			err:  "spec.restoreFrom: Invalid value",
+			opts: PodValidationOptions{AllowRestoreFrom: true},
+			test: "restoreFrom.name is immutable",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox"))),
+				podtest.SetRestoreFrom("checkpoint-v1")),
+			old: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox")))),
+			err:  "spec.restoreFrom: Invalid value",
+			opts: PodValidationOptions{AllowRestoreFrom: true},
+			test: "restoreFrom cannot be set after creation",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox")))),
+			old: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox"))),
+				podtest.SetRestoreFrom("checkpoint-v1")),
+			err:  "spec.restoreFrom: Invalid value",
+			opts: PodValidationOptions{AllowRestoreFrom: true},
+			test: "restoreFrom cannot be cleared after creation",
 		},
 	}
 
@@ -24565,6 +24593,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ResourceClaims[*].ResourceClaimTemplateName",
 		"Resources",
 		"RestartPolicy",
+		"RestoreFrom",
 		"RuntimeClassName",
 		"SchedulerName",
 		"SchedulingGates[*].Name",
@@ -32734,6 +32763,45 @@ func TestValidatePodSchedulingGroup(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("Expected failure for %q", name)
 		}
+	}
+}
+
+func TestValidateRestoreFrom(t *testing.T) {
+	tests := []struct {
+		name        string
+		restoreFrom *core.CheckpointReference
+		wantField   string
+	}{
+		{
+			name:        "empty reference",
+			restoreFrom: &core.CheckpointReference{},
+			wantField:   "spec.restoreFrom.name",
+		},
+		{
+			name:        "valid checkpoint name",
+			restoreFrom: &core.CheckpointReference{Name: "my-checkpoint"},
+		},
+		{
+			name:        "invalid name (slash)",
+			restoreFrom: &core.CheckpointReference{Name: "bad/name"},
+			wantField:   "spec.restoreFrom.name",
+		},
+		{
+			name:        "invalid name (uppercase)",
+			restoreFrom: &core.CheckpointReference{Name: "Bad"},
+			wantField:   "spec.restoreFrom.name",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateRestoreFrom(tc.restoreFrom, field.NewPath("spec", "restoreFrom"))
+			if tc.wantField == "" {
+				require.Empty(t, errs)
+				return
+			}
+			require.NotEmpty(t, errs)
+			assert.Equal(t, tc.wantField, errs[0].Field)
+		})
 	}
 }
 
