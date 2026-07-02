@@ -517,7 +517,7 @@ func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinit
 		return err
 	}
 	for _, version := range servedV1Versions(crd) {
-		err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 			exists, err := existsInDiscoveryV1(crd, apiExtensionsClient, version)
 			return !exists, err
 		})
@@ -539,7 +539,7 @@ func DeleteV1CustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExt
 	}
 	for _, crd := range list.Items {
 		for _, version := range servedV1Versions(&crd) {
-			err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+			err := wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 				exists, err := existsInDiscoveryV1(&crd, apiExtensionsClient, version)
 				return !exists, err
 			})
