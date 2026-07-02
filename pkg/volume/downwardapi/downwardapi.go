@@ -23,8 +23,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -176,7 +178,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 		return err
 	}
 
-	data, err := CollectData(b.source.Items, b.pod, b.plugin.host, b.source.DefaultMode)
+	data, err := CollectData(b.source.Items, b.pod, b.plugin.host, b.source.DefaultMode, b.source.DefaultUser)
 	if err != nil {
 		klog.Errorf("Error preparing data for downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
@@ -235,7 +237,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 // Map's value is the (sorted) content of the field to be dumped in the file.
 //
 // Note: this function is exported so that it can be called from the projection volume driver
-func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.VolumeHost, defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
+func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.VolumeHost, defaultMode *int32, defaultUser *int64) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
@@ -249,6 +251,13 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 			fileProjection.Mode = *fileInfo.Mode
 		} else {
 			fileProjection.Mode = *defaultMode
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.AtomicWriteVolumeUserFields) {
+			if fileInfo.User != nil {
+				fileProjection.FsUser = fileInfo.User
+			} else if defaultUser != nil {
+				fileProjection.FsUser = defaultUser
+			}
 		}
 		if fileInfo.FieldRef != nil {
 			// TODO: unify with Kubelet.podFieldSelectorRuntimeValue

@@ -41,6 +41,9 @@ type ServiceAccountTokenProjectionApplyConfiguration struct {
 	// path is the path relative to the mount point of the file to project the
 	// token into.
 	Path *string `json:"path,omitempty"`
+	// user is Optional: The owner UID of the created file.
+	// Default is implementation-defined.
+	User *int64 `json:"user,omitempty"`
 }
 
 // ServiceAccountTokenProjectionApplyConfiguration constructs a declarative configuration of the ServiceAccountTokenProjection type for use with
@@ -70,5 +73,13 @@ func (b *ServiceAccountTokenProjectionApplyConfiguration) WithExpirationSeconds(
 // If called multiple times, the Path field is set to the value of the last call.
 func (b *ServiceAccountTokenProjectionApplyConfiguration) WithPath(value string) *ServiceAccountTokenProjectionApplyConfiguration {
 	b.Path = &value
+	return b
+}
+
+// WithUser sets the User field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the User field is set to the value of the last call.
+func (b *ServiceAccountTokenProjectionApplyConfiguration) WithUser(value int64) *ServiceAccountTokenProjectionApplyConfiguration {
+	b.User = &value
 	return b
 }

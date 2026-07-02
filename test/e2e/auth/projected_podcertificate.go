@@ -29,15 +29,18 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
 	imageutils "k8s.io/kubernetes/test/utils/image" // Import imageutils
 	admissionapi "k8s.io/pod-security-admission/api"
 	admissiontest "k8s.io/pod-security-admission/test"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe("Projected PodCertificate",
@@ -118,7 +121,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 			userAnnotations := map[string]string{
 				"spiffe/path-overriding": customPath, // Match the key supported the signer
 			}
-			inspectorPod := createInspectorPod(namespace, "path-override-pod", userAnnotations, nil, spiffeSignerName)
+			inspectorPod := createInspectorPod(namespace, "path-override-pod", createPodCertificateVolumes(userAnnotations, nil, spiffeSignerName))
 
 			ginkgo.By("Creating inspector pod with UserAnnotations...")
 			_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, inspectorPod, metav1.CreateOptions{})
@@ -163,7 +166,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 				ginkgo.By("Using namespace: " + namespace)
 
 				// Create pod without MaxExpirationSeconds
-				testPod := createInspectorPod(namespace, "default-duration-pod", nil, nil, spiffeSignerName)
+				testPod := createInspectorPod(namespace, "default-duration-pod", createPodCertificateVolumes(nil, nil, spiffeSignerName))
 				ginkgo.By("Creating pod without MaxExpirationSeconds...")
 				createdPod, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err != nil {
@@ -199,7 +202,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 
 				// Create pod requesting 1 hour
 				requestedSeconds := int32(3600)
-				testPod := createInspectorPod(namespace, "one-hour-duration-pod", nil, &requestedSeconds, spiffeSignerName)
+				testPod := createInspectorPod(namespace, "one-hour-duration-pod", createPodCertificateVolumes(nil, &requestedSeconds, spiffeSignerName))
 				ginkgo.By("Creating pod requesting 1 hour MaxExpirationSeconds...")
 				createdPod, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err != nil {
@@ -235,7 +238,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 
 				// Exceeds 91 days
 				tooLongSeconds := int32((91 * 24 * 60 * 60) + 1)
-				testPod := createInspectorPod(namespace, "too-long-duration-pod", nil, &tooLongSeconds, spiffeSignerName)
+				testPod := createInspectorPod(namespace, "too-long-duration-pod", createPodCertificateVolumes(nil, &tooLongSeconds, spiffeSignerName))
 				ginkgo.By("Creating pod requesting >91d MaxExpirationSeconds...")
 				_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err == nil {
@@ -254,7 +257,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 
 				// Less than 1 hour
 				tooShortSeconds := int32(3599)
-				testPod := createInspectorPod(namespace, "too-short-duration-pod", nil, &tooShortSeconds, spiffeSignerName)
+				testPod := createInspectorPod(namespace, "too-short-duration-pod", createPodCertificateVolumes(nil, &tooShortSeconds, spiffeSignerName))
 				ginkgo.By("Creating pod requesting <1h MaxExpirationSeconds...")
 				_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err != nil {
@@ -263,6 +266,52 @@ var _ = SIGDescribe("Projected PodCertificate",
 					}
 				}
 			})
+		})
+
+		ginkgo.It("should issue certificate with user fields [LinuxOnly]", f.WithFeatureGate(features.AtomicWriteVolumeUserFields), func(ctx context.Context) {
+			for _, tt := range []struct {
+				name           string
+				itemUser       *int64
+				defaultUser    *int64
+				expectedOutput []string
+			}{
+				{
+					name:           "set ownership when DefaultUser is present",
+					defaultUser:    ptr.To[int64](1000),
+					expectedOutput: []string{"owner UID of \"/run/tls-config/..data/spiffe-cred-bundle.pem\": 1000"},
+				},
+				{
+					name:           "set ownership when User is present",
+					itemUser:       ptr.To[int64](1000),
+					expectedOutput: []string{"owner UID of \"/run/tls-config/..data/spiffe-cred-bundle.pem\": 1000"},
+				},
+				{
+					name:           "set ownership when DefaultUser and User is present",
+					defaultUser:    ptr.To[int64](1001),
+					itemUser:       ptr.To[int64](1000),
+					expectedOutput: []string{"owner UID of \"/run/tls-config/..data/spiffe-cred-bundle.pem\": 1000"},
+				},
+			} {
+				podName := "pod-" + string(uuid.NewUUID())
+				volumes := createPodCertificateVolumes(nil, nil, spiffeSignerName)
+				volumeMounts := []v1.VolumeMount{
+					{Name: "tls-config", MountPath: "/run/tls-config"},
+				}
+				mounttestArgs := []string{
+					"mounttest",
+					"--file_owner=/run/tls-config/..data/spiffe-cred-bundle.pem",
+				}
+				pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, volumes, volumeMounts, nil, mounttestArgs...)
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+
+				if tt.itemUser != nil {
+					pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].PodCertificate.User = tt.itemUser
+				}
+				if tt.defaultUser != nil {
+					pod.Spec.Volumes[0].VolumeSource.Projected.DefaultUser = tt.defaultUser
+				}
+				e2epodoutput.TestContainerOutputRegexp(ctx, f, "project pod certificate", pod, 0, tt.expectedOutput)
+			}
 		})
 	})
 
@@ -413,7 +462,7 @@ func createClientObjects(namespace string, spiffeSignerName string, securityCont
 }
 
 // createInspectorPod creates a pod designed to print its certificate and wait, for inspection purposes.
-func createInspectorPod(namespace, podName string, userAnnotations map[string]string, maxExpirationSeconds *int32, spiffeSignerName string) *v1.Pod {
+func createInspectorPod(namespace, podName string, volumes []v1.Volume) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -431,27 +480,31 @@ func createInspectorPod(namespace, podName string, userAnnotations map[string]st
 					},
 				},
 			},
-			Volumes: []v1.Volume{
-				{
-					Name: "tls-config",
-					VolumeSource: v1.VolumeSource{
-						Projected: &v1.ProjectedVolumeSource{
-							Sources: []v1.VolumeProjection{
-								{
-									PodCertificate: &v1.PodCertificateProjection{
-										SignerName:           spiffeSignerName,
-										CredentialBundlePath: "spiffe-cred-bundle.pem",
-										KeyType:              "ECDSAP256",
-										UserAnnotations:      userAnnotations,
-										MaxExpirationSeconds: maxExpirationSeconds,
-									},
-								},
+			Volumes:       volumes,
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+}
+
+func createPodCertificateVolumes(userAnnotations map[string]string, maxExpirationSeconds *int32, spiffeSignerName string) []v1.Volume {
+	return []v1.Volume{
+		{
+			Name: "tls-config",
+			VolumeSource: v1.VolumeSource{
+				Projected: &v1.ProjectedVolumeSource{
+					Sources: []v1.VolumeProjection{
+						{
+							PodCertificate: &v1.PodCertificateProjection{
+								SignerName:           spiffeSignerName,
+								CredentialBundlePath: "spiffe-cred-bundle.pem",
+								KeyType:              "ECDSAP256",
+								UserAnnotations:      userAnnotations,
+								MaxExpirationSeconds: maxExpirationSeconds,
 							},
 						},
 					},
 				},
 			},
-			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 }
