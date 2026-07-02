@@ -37,6 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/util/protectionutil"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
+	pvcmetrics "k8s.io/kubernetes/pkg/controller/volume/pvcprotection/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -160,6 +161,8 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 			e.podAddedDeletedUpdated(logger, old, new, false)
 		},
 	})
+
+	pvcmetrics.Register()
 
 	return e, nil
 }
@@ -354,9 +357,11 @@ func (c *Controller) setUnusedCondition(ctx context.Context, pvc *v1.PersistentV
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(ctx, claimClone, metav1.UpdateOptions{})
 	logger := klog.FromContext(ctx)
 	if err != nil {
+		pvcmetrics.UnusedConditionSyncsTotal.WithLabelValues("error").Inc()
 		logger.Error(err, "Error updating Unused condition in PVC status", "PVC", klog.KObj(pvc))
 		return err
 	}
+	pvcmetrics.UnusedConditionSyncsTotal.WithLabelValues("success").Inc()
 	logger.V(3).Info("Updated Unused condition in PVC status", "PVC", klog.KObj(pvc), "status", status)
 	return nil
 }
