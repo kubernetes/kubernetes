@@ -17,19 +17,27 @@ limitations under the License.
 package podcheckpoint
 
 import (
+	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	podcheckpointcontroller "k8s.io/kubernetes/pkg/controller/podcheckpoint"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -144,6 +152,50 @@ func TestPodCheckpointGeneration(t *testing.T) {
 	}
 }
 
+// TestPodCheckpointControllerReconciles verifies routing to the source node
+// before execution.
+func TestPodCheckpointControllerReconciles(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+
+	tCtx := ktesting.Init(t)
+	clientSet, _, closeFn := startAPIServer(tCtx, t, true)
+	defer closeFn()
+
+	ns := framework.CreateNamespaceOrDie(clientSet, "podcheckpoint", t)
+	checkpoints := clientSet.NodeV1alpha1().PodCheckpoints(ns.Name)
+	source := createCheckpointSource(tCtx, t, clientSet, ns.Name, "source-pod")
+
+	// Start the controller.
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+	controller := podcheckpointcontroller.NewController(clientSet, informerFactory.Core().V1().Pods())
+	informerFactory.Start(tCtx.Done())
+	go controller.Run(tCtx, 1)
+
+	checkpoint := newPodCheckpoint(ns.Name, "cp-1", "source-pod")
+	if _, err := checkpoints.Create(tCtx, checkpoint, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("failed to create PodCheckpoint: %v", err)
+	}
+	err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		stored, err := checkpoints.Get(ctx, checkpoint.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if stored.Status.NodeName == nil || stored.Status.SourcePodUID == nil {
+			return false, nil
+		}
+		if *stored.Status.NodeName != source.Spec.NodeName || *stored.Status.SourcePodUID != source.UID {
+			return false, fmt.Errorf("checkpoint was assigned to node %q with source UID %q", *stored.Status.NodeName, *stored.Status.SourcePodUID)
+		}
+		if len(stored.Status.Conditions) != 0 {
+			return false, fmt.Errorf("routing changed execution conditions: %#v", stored.Status.Conditions)
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("controller did not assign the checkpoint: %v", err)
+	}
+}
+
 // TestPodCheckpointAPINotServedWhenDisabled verifies that with the
 // PodLevelCheckpointRestore feature gate disabled, PodCheckpoint is not served
 // even when enabled in runtime configuration.
@@ -159,5 +211,147 @@ func TestPodCheckpointAPINotServedWhenDisabled(t *testing.T) {
 
 	if _, err := checkpoints.Create(tCtx, newPodCheckpoint(ns.Name, "cp-1", "src-pod"), metav1.CreateOptions{}); !apierrors.IsNotFound(err) {
 		t.Fatalf("expected PodCheckpoint API to be unavailable when the feature gate is disabled, got %v", err)
+	}
+}
+
+func TestPodCheckpointNodeReadIsolation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	tCtx := ktesting.Init(t)
+	client, config, closeFn := startAPIServer(tCtx, t, true, func(opts *options.ServerRunOptions) {
+		opts.Authorization.Modes = []string{"Node", "RBAC"}
+		opts.Admission.GenericAdmission.EnablePlugins = append(opts.Admission.GenericAdmission.EnablePlugins, "NodeRestriction")
+	})
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(client, "checkpoint-node-isolation", t)
+	checkpoints := client.NodeV1alpha1().PodCheckpoints(ns.Name)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	controller := podcheckpointcontroller.NewController(client, informerFactory.Core().V1().Pods())
+	informerFactory.Start(tCtx.Done())
+	go controller.Run(tCtx, 1)
+
+	sources := make([]*v1.Pod, 2)
+	nodeClients := make([]clientset.Interface, 2)
+	for i, nodeName := range []string{"node-1", "node-2"} {
+		source, err := client.CoreV1().Pods(ns.Name).Create(tCtx, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("source-%d", i)},
+			Spec: v1.PodSpec{NodeName: nodeName, Containers: []v1.Container{{
+				Name: "app", Image: "pause", Env: []v1.EnvVar{{Name: "NODE_PRIVATE_VALUE", Value: nodeName}},
+			}}},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		source = markCheckpointSourceRunning(tCtx, t, client, source)
+		sources[i] = source
+		name := fmt.Sprintf("checkpoint-%d", i)
+		if _, err := checkpoints.Create(tCtx, newPodCheckpoint(ns.Name, name, source.Name), metav1.CreateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		if err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+			checkpoint, err := checkpoints.Get(ctx, name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return checkpoint.Status.NodeName != nil && *checkpoint.Status.NodeName == nodeName &&
+				checkpoint.Status.SourcePodUID != nil && *checkpoint.Status.SourcePodUID == source.UID, nil
+		}); err != nil {
+			t.Fatalf("controller did not route %s: %v", name, err)
+		}
+
+		nodeConfig := restclient.CopyConfig(config)
+		nodeConfig.Impersonate = restclient.ImpersonationConfig{UserName: "system:node:" + nodeName, Groups: []string{user.NodesGroup, user.AllAuthenticated}}
+		nodeClient, err := clientset.NewForConfig(nodeConfig)
+		if err != nil {
+			t.Fatal(err)
+		}
+		nodeClients[i] = nodeClient
+		if err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+			_, err := nodeClient.NodeV1alpha1().PodCheckpoints(ns.Name).Get(ctx, name, metav1.GetOptions{})
+			if apierrors.IsForbidden(err) {
+				return false, nil
+			}
+			return err == nil, err
+		}); err != nil {
+			t.Fatalf("node could not read its checkpoint after graph synchronization: %v", err)
+		}
+	}
+
+	nodeCheckpoints := nodeClients[0].NodeV1alpha1().PodCheckpoints(metav1.NamespaceAll)
+	for _, selector := range []string{"", fields.OneTermEqualSelector("status.nodeName", "node-2").String()} {
+		if _, err := nodeCheckpoints.List(tCtx, metav1.ListOptions{FieldSelector: selector}); !apierrors.IsForbidden(err) {
+			t.Errorf("node LIST with selector %q: got %v, want forbidden", selector, err)
+		}
+		watch, err := nodeCheckpoints.Watch(tCtx, metav1.ListOptions{FieldSelector: selector})
+		if watch != nil {
+			watch.Stop()
+		}
+		if !apierrors.IsForbidden(err) {
+			t.Errorf("node WATCH with selector %q: got %v, want forbidden", selector, err)
+		}
+	}
+	if _, err := nodeClients[0].NodeV1alpha1().PodCheckpoints(ns.Name).Get(tCtx, "checkpoint-1", metav1.GetOptions{}); !apierrors.IsForbidden(err) {
+		t.Errorf("node GET on another node's checkpoint: got %v, want forbidden", err)
+	}
+	selector := fields.OneTermEqualSelector("status.nodeName", "node-1").String()
+	list, err := nodeCheckpoints.List(tCtx, metav1.ListOptions{FieldSelector: selector})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Items) != 1 || list.Items[0].Name != "checkpoint-0" {
+		t.Fatalf("node-scoped LIST returned other checkpoints: %#v", list.Items)
+	}
+	watch, err := nodeCheckpoints.Watch(tCtx, metav1.ListOptions{FieldSelector: selector, ResourceVersion: list.ResourceVersion})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer watch.Stop()
+	for _, name := range []string{"checkpoint-1", "checkpoint-0"} {
+		checkpoint, err := checkpoints.Get(tCtx, name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		checkpoint.Annotations = map[string]string{"watch-check": "updated"}
+		if _, err := checkpoints.Update(tCtx, checkpoint, metav1.UpdateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	select {
+	case event, open := <-watch.ResultChan():
+		checkpoint, ok := event.Object.(*nodev1alpha1.PodCheckpoint)
+		if !open || !ok || checkpoint.Name != "checkpoint-0" || checkpoint.Annotations["watch-check"] != "updated" {
+			t.Fatalf("node-scoped WATCH returned unexpected event: %#v", event)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("node-scoped WATCH did not deliver its checkpoint update")
+	}
+
+	if err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, err := nodeClients[0].CoreV1().Pods(ns.Name).Get(ctx, sources[0].Name, metav1.GetOptions{})
+		if apierrors.IsForbidden(err) {
+			return false, nil
+		}
+		return err == nil, err
+	}); err != nil {
+		t.Fatalf("node could not read its source Pod before deletion: %v", err)
+	}
+	if err := client.CoreV1().Pods(ns.Name).Delete(tCtx, sources[0].Name, metav1.DeleteOptions{GracePeriodSeconds: new(int64(0))}); err != nil {
+		t.Fatal(err)
+	}
+	// Wait for the Pod's graph edge to disappear before checking that the
+	// checkpoint remains readable for recovery after the source Pod is gone.
+	if err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, err := nodeClients[0].CoreV1().Pods(ns.Name).Get(ctx, sources[0].Name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		if apierrors.IsForbidden(err) {
+			return true, nil
+		}
+		return false, err
+	}); err != nil {
+		t.Fatalf("source Pod graph edge did not disappear: %v", err)
+	}
+	if _, err := nodeClients[0].NodeV1alpha1().PodCheckpoints(ns.Name).Get(tCtx, "checkpoint-0", metav1.GetOptions{}); err != nil {
+		t.Fatalf("source deletion revoked access to its checkpoint: %v", err)
 	}
 }
