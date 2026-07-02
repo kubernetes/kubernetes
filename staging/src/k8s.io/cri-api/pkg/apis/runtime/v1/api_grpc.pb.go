@@ -81,6 +81,8 @@ const (
 	RuntimeService_UpdateRuntimeConfig_FullMethodName       = "/runtime.v1.RuntimeService/UpdateRuntimeConfig"
 	RuntimeService_Status_FullMethodName                    = "/runtime.v1.RuntimeService/Status"
 	RuntimeService_CheckpointContainer_FullMethodName       = "/runtime.v1.RuntimeService/CheckpointContainer"
+	RuntimeService_CheckpointPod_FullMethodName             = "/runtime.v1.RuntimeService/CheckpointPod"
+	RuntimeService_RestorePod_FullMethodName                = "/runtime.v1.RuntimeService/RestorePod"
 	RuntimeService_GetContainerEvents_FullMethodName        = "/runtime.v1.RuntimeService/GetContainerEvents"
 	RuntimeService_ListMetricDescriptors_FullMethodName     = "/runtime.v1.RuntimeService/ListMetricDescriptors"
 	RuntimeService_ListPodSandboxMetrics_FullMethodName     = "/runtime.v1.RuntimeService/ListPodSandboxMetrics"
@@ -227,6 +229,23 @@ type RuntimeServiceClient interface {
 	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	// CheckpointContainer checkpoints a container
 	CheckpointContainer(ctx context.Context, in *CheckpointContainerRequest, opts ...grpc.CallOption) (*CheckpointContainerResponse, error)
+	// CheckpointPod creates a Pod-level checkpoint. The caller must set a
+	// deadline on the call. If the pod sandbox does not exist, the deadline is
+	// exceeded, or the checkpoint operation fails, the call returns an error.
+	// The pod sandbox and containers must be running when the call starts. The
+	// runtime must pause every selected container before capturing any of
+	// them, keep all selected containers paused until every selected
+	// container has been captured, and resume all of them before returning on
+	// success, error, or deadline expiry. This produces one consistent
+	// pod-wide cut while ensuring the runtime never returns a frozen pod.
+	CheckpointPod(ctx context.Context, in *CheckpointPodRequest, opts ...grpc.CallOption) (*CheckpointPodResponse, error)
+	// RestorePod prepares a pod sandbox and containers from a checkpoint. The
+	// caller must set a deadline on the call. On success, every returned
+	// container must be in the CREATED state and must not have executed the
+	// restored process; the caller invokes its pre-start hooks and then calls
+	// StartContainer for each returned ID. On error, the runtime must remove
+	// any sandbox and containers created by the call before returning.
+	RestorePod(ctx context.Context, in *RestorePodRequest, opts ...grpc.CallOption) (*RestorePodResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error)
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
@@ -601,6 +620,26 @@ func (c *runtimeServiceClient) CheckpointContainer(ctx context.Context, in *Chec
 	return out, nil
 }
 
+func (c *runtimeServiceClient) CheckpointPod(ctx context.Context, in *CheckpointPodRequest, opts ...grpc.CallOption) (*CheckpointPodResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckpointPodResponse)
+	err := c.cc.Invoke(ctx, RuntimeService_CheckpointPod_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runtimeServiceClient) RestorePod(ctx context.Context, in *RestorePodRequest, opts ...grpc.CallOption) (*RestorePodResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RestorePodResponse)
+	err := c.cc.Invoke(ctx, RuntimeService_RestorePod_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *runtimeServiceClient) GetContainerEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContainerEventResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &RuntimeService_ServiceDesc.Streams[4], RuntimeService_GetContainerEvents_FullMethodName, cOpts...)
@@ -817,6 +856,23 @@ type RuntimeServiceServer interface {
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	// CheckpointContainer checkpoints a container
 	CheckpointContainer(context.Context, *CheckpointContainerRequest) (*CheckpointContainerResponse, error)
+	// CheckpointPod creates a Pod-level checkpoint. The caller must set a
+	// deadline on the call. If the pod sandbox does not exist, the deadline is
+	// exceeded, or the checkpoint operation fails, the call returns an error.
+	// The pod sandbox and containers must be running when the call starts. The
+	// runtime must pause every selected container before capturing any of
+	// them, keep all selected containers paused until every selected
+	// container has been captured, and resume all of them before returning on
+	// success, error, or deadline expiry. This produces one consistent
+	// pod-wide cut while ensuring the runtime never returns a frozen pod.
+	CheckpointPod(context.Context, *CheckpointPodRequest) (*CheckpointPodResponse, error)
+	// RestorePod prepares a pod sandbox and containers from a checkpoint. The
+	// caller must set a deadline on the call. On success, every returned
+	// container must be in the CREATED state and must not have executed the
+	// restored process; the caller invokes its pre-start hooks and then calls
+	// StartContainer for each returned ID. On error, the runtime must remove
+	// any sandbox and containers created by the call before returning.
+	RestorePod(context.Context, *RestorePodRequest) (*RestorePodResponse, error)
 	// GetContainerEvents gets container events from the CRI runtime
 	GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
@@ -951,6 +1007,12 @@ func (UnimplementedRuntimeServiceServer) Status(context.Context, *StatusRequest)
 }
 func (UnimplementedRuntimeServiceServer) CheckpointContainer(context.Context, *CheckpointContainerRequest) (*CheckpointContainerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CheckpointContainer not implemented")
+}
+func (UnimplementedRuntimeServiceServer) CheckpointPod(context.Context, *CheckpointPodRequest) (*CheckpointPodResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckpointPod not implemented")
+}
+func (UnimplementedRuntimeServiceServer) RestorePod(context.Context, *RestorePodRequest) (*RestorePodResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RestorePod not implemented")
 }
 func (UnimplementedRuntimeServiceServer) GetContainerEvents(*GetEventsRequest, grpc.ServerStreamingServer[ContainerEventResponse]) error {
 	return status.Error(codes.Unimplemented, "method GetContainerEvents not implemented")
@@ -1485,6 +1547,42 @@ func _RuntimeService_CheckpointContainer_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RuntimeService_CheckpointPod_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckpointPodRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuntimeServiceServer).CheckpointPod(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuntimeService_CheckpointPod_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuntimeServiceServer).CheckpointPod(ctx, req.(*CheckpointPodRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RuntimeService_RestorePod_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestorePodRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RuntimeServiceServer).RestorePod(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RuntimeService_RestorePod_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RuntimeServiceServer).RestorePod(ctx, req.(*RestorePodRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RuntimeService_GetContainerEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(GetEventsRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -1685,6 +1783,14 @@ var RuntimeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CheckpointContainer",
 			Handler:    _RuntimeService_CheckpointContainer_Handler,
+		},
+		{
+			MethodName: "CheckpointPod",
+			Handler:    _RuntimeService_CheckpointPod_Handler,
+		},
+		{
+			MethodName: "RestorePod",
+			Handler:    _RuntimeService_RestorePod_Handler,
 		},
 		{
 			MethodName: "ListMetricDescriptors",

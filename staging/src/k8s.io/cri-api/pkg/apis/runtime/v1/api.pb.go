@@ -12816,7 +12816,7 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x05GAUGE\x10\x01*)\n" +
 	"\fCgroupDriver\x12\v\n" +
 	"\aSYSTEMD\x10\x00\x12\f\n" +
-	"\bCGROUPFS\x10\x012\x9f\x1a\n" +
+	"\bCGROUPFS\x10\x012\xc6\x1b\n" +
 	"\x0eRuntimeService\x12D\n" +
 	"\aVersion\x12\x1a.runtime.v1.VersionRequest\x1a\x1b.runtime.v1.VersionResponse\"\x00\x12V\n" +
 	"\rRunPodSandbox\x12 .runtime.v1.RunPodSandboxRequest\x1a!.runtime.v1.RunPodSandboxResponse\"\x00\x12Y\n" +
@@ -12846,7 +12846,10 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x15StreamPodSandboxStats\x12(.runtime.v1.StreamPodSandboxStatsRequest\x1a).runtime.v1.StreamPodSandboxStatsResponse\"\x000\x01\x12h\n" +
 	"\x13UpdateRuntimeConfig\x12&.runtime.v1.UpdateRuntimeConfigRequest\x1a'.runtime.v1.UpdateRuntimeConfigResponse\"\x00\x12A\n" +
 	"\x06Status\x12\x19.runtime.v1.StatusRequest\x1a\x1a.runtime.v1.StatusResponse\"\x00\x12h\n" +
-	"\x13CheckpointContainer\x12&.runtime.v1.CheckpointContainerRequest\x1a'.runtime.v1.CheckpointContainerResponse\"\x00\x12Z\n" +
+	"\x13CheckpointContainer\x12&.runtime.v1.CheckpointContainerRequest\x1a'.runtime.v1.CheckpointContainerResponse\"\x00\x12V\n" +
+	"\rCheckpointPod\x12 .runtime.v1.CheckpointPodRequest\x1a!.runtime.v1.CheckpointPodResponse\"\x00\x12M\n" +
+	"\n" +
+	"RestorePod\x12\x1d.runtime.v1.RestorePodRequest\x1a\x1e.runtime.v1.RestorePodResponse\"\x00\x12Z\n" +
 	"\x12GetContainerEvents\x12\x1c.runtime.v1.GetEventsRequest\x1a\".runtime.v1.ContainerEventResponse\"\x000\x01\x12n\n" +
 	"\x15ListMetricDescriptors\x12(.runtime.v1.ListMetricDescriptorsRequest\x1a).runtime.v1.ListMetricDescriptorsResponse\"\x00\x12n\n" +
 	"\x15ListPodSandboxMetrics\x12(.runtime.v1.ListPodSandboxMetricsRequest\x1a).runtime.v1.ListPodSandboxMetricsResponse\"\x00\x12v\n" +
@@ -13366,61 +13369,65 @@ var file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_depIdxs = []in
 	127, // 268: runtime.v1.RuntimeService.UpdateRuntimeConfig:input_type -> runtime.v1.UpdateRuntimeConfigRequest
 	131, // 269: runtime.v1.RuntimeService.Status:input_type -> runtime.v1.StatusRequest
 	162, // 270: runtime.v1.RuntimeService.CheckpointContainer:input_type -> runtime.v1.CheckpointContainerRequest
-	169, // 271: runtime.v1.RuntimeService.GetContainerEvents:input_type -> runtime.v1.GetEventsRequest
-	171, // 272: runtime.v1.RuntimeService.ListMetricDescriptors:input_type -> runtime.v1.ListMetricDescriptorsRequest
-	174, // 273: runtime.v1.RuntimeService.ListPodSandboxMetrics:input_type -> runtime.v1.ListPodSandboxMetricsRequest
-	176, // 274: runtime.v1.RuntimeService.StreamPodSandboxMetrics:input_type -> runtime.v1.StreamPodSandboxMetricsRequest
-	181, // 275: runtime.v1.RuntimeService.RuntimeConfig:input_type -> runtime.v1.RuntimeConfigRequest
-	184, // 276: runtime.v1.RuntimeService.UpdatePodSandboxResources:input_type -> runtime.v1.UpdatePodSandboxResourcesRequest
-	113, // 277: runtime.v1.ImageService.ListImages:input_type -> runtime.v1.ListImagesRequest
-	116, // 278: runtime.v1.ImageService.StreamImages:input_type -> runtime.v1.StreamImagesRequest
-	118, // 279: runtime.v1.ImageService.ImageStatus:input_type -> runtime.v1.ImageStatusRequest
-	121, // 280: runtime.v1.ImageService.PullImage:input_type -> runtime.v1.PullImageRequest
-	123, // 281: runtime.v1.ImageService.RemoveImage:input_type -> runtime.v1.RemoveImageRequest
-	136, // 282: runtime.v1.ImageService.ImageFsInfo:input_type -> runtime.v1.ImageFsInfoRequest
-	12,  // 283: runtime.v1.RuntimeService.Version:output_type -> runtime.v1.VersionResponse
-	26,  // 284: runtime.v1.RuntimeService.RunPodSandbox:output_type -> runtime.v1.RunPodSandboxResponse
-	28,  // 285: runtime.v1.RuntimeService.StopPodSandbox:output_type -> runtime.v1.StopPodSandboxResponse
-	30,  // 286: runtime.v1.RuntimeService.RemovePodSandbox:output_type -> runtime.v1.RemovePodSandboxResponse
-	37,  // 287: runtime.v1.RuntimeService.PodSandboxStatus:output_type -> runtime.v1.PodSandboxStatusResponse
-	42,  // 288: runtime.v1.RuntimeService.ListPodSandbox:output_type -> runtime.v1.ListPodSandboxResponse
-	44,  // 289: runtime.v1.RuntimeService.StreamPodSandboxes:output_type -> runtime.v1.StreamPodSandboxesResponse
-	83,  // 290: runtime.v1.RuntimeService.CreateContainer:output_type -> runtime.v1.CreateContainerResponse
-	85,  // 291: runtime.v1.RuntimeService.StartContainer:output_type -> runtime.v1.StartContainerResponse
-	87,  // 292: runtime.v1.RuntimeService.StopContainer:output_type -> runtime.v1.StopContainerResponse
-	89,  // 293: runtime.v1.RuntimeService.RemoveContainer:output_type -> runtime.v1.RemoveContainerResponse
-	94,  // 294: runtime.v1.RuntimeService.ListContainers:output_type -> runtime.v1.ListContainersResponse
-	96,  // 295: runtime.v1.RuntimeService.StreamContainers:output_type -> runtime.v1.StreamContainersResponse
-	99,  // 296: runtime.v1.RuntimeService.ContainerStatus:output_type -> runtime.v1.ContainerStatusResponse
-	103, // 297: runtime.v1.RuntimeService.UpdateContainerResources:output_type -> runtime.v1.UpdateContainerResourcesResponse
-	161, // 298: runtime.v1.RuntimeService.ReopenContainerLog:output_type -> runtime.v1.ReopenContainerLogResponse
-	105, // 299: runtime.v1.RuntimeService.ExecSync:output_type -> runtime.v1.ExecSyncResponse
-	107, // 300: runtime.v1.RuntimeService.Exec:output_type -> runtime.v1.ExecResponse
-	109, // 301: runtime.v1.RuntimeService.Attach:output_type -> runtime.v1.AttachResponse
-	111, // 302: runtime.v1.RuntimeService.PortForward:output_type -> runtime.v1.PortForwardResponse
-	143, // 303: runtime.v1.RuntimeService.ContainerStats:output_type -> runtime.v1.ContainerStatsResponse
-	146, // 304: runtime.v1.RuntimeService.ListContainerStats:output_type -> runtime.v1.ListContainerStatsResponse
-	148, // 305: runtime.v1.RuntimeService.StreamContainerStats:output_type -> runtime.v1.StreamContainerStatsResponse
-	46,  // 306: runtime.v1.RuntimeService.PodSandboxStats:output_type -> runtime.v1.PodSandboxStatsResponse
-	49,  // 307: runtime.v1.RuntimeService.ListPodSandboxStats:output_type -> runtime.v1.ListPodSandboxStatsResponse
-	51,  // 308: runtime.v1.RuntimeService.StreamPodSandboxStats:output_type -> runtime.v1.StreamPodSandboxStatsResponse
-	128, // 309: runtime.v1.RuntimeService.UpdateRuntimeConfig:output_type -> runtime.v1.UpdateRuntimeConfigResponse
-	135, // 310: runtime.v1.RuntimeService.Status:output_type -> runtime.v1.StatusResponse
-	163, // 311: runtime.v1.RuntimeService.CheckpointContainer:output_type -> runtime.v1.CheckpointContainerResponse
-	170, // 312: runtime.v1.RuntimeService.GetContainerEvents:output_type -> runtime.v1.ContainerEventResponse
-	172, // 313: runtime.v1.RuntimeService.ListMetricDescriptors:output_type -> runtime.v1.ListMetricDescriptorsResponse
-	175, // 314: runtime.v1.RuntimeService.ListPodSandboxMetrics:output_type -> runtime.v1.ListPodSandboxMetricsResponse
-	177, // 315: runtime.v1.RuntimeService.StreamPodSandboxMetrics:output_type -> runtime.v1.StreamPodSandboxMetricsResponse
-	182, // 316: runtime.v1.RuntimeService.RuntimeConfig:output_type -> runtime.v1.RuntimeConfigResponse
-	185, // 317: runtime.v1.RuntimeService.UpdatePodSandboxResources:output_type -> runtime.v1.UpdatePodSandboxResourcesResponse
-	115, // 318: runtime.v1.ImageService.ListImages:output_type -> runtime.v1.ListImagesResponse
-	117, // 319: runtime.v1.ImageService.StreamImages:output_type -> runtime.v1.StreamImagesResponse
-	119, // 320: runtime.v1.ImageService.ImageStatus:output_type -> runtime.v1.ImageStatusResponse
-	122, // 321: runtime.v1.ImageService.PullImage:output_type -> runtime.v1.PullImageResponse
-	124, // 322: runtime.v1.ImageService.RemoveImage:output_type -> runtime.v1.RemoveImageResponse
-	141, // 323: runtime.v1.ImageService.ImageFsInfo:output_type -> runtime.v1.ImageFsInfoResponse
-	283, // [283:324] is the sub-list for method output_type
-	242, // [242:283] is the sub-list for method input_type
+	164, // 271: runtime.v1.RuntimeService.CheckpointPod:input_type -> runtime.v1.CheckpointPodRequest
+	166, // 272: runtime.v1.RuntimeService.RestorePod:input_type -> runtime.v1.RestorePodRequest
+	169, // 273: runtime.v1.RuntimeService.GetContainerEvents:input_type -> runtime.v1.GetEventsRequest
+	171, // 274: runtime.v1.RuntimeService.ListMetricDescriptors:input_type -> runtime.v1.ListMetricDescriptorsRequest
+	174, // 275: runtime.v1.RuntimeService.ListPodSandboxMetrics:input_type -> runtime.v1.ListPodSandboxMetricsRequest
+	176, // 276: runtime.v1.RuntimeService.StreamPodSandboxMetrics:input_type -> runtime.v1.StreamPodSandboxMetricsRequest
+	181, // 277: runtime.v1.RuntimeService.RuntimeConfig:input_type -> runtime.v1.RuntimeConfigRequest
+	184, // 278: runtime.v1.RuntimeService.UpdatePodSandboxResources:input_type -> runtime.v1.UpdatePodSandboxResourcesRequest
+	113, // 279: runtime.v1.ImageService.ListImages:input_type -> runtime.v1.ListImagesRequest
+	116, // 280: runtime.v1.ImageService.StreamImages:input_type -> runtime.v1.StreamImagesRequest
+	118, // 281: runtime.v1.ImageService.ImageStatus:input_type -> runtime.v1.ImageStatusRequest
+	121, // 282: runtime.v1.ImageService.PullImage:input_type -> runtime.v1.PullImageRequest
+	123, // 283: runtime.v1.ImageService.RemoveImage:input_type -> runtime.v1.RemoveImageRequest
+	136, // 284: runtime.v1.ImageService.ImageFsInfo:input_type -> runtime.v1.ImageFsInfoRequest
+	12,  // 285: runtime.v1.RuntimeService.Version:output_type -> runtime.v1.VersionResponse
+	26,  // 286: runtime.v1.RuntimeService.RunPodSandbox:output_type -> runtime.v1.RunPodSandboxResponse
+	28,  // 287: runtime.v1.RuntimeService.StopPodSandbox:output_type -> runtime.v1.StopPodSandboxResponse
+	30,  // 288: runtime.v1.RuntimeService.RemovePodSandbox:output_type -> runtime.v1.RemovePodSandboxResponse
+	37,  // 289: runtime.v1.RuntimeService.PodSandboxStatus:output_type -> runtime.v1.PodSandboxStatusResponse
+	42,  // 290: runtime.v1.RuntimeService.ListPodSandbox:output_type -> runtime.v1.ListPodSandboxResponse
+	44,  // 291: runtime.v1.RuntimeService.StreamPodSandboxes:output_type -> runtime.v1.StreamPodSandboxesResponse
+	83,  // 292: runtime.v1.RuntimeService.CreateContainer:output_type -> runtime.v1.CreateContainerResponse
+	85,  // 293: runtime.v1.RuntimeService.StartContainer:output_type -> runtime.v1.StartContainerResponse
+	87,  // 294: runtime.v1.RuntimeService.StopContainer:output_type -> runtime.v1.StopContainerResponse
+	89,  // 295: runtime.v1.RuntimeService.RemoveContainer:output_type -> runtime.v1.RemoveContainerResponse
+	94,  // 296: runtime.v1.RuntimeService.ListContainers:output_type -> runtime.v1.ListContainersResponse
+	96,  // 297: runtime.v1.RuntimeService.StreamContainers:output_type -> runtime.v1.StreamContainersResponse
+	99,  // 298: runtime.v1.RuntimeService.ContainerStatus:output_type -> runtime.v1.ContainerStatusResponse
+	103, // 299: runtime.v1.RuntimeService.UpdateContainerResources:output_type -> runtime.v1.UpdateContainerResourcesResponse
+	161, // 300: runtime.v1.RuntimeService.ReopenContainerLog:output_type -> runtime.v1.ReopenContainerLogResponse
+	105, // 301: runtime.v1.RuntimeService.ExecSync:output_type -> runtime.v1.ExecSyncResponse
+	107, // 302: runtime.v1.RuntimeService.Exec:output_type -> runtime.v1.ExecResponse
+	109, // 303: runtime.v1.RuntimeService.Attach:output_type -> runtime.v1.AttachResponse
+	111, // 304: runtime.v1.RuntimeService.PortForward:output_type -> runtime.v1.PortForwardResponse
+	143, // 305: runtime.v1.RuntimeService.ContainerStats:output_type -> runtime.v1.ContainerStatsResponse
+	146, // 306: runtime.v1.RuntimeService.ListContainerStats:output_type -> runtime.v1.ListContainerStatsResponse
+	148, // 307: runtime.v1.RuntimeService.StreamContainerStats:output_type -> runtime.v1.StreamContainerStatsResponse
+	46,  // 308: runtime.v1.RuntimeService.PodSandboxStats:output_type -> runtime.v1.PodSandboxStatsResponse
+	49,  // 309: runtime.v1.RuntimeService.ListPodSandboxStats:output_type -> runtime.v1.ListPodSandboxStatsResponse
+	51,  // 310: runtime.v1.RuntimeService.StreamPodSandboxStats:output_type -> runtime.v1.StreamPodSandboxStatsResponse
+	128, // 311: runtime.v1.RuntimeService.UpdateRuntimeConfig:output_type -> runtime.v1.UpdateRuntimeConfigResponse
+	135, // 312: runtime.v1.RuntimeService.Status:output_type -> runtime.v1.StatusResponse
+	163, // 313: runtime.v1.RuntimeService.CheckpointContainer:output_type -> runtime.v1.CheckpointContainerResponse
+	165, // 314: runtime.v1.RuntimeService.CheckpointPod:output_type -> runtime.v1.CheckpointPodResponse
+	168, // 315: runtime.v1.RuntimeService.RestorePod:output_type -> runtime.v1.RestorePodResponse
+	170, // 316: runtime.v1.RuntimeService.GetContainerEvents:output_type -> runtime.v1.ContainerEventResponse
+	172, // 317: runtime.v1.RuntimeService.ListMetricDescriptors:output_type -> runtime.v1.ListMetricDescriptorsResponse
+	175, // 318: runtime.v1.RuntimeService.ListPodSandboxMetrics:output_type -> runtime.v1.ListPodSandboxMetricsResponse
+	177, // 319: runtime.v1.RuntimeService.StreamPodSandboxMetrics:output_type -> runtime.v1.StreamPodSandboxMetricsResponse
+	182, // 320: runtime.v1.RuntimeService.RuntimeConfig:output_type -> runtime.v1.RuntimeConfigResponse
+	185, // 321: runtime.v1.RuntimeService.UpdatePodSandboxResources:output_type -> runtime.v1.UpdatePodSandboxResourcesResponse
+	115, // 322: runtime.v1.ImageService.ListImages:output_type -> runtime.v1.ListImagesResponse
+	117, // 323: runtime.v1.ImageService.StreamImages:output_type -> runtime.v1.StreamImagesResponse
+	119, // 324: runtime.v1.ImageService.ImageStatus:output_type -> runtime.v1.ImageStatusResponse
+	122, // 325: runtime.v1.ImageService.PullImage:output_type -> runtime.v1.PullImageResponse
+	124, // 326: runtime.v1.ImageService.RemoveImage:output_type -> runtime.v1.RemoveImageResponse
+	141, // 327: runtime.v1.ImageService.ImageFsInfo:output_type -> runtime.v1.ImageFsInfoResponse
+	285, // [285:328] is the sub-list for method output_type
+	242, // [242:285] is the sub-list for method input_type
 	242, // [242:242] is the sub-list for extension type_name
 	242, // [242:242] is the sub-list for extension extendee
 	0,   // [0:242] is the sub-list for field type_name
