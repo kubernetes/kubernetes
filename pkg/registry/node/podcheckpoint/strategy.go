@@ -19,6 +19,7 @@ package podcheckpoint
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -60,11 +61,15 @@ func (podCheckpointStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpat
 	return fields
 }
 
-// PrepareForCreate sets the initial generation. The storage BeginCreate hook,
-// which runs before it on every create, already replaced any client-supplied
-// status with the source Pod's node and UID.
+// PrepareForCreate adds the restore protection finalizer and sets the initial
+// generation. The storage BeginCreate hook, which runs before it on every
+// create, already replaced any client-supplied status with the source Pod's
+// node and UID.
 func (podCheckpointStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pc := obj.(*nodeapi.PodCheckpoint)
+	if !slices.Contains(pc.Finalizers, nodeapi.PodCheckpointRestoreProtectionFinalizer) {
+		pc.Finalizers = append(pc.Finalizers, nodeapi.PodCheckpointRestoreProtectionFinalizer)
+	}
 	pc.Generation = 1
 }
 

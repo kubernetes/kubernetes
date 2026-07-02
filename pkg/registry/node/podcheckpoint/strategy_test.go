@@ -17,7 +17,9 @@ limitations under the License.
 package podcheckpoint
 
 import (
+	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -281,5 +283,17 @@ func TestPodCheckpointCapturedTemplateAfterSeccompAnnotationUpdate(t *testing.T)
 				})
 			}
 		})
+	}
+}
+
+func TestCheckpointRestoreProtectionOnCreate(t *testing.T) {
+	pc := newPodCheckpoint()
+	Strategy.PrepareForCreate(context.Background(), pc)
+	if !slices.Contains(pc.Finalizers, nodeapi.PodCheckpointRestoreProtectionFinalizer) {
+		t.Fatal("checkpoint was created without restore protection")
+	}
+	Strategy.PrepareForCreate(context.Background(), pc)
+	if len(pc.Finalizers) != 1 {
+		t.Fatal("restore protection was duplicated")
 	}
 }
