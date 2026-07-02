@@ -2666,6 +2666,81 @@ var resizeStatusSet = sets.New(core.PersistentVolumeClaimControllerResizeInProgr
 	core.PersistentVolumeClaimNodeResizeInProgress,
 	core.PersistentVolumeClaimNodeResizeInfeasible)
 
+var validVolumeHealthStatusTypes = sets.New(
+	core.VolumeHealthInaccessible,
+	core.VolumeHealthDataLoss,
+	core.VolumeHealthDegraded,
+)
+
+func validateVolumeHealthCondition(condition core.VolumeHealthCondition, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !validVolumeHealthStatusTypes.Has(condition.Status) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validVolumeHealthStatusTypes)))
+	}
+	if len(condition.Reason) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), ""))
+	} else if len(condition.Reason) > 256 {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, 256))
+	}
+	if len(condition.Message) > 1024 {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024))
+	}
+	return allErrs
+}
+
+func validateVolumeHealthStatus(healthStatus *core.VolumeHealthStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if healthStatus == nil {
+		return allErrs
+	}
+	seen := sets.New[string]()
+	for i, condition := range healthStatus.Conditions {
+		key := string(condition.Status) + "/" + condition.Reason
+		idxPath := fldPath.Child("conditions").Index(i)
+		if seen.Has(key) {
+			allErrs = append(allErrs, field.Duplicate(idxPath, key))
+		}
+		seen.Insert(key)
+		allErrs = append(allErrs, validateVolumeHealthCondition(condition, idxPath)...)
+	}
+	return allErrs
+}
+
+func validatePodVolumeHealth(volumeHealth []core.PodVolumeHealth, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	volumeNames := sets.New[string]()
+	if spec != nil {
+		for _, v := range spec.Volumes {
+			volumeNames.Insert(v.Name)
+		}
+	}
+	seenNames := sets.New[string]()
+	for i, vh := range volumeHealth {
+		idxPath := fldPath.Index(i)
+		if len(vh.Name) == 0 {
+			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
+		}
+		if seenNames.Has(vh.Name) {
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), vh.Name))
+		}
+		seenNames.Insert(vh.Name)
+		if len(vh.Name) > 0 && !volumeNames.Has(vh.Name) {
+			allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), vh.Name))
+		}
+		condSeen := sets.New[string]()
+		for j, cond := range vh.Conditions {
+			key := string(cond.Status) + "/" + cond.Reason
+			condPath := idxPath.Child("conditions").Index(j)
+			if condSeen.Has(key) {
+				allErrs = append(allErrs, field.Duplicate(condPath, key))
+			}
+			condSeen.Insert(key)
+			allErrs = append(allErrs, validateVolumeHealthCondition(cond, condPath)...)
+		}
+	}
+	return allErrs
+}
+
 // ValidatePersistentVolumeClaimStatusUpdate validates an update to status of a PersistentVolumeClaim
 func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVolumeClaim, validationOpts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
@@ -2708,6 +2783,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 			}
 		}
 	}
+	allErrs = append(allErrs, validateVolumeHealthStatus(newPvc.Status.HealthStatus, field.NewPath("status", "healthStatus"))...)
 	return allErrs
 }
 
@@ -6078,6 +6154,10 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, &newPod.Spec, fldPath.Child("extendedResourceClaimStatus"))...)
 	allErrs = append(allErrs, validateNodeAllocatableResourceClaimStatus(newPod.Status, &newPod.Spec, fldPath.Child("nodeAllocatableResourceClaimStatuses"))...)
+
+	if len(newPod.Status.VolumeHealth) > 0 {
+		allErrs = append(allErrs, validatePodVolumeHealth(newPod.Status.VolumeHealth, &newPod.Spec, fldPath.Child("volumeHealth"))...)
+	}
 
 	if newIPErrs := validatePodIPs(newPod, oldPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)

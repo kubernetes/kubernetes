@@ -4507,6 +4507,14 @@
             "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using. When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim",
             "type": "string"
           },
+          "healthStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthStatus"
+              }
+            ],
+            "description": "healthStatus contains the latest controller-reported health information for the volume bound to this claim."
+          },
           "modifyVolumeStatus": {
             "allOf": [
               {
@@ -5884,6 +5892,17 @@
               }
             ],
             "description": "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod."
+          },
+          "volumeHealth": {
+            "description": "volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.PodVolumeHealth"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
           }
         },
         "type": "object"
@@ -5989,6 +6008,40 @@
             "description": "Specification of the desired behavior of the pod. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.PodVolumeHealth": {
+        "description": "PodVolumeHealth contains health information for a volume used by a pod, reported by the CSI node plugin via the kubelet.",
+        "properties": {
+          "conditions": {
+            "description": "conditions is the set of adverse conditions reported by the CSI node plugin for this volume on this node.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthCondition"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "status",
+              "reason"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "lastTransitionTime": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
+            "description": "lastTransitionTime is when the current set of conditions first appeared."
+          },
+          "name": {
+            "default": "",
+            "description": "name matches an entry in pod.spec.volumes.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.PortStatus": {
@@ -8208,6 +8261,56 @@
           "name",
           "devicePath"
         ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.VolumeHealthCondition": {
+        "description": "VolumeHealthCondition represents an adverse health condition reported for a volume.",
+        "properties": {
+          "message": {
+            "description": "message is a human-readable description.",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "description": "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry.",
+            "type": "string"
+          },
+          "status": {
+            "default": "",
+            "description": "status is the machine-parseable health category. One of \"Inaccessible\", \"DataLoss\", \"Degraded\".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.VolumeHealthStatus": {
+        "description": "VolumeHealthStatus contains health information for a volume reported by the CSI controller plugin.",
+        "properties": {
+          "conditions": {
+            "description": "conditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthCondition"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "status",
+              "reason"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "lastTransitionTime": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
+            "description": "lastTransitionTime is when the current set of conditions first appeared."
+          }
+        },
         "type": "object"
       },
       "io.k8s.api.core.v1.VolumeMount": {

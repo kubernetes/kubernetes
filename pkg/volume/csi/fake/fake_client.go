@@ -448,6 +448,22 @@ func (f *NodeClient) NodeGetVolumeStats(ctx context.Context, req *csipb.NodeGetV
 	return &csipb.NodeGetVolumeStatsResponse{}, nil
 }
 
+// NodeGetVolumeHealth implements csi method
+func (f *NodeClient) NodeGetVolumeHealth(ctx context.Context, req *csipb.NodeGetVolumeHealthRequest, opts ...grpc.CallOption) (*csipb.NodeGetVolumeHealthResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+	return &csipb.NodeGetVolumeHealthResponse{}, nil
+}
+
+// NodeGetStorageHealth implements csi method
+func (f *NodeClient) NodeGetStorageHealth(ctx context.Context, req *csipb.NodeGetStorageHealthRequest, opts ...grpc.CallOption) (*csipb.NodeGetStorageHealthResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+	return &csipb.NodeGetStorageHealthResponse{}, nil
+}
+
 // ControllerClient represents a CSI Controller client
 type ControllerClient struct {
 	nextCapabilities []*csipb.ControllerServiceCapability
