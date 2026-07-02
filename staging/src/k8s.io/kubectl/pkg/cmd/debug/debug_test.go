@@ -1410,6 +1410,49 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "with custom image pull secret",
+			opts: &DebugOptions{
+				CopyTo:                     "debugger",
+				Container:                  "debugger",
+				Image:                      "busybox",
+				PullPolicy:                 corev1.PullIfNotPresent,
+				DebugImagePullSecretConfig: "testdata/test-docker-config.json",
+				Profile:                    ProfileLegacy,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "debugger",
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+						},
+					},
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{
+							Name: "debug-secret-debugger",
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
@@ -1814,6 +1857,64 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 					NodeName:      "node-XXX",
 					RestartPolicy: corev1.RestartPolicyNever,
 					Volumes:       nil,
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "with image pull secret",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-XXX",
+				},
+			},
+			opts: &DebugOptions{
+				Image:                      "busybox",
+				PullPolicy:                 corev1.PullIfNotPresent,
+				DebugImagePullSecretConfig: "testdata/test-docker-config.json",
+				Profile:                    ProfileLegacy,
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/host",
+									Name:      "host-root",
+								},
+							},
+						},
+					},
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{
+							Name: "debug-secret-node-debugger-node-XXX-1",
+						},
+					},
+					HostIPC:       true,
+					HostNetwork:   true,
+					HostPID:       true,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+							},
+						},
+					},
 					Tolerations: []corev1.Toleration{
 						{
 							Operator: corev1.TolerationOpExists,
