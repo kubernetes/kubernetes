@@ -18,6 +18,8 @@ package e2enode
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -106,6 +108,87 @@ var _ = SIGDescribe("ContainerLogRotation", framework.WithSlow(), framework.With
 				}
 				return len(logs), nil
 			}, rotationConsistentlyTimeout, rotationPollInterval).Should(gomega.BeNumerically("<=", testContainerLogMaxFiles), "should never exceed max file limit")
+		})
+	})
+})
+
+var _ = SIGDescribe("ContainerLogRedundantCleanup", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), func() {
+	f := framework.NewDefaultFramework("container-log-redundant-cleanup-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.Context("when a container restarts many times", func() {
+		const (
+			redundantTestMaxFiles = 3
+		)
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.ContainerLogMaxFiles = redundantTestMaxFiles
+			initialConfig.ContainerLogMaxSize = testContainerLogMaxSize
+		})
+
+		ginkgo.It("should remove redundant logs from previous restarts", func(ctx context.Context) {
+			ginkgo.By("create a pod that crashes and restarts multiple times")
+			// The container exits after printing some output, causing restarts.
+			// With RestartPolicyAlways, kubelet will restart it, creating 0.log, 1.log, 2.log, etc.
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-redundant-log-cleanup",
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					Containers: []v1.Container{
+						{
+							Name:  "log-container",
+							Image: busyboxImage,
+							Command: []string{
+								"sh",
+								"-c",
+								// Generate enough logs to trigger rotation check, then exit to cause restart.
+								"for i in $(seq 1 100); do echo redundant log test line $i; done; exit 0",
+							},
+						},
+					},
+				},
+			}
+			logPod := e2epod.NewPodClient(f).Create(ctx, pod)
+			ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, logPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+
+			ginkgo.By("wait for the container to restart enough times to exceed MaxFiles")
+			// We need at least MaxFiles+1 restarts to trigger redundant log cleanup.
+			targetRestarts := int32(redundantTestMaxFiles + 2)
+			gomega.Eventually(ctx, func() (int32, error) {
+				p, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return 0, err
+				}
+				if len(p.Status.ContainerStatuses) == 0 {
+					return 0, nil
+				}
+				return p.Status.ContainerStatuses[0].RestartCount, nil
+			}, rotationEventuallyTimeout, rotationPollInterval).Should(gomega.BeNumerically(">=", targetRestarts),
+				"container should restart enough times to generate redundant logs")
+
+			ginkgo.By("get container log directory")
+			p, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(p.Status.ContainerStatuses).To(gomega.HaveLen(1))
+			id := kubecontainer.ParseContainerID(p.Status.ContainerStatuses[0].ContainerID).ID
+			r, _, err := getCRIClient(ctx)
+			framework.ExpectNoError(err)
+			resp, err := r.ContainerStatus(ctx, id, false)
+			framework.ExpectNoError(err)
+			logPath := resp.GetStatus().GetLogPath()
+			// The container log directory is the parent of the log file (e.g., /var/log/pods/.../log-container/)
+			logDir := filepath.Dir(logPath)
+
+			ginkgo.By("verify redundant logs have been cleaned up")
+			gomega.Eventually(ctx, func() (int, error) {
+				entries, err := os.ReadDir(logDir)
+				if err != nil {
+					return 0, err
+				}
+				return len(entries), nil
+			}, rotationEventuallyTimeout, rotationPollInterval).Should(gomega.BeNumerically("<=", redundantTestMaxFiles),
+				"redundant log files from old restarts should be removed, keeping at most MaxFiles")
 		})
 	})
 })
