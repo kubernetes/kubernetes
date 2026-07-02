@@ -43,6 +43,8 @@ const (
 	//     * "*": generate validation for all types in this package
 	//	   * "TypesWithField=FooBar": generate validation for all types with a
 	//	     field named "FooBar"
+	//     * "TypesWithSuffix=FooBar": generate validation for all types whose
+	//       name ends with "FooBar"
 	//   Per-type:
 	//	   * "true": generate validation for this type
 	//	   * "false": do not generate validation for this type
@@ -361,6 +363,12 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 				}
 				continue
 			}
+			if val, found := strings.CutPrefix(crit, "TypesWithSuffix="); found {
+				if val == "" {
+					klog.Fatalf("%s: found package tag \"%s=%s\" with empty value", input, mainTagName, crit)
+				}
+				continue
+			}
 			klog.Fatalf("%s: unknown value for package tag %q: %q", input, mainTagName, crit)
 		}
 		shouldCreateObjectValidationFn := func(t *types.Type) bool {
@@ -399,6 +407,11 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 				}
 				if field, found := strings.CutPrefix(v, "TypesWithField="); found {
 					if isTypeWithField(t, field) {
+						return true
+					}
+				}
+				if field, found := strings.CutPrefix(v, "TypesWithSuffix="); found {
+					if isTypeWithSuffix(t, field) {
 						return true
 					}
 				}
@@ -532,4 +545,8 @@ func isTypeWithField(t *types.Type, fieldName string) bool {
 		}
 	}
 	return false
+}
+
+func isTypeWithSuffix(t *types.Type, suffix string) bool {
+	return strings.HasSuffix(t.Name.Name, suffix)
 }
