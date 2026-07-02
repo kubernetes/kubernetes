@@ -3015,6 +3015,91 @@ func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	require.NoError(t, result.Error())
 }
 
+func TestStartedPodsErrorsTotalByType(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	metrics.Register()
+
+	testCases := map[string]struct {
+		setup func(t *testing.T) (*kubeGenericRuntimeManager, *v1.Pod)
+		wants string
+	}{
+		"sandbox creation error increments startup and sandbox labels": {
+			setup: func(t *testing.T) (*kubeGenericRuntimeManager, *v1.Pod) {
+				fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+				require.NoError(t, err)
+				fakeRuntime.ErrorOnSandboxCreate = true
+
+				return m, &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						UID:       "12345678",
+						Name:      "foo",
+						Namespace: "new",
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:            "foo",
+								Image:           "busybox",
+								ImagePullPolicy: v1.PullIfNotPresent,
+							},
+						},
+					},
+				}
+			},
+			wants: `
+				# HELP kubelet_started_pods_errors_total [ALPHA] Cumulative number of errors when starting pods
+				# TYPE kubelet_started_pods_errors_total counter
+				kubelet_started_pods_errors_total{error_type="sandbox"} 1
+				kubelet_started_pods_errors_total{error_type="startup"} 1
+			`,
+		},
+		"container startup error increments startup label only": {
+			setup: func(t *testing.T) (*kubeGenericRuntimeManager, *v1.Pod) {
+				_, _, m, err := createTestRuntimeManagerWithErrors(tCtx, map[string][]error{
+					"StartContainer": {errors.New("injected start container error")},
+				})
+				require.NoError(t, err)
+
+				return m, &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						UID:       "12345678",
+						Name:      "foo",
+						Namespace: "new",
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:            "foo",
+								Image:           "busybox",
+								ImagePullPolicy: v1.PullIfNotPresent,
+							},
+						},
+					},
+				}
+			},
+			wants: `
+				# HELP kubelet_started_pods_errors_total [ALPHA] Cumulative number of errors when starting pods
+				# TYPE kubelet_started_pods_errors_total counter
+				kubelet_started_pods_errors_total{error_type="startup"} 1
+			`,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			metrics.StartedPodsErrorsTotal.Reset()
+			m, pod := tc.setup(t)
+
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+			require.Error(t, result.Error())
+
+			require.NoError(t, testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants),
+				"kubelet_"+metrics.StartedPodsErrorsTotalKey))
+		})
+	}
+}
+
 func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontainer.PodStatus) {
 	pod, status := makeBasePodAndStatus()
 	pod.Spec.InitContainers = []v1.Container{

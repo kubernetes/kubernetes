@@ -170,16 +170,19 @@ const (
 	MemoryQoSNodeMemoryLowBytesKey = "memory_qos_node_memory_low_bytes"
 
 	// Values used in metric labels
-	Container          = "container"
-	InitContainer      = "init_container"
-	EphemeralContainer = "ephemeral_container"
+	Container                 = "container"
+	InitContainer             = "init_container"
+	EphemeralContainer        = "ephemeral_container"
+	StartedPodsErrorTypeLabel = "error_type"
 
 	AlignScopePod       = "pod"
 	AlignScopeContainer = "container"
 
-	AlignedPhysicalCPU = "physical_cpu"
-	AlignedNUMANode    = "numa_node"
-	AlignedUncoreCache = "uncore_cache"
+	AlignedPhysicalCPU     = "physical_cpu"
+	AlignedNUMANode        = "numa_node"
+	AlignedUncoreCache     = "uncore_cache"
+	StartedPodErrorSandbox = "sandbox"
+	StartedPodErrorStartup = "startup"
 
 	// Metrics to track kubelet admission rejections.
 	AdmissionRejectionsTotalKey = "admission_rejections_total"
@@ -747,14 +750,15 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	// StartedPodsErrorsTotal is a counter that tracks the number of errors creating pod sandboxes
-	StartedPodsErrorsTotal = metrics.NewCounter(
+	// StartedPodsErrorsTotal is a counter that tracks the number of errors creating pods by error type.
+	StartedPodsErrorsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           StartedPodsErrorsTotalKey,
 			Help:           "Cumulative number of errors when starting pods",
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{StartedPodsErrorTypeLabel},
 	)
 	// StartedContainersTotal is a counter that tracks the number of container creation operations
 	StartedContainersTotal = metrics.NewCounterVec(
