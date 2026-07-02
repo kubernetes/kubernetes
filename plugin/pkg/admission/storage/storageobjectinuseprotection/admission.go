@@ -137,7 +137,6 @@ func (c *storageProtectionPlugin) admitVAC(a admission.Attributes) error {
 	vac, ok := a.GetObject().(*storageapi.VolumeAttributesClass)
 	// if we can't convert the obj to VAC, just return
 	if !ok {
-		klog.V(2).Infof("can't convert the obj to VAC to %s", vac.Name)
 		return nil
 	}
 	for _, f := range vac.Finalizers {
