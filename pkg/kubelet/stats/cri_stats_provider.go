@@ -185,11 +185,11 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 	}
 
 	logger := klog.FromContext(ctx)
-	allInfos, err := getCadvisorContainerInfo(logger, p.cadvisor)
+	cadvisorInfos, err := getCadvisorContainerInfo(logger, p.cadvisor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
-	caInfos, allInfos := getCRICadvisorStats(logger, allInfos)
+	caInfos, _ := getCRICadvisorStats(logger, cadvisorInfos)
 
 	// get network stats for containers.
 	// This is only used on Windows. For other platforms, (nil, nil) should be returned.
@@ -224,9 +224,9 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 			return nil, fmt.Errorf("make container stats: %w", err)
 		}
 		p.addPodNetworkStats(logger, ps, podSandboxID, caInfos, cs, containerNetworkStats[podSandboxID])
-		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
-		p.addSwapStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
-		p.addIOStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
+		p.addPodCPUMemoryStats(ps, cs)
+		p.addSwapStats(ps, cs)
+		p.addIOStats(ps, cs)
 
 		// If cadvisor stats is available for the container, use it to populate
 		// container stats
@@ -424,11 +424,11 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
 
-	allInfos, err := getCadvisorContainerInfo(logger, p.cadvisor)
+	cadvisorInfos, err := getCadvisorContainerInfo(logger, p.cadvisor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
-	caInfos, allInfos := getCRICadvisorStats(logger, allInfos)
+	caInfos, _ := getCRICadvisorStats(logger, cadvisorInfos)
 
 	for _, stats := range resp {
 		containerID := stats.Attributes.Id
@@ -453,8 +453,8 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 
 		// Fill available CPU and memory stats for full set of required pod stats
 		cs := p.makeContainerCPUAndMemoryStats(stats, time.Unix(0, container.CreatedAt), true)
-		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
-		p.addSwapStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
+		p.addPodCPUMemoryStats(ps, cs)
+		p.addSwapStats(ps, cs)
 
 		// If cadvisor stats is available for the container, use it to populate
 		// container stats
@@ -628,20 +628,11 @@ func (p *criStatsProvider) addPodNetworkStats(
 
 func (p *criStatsProvider) addPodCPUMemoryStats(
 	ps *statsapi.PodStats,
-	podUID types.UID,
-	allInfos map[string]cadvisorapi.ContainerInfo,
 	cs *statsapi.ContainerStats,
 ) {
-	// try get cpu and memory stats from cadvisor first.
-	podCgroupInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
-	if podCgroupInfo != nil {
-		cpu, memory := cadvisorInfoToCPUandMemoryStats(podCgroupInfo)
-		ps.CPU = cpu
-		ps.Memory = memory
-		return
-	}
-
-	// Sum Pod cpu and memory stats from containers stats.
+	// Sum pod cpu and memory stats from individual container stats to avoid
+	// including stats from terminated containers (e.g. init containers) whose
+	// resource usage is still charged to the pod cgroup.
 	if cs.CPU != nil {
 		if ps.CPU == nil {
 			ps.CPU = &statsapi.CPUStats{}
@@ -679,18 +670,9 @@ func (p *criStatsProvider) addPodCPUMemoryStats(
 
 func (p *criStatsProvider) addSwapStats(
 	ps *statsapi.PodStats,
-	podUID types.UID,
-	allInfos map[string]cadvisorapi.ContainerInfo,
 	cs *statsapi.ContainerStats,
 ) {
-	// try get swap stats from cadvisor first.
-	podCgroupInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
-	if podCgroupInfo != nil {
-		ps.Swap = cadvisorInfoToSwapStats(podCgroupInfo)
-		return
-	}
-
-	// Sum Pod swap stats from containers stats.
+	// Sum pod swap stats from individual container stats.
 	if cs.Swap != nil {
 		if ps.Swap == nil {
 			ps.Swap = &statsapi.SwapStats{Time: cs.Swap.Time}
@@ -731,20 +713,13 @@ func aggregatePodSwapStats(ps *statsapi.PodStats) {
 
 func (p *criStatsProvider) addIOStats(
 	ps *statsapi.PodStats,
-	podUID types.UID,
-	allInfos map[string]cadvisorapi.ContainerInfo,
 	cs *statsapi.ContainerStats,
 ) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 		return
 	}
-	// try get IO stats from cadvisor first.
-	podCgroupInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
-	if podCgroupInfo != nil {
-		ps.IO = cadvisorInfoToIOStats(podCgroupInfo)
-		return
-	}
 
+	// Sum pod IO stats from individual container stats.
 	if cs.IO != nil {
 		if ps.IO == nil {
 			ps.IO = &statsapi.IOStats{Time: cs.IO.Time}
