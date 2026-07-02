@@ -296,7 +296,92 @@ func TestReconcileElectionStep(t *testing.T) {
 			existingLease:          nil,
 			expectLease:            false,
 			expectedHolderIdentity: nil,
+			// No requeue: controller waits for the candidate's ack via informer event
+			// rather than polling on a timer.
+			expectedRequeue: false,
+			expectedError:   false,
+		},
+		{
+			name:    "best candidate acked, worse candidate still pending, should elect immediately",
+			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
+			candidates: []*v1beta1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "component-best",
+					},
+					Spec: v1beta1.LeaseCandidateSpec{
+						LeaseName:        "component-A",
+						EmulationVersion: "1.19.0",
+						BinaryVersion:    "1.19.0",
+						// Pinged and acked (RenewTime >= PingTime, both within election window)
+						PingTime:  ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime: ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						Strategy:  v1.OldestEmulationVersion,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "component-worse",
+					},
+					Spec: v1beta1.LeaseCandidateSpec{
+						LeaseName:        "component-A",
+						EmulationVersion: "1.20.0",
+						BinaryVersion:    "1.20.0",
+						// Pinged but NOT acked (RenewTime < PingTime, PingTime within election window)
+						PingTime:  ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime: ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Minute))),
+						Strategy:  v1.OldestEmulationVersion,
+					},
+				},
+			},
+			existingLease:          nil,
+			expectLease:            true,
+			expectedHolderIdentity: ptr.To("component-best"),
+			expectedStrategy:       ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
 			expectedRequeue:        true,
+			expectedError:          false,
+		},
+		{
+			name:    "best candidate NOT acked, worse candidate acked, should wait",
+			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
+			candidates: []*v1beta1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "component-best",
+					},
+					Spec: v1beta1.LeaseCandidateSpec{
+						LeaseName:        "component-A",
+						EmulationVersion: "1.19.0",
+						BinaryVersion:    "1.19.0",
+						// Pinged but NOT acked
+						PingTime:  ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime: ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Minute))),
+						Strategy:  v1.OldestEmulationVersion,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "component-worse",
+					},
+					Spec: v1beta1.LeaseCandidateSpec{
+						LeaseName:        "component-A",
+						EmulationVersion: "1.20.0",
+						BinaryVersion:    "1.20.0",
+						// Pinged and acked
+						PingTime:  ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime: ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						Strategy:  v1.OldestEmulationVersion,
+					},
+				},
+			},
+			existingLease:          nil,
+			expectLease:            false,
+			expectedHolderIdentity: nil,
+			expectedRequeue:        false,
 			expectedError:          false,
 		},
 		{
@@ -835,6 +920,136 @@ func TestController(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestElectionNeededFiltersNonResponsiveCandidates(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	now := fakeClock.Now()
+
+	leaseNN := types.NamespacedName{Namespace: "default", Name: "component-A"}
+
+	// A valid, non-expired lease held by component-identity-1
+	existingLease := &v1.Lease{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "component-A",
+		},
+		Spec: v1.LeaseSpec{
+			HolderIdentity:       ptr.To("component-identity-1"),
+			LeaseDurationSeconds: ptr.To(int32(10)),
+			RenewTime:            ptr.To(metav1.NewMicroTime(now)),
+		},
+	}
+
+	// Current leader (responsive)
+	currentLeader := &v1beta1.LeaseCandidate{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "component-identity-1",
+		},
+		Spec: v1beta1.LeaseCandidateSpec{
+			LeaseName:        "component-A",
+			EmulationVersion: "1.20.0",
+			BinaryVersion:    "1.20.0",
+			RenewTime:        ptr.To(metav1.NewMicroTime(now)),
+			Strategy:         v1.OldestEmulationVersion,
+		},
+	}
+
+	// Dead candidate: "better" (older emulation version) but pinged and never acked
+	deadCandidate := &v1beta1.LeaseCandidate{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "component-identity-2",
+		},
+		Spec: v1beta1.LeaseCandidateSpec{
+			LeaseName:        "component-A",
+			EmulationVersion: "1.19.0",
+			BinaryVersion:    "1.19.0",
+			PingTime:         ptr.To(metav1.NewMicroTime(now.Add(-2 * electionDuration))),
+			RenewTime:        ptr.To(metav1.NewMicroTime(now.Add(-3 * electionDuration))),
+			Strategy:         v1.OldestEmulationVersion,
+		},
+	}
+
+	t.Run("dead candidate does not trigger election", func(t *testing.T) {
+		ctx := context.Background()
+		client := fake.NewSimpleClientset()
+		informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+		controller, err := NewController(
+			informerFactory.Coordination().V1().Leases(),
+			informerFactory.Coordination().V1beta1().LeaseCandidates(),
+			client.CoordinationV1(),
+			client.CoordinationV1beta1(),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		controller.clock = fakeClock
+
+		if _, err := client.CoordinationV1().Leases(existingLease.Namespace).Create(ctx, existingLease, metav1.CreateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []*v1beta1.LeaseCandidate{currentLeader, deadCandidate} {
+			if _, err := client.CoordinationV1beta1().LeaseCandidates(c.Namespace).Create(ctx, c, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		informerFactory.Start(ctx.Done())
+		informerFactory.WaitForCacheSync(ctx.Done())
+
+		needed, err := controller.electionNeeded([]*v1beta1.LeaseCandidate{currentLeader, deadCandidate}, leaseNN)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if needed {
+			t.Error("electionNeeded() = true, want false: dead candidate should be filtered out")
+		}
+	})
+
+	t.Run("recovered candidate triggers election", func(t *testing.T) {
+		ctx := context.Background()
+		client := fake.NewSimpleClientset()
+		informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+		controller, err := NewController(
+			informerFactory.Coordination().V1().Leases(),
+			informerFactory.Coordination().V1beta1().LeaseCandidates(),
+			client.CoordinationV1(),
+			client.CoordinationV1beta1(),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		controller.clock = fakeClock
+
+		if _, err := client.CoordinationV1().Leases(existingLease.Namespace).Create(ctx, existingLease, metav1.CreateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Same candidate but RenewTime is after PingTime (it came back)
+		recoveredCandidate := deadCandidate.DeepCopy()
+		recoveredCandidate.Spec.RenewTime = ptr.To(metav1.NewMicroTime(now))
+
+		for _, c := range []*v1beta1.LeaseCandidate{currentLeader, recoveredCandidate} {
+			if _, err := client.CoordinationV1beta1().LeaseCandidates(c.Namespace).Create(ctx, c, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		informerFactory.Start(ctx.Done())
+		informerFactory.WaitForCacheSync(ctx.Done())
+
+		needed, err := controller.electionNeeded([]*v1beta1.LeaseCandidate{currentLeader, recoveredCandidate}, leaseNN)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !needed {
+			t.Error("electionNeeded() = false, want true: recovered candidate with better version should trigger election")
+		}
+	})
 }
 
 func strOrNil[T any](s *T) string {
