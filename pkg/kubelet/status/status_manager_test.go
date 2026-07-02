@@ -334,6 +334,74 @@ func TestSyncPodIgnoresNotFound(t *testing.T) {
 	verifyActions(t, syncer, []core.Action{getAction()})
 }
 
+func TestSyncPodNotFoundStopsRetrying(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	client := fake.Clientset{}
+	syncer := newTestManager(&client)
+	client.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.NewNotFound(api.Resource("pods"), "test-pod")
+	})
+	pod := getTestPod()
+	syncer.SetPodStatus(logger, pod, getRandomPodStatus())
+	// First sync: should issue one GET that returns 404.
+	verifyActions(t, syncer, []core.Action{getAction()})
+
+	// Subsequent syncBatch(true) should NOT issue another GET because the
+	// version was marked as synced after the 404 response.
+	syncer.testSyncBatch(ctx)
+	actions := syncer.kubeClient.(*fake.Clientset).Actions()
+	assert.Empty(t, actions, "Expected no API calls after 404 was already handled")
+
+	// A new status update should trigger one more GET (and 404 again).
+	syncer.SetPodStatus(logger, pod, getRandomPodStatus())
+	verifyActions(t, syncer, []core.Action{getAction()})
+
+	// And again, no retries after that.
+	syncer.kubeClient.(*fake.Clientset).ClearActions()
+	syncer.testSyncBatch(ctx)
+	actions = syncer.kubeClient.(*fake.Clientset).Actions()
+	assert.Empty(t, actions, "Expected no API calls on second retry suppression")
+}
+
+func TestSyncPodMismatchedUIDClearsVersionAndResyncs(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	client := fake.Clientset{}
+	syncer := newTestManager(&client)
+
+	pod := getTestPod()
+	pod.UID = "first"
+	syncer.podManager.(mutablePodManager).AddPod(pod)
+
+	// A different pod exists on the API server with the same name but different UID,
+	// simulating a pod that was deleted and recreated.
+	recreatedPod := getTestPod()
+	recreatedPod.UID = "second"
+	syncer.kubeClient = fake.NewSimpleClientset(recreatedPod)
+	syncer.podManager.(mutablePodManager).AddPod(recreatedPod)
+
+	// Sync the old pod's status. syncPod will GET the recreated pod from the API server,
+	// TranslatePodUID("second") returns "second" which != "first" → UID mismatch.
+	// This should delete the old status and clean up apiStatusVersions.
+	syncer.SetPodStatus(logger, pod, getRandomPodStatus())
+	verifyActions(t, syncer, []core.Action{getAction()})
+
+	// The apiStatusVersions entry for the old pod should be cleaned up.
+	oldMirrorUID := kubetypes.MirrorPodUID(pod.UID)
+	_, exists := syncer.apiStatusVersions[oldMirrorUID]
+	assert.False(t, exists, "apiStatusVersions for old UID should be deleted after mismatch")
+
+	// Now set status for the recreated pod. It should sync normally (GET + PATCH)
+	// because the stale version entry was cleaned up and won't suppress the sync.
+	syncer.SetPodStatus(logger, recreatedPod, getRandomPodStatus())
+	verifyActions(t, syncer, []core.Action{getAction(), patchAction()})
+
+	// Subsequent syncBatch should not re-sync (version already recorded).
+	syncer.kubeClient.(*fake.Clientset).ClearActions()
+	syncer.testSyncBatch(ctx)
+	actions := syncer.kubeClient.(*fake.Clientset).Actions()
+	assert.Empty(t, actions, "Expected no API calls after recreated pod status was already synced")
+}
+
 func TestSyncPod(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	syncer := newTestManager(&fake.Clientset{})
