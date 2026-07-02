@@ -1333,6 +1333,78 @@ func tryPop(t *testing.T, logger klog.Logger, q *PriorityQueue) framework.Queued
 	return gotEntity
 }
 
+// TestAddUnschedulablePodIfNotPresent_RaceWithConcurrentPop verifies that a pod
+// requeued by AddUnschedulablePodIfNotPresent is not silently dropped when a
+// concurrent Pop picks it up before Done() is called.
+//
+// The race: without calling Done() before requeueEntityWithQueueingStrategy,
+// a goroutine already waiting in Pop can grab the pod from activeQ while its
+// UID is still present in inFlightPods. unlockedMoveEntityToInFlight then
+// detects the duplicate and discards the pod permanently.
+//
+// This test synchronizes deterministically using a wait group and a channel
+// to ensure the race condition reliably triggers without the fix.
+func TestAddUnschedulablePodIfNotPresent_RaceWithConcurrentPop(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pod := st.MakePod().Name("pod1").UID("pod1").Obj()
+	// Disable backoff so the pod goes to activeQ (not backoffQ) on requeue,
+	// which is required to trigger the broadcast that wakes the waiting Pop.
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod},
+		WithPodMaxBackoffDuration(0))
+	q.Add(ctx, pod)
+
+	// Simulate a failed scheduling attempt.
+	poppedPod := popPod(t, logger, q, pod)
+	poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
+
+	// Force-activate the pod so that AddUnschedulablePodIfNotPresent requeues it
+	// back to activeQ via the ForceActivate wildcard event.
+	q.Activate(logger, map[string]*v1.Pod{pod.Name: pod})
+
+	// Synchronize Pop and AddUnschedulablePodIfNotPresent deterministically.
+	// We block Pop by making activeQ empty, wait for it to reach cond.Wait(),
+	// then proceed with AddUnschedulablePodIfNotPresent which will requeue and broadcast.
+	var wg sync.WaitGroup
+	poppedCh := make(chan *framework.QueuedPodInfo, 1)
+	popBlocked := make(chan struct{})
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// This will block in aq.cond.Wait() since activeQ is empty.
+		close(popBlocked)
+		poppedCh <- popPod(t, logger, q, pod)
+	}()
+
+	// Wait for Pop goroutine to be blocked in cond.Wait().
+	<-popBlocked
+	// Ensure it's actually blocked by giving the goroutine time to acquire lock and wait.
+	time.Sleep(50 * time.Millisecond)
+
+	// Now call AddUnschedulablePodIfNotPresent, which requeues the pod and broadcasts.
+	// With the fix, Done() is called before the broadcast, so Pop succeeds.
+	// Without the fix, Pop gets the broadcast while UID is still in inFlightPods,
+	// and unlockedMoveEntityToInFlight discards it.
+	if err := q.AddUnschedulablePodIfNotPresent(logger, poppedPod, q.SchedulingCycle()); err != nil {
+		t.Errorf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+	}
+
+	// Wait for Pop to complete.
+	wg.Wait()
+
+	select {
+	case popped := <-poppedCh:
+		if popped.Pod.UID != pod.UID {
+			t.Errorf("unexpected pod: want %s, got %s", pod.UID, popped.Pod.UID)
+		}
+	default:
+		t.Error("Pop did not complete: pod was silently dropped from the scheduling queue")
+	}
+}
+
 func TestPriorityQueue_Pop(t *testing.T) {
 	highPriorityPodInfo2 := mustNewPodInfo(
 		st.MakePod().Name("hpp2").Namespace("ns1").UID("hpp2ns1").Priority(highPriority).Obj(),
