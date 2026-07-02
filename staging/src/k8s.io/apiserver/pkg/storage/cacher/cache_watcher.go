@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
@@ -78,6 +79,8 @@ type cacheWatcher struct {
 	// instance with request
 	identifier string
 
+	auditID types.UID
+
 	// drainInputBuffer indicates whether we should delay closing this watcher
 	// and send all event in the input buffer.
 	drainInputBuffer bool
@@ -107,6 +110,7 @@ func newCacheWatcher(
 	groupResource schema.GroupResource,
 	watcherMetrics *metrics.WatcherMetricsObservers,
 	identifier string,
+	auditID types.UID,
 ) *cacheWatcher {
 	return &cacheWatcher{
 		input:               make(chan inputEvent, chanSize),
@@ -116,11 +120,14 @@ func newCacheWatcher(
 		stopped:             false,
 		forget:              forget,
 		versioner:           versioner,
-		deadline:            deadline,
-		allowWatchBookmarks: allowWatchBookmarks,
-		groupResource:       groupResource,
-		watcherMetrics:      watcherMetrics,
-		identifier:          identifier,
+		deadline:                     deadline,
+		allowWatchBookmarks:          allowWatchBookmarks,
+		groupResource:                groupResource,
+		watcherMetrics:               watcherMetrics,
+		identifier:                   identifier,
+		auditID:                      auditID,
+		bookmarkAfterResourceVersion: 0,
+		state:                        cacheWatcherWaitingForBookmark,
 	}
 }
 
@@ -559,6 +566,9 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 				builtAt, sentAt := c.sendWatchCacheEvent(event)
 				if !sentAt.IsZero() {
 					c.recordLifecycleMetrics(event, ie.enqueuedAt, dequeuedAt, builtAt, sentAt)
+					if !event.RecordTime.IsZero() && sentAt.Sub(event.RecordTime) >= slowDispatchThreshold {
+						c.logIfSlow(event, ie.enqueuedAt, dequeuedAt, builtAt, sentAt)
+					}
 				}
 			}
 		case <-ctx.Done():
@@ -591,4 +601,66 @@ func (c *cacheWatcher) observeStage(stage metrics.DispatchStage, from, to time.T
 		return
 	}
 	c.watcherMetrics.ObserveStage(stage, to.Sub(from))
+}
+
+const (
+	// slowDispatchThreshold is the per (event, watcher) end-to-end
+	// latency threshold to emit a diagnostic log.
+	slowDispatchThreshold = 500 * time.Millisecond
+	// slowDispatchWatchLogInterval bounds the rate of per-event
+	// slow-dispatch log emission.
+	slowDispatchWatchLogInterval = time.Second
+)
+
+var slowDispatchLog = &slowDispatchLogger{
+	interval: slowDispatchWatchLogInterval,
+}
+
+// slowDispatchLogger emits at most one per-event slow-dispatch log line per
+// interval. It counts skipped lines to summarize omitted slow events.
+type slowDispatchLogger struct {
+	mu                 sync.Mutex
+	lastLogTime        time.Time
+	skippedEventsCount int
+	interval           time.Duration
+}
+
+func (l *slowDispatchLogger) allow() (bool, int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.skippedEventsCount++
+	if time.Since(l.lastLogTime) < l.interval {
+		return false, 0
+	}
+
+	skipped := l.skippedEventsCount - 1
+	l.skippedEventsCount = 0
+	l.lastLogTime = time.Now()
+	return true, skipped
+}
+
+func safeDurationSecs(from, to time.Time) float64 {
+	if from.IsZero() || to.IsZero() {
+		return 0
+	}
+	return to.Sub(from).Seconds()
+}
+
+func (c *cacheWatcher) logIfSlow(event *watchCacheEvent, enqueuedAt, dequeuedAt, builtAt, sentAt time.Time) {
+	if allow, skipped := slowDispatchLog.allow(); allow {
+		tl := event.timeline
+		klog.InfoS("Slow watch cache processing",
+			"resource", c.groupResource.String(),
+			"auditID", c.auditID,
+			"propagationSeconds", safeDurationSecs(event.RecordTime, tl.cacheReceived),
+			"cacheIngestSeconds", safeDurationSecs(tl.cacheReceived, tl.ringBuffered),
+			"incomingQueueSeconds", safeDurationSecs(tl.ringBuffered, tl.dispatched),
+			"fanoutSeconds", safeDurationSecs(tl.dispatched, enqueuedAt),
+			"watcherQueueSeconds", safeDurationSecs(enqueuedAt, dequeuedAt),
+			"encodeSeconds", safeDurationSecs(dequeuedAt, builtAt),
+			"handoffSeconds", safeDurationSecs(builtAt, sentAt),
+			"skipped", skipped,
+		)
+	}
 }

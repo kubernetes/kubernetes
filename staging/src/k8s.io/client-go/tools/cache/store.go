@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // Store is a generic object storage and processing interface.  A
@@ -80,12 +79,6 @@ type Store interface {
 	// meaning in some implementations that have non-trivial
 	// additional behavior (e.g., DeltaFIFO).
 	Resync() error
-}
-
-// WatchEventReceiver is an optional interface for Store implementations that want to
-// receive the full watch.Event (including any telemetry metadata) rather than just the object.
-type WatchEventReceiver interface {
-	ProcessWatchEvent(event watch.Event) error
 }
 
 // TransactionType defines the type of a transaction operation. It is used to indicate whether

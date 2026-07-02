@@ -209,16 +209,6 @@ func (w *watchCache) Delete(obj interface{}) error {
 	return w.processEvent(event, resourceVersion)
 }
 
-// ProcessWatchEvent takes a watch.Event as an argument and processes it.
-// This implements the WatchEventReceiver interface.
-func (w *watchCache) ProcessWatchEvent(event watch.Event) error {
-	_, resourceVersion, err := w.objectToVersionedRuntimeObject(event.Object)
-	if err != nil {
-		return err
-	}
-	return w.processEvent(event, resourceVersion)
-}
-
 func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, error) {
 	object, ok := obj.(runtime.Object)
 	if !ok {
@@ -235,6 +225,13 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 // at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) error {
 	cacheReceived := w.config.clock.Now()
+
+	recordTime := cacheReceived
+	if carrier, ok := event.Object.(storage.RecordTimeCarrier); ok {
+		recordTime = carrier.RecordTime()
+		event.Object = carrier.Unwrap()
+	}
+
 	metrics.EventsReceivedCounter.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Inc()
 
 	key, err := w.config.keyFunc(event.Object)

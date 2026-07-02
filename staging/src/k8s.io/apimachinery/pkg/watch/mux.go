@@ -221,7 +221,7 @@ func (m *Broadcaster) Action(action EventType, obj runtime.Object) error {
 	default:
 	}
 
-	m.incoming <- Event{Type: action, Object: obj}
+	m.incoming <- Event{action, obj}
 	return nil
 }
 
@@ -240,7 +240,7 @@ func (m *Broadcaster) ActionOrDrop(action EventType, obj runtime.Object) (bool, 
 	}
 
 	select {
-	case m.incoming <- Event{Type: action, Object: obj}:
+	case m.incoming <- Event{action, obj}:
 		return true, nil
 	default:
 		return false, nil

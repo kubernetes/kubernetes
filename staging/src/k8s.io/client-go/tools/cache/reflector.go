@@ -1010,25 +1010,29 @@ loop:
 			if event.Type == watch.Error {
 				return watchListBookmarkReceived, apierrors.FromObject(event.Object)
 			}
+			inspectObj := event.Object
+			if u, ok := inspectObj.(interface{ Unwrap() runtime.Object }); ok {
+				inspectObj = u.Unwrap()
+			}
 			if expectedType != nil {
-				if e, a := expectedType, reflect.TypeOf(event.Object); e != a {
+				if e, a := expectedType, reflect.TypeOf(inspectObj); e != a {
 					utilruntime.HandleErrorWithContext(ctx, nil, "Unexpected watch event object type", "reflector", name, "expectedType", e, "actualType", a)
 					continue
 				}
 			}
 			if expectedGVK != nil {
-				if e, a := *expectedGVK, event.Object.GetObjectKind().GroupVersionKind(); e != a {
+				if e, a := *expectedGVK, inspectObj.GetObjectKind().GroupVersionKind(); e != a {
 					utilruntime.HandleErrorWithContext(ctx, nil, "Unexpected watch event object gvk", "reflector", name, "expectedGVK", e, "actualGVK", a)
 					continue
 				}
 			}
 			// we don't support receiving resources in Table format
 			// see #132926 for more info
-			if unsupportedGVK := isUnsupportedTableObject(event.Object); unsupportedGVK {
-				utilruntime.HandleErrorWithContext(ctx, nil, "Unsupported watch event object gvk", "reflector", name, "actualGVK", event.Object.GetObjectKind().GroupVersionKind())
+			if unsupportedGVK := isUnsupportedTableObject(inspectObj); unsupportedGVK {
+				utilruntime.HandleErrorWithContext(ctx, nil, "Unsupported watch event object gvk", "reflector", name, "actualGVK", inspectObj.GetObjectKind().GroupVersionKind())
 				continue
 			}
-			meta, err := meta.Accessor(event.Object)
+			meta, err := meta.Accessor(inspectObj)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Unable to understand watch event", "reflector", name, "event", event)
 				continue
@@ -1036,23 +1040,13 @@ loop:
 			resourceVersion := meta.GetResourceVersion()
 			switch event.Type {
 			case watch.Added:
-				var err error
-				if receiver, ok := store.(WatchEventReceiver); ok {
-					err = receiver.ProcessWatchEvent(event)
-				} else {
-					err = store.Add(event.Object)
-				}
+				err := store.Add(event.Object)
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to add watch event object to store", "reflector", name, "object", event.Object)
 				}
 			case watch.Modified:
 				eventReceivedBesidesAdded = true
-				var err error
-				if receiver, ok := store.(WatchEventReceiver); ok {
-					err = receiver.ProcessWatchEvent(event)
-				} else {
-					err = store.Update(event.Object)
-				}
+				err := store.Update(event.Object)
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to update watch event object to store", "reflector", name, "object", event.Object)
 				}
@@ -1061,12 +1055,7 @@ loop:
 				// state", which is passed in event.Object? If so, may need
 				// to change this.
 				eventReceivedBesidesAdded = true
-				var err error
-				if receiver, ok := store.(WatchEventReceiver); ok {
-					err = receiver.ProcessWatchEvent(event)
-				} else {
-					err = store.Delete(event.Object)
-				}
+				err := store.Delete(event.Object)
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to delete watch event object from store", "reflector", name, "object", event.Object)
 				}
