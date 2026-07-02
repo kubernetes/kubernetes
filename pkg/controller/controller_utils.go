@@ -573,6 +573,7 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 		return nil, fmt.Errorf("parentObject does not have ObjectMeta, %v", err)
 	}
 	prefix := getPodsPrefix(accessor.GetName())
+	desiredAnnotations = SetTopControllerAnnotations(desiredAnnotations, accessor, controllerRef)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -587,6 +588,33 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	}
 	pod.Spec = *template.Spec.DeepCopy()
 	return pod, nil
+}
+
+// TopController returns object itself when it has no controller owner, or the recorded top-level controller.
+func TopController(object metav1.Object, controllerRef *metav1.OwnerReference) (string, string) {
+	if metav1.GetControllerOfNoCopy(object) == nil {
+		if controllerRef != nil {
+			return object.GetName(), controllerRef.Kind
+		}
+		return object.GetName(), ""
+	}
+	if annotations := object.GetAnnotations(); annotations != nil {
+		if name, resourceType := annotations[v1.TopControllerName], annotations[v1.TopControllerResourceType]; name != "" && resourceType != "" {
+			return name, resourceType
+		}
+	}
+	return "", ""
+}
+
+// SetTopControllerAnnotations records object's top-level controller on annotations.
+func SetTopControllerAnnotations(annotations map[string]string, object metav1.Object, controllerRef *metav1.OwnerReference) map[string]string {
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	name, resourceType := TopController(object, controllerRef)
+	annotations[v1.TopControllerName] = name
+	annotations[v1.TopControllerResourceType] = resourceType
+	return annotations
 }
 
 func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v1.Pod, object runtime.Object, controllerRef *metav1.OwnerReference) error {

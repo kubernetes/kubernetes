@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/utils/ptr"
 )
 
@@ -252,6 +253,7 @@ func getJobFromTemplate2(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1
 	}
 	// Append job creation timestamp to the cronJob annotations. The time will be in RFC3339 form.
 	annotations[batchv1.CronJobScheduledTimestampAnnotation] = scheduledTime.In(timeZoneLocation).Format(time.RFC3339)
+	annotations = controller.SetTopControllerAnnotations(annotations, cj, metav1.NewControllerRef(cj, controllerKind))
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

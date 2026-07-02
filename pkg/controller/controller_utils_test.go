@@ -29,6 +29,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -344,7 +345,11 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 			},
 			wantPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:       controllerSpec.Spec.Template.Labels,
+					Labels: controllerSpec.Spec.Template.Labels,
+					Annotations: map[string]string{
+						v1.TopControllerName:         controllerSpec.Name,
+						v1.TopControllerResourceType: "ReplicationController",
+					},
 					GenerateName: fmt.Sprintf("%s-", controllerSpec.Name),
 				},
 				Spec: controllerSpec.Spec.Template.Spec,
@@ -358,7 +363,11 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 			},
 			wantPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:          controllerSpec.Spec.Template.Labels,
+					Labels: controllerSpec.Spec.Template.Labels,
+					Annotations: map[string]string{
+						v1.TopControllerName:         controllerSpec.Name,
+						v1.TopControllerResourceType: "ReplicationController",
+					},
 					GenerateName:    generateName,
 					OwnerReferences: []metav1.OwnerReference{*controllerRef},
 				},
@@ -397,6 +406,158 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 			require.NoError(t, err, "unexpected error: %v", err)
 			assert.True(t, apiequality.Semantic.DeepDerivative(test.wantPod, actualPod),
 				"Body: %s", fakeHandler.RequestBody)
+		})
+	}
+}
+
+func TestGetPodFromTemplateSetsTopControllerAnnotations(t *testing.T) {
+	deployment := &apps.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "top-deployment",
+			UID:  types.UID("deployment-uid"),
+		},
+	}
+
+	tests := []struct {
+		name                 string
+		setup                func() (runtime.Object, *metav1.OwnerReference)
+		wantName             string
+		wantResourceType     string
+		templateHasStaleData bool
+	}{
+		{
+			name: "deployment via replicaset",
+			setup: func() (runtime.Object, *metav1.OwnerReference) {
+				rs := newReplicaSet("middle-replicaset", 1, types.UID("replicaset-uid"))
+				rs.OwnerReferences = []metav1.OwnerReference{
+					*metav1.NewControllerRef(deployment, apps.SchemeGroupVersion.WithKind("Deployment")),
+				}
+				rs.Annotations = map[string]string{
+					v1.TopControllerName:         deployment.Name,
+					v1.TopControllerResourceType: "Deployment",
+				}
+				return rs, metav1.NewControllerRef(rs, apps.SchemeGroupVersion.WithKind("ReplicaSet"))
+			},
+			wantName:             deployment.Name,
+			wantResourceType:     "Deployment",
+			templateHasStaleData: true,
+		},
+		{
+			name: "replicaset owned by deployment without top controller annotations",
+			setup: func() (runtime.Object, *metav1.OwnerReference) {
+				rs := newReplicaSet("middle-replicaset", 1, types.UID("replicaset-uid"))
+				rs.OwnerReferences = []metav1.OwnerReference{
+					*metav1.NewControllerRef(deployment, apps.SchemeGroupVersion.WithKind("Deployment")),
+				}
+				return rs, metav1.NewControllerRef(rs, apps.SchemeGroupVersion.WithKind("ReplicaSet"))
+			},
+			wantName:         "",
+			wantResourceType: "",
+		},
+		{
+			name: "daemonset",
+			setup: func() (runtime.Object, *metav1.OwnerReference) {
+				ds := &apps.DaemonSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-daemonset", UID: types.UID("daemonset-uid")},
+				}
+				return ds, metav1.NewControllerRef(ds, apps.SchemeGroupVersion.WithKind("DaemonSet"))
+			},
+			wantName:             "test-daemonset",
+			wantResourceType:     "DaemonSet",
+			templateHasStaleData: true,
+		},
+		{
+			name: "job",
+			setup: func() (runtime.Object, *metav1.OwnerReference) {
+				job := &batch.Job{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-job", UID: types.UID("job-uid")},
+				}
+				return job, metav1.NewControllerRef(job, batch.SchemeGroupVersion.WithKind("Job"))
+			},
+			wantName:             "test-job",
+			wantResourceType:     "Job",
+			templateHasStaleData: true,
+		},
+		{
+			name: "cronjob via job",
+			setup: func() (runtime.Object, *metav1.OwnerReference) {
+				cronJob := &batch.CronJob{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-cronjob", UID: types.UID("cronjob-uid")},
+				}
+				job := &batch.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-job",
+						UID:  types.UID("job-uid"),
+						OwnerReferences: []metav1.OwnerReference{
+							*metav1.NewControllerRef(cronJob, batch.SchemeGroupVersion.WithKind("CronJob")),
+						},
+						Annotations: map[string]string{
+							v1.TopControllerName:         "test-cronjob",
+							v1.TopControllerResourceType: "CronJob",
+						},
+					},
+				}
+				return job, metav1.NewControllerRef(job, batch.SchemeGroupVersion.WithKind("Job"))
+			},
+			wantName:         "test-cronjob",
+			wantResourceType: "CronJob",
+		},
+		{
+			name: "statefulset",
+			setup: func() (runtime.Object, *metav1.OwnerReference) {
+				set := &apps.StatefulSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-statefulset", UID: types.UID("statefulset-uid")},
+				}
+				return set, metav1.NewControllerRef(set, apps.SchemeGroupVersion.WithKind("StatefulSet"))
+			},
+			wantName:         "test-statefulset",
+			wantResourceType: "StatefulSet",
+		},
+		{
+			name: "replicaset",
+			setup: func() (runtime.Object, *metav1.OwnerReference) {
+				rs := newReplicaSet("test-replicaset", 1, types.UID("replicaset-uid"))
+				return rs, metav1.NewControllerRef(rs, apps.SchemeGroupVersion.WithKind("ReplicaSet"))
+			},
+			wantName:         "test-replicaset",
+			wantResourceType: "ReplicaSet",
+		},
+		{
+			name: "replicationcontroller",
+			setup: func() (runtime.Object, *metav1.OwnerReference) {
+				rc := newReplicationController(1)
+				rc.Name = "test-rc"
+				return rc, metav1.NewControllerRef(rc, v1.SchemeGroupVersion.WithKind("ReplicationController"))
+			},
+			wantName:         "test-rc",
+			wantResourceType: "ReplicationController",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			template := &v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "test"},
+				},
+			}
+			if test.templateHasStaleData {
+				template.Annotations = map[string]string{
+					v1.TopControllerName:         "template-name",
+					v1.TopControllerResourceType: "template-kind",
+				}
+			}
+			parent, controllerRef := test.setup()
+
+			pod, err := GetPodFromTemplate(template, parent, controllerRef)
+			require.NoError(t, err, "unexpected error")
+
+			if got := pod.Annotations[v1.TopControllerName]; got != test.wantName {
+				t.Fatalf("expected %s annotation to be %q, got %q", v1.TopControllerName, test.wantName, got)
+			}
+			if got := pod.Annotations[v1.TopControllerResourceType]; got != test.wantResourceType {
+				t.Fatalf("expected %s annotation to be %q, got %q", v1.TopControllerResourceType, test.wantResourceType, got)
+			}
 		})
 	}
 }
