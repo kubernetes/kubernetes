@@ -530,12 +530,12 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "failed to retrieve object from tombstone", "obj", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %+v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "tombstone contained non-pod object", "obj", obj)
 			return
 		}
 	}
@@ -634,12 +634,12 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "failed to retrieve object from tombstone", "obj", obj)
 			return
 		}
 		jobObj, ok = tombstone.Obj.(*batch.Job)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a job %+v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "tombstone contained non-job object", "obj", obj)
 			return
 		}
 	}
@@ -653,7 +653,7 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 	key := cache.MetaObjectToName(jobObj).String()
 	err := jm.podBackoffStore.removeBackoffRecord(key)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error removing backoff record %w", err))
+		utilruntime.HandleErrorWithLogger(logger, err, "error removing backoff record", "key", key)
 	}
 }
 
@@ -703,7 +703,7 @@ func (jm *Controller) enqueueSyncJobWithDelay(logger klog.Logger, obj interface{
 func (jm *Controller) enqueueSyncJobInternal(logger klog.Logger, obj interface{}, delay time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleErrorWithLogger(logger, nil, "failed to retrieve key for object", "obj", obj)
 		return
 	}
 
@@ -746,7 +746,7 @@ func (jm *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("syncing job: %w", err))
+	utilruntime.HandleErrorWithContext(ctx, err, "syncing job error", "key", key)
 	jm.queue.AddRateLimited(key)
 
 	return true
@@ -765,7 +765,7 @@ func (jm *Controller) processNextOrphanPod(ctx context.Context) bool {
 	defer jm.orphanQueue.Done(key)
 	err := jm.syncOrphanPod(ctx, key)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error syncing orphan pod: %v", err))
+		utilruntime.HandleErrorWithContext(ctx, err, "error syncing orphan pod", "key", key)
 		jm.orphanQueue.AddRateLimited(key)
 	} else {
 		jm.orphanQueue.Forget(key)
@@ -1228,7 +1228,7 @@ func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods
 			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job); err != nil && !apierrors.IsNotFound(err) {
 				atomic.AddInt32(&successfulDeletes, -1)
 				errCh <- err
-				utilruntime.HandleError(err)
+				utilruntime.HandleErrorWithContext(ctx, err, "error deleting pod", "pod", pod)
 			}
 			if podutil.IsPodReady(pod) {
 				atomic.AddInt32(&deletedReady, 1)
@@ -1264,10 +1264,9 @@ func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey 
 		// Decrement the expected number of deletes because the informer won't observe this deletion
 		jm.expectations.DeletionObserved(logger, jobKey)
 		if !apierrors.IsNotFound(err) {
-			logger.V(2).Info("Failed to delete Pod", "job", klog.KObj(job), "pod", klog.KObj(pod), "err", err)
 			atomic.AddInt32(&successfulDeletes, -1)
 			errCh <- err
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithLogger(logger, err, "error deleting pod", "job", klog.KObj(job), "pod", klog.KObj(pod))
 		}
 	}
 
@@ -1588,7 +1587,7 @@ func (jm *Controller) removeTrackingFinalizerFromPods(ctx context.Context, jobKe
 					}
 					if !apierrors.IsNotFound(err) {
 						errCh <- err
-						utilruntime.HandleError(fmt.Errorf("removing tracking finalizer: %w", err))
+						utilruntime.HandleErrorWithLogger(logger, err, "error removing tracking finalizer", "pod", pod)
 						return
 					}
 				}
@@ -1751,7 +1750,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "failed to retrieve key for job", "job", job, "jobKey", jobKey)
 		return 0, metrics.JobSyncActionTracking, nil
 	}
 
@@ -1924,9 +1923,8 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						}
 					}
 					if err != nil {
-						defer utilruntime.HandleError(err)
+						defer utilruntime.HandleErrorWithLogger(logger, err, "error creating pod", "job", klog.KObj(job), "generateName", generateName)
 						// Decrement the expected number of creates because the informer won't observe this pod
-						logger.V(2).Info("Failed creation, decrementing expectations", "job", klog.KObj(job))
 						jm.expectations.CreationObserved(logger, jobKey)
 						atomic.AddInt32(&active, -1)
 						errCh <- err
