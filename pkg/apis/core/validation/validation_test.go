@@ -11096,6 +11096,22 @@ func TestValidatePod(t *testing.T) {
 				},
 			}),
 		),
+		"localhost AppArmor profile with absolute path": *podtest.MakePod("123",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				AppArmorProfile: &core.AppArmorProfile{
+					Type:             core.AppArmorProfileTypeLocalhost,
+					LocalhostProfile: ptr.To("/usr/sbin/ntpd"),
+				},
+			}),
+		),
+		"localhost AppArmor profile with dots in name": *podtest.MakePod("123",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				AppArmorProfile: &core.AppArmorProfile{
+					Type:             core.AppArmorProfileTypeLocalhost,
+					LocalhostProfile: ptr.To("my..profile"),
+				},
+			}),
+		),
 		"syntactically valid sysctls": *podtest.MakePod("123",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
 				Sysctls: []core.Sysctl{{
@@ -12492,6 +12508,28 @@ func TestValidatePod(t *testing.T) {
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeLocalhost,
 						LocalhostProfile: ptr.To(strings.Repeat("a", 4096)),
+					},
+				}),
+			),
+		},
+		"AppArmor localhost profile with backsteps": {
+			expectedError: "must not contain '..'",
+			spec: *podtest.MakePod("123",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type:             core.AppArmorProfileTypeLocalhost,
+						LocalhostProfile: ptr.To("../foo"),
+					},
+				}),
+			),
+		},
+		"AppArmor localhost profile with mid-path backsteps": {
+			expectedError: "must not contain '..'",
+			spec: *podtest.MakePod("123",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type:             core.AppArmorProfileTypeLocalhost,
+						LocalhostProfile: ptr.To("foo/../bar"),
 					},
 				}),
 			),
@@ -27334,6 +27372,8 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 		{"baz", false}, // Missing local prefix.
 		{v1.DeprecatedAppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
 		{v1.DeprecatedAppArmorBetaProfileNamePrefix + "foo-bar", true},
+		{v1.DeprecatedAppArmorBetaProfileNamePrefix + "../../../foo", false},
+		{v1.DeprecatedAppArmorBetaProfileNamePrefix + "foo/../bar", false},
 	}
 
 	for _, test := range tests {
