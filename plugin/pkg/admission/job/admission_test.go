@@ -26,22 +26,44 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/ptr"
 )
 
 func TestGangSchedulingParallelism(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
-	gangPG := &schedulingv1alpha3.PodGroup{
+	indexedMode := batch.IndexedCompletion
+	oldJob := &batch.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: metav1.NamespaceDefault,
+			UID:       types.UID("test-job-uid"),
+		},
+		Spec: batch.JobSpec{
+			CompletionMode: &indexedMode,
+			Completions:    new(int32(4)),
+			Parallelism:    new(int32(4)),
+		},
+	}
+	newJob := oldJob.DeepCopy()
+	newJob.Spec.Parallelism = new(int32(2))
+
+	p := NewPlugin()
+	p.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	p.SetExternalKubeInformerFactory(informerFactory)
+
+	// A gang PodGroup owned by the Job exists: the plugin must still allow the
+	// parallelism change (the v1.36 block is gone).
+	gangPodGroup := &schedulingv1alpha3.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "gang-pg",
 			Namespace: metav1.NamespaceDefault,
+			OwnerReferences: []metav1.OwnerReference{
+				{APIVersion: "batch/v1", Kind: "Job", Name: "test-job", UID: types.UID("test-job-uid"), Controller: new(true)},
+			},
 		},
 		Spec: schedulingv1alpha3.PodGroupSpec{
 			SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
@@ -49,234 +71,19 @@ func TestGangSchedulingParallelism(t *testing.T) {
 			},
 		},
 	}
-
-	basicPG := &schedulingv1alpha3.PodGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "basic-pg",
-			Namespace: metav1.NamespaceDefault,
-		},
-		Spec: schedulingv1alpha3.PodGroupSpec{
-			SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
-			},
-		},
+	if err := informerFactory.Scheduling().V1alpha3().PodGroups().Informer().GetStore().Add(gangPodGroup); err != nil {
+		t.Fatalf("failed to add PodGroup: %v", err)
 	}
 
-	indexedMode := batch.IndexedCompletion
+	attrs := admission.NewAttributesRecord(
+		newJob, oldJob,
+		schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"},
+		metav1.NamespaceDefault, "test-job",
+		batch.Resource("jobs").WithVersion("v1"),
+		"", admission.Update, &metav1.UpdateOptions{}, false, nil,
+	)
 
-	baseJob := func(sgName *string) *batch.Job {
-		j := &batch.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-job",
-				Namespace: metav1.NamespaceDefault,
-				UID:       types.UID("test-job-uid"),
-			},
-			Spec: batch.JobSpec{
-				CompletionMode: &indexedMode,
-				Completions:    ptr.To[int32](4),
-				Parallelism:    ptr.To[int32](4),
-			},
-		}
-		if sgName != nil {
-			j.Spec.Template.Spec.SchedulingGroup = &api.PodSchedulingGroup{
-				PodGroupName: sgName,
-			}
-		}
-		return j
-	}
-
-	cases := map[string]struct {
-		enableFeatureGate bool
-		oldJob            *batch.Job
-		newJob            *batch.Job
-		podGroups         []*schedulingv1alpha3.PodGroup
-		wantErr           bool
-	}{
-		"feature gate disabled: allows parallelism change": {
-			oldJob: baseJob(ptr.To("gang-pg")),
-			newJob: func() *batch.Job {
-				j := baseJob(ptr.To("gang-pg"))
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-			podGroups: []*schedulingv1alpha3.PodGroup{gangPG},
-		},
-		"no schedulingGroup: skips check (handled by validation)": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(nil),
-			newJob: func() *batch.Job {
-				j := baseJob(nil)
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-		},
-		"parallelism unchanged: allows": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(ptr.To("gang-pg")),
-			newJob:            baseJob(ptr.To("gang-pg")),
-			podGroups:         []*schedulingv1alpha3.PodGroup{gangPG},
-		},
-		"gang PodGroup: rejects parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(ptr.To("gang-pg")),
-			newJob: func() *batch.Job {
-				j := baseJob(ptr.To("gang-pg"))
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-			podGroups: []*schedulingv1alpha3.PodGroup{gangPG},
-			wantErr:   true,
-		},
-		"basic PodGroup: allows parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(ptr.To("basic-pg")),
-			newJob: func() *batch.Job {
-				j := baseJob(ptr.To("basic-pg"))
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-			podGroups: []*schedulingv1alpha3.PodGroup{basicPG},
-		},
-		"PodGroup not found: allows parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(ptr.To("missing-pg")),
-			newJob: func() *batch.Job {
-				j := baseJob(ptr.To("missing-pg"))
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-		},
-		"controller-created gang PodGroup - rejects parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(nil),
-			newJob: func() *batch.Job {
-				j := baseJob(nil)
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-			podGroups: []*schedulingv1alpha3.PodGroup{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "controller-created-pg",
-						Namespace: metav1.NamespaceDefault,
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: "batch/v1",
-								Kind:       "Job",
-								Name:       "test-job",
-								UID:        types.UID("test-job-uid"),
-								Controller: ptr.To(true),
-							},
-						},
-					},
-					Spec: schedulingv1alpha3.PodGroupSpec{
-						SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-							Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4},
-						},
-					},
-				},
-			},
-			wantErr: true,
-		},
-		"controller-created basic PodGroup - allows parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(nil),
-			newJob: func() *batch.Job {
-				j := baseJob(nil)
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-			podGroups: []*schedulingv1alpha3.PodGroup{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "controller-created-pg",
-						Namespace: metav1.NamespaceDefault,
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: "batch/v1",
-								Kind:       "Job",
-								Name:       "test-job",
-								UID:        types.UID("test-job-uid"),
-								Controller: ptr.To(true),
-							},
-						},
-					},
-					Spec: schedulingv1alpha3.PodGroupSpec{
-						SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-							Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
-						},
-					},
-				},
-			},
-		},
-		"gang PodGroup owned by different Job - allows parallelism change": {
-			enableFeatureGate: true,
-			oldJob:            baseJob(nil),
-			newJob: func() *batch.Job {
-				j := baseJob(nil)
-				j.Spec.Parallelism = ptr.To[int32](2)
-				return j
-			}(),
-			podGroups: []*schedulingv1alpha3.PodGroup{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "other-gang-pg",
-						Namespace: metav1.NamespaceDefault,
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: "batch/v1",
-								Kind:       "Job",
-								Name:       "other-job",
-								UID:        types.UID("other-job-uid"),
-								Controller: ptr.To(true),
-							},
-						},
-					},
-					Spec: schedulingv1alpha3.PodGroupSpec{
-						SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-							Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t,
-				utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload: tc.enableFeatureGate,
-					features.WorkloadWithJob: tc.enableFeatureGate,
-				})
-
-			p := NewPlugin()
-			p.InspectFeatureGates(utilfeature.DefaultFeatureGate)
-
-			informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-			p.SetExternalKubeInformerFactory(informerFactory)
-
-			for _, pg := range tc.podGroups {
-				if err := informerFactory.Scheduling().V1alpha3().PodGroups().Informer().GetStore().Add(pg); err != nil {
-					t.Fatalf("failed to add PodGroup: %v", err)
-				}
-			}
-
-			attrs := admission.NewAttributesRecord(
-				tc.newJob, tc.oldJob,
-				schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"},
-				metav1.NamespaceDefault, "test-job",
-				batch.Resource("jobs").WithVersion("v1"),
-				"", admission.Update, &metav1.UpdateOptions{}, false, nil,
-			)
-
-			err := p.Validate(ctx, attrs, nil)
-			if tc.wantErr && err == nil {
-				t.Error("expected error, got nil")
-			}
-			if !tc.wantErr && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
+	if err := p.Validate(ctx, attrs, nil); err != nil {
+		t.Errorf("expected parallelism change to be allowed for gang-scheduled Job, got: %v", err)
 	}
 }
