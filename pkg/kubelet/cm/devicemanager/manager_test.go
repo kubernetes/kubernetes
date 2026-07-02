@@ -19,6 +19,7 @@ package devicemanager
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -71,7 +72,8 @@ func newWrappedManagerImpl(logger klog.Logger, socketPath string, manager *Manag
 		callback:    manager.genericDeviceUpdateCallback,
 	}
 	w.socketdir, _ = filepath.Split(socketPath)
-	w.server, _ = plugin.NewServer(logger, socketPath, w, w)
+	srv, _ := plugin.NewServer(logger, socketPath, w, w)
+	w.servers = []plugin.Server{srv}
 	return w
 }
 
@@ -102,9 +104,139 @@ func TestNewManagerImpl(t *testing.T) {
 	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	_, err = newManagerImpl(logger, socketName, nil, topologyStore)
+	_, err = newManagerImpl(logger, []string{socketName}, nil, topologyStore)
 	require.NoError(t, err)
 	os.RemoveAll(socketDir)
+}
+
+func TestDevicePluginSocketPaths(t *testing.T) {
+	legacy := pluginapi.KubeletSocket
+	if goruntime.GOOS == "windows" {
+		legacy = os.Getenv("SYSTEMDRIVE") + pluginapi.KubeletSocketWindows
+	}
+
+	for _, tc := range []struct {
+		name    string
+		rootDir string
+		want    []string
+	}{
+		{
+			name:    "empty root dir falls back to legacy only",
+			rootDir: "",
+			want:    []string{legacy},
+		},
+		{
+			name:    "default root dir collapses to single legacy listener",
+			rootDir: filepath.Dir(filepath.Dir(legacy)),
+			want:    []string{legacy},
+		},
+		{
+			name:    "custom root dir exposes primary and legacy",
+			rootDir: filepath.Join(string(filepath.Separator), "var", "lib", "ci", "kubelet"),
+			want: []string{
+				filepath.Join(string(filepath.Separator), "var", "lib", "ci", "kubelet", "device-plugins", "kubelet.sock"),
+				legacy,
+			},
+		},
+		{
+			name:    "default root dir with trailing slash collapses",
+			rootDir: filepath.Dir(filepath.Dir(legacy)) + string(filepath.Separator),
+			want:    []string{legacy},
+		},
+		{
+			name:    "default root dir with dot segment collapses",
+			rootDir: filepath.Join(filepath.Dir(filepath.Dir(legacy)), ".", "."),
+			want:    []string{legacy},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := devicePluginSocketPaths(tc.rootDir)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestNewManagerImplDualSockets(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	topologyStore := topologymanager.NewFakeManager(logger)
+
+	primaryDir := t.TempDir()
+	compatDir := t.TempDir()
+
+	primarySocket := filepath.Join(primaryDir, "kubelet.sock")
+	compatSocket := filepath.Join(compatDir, "kubelet.sock")
+
+	m, err := newManagerImpl(logger, []string{primarySocket, compatSocket}, nil, topologyStore)
+	require.NoError(t, err)
+	require.Len(t, m.servers, 2)
+	require.Equal(t, primarySocket, m.servers[0].SocketPath())
+	require.Equal(t, compatSocket, m.servers[1].SocketPath())
+	// Checkpoint must live under the primary (rootdir-relative) directory.
+	require.Equal(t, primaryDir+string(filepath.Separator), m.checkpointdir)
+}
+
+// fakeServer is a plugin.Server stub that records Start/Stop calls and can be
+// configured to fail on Start. It is used to exercise Manager.Start rollback
+// behaviour without binding real unix sockets.
+type fakeServer struct {
+	socket     string
+	startErr   error
+	startCalls int
+	stopCalls  int
+}
+
+func (s *fakeServer) Start(klog.Logger) error {
+	s.startCalls++
+	return s.startErr
+}
+func (s *fakeServer) Stop(klog.Logger) error {
+	s.stopCalls++
+	return nil
+}
+func (s *fakeServer) SocketPath() string { return s.socket }
+func (s *fakeServer) Name() string       { return "fake" }
+func (s *fakeServer) Check(*http.Request) error {
+	return nil
+}
+func (s *fakeServer) ValidatePlugin(context.Context, string, string, []string) error {
+	return nil
+}
+func (s *fakeServer) RegisterPlugin(context.Context, string, string, []string, *time.Duration) error {
+	return nil
+}
+func (s *fakeServer) DeRegisterPlugin(context.Context, string, string) {}
+
+// TestManagerStartRollsBackOnPartialFailure ensures that when one of the
+// dual-socket servers fails to start, the servers that already started are
+// stopped so the manager does not leak running listeners. Callers typically
+// `defer Stop()` only after Start returns successfully, so Start must clean up
+// after itself on partial failure.
+func TestManagerStartRollsBackOnPartialFailure(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	primary := &fakeServer{socket: "/primary.sock"}
+	compat := &fakeServer{socket: "/compat.sock", startErr: fmt.Errorf("bind failed")}
+
+	checkpointDir := t.TempDir()
+	checkpointManager, err := checkpointmanager.NewCheckpointManager(checkpointDir)
+	require.NoError(t, err)
+
+	m := &ManagerImpl{
+		servers:               []plugin.Server{primary, compat},
+		activePods:            func() []*v1.Pod { return nil },
+		sourcesReady:          &sourcesReadyStub{},
+		checkpointManager:     checkpointManager,
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
+	}
+
+	err = m.Start(logger, m.activePods, m.sourcesReady, containermap.ContainerMap{}, sets.New[string]())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), compat.SocketPath())
+
+	require.Equal(t, 1, primary.startCalls, "primary server should have been started")
+	require.Equal(t, 1, compat.startCalls, "compat server should have been attempted")
+	require.Equal(t, 1, primary.stopCalls, "already-started primary server should be rolled back")
+	require.Equal(t, 0, compat.stopCalls, "failed server should not be stopped")
 }
 
 func TestNewManagerImplStart(t *testing.T) {
@@ -289,7 +421,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string,
 	topology []cadvisorapi.Node, logger klog.Logger) (Manager, <-chan interface{}) {
 	topologyStore := topologymanager.NewFakeManager(logger)
-	m, err := newManagerImpl(logger, socketName, topology, topologyStore)
+	m, err := newManagerImpl(logger, []string{socketName}, topology, topologyStore)
 	require.NoError(t, err)
 	updateChan := make(chan interface{})
 
@@ -368,7 +500,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
+	testManager, err := newManagerImpl(logger, []string{socketName}, nil, topologyStore)
 	as := assert.New(t)
 	as.NotNil(testManager)
 	as.NoError(err)
@@ -514,7 +646,7 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
+	testManager, err := newManagerImpl(logger, []string{socketName}, nil, topologyStore)
 	as := assert.New(t)
 	as.NotNil(testManager)
 	as.NoError(err)
@@ -556,7 +688,7 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
+	testManager, err := newManagerImpl(logger, []string{socketName}, nil, topologyStore)
 	as := assert.New(t)
 	as.NotNil(testManager)
 	as.NoError(err)
@@ -2167,7 +2299,7 @@ func TestEndpointSyncOnDisconnect(t *testing.T) {
 		}
 	}()
 
-	manager, err := newManagerImpl(logger, socketName, nil, nil)
+	manager, err := newManagerImpl(logger, []string{socketName}, nil, nil)
 	require.NoError(t, err)
 
 	resourceName := "domain1.com/resource1"
