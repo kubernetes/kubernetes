@@ -180,13 +180,14 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
-	fields := make(fields.Set, 3)
+	fields := make(fields.Set, 4)
 	if slice.Spec.NodeName == nil {
 		fields[resource.ResourceSliceSelectorNodeName] = ""
 	} else {
 		fields[resource.ResourceSliceSelectorNodeName] = *slice.Spec.NodeName
 	}
 	fields[resource.ResourceSliceSelectorDriver] = slice.Spec.Driver
+	fields[resource.ResourceSliceSelectorPoolName] = slice.Spec.Pool.Name
 
 	// Adds one field.
 	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)
