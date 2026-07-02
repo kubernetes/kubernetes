@@ -2127,6 +2127,51 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 			},
 			expectedPodStatusUpdate: true,
 		},
+		// Node status updated to False. Then grace period passes and it goes to Unknown.
+		// Expect pods status updated.
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+							},
+							Capacity: v1.ResourceList{
+								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			timeToPass: 1 * time.Minute,
+			newNodeStatus: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionFalse,
+						LastHeartbeatTime:  fakeNow,
+						LastTransitionTime: fakeNow,
+					},
+				},
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			expectedPodStatusUpdate: true,
+		},
 	}
 
 	tCtx := ktesting.Init(t)
