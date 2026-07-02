@@ -2017,6 +2017,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.36"
+- name: VolumeControllerCircuitBreaker
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: VolumeLimitScaling
   versionedSpecs:
   - default: false

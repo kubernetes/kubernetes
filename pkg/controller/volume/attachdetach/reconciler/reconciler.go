@@ -26,20 +26,31 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
+	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+)
+
+var (
+	nodeResource schema.GroupResource = v1.SchemeGroupVersion.WithResource("nodes").GroupResource()
 )
 
 // Reconciler runs a periodic loop to reconcile the desired state of the world with
@@ -75,7 +86,10 @@ func NewReconciler(
 	attacherDetacher operationexecutor.OperationExecutor,
 	nodeStatusUpdater statusupdater.NodeStatusUpdater,
 	nodeLister corelisters.NodeLister,
-	recorder record.EventRecorder) Reconciler {
+	recorder record.EventRecorder,
+	kubeClient clientset.Interface,
+	consistencyStore consistencyutil.ConsistencyStore,
+) Reconciler {
 	return &reconciler{
 		loopPeriod:                  loopPeriod,
 		maxWaitForUnmountDuration:   maxWaitForUnmountDuration,
@@ -89,6 +103,8 @@ func NewReconciler(
 		nodeLister:                  nodeLister,
 		timeOfLastSync:              time.Now(),
 		recorder:                    recorder,
+		kubeClient:                  kubeClient,
+		consistencyStore:            consistencyStore,
 	}
 }
 
@@ -105,6 +121,8 @@ type reconciler struct {
 	disableReconciliationSync   bool
 	disableForceDetachOnTimeout bool
 	recorder                    record.EventRecorder
+	kubeClient                  clientset.Interface
+	consistencyStore            consistencyutil.ConsistencyStore
 }
 
 func (rc *reconciler) Run(ctx context.Context) {
@@ -226,7 +244,41 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			if maxWaitForUnmountDurationExpired && rc.disableForceDetachOnTimeout {
 				logger.V(5).Info("Drain timeout expired for volume but disableForceDetachOnTimeout was set", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
 			}
-			forceDetach := !isHealthy && forceDetachTimeoutExpired
+
+			// If the node cache is stale, we disable force detach for this node in this cycle.
+			nodeCacheStale := false
+			if utilfeature.DefaultFeatureGate.Enabled(features.VolumeControllerCircuitBreaker) && !isHealthy && forceDetachTimeoutExpired {
+				if err := rc.consistencyStore.EnsureReady(types.NamespacedName{}); err != nil {
+					logger.V(4).Info("Skipping force-detach because node cache is stale", "node", attachedVolume.NodeName, "err", err)
+					nodeCacheStale = true
+				} else {
+					// Double check with live node to detect lag
+					liveNode, err := rc.kubeClient.CoreV1().Nodes().Get(ctx, string(attachedVolume.NodeName), metav1.GetOptions{})
+					if err == nil {
+						cachedNode, err := rc.nodeLister.Get(string(attachedVolume.NodeName))
+						if err == nil && liveNode.ResourceVersion != cachedNode.ResourceVersion {
+							// Detect lag, trigger circuit breaker
+							rc.consistencyStore.WroteAt(
+								types.NamespacedName{},
+								"", // No specific UID
+								nodeResource,
+								liveNode.ResourceVersion,
+							)
+							logger.Info("Node cache lag detected, pausing force-detaches", "node", attachedVolume.NodeName, "readRV", cachedNode.ResourceVersion, "wroteRV", liveNode.ResourceVersion)
+							nodeCacheStale = true
+						} else if err == nil {
+							// Update isHealthy based on fresh live node
+							isHealthy = nodeutil.IsNodeReady(liveNode)
+						}
+					} else if !apierrors.IsNotFound(err) {
+						logger.Error(err, "Failed to get live node to verify health", "node", attachedVolume.NodeName)
+						// Fallback to cached health if live read fails, but don't force detach if we can't verify
+						nodeCacheStale = true
+					}
+				}
+			}
+
+			forceDetach := !isHealthy && forceDetachTimeoutExpired && !nodeCacheStale
 
 			hasOutOfServiceTaint, err := rc.hasOutOfServiceTaint(attachedVolume.NodeName)
 			if err != nil {
