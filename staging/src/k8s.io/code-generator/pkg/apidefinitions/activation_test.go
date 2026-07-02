@@ -78,11 +78,11 @@ func TestIdentify(t *testing.T) {
 			wantValues:         []string{"TypeMeta"},
 		},
 		{
-			name:               "validation-gen=TypeMeta activates",
+			name:               "validation-gen=TypesWithField=TypeMeta activates",
 			spec:               Validation,
-			comments:           []string{"+k8s:validation-gen=TypeMeta"},
+			comments:           []string{"+k8s:validation-gen=TypesWithField=TypeMeta"},
 			wantShouldGenerate: true,
-			wantValues:         []string{"TypeMeta"},
+			wantValues:         []string{"TypesWithField=TypeMeta"},
 		},
 		{
 			name:               "prerelease-lifecycle-gen=true activates",
@@ -153,11 +153,11 @@ func TestIdentify(t *testing.T) {
 			name: "non-generator +k8s: tag passes validation untouched",
 			spec: Validation,
 			comments: []string{
-				"+k8s:validation-gen=TypeMeta",
+				"+k8s:validation-gen=TypesWithField=TypeMeta",
 				"+k8s:validateFalse=field",
 			},
 			wantShouldGenerate: true,
-			wantValues:         []string{"TypeMeta"},
+			wantValues:         []string{"TypesWithField=TypeMeta"},
 		},
 		{
 			name: "subtagged generator tag is recognized by its base",
@@ -176,7 +176,7 @@ func TestIdentify(t *testing.T) {
 				"+k8s:conversion-gen-external-types=k8s.io/api/foo/v1",
 				"+k8s:defaulter-gen=TypeMeta",
 				"+k8s:defaulter-gen-input=k8s.io/api/foo/v1",
-				"+k8s:validation-gen=TypeMeta",
+				"+k8s:validation-gen=TypesWithField=TypeMeta",
 				"+k8s:validation-gen-input=k8s.io/api/foo/v1",
 				"+k8s:validation-gen-nolint",
 				"+k8s:validation-gen-scheme-registry=foo",

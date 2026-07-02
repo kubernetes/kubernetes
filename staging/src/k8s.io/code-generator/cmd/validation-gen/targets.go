@@ -41,7 +41,8 @@ const (
 	// this can be used:
 	//   Per-package:
 	//     * "*": generate validation for all types in this package
-	//	   * "FooBar": generate validation for all types with a field named "FooBar"
+	//	   * "TypesWithField=FooBar": generate validation for all types with a
+	//	     field named "FooBar"
 	//   Per-type:
 	//	   * "true": generate validation for this type
 	//	   * "false": do not generate validation for this type
@@ -342,15 +343,31 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 		schemeRegistry, registerThisPkg := schemeRegistryTag(pkg)
 
-		typesWith, found := validationTypeMatch(pkg, idOpts)
+		criteria, found := validationTypeMatch(pkg, idOpts)
 		if !found {
 			klog.V(2).InfoS("  did not find required tag", "tag", mainTagName)
 			continue
 		}
-		if len(typesWith) == 1 && typesWith[0] == "" {
-			klog.Fatalf("found package tag %q with no value", mainTagName)
+		if len(criteria) == 1 && criteria[0] == "" {
+			klog.Fatalf("%s: found package tag %q with no value", input, mainTagName)
+		}
+		for _, crit := range criteria {
+			if crit == "*" {
+				continue
+			}
+			if val, found := strings.CutPrefix(crit, "TypesWithField="); found {
+				if val == "" {
+					klog.Fatalf("%s: found package tag \"%s=%s\" with empty value", input, mainTagName, crit)
+				}
+				continue
+			}
+			klog.Fatalf("%s: unknown value for package tag %q: %q", input, mainTagName, crit)
 		}
 		shouldCreateObjectValidationFn := func(t *types.Type) bool {
+			// Never generate validation for unexported types.
+			if namer.IsPrivateGoName(t.Name.Name) {
+				return false
+			}
 			// opt-out
 			if checkMainTag(t.CommentLines, "false") {
 				return false
@@ -376,17 +393,17 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			}
 
 			// all types
-			for _, v := range typesWith {
-				if v == "*" && !namer.IsPrivateGoName(t.Name.Name) {
+			for _, v := range criteria {
+				if v == "*" {
 					return true
 				}
+				if field, found := strings.CutPrefix(v, "TypesWithField="); found {
+					if isTypeWithField(t, field) {
+						return true
+					}
+				}
 			}
-			// For every k8s:validation-gen tag at the package level, interpret the value as a
-			// field name (like TypeMeta, ListMeta, ObjectMeta) and trigger validation generation
-			// for any type with any of the matching field names. Provides a more useful package
-			// level validation than global (because we only need validations on a subset of objects -
-			// usually those with TypeMeta).
-			return isTypeWith(t, typesWith)
+			return false
 		}
 
 		// Find the right input pkg, which might not be this one.
@@ -506,13 +523,11 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	return targetList
 }
 
-func isTypeWith(t *types.Type, typesWith []string) bool {
-	if t.Kind == types.Struct && len(typesWith) > 0 {
+func isTypeWithField(t *types.Type, fieldName string) bool {
+	if t.Kind == types.Struct {
 		for _, field := range t.Members {
-			for _, s := range typesWith {
-				if field.Name == s {
-					return true
-				}
+			if field.Name == fieldName {
+				return true
 			}
 		}
 	}
