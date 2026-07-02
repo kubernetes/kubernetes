@@ -23,8 +23,12 @@ import (
 )
 
 const (
-	// maxInt64Factors is the highest value that will be checked when removing factors of 10 from an int64.
-	// It is also the maximum decimal digits that can be represented with an int64.
+	// maxInt64Factors is the highest power of 10 that will be checked when
+	// removing factors of 10 from an int64 (see int64Amount.AsScale()).
+	//
+	// It also represents the maximum number of base-10 digits that can be
+	// safely represented in the int64 fast path without risking overflow
+	// during internal scaling or canonicalization.
 	maxInt64Factors = 18
 )
 
