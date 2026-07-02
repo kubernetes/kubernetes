@@ -17,13 +17,23 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	nodelisters "k8s.io/client-go/listers/node/v1alpha1"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
 func TestGraphPopulator_CoalescedDeleteAndRecreate(t *testing.T) {
@@ -368,4 +378,77 @@ func TestGraphPopulator_UpdatePodVolumes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGraphPopulatorPodCheckpointAssignment(t *testing.T) {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	graph := NewGraph()
+	g := &graphPopulator{
+		graph:            graph,
+		checkpointQueue:  newRateLimitingQueue("test_node_authorizer_checkpoint_populator"),
+		checkpointLister: nodelisters.NewPodCheckpointLister(indexer),
+	}
+	defer g.checkpointQueue.ShutDown()
+	featuresForTest := utilfeature.DefaultFeatureGate.DeepCopy()
+	featuregatetesting.SetFeatureGateDuringTest(t, featuresForTest, features.PodLevelCheckpointRestore, true)
+	authz := NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
+	authz.features = featuresForTest
+	process := func(allowedNode string) {
+		t.Helper()
+		if g.checkpointQueue.Len() != 1 {
+			t.Fatalf("queued checkpoints = %d, want 1", g.checkpointQueue.Len())
+		}
+		key, _ := g.checkpointQueue.Get()
+		defer g.checkpointQueue.Done(key)
+		if err := g.processCheckpointKey(key); err != nil {
+			t.Fatal(err)
+		}
+		for _, nodeName := range []string{"node0", "node1"} {
+			attrs := authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "system:node:" + nodeName, Groups: []string{"system:nodes"}},
+				ResourceRequest: true, Verb: "get", APIGroup: "node.k8s.io", Resource: "podcheckpoints", Namespace: "ns", Name: "checkpoint"}
+			decision, reason, err := authz.Authorize(context.Background(), attrs)
+			if err != nil || (decision == authorizer.DecisionAllow) != (nodeName == allowedNode) {
+				t.Fatalf("node %s decision = %v (%s), error = %v, assigned node = %q", nodeName, decision, reason, err, allowedNode)
+			}
+		}
+	}
+	checkpoint := &nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns", UID: "old"}}
+	if err := indexer.Add(checkpoint); err != nil {
+		t.Fatal(err)
+	}
+	g.addCheckpoint(checkpoint)
+	process("")
+
+	assigned := checkpoint.DeepCopy()
+	assigned.Status.NodeName = new("node0")
+	if err := indexer.Update(assigned); err != nil {
+		t.Fatal(err)
+	}
+	g.updateCheckpoint(checkpoint, assigned)
+	process("node0")
+
+	// A coalesced delete/recreate must use the new object from the informer.
+	replacement := assigned.DeepCopy()
+	replacement.UID = "new"
+	replacement.Status.NodeName = new("node1")
+	if err := indexer.Update(replacement); err != nil {
+		t.Fatal(err)
+	}
+	g.deleteCheckpoint(cache.DeletedFinalStateUnknown{Obj: assigned})
+	g.addCheckpoint(replacement)
+	process("node1")
+
+	unassigned := replacement.DeepCopy()
+	unassigned.Status.NodeName = nil
+	if err := indexer.Update(unassigned); err != nil {
+		t.Fatal(err)
+	}
+	g.updateCheckpoint(replacement, unassigned)
+	process("")
+
+	if err := indexer.Delete(unassigned); err != nil {
+		t.Fatal(err)
+	}
+	g.deleteCheckpoint(unassigned)
+	process("")
 }
