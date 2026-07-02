@@ -34,6 +34,8 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	kubelettypes "k8s.io/kubelet/pkg/types"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -46,6 +48,8 @@ import (
 )
 
 const podCheckpointTestTimeout = time.Minute
+
+const podRestoreTestTimeout = time.Minute
 
 func podCheckpointRuntimeUnsupported(rpcName, message string) bool {
 	for _, fragment := range []string{
@@ -96,6 +100,40 @@ done`},
 				TimeoutSeconds: 1,
 			},
 		})
+	}
+	return pod
+}
+
+func restrictedPodCheckpointSource(namespace, name string) *v1.Pod {
+	pod := podCheckpointSource(namespace, name)
+	pod.Spec.SecurityContext = &v1.PodSecurityContext{
+		RunAsUser: new(int64(1000)), RunAsGroup: new(int64(2000)),
+		RunAsNonRoot: new(true), SupplementalGroups: []int64{3000},
+		SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
+	}
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		container.SecurityContext = &v1.SecurityContext{
+			AllowPrivilegeEscalation: new(false),
+			Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
+		}
+		// Run the forbidden operation from the resumed workload's own loop,
+		// rather than from a newly created exec process.
+		container.Command[2] = `token=$(cat /proc/sys/kernel/random/uuid)
+command -v mknod >/dev/null
+count=0
+while true; do
+  if mknod /tmp/checkpoint-forbidden-device c 1 3 2>/tmp/checkpoint-forbidden-error; then
+    rm /tmp/checkpoint-forbidden-device
+    echo 'workload unexpectedly created a device node' >&2
+    exit 1
+  fi
+  grep -Eq 'Operation not permitted|Permission denied' /tmp/checkpoint-forbidden-error
+  count=$((count + 1))
+  printf '%s %s\n' "$token" "$count" > /tmp/checkpoint-state.next
+  mv /tmp/checkpoint-state.next /tmp/checkpoint-state
+  sleep 1
+done`
 	}
 	return pod
 }
@@ -192,16 +230,78 @@ func podCheckpointProbeCounts(f *framework.Framework, pod *v1.Pod, container str
 	return counts, nil
 }
 
+// Read PID 1, which is the counting shell that must survive restore. The fresh
+// exec process supplies only the destination LSM label for comparison; SELinux
+// may assign a different category to the new Pod than it gave the source Pod.
+func checkPodCheckpointSecurity(f *framework.Framework, pod *v1.Pod, container string) error {
+	stdout, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, container, "/bin/sh", "-ec", `cat /proc/1/status
+printf '\nworkload-lsm:'
+cat /proc/1/attr/current 2>/dev/null || printf unavailable
+printf '\nexec-lsm:'
+cat /proc/self/attr/current 2>/dev/null || printf unavailable`)
+	if err != nil {
+		return fmt.Errorf("read workload security in %s/%s: %w: %s", pod.Name, container, err, stderr)
+	}
+	if err := validatePodCheckpointSecurity(stdout); err != nil {
+		return fmt.Errorf("workload security in %s/%s: %w", pod.Name, container, err)
+	}
+	if strings.Contains(stdout, "\nworkload-lsm:unavailable") {
+		framework.Logf("No readable LSM task labels in %s/%s; LSM enforcement was not verified", pod.Name, container)
+	}
+	return nil
+}
+
+func validatePodCheckpointSecurity(status string) error {
+	fields := map[string]string{}
+	for line := range strings.SplitSeq(status, "\n") {
+		name, value, found := strings.Cut(line, ":")
+		if found {
+			fields[name] = strings.Join(strings.Fields(value), " ")
+		}
+	}
+	for name, want := range map[string]string{
+		"Pid": "1", "Uid": "1000 1000 1000 1000", "Gid": "2000 2000 2000 2000",
+		"NoNewPrivs": "1", "Seccomp": "2",
+	} {
+		if fields[name] != want {
+			return fmt.Errorf("%s is %q, want %q", name, fields[name], want)
+		}
+	}
+	for _, name := range []string{"CapInh", "CapPrm", "CapEff", "CapBnd", "CapAmb"} {
+		value, err := strconv.ParseUint(fields[name], 16, 64)
+		if err != nil || value != 0 {
+			return fmt.Errorf("%s is %q, want no capabilities", name, fields[name])
+		}
+	}
+	groups := strings.Fields(fields["Groups"])
+	seenGroups := map[string]bool{}
+	for _, group := range groups {
+		// Some runtimes also include the primary GID in the supplementary list.
+		if seenGroups[group] || group != "2000" && group != "3000" {
+			return fmt.Errorf("supplementary groups are %q, want 3000 and optionally primary GID 2000", fields["Groups"])
+		}
+		seenGroups[group] = true
+	}
+	if !seenGroups["3000"] {
+		return fmt.Errorf("supplementary groups are %q, want 3000", fields["Groups"])
+	}
+	if fields["workload-lsm"] == "" || fields["workload-lsm"] != fields["exec-lsm"] {
+		return fmt.Errorf("workload LSM label %q differs from destination label %q", fields["workload-lsm"], fields["exec-lsm"])
+	}
+	return nil
+}
+
 var _ = SIGDescribe("Checkpoint Pod", feature.PodLevelCheckpointRestore, framework.WithSerial(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("checkpoint-pod-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	tempSetCurrentKubeletConfig(f, func(_ context.Context, config *kubeletconfiginternal.KubeletConfiguration) {
 		config.PodCheckpointTimeout = metav1.Duration{Duration: podCheckpointTestTimeout}
+		config.PodRestoreTimeout = metav1.Duration{Duration: podRestoreTestTimeout}
 	})
 
-	ginkgo.It("should checkpoint the data of both containers on their node", func(ctx context.Context) {
+	ginkgo.It("should checkpoint data and restore both containers on the same node", func(ctx context.Context) {
 		podClient := e2epod.NewPodClient(f)
-		pod := podClient.CreateSync(ctx, podCheckpointSource(f.Namespace.Name, "checkpoint-source"))
+		pod := podClient.CreateSync(ctx, restrictedPodCheckpointSource(f.Namespace.Name, "checkpoint-source"))
 		sourceContainerIDs := map[string]string{}
 		for _, container := range pod.Status.ContainerStatuses {
 			gomega.Expect(container.ContainerID).NotTo(gomega.BeEmpty())
@@ -223,6 +323,7 @@ var _ = SIGDescribe("Checkpoint Pod", feature.PodLevelCheckpointRestore, framewo
 				before[container.Name] = state
 				return nil
 			}, time.Minute, time.Second).Should(gomega.Succeed())
+			framework.ExpectNoError(checkPodCheckpointSecurity(f, pod, container.Name))
 		}
 
 		ginkgo.By("checkpointing the Pod through its assigned kubelet")
@@ -313,5 +414,117 @@ var _ = SIGDescribe("Checkpoint Pod", feature.PodLevelCheckpointRestore, framewo
 			return nil
 		}))
 		gomega.Expect(dataFiles).To(gomega.BeNumerically(">", 0), "checkpoint must contain nonempty files")
+
+		runtime, _, err := getCRIClient(ctx)
+		framework.ExpectNoError(err)
+		sourceSandboxes, err := runtime.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
+			LabelSelector: map[string]string{kubelettypes.KubernetesPodUIDLabel: string(pod.UID)},
+			State:         &runtimeapi.PodSandboxStateValue{State: runtimeapi.PodSandboxState_SANDBOX_READY},
+		})
+		framework.ExpectNoError(err)
+		gomega.Expect(sourceSandboxes).To(gomega.HaveLen(1))
+		sourceSandboxID := sourceSandboxes[0].Id
+		gomega.Expect(sourceSandboxID).NotTo(gomega.BeEmpty())
+
+		ginkgo.By("deleting the source Pod so restore cannot read its live filesystem")
+		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))
+
+		ginkgo.By("creating a new Pod from the captured template without a node binding")
+		restorePod := &v1.Pod{ObjectMeta: *checkpoint.Status.CheckpointedPodTemplate.ObjectMeta.DeepCopy(), Spec: *checkpoint.Status.CheckpointedPodTemplate.Spec.DeepCopy()}
+		restorePod.Name = "checkpoint-restored"
+		restorePod.Namespace = f.Namespace.Name
+		restorePod.Spec.RestoreFrom = &v1.CheckpointReference{Name: checkpoint.Name}
+		// PodClient would set nodeName during create. The local node runner has
+		// no scheduler, so create normally and use the binding API afterwards.
+		restorePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, restorePod, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, restorePod)
+		gomega.Expect(restorePod.UID).NotTo(gomega.Equal(pod.UID))
+		gomega.Expect(restorePod.Spec.RestoreFrom.UID).To(gomega.Equal(checkpoint.UID))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Bind(ctx, &v1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Name: restorePod.Name, Namespace: restorePod.Namespace},
+			Target:     v1.ObjectReference{Kind: "Node", Name: pod.Spec.NodeName},
+		}, metav1.CreateOptions{}))
+
+		ginkgo.By("waiting for the one-time restore outcome")
+		// A late start failure can require RestorePod, sandbox cleanup, and
+		// cancellation confirmation before the one-time outcome is published.
+		var restoredCondition *v1.PodCondition
+		framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Second, f.Timeouts.PodStart+3*podRestoreTestTimeout+time.Minute, true, func(ctx context.Context) (bool, error) {
+			restorePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, restorePod.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			for i := range restorePod.Status.Conditions {
+				condition := &restorePod.Status.Conditions[i]
+				if condition.Type == v1.PodRestored && condition.Status != v1.ConditionUnknown {
+					restoredCondition = condition
+					return true, nil
+				}
+			}
+			return false, nil
+		}))
+		if restoredCondition.Status == v1.ConditionFalse && podCheckpointRuntimeUnsupported("RestorePod", restoredCondition.Message) {
+			ginkgo.Skip("Container runtime does not support Pod restore: " + restoredCondition.Message)
+		}
+		gomega.Expect(restoredCondition.Status).To(gomega.Equal(v1.ConditionTrue), "restore failed: %s", restoredCondition.Message)
+		ginkgo.By("waiting for confirmed checkpoint reservation release")
+		framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Second, f.Timeouts.PodStart, true, func(ctx context.Context) (bool, error) {
+			current, err := f.ClientSet.NodeV1alpha1().PodCheckpoints(checkpoint.Namespace).Get(ctx, checkpoint.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if current.UID != checkpoint.UID {
+				return false, fmt.Errorf("checkpoint identity changed during restore")
+			}
+			for _, consumer := range current.Status.ActiveRestores {
+				if consumer.UID == restorePod.UID {
+					return false, nil
+				}
+			}
+			return current.Status.RestoreGeneration != nil && *current.Status.RestoreGeneration > 0, nil
+		}))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, restorePod.Name, f.Namespace.Name, f.Timeouts.PodStart))
+		restorePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, restorePod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		gomega.Expect(restorePod.Spec.NodeName).To(gomega.Equal(pod.Spec.NodeName))
+		restoredSandboxes, err := runtime.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
+			LabelSelector: map[string]string{kubelettypes.KubernetesPodUIDLabel: string(restorePod.UID)},
+			State:         &runtimeapi.PodSandboxStateValue{State: runtimeapi.PodSandboxState_SANDBOX_READY},
+		})
+		framework.ExpectNoError(err)
+		gomega.Expect(restoredSandboxes).To(gomega.HaveLen(1))
+		gomega.Expect(restoredSandboxes[0].Id).NotTo(gomega.BeEmpty())
+		gomega.Expect(restoredSandboxes[0].Id).NotTo(gomega.Equal(sourceSandboxID))
+		gomega.Expect(restorePod.Status.ContainerStatuses).To(gomega.HaveLen(len(pod.Status.ContainerStatuses)))
+		for _, status := range restorePod.Status.ContainerStatuses {
+			gomega.Expect(status.RestartCount).To(gomega.BeZero())
+			gomega.Expect(status.ContainerID).NotTo(gomega.BeEmpty())
+			for _, originalID := range sourceContainerIDs {
+				gomega.Expect(status.ContainerID).NotTo(gomega.Equal(originalID))
+			}
+		}
+
+		ginkgo.By("verifying that both restored processes retain their tokens and keep counting")
+		for _, container := range pod.Spec.Containers {
+			framework.ExpectNoError(checkPodCheckpointSecurity(f, restorePod, container.Name))
+			initial, err := readPodCheckpointState(f, restorePod, container.Name)
+			framework.ExpectNoError(err)
+			gomega.Expect(initial.token).To(gomega.Equal(before[container.Name].token))
+			gomega.Expect(initial.count).To(gomega.BeNumerically(">=", before[container.Name].count))
+			gomega.Eventually(ctx, func() error {
+				state, err := readPodCheckpointState(f, restorePod, container.Name)
+				if err != nil {
+					return err
+				}
+				if state.token != initial.token {
+					return fmt.Errorf("container %q started a new process instead of resuming its token", container.Name)
+				}
+				if state.count <= initial.count {
+					return fmt.Errorf("counter in %q has not advanced from %d", container.Name, initial.count)
+				}
+				return nil
+			}, time.Minute, time.Second).Should(gomega.Succeed())
+		}
 	})
 })
