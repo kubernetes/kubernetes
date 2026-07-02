@@ -61,5 +61,20 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		responsewriters.ErrorNegotiated(err, h.serializer, gv, rw, req)
 		return
 	}
-	http.NotFound(rw, req)
+	gv := schema.GroupVersion{Group: "", Version: "v1"}
+	if requestInfo, ok := apirequest.RequestInfoFrom(req.Context()); ok {
+		if requestInfo.APIGroup != "" || requestInfo.APIVersion != "" {
+			gv.Group = requestInfo.APIGroup
+			gv.Version = requestInfo.APIVersion
+		}
+	}
+	notFoundErr := &apierrors.StatusError{
+		ErrStatus: metav1.Status{
+			Status:  metav1.StatusFailure,
+			Code:    int32(http.StatusNotFound),
+			Reason:  metav1.StatusReasonNotFound,
+			Message: "the server could not find the requested resource",
+		},
+	}
+	responsewriters.ErrorNegotiated(notFoundErr, h.serializer, gv, rw, req)
 }
