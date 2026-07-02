@@ -50,8 +50,18 @@ var (
 	// verifier's expected audiences.
 	ErrAudienceMismatch = fmt.Errorf("%w: audience mismatch", ErrVerificationFailed)
 
+	// ErrIssuerMismatch indicates the token "iss" claim was absent, or did not
+	// equal the verifier's expected issuer. RFC 7519 / OIDC require the issuer to
+	// be validated; a token from an unexpected (or unstated) issuer is rejected.
+	ErrIssuerMismatch = fmt.Errorf("%w: issuer mismatch", ErrVerificationFailed)
+
 	// ErrExpired indicates the token is past its exp instant (accounting for leeway).
 	ErrExpired = fmt.Errorf("%w: token expired", ErrVerificationFailed)
+
+	// ErrMissingExpiry indicates the token carried no "exp" claim. A token without
+	// an expiry would never expire, so its absence is rejected rather than treated
+	// as "valid forever".
+	ErrMissingExpiry = fmt.Errorf("%w: token missing expiry", ErrVerificationFailed)
 
 	// ErrNotYetValid indicates the token is before its nbf instant (accounting for leeway).
 	ErrNotYetValid = fmt.Errorf("%w: token not yet valid", ErrVerificationFailed)

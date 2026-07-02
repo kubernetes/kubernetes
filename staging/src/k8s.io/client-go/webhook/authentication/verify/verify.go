@@ -89,32 +89,54 @@ func WithClock(now func() time.Time) Option {
 }
 
 // WithLeeway sets a symmetric tolerance applied to exp/nbf comparisons to absorb
-// clock skew between the issuer and the verifying webhook.
+// clock skew between the issuer and the verifying webhook. The value is clamped
+// to maxLeeway: an excessively large leeway would effectively disable expiry, so
+// requests above the cap are silently reduced to it.
 func WithLeeway(d time.Duration) Option {
 	return func(v *Verifier) {
-		if d >= 0 {
-			v.leeway = d
+		if d < 0 {
+			return
 		}
+		if d > maxLeeway {
+			d = maxLeeway
+		}
+		v.leeway = d
 	}
 }
+
+// maxLeeway bounds WithLeeway. Clock skew between correctly configured hosts is
+// on the order of seconds; a cap of a few minutes tolerates realistic skew while
+// preventing a leeway large enough to neuter the expiry check.
+const maxLeeway = 5 * time.Minute
 
 // Verifier performs offline verification of webhook authentication tokens.
 type Verifier struct {
 	keySet    KeySet
+	issuer    string
 	audiences []string
 	now       func() time.Time
 	leeway    time.Duration
 }
 
-// NewVerifier constructs a Verifier that checks signatures via keySet and
-// requires the token audience to include at least one of expectedAudiences.
+// NewVerifier constructs a Verifier that checks signatures via keySet, requires
+// the token issuer to equal expectedIssuer, and requires the token audience to
+// include at least one of expectedAudiences.
 //
-// It returns an error for obvious misconfiguration (nil key set or empty
-// audience list) so callers fail fast at startup rather than silently rejecting
-// every token at request time.
-func NewVerifier(keySet KeySet, expectedAudiences []string, opts ...Option) (*Verifier, error) {
+// expectedIssuer must be non-empty: an unvalidated issuer would let a token
+// minted by any trusted-key holder for a different issuer pass. When keySet is a
+// network-fetching key set (for example josekeyset.RemoteKeySet), expectedIssuer
+// MUST equal the issuer configured on that key set, so the keys used to verify
+// the signature and the issuer asserted in the token cannot disagree.
+//
+// It returns an error for obvious misconfiguration (nil key set, empty issuer,
+// or empty audience list) so callers fail fast at startup rather than silently
+// rejecting every token at request time.
+func NewVerifier(keySet KeySet, expectedIssuer string, expectedAudiences []string, opts ...Option) (*Verifier, error) {
 	if keySet == nil {
 		return nil, errors.New("verify: KeySet must not be nil")
+	}
+	if expectedIssuer == "" {
+		return nil, errors.New("verify: expected issuer must not be empty")
 	}
 	if len(expectedAudiences) == 0 {
 		return nil, errors.New("verify: at least one expected audience is required")
@@ -124,6 +146,7 @@ func NewVerifier(keySet KeySet, expectedAudiences []string, opts ...Option) (*Ve
 
 	v := &Verifier{
 		keySet:    keySet,
+		issuer:    expectedIssuer,
 		audiences: auds,
 		now:       time.Now,
 		leeway:    0,
@@ -162,7 +185,13 @@ func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup s
 		return nil, ErrAudienceMismatch
 	}
 
-	// 6. Time validity (checked early; ordering relative to other checks is not
+	// 3. Issuer: the token must assert the issuer this verifier trusts. An absent
+	// "iss" is treated as a mismatch, never accepted.
+	if claims.Issuer == "" || claims.Issuer != v.issuer {
+		return nil, ErrIssuerMismatch
+	}
+
+	// 4. Time validity (checked early; ordering relative to other checks is not
 	// security-significant because every failure returns the same generic error).
 	if err := v.checkTimeValidity(claims); err != nil {
 		return nil, err
@@ -173,13 +202,13 @@ func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup s
 		return nil, ErrNoBoundObject
 	}
 
-	// 3. Bound-object rule: exactly one of validating / mutating.
+	// 5. Bound-object rule: exactly one of validating / mutating.
 	kind, name, uid, err := boundObject(k)
 	if err != nil {
 		return nil, err
 	}
 
-	// 4. allowedAPIGroup attestation claim must be present with exactly one value,
+	// 6. allowedAPIGroup attestation claim must be present with exactly one value,
 	// under the fully-namespaced key.
 	groups, ok := k.AttestationClaims[AllowedAPIGroupClaimKey]
 	if !ok || len(groups) != 1 {
@@ -187,7 +216,7 @@ func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup s
 	}
 	allowed := groups[0]
 
-	// 5. Wildcard matches all; otherwise it must exactly equal the review group.
+	// 7. Wildcard matches all; otherwise it must exactly equal the review group.
 	if allowed != WildcardAPIGroup && allowed != reviewAPIGroup {
 		return nil, ErrAPIGroupNotAuthorized
 	}
@@ -213,10 +242,15 @@ func (v *Verifier) audienceMatches(tokenAud audience) bool {
 	return false
 }
 
-// checkTimeValidity enforces exp and nbf with the configured leeway.
+// checkTimeValidity enforces exp and nbf with the configured leeway. A token
+// without an exp claim is rejected: absent expiry would make the token valid
+// indefinitely.
 func (v *Verifier) checkTimeValidity(claims tokenClaims) error {
 	now := v.now()
-	if claims.Expiry != nil && now.After(claims.Expiry.time().Add(v.leeway)) {
+	if claims.Expiry == nil {
+		return ErrMissingExpiry
+	}
+	if now.After(claims.Expiry.time().Add(v.leeway)) {
 		return ErrExpired
 	}
 	if claims.NotBefore != nil && now.Add(v.leeway).Before(claims.NotBefore.time()) {

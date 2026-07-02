@@ -76,23 +76,30 @@ func (h *remoteHarness) mint(t *testing.T, claims map[string]interface{}) string
 type oidcServer struct {
 	srv *httptest.Server
 
-	mu            sync.Mutex
-	issuer        string // value advertised in the discovery doc; defaults to srv.URL
-	jwks          jose.JSONWebKeySet
-	badDiscovery  bool
-	badJWKS       bool
-	discoveryHits int
-	jwksHits      int
+	mu                  sync.Mutex
+	issuer              string // value advertised in the discovery doc; defaults to srv.URL
+	jwksURIOverride     string // when set, advertised as jwks_uri instead of srv.URL + "/jwks"
+	redirectDiscoveryTo string // when set, the discovery endpoint 302-redirects here
+	redirectJWKSTo      string // when set, the JWKS endpoint 302-redirects here
+	jwks                jose.JSONWebKeySet
+	badDiscovery        bool
+	badJWKS             bool
+	discoveryHits       int
+	jwksHits            int
 }
 
 func newOIDCServer(t *testing.T, keys ...jose.JSONWebKey) *oidcServer {
 	t.Helper()
 	o := &oidcServer{jwks: jose.JSONWebKeySet{Keys: keys}}
 	mux := http.NewServeMux()
-	mux.HandleFunc(discoveryPath, func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc(discoveryPath, func(w http.ResponseWriter, req *http.Request) {
 		o.mu.Lock()
 		defer o.mu.Unlock()
 		o.discoveryHits++
+		if o.redirectDiscoveryTo != "" {
+			http.Redirect(w, req, o.redirectDiscoveryTo, http.StatusFound)
+			return
+		}
 		if o.badDiscovery {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte("{not json"))
@@ -102,16 +109,24 @@ func newOIDCServer(t *testing.T, keys ...jose.JSONWebKey) *oidcServer {
 		if issuer == "" {
 			issuer = o.srv.URL
 		}
+		jwksURI := o.jwksURIOverride
+		if jwksURI == "" {
+			jwksURI = o.srv.URL + "/jwks"
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"issuer":   issuer,
-			"jwks_uri": o.srv.URL + "/jwks",
+			"jwks_uri": jwksURI,
 		})
 	})
-	mux.HandleFunc("/jwks", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/jwks", func(w http.ResponseWriter, req *http.Request) {
 		o.mu.Lock()
 		defer o.mu.Unlock()
 		o.jwksHits++
+		if o.redirectJWKSTo != "" {
+			http.Redirect(w, req, o.redirectJWKSTo, http.StatusFound)
+			return
+		}
 		if o.badJWKS {
 			_, _ = w.Write([]byte("{not json"))
 			return
@@ -268,6 +283,18 @@ func TestRemoteKeySet_Rejected(t *testing.T) {
 		{
 			name:      "malformed JWKS document -> rejected",
 			configure: func(o *oidcServer) { o.badJWKS = true },
+		},
+		{
+			name:      "jwks_uri points to a foreign host -> rejected (SSRF guard)",
+			configure: func(o *oidcServer) { o.jwksURIOverride = "https://attacker.example.com/jwks" },
+		},
+		{
+			name:      "discovery redirects to a foreign host -> rejected",
+			configure: func(o *oidcServer) { o.redirectDiscoveryTo = "https://attacker.example.com" + discoveryPath },
+		},
+		{
+			name:      "JWKS fetch redirects to a foreign host -> rejected",
+			configure: func(o *oidcServer) { o.redirectJWKSTo = "https://attacker.example.com/jwks" },
 		},
 	}
 	for _, tc := range tests {

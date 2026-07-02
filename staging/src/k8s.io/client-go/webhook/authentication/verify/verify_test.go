@@ -47,6 +47,7 @@ func fixedClock(t time.Time) func() time.Time {
 const (
 	testAudience = "webhook.example.com"
 	testGroup    = "apps"
+	testIssuer   = "https://issuer.example.com"
 )
 
 // tokenBuilder assembles a token payload for tests. Because the fake KeySet
@@ -111,7 +112,7 @@ func (b *tokenBuilder) build(t *testing.T) string {
 
 func newTestVerifier(t *testing.T, ks KeySet, opts ...Option) *Verifier {
 	t.Helper()
-	v, err := NewVerifier(ks, []string{testAudience}, opts...)
+	v, err := NewVerifier(ks, testIssuer, []string{testAudience}, opts...)
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -122,31 +123,42 @@ func TestNewVerifier_Validation(t *testing.T) {
 	tests := []struct {
 		name      string
 		keySet    KeySet
+		issuer    string
 		audiences []string
 		wantErr   bool
 	}{
 		{
 			name:      "nil KeySet -> error",
 			keySet:    nil,
+			issuer:    testIssuer,
+			audiences: []string{testAudience},
+			wantErr:   true,
+		},
+		{
+			name:      "empty issuer -> error",
+			keySet:    fakeKeySet{},
+			issuer:    "",
 			audiences: []string{testAudience},
 			wantErr:   true,
 		},
 		{
 			name:      "empty audiences -> error",
 			keySet:    fakeKeySet{},
+			issuer:    testIssuer,
 			audiences: nil,
 			wantErr:   true,
 		},
 		{
-			name:      "valid KeySet and audience -> ok",
+			name:      "valid KeySet, issuer and audience -> ok",
 			keySet:    fakeKeySet{},
+			issuer:    testIssuer,
 			audiences: []string{testAudience},
 			wantErr:   false,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewVerifier(tc.keySet, tc.audiences)
+			_, err := NewVerifier(tc.keySet, tc.issuer, tc.audiences)
 			if tc.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -288,6 +300,27 @@ func TestVerify(t *testing.T) {
 			wantErr: ErrAudienceMismatch,
 		},
 		{
+			name: "issuer differs from expected -> ErrIssuerMismatch",
+			mutate: func(b *tokenBuilder) {
+				b.iss = "https://attacker.example.com"
+			},
+			wantErr: ErrIssuerMismatch,
+		},
+		{
+			name: "issuer absent -> ErrIssuerMismatch",
+			mutate: func(b *tokenBuilder) {
+				b.iss = ""
+			},
+			wantErr: ErrIssuerMismatch,
+		},
+		{
+			name: "expiry claim absent -> ErrMissingExpiry",
+			mutate: func(b *tokenBuilder) {
+				b.exp = nil
+			},
+			wantErr: ErrMissingExpiry,
+		},
+		{
 			name: "allowedAPIGroup claim absent -> ErrMissingAllowedAPIGroup",
 			mutate: func(b *tokenBuilder) {
 				b.k8s.AttestationClaims = map[string][]string{}
@@ -330,6 +363,18 @@ func TestVerify(t *testing.T) {
 			opts: []Option{
 				WithClock(fixedClock(leewayExpiry.Add(2 * time.Minute))),
 				WithLeeway(60 * time.Second),
+			},
+			wantErr: ErrExpired,
+		},
+		{
+			name: "leeway request above the cap is clamped -> ErrExpired",
+			// exp is 6m in the past. An over-large 10m leeway is clamped to the 5m
+			// maximum, which is not enough to tolerate the skew, so the token is
+			// still rejected. This proves WithLeeway cannot neuter expiry.
+			mutate: func(b *tokenBuilder) { b.exp = unixPtr(leewayExpiry) },
+			opts: []Option{
+				WithClock(fixedClock(leewayExpiry.Add(6 * time.Minute))),
+				WithLeeway(10 * time.Minute),
 			},
 			wantErr: ErrExpired,
 		},

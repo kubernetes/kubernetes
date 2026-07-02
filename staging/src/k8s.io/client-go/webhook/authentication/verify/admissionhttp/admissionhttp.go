@@ -59,6 +59,15 @@ const genericDenyMessage = "webhook token verification failed"
 // no claim values.
 var errNoBearerToken = errors.New("admissionhttp: no bearer token presented")
 
+// errUndecodableReview reports that the request body was not a decodable
+// AdmissionReview carrying a Request, so the resource API group could not be
+// determined. It is surfaced only to the observation hook.
+var errUndecodableReview = errors.New("admissionhttp: request is not a decodable AdmissionReview")
+
+// errBodyTooLarge reports that the request body exceeded the configured limit.
+// It is surfaced only internally; the client receives a generic 400.
+var errBodyTooLarge = errors.New("admissionhttp: request body exceeds limit")
+
 // mode selects how the adapter reacts to a verification failure.
 type mode int
 
@@ -159,7 +168,20 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiGroup := decodeResourceAPIGroup(body)
+	apiGroup, decoded := decodeResourceAPIGroup(body)
+	if !decoded {
+		// The AdmissionReview could not be decoded or carried no Request, so the
+		// resource API group is unknown. Defaulting it to the core group ("")
+		// would let a core-group token match a request whose group we never
+		// established, so fail closed in enforce mode instead.
+		h.hook(nil, errUndecodableReview)
+		if h.mode == modeEnforce {
+			writeDenied(w, http.StatusBadRequest)
+			return
+		}
+		h.next.ServeHTTP(w, r)
+		return
+	}
 
 	token, ok := bearerToken(r)
 	if !ok {
@@ -205,17 +227,22 @@ func bearerToken(r *http.Request) (token string, ok bool) {
 
 // bufferAndResetBody reads up to max bytes of r.Body and replaces r.Body with a
 // fresh reader over the buffered bytes, leaving the request readable by
-// downstream handlers. A nil body is treated as empty.
+// downstream handlers. A nil body is treated as empty. It reads one byte past
+// the limit so an over-limit body can be rejected rather than silently
+// forwarding truncated bytes to the wrapped handler.
 func bufferAndResetBody(r *http.Request, max int64) ([]byte, error) {
 	if r.Body == nil {
 		return nil, nil
 	}
-	buf, err := io.ReadAll(io.LimitReader(r.Body, max))
+	buf, err := io.ReadAll(io.LimitReader(r.Body, max+1))
 	// Close the original body regardless of read outcome; the reset reader below
 	// becomes the request's body.
 	_ = r.Body.Close()
 	if err != nil {
 		return nil, err
+	}
+	if int64(len(buf)) > max {
+		return nil, errBodyTooLarge
 	}
 	r.Body = io.NopCloser(bytes.NewReader(buf))
 	r.ContentLength = int64(len(buf))
@@ -223,21 +250,22 @@ func bufferAndResetBody(r *http.Request, max int64) ([]byte, error) {
 }
 
 // decodeResourceAPIGroup best-effort decodes an AdmissionReview from body and
-// returns Request.Resource.Group. It returns "" when the body is not a
-// decodable AdmissionReview or carries no request; verification then proceeds
-// with an empty group, which a non-wildcard token will not match.
-func decodeResourceAPIGroup(body []byte) string {
+// returns Request.Resource.Group along with ok=true. It returns ok=false when
+// the body is not a decodable AdmissionReview or carries no Request, so the
+// caller can distinguish a genuine core group ("") from an undeterminable one
+// and fail closed rather than defaulting to the core group.
+func decodeResourceAPIGroup(body []byte) (group string, ok bool) {
 	if len(body) == 0 {
-		return ""
+		return "", false
 	}
 	var review admissionv1.AdmissionReview
 	if err := json.Unmarshal(body, &review); err != nil {
-		return ""
+		return "", false
 	}
 	if review.Request == nil {
-		return ""
+		return "", false
 	}
-	return review.Request.Resource.Group
+	return review.Request.Resource.Group, true
 }
 
 // writeDenied writes a generic denial with the given status code. The body is a

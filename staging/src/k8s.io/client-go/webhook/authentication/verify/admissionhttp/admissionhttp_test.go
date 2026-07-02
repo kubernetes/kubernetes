@@ -43,6 +43,7 @@ import (
 const (
 	testAudience = "webhook.example.com"
 	testGroup    = "apps"
+	testIssuer   = "https://issuer.example.com"
 	testKeyID    = "admissionhttp-test-key"
 	reviewUID    = "req-uid-1"
 )
@@ -112,7 +113,7 @@ func baseClaims() map[string]interface{} {
 
 func newVerifier(t *testing.T, h *signingHarness) *verify.Verifier {
 	t.Helper()
-	v, err := verify.NewVerifier(josekeyset.NewStaticKeySet(h.jwks), []string{testAudience})
+	v, err := verify.NewVerifier(josekeyset.NewStaticKeySet(h.jwks), testIssuer, []string{testAudience})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
@@ -424,6 +425,87 @@ func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
 	if review.Response == nil || !review.Response.Allowed {
 		t.Errorf("expected allow response, got %+v", review.Response)
 	}
+}
+
+// coreGroupClaims returns an otherwise-valid token claim set authorized for the
+// core API group (""). Before the fail-closed fix, an undecodable AdmissionReview
+// body defaulted the review group to "", which such a token would match.
+func coreGroupClaims() map[string]interface{} {
+	c := baseClaims()
+	k8s := c["kubernetes.io"].(map[string]interface{})
+	k8s["attestationClaims"] = map[string][]string{
+		verify.AllowedAPIGroupClaimKey: {""},
+	}
+	return c
+}
+
+// TestWithTokenVerification_UndecodableBodyFailsClosed proves the adapter fails
+// closed: an undecodable AdmissionReview body no longer defaults the review
+// group to the core group (""). In enforce mode the request is denied and the
+// wrapped handler is never reached, even when the presented token is otherwise
+// valid and authorized for the core group.
+func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
+	h := newSigningHarness(t)
+	token := h.mint(t, coreGroupClaims())
+	undecodable := []byte("{ this is not a valid AdmissionReview")
+
+	t.Run("enforce -> denied, next not reached", func(t *testing.T) {
+		v := newVerifier(t, h)
+		spy := newSpyHandler()
+		adapter := admissionhttp.WithTokenVerification(v, spy, admissionhttp.WithEnforceMode())
+
+		rec := httptest.NewRecorder()
+		adapter.ServeHTTP(rec, newRequest(t, undecodable, token))
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if spy.wasReached() {
+			t.Error("wrapped handler was reached on an undecodable body")
+		}
+		assertNoLeak(t, rec.Body.String())
+	})
+
+	t.Run("permissive -> next reached", func(t *testing.T) {
+		v := newVerifier(t, h)
+		spy := newSpyHandler()
+		adapter := admissionhttp.WithTokenVerification(v, spy, admissionhttp.WithPermissiveMode())
+
+		rec := httptest.NewRecorder()
+		adapter.ServeHTTP(rec, newRequest(t, undecodable, token))
+
+		if !spy.wasReached() {
+			t.Error("permissive mode should still reach the wrapped handler")
+		}
+	})
+}
+
+// TestWithTokenVerification_OverLimitBodyRejected proves the adapter rejects a
+// body larger than the configured limit with a generic 400 instead of
+// forwarding truncated bytes to the wrapped handler.
+func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
+	h := newSigningHarness(t)
+	v := newVerifier(t, h)
+	spy := newSpyHandler()
+	// A tiny limit guarantees the AdmissionReview body exceeds it.
+	adapter := admissionhttp.WithTokenVerification(v, spy, admissionhttp.WithMaxBodyBytes(16))
+
+	body := admissionReviewBody(t, testGroup)
+	if int64(len(body)) <= 16 {
+		t.Fatalf("test body must exceed the limit, got %d bytes", len(body))
+	}
+	token := h.mint(t, baseClaims())
+
+	rec := httptest.NewRecorder()
+	adapter.ServeHTTP(rec, newRequest(t, body, token))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if spy.wasReached() {
+		t.Error("wrapped handler was reached with an over-limit body")
+	}
+	assertNoLeak(t, rec.Body.String())
 }
 
 // assertNoLeak fails if the response body contains any webhook identifier the

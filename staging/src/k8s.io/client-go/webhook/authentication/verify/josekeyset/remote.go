@@ -57,6 +57,8 @@ var (
 	errRemoteIssuerMismatch = errors.New("josekeyset: discovery document issuer mismatch")
 	errRemoteInsecureScheme = errors.New("josekeyset: refusing non-HTTPS URL")
 	errRemoteMalformed      = errors.New("josekeyset: malformed discovery or JWKS document")
+	errRemoteForeignHost    = errors.New("josekeyset: refusing URL whose origin differs from the issuer")
+	errRemoteTooManyHops    = errors.New("josekeyset: too many redirects")
 )
 
 // RemoteKeySet is a [verify.KeySet] that discovers an issuer's signing keys over
@@ -75,6 +77,7 @@ var (
 // hack/update-vendor.sh and sig-auth sign-off; do not hand-edit go.mod/go.work.
 type RemoteKeySet struct {
 	issuer             string
+	issuerURL          *url.URL
 	httpClient         *http.Client
 	allowHTTP          bool
 	minRefreshInterval time.Duration
@@ -144,7 +147,46 @@ func NewRemoteKeySet(issuer string, opts ...RemoteOption) (*RemoteKeySet, error)
 	if err := r.checkScheme(issuer); err != nil {
 		return nil, err
 	}
+	issuerURL, err := url.Parse(issuer)
+	if err != nil || issuerURL.Host == "" {
+		return nil, errRemoteMalformed
+	}
+	r.issuerURL = issuerURL
+
+	// Wrap the effective HTTP client in a shallow copy so a redirect guard can be
+	// installed without mutating a caller-supplied client (WithHTTPClient). The
+	// copy shares the caller's transport/timeout but re-validates every redirect
+	// hop, so a discovery or JWKS response cannot bounce the fetch to a foreign
+	// origin or downgrade the scheme.
+	clientCopy := *r.httpClient
+	clientCopy.CheckRedirect = r.checkRedirect
+	r.httpClient = &clientCopy
+
 	return r, nil
+}
+
+// checkRedirect re-validates each redirect hop: the target must keep the issuer's
+// scheme policy (HTTPS unless WithInsecureAllowHTTP) and share the issuer's
+// origin. This prevents a hostile or compromised endpoint from using a redirect
+// to reach an internal host the direct-URL checks already forbid.
+func (r *RemoteKeySet) checkRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errRemoteTooManyHops
+	}
+	if err := r.checkScheme(req.URL.String()); err != nil {
+		return err
+	}
+	if !r.sameOriginAsIssuer(req.URL) {
+		return errRemoteForeignHost
+	}
+	return nil
+}
+
+// sameOriginAsIssuer reports whether u shares the configured issuer's scheme and
+// host (including port). It is the same-origin test applied to the discovered
+// jwks_uri and to every redirect target.
+func (r *RemoteKeySet) sameOriginAsIssuer(u *url.URL) bool {
+	return u.Scheme == r.issuerURL.Scheme && u.Host == r.issuerURL.Host
 }
 
 // VerifySignature implements verify.KeySet. It parses rawToken as a compact JWS,
@@ -154,6 +196,9 @@ func NewRemoteKeySet(issuer string, opts ...RemoteOption) (*RemoteKeySet, error)
 func (r *RemoteKeySet) VerifySignature(ctx context.Context, rawToken string) ([]byte, error) {
 	jws, err := jose.ParseSigned(rawToken)
 	if err != nil {
+		return nil, err
+	}
+	if err := checkAlgorithms(jws); err != nil {
 		return nil, err
 	}
 
@@ -284,6 +329,16 @@ func (r *RemoteKeySet) discover(ctx context.Context) (string, error) {
 	if err := r.checkScheme(doc.JWKSURI); err != nil {
 		return "", err
 	}
+	// Constrain the JWKS endpoint to the issuer's own origin. A hostile or
+	// compromised discovery document could otherwise point the fetch at an
+	// arbitrary internal HTTPS endpoint (SSRF).
+	jwksURL, err := url.Parse(doc.JWKSURI)
+	if err != nil || jwksURL.Host == "" {
+		return "", errRemoteMalformed
+	}
+	if !r.sameOriginAsIssuer(jwksURL) {
+		return "", errRemoteForeignHost
+	}
 	return doc.JWKSURI, nil
 }
 
@@ -293,6 +348,9 @@ func (r *RemoteKeySet) fetchJWKS(ctx context.Context, jwksURI string) (*jose.JSO
 	if err := r.getJSON(ctx, jwksURI, &ks); err != nil {
 		return nil, err
 	}
+	// Keep only keys usable for signature verification (drop symmetric and
+	// encryption-only keys) before trusting anything from the set.
+	ks.Keys = filterSignatureKeys(ks.Keys)
 	if len(ks.Keys) == 0 {
 		return nil, errRemoteMalformed
 	}
