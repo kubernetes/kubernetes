@@ -594,6 +594,8 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, pred.Label, pred.Field)
 
+	auditID, _ := audit.AuditIDFrom(ctx)
+
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
@@ -608,6 +610,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.groupResource,
 		c.watcherMetrics,
 		identifier,
+		auditID,
 	)
 
 	// note that c.waitUntilWatchCacheFreshAndForceAllEvents must be called without

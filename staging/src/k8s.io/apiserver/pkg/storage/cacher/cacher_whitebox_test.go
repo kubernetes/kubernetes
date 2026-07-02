@@ -2490,6 +2490,7 @@ func TestForgetWatcher(t *testing.T) {
 		groupResource,
 		metrics.NewNoopWatcherMetricsObservers(),
 		"1",
+		"",
 	)
 	forgetWatcherFn = forgetWatcher(cacher, w, 0, namespacedName{}, "", false)
 	addWatcher := func(w *cacheWatcher) {
