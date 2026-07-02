@@ -932,6 +932,8 @@ template:
       requests:
         requestsKey: "0"
     restartPolicy: restartPolicyValue
+    restoreFrom:
+      name: nameValue
     runtimeClassName: runtimeClassNameValue
     schedulerName: schedulerNameValue
     schedulingGates:

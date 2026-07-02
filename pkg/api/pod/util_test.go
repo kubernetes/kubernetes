@@ -3937,6 +3937,38 @@ func TestValidateAllowSidecarResizePolicy(t *testing.T) {
 	}
 }
 
+func TestGetValidationOptionsRestoreFrom(t *testing.T) {
+	testCases := []struct {
+		name        string
+		oldPodSpec  *api.PodSpec
+		gateEnabled bool
+		want        bool
+	}{
+		{name: "gate enabled, no old", gateEnabled: true, want: true},
+		{name: "gate disabled, no old", gateEnabled: false, want: false},
+		{
+			name:        "gate disabled, old set restoreFrom (ratcheting)",
+			oldPodSpec:  &api.PodSpec{RestoreFrom: &api.CheckpointReference{Name: "checkpoint-1"}},
+			gateEnabled: false,
+			want:        true,
+		},
+		{
+			name:        "gate disabled, old had empty restoreFrom (ratcheting)",
+			oldPodSpec:  &api.PodSpec{RestoreFrom: &api.CheckpointReference{}},
+			gateEnabled: false,
+			want:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, tc.gateEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			assert.Equal(t, tc.want, gotOptions.AllowRestoreFrom, "AllowRestoreFrom")
+		})
+	}
+}
+
 func TestDropDisabledPodCheckpointConditions(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -3947,12 +3979,12 @@ func TestDropDisabledPodCheckpointConditions(t *testing.T) {
 		{name: "gate disabled drops new status", wantDropped: true},
 		{name: "gate disabled drops new status on update", oldStatus: &api.PodStatus{}, wantDropped: true},
 		{name: "gate enabled preserves new status", gateEnabled: true},
-		{name: "gate disabled preserves in-progress status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Status: api.ConditionUnknown}}}},
-		{name: "gate disabled preserves completed status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Status: api.ConditionTrue}}}},
-		{name: "gate disabled preserves failed status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Status: api.ConditionFalse}}}},
-		{name: "gate disabled preserves legacy status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{}}}},
+		{name: "gate disabled preserves in-progress status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionUnknown}}}},
+		{name: "gate disabled preserves completed status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionTrue}}}},
+		{name: "gate disabled preserves failed status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionFalse}}}},
+		{name: "gate disabled preserves legacy status", oldStatus: &api.PodStatus{Conditions: []api.PodCondition{{Type: api.PodRestored}}}},
 	}
-	for _, conditionType := range []api.PodConditionType{api.PodCheckpointing} {
+	for _, conditionType := range []api.PodConditionType{api.PodRestored, api.PodCheckpointing} {
 		t.Run(string(conditionType), func(t *testing.T) {
 			for _, tc := range tests {
 				t.Run(tc.name, func(t *testing.T) {
