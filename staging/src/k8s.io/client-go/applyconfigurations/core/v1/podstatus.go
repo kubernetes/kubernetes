@@ -55,6 +55,9 @@ type PodStatusApplyConfiguration struct {
 	// Current service state of pod.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
 	Conditions []PodConditionApplyConfiguration `json:"conditions,omitempty"`
+	// RestoreStatus records the one-time restore operation for a Pod created
+	// with spec.restoreFrom. Once Completed or Failed, this status is not reset.
+	RestoreStatus *PodRestoreStatusApplyConfiguration `json:"restoreStatus,omitempty"`
 	// A human readable message indicating details about why the pod is in this condition.
 	Message *string `json:"message,omitempty"`
 	// A brief CamelCase message indicating details about why the pod is in this state.
@@ -182,6 +185,14 @@ func (b *PodStatusApplyConfiguration) WithConditions(values ...*PodConditionAppl
 		}
 		b.Conditions = append(b.Conditions, *values[i])
 	}
+	return b
+}
+
+// WithRestoreStatus sets the RestoreStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RestoreStatus field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithRestoreStatus(value *PodRestoreStatusApplyConfiguration) *PodStatusApplyConfiguration {
+	b.RestoreStatus = value
 	return b
 }
 

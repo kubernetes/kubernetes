@@ -251,6 +251,10 @@
         {
           "groupVersion": "node.k8s.io/v1",
           "version": "v1"
+        },
+        {
+          "groupVersion": "node.k8s.io/v1alpha1",
+          "version": "v1alpha1"
         }
       ]
     },

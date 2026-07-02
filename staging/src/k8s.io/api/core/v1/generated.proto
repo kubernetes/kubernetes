@@ -370,6 +370,16 @@ message CephFSVolumeSource {
   optional bool readOnly = 6;
 }
 
+// CheckpointReference identifies a PodCheckpoint to restore a Pod from.
+// +structType=atomic
+message CheckpointReference {
+  // Name is the name of a PodCheckpoint in the Pod's namespace.
+  // +required
+  // +k8s:alpha(since: "1.37")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:format=k8s-long-name
+  optional string name = 1;
+}
+
 // Represents a cinder volume resource in Openstack.
 // A Cinder volume must exist before mounting to a container.
 // The volume must also be in the same region as the kubelet.
@@ -3903,6 +3913,7 @@ message Pod {
   // Specification of the desired behavior of the pod.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:subfield(restoreFrom)=+k8s:immutable
   optional PodSpec spec = 2;
 
   // Most recently observed status of the pod.
@@ -4469,6 +4480,20 @@ message PodResourceClaimStatus {
   //
   // +optional
   optional string resourceClaimName = 2;
+}
+
+// PodRestoreStatus records the outcome of the one-time restore operation.
+message PodRestoreStatus {
+  // RestoreState is the current state of the restore operation.
+  optional string restoreState = 1;
+
+  // Reason is a brief CamelCase reason for a failed restore.
+  // +optional
+  optional string reason = 2;
+
+  // Message explains the current restore state.
+  // +optional
+  optional string message = 3;
 }
 
 // PodSchedulingGate is associated to a Pod to guard its scheduling.
@@ -5055,6 +5080,17 @@ message PodSpec {
   // +k8s:maxItems=10
   // +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
   repeated EvictionResponder evictionResponders = 44;
+
+  // RestoreFrom specifies a PodCheckpoint in this Pod's namespace to restore
+  // this Pod from. When set, the Pod is restored from that checkpoint's archive
+  // instead of being created from scratch; the kubelet resolves the reference to
+  // the on-node archive via the PodCheckpoint's status.
+  // This field is immutable. Restoring from another checkpoint requires creating
+  // a new Pod; in-place restore of an existing Pod is not supported.
+  // +featureGate=PodLevelCheckpointRestore
+  // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  optional CheckpointReference restoreFrom = 45;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -5095,6 +5131,12 @@ message PodStatus {
   // +listType=map
   // +listMapKey=type
   repeated PodCondition conditions = 2;
+
+  // RestoreStatus records the one-time restore operation for a Pod created
+  // with spec.restoreFrom. Once Completed or Failed, this status is not reset.
+  // +featureGate=PodLevelCheckpointRestore
+  // +optional
+  optional PodRestoreStatus restoreStatus = 24;
 
   // A human readable message indicating details about why the pod is in this condition.
   // +optional

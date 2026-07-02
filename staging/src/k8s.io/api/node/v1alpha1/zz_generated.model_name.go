@@ -22,8 +22,48 @@ limitations under the License.
 package v1alpha1
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CheckpointSource) OpenAPIModelName() string {
+	return "io.k8s.api.node.v1alpha1.CheckpointSource"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodeLocalCheckpointSource) OpenAPIModelName() string {
+	return "io.k8s.api.node.v1alpha1.NodeLocalCheckpointSource"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Overhead) OpenAPIModelName() string {
 	return "io.k8s.api.node.v1alpha1.Overhead"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCheckpoint) OpenAPIModelName() string {
+	return "io.k8s.api.node.v1alpha1.PodCheckpoint"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCheckpointContainerStatus) OpenAPIModelName() string {
+	return "io.k8s.api.node.v1alpha1.PodCheckpointContainerStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCheckpointList) OpenAPIModelName() string {
+	return "io.k8s.api.node.v1alpha1.PodCheckpointList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCheckpointSpec) OpenAPIModelName() string {
+	return "io.k8s.api.node.v1alpha1.PodCheckpointSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCheckpointStatus) OpenAPIModelName() string {
+	return "io.k8s.api.node.v1alpha1.PodCheckpointStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodReference) OpenAPIModelName() string {
+	return "io.k8s.api.node.v1alpha1.PodReference"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
