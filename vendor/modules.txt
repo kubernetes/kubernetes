@@ -1125,7 +1125,7 @@ k8s.io/klog/v2/textlogger
 ## explicit; go 1.26.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.26.0
-# k8s.io/kube-openapi v0.0.0-20260618221249-bc653b64f974
+# k8s.io/kube-openapi v0.0.0-20260701233525-7d8d9edb5314 => github.com/jpbetz/kube-openapi v0.0.0-20260701233525-7d8d9edb5314
 ## explicit; go 1.24.0
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
@@ -1303,7 +1303,7 @@ sigs.k8s.io/kustomize/kyaml/yaml/walk
 ## explicit; go 1.18
 sigs.k8s.io/randfill
 sigs.k8s.io/randfill/bytesource
-# sigs.k8s.io/structured-merge-diff/v6 v6.4.0
+# sigs.k8s.io/structured-merge-diff/v6 v6.3.3-0.20260701231238-8587764c81eb => github.com/jpbetz/structured-merge-diff/v6 v6.3.3-0.20260701231238-8587764c81eb
 ## explicit; go 1.23
 sigs.k8s.io/structured-merge-diff/v6/fieldpath
 sigs.k8s.io/structured-merge-diff/v6/merge
@@ -1314,3 +1314,5 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/kyaml
+# k8s.io/kube-openapi => github.com/jpbetz/kube-openapi v0.0.0-20260701233525-7d8d9edb5314
+# sigs.k8s.io/structured-merge-diff/v6 => github.com/jpbetz/structured-merge-diff/v6 v6.3.3-0.20260701231238-8587764c81eb
