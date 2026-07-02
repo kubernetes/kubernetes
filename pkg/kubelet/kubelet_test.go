@@ -1308,11 +1308,13 @@ func TestHandlePluginResources(t *testing.T) {
 			},
 		}}},
 	}
-	// pod requiring missingResource will pass PredicateAdmit.
+	// pod requiring missingResource has its admission deferred.
 	//
-	// Extended resources missing in node status are ignored in PredicateAdmit.
-	// This is required to support extended resources that are not managed by
-	// device plugin, such as cluster-level resources.
+	// An extended resource that is absent from the node's allocatable may be
+	// provided by a device plugin that has not registered with the kubelet yet,
+	// so the pod is kept Pending (admission deferred) rather than admitted or
+	// rejected. The allocation manager retries admission and rejects the pod if
+	// the device plugin never registers before the deferral times out.
 	missingPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
 			Limits: v1.ResourceList{
@@ -1345,7 +1347,12 @@ func TestHandlePluginResources(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
 	checkPodStatus(t, kl, emptyPod, v1.PodFailed)
-	checkPodStatus(t, kl, missingPod, v1.PodPending)
+	// missingPod's admission is deferred: it is neither admitted nor rejected,
+	// so no status is recorded for it and it remains Pending until the device
+	// plugin registers or the deferral times out.
+	if _, found := kl.statusManager.GetPodStatus(missingPod.UID); found {
+		t.Errorf("expected no status for deferred pod %q, but a status was recorded", missingPod.UID)
+	}
 	checkPodStatus(t, kl, failedPod, v1.PodFailed)
 }
 

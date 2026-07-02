@@ -1759,7 +1759,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 			}
 
-			ok, reason, message := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
+			ok, _, reason, message := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
 			require.Equal(t, tc.expectAdmit, ok)
 			require.Equal(t, tc.admissionFailureReason, reason)
 			require.Equal(t, tc.admissionFailureMessage, message)
@@ -2018,7 +2018,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 			}
 
-			ok, reason, message := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
+			ok, _, reason, message := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
 			require.Equal(t, tc.expectAdmit, ok)
 			require.Equal(t, tc.admissionFailureReason, reason)
 			require.Equal(t, tc.admissionFailureMessage, message)

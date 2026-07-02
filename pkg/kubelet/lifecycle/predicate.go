@@ -76,6 +76,16 @@ const (
 	// object that was not an InsufficientResourceError or a PredicateFailureError.
 	UnexpectedPredicateFailureType = "UnexpectedPredicateFailureType"
 
+	// DeviceNotReady is used to denote that the pod's admission was deferred
+	// (kept Pending and retried) rather than rejected because it requested an
+	// extended resource that is absent from the node's allocatable. The resource
+	// may be provided by a device plugin that has not yet registered with the
+	// kubelet, so the pod is given a chance to be admitted once the plugin
+	// registers. The value intentionally matches
+	// admission.ErrorReasonDeviceNotReady; it is duplicated here because the
+	// admission package imports this one, so this package cannot import it back.
+	DeviceNotReady = "DeviceNotReady"
+
 	// Prefix for admission reason when kubelet rejects a pod due to insufficient
 	// resources available.
 	InsufficientResourcePrefix = "OutOf"
@@ -166,6 +176,25 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  UnexpectedAdmissionError,
+			Message: message,
+		}
+	}
+
+	// Defer admission for pods that request an extended resource that is absent
+	// from the node's allocatable and is not backed by DRA. Such a resource may
+	// be provided by a device plugin that has not registered with the kubelet
+	// yet (e.g. on node reboot, or when the device plugin pod starts after a
+	// workload pod is bound to the node). Rather than silently dropping the
+	// request (which would let the pod run without the device) or rejecting the
+	// pod outright, keep it Pending so admission can be retried once the plugin
+	// registers; the allocation manager rejects it if the deferral times out.
+	if deferred := missingDeferrableExtendedResources(admitPod, nodeInfo); len(deferred) > 0 {
+		message := fmt.Sprintf("Pod requests extended resource(s) %v that are not currently available on the node; deferring admission until the providing device plugin registers", deferred)
+		logger.V(2).Info("Deferring pod admission for not-yet-available extended resources", "pod", klog.KObj(admitPod), "resources", deferred)
+		return PodAdmitResult{
+			Admit:   false,
+			Defer:   true,
+			Reason:  DeviceNotReady,
 			Message: message,
 		}
 	}
@@ -343,21 +372,26 @@ func rejectPodAdmissionBasedOnSupplementalGroupsPolicy(pod *v1.Pod, node *v1.Nod
 	return admit
 }
 
-func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
-	isResourceBackedByDRA := func(resourceName v1.ResourceName, containerName string) bool {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-			return false
-		}
-		if pod.Status.ExtendedResourceClaimStatus == nil {
-			return false
-		}
-		for _, resourceMapping := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
-			if v1.ResourceName(resourceMapping.ResourceName) == resourceName && resourceMapping.ContainerName == containerName {
-				return true
-			}
-		}
+// isResourceBackedByDRA reports whether the given extended resource requested by
+// the named container is satisfied by a DRA-backed extended resource claim. Such
+// resources are managed by DRA rather than by a device plugin, so they must not
+// be deferred when absent from the node's allocatable.
+func isResourceBackedByDRA(pod *v1.Pod, resourceName v1.ResourceName, containerName string) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
 		return false
 	}
+	if pod.Status.ExtendedResourceClaimStatus == nil {
+		return false
+	}
+	for _, resourceMapping := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
+		if v1.ResourceName(resourceMapping.ResourceName) == resourceName && resourceMapping.ContainerName == containerName {
+			return true
+		}
+	}
+	return false
+}
+
+func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
 	filterExtendedResources := func(containers []v1.Container) {
 		for i, c := range containers {
 			// We only handle requests in Requests but not Limits because the
@@ -365,7 +399,7 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.No
 			// does not use Limits.
 			filteredResources := make(v1.ResourceList)
 			for rName, rQuant := range c.Resources.Requests {
-				if schedutil.IsDRAExtendedResourceName(rName) && isResourceBackedByDRA(rName, c.Name) {
+				if schedutil.IsDRAExtendedResourceName(rName) && isResourceBackedByDRA(pod, rName, c.Name) {
 					continue
 				}
 				if v1helper.IsExtendedResourceName(rName) {
@@ -382,6 +416,42 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.No
 	filterExtendedResources(podCopy.Spec.Containers)
 	filterExtendedResources(podCopy.Spec.InitContainers)
 	return podCopy
+}
+
+// missingDeferrableExtendedResources returns the distinct extended resources
+// requested by the pod that are absent from the node's allocatable and are not
+// backed by DRA. These are the resources whose admission should be deferred
+// because a device plugin may register and provide them shortly. Resources that
+// are present in allocatable (e.g. registered device plugin resources, even with
+// zero healthy devices, or extended resources advertised directly on the node)
+// are intentionally excluded so they continue to be admitted or rejected by the
+// normal predicate checks.
+func missingDeferrableExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []v1.ResourceName {
+	seen := make(map[v1.ResourceName]struct{})
+	var missing []v1.ResourceName
+	collect := func(containers []v1.Container) {
+		for _, c := range containers {
+			for rName := range c.Resources.Requests {
+				if _, ok := seen[rName]; ok {
+					continue
+				}
+				if !v1helper.IsExtendedResourceName(rName) {
+					continue
+				}
+				if schedutil.IsDRAExtendedResourceName(rName) && isResourceBackedByDRA(pod, rName, c.Name) {
+					continue
+				}
+				if _, found := nodeInfo.Allocatable.ScalarResources[rName]; found {
+					continue
+				}
+				seen[rName] = struct{}{}
+				missing = append(missing, rName)
+			}
+		}
+	}
+	collect(pod.Spec.Containers)
+	collect(pod.Spec.InitContainers)
+	return missing
 }
 
 // InsufficientResourceError is an error type that indicates what kind of resource limit is

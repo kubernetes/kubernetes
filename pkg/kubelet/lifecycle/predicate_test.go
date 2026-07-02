@@ -167,6 +167,126 @@ func TestRemoveMissingExtendedResources(t *testing.T) {
 	}
 }
 
+func TestMissingDeferrableExtendedResources(t *testing.T) {
+	for _, test := range []struct {
+		desc                      string
+		pod                       *v1.Pod
+		node                      *v1.Node
+		enableDRAExtendedResource bool
+
+		expected []v1.ResourceName
+	}{
+		{
+			desc: "extended resource absent from allocatable should be deferred",
+			pod: makeTestPod(
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+			node:     makeTestNode(v1.ResourceList{}), // resource absent
+			expected: []v1.ResourceName{extendedResource},
+		},
+		{
+			desc: "extended resource present in allocatable should not be deferred",
+			pod: makeTestPod(
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+			node:     makeTestNode(v1.ResourceList{extendedResource: quantity}),
+			expected: nil,
+		},
+		{
+			desc: "extended resource present with zero allocatable should not be deferred",
+			pod: makeTestPod(
+				v1.ResourceList{extendedResource: quantity}, // Requests
+				v1.ResourceList{extendedResource: quantity}, // Limits
+			),
+			node:     makeTestNode(v1.ResourceList{extendedResource: *resource.NewQuantity(0, resource.DecimalSI)}),
+			expected: nil,
+		},
+		{
+			desc: "native resources absent from allocatable should not be deferred",
+			pod: makeTestPod(
+				v1.ResourceList{v1.ResourceCPU: quantity}, // Requests
+				v1.ResourceList{v1.ResourceCPU: quantity}, // Limits
+			),
+			node:     makeTestNode(v1.ResourceList{}),
+			expected: nil,
+		},
+		{
+			desc:                      "DRA-backed extended resource absent from allocatable should not be deferred",
+			pod:                       makeTestPodWithDRAResource(extendedResource, quantity),
+			node:                      makeTestNode(v1.ResourceList{}),
+			enableDRAExtendedResource: true,
+			expected:                  nil,
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			if !test.enableDRAExtendedResource {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.36"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableDRAExtendedResource)
+			nodeInfo := schedulerframework.NewNodeInfo()
+			nodeInfo.SetNode(test.node)
+			got := missingDeferrableExtendedResources(test.pod, nodeInfo)
+			if diff := cmp.Diff(test.expected, got); diff != "" {
+				t.Errorf("unexpected deferrable resources (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// noopAdmissionFailureHandler returns the failure reasons unchanged.
+type noopAdmissionFailureHandler struct{}
+
+func (noopAdmissionFailureHandler) HandleAdmissionFailure(_ context.Context, _ *v1.Pod, reasons []PredicateFailureReason) ([]PredicateFailureReason, error) {
+	return reasons, nil
+}
+
+func TestAdmitDefersUnavailableExtendedResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS}},
+		Status: v1.NodeStatus{
+			Capacity:    makeResources(10, 20, 32, 0, 0, 0),
+			Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0),
+		},
+	}
+
+	// extendedResource (foo.com/bar) is not present in the node's allocatable,
+	// so admission should be deferred rather than rejected.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "deferred-pod"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{extendedResource: quantity},
+					Limits:   v1.ResourceList{extendedResource: quantity},
+				},
+			}},
+		},
+	}
+
+	w := &predicateAdmitHandler{
+		getNodeAnyWayFunc: func(ctx context.Context, useCache bool) (*v1.Node, error) {
+			return node, nil
+		},
+		pluginResourceUpdateFunc: func(*schedulerframework.NodeInfo, *PodAdmitAttributes) error { return nil },
+		admissionFailureHandler:  noopAdmissionFailureHandler{},
+	}
+
+	result := w.Admit(tCtx, &PodAdmitAttributes{Pod: pod})
+	if result.Admit {
+		t.Fatalf("expected admission to be denied, got Admit=true")
+	}
+	if !result.Defer {
+		t.Errorf("expected admission to be deferred (Defer=true), got Defer=false; reason=%q message=%q", result.Reason, result.Message)
+	}
+	if result.Reason != DeviceNotReady {
+		t.Errorf("expected reason %q, got %q", DeviceNotReady, result.Reason)
+	}
+}
+
 func makeTestPod(requests, limits v1.ResourceList) *v1.Pod {
 	return &v1.Pod{
 		Spec: v1.PodSpec{
