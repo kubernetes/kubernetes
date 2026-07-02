@@ -1234,6 +1234,12 @@ type Kubelet struct {
 	cachedNode   *v1.Node
 	runtimeCache kubecontainer.RuntimeCache
 	kubeClient   clientset.Interface
+	// restoreBlockedPods holds the UIDs of pods whose restore-from-checkpoint is
+	// currently blocked waiting for another restore of the same (namespace, name)
+	// to finish. It is populated by the runtime manager via SetPodRestoreBlocked
+	// and read when generating PodRestored=Unknown with reason RestoreInProgress
+	// (KEP-5823). It is node-local kubelet state, not an API-level lock.
+	restoreBlockedPods sync.Map // map[types.UID]struct{}
 	// checkpointsInFlight prevents replay from the time the watch hands a
 	// checkpoint to the pod worker until its outcome is published. The source
 	// Checkpointing condition ends earlier, when probes resume. This state does
@@ -1246,6 +1252,10 @@ type Kubelet struct {
 
 	// podCheckpointWatch is published before the checkpoint informer starts.
 	podCheckpointWatch atomic.Pointer[podCheckpointWatchState]
+	// restoreOperationsInFlight identifies restore operations initiated by this
+	// kubelet. An InProgress status with no local operation after a kubelet
+	// restart is non-recoverable and must not be retried from the checkpoint.
+	restoreOperationsInFlight sync.Map // map[types.UID]struct{}
 	// checkpointCleanupBlocked holds interrupted PodCheckpoint UIDs whose
 	// caller-owned output could not be removed during startup recovery. They are
 	// not retried in this process, because doing so could overwrite or orphan the
@@ -2132,6 +2142,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
+	pod, restore := kl.podRestoreSync(pod, podStatus)
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
 		if kl.containerRuntime.IsPodResizeInProgress(pod, podStatus) {
@@ -2148,6 +2160,9 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	// Generate final API pod status with pod and status manager status
 	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, SyncPod)
+	if kl.stopUnrecoverableRestore(logger, pod, &apiPodStatus, restore) {
+		return true, nil, nil
+	}
 	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
 	// TODO(random-liu): After writing pod spec into container labels, check whether pod is using host network, and
 	// set pod IP to hostIP directly in runtime.GetPodStatus
@@ -2175,6 +2190,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
+
+	if restore.requested {
+		pod.Status = apiPodStatus
+	}
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
 	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
@@ -2263,7 +2282,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
-		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "error making pod data directories: %v", err)
+		reason := restore.preparationFailureReason(events.FailedToMakePodDataDirectories)
+		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, reason, "error making pod data directories: %v", err)
 		logger.Error(err, "Unable to make pod data directories for pod", "pod", klog.KObj(pod))
 		return false, nil, err
 	}
@@ -2291,6 +2311,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(ctx, pod)
 
+	if err := kl.preparePodRestorePaths(ctx, pod, podStatus, restore); err != nil {
+		return false, nil, err
+	}
+
 	// Capture a requested checkpoint before the runtime sync can start, stop,
 	// or resize containers.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
@@ -2314,6 +2338,9 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.crashLoopBackOff, restartingAllContainers)
 	kl.reasonCache.Update(pod.UID, result)
+	if kl.handlePodRestoreResult(logger, pod, &apiPodStatus, podStatus, result, restore) {
+		return true, nil, nil
+	}
 
 	// If we just performed a RestartAllContainers reset, we want to immediately
 	// trigger another sync to start the containers, rather than waiting for PLEG
@@ -2374,6 +2401,171 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	return false, postSync, err
+}
+
+// podRestoreSync describes the restore work of one SyncPod call.
+type podRestoreSync struct {
+	// requested is set when the feature is enabled and the Pod sets restoreFrom.
+	requested bool
+	// attempt is set when this kubelet owns the restore attempt.
+	attempt bool
+	// interrupted is set when a restore started before a kubelet restart.
+	interrupted bool
+	// failed is set when the Pod already reports a failed restore.
+	failed bool
+}
+
+// preparationFailureReason returns the event reason for a preparation failure,
+// reporting restore attempts as RestorePreparationFailed.
+func (r podRestoreSync) preparationFailureReason(reason string) string {
+	if r.attempt {
+		return events.RestorePreparationFailed
+	}
+	return reason
+}
+
+// podRestoreSync classifies the restore state of pod. When this kubelet starts
+// or resumes an attempt, it also marks the attempt as its own in
+// restoreOperationsInFlight. Restore is an imperative, one-time operation: the
+// kubelet marks the attempt before publishing PodRestored=Unknown. After a
+// kubelet restart, an in-progress condition without a local operation is failed
+// rather than replayed if RestorePod may have run, and started again otherwise.
+// When a restore is requested, the returned Pod is a copy carrying the newest
+// cached status.
+func (kl *Kubelet) podRestoreSync(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, podRestoreSync) {
+	var restore podRestoreSync
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) || pod.Spec.RestoreFrom == nil {
+		return pod, restore
+	}
+	restore.requested = true
+	pod = pod.DeepCopy()
+	if pod.Spec.RestoreFrom.Name == "" {
+		return pod, restore
+	}
+
+	// The status manager may have a newer outcome than the Pod watch.
+	if cached, ok := kl.statusManager.GetPodStatus(pod.UID); ok {
+		pod.Status = cached
+	}
+	_, restored := podutil.GetPodCondition(&pod.Status, v1.PodRestored)
+	switch {
+	case restored != nil && restored.Status == v1.ConditionTrue:
+	case restored != nil && restored.Status == v1.ConditionFalse:
+		restore.failed = true
+	case restored != nil && restored.Status == v1.ConditionUnknown:
+		_, active := kl.restoreOperationsInFlight.Load(pod.UID)
+		switch {
+		case active:
+			restore.attempt = true
+		case kl.podRestoreMayHaveRun(pod.UID, podStatus):
+			restore.interrupted = true
+		default:
+			// The kubelet restarted before calling RestorePod, so the restore
+			// has no runtime side effects and can start again.
+			kl.restoreOperationsInFlight.Store(pod.UID, struct{}{})
+			restore.attempt = true
+		}
+	default:
+		// A sandbox or a start marker without a recorded outcome means a restore
+		// may have reached the runtime before its status synced.
+		if kl.podRestoreMayHaveRun(pod.UID, podStatus) {
+			restore.interrupted = true
+			break
+		}
+		kl.restoreOperationsInFlight.Store(pod.UID, struct{}{})
+		restore.attempt = true
+	}
+	return pod, restore
+}
+
+// stopUnrecoverableRestore fails a Pod whose restore was interrupted by a
+// kubelet restart and keeps a failed restore terminal. It reports whether
+// SyncPod must stop.
+func (kl *Kubelet) stopUnrecoverableRestore(logger klog.Logger, pod *v1.Pod, apiPodStatus *v1.PodStatus, restore podRestoreSync) bool {
+	switch {
+	case restore.interrupted:
+		status.SetPodRestoredCondition(pod, apiPodStatus, v1.ConditionFalse, events.RestoreInterrupted, "pod restore was interrupted by a kubelet restart")
+		apiPodStatus.Phase = v1.PodFailed
+		kl.statusManager.SetPodStatus(logger, pod, *apiPodStatus)
+		kl.recorder.WithLogger(logger).Event(pod, v1.EventTypeWarning, events.RestoreInterrupted, "Pod restore was interrupted by a kubelet restart")
+		return true
+	case restore.failed:
+		apiPodStatus.Phase = v1.PodFailed
+		kl.statusManager.SetPodStatus(logger, pod, *apiPodStatus)
+		return true
+	}
+	return false
+}
+
+// preparePodRestorePaths creates the container paths that restored containers
+// expect immediately: /etc/hosts, termination log paths, and container
+// directories. These are normally created during container startup, so they
+// must exist before RestorePod is called. Only the first sandbox creation
+// restores the Pod; once a sandbox has existed, the Pod follows the normal
+// lifecycle.
+func (kl *Kubelet) preparePodRestorePaths(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, restore podRestoreSync) error {
+	_, restored := podutil.GetPodCondition(&pod.Status, v1.PodRestored)
+	if !restore.requested || pod.Spec.RestoreFrom.Name == "" ||
+		(restored != nil && restored.Status != v1.ConditionUnknown) ||
+		(podStatus != nil && len(podStatus.SandboxStatuses) > 0) {
+		return nil
+	}
+	if err := kl.prepareContainerPathsForRestore(ctx, pod, podStatus); err != nil {
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.RestorePreparationFailed, "error preparing container paths for restore: %v", err)
+		klog.FromContext(ctx).Error(err, "Unable to prepare container paths for pod restore", "pod", klog.KObj(pod))
+		return err
+	}
+	return nil
+}
+
+// handlePodRestoreResult publishes the outcome of a restore attempt after the
+// runtime sync. A clean result without a restored sandbox means the runtime
+// returned before restoring, so the attempt stays in flight for a later sync.
+// It reports whether the Pod failed and SyncPod must stop.
+func (kl *Kubelet) handlePodRestoreResult(logger klog.Logger, pod *v1.Pod, apiPodStatus *v1.PodStatus, podStatus *kubecontainer.PodStatus, result kubecontainer.PodSyncResult, restore podRestoreSync) bool {
+	if !restore.attempt || (result.Error() == nil && !restoreReachedSandbox(podStatus, result)) {
+		return false
+	}
+	kl.restoreOperationsInFlight.Delete(pod.UID)
+	if result.Error() == nil {
+		status.SetPodRestoredCondition(pod, apiPodStatus, v1.ConditionTrue, "RestoreCompleted", "pod was restored from checkpoint")
+		kl.statusManager.SetPodStatus(logger, pod, *apiPodStatus)
+		kl.recorder.WithLogger(logger).Event(pod, v1.EventTypeNormal, events.RestoreSucceeded, "Pod was restored from checkpoint")
+		return false
+	}
+
+	switch reason := kubecontainer.RestoreErrorReason(result.Error()); reason {
+	case events.CheckpointNotReady, events.RestoreInProgress, events.RestorePreparationFailed,
+		events.RestorePostProcessingFailed:
+		// Preparation has no runtime side effects. Post-processing retries
+		// observe the existing sandbox without repeating the CRI restore.
+		kl.restoreOperationsInFlight.Store(pod.UID, struct{}{})
+		return false
+	default:
+		if reason == "" {
+			reason = events.RestoreFailed
+			kl.recorder.WithLogger(logger).Event(pod, v1.EventTypeWarning, reason, "Pod restore failed")
+		}
+		status.SetPodRestoredCondition(pod, apiPodStatus, v1.ConditionFalse, reason, fmt.Sprintf("pod restore failed: %v", result.Error()))
+		apiPodStatus.Phase = v1.PodFailed
+		kl.statusManager.SetPodStatus(logger, pod, *apiPodStatus)
+		return true
+	}
+}
+
+// restoreReachedSandbox reports whether a restore sync produced a sandbox:
+// either this sync restored it, or it already existed from an earlier sync of
+// the same attempt that failed after RestorePod succeeded.
+func restoreReachedSandbox(podStatus *kubecontainer.PodStatus, result kubecontainer.PodSyncResult) bool {
+	if podStatus != nil && len(podStatus.SandboxStatuses) > 0 {
+		return true
+	}
+	for _, r := range result.SyncResults {
+		if r.Action == kubecontainer.RestorePodSandbox && r.Error == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // SyncTerminatingPod is expected to terminate all running containers in a pod. Once this method
@@ -2437,6 +2629,11 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	//   the detection of a container shutdown or (for readiness) after the first failure. Tracked as
 	//   https://github.com/kubernetes/kubernetes/issues/107894 although may not be worth optimizing.
 	kl.probeManager.RemovePod(pod)
+
+	// No further restore sync can run for this Pod after termination, including
+	// attempts that stopped during preparation before reaching the runtime.
+	kl.restoreBlockedPods.Delete(pod.UID)
+	kl.restoreOperationsInFlight.Delete(pod.UID)
 
 	// Guard against consistency issues in KillPod implementations by checking that there are no
 	// running containers. This method is invoked infrequently so this is effectively free and can
@@ -4265,9 +4462,29 @@ func (a *allocatedPodManager) GetPods() []*v1.Pod {
 	return allocatedPods
 }
 
+// SetPodRestoreBlocked marks whether pod podUID's restore-from-checkpoint is
+// currently blocked waiting for another restore of the same (namespace, name) to
+// finish. It is the RuntimeHelper callback invoked by the runtime manager from
+// the restore path so the kubelet can surface PodRestored=Unknown with reason
+// RestoreInProgress (KEP-5823). This method implements RuntimeHelper.
+func (kl *Kubelet) SetPodRestoreBlocked(podUID types.UID, blocked bool) {
+	if blocked {
+		kl.restoreBlockedPods.Store(podUID, struct{}{})
+		return
+	}
+	kl.restoreBlockedPods.Delete(podUID)
+}
+
 // podCheckpointInFlight reports whether a checkpoint of the Pod is waiting for
 // the pod worker, capturing, or publishing its outcome.
 func (kl *Kubelet) podCheckpointInFlight(podUID types.UID) bool {
 	_, ok := kl.checkpointsInFlight.Load(podUID)
+	return ok
+}
+
+// podRestoreBlocked reports whether pod podUID's restore is currently blocked
+// waiting for another restore of the same (namespace, name) to finish.
+func (kl *Kubelet) podRestoreBlocked(podUID types.UID) bool {
+	_, ok := kl.restoreBlockedPods.Load(podUID)
 	return ok
 }

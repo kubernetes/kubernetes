@@ -62,6 +62,7 @@ import (
 	cmtesting "k8s.io/kubernetes/pkg/kubelet/cm/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -337,7 +338,7 @@ func TestContainerRuntimeType(t *testing.T) {
 func TestGetPodStatus(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	containers := []v1.Container{
 		{
@@ -698,6 +699,93 @@ func TestSyncPod(t *testing.T) {
 	for _, c := range fakeRuntime.Containers {
 		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
 	}
+}
+
+// TestSyncPodRestoreFromGatedByFeature verifies that the restore routing in
+// SyncPod is governed by the PodLevelCheckpointRestore feature gate (KEP-5823):
+// with the gate off, a Pod carrying spec.restoreFrom is created as a fresh
+// sandbox (restoreFrom is a no-op); with the gate on, it is routed to RestorePod.
+func TestSyncPodRestoreFromGatedByFeature(t *testing.T) {
+	checkpointName := "my-checkpoint"
+	newRestorePod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "foo", Namespace: "new"},
+			Spec: v1.PodSpec{
+				Containers:  []v1.Container{{Name: "c1", Image: "busybox", ImagePullPolicy: v1.PullIfNotPresent}},
+				RestoreFrom: &v1.CheckpointReference{Name: checkpointName},
+			},
+		}
+	}
+
+	// The kubelet reports a completed restore only when it sees RestorePodSandbox.
+	sandboxActions := func(result kubecontainer.PodSyncResult) []kubecontainer.SyncAction {
+		var actions []kubecontainer.SyncAction
+		for _, r := range result.SyncResults {
+			if r.Action == kubecontainer.CreatePodSandbox || r.Action == kubecontainer.RestorePodSandbox {
+				actions = append(actions, r.Action)
+			}
+		}
+		return actions
+	}
+
+	t.Run("feature gate disabled: restoreFrom is a no-op and a fresh sandbox is created", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, false)
+		tCtx := ktesting.Init(t)
+		fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
+
+		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+		result := m.SyncPod(tCtx, newRestorePod(), &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+		require.NoError(t, result.Error())
+		assert.Empty(t, fakeRuntime.RestoredPods, "RestorePod must not be called when the feature gate is disabled")
+		assert.Len(t, fakeRuntime.Sandboxes, 1, "a fresh sandbox should be created via the normal path")
+		assert.Equal(t, []kubecontainer.SyncAction{kubecontainer.CreatePodSandbox}, sandboxActions(result))
+	})
+
+	t.Run("feature gate enabled: restoreFrom is routed to RestorePod", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+		tCtx := ktesting.Init(t)
+		fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
+
+		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+		pod := newRestorePod()
+		result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+		require.NoError(t, result.Error())
+		require.Len(t, fakeRuntime.RestoredPods, 1, "RestorePod should be called when the feature gate is enabled and restoreFrom is set")
+		assert.Equal(t, []kubecontainer.SyncAction{kubecontainer.RestorePodSandbox}, sandboxActions(result))
+		assert.Equal(t, "/fake/pod-checkpoints/checkpoint", fakeRuntime.RestoredPods[0].CheckpointPath)
+		require.Len(t, fakeRuntime.Sandboxes, 1, "the fake restore should register the restored sandbox")
+		runtimeHelper := m.runtimeHelper.(*containertest.FakeRuntimeHelper)
+		assert.Equal(t, apitest.FakePodSandboxIPs, runtimeHelper.PodRestoreIPs[pod.UID], "restored hosts file should be refreshed with CNI-assigned IPs")
+
+		// A later sync must retry the hosts update even though restore itself is
+		// only performed for the first sandbox creation.
+		runtimePod, err := m.GetPod(tCtx, pod.UID)
+		require.NoError(t, err)
+		podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+		require.NoError(t, err)
+		runtimeHelper.PodRestoreIPs = nil
+		result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+		require.NoError(t, result.Error())
+		assert.Equal(t, apitest.FakePodSandboxIPs, runtimeHelper.PodRestoreIPs[pod.UID])
+		require.Len(t, fakeRuntime.RestoredPods, 1, "later syncs must not restore the checkpoint again")
+	})
+
+	t.Run("completed restore uses the normal sandbox path", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+		tCtx := ktesting.Init(t)
+		fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
+
+		pod := newRestorePod()
+		pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodRestored, Status: v1.ConditionTrue}}
+		result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, flowcontrol.NewBackOff(time.Second, time.Minute), false)
+		require.NoError(t, result.Error())
+		assert.Empty(t, fakeRuntime.RestoredPods, "a completed restore must not replay the checkpoint")
+		assert.Len(t, fakeRuntime.Sandboxes, 1, "a completed restore must use normal sandbox creation")
+		assert.Equal(t, []kubecontainer.SyncAction{kubecontainer.CreatePodSandbox}, sandboxActions(result))
+	})
 }
 
 func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
@@ -6662,6 +6750,17 @@ type testRuntimeHelper struct {
 	captureStateFunc              func() // optional function to capture state when OnPodSandboxReady is called
 	prepareDynamicResourcesCalled bool
 	prepareDynamicResourcesError  error
+	updatePodRestoreHostsError    error
+	updatePodRestoreHostsCalls    int
+	getPodCheckpointPathError     error
+	runContainerPodIP             string
+	runContainerPodIPs            []string
+}
+
+func (t *testRuntimeHelper) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
+	t.runContainerPodIP = podIP
+	t.runContainerPodIPs = append([]string(nil), podIPs...)
+	return t.FakeRuntimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, podIPs, imageVolumes)
 }
 
 func (t *testRuntimeHelper) OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error {
@@ -6677,6 +6776,21 @@ func (t *testRuntimeHelper) OnPodSandboxReady(ctx context.Context, pod *v1.Pod) 
 func (t *testRuntimeHelper) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
 	t.prepareDynamicResourcesCalled = true
 	return t.prepareDynamicResourcesError
+}
+
+func (t *testRuntimeHelper) UpdatePodRestoreHosts(ctx context.Context, pod *v1.Pod, podIPs []string) error {
+	t.updatePodRestoreHostsCalls++
+	if t.updatePodRestoreHostsError != nil {
+		return t.updatePodRestoreHostsError
+	}
+	return t.FakeRuntimeHelper.UpdatePodRestoreHosts(ctx, pod, podIPs)
+}
+
+func (t *testRuntimeHelper) ValidateRestoreCheckpoint(ctx context.Context, pod *v1.Pod) (string, error) {
+	if t.getPodCheckpointPathError != nil {
+		return "", t.getPodCheckpointPathError
+	}
+	return t.FakeRuntimeHelper.ValidateRestoreCheckpoint(ctx, pod)
 }
 
 // TestOnPodSandboxReadyInvocation verifies OnPodSandboxReady is called at the correct time
@@ -7085,6 +7199,261 @@ func TestSyncResultErrorsMetric(t *testing.T) {
 				strings.NewReader(expected),
 				"kubelet_"+metrics.SyncResultErrorsTotalKey,
 			))
+		})
+	}
+}
+
+func TestSyncPodPreservesRestoreLockReason(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	ctx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(ctx)
+	require.NoError(t, err)
+	pod := newTestPod()
+	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+	require.True(t, m.acquireRestore(pod.Namespace+"/"+pod.Name))
+	result := m.SyncPod(ctx, pod, &kubecontainer.PodStatus{}, nil, flowcontrol.NewBackOff(time.Second, time.Minute), false)
+	require.Error(t, result.Error())
+	require.Empty(t, fakeRuntime.RestoredPods)
+	assert.Equal(t, "RestoreInProgress", kubecontainer.RestoreErrorReason(result.Error()))
+	require.ErrorIs(t, result.Error(), kubecontainer.ErrCreatePodSandbox)
+	m.releaseRestore(pod.Namespace + "/" + pod.Name)
+	result = m.SyncPod(ctx, pod, &kubecontainer.PodStatus{}, nil, flowcontrol.NewBackOff(time.Second, time.Minute), false)
+	require.NoError(t, result.Error())
+	require.Len(t, fakeRuntime.RestoredPods, 1)
+}
+
+func TestSyncPodRestoreRetriesPreparationAndBookkeeping(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, test := range []struct {
+		name        string
+		reason      string
+		eventReason string
+		terminal    bool
+	}{
+		{name: "missing checkpoint", reason: events.CheckpointNotReady, eventReason: events.CheckpointNotReady},
+		{name: "checkpoint API unavailable", reason: events.RestorePreparationFailed, eventReason: events.RestorePreparationFailed},
+		{name: "image pull", reason: events.RestorePreparationFailed, eventReason: events.RestorePreparationFailed},
+		{name: "dynamic resources", reason: events.RestorePreparationFailed, eventReason: events.RestorePreparationFailed},
+		{name: "sandbox status", reason: events.RestoreFailed, eventReason: events.RestoreFailed, terminal: true},
+		{name: "hosts file", reason: events.RestoreFailed, eventReason: events.RestoreFailed, terminal: true},
+		{name: "CRI restore", reason: events.RestoreFailed, eventReason: events.RestoreFailed, terminal: true},
+		{name: "start container", reason: events.RestoreFailed, eventReason: events.RestoreFailed, terminal: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			recorder := record.NewFakeRecorder(20)
+			runtime, images, m, err := createTestRuntimeManager(ctx, withRecorder(recorder))
+			require.NoError(t, err)
+			helper := &testRuntimeHelper{FakeRuntimeHelper: m.runtimeHelper.(*containertest.FakeRuntimeHelper)}
+			m.runtimeHelper = helper
+			failure := errors.New("temporary preparation failure")
+			switch test.name {
+			case "missing checkpoint":
+				helper.getPodCheckpointPathError = &kubecontainer.RestoreError{Reason: events.CheckpointNotReady, Err: failure}
+			case "checkpoint API unavailable":
+				helper.getPodCheckpointPathError = failure
+			case "image pull":
+				images.InjectError("PullImage", failure)
+			case "dynamic resources":
+				helper.prepareDynamicResourcesError = failure
+			case "sandbox status":
+				runtime.InjectError("PodSandboxStatus", failure)
+			case "hosts file":
+				helper.updatePodRestoreHostsError = failure
+			case "CRI restore":
+				runtime.InjectError("RestorePod", failure)
+			case "start container":
+				runtime.InjectError("StartContainer", failure)
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: "ns", UID: "restore-uid"},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Name: "app", Image: "busybox", ImagePullPolicy: v1.PullIfNotPresent}},
+					RestoreFrom: &v1.CheckpointReference{Name: "checkpoint"},
+				},
+			}
+			backoff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			result := m.SyncPod(ctx, pod, &kubecontainer.PodStatus{}, nil, backoff, false)
+			require.Error(t, result.Error())
+			require.Equal(t, test.reason, kubecontainer.RestoreErrorReason(result.Error()))
+			if test.eventReason != "" {
+				var recordedEvents []string
+				for len(recorder.Events) > 0 {
+					recordedEvents = append(recordedEvents, <-recorder.Events)
+				}
+				messages := strings.Join(recordedEvents, "\n")
+				require.Equal(t, 1, strings.Count(messages, v1.EventTypeWarning+" "+test.eventReason+" "))
+				require.NotContains(t, messages, events.RestoreSucceeded)
+			}
+			if test.terminal {
+				require.ErrorIs(t, result.Error(), failure)
+				require.Contains(t, runtime.Called, "RestorePod", "a CRI attempt must not be classified as preparation")
+				if test.name == "sandbox status" || test.name == "hosts file" {
+					require.NotContains(t, runtime.Called, "StartContainer", "network preparation must precede restored process startup")
+					require.Contains(t, runtime.Called, "StopPodSandbox")
+					require.Contains(t, runtime.Called, "RemovePodSandbox")
+					require.Empty(t, runtime.Sandboxes)
+					require.Empty(t, runtime.Containers)
+				}
+				return
+			}
+			require.Empty(t, runtime.RestoredPods, "preparation failure must precede CRI restore")
+			helper.prepareDynamicResourcesError = nil
+			helper.updatePodRestoreHostsError = nil
+			helper.getPodCheckpointPathError = nil
+			podStatus := &kubecontainer.PodStatus{}
+			if test.name == "image pull" {
+				result = m.SyncPod(ctx, pod, podStatus, nil, backoff, false)
+				require.Equal(t, events.RestorePreparationFailed, kubecontainer.RestoreErrorReason(result.Error()))
+				require.Empty(t, runtime.RestoredPods, "image pull backoff must not become a restore attempt")
+				// A separate pull populates the cache while this Pod is backing off.
+				images.SetFakeImages([]string{"busybox:latest"})
+			}
+			result = m.SyncPod(ctx, pod, podStatus, nil, backoff, false)
+			require.NoError(t, result.Error())
+			require.Len(t, runtime.RestoredPods, 1, "bookkeeping retries must not repeat CRI restore")
+			for _, container := range runtime.Containers {
+				require.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, container.State)
+			}
+		})
+	}
+}
+
+func TestSyncPodRestoreRetriesHostsForStartedContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	ctx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(ctx)
+	require.NoError(t, err)
+	helper := &testRuntimeHelper{FakeRuntimeHelper: m.runtimeHelper.(*containertest.FakeRuntimeHelper)}
+	m.runtimeHelper = helper
+	pod := newTestPod()
+	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+	backoff := flowcontrol.NewBackOff(time.Second, time.Minute)
+
+	result := m.SyncPod(ctx, pod, &kubecontainer.PodStatus{}, nil, backoff, false)
+	require.NoError(t, result.Error())
+	require.Len(t, fakeRuntime.RestoredPods, 1)
+	require.Equal(t, 1, helper.updatePodRestoreHostsCalls, "the initial hosts update must not be repeated after start")
+	statusCalls := 0
+	startCalls := 0
+	for _, call := range fakeRuntime.GetCalls() {
+		if call == "PodSandboxStatus" {
+			statusCalls++
+		}
+		if call == "StartContainer" {
+			startCalls++
+		}
+	}
+	require.Equal(t, 1, statusCalls, "initial restore must reuse the validated sandbox status")
+	require.Equal(t, len(pod.Spec.Containers), startCalls)
+	runtimePod, err := m.GetPod(ctx, pod.UID)
+	require.NoError(t, err)
+	podStatus, err := m.GetPodStatus(ctx, runtimePod)
+	require.NoError(t, err)
+	helper.updatePodRestoreHostsError = errors.New("temporary hosts write failure")
+
+	result = m.SyncPod(ctx, pod, podStatus, nil, backoff, false)
+	require.Error(t, result.Error())
+	require.Equal(t, events.RestorePostProcessingFailed, kubecontainer.RestoreErrorReason(result.Error()))
+	helper.updatePodRestoreHostsError = nil
+	result = m.SyncPod(ctx, pod, podStatus, nil, backoff, false)
+	require.NoError(t, result.Error())
+	require.Equal(t, 3, helper.updatePodRestoreHostsCalls)
+	require.Len(t, fakeRuntime.RestoredPods, 1, "bookkeeping retries must not repeat restore")
+	startsAfterRetry := 0
+	for _, call := range fakeRuntime.GetCalls() {
+		if call == "StartContainer" {
+			startsAfterRetry++
+		}
+	}
+	require.Equal(t, startCalls, startsAfterRetry, "bookkeeping retries must not repeat restored process startup")
+	require.NotContains(t, fakeRuntime.GetCalls(), "CreateContainer")
+	for _, container := range fakeRuntime.Containers {
+		require.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, container.State)
+	}
+}
+
+func TestRestoreContainerStartBookkeeping(t *testing.T) {
+	metrics.Register()
+	for _, tc := range []struct {
+		name      string
+		errorCode error
+		attempts  float64
+		created   int
+		started   int
+	}{
+		{name: "success", attempts: 2, created: 3, started: 3},
+		{name: "pre-start failure", errorCode: ErrPreStartHook, attempts: 1, created: 1, started: 1},
+		{name: "start failure", errorCode: kubecontainer.ErrRunContainer, attempts: 1, created: 2, started: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			recorder := record.NewFakeRecorder(30)
+			runtime, _, m, err := createTestRuntimeManager(ctx, withRecorder(recorder))
+			require.NoError(t, err)
+			failure := errors.New("container operation failed")
+			lifecycle := &recordingInternalContainerLifecycle{}
+			m.internalLifecycle = lifecycle
+			if tc.name == "pre-start failure" {
+				lifecycle.preStart = func(container *v1.Container, _ string) error {
+					if container.Name == "foo" {
+						return failure
+					}
+					return nil
+				}
+			}
+			if tc.name == "start failure" {
+				runtime.InjectError("StartContainer", nil)
+				runtime.InjectError("StartContainer", failure)
+			}
+			beforeRegular, err := testutil.GetCounterMetricValue(metrics.StartedContainersTotal.WithLabelValues(metrics.Container))
+			require.NoError(t, err)
+			beforeInit, err := testutil.GetCounterMetricValue(metrics.StartedContainersTotal.WithLabelValues(metrics.InitContainer))
+			require.NoError(t, err)
+			beforeErrors := float64(0)
+			if tc.errorCode != nil {
+				beforeErrors, err = testutil.GetCounterMetricValue(metrics.StartedContainersErrorsTotal.WithLabelValues(metrics.Container, tc.errorCode.Error()))
+				require.NoError(t, err)
+			}
+			pod := newTestPod()
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "other", Image: "busybox"})
+			pod.Spec.InitContainers = []v1.Container{{Name: "sidecar", Image: "busybox", RestartPolicy: &containerRestartPolicyAlways}}
+			_, _, err = m.restorePodSandbox(ctx, pod, 0, nil)
+			if tc.errorCode == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, failure)
+				afterErrors, metricErr := testutil.GetCounterMetricValue(metrics.StartedContainersErrorsTotal.WithLabelValues(metrics.Container, tc.errorCode.Error()))
+				require.NoError(t, metricErr)
+				require.InDelta(t, float64(1), afterErrors-beforeErrors, 0.001)
+			}
+			afterRegular, err := testutil.GetCounterMetricValue(metrics.StartedContainersTotal.WithLabelValues(metrics.Container))
+			require.NoError(t, err)
+			afterInit, err := testutil.GetCounterMetricValue(metrics.StartedContainersTotal.WithLabelValues(metrics.InitContainer))
+			require.NoError(t, err)
+			require.InDelta(t, tc.attempts, afterRegular-beforeRegular, 0.001)
+			require.InDelta(t, float64(1), afterInit-beforeInit, 0.001)
+			created, started, failures := 0, 0, 0
+			for len(recorder.Events) > 0 {
+				event := <-recorder.Events
+				if strings.HasPrefix(event, v1.EventTypeNormal+" "+events.CreatedContainer+" ") {
+					created++
+				}
+				if strings.HasPrefix(event, v1.EventTypeNormal+" "+events.StartedContainer+" ") {
+					started++
+				}
+				if strings.HasPrefix(event, v1.EventTypeWarning+" "+events.FailedToStartContainer+" ") {
+					failures++
+				}
+			}
+			require.Equal(t, tc.created, created)
+			require.Equal(t, tc.started, started)
+			if tc.errorCode != nil {
+				require.Equal(t, 1, failures)
+			} else {
+				require.Zero(t, failures)
+			}
 		})
 	}
 }

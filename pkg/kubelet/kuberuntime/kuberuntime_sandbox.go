@@ -18,9 +18,12 @@ package kuberuntime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -30,16 +33,20 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	netutils "k8s.io/utils/net"
 )
 
 // preparePodSandboxConfig generates the sandbox config and creates the Pod log
-// directory. On failure, it returns a message for the Pod's sync result.
+// directory. Both new and restored sandboxes use it. On failure, it returns a
+// message for the Pod's sync result.
 func (m *kubeGenericRuntimeManager) preparePodSandboxConfig(ctx context.Context, pod *v1.Pod, attempt uint32) (*runtimeapi.PodSandboxConfig, string, error) {
 	logger := klog.FromContext(ctx)
 	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, attempt)
@@ -87,6 +94,399 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 	}
 
 	return podSandBoxID, "", nil
+}
+
+// acquireRestore records that a sandbox restore is starting for the given pod
+// (keyed by namespace/name). It returns false if a restore for that pod is
+// already in flight, so the caller can reject the second attempt instead of
+// racing the first. It is keyed by namespace/name rather than UID because each
+// restore attempt is admitted under a fresh pod UID, so a UID key would never
+// collide.
+func (m *kubeGenericRuntimeManager) acquireRestore(key string) bool {
+	m.restoresInFlightLock.Lock()
+	defer m.restoresInFlightLock.Unlock()
+	if _, inFlight := m.restoresInFlight[key]; inFlight {
+		return false
+	}
+	m.restoresInFlight[key] = struct{}{}
+	return true
+}
+
+// releaseRestore clears the in-flight restore marker for the given pod key.
+func (m *kubeGenericRuntimeManager) releaseRestore(key string) {
+	m.restoresInFlightLock.Lock()
+	defer m.restoresInFlightLock.Unlock()
+	delete(m.restoresInFlight, key)
+}
+
+type restoredPodSandbox struct {
+	id     string
+	status *runtimeapi.PodSandboxStatus
+}
+
+// restorePodSandbox uses the restoring Pod's namespace and security settings.
+// Networking and hosts setup finish before restored processes resume.
+func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32, pullSecrets []v1.Secret) (_ *restoredPodSandbox, _ string, retErr error) {
+	logger := klog.FromContext(ctx)
+
+	// Preparation can retry safely until the first CRI restore call. After that
+	// call, an error may hide runtime side effects and must remain terminal.
+	restoreStarted := false
+	defer func() {
+		if retErr != nil && !restoreStarted && kubecontainer.RestoreErrorReason(retErr) == "" {
+			retErr = &kubecontainer.RestoreError{Reason: events.RestorePreparationFailed, Err: retErr}
+		}
+	}()
+
+	if pod.Spec.RestoreFrom == nil || pod.Spec.RestoreFrom.Name == "" {
+		message := "spec.restoreFrom.name is not specified"
+		logger.Error(nil, message, "pod", klog.KObj(pod))
+		return nil, message, errors.New(message)
+	}
+
+	// Gate concurrent restores of the same pod. The CRI RestorePod call below
+	// can be long-running, so reject a second restore for this pod while one is
+	// already in flight rather than racing two restores into the same pod
+	// sandbox. Keyed by namespace/name because each restore attempt is admitted
+	// under a fresh pod UID.
+	restoreKey := pod.Namespace + "/" + pod.Name
+	if !m.acquireRestore(restoreKey) {
+		// Another restore for the same (namespace, name) holds the lock. Record
+		// the blocked state so PodRestored=Unknown explains that this Pod is
+		// waiting for another restore while it retries (KEP-5823).
+		m.runtimeHelper.SetPodRestoreBlocked(pod.UID, true)
+		message := fmt.Sprintf("A restore is already in progress for pod %q", format.Pod(pod))
+		logger.Info(message, "pod", klog.KObj(pod), "podUID", pod.UID)
+		return nil, message, &kubecontainer.RestoreError{Reason: events.RestoreInProgress, Err: fmt.Errorf("restore already in progress for pod %s", format.Pod(pod))}
+	}
+	defer m.releaseRestore(restoreKey)
+	// This Pod now holds the restore lock, so its progress message no longer
+	// reports waiting for another restore. PodRestored remains Unknown.
+	m.runtimeHelper.SetPodRestoreBlocked(pod.UID, false)
+
+	// Resolve spec.restoreFrom.name (the name of a PodCheckpoint in the pod's
+	// namespace) to the on-node checkpoint directory.
+	checkpointPath, err := m.runtimeHelper.ValidateRestoreCheckpoint(ctx, pod)
+	if err != nil {
+		message := fmt.Sprintf("Failed to resolve checkpoint for pod %q: %v", format.Pod(pod), err)
+		logger.Error(err, "Failed to resolve checkpoint directory for restore", "pod", klog.KObj(pod), "checkpointName", pod.Spec.RestoreFrom.Name)
+		return nil, message, err
+	}
+
+	podSandboxConfig, message, err := m.preparePodSandboxConfig(ctx, pod, attempt)
+	if err != nil {
+		return nil, message, err
+	}
+
+	runtimeHandler := ""
+	if m.runtimeClassManager != nil {
+		runtimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+		if err != nil {
+			message := fmt.Sprintf("Failed to restore sandbox for pod %q: %v", format.Pod(pod), err)
+			return nil, message, err
+		}
+		if runtimeHandler != "" {
+			logger.V(2).Info("Restoring pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
+		}
+	}
+
+	logger.V(2).Info("Restoring pod sandbox from checkpoint", "pod", klog.KObj(pod), "checkpointName", pod.Spec.RestoreFrom.Name, "checkpointPath", checkpointPath, "runtimeHandler", runtimeHandler)
+
+	// The sandbox config (including namespace options and security context) is
+	// derived from the pod spec by generatePodSandboxConfig, exactly as for
+	// createPodSandbox. Because the restoring pod's spec is validated to match
+	// the checkpoint, its ShareProcessNamespace/HostPID settings reproduce the
+	// process-namespace topology that was captured. We deliberately do not
+	// override the PID namespace here.
+
+	// Generate container configs with mount information for all containers
+	// This tells the CRI runtime where to mount host paths into the restored containers
+	if err := m.pullRestoreContainerImages(ctx, pod, podSandboxConfig, runtimeHandler, pullSecrets); err != nil {
+		return nil, err.Error(), err
+	}
+	imageVolumePullResults, err := m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
+	if err != nil {
+		message := fmt.Sprintf("Failed to prepare image volumes for restore for pod %q: %v", format.Pod(pod), err)
+		logger.Error(err, "Failed to prepare image volumes for pod restore", "pod", klog.KObj(pod))
+		return nil, message, err
+	}
+	containerConfigs, cleanupAction, err := m.generateContainerConfigsForRestore(ctx, pod, podSandboxConfig, imageVolumePullResults)
+	if cleanupAction != nil {
+		defer cleanupAction()
+	}
+	if err != nil {
+		message := fmt.Sprintf("Failed to generate container configs for restore for pod %q: %v", format.Pod(pod), err)
+		logger.Error(err, "Failed to generate container configs for restore", "pod", klog.KObj(pod))
+		return nil, message, err
+	}
+
+	logger.V(1).Info("Generated container configs for restore", "pod", klog.KObj(pod), "containerCount", len(containerConfigs))
+
+	// Create the RestorePodRequest.
+	restoreRequest := &runtimeapi.RestorePodRequest{
+		CheckpointPath:   checkpointPath,
+		Config:           podSandboxConfig,
+		RuntimeHandler:   runtimeHandler,
+		ContainerConfigs: containerConfigs,
+	}
+
+	// After a kubelet restart, this record separates a restore that may have
+	// reached the runtime from one that can start again.
+	if err := m.runtimeHelper.MarkPodRestoreStarted(pod.UID); err != nil {
+		message := fmt.Sprintf("Failed to record restore start for pod %q: %v", format.Pod(pod), err)
+		logger.Error(err, "Failed to record restore start", "pod", klog.KObj(pod))
+		return nil, message, err
+	}
+
+	// Call the CRI RestorePod RPC.
+	restoreStarted = true
+	restoreResponse, err := m.runtimeService.RestorePod(ctx, restoreRequest)
+	if err != nil {
+		message := fmt.Sprintf("Failed to restore pod sandbox from checkpoint %q for pod %q: %v", checkpointPath, format.Pod(pod), err)
+		logger.Error(err, "Failed to restore pod sandbox from checkpoint", "pod", klog.KObj(pod), "checkpointPath", checkpointPath)
+		return nil, message, err
+	}
+
+	containerIDsByName, err := validateRestorePodResponse(restoreRequest, restoreResponse)
+	if err != nil {
+		message := fmt.Sprintf("RestorePod returned an invalid response for pod %q: %v", format.Pod(pod), err)
+		logger.Error(err, "RestorePod returned an invalid response", "pod", klog.KObj(pod), "checkpointPath", checkpointPath)
+		if cleanupErr := m.cleanupRestoredPod(ctx, restoreResponse.GetPodSandboxId()); cleanupErr != nil {
+			logger.Error(cleanupErr, "Failed to clean up restored pod after invalid RestorePod response", "pod", klog.KObj(pod), "podSandboxID", restoreResponse.GetPodSandboxId())
+			err = errors.Join(err, fmt.Errorf("failed to clean up invalid restore: %w", cleanupErr))
+		}
+		return nil, message, err
+	}
+	podSandBoxID := restoreResponse.GetPodSandboxId()
+	sandboxStatus, err := m.prepareRestoredPodHosts(ctx, pod, podSandBoxID)
+	if err != nil {
+		message := fmt.Sprintf("Failed to prepare hosts for restored pod %q: %v", format.Pod(pod), err)
+		if cleanupErr := m.cleanupRestoredPod(ctx, podSandBoxID); cleanupErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to clean up unstarted restore: %w", cleanupErr))
+		}
+		return nil, message, err
+	}
+
+	// RestorePod returns prepared containers without executing their restored
+	// processes. Run PreStart and StartContainer in deterministic Pod-spec order,
+	// matching the normal container lifecycle. PostStart is intentionally not
+	// rerun because it already executed before the checkpoint was captured.
+	configIndex := 0
+	for container, containerType := range kubecontainer.CheckpointContainers(&pod.Spec) {
+		metricLabel := metrics.Container
+		if containerType == podutil.InitContainers {
+			metricLabel = metrics.InitContainer
+		}
+		containerID := containerIDsByName[container.Name]
+		message, err := m.startRestoredContainer(ctx, pod, container, containerID, containerConfigs[configIndex], podSandboxConfig, metricLabel)
+		configIndex++
+		if err != nil {
+			if cleanupErr := m.cleanupRestoredPod(ctx, podSandBoxID); cleanupErr != nil {
+				logger.Error(cleanupErr, "Failed to clean up restored pod after container start failure", "pod", klog.KObj(pod), "podSandboxID", podSandBoxID)
+				err = errors.Join(err, fmt.Errorf("failed to clean up rejected restore: %w", cleanupErr))
+			}
+			return nil, message, err
+		}
+	}
+
+	logger.V(2).Info("Successfully restored pod sandbox from checkpoint", "pod", klog.KObj(pod), "podSandboxID", podSandBoxID, "checkpointName", pod.Spec.RestoreFrom.Name, "checkpointPath", checkpointPath)
+
+	return &restoredPodSandbox{id: podSandBoxID, status: sandboxStatus}, "", nil
+}
+
+func (m *kubeGenericRuntimeManager) startRestoredContainer(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string, containerConfig *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig, metricLabel string) (string, error) {
+	countFailure := countContainerStart(pod, container, metricLabel)
+	msg, syncErr, err := m.startCreatedContainer(ctx, pod, container, containerID, containerConfig, sandboxConfig)
+	if syncErr != nil {
+		countFailure(syncErr)
+		message := fmt.Sprintf("Failed to start restored container %q in pod %q: %s", container.Name, format.Pod(pod), msg)
+		return message, fmt.Errorf("%w: %w", syncErr, err)
+	}
+	return "", nil
+}
+
+// prepareRestoredPodHosts finishes node-local network preparation before any
+// restored process can read its hosts file. Failures after RestorePod cannot use
+// normal container reconciliation to resume the prepared containers safely.
+func (m *kubeGenericRuntimeManager) prepareRestoredPodHosts(ctx context.Context, pod *v1.Pod, sandboxID string) (*runtimeapi.PodSandboxStatus, error) {
+	response, err := m.runtimeService.PodSandboxStatus(ctx, sandboxID, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get restored sandbox status: %w", err)
+	}
+	sandboxStatus := response.GetStatus()
+	if sandboxStatus == nil {
+		return nil, errors.New("restored sandbox status is nil")
+	}
+	if sandboxStatus.State != runtimeapi.PodSandboxState_SANDBOX_READY {
+		return nil, errors.New("restored sandbox is not ready")
+	}
+	var podIPs []string
+	if !kubecontainer.IsHostNetworkPod(pod) {
+		podIPs = m.determinePodSandboxIPs(ctx, pod.Namespace, pod.Name, sandboxStatus)
+		if len(podIPs) == 0 {
+			return nil, errors.New("restored sandbox has no Pod IP")
+		}
+	}
+	if err := m.runtimeHelper.UpdatePodRestoreHosts(ctx, pod, podIPs); err != nil {
+		return nil, fmt.Errorf("failed to update restored Pod hosts: %w", err)
+	}
+	return sandboxStatus, nil
+}
+
+// validateRestorePodResponse verifies that the runtime returned one non-empty,
+// unique container ID for exactly every container configuration in the request.
+func validateRestorePodResponse(request *runtimeapi.RestorePodRequest, response *runtimeapi.RestorePodResponse) (map[string]string, error) {
+	if response == nil {
+		return nil, errors.New("response is nil")
+	}
+	if response.GetPodSandboxId() == "" {
+		return nil, errors.New("pod sandbox ID is empty")
+	}
+
+	expectedNames := make(map[string]struct{}, len(request.GetContainerConfigs()))
+	for i, config := range request.GetContainerConfigs() {
+		name := config.GetMetadata().GetName()
+		if name == "" {
+			return nil, fmt.Errorf("request container_configs[%d] has an empty metadata name", i)
+		}
+		if _, duplicate := expectedNames[name]; duplicate {
+			return nil, fmt.Errorf("request container_configs contains duplicate metadata name %q", name)
+		}
+		expectedNames[name] = struct{}{}
+	}
+	if len(expectedNames) == 0 {
+		return nil, errors.New("request container_configs is empty")
+	}
+	if len(response.GetRestoredContainers()) != len(expectedNames) {
+		return nil, fmt.Errorf("restored container count %d does not match requested count %d", len(response.GetRestoredContainers()), len(expectedNames))
+	}
+
+	containerIDsByName := make(map[string]string, len(expectedNames))
+	containerNamesByID := make(map[string]string, len(expectedNames))
+	for i, restored := range response.GetRestoredContainers() {
+		if restored == nil {
+			return nil, fmt.Errorf("restored_containers[%d] is nil", i)
+		}
+		name := restored.GetName()
+		if name == "" {
+			return nil, fmt.Errorf("restored_containers[%d] has an empty name", i)
+		}
+		if _, expected := expectedNames[name]; !expected {
+			return nil, fmt.Errorf("restored_containers[%d] has unexpected name %q", i, name)
+		}
+		if _, duplicate := containerIDsByName[name]; duplicate {
+			return nil, fmt.Errorf("restored_containers contains duplicate name %q", name)
+		}
+		containerID := restored.GetContainerId()
+		if containerID == "" {
+			return nil, fmt.Errorf("restored container %q has an empty container ID", name)
+		}
+		if existingName, duplicate := containerNamesByID[containerID]; duplicate {
+			return nil, fmt.Errorf("restored containers %q and %q have duplicate container ID %q", existingName, name, containerID)
+		}
+		containerIDsByName[name] = containerID
+		containerNamesByID[containerID] = name
+	}
+	return containerIDsByName, nil
+}
+
+func (m *kubeGenericRuntimeManager) cleanupRestoredPod(ctx context.Context, podSandboxID string) error {
+	if podSandboxID == "" {
+		return nil
+	}
+	cleanupCtx := context.WithoutCancel(ctx)
+	if err := m.runtimeService.StopPodSandbox(cleanupCtx, podSandboxID); err != nil {
+		return err
+	}
+	containers, err := m.runtimeService.ListContainers(cleanupCtx, &runtimeapi.ContainerFilter{PodSandboxId: podSandboxID})
+	if err != nil {
+		return err
+	}
+	var removalErrors []error
+	for _, container := range containers {
+		// Keep failed-restore logs for diagnosis, and run the normal post-stop
+		// hook before the runtime forgets the container ID needed for cleanup.
+		if err := m.removeContainer(cleanupCtx, container.Id, true); err != nil {
+			removalErrors = append(removalErrors, err)
+		}
+	}
+	if len(removalErrors) > 0 {
+		// Leave failed removals visible to ordinary container garbage collection.
+		return errors.Join(removalErrors...)
+	}
+	return m.runtimeService.RemovePodSandbox(cleanupCtx, podSandboxID)
+}
+
+// pullRestoreContainerImages applies the Pod's pull policy and credentials
+// before generating the same image-derived security context used at creation.
+func (m *kubeGenericRuntimeManager) pullRestoreContainerImages(ctx context.Context, pod *v1.Pod, sandboxConfig *runtimeapi.PodSandboxConfig, runtimeHandler string, pullSecrets []v1.Secret) error {
+	for container := range kubecontainer.CheckpointContainers(&pod.Spec) {
+		ref, err := kubecontainer.GenerateContainerRef(pod, container)
+		if err != nil {
+			return fmt.Errorf("failed to reference restore container %q: %w", container.Name, err)
+		}
+		if _, message, err := m.imagePuller.EnsureImageExists(ctx, ref, pod, container.Image, pullSecrets, sandboxConfig, runtimeHandler, container.ImagePullPolicy); err != nil {
+			return fmt.Errorf("failed to prepare image for restore container %q: %s: %w", container.Name, message, err)
+		}
+	}
+	return nil
+}
+
+// generateContainerConfigsForRestore generates the same complete container
+// configurations used by the normal start path. The runtime uses the base image
+// and applies restore-time security, resource, logging, device, and mount settings.
+// The checkpoint supplies the process state, including its argv and environment.
+func (m *kubeGenericRuntimeManager) generateContainerConfigsForRestore(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, imageVolumePullResults imageVolumePulls) ([]*runtimeapi.ContainerConfig, func(), error) {
+	logger := klog.FromContext(ctx)
+
+	var containerConfigs []*runtimeapi.ContainerConfig
+	var cleanupActions []func()
+	cleanup := func() {
+		for _, action := range slices.Backward(cleanupActions) {
+			action()
+		}
+	}
+
+	for container, containerType := range kubecontainer.CheckpointContainers(&pod.Spec) {
+		syncResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
+		imageVolumes, err := m.toKubeContainerImageVolumes(ctx, imageVolumePullResults, container, pod, syncResult)
+		if err != nil {
+			cleanup()
+			return nil, nil, fmt.Errorf("failed to prepare image volumes for container %s: %w", container.Name, err)
+		}
+
+		config, cleanupAction, msg, err := m.createContainerConfig(ctx, pod, container, containerType, 0, "", container.Image, nil, nil, imageVolumes)
+		if cleanupAction != nil {
+			cleanupActions = append(cleanupActions, cleanupAction)
+		}
+		if err != nil {
+			cleanup()
+			return nil, nil, fmt.Errorf("container %s: %w: %s", container.Name, err, msg)
+		}
+
+		// A restored sandbox has no Pod IP yet, so the normal options helper may
+		// omit /etc/hosts. Preserve kubelet ownership of that node-local mount.
+		hasHostsMount := false
+		for _, mount := range config.Mounts {
+			if mount.ContainerPath == "/etc/hosts" {
+				hasHostsMount = true
+				break
+			}
+		}
+		if !hasHostsMount {
+			hostsPath := filepath.Join(m.runtimeHelper.GetPodDir(pod.UID), "etc-hosts")
+			config.Mounts = append(config.Mounts, &runtimeapi.Mount{
+				HostPath:       hostsPath,
+				ContainerPath:  "/etc/hosts",
+				SelinuxRelabel: true,
+			})
+		}
+
+		containerConfigs = append(containerConfigs, config)
+		logger.V(2).Info("Generated container config for restore", "pod", klog.KObj(pod), "containerName", container.Name, "mountCount", len(config.Mounts))
+	}
+
+	return containerConfigs, cleanup, nil
 }
 
 // generatePodSandboxConfig generates pod sandbox config from v1.Pod.

@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -205,6 +206,15 @@ type kubeGenericRuntimeManager struct {
 
 	// Records first initContainer start time and last initContainer finish time
 	podInitContainerTimeRecorder PodInitContainerTimeRecorder
+
+	// restoresInFlightLock guards restoresInFlight.
+	restoresInFlightLock sync.Mutex
+	// restoresInFlight holds the namespace/name keys of pods that currently have
+	// a sandbox restore in progress. It gates concurrent restores of the same
+	// logical pod so a second attempt is rejected while the first is still
+	// running. It is keyed by namespace/name rather than UID because each
+	// restore attempt is admitted under a fresh pod UID.
+	restoresInFlight map[string]struct{}
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and streaming runtime.
@@ -287,6 +297,7 @@ func NewKubeGenericRuntimeManager(
 		memoryReservationPolicy:      memoryReservationPolicy,
 		podLogsDirectory:             podLogsDirectory,
 		podInitContainerTimeRecorder: podInitContainerTimeRecorder,
+		restoresInFlight:             make(map[string]struct{}),
 	}
 
 	// Initialize swap controller availability check with lazy evaluation
@@ -1728,9 +1739,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 	// Step 4: Create a sandbox for the pod if necessary.
 	podSandboxID := podContainerChanges.SandboxID
+	restorePod, restoreSandbox := podSandboxRestore(pod, podStatus)
+
 	if podContainerChanges.CreateSandbox {
-		var msg string
-		var err error
+		var sandboxStatus *runtimeapi.PodSandboxStatus
 
 		logger.V(4).Info("Creating PodSandbox for pod", "pod", klog.KObj(pod))
 		metrics.StartedPodsTotal.Inc()
@@ -1753,7 +1765,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 				}
 			}()
 		}
-		createSandboxResult := kubecontainer.NewSyncResult(kubecontainer.CreatePodSandbox, format.Pod(pod))
+		createSandboxResult := kubecontainer.NewSyncResult(podSandboxSyncAction(restoreSandbox), format.Pod(pod))
 		result.AddSyncResult(createSandboxResult)
 
 		// ConvertPodSysctlsVariableToDotsSeparator converts sysctl variable
@@ -1768,62 +1780,55 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 		// Prepare resources allocated by the Dynamic Resource Allocation feature for the pod
 		if err := m.runtimeHelper.PrepareDynamicResources(ctx, pod); err != nil {
+			reason := dynamicResourcesFailureReason(restoreSandbox)
+			if restoreSandbox {
+				createSandboxResult.Fail(&kubecontainer.RestoreError{Reason: reason, Err: err}, err.Error())
+			}
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 			if referr != nil {
 				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 				return
 			}
-			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "Failed to prepare dynamic resources: %v", err)
+			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, reason, "Failed to prepare dynamic resources: %v", err)
 			logger.Error(err, "Failed to prepare dynamic resources", "pod", klog.KObj(pod))
 			return
 		}
 
-		podSandboxID, msg, err = m.createPodSandbox(ctx, pod, podContainerChanges.Attempt)
-		if err != nil {
-			// createPodSandbox can return an error from CNI, CSI,
-			// or CRI if the Pod has been deleted while the POD is
-			// being created. If the pod has been deleted then it's
-			// not a real error.
-			//
-			// SyncPod can still be running when we get here, which
-			// means the PodWorker has not acked the deletion.
-			if m.podStateProvider.IsPodTerminationRequested(pod.UID) {
-				logger.V(4).Info("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
+		var started bool
+		if restoreSandbox {
+			podSandboxID, sandboxStatus, started = m.restorePodSandboxForSync(ctx, pod, podContainerChanges.Attempt, pullSecrets, createSandboxResult)
+		} else {
+			podSandboxID, started = m.createPodSandboxForSync(ctx, pod, podContainerChanges.Attempt, createSandboxResult)
+		}
+		if !started {
+			return
+		}
+
+		if sandboxStatus == nil {
+			resp, err := m.runtimeService.PodSandboxStatus(ctx, podSandboxID, false)
+			if err != nil {
+				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+				if referr != nil {
+					logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+				}
+				m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedStatusPodSandBox, "Unable to get pod sandbox status: %v", err)
+				logger.Error(err, "Failed to get pod sandbox status; Skipping pod", "pod", klog.KObj(pod))
+				result.Fail(err)
 				return
 			}
-			metrics.StartedPodsErrorsTotal.Inc()
-			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
-			logger.Error(err, "CreatePodSandbox for pod failed", "pod", klog.KObj(pod))
-			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
-			if referr != nil {
-				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+			if resp.GetStatus() == nil {
+				result.Fail(errors.New("pod sandbox status is nil"))
+				return
 			}
-			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed to create pod sandbox: %v", err)
-			return
-		}
-		logger.V(4).Info("Created PodSandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
 
-		resp, err := m.runtimeService.PodSandboxStatus(ctx, podSandboxID, false)
-		if err != nil {
-			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
-			if referr != nil {
-				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
-			}
-			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedStatusPodSandBox, "Unable to get pod sandbox status: %v", err)
-			logger.Error(err, "Failed to get pod sandbox status; Skipping pod", "pod", klog.KObj(pod))
-			result.Fail(err)
-			return
-		}
-		if resp.GetStatus() == nil {
-			result.Fail(errors.New("pod sandbox status is nil"))
-			return
+			sandboxStatus = resp.GetStatus()
 		}
 
 		// If we ever allow updating a pod from non-host-network to
 		// host-network, we may use a stale IP.
 		if !kubecontainer.IsHostNetworkPod(pod) {
 			// Overwrite the podIPs passed in the pod status, since we just started the pod sandbox.
-			podIPs = m.determinePodSandboxIPs(ctx, pod.Namespace, pod.Name, resp.GetStatus())
+			podIPs = m.determinePodSandboxIPs(ctx, pod.Namespace, pod.Name, sandboxStatus)
 			logger.V(4).Info("Determined the ip for pod after sandbox changed", "IPs", podIPs, "pod", klog.KObj(pod))
 		}
 
@@ -1844,6 +1849,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	podIP := ""
 	if len(podIPs) != 0 {
 		podIP = podIPs[0]
+	}
+	if restorePod && !restoreSandbox {
+		if err := m.updateRestoredPodHosts(ctx, pod, podIPs); err != nil {
+			result.Fail(err)
+			return
+		}
 	}
 
 	// Step 6: Resize pod & running containers (if necessary).
@@ -1944,6 +1955,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 	}
 
+	// When a pod is restored from a checkpoint, restorePodSandbox already
+	// started its containers. Skip container creation and startup.
+	if restoreSandbox {
+		logger.V(4).Info("Pod was restored from checkpoint, skipping container startup", "pod", klog.KObj(pod))
+		return result
+	}
+
 	// Step 7: start ephemeral containers
 	// These are started "prior" to init containers to allow running ephemeral containers even when there
 	// are errors starting an init container. In practice init containers will start first since ephemeral
@@ -1953,8 +1971,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		if start == nil {
 			return
 		}
-
-		start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
+		// Errors are recorded in result inside start; a failed ephemeral
+		// container start does not abort the sync.
+		_ = start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
 	}
 
 	// Step 8: start init containers.
@@ -2001,10 +2020,126 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			return
 		}
 
-		start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
+		// Errors are recorded in result inside start; remaining containers
+		// are still attempted.
+		_ = start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
 	}
 
 	return result
+}
+
+// podSandboxRestore reports whether pod restores from a checkpoint and whether
+// this sync restores its sandbox. Restore is only performed for the pod's
+// first-ever sandbox creation: it replaces the initial createPodSandbox with a
+// restore from the checkpoint's captured state. Once any sandbox has existed for
+// this pod, a later sandbox loss is handled by the normal restart path
+// (createPodSandbox honoring the RestartPolicy), not by re-restoring the stale
+// memory image.
+func podSandboxRestore(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (restorePod, restoreSandbox bool) {
+	_, restored := podutil.GetPodCondition(&pod.Status, v1.PodRestored)
+	restorePod = utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) &&
+		pod.Spec.RestoreFrom != nil && pod.Spec.RestoreFrom.Name != "" &&
+		(restored == nil || restored.Status == v1.ConditionUnknown)
+	restoreSandbox = restorePod && (podStatus == nil || len(podStatus.SandboxStatuses) == 0)
+	return restorePod, restoreSandbox
+}
+
+// podSandboxSyncAction returns the sync action that starts the Pod sandbox.
+func podSandboxSyncAction(restore bool) kubecontainer.SyncAction {
+	if restore {
+		return kubecontainer.RestorePodSandbox
+	}
+	return kubecontainer.CreatePodSandbox
+}
+
+// dynamicResourcesFailureReason returns the event reason for a DRA preparation
+// failure. A restore reports it as a retryable preparation error, because
+// nothing was restored yet.
+func dynamicResourcesFailureReason(restore bool) string {
+	if restore {
+		return events.RestorePreparationFailed
+	}
+	return events.FailedPrepareDynamicResources
+}
+
+// createPodSandboxForSync creates the Pod sandbox and reports a failure in
+// sandboxResult. It returns false when SyncPod must stop.
+func (m *kubeGenericRuntimeManager) createPodSandboxForSync(ctx context.Context, pod *v1.Pod, attempt uint32, sandboxResult *kubecontainer.SyncResult) (string, bool) {
+	logger := klog.FromContext(ctx)
+	podSandboxID, msg, err := m.createPodSandbox(ctx, pod, attempt)
+	if err != nil {
+		// createPodSandbox can return an error from CNI, CSI,
+		// or CRI if the Pod has been deleted while the POD is
+		// being created. If the pod has been deleted then it's
+		// not a real error.
+		//
+		// SyncPod can still be running when we get here, which
+		// means the PodWorker has not acked the deletion.
+		if m.podStateProvider.IsPodTerminationRequested(pod.UID) {
+			logger.V(4).Info("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
+			return "", false
+		}
+		metrics.StartedPodsErrorsTotal.Inc()
+		sandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
+		logger.Error(err, "CreatePodSandbox for pod failed", "pod", klog.KObj(pod))
+		ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+		if referr != nil {
+			logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+		}
+		m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed to create pod sandbox: %v", err)
+		return "", false
+	}
+	logger.V(4).Info("Created PodSandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
+	return podSandboxID, true
+}
+
+// restorePodSandboxForSync restores the Pod sandbox from its checkpoint and
+// reports a failure in sandboxResult with the restore reason, so the kubelet can
+// tell retryable preparation failures from terminal ones. It returns false when
+// SyncPod must stop.
+func (m *kubeGenericRuntimeManager) restorePodSandboxForSync(ctx context.Context, pod *v1.Pod, attempt uint32, pullSecrets []v1.Secret, sandboxResult *kubecontainer.SyncResult) (string, *runtimeapi.PodSandboxStatus, bool) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Restoring PodSandbox from checkpoint for pod", "pod", klog.KObj(pod), "checkpointName", pod.Spec.RestoreFrom.Name)
+	restoredSandbox, msg, err := m.restorePodSandbox(ctx, pod, attempt, pullSecrets)
+	if err != nil {
+		// As with createPodSandbox, an error after the Pod was deleted is
+		// not a real error.
+		if m.podStateProvider.IsPodTerminationRequested(pod.UID) {
+			logger.V(4).Info("Pod was deleted and sandbox failed to be restored", "pod", klog.KObj(pod), "podUID", pod.UID)
+			return "", nil, false
+		}
+		metrics.StartedPodsErrorsTotal.Inc()
+		if kubecontainer.RestoreErrorReason(err) == "" {
+			err = &kubecontainer.RestoreError{Reason: events.RestoreFailed, Err: err}
+		}
+		// Preserve the restore reason so kubelet can retry lock contention.
+		sandboxResult.Fail(fmt.Errorf("%w: %w", kubecontainer.ErrCreatePodSandbox, err), msg)
+		logger.Error(err, "RestorePodSandbox for pod failed", "pod", klog.KObj(pod), "checkpointName", pod.Spec.RestoreFrom.Name)
+		ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+		if referr != nil {
+			logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+		}
+		// Surface the specific restore failure reason (CheckpointNotReady,
+		// CheckpointWrongNode, PodSpecMismatch, RestoreInProgress) so operators
+		// can distinguish failure causes.
+		m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, kubecontainer.RestoreErrorReason(err), "Failed to restore pod sandbox from checkpoint: %v", err)
+		return "", nil, false
+	}
+	logger.V(4).Info("Restored PodSandbox for pod", "podSandboxID", restoredSandbox.id, "pod", klog.KObj(pod), "checkpointName", pod.Spec.RestoreFrom.Name)
+	return restoredSandbox.id, restoredSandbox.status, true
+}
+
+// updateRestoredPodHosts lets an existing restored sandbox retry hosts
+// bookkeeping without repeating RestorePod or starting its containers again.
+func (m *kubeGenericRuntimeManager) updateRestoredPodHosts(ctx context.Context, pod *v1.Pod, podIPs []string) error {
+	if !kubecontainer.IsHostNetworkPod(pod) && len(podIPs) == 0 {
+		return nil
+	}
+	if err := m.runtimeHelper.UpdatePodRestoreHosts(ctx, pod, podIPs); err != nil {
+		klog.FromContext(ctx).Error(err, "Failed to update restored pod hosts file", "pod", klog.KObj(pod), "podIPs", podIPs)
+		return &kubecontainer.RestoreError{Reason: events.RestorePostProcessingFailed, Err: err}
+	}
+	return nil
 }
 
 // incrementImageVolumeMetrics increments the image volume mount metrics

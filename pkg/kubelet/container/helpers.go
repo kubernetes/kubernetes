@@ -57,6 +57,19 @@ type RuntimeHelper interface {
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
+	// ValidateRestoreCheckpoint checks that the pod can restore from the
+	// PodCheckpoint named by spec.restoreFrom.name on this node and returns the
+	// on-node checkpoint directory. It returns an error if the checkpoint cannot
+	// be found, is not ready, was taken on a different node (cross-node restore
+	// is out of scope), or does not match the pod's spec.
+	ValidateRestoreCheckpoint(ctx context.Context, pod *v1.Pod) (string, error)
+	// UpdatePodRestoreHosts refreshes the kubelet-managed /etc/hosts file after
+	// RestorePod has created the sandbox and CNI has assigned its IPs.
+	UpdatePodRestoreHosts(ctx context.Context, pod *v1.Pod, podIPs []string) error
+	// MarkPodRestoreStarted durably records that the kubelet is about to call
+	// RestorePod for the Pod. After a kubelet restart, the record separates a
+	// restore that may have reached the runtime from one that can start again.
+	MarkPodRestoreStarted(podUID types.UID) error
 	GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
@@ -84,6 +97,12 @@ type RuntimeHelper interface {
 
 	// ResizeEphemeralVolume directly triggers a resize of the specified volume.
 	ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
+
+	// SetPodRestoreBlocked records whether a pod's restore-from-checkpoint is
+	// currently blocked waiting for another restore of the same (namespace, name)
+	// to finish, so the kubelet can surface PodRestored=Unknown/RestoreInProgress
+	// condition (KEP-5823).
+	SetPodRestoreBlocked(podUID types.UID, blocked bool)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.

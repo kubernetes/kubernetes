@@ -92,6 +92,20 @@ type podCheckpointWatchState struct {
 	queue     workqueue.TypedRateLimitingInterface[string]
 }
 
+// cachedPodCheckpoint returns the checkpoint from this node's PodCheckpoint
+// watch, or nil when the watch has not synced or does not hold it.
+func (kl *Kubelet) cachedPodCheckpoint(namespace, name string) *nodev1alpha1.PodCheckpoint {
+	state := kl.podCheckpointWatch.Load()
+	if state == nil || state.hasSynced == nil || !state.hasSynced() {
+		return nil
+	}
+	pc, err := state.lister.PodCheckpoints(namespace).Get(name)
+	if err != nil {
+		return nil
+	}
+	return pc
+}
+
 func (kl *Kubelet) prunePodCheckpointMarkers() {
 	state := kl.podCheckpointWatch.Load()
 	if state == nil || state.hasSynced == nil || !state.hasSynced() {
