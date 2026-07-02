@@ -23,10 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -46,16 +42,13 @@ func newFakeActualStateOfWorld() *fakeActualStateOfWorld {
 }
 
 func TestNodeExpander(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-
 	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeInfeasible
 
 	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
 	var tests = []struct {
-		name                          string
-		pvc                           *v1.PersistentVolumeClaim
-		pv                            *v1.PersistentVolume
-		recoverVolumeExpansionFailure bool
+		name string
+		pvc  *v1.PersistentVolumeClaim
+		pv   *v1.PersistentVolume
 
 		// desired size, defaults to pv.Spec.Capacity
 		desiredSize *resource.Quantity
@@ -75,10 +68,9 @@ func TestNodeExpander(t *testing.T) {
 		expectError              bool
 	}{
 		{
-			name:                          "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_failed",
-			pvc:                           getTestPVC("test-vol0", "2G", "1G", "", &nodeResizeFailed),
-			pv:                            getTestPV("test-vol0", "2G"),
-			recoverVolumeExpansionFailure: true,
+			name: "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_failed",
+			pvc:  getTestPVC("test-vol0", "2G", "1G", "", &nodeResizeFailed),
+			pv:   getTestPV("test-vol0", "2G"),
 
 			expectedResizeStatus:     nodeResizeFailed,
 			expectResizeCall:         false,
@@ -88,10 +80,9 @@ func TestNodeExpander(t *testing.T) {
 			expectedStatusSize:       resource.MustParse("1G"),
 		},
 		{
-			name:                          "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending",
-			pvc:                           getTestPVC("test-vol0", "2G", "1G", "2G", &nodeResizePending),
-			pv:                            getTestPV("test-vol0", "2G"),
-			recoverVolumeExpansionFailure: true,
+			name: "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending",
+			pvc:  getTestPVC("test-vol0", "2G", "1G", "2G", &nodeResizePending),
+			pv:   getTestPV("test-vol0", "2G"),
 
 			expectedResizeStatus:     "",
 			expectResizeCall:         true,
@@ -101,37 +92,34 @@ func TestNodeExpander(t *testing.T) {
 			expectedStatusSize:       resource.MustParse("2G"),
 		},
 		{
-			name:                          "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, reize_op=infeasible",
-			pvc:                           getTestPVC(volumetesting.InfeasibleNodeExpansion, "2G", "1G", "2G", &nodeResizePending),
-			pv:                            getTestPV(volumetesting.InfeasibleNodeExpansion, "2G"),
-			recoverVolumeExpansionFailure: false,
-			expectError:                   true,
-			expectedResizeStatus:          nodeResizeFailed,
-			expectResizeCall:              true,
-			assumeResizeOpAsFinished:      true,
-			expectedReturnValue:           false,
-			expectFinalErrors:             true,
-			expectedStatusSize:            resource.MustParse("1G"),
+			name:                     "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, reize_op=failing",
+			pvc:                      getTestPVC(volumetesting.OtherFinalNodeExpansionError, "2G", "1G", "2G", &nodeResizePending),
+			pv:                       getTestPV(volumetesting.OtherFinalNodeExpansionError, "2G"),
+			expectError:              true,
+			expectedResizeStatus:     v1.PersistentVolumeClaimNodeResizeInProgress,
+			expectResizeCall:         true,
+			expectedReturnValue:      false,
+			assumeResizeOpAsFinished: true,
+			expectFinalErrors:        true,
+			expectedStatusSize:       resource.MustParse("1G"),
 		},
 		{
-			name:                          "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, reize_op=failing",
-			pvc:                           getTestPVC(volumetesting.OtherFinalNodeExpansionError, "2G", "1G", "2G", &nodeResizePending),
-			pv:                            getTestPV(volumetesting.OtherFinalNodeExpansionError, "2G"),
-			recoverVolumeExpansionFailure: true,
-			expectError:                   true,
-			expectedResizeStatus:          v1.PersistentVolumeClaimNodeResizeInProgress,
-			expectResizeCall:              true,
-			expectedReturnValue:           false,
-			assumeResizeOpAsFinished:      true,
-			expectFinalErrors:             true,
-			expectedStatusSize:            resource.MustParse("1G"),
-		},
-		{
-			name:                          "RWO volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
-			pvc:                           getTestPVC("test-vol0", "2G", "2G", "2G", nil),
-			pv:                            getTestPV("test-vol0", "2G"),
-			recoverVolumeExpansionFailure: false,
+			name: "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
+			pvc:  addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany),
+			pv:   getTestPV("test-vol0", "2G"),
 
+			expectedResizeStatus:     "",
+			expectResizeCall:         true,
+			assumeResizeOpAsFinished: true,
+			expectedReturnValue:      true,
+			expectFinalErrors:        false,
+			expectedStatusSize:       resource.MustParse("2G"),
+		},
+		{
+			name:                     "RWX pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize, reize_op=unsupported",
+			pvc:                      addAccessMode(getTestPVC(volumetesting.FailWithUnSupportedVolumeName, "2G", "2G", "2G", nil), v1.ReadWriteMany),
+			pv:                       getTestPV(volumetesting.FailWithUnSupportedVolumeName, "2G"),
+			expectError:              false,
 			expectedResizeStatus:     "",
 			expectResizeCall:         false,
 			assumeResizeOpAsFinished: true,
@@ -140,54 +128,14 @@ func TestNodeExpander(t *testing.T) {
 			expectedStatusSize:       resource.MustParse("2G"),
 		},
 		{
-			name:                          "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
-			pvc:                           addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany),
-			pv:                            getTestPV("test-vol0", "2G"),
-			recoverVolumeExpansionFailure: true,
-
-			expectedResizeStatus:     "",
-			expectResizeCall:         true,
-			assumeResizeOpAsFinished: true,
-			expectedReturnValue:      true,
-			expectFinalErrors:        false,
-			expectedStatusSize:       resource.MustParse("2G"),
-		},
-		{
-			name:                          "RWX pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize, reize_op=unsupported",
-			pvc:                           addAccessMode(getTestPVC(volumetesting.FailWithUnSupportedVolumeName, "2G", "2G", "2G", nil), v1.ReadWriteMany),
-			pv:                            getTestPV(volumetesting.FailWithUnSupportedVolumeName, "2G"),
-			recoverVolumeExpansionFailure: true,
-			expectError:                   false,
-			expectedResizeStatus:          "",
-			expectResizeCall:              false,
-			assumeResizeOpAsFinished:      true,
-			expectedReturnValue:           true,
-			expectFinalErrors:             false,
-			expectedStatusSize:            resource.MustParse("2G"),
-		},
-		{
-			name:                          "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize, node-expansion-not-required",
-			pvc:                           addAnnotation(addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany), volumetypes.NodeExpansionNotRequired, "true"),
-			pv:                            getTestPV("test-vol0", "2G"),
-			recoverVolumeExpansionFailure: true,
+			name: "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize, node-expansion-not-required",
+			pvc:  addAnnotation(addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany), volumetypes.NodeExpansionNotRequired, "true"),
+			pv:   getTestPV("test-vol0", "2G"),
 
 			expectedResizeStatus:     "",
 			expectedReturnValue:      true,
 			expectResizeCall:         false,
 			assumeResizeOpAsFinished: true,
-			expectFinalErrors:        false,
-			expectedStatusSize:       resource.MustParse("2G"),
-		},
-		{
-			name:                          "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, featuregate=disabled",
-			pvc:                           getTestPVC("test-vol0", "2G", "1G", "2G", &nodeResizePending),
-			pv:                            getTestPV("test-vol0", "2G"),
-			recoverVolumeExpansionFailure: false,
-
-			expectedResizeStatus:     "",
-			expectResizeCall:         true,
-			assumeResizeOpAsFinished: true,
-			expectedReturnValue:      true,
 			expectFinalErrors:        false,
 			expectedStatusSize:       resource.MustParse("2G"),
 		},
@@ -196,7 +144,6 @@ func TestNodeExpander(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.recoverVolumeExpansionFailure)
 			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 
 			pvc := test.pvc
