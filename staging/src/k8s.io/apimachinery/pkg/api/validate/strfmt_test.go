@@ -846,3 +846,189 @@ func TestResourceFullyQualifiedName(t *testing.T) {
 		})
 	}
 }
+
+func TestCIDRSloppy(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid: IPv4 subnet form",
+		input:    "192.168.1.0/24",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv4 interface-address form (host bits set)",
+		input:    "192.168.1.5/24",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv4 host (/32)",
+		input:    "10.0.0.1/32",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv4 default route",
+		input:    "0.0.0.0/0",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv4 with leading zeros (sloppy)",
+		input:    "010.002.003.000/24",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv6 subnet form",
+		input:    "2001:db8::/64",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv6 host (/128)",
+		input:    "2001:db8::1/128",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv6 interface-address form",
+		input:    "2001:db8::1/64",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv6 default route",
+		input:    "::/0",
+		wantErrs: nil,
+	}, {
+		name:  "invalid: empty",
+		input: "",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: IP address without prefix",
+		input: "192.168.1.1",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "192.168.1.1", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: prefix too long for IPv4",
+		input: "192.168.1.0/33",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "192.168.1.0/33", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: prefix too long for IPv6",
+		input: "2001:db8::/129",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "2001:db8::/129", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: octet out of range",
+		input: "192.168.300.0/24",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "192.168.300.0/24", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: not a CIDR",
+		input: "not-a-cidr",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "not-a-cidr", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: negative prefix length",
+		input: "192.168.1.0/-1",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "192.168.1.0/-1", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := CIDRSloppy(ctx, operation.Operation{}, fldPath, &value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
+func TestCIDRv4Sloppy(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid: IPv4 subnet form",
+		input:    "192.168.1.0/24",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv4 interface-address form",
+		input:    "10.0.0.1/8",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv4 with leading zeros (sloppy)",
+		input:    "010.000.000.000/8",
+		wantErrs: nil,
+	}, {
+		name:  "invalid: IPv6 CIDR",
+		input: "2001:db8::/64",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "2001:db8::/64", "must be a valid IPv4 CIDR value, (e.g. 10.9.8.0/24)").WithOrigin("format=k8s-cidrv4"),
+		},
+	}, {
+		name:  "invalid: not a CIDR",
+		input: "not-a-cidr",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "not-a-cidr", "must be a valid IPv4 CIDR value, (e.g. 10.9.8.0/24)").WithOrigin("format=k8s-cidrv4"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := CIDRv4Sloppy(ctx, operation.Operation{}, fldPath, &value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
+func TestCIDRv6Sloppy(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid: IPv6 subnet form",
+		input:    "2001:db8::/64",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv6 /128",
+		input:    "::1/128",
+		wantErrs: nil,
+	}, {
+		name:     "valid: IPv6 default route",
+		input:    "::/0",
+		wantErrs: nil,
+	}, {
+		name:  "invalid: IPv4 CIDR",
+		input: "192.168.1.0/24",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "192.168.1.0/24", "must be a valid IPv6 CIDR value, (e.g. 2001:db8::/64)").WithOrigin("format=k8s-cidrv6"),
+		},
+	}, {
+		name:  "invalid: not a CIDR",
+		input: "not-a-cidr",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "not-a-cidr", "must be a valid IPv6 CIDR value, (e.g. 2001:db8::/64)").WithOrigin("format=k8s-cidrv6"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := CIDRv6Sloppy(ctx, operation.Operation{}, fldPath, &value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
