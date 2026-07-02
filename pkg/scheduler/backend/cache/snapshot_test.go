@@ -27,9 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -805,6 +808,22 @@ func TestSnapshot_BackupRestore(t *testing.T) {
 			},
 		},
 		{
+			name: "Modify havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList (Remove)",
+			initialPods: []*v1.Pod{
+				podWithAntiAffinity,
+			},
+			initialNodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node-1", Labels: map[string]string{"key": "value"}}},
+			},
+			modifySnapshot: func(logger klog.Logger, s *Snapshot) {
+				node := s.nodeInfoMap["node-1"]
+				if err := node.RemovePod(logger, podWithAntiAffinity); err != nil {
+					t.Fatalf("Failed to remove pod: %v", err)
+				}
+				s.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = []fwk.NodeInfo{}
+			},
+		},
+		{
 			name: "Modify nodeInfoList directly",
 			initialNodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
@@ -820,10 +839,11 @@ func TestSnapshot_BackupRestore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, true)
 			s := NewSnapshot(tt.initialPods, tt.initialNodes)
 
 			// Store original state for deep verification
-			origNodeInfoMap, origNodeInfoList, origAffinityList, origAntiAffinityList := simplifySnapshot(s)
+			origNodeInfoMap, origNodeInfoList, origAffinityList, origAntiAffinityList, origNonHostScopedAntiAffinityList := simplifySnapshot(s)
 
 			restore, err := s.BackupSnapshot()
 			if err != nil {
@@ -833,7 +853,7 @@ func TestSnapshot_BackupRestore(t *testing.T) {
 			restore()
 
 			// Get state after for verification
-			postRestoreNodeInfoMap, postRestoreNodeInfoList, postRestoreAffinityList, postRestoreAntiAffinityList := simplifySnapshot(s)
+			postRestoreNodeInfoMap, postRestoreNodeInfoList, postRestoreAffinityList, postRestoreAntiAffinityList, postRestoreNonHostScopedAntiAffinityList := simplifySnapshot(s)
 
 			if cmp.Diff(origNodeInfoMap, postRestoreNodeInfoMap) != "" {
 				t.Errorf("nodeInfoMap mismatch: want %v, got %v", origNodeInfoMap, postRestoreNodeInfoMap)
@@ -847,16 +867,20 @@ func TestSnapshot_BackupRestore(t *testing.T) {
 			if cmp.Diff(origAntiAffinityList, postRestoreAntiAffinityList) != "" {
 				t.Errorf("havePodsWithRequiredAntiAffinityNodeInfoList mismatch: want %v, got %v", origAntiAffinityList, postRestoreAntiAffinityList)
 			}
+			if cmp.Diff(origNonHostScopedAntiAffinityList, postRestoreNonHostScopedAntiAffinityList) != "" {
+				t.Errorf("havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList mismatch: want %v, got %v", origNonHostScopedAntiAffinityList, postRestoreNonHostScopedAntiAffinityList)
+			}
 		})
 	}
 }
 
 // simplifySnapshot for comparison in unit tests
-func simplifySnapshot(s *Snapshot) (map[string][]string, []string, []string, []string) {
+func simplifySnapshot(s *Snapshot) (map[string][]string, []string, []string, []string, []string) {
 	nodeInfoMap := make(map[string][]string)
 	var nodeInfoList []string
 	var affinityList []string
 	var antiAffinityList []string
+	var nonHostScopedAntiAffinityList []string
 	for _, nodeInfo := range s.nodeInfoMap {
 		for _, p := range nodeInfo.GetPods() {
 			nodeInfoMap[nodeInfo.Node().Name] = append(nodeInfoMap[nodeInfo.Node().Name], p.GetPod().Name)
@@ -871,7 +895,10 @@ func simplifySnapshot(s *Snapshot) (map[string][]string, []string, []string, []s
 	for _, nodeInfo := range s.havePodsWithRequiredAntiAffinityNodeInfoList {
 		antiAffinityList = append(antiAffinityList, nodeInfo.Node().Name)
 	}
-	return nodeInfoMap, nodeInfoList, affinityList, antiAffinityList
+	for _, nodeInfo := range s.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList {
+		nonHostScopedAntiAffinityList = append(nonHostScopedAntiAffinityList, nodeInfo.Node().Name)
+	}
+	return nodeInfoMap, nodeInfoList, affinityList, antiAffinityList, nonHostScopedAntiAffinityList
 }
 
 func TestSnapshot_MultipleBackups(t *testing.T) {
@@ -996,6 +1023,51 @@ func TestSnapshot_CreateUsedPVCRefCounts(t *testing.T) {
 			actual := createUsedPVCRefCounts(tt.nodeInfoMap)
 			if diff := cmp.Diff(actual, tt.expectedPVCRefCount); diff != "" {
 				t.Errorf("Unexpected pvcRefCount (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSnapshot_HavePodsWithRequiredNonHostScopedAntiAffinityList(t *testing.T) {
+	podWithNonHostScopedAntiAffinity := st.MakePod().Name("pod-1").UID("pod-1").Namespace("ns").
+		PodAntiAffinityExists("label", "zone", st.PodAntiAffinityWithRequiredReq).Node("node-1").Obj()
+	podWithHostScopedAntiAffinity := st.MakePod().Name("pod-2").UID("pod-2").Namespace("ns").
+		PodAntiAffinityExists("label", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Node("node-1").Obj()
+	podWithoutAntiAffinity := st.MakePod().Name("pod-3").UID("pod-3").Namespace("ns").Node("node-2").Obj()
+
+	testCases := []struct {
+		name                                    string
+		pods                                    []*v1.Pod
+		nodes                                   []*v1.Node
+		interPodAffinityHostnameFastPathEnabled bool
+		expectedNodes                           int
+	}{
+		{
+			name:                                    "feature gate enabled, has non-host-scoped",
+			pods:                                    []*v1.Pod{podWithNonHostScopedAntiAffinity, podWithHostScopedAntiAffinity, podWithoutAntiAffinity},
+			nodes:                                   []*v1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}, {ObjectMeta: metav1.ObjectMeta{Name: "node-2"}}},
+			interPodAffinityHostnameFastPathEnabled: true,
+			expectedNodes:                           1,
+		},
+		{
+			name:                                    "feature gate disabled, has non-host-scoped",
+			pods:                                    []*v1.Pod{podWithNonHostScopedAntiAffinity, podWithHostScopedAntiAffinity, podWithoutAntiAffinity},
+			nodes:                                   []*v1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}, {ObjectMeta: metav1.ObjectMeta{Name: "node-2"}}},
+			interPodAffinityHostnameFastPathEnabled: false,
+			expectedNodes:                           0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, tc.interPodAffinityHostnameFastPathEnabled)
+			snapshot := NewSnapshot(tc.pods, tc.nodes)
+			antiAffinityList, err := snapshot.HavePodsWithRequiredNonHostScopedAntiAffinityList()
+			if err != nil {
+				t.Fatalf("HavePodsWithRequiredNonHostScopedAntiAffinityList failed: %v", err)
+			}
+			if len(antiAffinityList) != tc.expectedNodes {
+				t.Errorf("expected %d nodes, got %d", tc.expectedNodes, len(antiAffinityList))
 			}
 		})
 	}

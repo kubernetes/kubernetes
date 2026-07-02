@@ -3517,3 +3517,57 @@ func TestUpdateNodeAllocatableDRAClaimState(t *testing.T) {
 		})
 	}
 }
+
+func TestNodeInfoAddRemovePod_InterPodAffinityHostnameFastPath(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-1", Name: "pod-1"},
+		Spec: v1.PodSpec{
+			Affinity: &v1.Affinity{
+				PodAntiAffinity: &v1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{TopologyKey: "topology.kubernetes.io/zone"},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		featureGate   bool
+		expectedCount int
+	}{
+		{
+			name:          "feature gate enabled",
+			featureGate:   true,
+			expectedCount: 1,
+		},
+		{
+			name:          "feature gate disabled",
+			featureGate:   false,
+			expectedCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, tt.featureGate)
+
+			ni := NewNodeInfo()
+			ni.AddPod(pod)
+			if len(ni.PodsWithRequiredNonHostScopedAntiAffinity) != tt.expectedCount {
+				t.Errorf("expected %d, got %d", tt.expectedCount, len(ni.PodsWithRequiredNonHostScopedAntiAffinity))
+			}
+
+			// Also test RemovePod
+			logger, _ := ktesting.NewTestContext(t)
+			err := ni.RemovePod(logger, pod)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(ni.PodsWithRequiredNonHostScopedAntiAffinity) != 0 {
+				t.Errorf("expected 0 after RemovePod, got %d", len(ni.PodsWithRequiredNonHostScopedAntiAffinity))
+			}
+		})
+	}
+}

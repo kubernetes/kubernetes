@@ -53,6 +53,10 @@ type Snapshot struct {
 	// havePodsWithRequiredAntiAffinityNodeInfoList is the list of nodes with at least one pod declaring
 	// required anti-affinity terms.
 	havePodsWithRequiredAntiAffinityNodeInfoList []fwk.NodeInfo
+	// havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList is the list of nodes with at least one pod declaring
+	// required anti-affinity terms that are non-host-scoped.
+	// This list must be empty when the InterPodAffinityHostnameFastPath feature gate is disabled.
+	havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList []fwk.NodeInfo
 	// usedPVCRefCounts contains the number of nodes using each PVC across the cluster,
 	// keyed in the format "namespace/name".
 	usedPVCRefCounts map[string]int
@@ -94,6 +98,7 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	nodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithRequiredAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
+	havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	for _, v := range nodeInfoMap {
 		nodeInfoList = append(nodeInfoList, v)
 		if len(v.PodsWithAffinity) > 0 {
@@ -102,6 +107,9 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 		if len(v.PodsWithRequiredAntiAffinity) > 0 {
 			havePodsWithRequiredAntiAffinityNodeInfoList = append(havePodsWithRequiredAntiAffinityNodeInfoList, v)
 		}
+		if len(v.PodsWithRequiredNonHostScopedAntiAffinity) > 0 {
+			havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = append(havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList, v)
+		}
 	}
 
 	s := NewEmptySnapshot()
@@ -109,6 +117,7 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	s.nodeInfoList = nodeInfoList
 	s.havePodsWithAffinityNodeInfoList = havePodsWithAffinityNodeInfoList
 	s.havePodsWithRequiredAntiAffinityNodeInfoList = havePodsWithRequiredAntiAffinityNodeInfoList
+	s.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList
 	s.usedPVCRefCounts = createUsedPVCRefCounts(nodeInfoMap)
 	if s.genericWorkloadEnabled {
 		s.podGroupStates = createPodGroupStates(pods)
@@ -170,6 +179,7 @@ func (s *Snapshot) BackupSnapshot() (RestoreSnapshot, error) {
 	origNodeInfoList := s.nodeInfoList
 	origHavePodsWithAffinityNodeInfoList := s.havePodsWithAffinityNodeInfoList
 	origHavePodsWithRequiredAntiAffinityNodeInfoList := s.havePodsWithRequiredAntiAffinityNodeInfoList
+	origHavePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList := s.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList
 
 	clonedNodeInfoMap := make(map[string]*framework.NodeInfo, len(s.nodeInfoMap))
 	for k, v := range s.nodeInfoMap {
@@ -179,6 +189,7 @@ func (s *Snapshot) BackupSnapshot() (RestoreSnapshot, error) {
 	clonedNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
 	clonedHavePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
 	clonedHavePodsWithRequiredAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
+	clonedHavePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
 
 	for _, v := range s.nodeInfoList {
 		clonedNode := clonedNodeInfoMap[v.Node().Name]
@@ -189,6 +200,9 @@ func (s *Snapshot) BackupSnapshot() (RestoreSnapshot, error) {
 		if len(clonedNode.PodsWithRequiredAntiAffinity) > 0 {
 			clonedHavePodsWithRequiredAntiAffinityNodeInfoList = append(clonedHavePodsWithRequiredAntiAffinityNodeInfoList, clonedNode)
 		}
+		if len(clonedNode.PodsWithRequiredNonHostScopedAntiAffinity) > 0 {
+			clonedHavePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = append(clonedHavePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList, clonedNode)
+		}
 	}
 
 	s.hasBackup = true
@@ -196,6 +210,7 @@ func (s *Snapshot) BackupSnapshot() (RestoreSnapshot, error) {
 	s.nodeInfoList = clonedNodeInfoList
 	s.havePodsWithAffinityNodeInfoList = clonedHavePodsWithAffinityNodeInfoList
 	s.havePodsWithRequiredAntiAffinityNodeInfoList = clonedHavePodsWithRequiredAntiAffinityNodeInfoList
+	s.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = clonedHavePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList
 
 	return func() {
 		s.hasBackup = false
@@ -203,6 +218,7 @@ func (s *Snapshot) BackupSnapshot() (RestoreSnapshot, error) {
 		s.nodeInfoList = origNodeInfoList
 		s.havePodsWithAffinityNodeInfoList = origHavePodsWithAffinityNodeInfoList
 		s.havePodsWithRequiredAntiAffinityNodeInfoList = origHavePodsWithRequiredAntiAffinityNodeInfoList
+		s.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = origHavePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList
 	}, nil
 }
 
@@ -353,6 +369,13 @@ func (s *Snapshot) HavePodsWithAffinityList() ([]fwk.NodeInfo, error) {
 // required inter-pod anti-affinity
 func (s *Snapshot) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return s.havePodsWithRequiredAntiAffinityNodeInfoList, nil
+}
+
+// HavePodsWithRequiredNonHostScopedAntiAffinityList returns the list of nodes with at least one pod with
+// required inter-pod anti-affinity that is non-host-scoped.
+// It returns an empty list and no error if the InterPodAffinityHostnameFastPath feature gate is disabled.
+func (s *Snapshot) HavePodsWithRequiredNonHostScopedAntiAffinityList() ([]fwk.NodeInfo, error) {
+	return s.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList, nil
 }
 
 // Get returns the NodeInfo of the given node name.
