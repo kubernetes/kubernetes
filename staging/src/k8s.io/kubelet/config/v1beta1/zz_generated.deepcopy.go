@@ -575,6 +575,13 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.DefaultPodSysctls != nil {
+		in, out := &in.DefaultPodSysctls, &out.DefaultPodSysctls
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	in.Logging.DeepCopyInto(&out.Logging)
 	if in.EnableSystemLogHandler != nil {
 		in, out := &in.EnableSystemLogHandler, &out.EnableSystemLogHandler

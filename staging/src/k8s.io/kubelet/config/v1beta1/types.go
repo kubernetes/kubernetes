@@ -772,6 +772,9 @@ type KubeletConfiguration struct {
 	// Default: []
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// DefaultPodSysctls is a set of default sysctls that will be applied to all pods.
+	// +optional
+	DefaultPodSysctls map[string]string `json:"defaultPodSysctls,omitempty"`
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins.
 	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"

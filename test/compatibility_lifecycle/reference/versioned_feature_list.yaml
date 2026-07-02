@@ -389,6 +389,12 @@
     lockToDefault: true
     preRelease: Deprecated
     version: "1.37"
+- name: DefaultPodSysctls
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: DeploymentReplicaSetTerminatingReplicas
   versionedSpecs:
   - default: false

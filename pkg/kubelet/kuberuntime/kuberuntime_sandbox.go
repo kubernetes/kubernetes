@@ -22,11 +22,14 @@ import (
 	"net/url"
 	"runtime"
 	"sort"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -176,6 +179,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(ctx context.Co
 	}
 
 	sysctls := make(map[string]string)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DefaultPodSysctls) {
+		applyPodSysctls(sysctls, m.defaultPodSysctls, pod)
+	}
 	if pod.Spec.SecurityContext != nil {
 		for _, c := range pod.Spec.SecurityContext.Sysctls {
 			sysctls[c.Name] = c.Value
@@ -353,4 +359,48 @@ func (m *kubeGenericRuntimeManager) GetPortForward(ctx context.Context, podName,
 		return nil, err
 	}
 	return url.Parse(resp.Url)
+}
+
+var validSysctlMap = map[string]bool{
+	"kernel.msgmax":          true,
+	"kernel.msgmnb":          true,
+	"kernel.msgmni":          true,
+	"kernel.sem":             true,
+	"kernel.shmall":          true,
+	"kernel.shmmax":          true,
+	"kernel.shmmni":          true,
+	"kernel.shm_rmid_forced": true,
+}
+
+// From https://github.com/opencontainers/runc/blob/master/libcontainer/configs/validate/validator.go
+func applyPodSysctls(sysctls, podSysctls map[string]string, pod *v1.Pod) {
+	for k, v := range podSysctls {
+		if validSysctlMap[k] || strings.HasPrefix(k, "fs.mqueue.") {
+			if !pod.Spec.HostIPC {
+				// Set the IPC parameters unless the pod runs in the host IPC
+				// namespace.
+				sysctls[k] = v
+			}
+			continue
+		}
+		if strings.HasPrefix(k, "net.") {
+			if !pod.Spec.HostNetwork {
+				// Set the networking parameters unless the pod runs in the
+				// host network namespace.
+				sysctls[k] = v
+			}
+			continue
+		}
+		if !pod.Spec.HostNetwork {
+			switch k {
+			case "kernel.domainname":
+				// This is namespaced and there's no explicit OCI field for it.
+				sysctls[k] = v
+			case "kernel.hostname":
+				// This is namespaced but there's a conflicting (dedicated) OCI
+				// field for it.
+			}
+			continue
+		}
+	}
 }
