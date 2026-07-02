@@ -679,9 +679,13 @@ func (asw *actualStateOfWorld) addVolume(logger klog.Logger,
 
 	volumePlugin, err := asw.volumePluginMgr.FindPluginBySpec(volumeSpec)
 	if err != nil || volumePlugin == nil {
+		volumeSpecName := ""
+		if volumeSpec != nil {
+			volumeSpecName = volumeSpec.Name()
+		}
 		return fmt.Errorf(
 			"failed to get Plugin from volumeSpec for volume %q err=%v",
-			volumeSpec.Name(),
+			volumeSpecName,
 			err)
 	}
 
