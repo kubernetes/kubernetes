@@ -22,6 +22,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -120,11 +121,9 @@ func newVerifier(t *testing.T, h *signingHarness) *verify.Verifier {
 	return v
 }
 
-// admissionReviewBody builds a JSON AdmissionReview request body whose resource
-// belongs to apiGroup. It is the payload the wrapped handler expects to read.
-func admissionReviewBody(t *testing.T, apiGroup string) []byte {
-	t.Helper()
-	review := admissionv1.AdmissionReview{
+// admissionReview builds an AdmissionReview whose resource belongs to apiGroup.
+func admissionReview(apiGroup string) *admissionv1.AdmissionReview {
+	return &admissionv1.AdmissionReview{
 		TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
 		Request: &admissionv1.AdmissionRequest{
 			UID:      types.UID(reviewUID),
@@ -132,33 +131,44 @@ func admissionReviewBody(t *testing.T, apiGroup string) []byte {
 			Name:     "my-deploy",
 		},
 	}
-	body, err := json.Marshal(review)
+}
+
+// admissionReviewBody builds a JSON AdmissionReview request body whose resource
+// belongs to apiGroup. It is the payload the adapter decodes.
+func admissionReviewBody(t *testing.T, apiGroup string) []byte {
+	t.Helper()
+	body, err := json.Marshal(admissionReview(apiGroup))
 	if err != nil {
 		t.Fatalf("marshal AdmissionReview: %v", err)
 	}
 	return body
 }
 
-// spyHandler is the "real" admission webhook that the adapter wraps. It records
-// whether it was reached and the exact body it observed, then returns a canned
-// allow AdmissionReview so a successful round-trip is visible in the response.
+// spyHandler is the downstream admission webhook the adapter forwards to. It is
+// an admissionhttp.ReviewHandler: it receives the AdmissionReview the adapter
+// already decoded, records what it observed, and returns a canned allow
+// response. It also drains r.Body to prove the adapter consumed it once and did
+// not buffer-and-reset it for a second decode.
 type spyHandler struct {
-	mu       sync.Mutex
-	reached  bool
-	gotBody  []byte
-	respUID  types.UID
-	allowVal bool
+	mu        sync.Mutex
+	reached   bool
+	gotReview *admissionv1.AdmissionReview
+	leftover  []byte
+	respUID   types.UID
+	allowVal  bool
 }
 
 func newSpyHandler() *spyHandler {
 	return &spyHandler{respUID: types.UID(reviewUID), allowVal: true}
 }
 
-func (s *spyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	body, _ := io.ReadAll(r.Body)
+// serve matches admissionhttp.ReviewHandler.
+func (s *spyHandler) serve(w http.ResponseWriter, r *http.Request, review *admissionv1.AdmissionReview) {
+	leftover, _ := io.ReadAll(r.Body)
 	s.mu.Lock()
 	s.reached = true
-	s.gotBody = body
+	s.gotReview = review
+	s.leftover = leftover
 	s.mu.Unlock()
 
 	resp := admissionv1.AdmissionReview{
@@ -176,10 +186,16 @@ func (s *spyHandler) wasReached() bool {
 	return s.reached
 }
 
-func (s *spyHandler) observedBody() []byte {
+func (s *spyHandler) review() *admissionv1.AdmissionReview {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.gotBody
+	return s.gotReview
+}
+
+func (s *spyHandler) leftoverBody() []byte {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.leftover
 }
 
 // newRequest builds a POST carrying the AdmissionReview body and, when token is
@@ -195,24 +211,24 @@ func newRequest(t *testing.T, body []byte, token string) *http.Request {
 }
 
 // TestWithTokenVerification_EndToEnd exercises the full offline flow: a real
-// signed token, a StaticKeySet-backed verifier, the adapter, and a spy "real"
-// handler standing in for the webhook. Each case asserts the HTTP status, that
-// next was (or was not) reached, and that no response leaks claim identifiers.
+// signed token, a StaticKeySet-backed verifier, the enforce-only adapter, and a
+// spy downstream ReviewHandler. Each case asserts the HTTP status, whether the
+// downstream was reached, the observed reason string, and that no response leaks
+// claim identifiers. There is no permissive mode: every failure is a uniform
+// 401 and the downstream is never reached.
 func TestWithTokenVerification_EndToEnd(t *testing.T) {
 	tests := []struct {
 		name string
-		// permissive selects permissive mode; false means enforce (default).
-		permissive bool
-		// token builds the presented token from the harness; "" omits the header.
+		// token builds the presented token from the harness; nil omits the header.
 		token func(t *testing.T, h *signingHarness) string
 		// reviewGroup is the API group of the AdmissionReview resource.
 		reviewGroup string
 		// wantStatus is the expected HTTP status code.
 		wantStatus int
-		// wantNextReached asserts whether the wrapped handler ran.
+		// wantNextReached asserts whether the downstream handler ran.
 		wantNextReached bool
-		// wantHookErr asserts whether the result hook observed a failure.
-		wantHookErr bool
+		// wantReason, when non-empty, is a substring the observed deny reason must contain.
+		wantReason string
 	}{
 		{
 			name:            "valid token, group matches -> next reached, 200 allow",
@@ -220,72 +236,49 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 			reviewGroup:     testGroup,
 			wantStatus:      http.StatusOK,
 			wantNextReached: true,
-			wantHookErr:     false,
 		},
 		{
-			name:            "missing Authorization header, enforce -> 401, next not reached",
+			name:            "missing Authorization header -> 401, next not reached",
 			token:           nil,
 			reviewGroup:     testGroup,
 			wantStatus:      http.StatusUnauthorized,
 			wantNextReached: false,
-			wantHookErr:     true,
+			wantReason:      "bearer",
 		},
 		{
-			name:            "missing Authorization header, permissive -> next reached",
-			permissive:      true,
-			token:           nil,
-			reviewGroup:     testGroup,
-			wantStatus:      http.StatusOK,
-			wantNextReached: true,
-			wantHookErr:     true,
-		},
-		{
-			name: "expired token, enforce -> 403, next not reached",
+			name: "expired token -> 401, next not reached",
 			token: func(t *testing.T, h *signingHarness) string {
 				c := baseClaims()
 				c["exp"] = time.Now().Add(-1 * time.Minute).Unix()
 				return h.mint(t, c)
 			},
 			reviewGroup:     testGroup,
-			wantStatus:      http.StatusForbidden,
+			wantStatus:      http.StatusUnauthorized,
 			wantNextReached: false,
-			wantHookErr:     true,
+			wantReason:      "expired",
 		},
 		{
-			name:       "expired token, permissive -> next reached, hook observes failure",
-			permissive: true,
-			token: func(t *testing.T, h *signingHarness) string {
-				c := baseClaims()
-				c["exp"] = time.Now().Add(-1 * time.Minute).Unix()
-				return h.mint(t, c)
-			},
-			reviewGroup:     testGroup,
-			wantStatus:      http.StatusOK,
-			wantNextReached: true,
-			wantHookErr:     true,
-		},
-		{
-			name: "wrong audience, enforce -> 403, next not reached",
+			name: "wrong audience -> 401, next not reached",
 			token: func(t *testing.T, h *signingHarness) string {
 				c := baseClaims()
 				c["aud"] = []string{"someone.else.example.com"}
 				return h.mint(t, c)
 			},
 			reviewGroup:     testGroup,
-			wantStatus:      http.StatusForbidden,
+			wantStatus:      http.StatusUnauthorized,
 			wantNextReached: false,
-			wantHookErr:     true,
+			wantReason:      "audience",
 		},
 		{
-			name: "allowedAPIGroup mismatch vs review group, enforce -> 403",
+			name: "allowedAPIGroup mismatch vs review group -> 401, next not reached",
 			token: func(t *testing.T, h *signingHarness) string {
 				// Token authorizes testGroup, but the review is for another group.
 				return h.mint(t, baseClaims())
 			},
 			reviewGroup:     "batch",
-			wantStatus:      http.StatusForbidden,
+			wantStatus:      http.StatusUnauthorized,
 			wantNextReached: false,
-			wantHookErr:     true,
+			wantReason:      "authorize",
 		},
 		{
 			name: "wildcard allowedAPIGroup -> allowed for any review group",
@@ -300,7 +293,6 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 			reviewGroup:     "any.group.example.com",
 			wantStatus:      http.StatusOK,
 			wantNextReached: true,
-			wantHookErr:     false,
 		},
 	}
 
@@ -312,21 +304,16 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 
 			var (
 				hookCalled bool
-				hookErr    error
+				hookRes    *verify.Result
+				hookReason string
 			)
-			opts := []admissionhttp.Option{
-				admissionhttp.WithResultHook(func(_ *verify.Result, err error) {
+			adapter := admissionhttp.WithTokenVerification(v, spy.serve,
+				admissionhttp.WithObserver(func(res *verify.Result, reason string) {
 					hookCalled = true
-					hookErr = err
+					hookRes = res
+					hookReason = reason
 				}),
-			}
-			if tc.permissive {
-				opts = append(opts, admissionhttp.WithPermissiveMode())
-			} else {
-				opts = append(opts, admissionhttp.WithEnforceMode())
-			}
-
-			adapter := admissionhttp.WithTokenVerification(v, spy, opts...)
+			)
 
 			var token string
 			if tc.token != nil {
@@ -345,13 +332,24 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 				t.Errorf("next reached = %v, want %v", got, tc.wantNextReached)
 			}
 			if !hookCalled {
-				t.Error("result hook was not called")
+				t.Error("observer was not called")
 			}
-			if tc.wantHookErr && hookErr == nil {
-				t.Error("expected result hook to observe an error, got nil")
-			}
-			if !tc.wantHookErr && hookErr != nil {
-				t.Errorf("unexpected result hook error: %v", hookErr)
+			if tc.wantNextReached {
+				// Success: observer sees the identity and no reason.
+				if hookRes == nil {
+					t.Error("expected observer to see a verified result, got nil")
+				}
+				if hookReason != "" {
+					t.Errorf("expected empty reason on success, got %q", hookReason)
+				}
+			} else {
+				// Denial: observer sees no result and the expected reason.
+				if hookRes != nil {
+					t.Errorf("expected nil result on denial, got %+v", hookRes)
+				}
+				if !strings.Contains(hookReason, tc.wantReason) {
+					t.Errorf("deny reason = %q, want it to contain %q", hookReason, tc.wantReason)
+				}
 			}
 
 			// No response must leak webhook identifiers regardless of outcome.
@@ -360,14 +358,16 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 	}
 }
 
-// TestWithTokenVerification_BodyReadableByNext proves the adapter's body reset:
-// after the adapter buffers and decodes the AdmissionReview, the wrapped handler
-// must still observe the full, byte-identical request body.
-func TestWithTokenVerification_BodyReadableByNext(t *testing.T) {
+// TestWithTokenVerification_DecodesOnce proves the decode-once design: the
+// adapter decodes the AdmissionReview a single time and hands the decoded object
+// to the downstream ReviewHandler, and it does NOT buffer-and-reset r.Body — so
+// the downstream both receives the correct decoded review and finds the body
+// already fully consumed (nothing left for a second decode).
+func TestWithTokenVerification_DecodesOnce(t *testing.T) {
 	h := newSigningHarness(t)
 	v := newVerifier(t, h)
 	spy := newSpyHandler()
-	adapter := admissionhttp.WithTokenVerification(v, spy)
+	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
 
 	body := admissionReviewBody(t, testGroup)
 	token := h.mint(t, baseClaims())
@@ -377,10 +377,20 @@ func TestWithTokenVerification_BodyReadableByNext(t *testing.T) {
 	adapter.ServeHTTP(rec, req)
 
 	if !spy.wasReached() {
-		t.Fatal("wrapped handler was not reached on a valid token")
+		t.Fatal("downstream handler was not reached on a valid token")
 	}
-	if got := spy.observedBody(); !bytes.Equal(got, body) {
-		t.Errorf("wrapped handler saw body %q, want %q", string(got), string(body))
+	got := spy.review()
+	if got == nil || got.Request == nil {
+		t.Fatal("downstream did not receive a decoded AdmissionReview")
+	}
+	if got.Request.Resource.Group != testGroup {
+		t.Errorf("decoded review group = %q, want %q", got.Request.Resource.Group, testGroup)
+	}
+	if string(got.Request.UID) != reviewUID {
+		t.Errorf("decoded review UID = %q, want %q", got.Request.UID, reviewUID)
+	}
+	if left := spy.leftoverBody(); len(left) != 0 {
+		t.Errorf("expected r.Body fully consumed by a single decode, got %d leftover bytes: %q", len(left), string(left))
 	}
 }
 
@@ -391,7 +401,7 @@ func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
 	h := newSigningHarness(t)
 	v := newVerifier(t, h)
 	spy := newSpyHandler()
-	srv := httptest.NewServer(admissionhttp.WithTokenVerification(v, spy))
+	srv := httptest.NewServer(admissionhttp.WithTokenVerification(v, spy.serve))
 	defer srv.Close()
 
 	body := admissionReviewBody(t, testGroup)
@@ -414,7 +424,7 @@ func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
 	if !spy.wasReached() {
-		t.Error("wrapped handler was not reached over the HTTP server")
+		t.Error("downstream handler was not reached over the HTTP server")
 	}
 
 	respBody, _ := io.ReadAll(resp.Body)
@@ -428,8 +438,9 @@ func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
 }
 
 // coreGroupClaims returns an otherwise-valid token claim set authorized for the
-// core API group (""). Before the fail-closed fix, an undecodable AdmissionReview
-// body defaulted the review group to "", which such a token would match.
+// core API group (""). Before the fail-closed behavior, an undecodable
+// AdmissionReview body defaulted the review group to "", which such a token
+// would match.
 func coreGroupClaims() map[string]interface{} {
 	c := baseClaims()
 	k8s := c["kubernetes.io"].(map[string]interface{})
@@ -440,55 +451,41 @@ func coreGroupClaims() map[string]interface{} {
 }
 
 // TestWithTokenVerification_UndecodableBodyFailsClosed proves the adapter fails
-// closed: an undecodable AdmissionReview body no longer defaults the review
-// group to the core group (""). In enforce mode the request is denied and the
-// wrapped handler is never reached, even when the presented token is otherwise
-// valid and authorized for the core group.
+// closed: an undecodable AdmissionReview body does not default the review group
+// to the core group (""). The request is denied with a generic 401 and the
+// downstream handler is never reached, even when the presented token is
+// otherwise valid and authorized for the core group.
 func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
 	h := newSigningHarness(t)
 	token := h.mint(t, coreGroupClaims())
 	undecodable := []byte("{ this is not a valid AdmissionReview")
 
-	t.Run("enforce -> denied, next not reached", func(t *testing.T) {
-		v := newVerifier(t, h)
-		spy := newSpyHandler()
-		adapter := admissionhttp.WithTokenVerification(v, spy, admissionhttp.WithEnforceMode())
+	v := newVerifier(t, h)
+	spy := newSpyHandler()
+	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
 
-		rec := httptest.NewRecorder()
-		adapter.ServeHTTP(rec, newRequest(t, undecodable, token))
+	rec := httptest.NewRecorder()
+	adapter.ServeHTTP(rec, newRequest(t, undecodable, token))
 
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-		}
-		if spy.wasReached() {
-			t.Error("wrapped handler was reached on an undecodable body")
-		}
-		assertNoLeak(t, rec.Body.String())
-	})
-
-	t.Run("permissive -> next reached", func(t *testing.T) {
-		v := newVerifier(t, h)
-		spy := newSpyHandler()
-		adapter := admissionhttp.WithTokenVerification(v, spy, admissionhttp.WithPermissiveMode())
-
-		rec := httptest.NewRecorder()
-		adapter.ServeHTTP(rec, newRequest(t, undecodable, token))
-
-		if !spy.wasReached() {
-			t.Error("permissive mode should still reach the wrapped handler")
-		}
-	})
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	if spy.wasReached() {
+		t.Error("downstream handler was reached on an undecodable body")
+	}
+	assertNoLeak(t, rec.Body.String())
 }
 
-// TestWithTokenVerification_OverLimitBodyRejected proves the adapter rejects a
-// body larger than the configured limit with a generic 400 instead of
-// forwarding truncated bytes to the wrapped handler.
+// TestWithTokenVerification_OverLimitBodyRejected proves the adapter keeps the
+// over-limit body guard: a body larger than the configured limit is rejected
+// with a generic 401 instead of decoding truncated bytes or reaching the
+// downstream handler.
 func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 	h := newSigningHarness(t)
 	v := newVerifier(t, h)
 	spy := newSpyHandler()
 	// A tiny limit guarantees the AdmissionReview body exceeds it.
-	adapter := admissionhttp.WithTokenVerification(v, spy, admissionhttp.WithMaxBodyBytes(16))
+	adapter := admissionhttp.WithTokenVerification(v, spy.serve, admissionhttp.WithMaxBodyBytes(16))
 
 	body := admissionReviewBody(t, testGroup)
 	if int64(len(body)) <= 16 {
@@ -499,13 +496,49 @@ func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 	rec := httptest.NewRecorder()
 	adapter.ServeHTTP(rec, newRequest(t, body, token))
 
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
 	}
 	if spy.wasReached() {
-		t.Error("wrapped handler was reached with an over-limit body")
+		t.Error("downstream handler was reached with an over-limit body")
 	}
 	assertNoLeak(t, rec.Body.String())
+}
+
+// TestVerifyAdmissionReview exercises the primary decoded-input entry point that
+// a caller (for example controller-runtime) uses after decoding the body once.
+// It proves a correct token verifies, an unauthorized group produces the single
+// generic failure with a useful log reason, and a review with no Request fails
+// closed.
+func TestVerifyAdmissionReview(t *testing.T) {
+	h := newSigningHarness(t)
+	v := newVerifier(t, h)
+
+	t.Run("valid token and matching group -> nil", func(t *testing.T) {
+		token := h.mint(t, baseClaims())
+		if err := admissionhttp.VerifyAdmissionReview(context.Background(), v, admissionReview(testGroup), token); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("group not authorized -> generic failure", func(t *testing.T) {
+		token := h.mint(t, baseClaims())
+		err := admissionhttp.VerifyAdmissionReview(context.Background(), v, admissionReview("batch"), token)
+		if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
+			t.Fatalf("want generic verification failure, got %v", err)
+		}
+		if !strings.Contains(verify.Reason(err), "authorize") {
+			t.Errorf("reason = %q, want it to mention authorization", verify.Reason(err))
+		}
+	})
+
+	t.Run("nil request -> fails closed", func(t *testing.T) {
+		token := h.mint(t, baseClaims())
+		err := admissionhttp.VerifyAdmissionReview(context.Background(), v, &admissionv1.AdmissionReview{}, token)
+		if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
+			t.Fatalf("want generic verification failure for a review with no Request, got %v", err)
+		}
+	})
 }
 
 // assertNoLeak fails if the response body contains any webhook identifier the
