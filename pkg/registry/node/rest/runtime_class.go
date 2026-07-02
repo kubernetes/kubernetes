@@ -18,12 +18,16 @@ package rest
 
 import (
 	nodev1 "k8s.io/api/node/v1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodeinternal "k8s.io/kubernetes/pkg/apis/node"
+	"k8s.io/kubernetes/pkg/features"
+	podcheckpointstorage "k8s.io/kubernetes/pkg/registry/node/podcheckpoint/storage"
 	runtimeclassstorage "k8s.io/kubernetes/pkg/registry/node/runtimeclass/storage"
 )
 
@@ -39,8 +43,34 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[nodev1.SchemeGroupVersion.Version] = storageMap
 	}
+	if storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[nodev1alpha1.SchemeGroupVersion.Version] = storageMap
+	}
 
 	return apiGroupInfo, nil
+}
+
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+
+	// PodCheckpoint is served only when its feature gate is enabled, in
+	// addition to being enabled through --runtime-config.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		return storage, nil
+	}
+
+	if resource := "podcheckpoints"; apiResourceConfigSource.ResourceEnabled(nodev1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		podCheckpointStorage, podCheckpointStatusStorage, err := podcheckpointstorage.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = podCheckpointStorage
+		storage[resource+"/status"] = podCheckpointStatusStorage
+	}
+
+	return storage, nil
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
