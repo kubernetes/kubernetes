@@ -275,7 +275,9 @@ type PolicyRule struct {
 type GroupResources struct {
 	// Group is the name of the API group that contains the resources.
 	// The empty string represents the core API group.
-	// `*` matches all groups
+	// `*` matches all groups.
+	// A leading `*.` matches all subgroups, e.g. `*.example.com` matches
+	// `foo.example.com` and `bar.foo.example.com`, but not `example.com` itself.
 	// +optional
 	Group string
 	// Resources is a list of resources this rule applies to.

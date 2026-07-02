@@ -64042,7 +64042,7 @@ func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) commo
 				Properties: map[string]spec.Schema{
 					"group": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Group is the name of the API group that contains the resources. The empty string represents the core API group. `*` matches all groups",
+							Description: "Group is the name of the API group that contains the resources. The empty string represents the core API group. `*` matches all groups. A leading `*.` matches all subgroups, e.g. `*.example.com` matches `foo.example.com` and `bar.foo.example.com`, but not `example.com` itself.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
