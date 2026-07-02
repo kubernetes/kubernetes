@@ -788,6 +788,20 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 		},
 		{
 			Group: metav1.APIGroup{
+				Name: "apiextensions.k8s.io",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1": {
+					{Name: "customresourcedefinitions", Namespaced: false, Kind: "CustomResourceDefinition"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
 				Name: "company.com",
 				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1"},
