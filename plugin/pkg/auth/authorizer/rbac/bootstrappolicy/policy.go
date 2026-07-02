@@ -200,7 +200,13 @@ func editRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule(Write...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaimtemplates").RuleOrDie(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
-		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(nodeGroup).Resources("podcheckpoints").RuleOrDie())
+		rules = append(rules,
+			rbacv1helpers.NewRule(Write...).Groups(nodeGroup).Resources("podcheckpoints").RuleOrDie(),
+			// The "restore" verb gates creating a Pod with spec.restoreFrom.name set
+			// (consuming a checkpoint's captured state), separately from reading the
+			// PodCheckpoint object. Enforced by Pod REST storage.
+			rbacv1helpers.NewRule("restore").Groups(nodeGroup).Resources("podcheckpoints").RuleOrDie(),
+		)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie())

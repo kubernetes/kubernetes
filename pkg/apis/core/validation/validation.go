@@ -4711,6 +4711,7 @@ func validatePodMetadataAndSpec(pod, oldPod *core.Pod, opts PodValidationOptions
 	specPath := field.NewPath("spec")
 
 	allErrs := validatePodCheckpointingUpdate(pod, oldPod)
+	allErrs = append(allErrs, validatePodRestoreUpdate(pod, oldPod)...)
 	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, metaPath)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, metaPath.Child("annotations"), opts)...)
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, specPath, opts)...)

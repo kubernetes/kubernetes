@@ -2233,6 +2233,87 @@ func TestCheckpointingUpdatesPreserveWorkload(t *testing.T) {
 	}
 }
 
+func TestRestoreUpdatesPreserveWorkload(t *testing.T) {
+	changeImage := func(p *api.Pod) { p.Spec.Containers[0].Image = "changed-private-image" }
+	resizeCPU := func(p *api.Pod) {
+		p.Spec.Containers[0].Resources.Requests = api.ResourceList{api.ResourceCPU: resource.MustParse("2")}
+	}
+	for _, tc := range []struct {
+		name         string
+		subresource  string
+		mutate       func(*api.Pod)
+		restored     bool
+		gateDisabled bool
+		wantMismatch bool
+	}{
+		{name: "image before restore", mutate: changeImage, wantMismatch: true},
+		{name: "resize before restore", subresource: "resize", mutate: resizeCPU, wantMismatch: true},
+		{name: "ephemeral container before restore", subresource: "ephemeralcontainers", mutate: func(p *api.Pod) {
+			p.Spec.EphemeralContainers = []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{
+				Name: "debug", Image: "changed-private-image", ImagePullPolicy: api.PullIfNotPresent, TerminationMessagePolicy: api.TerminationMessageReadFile,
+			}}}
+		}, wantMismatch: true},
+		{name: "placement before restore", mutate: func(p *api.Pod) { p.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": "other"} }, wantMismatch: true},
+		{name: "arguments before restore", mutate: func(p *api.Pod) { p.Spec.Containers[0].Args[0] = "changed-private-argument" }, wantMismatch: true},
+		{name: "environment before restore", mutate: func(p *api.Pod) { p.Spec.Containers[0].Env[0].Value = "changed-private-environment" }, wantMismatch: true},
+		{name: "toleration before restore", mutate: func(p *api.Pod) { p.Spec.Tolerations[0].Value = "changed-private-toleration" }, wantMismatch: true},
+		{name: "multiple changes before restore", mutate: func(p *api.Pod) {
+			p.Spec.Containers[0].Image = "changed-private-image"
+			p.Spec.Containers[0].Env[0].Value = "changed-private-environment"
+		}, wantMismatch: true},
+		{name: "status cannot bypass pending restore", mutate: func(p *api.Pod) {
+			p.Spec.Containers[0].Image = "changed-private-image"
+			p.Status.Conditions = []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionTrue}}
+		}, wantMismatch: true},
+		{name: "remove scheduling gate", mutate: func(p *api.Pod) { p.Spec.SchedulingGates = nil }},
+		{name: "metadata update", mutate: func(p *api.Pod) { p.Labels = map[string]string{"app": "test"} }},
+		{name: "status update before restore", subresource: "status", mutate: changeImage},
+		{name: "image after restore", restored: true, mutate: changeImage},
+		{name: "resize after restore", restored: true, subresource: "resize", mutate: resizeCPU},
+		{name: "feature disabled", gateDisabled: true, mutate: changeImage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, !tc.gateDisabled)
+			oldPod := podtest.MakePod("restored",
+				podtest.SetResourceVersion("1"),
+				podtest.SetRestoreFrom("cp-1"),
+				podtest.SetContainers(podtest.MakeContainer("app",
+					podtest.SetContainerImage("captured-private-image"),
+					podtest.SetContainerResources(podtest.MakeResourceRequirements(map[string]string{"cpu": "1"}, nil)),
+				)),
+				podtest.SetTolerations(api.Toleration{Key: "private", Value: "captured-private-toleration"}),
+				podtest.SetSchedulingGates(api.PodSchedulingGate{Name: "example.com/ready"}),
+			)
+			oldPod.Spec.Containers[0].Args = []string{"captured-private-argument"}
+			oldPod.Spec.Containers[0].Env = []api.EnvVar{{Name: "PRIVATE_VALUE", Value: "captured-private-environment"}}
+			if tc.restored {
+				oldPod.Status.Conditions = []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionTrue}}
+			}
+			newPod := oldPod.DeepCopy()
+			tc.mutate(newPod)
+
+			errs := validatePodUpdate(tc.subresource, newPod, oldPod)
+			if !tc.wantMismatch {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected errors: %v", errs)
+				}
+				return
+			}
+			freezeErrs := workloadFreezeErrors(errs, "until restore succeeds")
+			if len(freezeErrs) != 1 {
+				t.Fatalf("want one restore error, got %v", errs)
+			}
+			err := freezeErrs[0]
+			if err.Type != field.ErrorTypeForbidden || err.Field != "spec" {
+				t.Errorf("want a forbidden spec error, got %v", err)
+			}
+			if strings.Contains(err.Error(), "captured-private-") || strings.Contains(err.Error(), "changed-private-") {
+				t.Errorf("error exposes a field value: %v", err)
+			}
+		})
+	}
+}
+
 func TestDropNonEphemeralContainerUpdates(t *testing.T) {
 	tests := []struct {
 		name                    string
@@ -6368,4 +6449,29 @@ func TestPodVolumeStatusesOwnership(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestRestoreCheckpointUIDPreservedOnUpdate(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		for _, tc := range []struct{ name, checkpoint, uid, want string }{
+			{name: "omitted UID", checkpoint: "checkpoint", want: "pinned"},
+			{name: "explicit UID", checkpoint: "checkpoint", uid: "pinned", want: "pinned"},
+			{name: "replacement UID is not defaulted", checkpoint: "checkpoint", uid: "replacement", want: "replacement"},
+			{name: "replacement name is not resolved", checkpoint: "replacement", want: ""},
+		} {
+			t.Run(fmt.Sprintf("gate-%t/%s", enabled, tc.name), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+				oldPod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns", Generation: 2}, Spec: api.PodSpec{RestoreFrom: &api.CheckpointReference{Name: "checkpoint", UID: "pinned"}}}
+				pod := oldPod.DeepCopy()
+				pod.Spec.RestoreFrom = &api.CheckpointReference{Name: tc.checkpoint, UID: types.UID(tc.uid)}
+				Strategy.PrepareForUpdate(context.Background(), pod, oldPod)
+				if pod.Spec.RestoreFrom.UID != types.UID(tc.want) {
+					t.Fatalf("UID %q, want %q", pod.Spec.RestoreFrom.UID, tc.want)
+				}
+				if tc.want == "pinned" && pod.Generation != oldPod.Generation {
+					t.Fatalf("identity defaulting changed generation: %d", pod.Generation)
+				}
+			})
+		}
+	}
 }
