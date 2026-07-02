@@ -17,7 +17,9 @@ limitations under the License.
 package v1_test
 
 import (
+	_ "embed"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/url"
 	"reflect"
@@ -33,19 +35,27 @@ import (
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	// ensure types are installed corereplicationcontroller<->replicaset conversions
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 )
+
+//go:embed testdata/exemplar_pod.yaml
+var benchmarkExemplarPodYAML []byte
+
+const benchmarkSeed = 100
 
 func TestPodLogOptions(t *testing.T) {
 	sinceSeconds := int64(1)
@@ -231,6 +241,108 @@ func TestPodSpecHostNamespaceSecurityContextRoundTrip(t *testing.T) {
 			}
 		})
 	}
+}
+
+func BenchmarkPodListConversion(b *testing.B) {
+	versionedPod := loadExemplarPod()
+
+	for _, tc := range []struct {
+		name      string
+		benchmark func(*testing.B, int, *v1.Pod)
+	}{
+		{name: "core-to-v1", benchmark: benchmarkConvertCorePodListToV1},
+		{name: "v1-to-core", benchmark: benchmarkConvertV1PodListToCore},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			for _, size := range []int{1, 100, 1000, 5000, 10000} {
+				b.Run(fmt.Sprintf("pods=%d", size), func(b *testing.B) {
+					tc.benchmark(b, size, versionedPod)
+				})
+			}
+		})
+	}
+}
+
+func benchmarkConvertCorePodListToV1(b *testing.B, size int, exemplar *v1.Pod) {
+	in := benchmarkCorePodList(b, benchmarkVersionedPodList(exemplar, size))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			out := &v1.PodList{}
+			if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+				panic(fmt.Sprintf("unexpected conversion error: %v", err))
+			}
+			if len(out.Items) != size {
+				panic(fmt.Sprintf("unexpected converted item count: got %d, want %d", len(out.Items), size))
+			}
+		}
+	})
+}
+
+func benchmarkConvertV1PodListToCore(b *testing.B, size int, exemplar *v1.Pod) {
+	in := benchmarkVersionedPodList(exemplar, size)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			out := &core.PodList{}
+			if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+				panic(fmt.Sprintf("unexpected conversion error: %v", err))
+			}
+			if len(out.Items) != size {
+				panic(fmt.Sprintf("unexpected converted item count: got %d, want %d", len(out.Items), size))
+			}
+		}
+	})
+}
+
+func benchmarkCorePodList(b *testing.B, in *v1.PodList) *core.PodList {
+	b.Helper()
+	out := &core.PodList{}
+	if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+		b.Fatalf("unexpected setup conversion error: %v", err)
+	}
+	return out
+}
+
+func benchmarkVersionedPodList(exemplar *v1.Pod, size int) *v1.PodList {
+	utilrand.Seed(benchmarkSeed)
+	nodeNames := make([]string, 25)
+	for i := range nodeNames {
+		nodeNames[i] = utilrand.String(10)
+	}
+	items := make([]v1.Pod, size)
+	for i := range items {
+		pod := exemplar.DeepCopy()
+		randomizePod(pod, utilrand.String(10), nodeNames[utilrand.Intn(len(nodeNames))])
+		items[i] = *pod
+	}
+	return &v1.PodList{
+		ListMeta: metav1.ListMeta{ResourceVersion: "1000"},
+		Items:    items,
+	}
+}
+
+func randomizePod(pod *v1.Pod, ns string, nodeName string) {
+	pod.Namespace = ns
+	pod.Name = pod.GenerateName + utilrand.String(10)
+	pod.UID = types.UID(utilrand.String(36))
+	pod.ResourceVersion = ""
+	pod.Spec.NodeName = nodeName
+}
+
+func loadExemplarPod() *v1.Pod {
+	if len(benchmarkExemplarPodYAML) == 0 {
+		panic("exemplar pod empty")
+	}
+	pod := &v1.Pod{}
+	if err := yaml.Unmarshal(benchmarkExemplarPodYAML, pod); err != nil {
+		panic(fmt.Sprintf("decode exemplar pod: %v", err))
+	}
+	return pod
 }
 
 func TestResourceListConversion(t *testing.T) {
