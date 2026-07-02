@@ -261,7 +261,37 @@ func Validate_IngressClassSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1beta1.IngressClassSpec) (errs field.ErrorList) {
 
-	// field networkingv1beta1.IngressClassSpec.Controller has no validation
+	{ // field networkingv1beta1.IngressClassSpec.Controller
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *networkingv1beta1.IngressClassSpec) *string {
+				return &oldObj.Controller
+			})
+		errs = append(errs, fn(fldPath.Child("controller"), &obj.Controller, oldVal, oldObj != nil)...)
+	}
 
 	{ // field networkingv1beta1.IngressClassSpec.Parameters
 		fn := func(
