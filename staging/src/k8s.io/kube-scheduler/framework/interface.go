@@ -829,6 +829,9 @@ type Handle interface {
 	// Instead, they should use the resources getting from Informer created from SharedInformerFactory().
 	SnapshotSharedLister() SharedLister
 
+	// MutableSnapshotLister returns a lister that supports mutating the snapshot.
+	MutableSnapshotLister() MutableSnapshotLister
+
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
 	IterateOverWaitingPods(callback func(WaitingPod))
 
