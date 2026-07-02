@@ -24,9 +24,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
 	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -399,5 +402,60 @@ func tweakPodSpec(podTweaks ...podtest.Tweak) func(*api.ReplicationController) {
 			tweak(pod)
 		}
 		rc.Spec.Template.Spec = pod.Spec
+	}
+}
+
+// TestDeclarativeValidateRestoreFrom covers the declarative rules on the pod
+// template's spec.restoreFrom (KEP-5823): the referenced PodCheckpoint name is
+// required and must be a valid long name. Pod templates may not set
+// restoreFrom, so every case also reports that. The feature gate is enabled
+// because a present restoreFrom is only validated with the gate on (the field
+// is dropped in PrepareForCreate otherwise).
+func TestDeclarativeValidateRestoreFrom(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIPrefix:         "api",
+			APIGroup:          "",
+			APIVersion:        apiVersion,
+			IsResourceRequest: true,
+			Verb:              "create",
+		})
+		testCases := map[string]struct {
+			input        api.ReplicationController
+			expectedErrs field.ErrorList
+		}{
+			"restoreFrom: valid name": {
+				input: mkValidReplicationController(setSpecRestoreFrom("valid-checkpoint")),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "restoreFrom"), "").MarkFromImperative(),
+				},
+			},
+			"restoreFrom: invalid name format": {
+				input: mkValidReplicationController(setSpecRestoreFrom("Invalid-Name")),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "template", "spec", "restoreFrom", "name"), nil, "").WithOrigin("format=k8s-long-name"),
+					field.Forbidden(field.NewPath("spec", "template", "spec", "restoreFrom"), "").MarkFromImperative(),
+				},
+			},
+			"restoreFrom: empty name": {
+				input: mkValidReplicationController(setSpecRestoreFrom("")),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("spec", "template", "spec", "restoreFrom", "name"), ""),
+					field.Forbidden(field.NewPath("spec", "template", "spec", "restoreFrom"), "").MarkFromImperative(),
+				},
+			},
+		}
+		for k, tc := range testCases {
+			t.Run(k, func(t *testing.T) {
+				apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+			})
+		}
+	}
+}
+
+func setSpecRestoreFrom(name string) func(rc *api.ReplicationController) {
+	return func(rc *api.ReplicationController) {
+		rc.Spec.Template.Spec.RestoreFrom = &api.CheckpointReference{Name: name}
 	}
 }

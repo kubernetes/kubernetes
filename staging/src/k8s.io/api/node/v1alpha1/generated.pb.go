@@ -46,6 +46,8 @@ func (m *Overhead) Reset() { *m = Overhead{} }
 
 func (m *PodCheckpoint) Reset() { *m = PodCheckpoint{} }
 
+func (m *PodCheckpointConsumerReference) Reset() { *m = PodCheckpointConsumerReference{} }
+
 func (m *PodCheckpointContainerStatus) Reset() { *m = PodCheckpointContainerStatus{} }
 
 func (m *PodCheckpointList) Reset() { *m = PodCheckpointList{} }
@@ -237,6 +239,39 @@ func (m *PodCheckpoint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *PodCheckpointConsumerReference) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PodCheckpointConsumerReference) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PodCheckpointConsumerReference) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.UID)
+	copy(dAtA[i:], m.UID)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.UID)))
+	i--
+	dAtA[i] = 0x12
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
 func (m *PodCheckpointContainerStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -370,6 +405,23 @@ func (m *PodCheckpointStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	i = encodeVarintGenerated(dAtA, i, uint64(m.RestoreGeneration))
+	i--
+	dAtA[i] = 0x48
+	if len(m.ActiveRestores) > 0 {
+		for iNdEx := len(m.ActiveRestores) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ActiveRestores[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x42
+		}
+	}
 	if len(m.CheckpointedContainers) > 0 {
 		for iNdEx := len(m.CheckpointedContainers) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -759,6 +811,19 @@ func (m *PodCheckpoint) Size() (n int) {
 	return n
 }
 
+func (m *PodCheckpointConsumerReference) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.UID)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func (m *PodCheckpointContainerStatus) Size() (n int) {
 	if m == nil {
 		return 0
@@ -839,6 +904,13 @@ func (m *PodCheckpointStatus) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	if len(m.ActiveRestores) > 0 {
+		for _, e := range m.ActiveRestores {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	n += 1 + sovGenerated(uint64(m.RestoreGeneration))
 	return n
 }
 
@@ -988,6 +1060,17 @@ func (this *PodCheckpoint) String() string {
 	}, "")
 	return s
 }
+func (this *PodCheckpointConsumerReference) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodCheckpointConsumerReference{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *PodCheckpointContainerStatus) String() string {
 	if this == nil {
 		return "nil"
@@ -1039,6 +1122,11 @@ func (this *PodCheckpointStatus) String() string {
 		repeatedStringForCheckpointedContainers += strings.Replace(strings.Replace(f.String(), "PodCheckpointContainerStatus", "PodCheckpointContainerStatus", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForCheckpointedContainers += "}"
+	repeatedStringForActiveRestores := "[]PodCheckpointConsumerReference{"
+	for _, f := range this.ActiveRestores {
+		repeatedStringForActiveRestores += strings.Replace(strings.Replace(f.String(), "PodCheckpointConsumerReference", "PodCheckpointConsumerReference", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForActiveRestores += "}"
 	s := strings.Join([]string{`&PodCheckpointStatus{`,
 		`Conditions:` + repeatedStringForConditions + `,`,
 		`NodeName:` + valueToStringGenerated(this.NodeName) + `,`,
@@ -1047,6 +1135,8 @@ func (this *PodCheckpointStatus) String() string {
 		`CompletionTime:` + strings.Replace(fmt.Sprintf("%v", this.CompletionTime), "Time", "v1.Time", 1) + `,`,
 		`CheckpointedPodTemplate:` + strings.Replace(fmt.Sprintf("%v", this.CheckpointedPodTemplate), "PodTemplateSpec", "v11.PodTemplateSpec", 1) + `,`,
 		`CheckpointedContainers:` + repeatedStringForCheckpointedContainers + `,`,
+		`ActiveRestores:` + repeatedStringForActiveRestores + `,`,
+		`RestoreGeneration:` + fmt.Sprintf("%v", this.RestoreGeneration) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1663,6 +1753,120 @@ func (m *PodCheckpoint) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *PodCheckpointConsumerReference) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodCheckpointConsumerReference: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodCheckpointConsumerReference: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.UID = k8s_io_apimachinery_pkg_types.UID(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *PodCheckpointContainerStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2236,6 +2440,59 @@ func (m *PodCheckpointStatus) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ActiveRestores", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ActiveRestores = append(m.ActiveRestores, PodCheckpointConsumerReference{})
+			if err := m.ActiveRestores[len(m.ActiveRestores)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RestoreGeneration", wireType)
+			}
+			m.RestoreGeneration = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RestoreGeneration |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

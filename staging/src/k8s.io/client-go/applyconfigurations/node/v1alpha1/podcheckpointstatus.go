@@ -91,6 +91,16 @@ type PodCheckpointStatusApplyConfiguration struct {
 	// completed and not re-run. The authoritative record is
 	// checkpointedPodTemplate.
 	CheckpointedContainers []PodCheckpointContainerStatusApplyConfiguration `json:"checkpointedContainers,omitempty"`
+	// activeRestores reserves checkpoint data for the listed restore operations.
+	// The assigned kubelet registers a Pod before calling the runtime and removes
+	// it only after completion or acknowledged cleanup. New entries are forbidden
+	// once deletion starts. At most 256 operations may reserve one checkpoint.
+	ActiveRestores []PodCheckpointConsumerReferenceApplyConfiguration `json:"activeRestores,omitempty"`
+	// restoreGeneration advances when a kubelet releases a restore reservation,
+	// including one whose registration response was lost. The resulting write
+	// fences a delayed registration that still carries an older resourceVersion.
+	// It is nonnegative and cannot decrease.
+	RestoreGeneration *int64 `json:"restoreGeneration,omitempty"`
 }
 
 // PodCheckpointStatusApplyConfiguration constructs a declarative configuration of the PodCheckpointStatus type for use with
@@ -162,5 +172,26 @@ func (b *PodCheckpointStatusApplyConfiguration) WithCheckpointedContainers(value
 		}
 		b.CheckpointedContainers = append(b.CheckpointedContainers, *values[i])
 	}
+	return b
+}
+
+// WithActiveRestores adds the given value to the ActiveRestores field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ActiveRestores field.
+func (b *PodCheckpointStatusApplyConfiguration) WithActiveRestores(values ...*PodCheckpointConsumerReferenceApplyConfiguration) *PodCheckpointStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithActiveRestores")
+		}
+		b.ActiveRestores = append(b.ActiveRestores, *values[i])
+	}
+	return b
+}
+
+// WithRestoreGeneration sets the RestoreGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RestoreGeneration field is set to the value of the last call.
+func (b *PodCheckpointStatusApplyConfiguration) WithRestoreGeneration(value int64) *PodCheckpointStatusApplyConfiguration {
+	b.RestoreGeneration = &value
 	return b
 }

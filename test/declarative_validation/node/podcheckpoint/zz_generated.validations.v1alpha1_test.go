@@ -108,6 +108,9 @@ func init() {
 			"status.checkpointedPodTemplate.spec.containers": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"status.checkpointedPodTemplate.spec.containers[*].securityContext.cgroupOptions.mountMode": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"status.checkpointedPodTemplate.spec.containers[*].securityContext.seccompProfile.oci": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
@@ -159,6 +162,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"status.checkpointedPodTemplate.spec.initContainers[*].securityContext.cgroupOptions.mountMode": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"status.checkpointedPodTemplate.spec.initContainers[*].securityContext.seccompProfile.oci": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
@@ -175,6 +181,10 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
 			},
 			"status.checkpointedPodTemplate.spec.initContainers[*].securityContext.seccompProfile.type": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.checkpointedPodTemplate.spec.restoreFrom.name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.checkpointedPodTemplate.spec.schedulingGroup": {

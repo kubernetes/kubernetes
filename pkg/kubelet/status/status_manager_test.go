@@ -4241,7 +4241,8 @@ func TestPodCheckpointingDisabled(t *testing.T) {
 	pod := getTestPod()
 	pod.Status = getReadyPodStatus()
 	pod.Status.Conditions = append(pod.Status.Conditions,
-		v1.PodCondition{Type: v1.PodCheckpointing, Status: v1.ConditionTrue})
+		v1.PodCondition{Type: v1.PodCheckpointing, Status: v1.ConditionTrue},
+		v1.PodCondition{Type: v1.PodRestored, Status: v1.ConditionTrue})
 	client := fake.NewSimpleClientset(pod)
 	m := newTestManager(client)
 	m.podManager.(mutablePodManager).UpdatePod(pod)
@@ -4252,6 +4253,8 @@ func TestPodCheckpointingDisabled(t *testing.T) {
 	require.NoError(t, err)
 	_, checkpointing := podutil.GetPodCondition(&updated.Status, v1.PodCheckpointing)
 	require.Nil(t, checkpointing)
+	_, restored := podutil.GetPodCondition(&updated.Status, v1.PodRestored)
+	require.NotNil(t, restored)
 	require.True(t, podutil.IsPodReadyConditionTrue(updated.Status))
 }
 

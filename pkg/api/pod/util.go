@@ -464,6 +464,11 @@ func dropDisabledFields(
 		dropContainerRestartRules(podSpec)
 	}
 
+	// If the feature is disabled and not in use, drop spec.restoreFrom.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) && !restoreFromInUse(oldPodSpec) {
+		podSpec.RestoreFrom = nil
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirVolumeMode) && !emptyDirVolumeModeInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			if podSpec.Volumes[i].EmptyDir != nil {
@@ -696,7 +701,10 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
-		for _, conditionType := range []api.PodConditionType{api.PodCheckpointing} {
+		for _, conditionType := range []api.PodConditionType{api.PodRestored, api.PodCheckpointing} {
+			if conditionType == api.PodRestored && oldPodSpec != nil && oldPodSpec.RestoreFrom != nil {
+				continue
+			}
 			if _, oldCondition := GetPodCondition(oldPodStatus, conditionType); oldCondition == nil {
 				podStatus.Conditions = slices.DeleteFunc(podStatus.Conditions, func(condition api.PodCondition) bool {
 					return condition.Type == conditionType
@@ -1004,6 +1012,13 @@ func podLevelStatusResourcesInUse(podStatus *api.PodStatus) bool {
 	}
 
 	return podStatus.Resources != nil || podStatus.AllocatedResources != nil
+}
+
+// restoreFromInUse returns true if the pod spec has a restore invocation. Preserve
+// even an incomplete reference during feature-gate rollback so validation can
+// report it instead of silently dropping it.
+func restoreFromInUse(podSpec *api.PodSpec) bool {
+	return podSpec != nil && podSpec.RestoreFrom != nil
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value

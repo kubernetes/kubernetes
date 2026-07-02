@@ -38,6 +38,9 @@ spec:
     uid: uidValue
   timeoutSeconds: 2
 status:
+  activeRestores:
+  - name: nameValue
+    uid: uidValue
   checkpointLocation:
     nodeLocal:
       path: pathValue
@@ -373,6 +376,8 @@ status:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -616,6 +621,8 @@ status:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -865,6 +872,8 @@ status:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -959,6 +968,9 @@ status:
         requests:
           requestsKey: "0"
       restartPolicy: restartPolicyValue
+      restoreFrom:
+        name: nameValue
+        uid: uidValue
       runtimeClassName: runtimeClassNameValue
       schedulerName: schedulerNameValue
       schedulingGates:
@@ -1348,4 +1360,5 @@ status:
     status: statusValue
     type: typeValue
   nodeName: nodeNameValue
+  restoreGeneration: 9
   sourcePodUID: sourcePodUIDValue

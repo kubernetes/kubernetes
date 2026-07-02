@@ -669,6 +669,8 @@ func Validate_PodCheckpointStatus(
 		errs = append(errs, fn(fldPath.Child("checkpointedContainers"), obj.CheckpointedContainers, oldVal, oldObj != nil)...)
 	}
 
+	// field nodev1alpha1.PodCheckpointStatus.ActiveRestores has no validation
+	// field nodev1alpha1.PodCheckpointStatus.RestoreGeneration has no validation
 	return errs
 }
 

@@ -84,6 +84,15 @@ message PodCheckpoint {
   optional PodCheckpointStatus status = 3;
 }
 
+// PodCheckpointConsumerReference identifies a restoring Pod in this namespace.
+message PodCheckpointConsumerReference {
+  // name is the name of the restoring Pod.
+  optional string name = 1;
+
+  // uid identifies the restore operation even after the Pod leaves the API.
+  optional string uid = 2;
+}
+
 // PodCheckpointContainerStatus identifies a container captured in a checkpoint.
 message PodCheckpointContainerStatus {
   // name is the name of the checkpointed container.
@@ -229,6 +238,24 @@ message PodCheckpointStatus {
   // +k8s:listType=map
   // +k8s:listMapKey=name
   repeated PodCheckpointContainerStatus checkpointedContainers = 7;
+
+  // activeRestores reserves checkpoint data for the listed restore operations.
+  // The assigned kubelet registers a Pod before calling the runtime and removes
+  // it only after completion or acknowledged cleanup. New entries are forbidden
+  // once deletion starts. At most 256 operations may reserve one checkpoint.
+  // +optional
+  // +listType=map
+  // +listMapKey=uid
+  // +patchStrategy=merge
+  // +patchMergeKey=uid
+  repeated PodCheckpointConsumerReference activeRestores = 8;
+
+  // restoreGeneration advances when a kubelet releases a restore reservation,
+  // including one whose registration response was lost. The resulting write
+  // fences a delayed registration that still carries an older resourceVersion.
+  // It is nonnegative and cannot decrease.
+  // +optional
+  optional int64 restoreGeneration = 9;
 }
 
 // PodReference identifies a pod in the same namespace by name and, optionally,

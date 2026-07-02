@@ -101,6 +101,28 @@ type RuntimeClassList struct {
 	Items []RuntimeClass
 }
 
+// PodRestoreProtectionFinalizer retains a restoring Pod until the kubelet has
+// confirmed that the runtime no longer depends on its checkpoint.
+const PodRestoreProtectionFinalizer = "node.k8s.io/pod-restore-protection"
+
+const (
+	// PodRestoreReasonCompleted reports that the one-time restore completed.
+	PodRestoreReasonCompleted = "RestoreCompleted"
+	// PodRestoreReasonCleanupPending reports that the kubelet is waiting for the
+	// runtime to confirm cleanup of restore work that may have reached it.
+	PodRestoreReasonCleanupPending = "RestoreCleanupPending"
+	// PodRestoreReasonCleanupCompleted acknowledges that failed restore work and
+	// its runtime resources have been cleaned up.
+	PodRestoreReasonCleanupCompleted = "RestoreCleanupCompleted"
+	// PodRestoreReasonNotStarted acknowledges that no restore reached the runtime.
+	PodRestoreReasonNotStarted = "RestoreNotStarted"
+	// PodRestoreReasonCleanupUnconfirmed reports that the runtime did not confirm
+	// cleanup of restore work in time after the Pod was deleted. The kubelet
+	// keeps retrying cleanup and holds the Pod's resources on the node until the
+	// runtime confirms it.
+	PodRestoreReasonCleanupUnconfirmed = "RestoreCleanupUnconfirmed"
+)
+
 const (
 	// PodCheckpointConditionReady is the summary condition type for a PodCheckpoint.
 	// It is True once the checkpoint data has been written and is ready to
@@ -235,6 +257,33 @@ type PodCheckpointStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	CheckpointedContainers []PodCheckpointContainerStatus
+
+	// activeRestores reserves checkpoint data for the listed restore operations.
+	// The assigned kubelet registers a Pod before calling the runtime and removes
+	// it only after completion or acknowledged cleanup. New entries are forbidden
+	// once deletion starts. At most 256 operations may reserve one checkpoint.
+	// +optional
+	// +listType=map
+	// +listMapKey=uid
+	ActiveRestores []PodCheckpointConsumerReference
+
+	// restoreGeneration advances when a kubelet releases a restore reservation,
+	// including one whose registration response was lost. The resulting write
+	// fences a delayed registration that still carries an older resourceVersion.
+	// It is nonnegative and cannot decrease.
+	// +optional
+	RestoreGeneration int64
+}
+
+// PodCheckpointActiveRestoresMaxSize bounds the number of concurrent consumers.
+const PodCheckpointActiveRestoresMaxSize = 256
+
+// PodCheckpointConsumerReference identifies a restoring Pod in this namespace.
+type PodCheckpointConsumerReference struct {
+	// name is the name of the restoring Pod.
+	Name string
+	// uid identifies the restore operation even after the Pod leaves the API.
+	UID types.UID
 }
 
 // PodCheckpointContainerStatus identifies a container captured in a checkpoint.

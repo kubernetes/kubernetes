@@ -11710,11 +11710,21 @@ type RestorePodRequest struct {
 	// RunPodSandboxRequest. The runtime must reject an unknown non-empty handler.
 	RuntimeHandler string `protobuf:"bytes,3,opt,name=runtime_handler,json=runtimeHandler,proto3" json:"runtime_handler,omitempty"`
 	// Optional opaque runtime-specific restore options supplied by the CRI
-	// caller. Keys are interpreted in the scope of `runtime_handler`.
-	// Kubernetes does not expose these options in its alpha API and kubelet
-	// sends an empty map. Direct CRI callers may set keys documented by the
-	// selected runtime. The runtime must reject unsupported or invalid keys and
-	// values rather than silently ignore them. Options must not contain secrets.
+	// caller. Keys are interpreted in the scope of `runtime_handler`. The alpha
+	// kubelet leaves this map empty and uses runtime defaults; Kubernetes does
+	// not expose custom options for this operation.
+	// Every caller's options are untrusted input. The runtime must explicitly
+	// support safe keys and validate their values, rejecting unsupported,
+	// invalid, or unsafe entries rather than passing arbitrary settings to the
+	// backend. Options must not contain secrets or override administrator
+	// configuration, Pod security constraints, or allocated devices. In
+	// particular, device mappings must come from the Pod's allocated devices.
+	// Trusted settings must come from node or runtime configuration, never this map.
+	//
+	// These options apply only to this restore attempt. They must not be
+	// inferred from CheckpointPodRequest.options or treated as defaults stored
+	// with the checkpoint. The runtime may separately read requirements encoded
+	// in its own checkpoint data.
 	Options map[string]string `protobuf:"bytes,4,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Complete restore-time configurations for all containers represented by
 	// the checkpoint. The list must be non-empty. Every entry must have a

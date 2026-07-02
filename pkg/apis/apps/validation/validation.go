@@ -256,6 +256,12 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, se
 		setOpts.SkipValidatePodTemplateSpec = true
 	}
 	specPath := field.NewPath("spec")
+	// Tolerating an old template defect must not permit a new restore invocation.
+	// Keep unchanged legacy references updateable, and allow removing them.
+	if setOpts.SkipValidatePodTemplateSpec && statefulSet.Spec.Template.Spec.RestoreFrom != nil &&
+		!apiequality.Semantic.DeepEqual(statefulSet.Spec.Template.Spec.RestoreFrom, oldStatefulSet.Spec.Template.Spec.RestoreFrom) {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("template", "spec", "restoreFrom"), "restoreFrom not allowed in pod template; set it on a Pod instead"))
+	}
 	allErrs = append(allErrs, ValidateStatefulSetSpec(&statefulSet.Spec, specPath, opts, setOpts)...)
 
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(statefulSet.Spec.Selector, oldStatefulSet.Spec.Selector, specPath.Child("selector")).WithOrigin("immutable").MarkCoveredByDeclarative()...)

@@ -21,14 +21,18 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/node/podcheckpoint"
 	podcases "k8s.io/kubernetes/test/declarative_validation/core/pod"
 )
 
 func TestDeclarativeCapturedTemplatePodSpec(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
 	path := field.NewPath("status", "checkpointedPodTemplate", "spec")
 	responders := make([]core.EvictionResponder, 11)
 	for i := range responders {
@@ -38,6 +42,15 @@ func TestDeclarativeCapturedTemplatePodSpec(t *testing.T) {
 		return []podtest.Tweak{func(p *core.Pod) { p.Spec.EvictionResponders = values }}
 	}
 	tests := append(podcases.InvalidPodSpecTestcases(path), []podcases.PodSpecTestcase{
+		{ID: "restore invocation forbidden", Tweaks: []podtest.Tweak{podtest.SetRestoreFrom("checkpoint")}, ExpectedErrs: field.ErrorList{field.Forbidden(path.Child("restoreFrom"), "").MarkFromImperative()}},
+		{ID: "restore name required", Tweaks: []podtest.Tweak{podtest.SetRestoreFrom("")}, ExpectedErrs: field.ErrorList{
+			field.Forbidden(path.Child("restoreFrom"), "").MarkFromImperative(),
+			field.Required(path.Child("restoreFrom", "name"), ""),
+		}},
+		{ID: "restore name format", Tweaks: []podtest.Tweak{podtest.SetRestoreFrom("Invalid Name")}, ExpectedErrs: field.ErrorList{
+			field.Forbidden(path.Child("restoreFrom"), "").MarkFromImperative(),
+			field.Invalid(path.Child("restoreFrom", "name"), nil, "").WithOrigin("format=k8s-long-name"),
+		}},
 		{ID: "responder count", Tweaks: withResponders(responders...), ExpectedErrs: field.ErrorList{field.TooMany(path.Child("evictionResponders"), 11, 10).WithOrigin("maxItems")}},
 		{ID: "responder name required", Tweaks: withResponders(core.EvictionResponder{Priority: new(int32(1000))}), ExpectedErrs: field.ErrorList{field.Required(path.Child("evictionResponders").Index(0).Child("name"), "")}},
 		{ID: "responder name format", Tweaks: withResponders(core.EvictionResponder{Name: "invalid", Priority: new(int32(1000))}), ExpectedErrs: field.ErrorList{field.Invalid(path.Child("evictionResponders").Index(0).Child("name"), nil, "").WithOrigin("format=k8s-prefixed-label-key")}},

@@ -42,6 +42,11 @@ func (in PodCheckpoint) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCheckpointConsumerReference) OpenAPIModelName() string {
+	return "io.k8s.api.node.v1alpha1.PodCheckpointConsumerReference"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodCheckpointContainerStatus) OpenAPIModelName() string {
 	return "io.k8s.api.node.v1alpha1.PodCheckpointContainerStatus"
 }

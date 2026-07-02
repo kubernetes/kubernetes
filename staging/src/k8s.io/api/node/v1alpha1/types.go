@@ -336,6 +336,35 @@ type PodCheckpointStatus struct {
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	CheckpointedContainers []PodCheckpointContainerStatus `json:"checkpointedContainers,omitempty" protobuf:"bytes,7,rep,name=checkpointedContainers"`
+
+	// activeRestores reserves checkpoint data for the listed restore operations.
+	// The assigned kubelet registers a Pod before calling the runtime and removes
+	// it only after completion or acknowledged cleanup. New entries are forbidden
+	// once deletion starts. At most 256 operations may reserve one checkpoint.
+	// +optional
+	// +listType=map
+	// +listMapKey=uid
+	// +patchStrategy=merge
+	// +patchMergeKey=uid
+	ActiveRestores []PodCheckpointConsumerReference `json:"activeRestores,omitempty" protobuf:"bytes,8,rep,name=activeRestores" patchStrategy:"merge" patchMergeKey:"uid"`
+
+	// restoreGeneration advances when a kubelet releases a restore reservation,
+	// including one whose registration response was lost. The resulting write
+	// fences a delayed registration that still carries an older resourceVersion.
+	// It is nonnegative and cannot decrease.
+	// +optional
+	RestoreGeneration int64 `json:"restoreGeneration,omitempty" protobuf:"varint,9,opt,name=restoreGeneration"`
+}
+
+// PodCheckpointActiveRestoresMaxSize bounds the number of concurrent consumers.
+const PodCheckpointActiveRestoresMaxSize = 256
+
+// PodCheckpointConsumerReference identifies a restoring Pod in this namespace.
+type PodCheckpointConsumerReference struct {
+	// name is the name of the restoring Pod.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// uid identifies the restore operation even after the Pod leaves the API.
+	UID types.UID `json:"uid" protobuf:"bytes,2,opt,name=uid"`
 }
 
 // PodCheckpointContainerStatus identifies a container captured in a checkpoint.

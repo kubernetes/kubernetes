@@ -66,6 +66,16 @@ func (PodCheckpoint) SwaggerDoc() map[string]string {
 	return map_PodCheckpoint
 }
 
+var map_PodCheckpointConsumerReference = map[string]string{
+	"":     "PodCheckpointConsumerReference identifies a restoring Pod in this namespace.",
+	"name": "name is the name of the restoring Pod.",
+	"uid":  "uid identifies the restore operation even after the Pod leaves the API.",
+}
+
+func (PodCheckpointConsumerReference) SwaggerDoc() map[string]string {
+	return map_PodCheckpointConsumerReference
+}
+
 var map_PodCheckpointContainerStatus = map[string]string{
 	"":     "PodCheckpointContainerStatus identifies a container captured in a checkpoint.",
 	"name": "name is the name of the checkpointed container.",
@@ -104,6 +114,8 @@ var map_PodCheckpointStatus = map[string]string{
 	"completionTime":          "completionTime is the time the checkpoint reached a terminal outcome: the Ready condition became True, or False with a failure reason. It is unset while the checkpoint is pending or in progress. Distinct from metadata.creationTimestamp (when the object was created).",
 	"checkpointedPodTemplate": "checkpointedPodTemplate is a sanitized PodTemplateSpec (object metadata plus the pod spec) captured from the source pod at checkpoint time. It is the authoritative record a restore is validated against: a pod restoring from this checkpoint must match this template. The kubelet sets it once. Later status updates cannot modify or clear it, so a template written in error cannot be corrected; capturing the Pod again requires a new PodCheckpoint. When first set, it must pass Pod template validation and its protobuf encoding must not exceed 1 MiB. Node-local and cluster-specific fields (for example spec.nodeName, uid, resourceVersion, managedFields) are excluded so the record stays portable. Ephemeral containers are excluded because they are not checkpointed; scheduling gates are excluded because they only delay scheduling. Other scheduling directives and resource requests and limits are retained and must match on restore. Images of checkpointed containers (regular containers and restartable init containers) are recorded as resolved repository digest references from the runtime. A restoring Pod must use those same image references; the original image tags are not accepted in their place. Images of completed non-restartable init containers are unchanged because those containers are not restored.",
 	"checkpointedContainers":  "checkpointedContainers lists the containers captured in the checkpoint: all regular containers plus any running restartable init (sidecar) containers, as a convenience for clients. Container names are unique within a pod, so a single list covers both. Completed non-restartable init containers are not captured; on restore they are reflected as completed and not re-run. The authoritative record is checkpointedPodTemplate.",
+	"activeRestores":          "activeRestores reserves checkpoint data for the listed restore operations. The assigned kubelet registers a Pod before calling the runtime and removes it only after completion or acknowledged cleanup. New entries are forbidden once deletion starts. At most 256 operations may reserve one checkpoint.",
+	"restoreGeneration":       "restoreGeneration advances when a kubelet releases a restore reservation, including one whose registration response was lost. The resulting write fences a delayed registration that still carries an older resourceVersion. It is nonnegative and cannot decrease.",
 }
 
 func (PodCheckpointStatus) SwaggerDoc() map[string]string {

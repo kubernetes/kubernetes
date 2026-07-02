@@ -4664,6 +4664,17 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: mountMode
       type:
         scalar: string
+- name: io.k8s.api.core.v1.CheckpointReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: uid
+      type:
+        scalar: string
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.CinderPersistentVolumeSource
   map:
     fields:
@@ -7322,6 +7333,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: restartPolicy
       type:
         scalar: string
+    - name: restoreFrom
+      type:
+        namedType: io.k8s.api.core.v1.CheckpointReference
     - name: runtimeClassName
       type:
         scalar: string
@@ -12175,6 +12189,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.node.v1alpha1.PodCheckpointStatus
       default: {}
+- name: io.k8s.api.node.v1alpha1.PodCheckpointConsumerReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: uid
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.node.v1alpha1.PodCheckpointContainerStatus
   map:
     fields:
@@ -12195,6 +12220,14 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.node.v1alpha1.PodCheckpointStatus
   map:
     fields:
+    - name: activeRestores
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.node.v1alpha1.PodCheckpointConsumerReference
+          elementRelationship: associative
+          keys:
+          - uid
     - name: checkpointLocation
       type:
         namedType: io.k8s.api.node.v1alpha1.CheckpointSource
@@ -12223,6 +12256,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeName
       type:
         scalar: string
+    - name: restoreGeneration
+      type:
+        scalar: numeric
     - name: sourcePodUID
       type:
         scalar: string

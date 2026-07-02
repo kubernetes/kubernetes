@@ -248,6 +248,35 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.core.v1.CgroupOptions": {
+        "description": "CgroupOptions defines options for cgroup filesystem access.",
+        "properties": {
+          "mountMode": {
+            "description": "mountMode controls how the cgroup filesystem is mounted in the container. Valid values are \"ReadOnly\" and \"ReadWrite\". If not specified, the container runtime's default mount mode is used. The kubelet refuses to create a container with an unrecognized value. \"ReadOnly\" cannot be set when the container's privileged field is true. \"ReadWrite\" cannot be set when spec.hostNetwork is true and spec.hostUsers is false.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.CheckpointReference": {
+        "description": "CheckpointReference identifies a PodCheckpoint to restore a Pod from.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "name is the name of a PodCheckpoint in the Pod's namespace.",
+            "type": "string"
+          },
+          "uid": {
+            "description": "uid pins the checkpoint instance selected at Pod creation. Admission fills an omitted value; with mutation admission disabled the caller must supply it. A checkpoint recreated under the same name cannot satisfy this reference.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "x-kubernetes-map-type": "atomic"
+      },
       "io.k8s.api.core.v1.CinderVolumeSource": {
         "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
         "properties": {
@@ -2422,7 +2451,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PodOS"
               }
             ],
-            "description": "os specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.resources - spec.securityContext.appArmorProfile - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.securityContext.supplementalGroupsPolicy - spec.containers[*].securityContext.appArmorProfile - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
+            "description": "os specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.resources - spec.securityContext.appArmorProfile - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.securityContext.supplementalGroupsPolicy - spec.containers[*].securityContext.appArmorProfile - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup - spec.containers[*].securityContext.cgroupOptions"
           },
           "overhead": {
             "additionalProperties": {
@@ -2476,6 +2505,14 @@
           "restartPolicy": {
             "description": "restartPolicy is the restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
             "type": "string"
+          },
+          "restoreFrom": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.CheckpointReference"
+              }
+            ],
+            "description": "restoreFrom specifies a PodCheckpoint in this Pod's namespace to restore this Pod from. When set, the Pod is restored from that checkpoint's archive instead of being created from scratch; the kubelet resolves the reference to the on-node archive via the PodCheckpoint's status. The Pod spec must match status.checkpointedPodTemplate.spec, except for nodeName, restoreFrom, ephemeralContainers, and schedulingGates. Scheduling directives, including node-identity constraints, and resource requests and limits must match the captured values, with the checkpoint-node affinity constraint added by admission. Ephemeral containers are not checkpointed. Scheduling gates may delay restore and be removed before scheduling. Do not set nodeName on creation; admission pins restore to the checkpoint's node through required node affinity. Workload updates, including resize and adding ephemeral containers, are rejected until PodRestored=True. Resize may be requested after restore. This field is immutable. Restoring from another checkpoint requires creating a new Pod; in-place restore of an existing Pod is not supported."
           },
           "runtimeClassName": {
             "description": "runtimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class",
@@ -3141,6 +3178,14 @@
               }
             ],
             "description": "capabilities is the capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime. Note that this field cannot be set when spec.os.name is windows."
+          },
+          "cgroupOptions": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.CgroupOptions"
+              }
+            ],
+            "description": "cgroupOptions holds the cgroup options for this container. If mountMode is specified, the scheduler only places the pod on a node whose status.declaredFeatures includes CgroupOptions. (Alpha) This field requires the CgroupOptions feature gate to be enabled. This field cannot be set for ephemeral containers or when spec.os.name is windows."
           },
           "privileged": {
             "description": "privileged indicates whether to run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false. Note that this field cannot be set when spec.os.name is windows.",
@@ -4060,6 +4105,26 @@
           }
         ]
       },
+      "io.k8s.api.node.v1alpha1.PodCheckpointConsumerReference": {
+        "description": "PodCheckpointConsumerReference identifies a restoring Pod in this namespace.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "name is the name of the restoring Pod.",
+            "type": "string"
+          },
+          "uid": {
+            "default": "",
+            "description": "uid identifies the restore operation even after the Pod leaves the API.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "uid"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.node.v1alpha1.PodCheckpointContainerStatus": {
         "description": "PodCheckpointContainerStatus identifies a container captured in a checkpoint.",
         "properties": {
@@ -4140,6 +4205,19 @@
       "io.k8s.api.node.v1alpha1.PodCheckpointStatus": {
         "description": "PodCheckpointStatus represents the current status of a PodCheckpoint.",
         "properties": {
+          "activeRestores": {
+            "description": "activeRestores reserves checkpoint data for the listed restore operations. The assigned kubelet registers a Pod before calling the runtime and removes it only after completion or acknowledged cleanup. New entries are forbidden once deletion starts. At most 256 operations may reserve one checkpoint.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.node.v1alpha1.PodCheckpointConsumerReference"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "uid"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "uid",
+            "x-kubernetes-patch-strategy": "merge"
+          },
           "checkpointLocation": {
             "allOf": [
               {
@@ -4191,6 +4269,11 @@
           "nodeName": {
             "description": "nodeName is the source node assigned to execute this checkpoint. The controller selects the source Pod's node before capture, and the kubelet preserves this assignment when writing the outcome. Once set, it cannot be changed or cleared. A value here does not imply that checkpoint data is ready; check the Ready condition.",
             "type": "string"
+          },
+          "restoreGeneration": {
+            "description": "restoreGeneration advances when a kubelet releases a restore reservation, including one whose registration response was lost. The resulting write fences a delayed registration that still carries an older resourceVersion. It is nonnegative and cannot decrease.",
+            "format": "int64",
+            "type": "integer"
           },
           "sourcePodUID": {
             "description": "sourcePodUID identifies the source Pod instance selected by the controller when it assigns nodeName. The kubelet preserves this UID when capturing the template and publishing the checkpoint outcome. Once set, it cannot be changed or cleared. If the Pod name is reused for another UID, the checkpoint fails instead of capturing the replacement. Set spec.sourcePod.uid at creation to pin the instance before the controller assigns it.",

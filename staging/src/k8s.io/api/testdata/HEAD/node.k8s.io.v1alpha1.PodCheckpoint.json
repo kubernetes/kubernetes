@@ -860,6 +860,9 @@
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "cgroupOptions": {
+                "mountMode": "mountModeValue"
               }
             },
             "stdin": true,
@@ -1192,6 +1195,9 @@
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "cgroupOptions": {
+                "mountMode": "mountModeValue"
               }
             },
             "stdin": true,
@@ -1524,6 +1530,9 @@
               "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
+              },
+              "cgroupOptions": {
+                "mountMode": "mountModeValue"
               }
             },
             "stdin": true,
@@ -1942,13 +1951,24 @@
             "name": "nameValue",
             "priority": 2
           }
-        ]
+        ],
+        "restoreFrom": {
+          "name": "nameValue",
+          "uid": "uidValue"
+        }
       }
     },
     "checkpointedContainers": [
       {
         "name": "nameValue"
       }
-    ]
+    ],
+    "activeRestores": [
+      {
+        "name": "nameValue",
+        "uid": "uidValue"
+      }
+    ],
+    "restoreGeneration": 9
   }
 }
