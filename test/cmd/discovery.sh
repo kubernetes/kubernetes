@@ -465,11 +465,197 @@ __EOF__
 
   set -o errexit
 
-  output_message=$(kubectl explain mock-resource)
-  kube::test::if_has_string "${output_message}" 'FIELDS:'
+  output_message=$(kubectl explain mock-resource --recursive --max-depth=1)
+  expected_message=$(cat <<EOF
+GROUP:      test.com
+KIND:       MockResource
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  apiVersion	<string>
+  kind	<string>
+  metadata	<ObjectMeta>
+  spec	<Object>
+EOF
+)
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
+
+  output_message=$(kubectl explain mock-resource --recursive --max-depth=2)
+  expected_message=$(cat <<EOF
+GROUP:      test.com
+KIND:       MockResource
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  apiVersion	<string>
+  kind	<string>
+  metadata	<ObjectMeta>
+    annotations	<map[string]string>
+    creationTimestamp	<string>
+    deletionGracePeriodSeconds	<integer>
+    deletionTimestamp	<string>
+    finalizers	<[]string>
+    generateName	<string>
+    generation	<integer>
+    labels	<map[string]string>
+    managedFields	<[]ManagedFieldsEntry>
+    name	<string>
+    namespace	<string>
+    ownerReferences	<[]OwnerReference>
+    resourceVersion	<string>
+    selfLink	<string>
+    uid	<string>
+  spec	<Object>
+    test	<map[string][]string>
+EOF
+)
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
 
   output_message=$(kubectl explain mock-resource --recursive)
-  kube::test::if_has_string "${output_message}" 'FIELDS:'
+  expected_message=$(cat <<EOF
+GROUP:      test.com
+KIND:       MockResource
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  apiVersion	<string>
+  kind	<string>
+  metadata	<ObjectMeta>
+    annotations	<map[string]string>
+    creationTimestamp	<string>
+    deletionGracePeriodSeconds	<integer>
+    deletionTimestamp	<string>
+    finalizers	<[]string>
+    generateName	<string>
+    generation	<integer>
+    labels	<map[string]string>
+    managedFields	<[]ManagedFieldsEntry>
+      apiVersion	<string>
+      fieldsType	<string>
+      fieldsV1	<FieldsV1>
+      manager	<string>
+      operation	<string>
+      subresource	<string>
+      time	<string>
+    name	<string>
+    namespace	<string>
+    ownerReferences	<[]OwnerReference>
+      apiVersion	<string> -required-
+      blockOwnerDeletion	<boolean>
+      controller	<boolean>
+      kind	<string> -required-
+      name	<string> -required-
+      uid	<string> -required-
+    resourceVersion	<string>
+    selfLink	<string>
+    uid	<string>
+  spec	<Object>
+    test	<map[string][]string>
+EOF
+)
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
+
+  output_message=$(kubectl explain mock-resource --recursive --max-depth=1 -o plaintext-openapiv2)
+  expected_message=$(cat <<EOF
+KIND:     MockResource
+VERSION:  test.com/v1
+
+DESCRIPTION:
+     <empty>
+
+FIELDS:
+   apiVersion	<string>
+   kind	<string>
+   metadata	<Object>
+   spec	<Object>
+EOF
+)
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
+
+  output_message=$(kubectl explain mock-resource --recursive --max-depth=2 -o plaintext-openapiv2)
+  expected_message=$(cat <<EOF
+KIND:     MockResource
+VERSION:  test.com/v1
+
+DESCRIPTION:
+     <empty>
+
+FIELDS:
+   apiVersion	<string>
+   kind	<string>
+   metadata	<Object>
+      annotations	<map[string]string>
+      creationTimestamp	<string>
+      deletionGracePeriodSeconds	<integer>
+      deletionTimestamp	<string>
+      finalizers	<[]string>
+      generateName	<string>
+      generation	<integer>
+      labels	<map[string]string>
+      managedFields	<[]Object>
+      name	<string>
+      namespace	<string>
+      ownerReferences	<[]Object>
+      resourceVersion	<string>
+      selfLink	<string>
+      uid	<string>
+   spec	<Object>
+      test	<map[string][]string>
+EOF
+)
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
+
+  output_message=$(kubectl explain mock-resource --recursive -o plaintext-openapiv2)
+  expected_message=$(cat <<EOF
+KIND:     MockResource
+VERSION:  test.com/v1
+
+DESCRIPTION:
+     <empty>
+
+FIELDS:
+   apiVersion	<string>
+   kind	<string>
+   metadata	<Object>
+      annotations	<map[string]string>
+      creationTimestamp	<string>
+      deletionGracePeriodSeconds	<integer>
+      deletionTimestamp	<string>
+      finalizers	<[]string>
+      generateName	<string>
+      generation	<integer>
+      labels	<map[string]string>
+      managedFields	<[]Object>
+         apiVersion	<string>
+         fieldsType	<string>
+         fieldsV1	<map[string]>
+         manager	<string>
+         operation	<string>
+         subresource	<string>
+         time	<string>
+      name	<string>
+      namespace	<string>
+      ownerReferences	<[]Object>
+         apiVersion	<string>
+         blockOwnerDeletion	<boolean>
+         controller	<boolean>
+         kind	<string>
+         name	<string>
+         uid	<string>
+      resourceVersion	<string>
+      selfLink	<string>
+      uid	<string>
+   spec	<Object>
+      test	<map[string][]string>
+EOF
+)
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
 
   # Cleanup
   kubectl delete crd mock-resources.test.com
