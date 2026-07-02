@@ -44,6 +44,12 @@ func (FakeManager) CleanupPods(_ map[types.UID]sets.Empty) {}
 // Start simulates start syncing the probe status
 func (FakeManager) Start() {}
 
+// SuspendProbes simulates pausing probes for a Pod.
+func (FakeManager) SuspendProbes(_ types.UID) {}
+
+// ResumeProbes simulates resuming probes for a Pod.
+func (FakeManager) ResumeProbes(_ types.UID) {}
+
 // UpdatePodStatus simulates updating the Pod Status.
 func (FakeManager) UpdatePodStatus(_ context.Context, _ *v1.Pod, podStatus *v1.PodStatus) {
 	for i := range podStatus.ContainerStatuses {

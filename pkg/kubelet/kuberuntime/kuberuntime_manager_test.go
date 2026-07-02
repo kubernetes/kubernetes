@@ -697,6 +697,54 @@ func TestSyncPod(t *testing.T) {
 	}
 }
 
+// TestSyncPodRestoreFromGatedByFeature verifies that the restore routing in
+// SyncPod is governed by the PodLevelCheckpointRestore feature gate (KEP-5823):
+// with the gate off, a Pod carrying spec.restoreFrom is created as a fresh
+// sandbox (restoreFrom is a no-op); with the gate on, it is routed to RestorePod.
+func TestSyncPodRestoreFromGatedByFeature(t *testing.T) {
+	checkpointName := "my-checkpoint"
+	newRestorePod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "foo", Namespace: "new"},
+			Spec: v1.PodSpec{
+				Containers:  []v1.Container{{Name: "c1", Image: "busybox", ImagePullPolicy: v1.PullIfNotPresent}},
+				RestoreFrom: &checkpointName,
+			},
+		}
+	}
+
+	t.Run("feature gate disabled: restoreFrom is a no-op and a fresh sandbox is created", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, false)
+		tCtx := ktesting.Init(t)
+		fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
+
+		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+		result := m.SyncPod(tCtx, newRestorePod(), &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+		assert.NoError(t, result.Error())
+		assert.Empty(t, fakeRuntime.RestoredPods, "RestorePod must not be called when the feature gate is disabled")
+		assert.Len(t, fakeRuntime.Sandboxes, 1, "a fresh sandbox should be created via the normal path")
+	})
+
+	t.Run("feature gate enabled: restoreFrom is routed to RestorePod", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+		tCtx := ktesting.Init(t)
+		fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
+
+		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+		// We assert on the RestorePod invocation rather than result.Error(): the
+		// fake runtime's RestorePod returns an ID without registering a sandbox,
+		// so the follow-up status lookup in SyncPod fails. That is a fake-harness
+		// artifact; the routing decision (the gated behavior under test) has
+		// already happened by then.
+		m.SyncPod(tCtx, newRestorePod(), &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+		require.Len(t, fakeRuntime.RestoredPods, 1, "RestorePod should be called when the feature gate is enabled and restoreFrom is set")
+		assert.Equal(t, "/fake/pod-checkpoints/archive.tar", fakeRuntime.RestoredPods[0].Path)
+		assert.Empty(t, fakeRuntime.Sandboxes, "no fresh sandbox should be created on the restore path")
+	})
+}
+
 func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)

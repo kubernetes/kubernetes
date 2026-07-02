@@ -41,6 +41,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/mount-utils"
@@ -322,6 +323,7 @@ type Dependencies struct {
 	HeartbeatClient           clientset.Interface
 	OnHeartbeatFailure        func()
 	KubeClient                clientset.Interface
+	DynamicClient             dynamic.Interface
 	Mounter                   mount.Interface
 	HostUtil                  hostutil.HostUtils
 	OOMAdjuster               *oom.OOMAdjuster
@@ -614,6 +616,7 @@ func NewMainKubelet(ctx context.Context,
 		hostname:                     hostname,
 		nodeName:                     nodeName,
 		kubeClient:                   kubeDeps.KubeClient,
+		dynamicClient:                kubeDeps.DynamicClient,
 		heartbeatClient:              kubeDeps.HeartbeatClient,
 		onRepeatedHeartbeatFailure:   kubeDeps.OnHeartbeatFailure,
 		rootDirectory:                filepath.Clean(rootDirectory),
@@ -1207,11 +1210,25 @@ type Kubelet struct {
 	// hostname is the hostname the kubelet detected or was given via flag/config
 	hostname string
 
-	nodeName        types.NodeName
-	cachedNode      *v1.Node
-	runtimeCache    kubecontainer.RuntimeCache
-	kubeClient      clientset.Interface
-	heartbeatClient clientset.Interface
+	nodeName      types.NodeName
+	cachedNode    *v1.Node
+	runtimeCache  kubecontainer.RuntimeCache
+	kubeClient    clientset.Interface
+	dynamicClient dynamic.Interface
+	// restoreBlockedPods holds the UIDs of pods whose restore-from-checkpoint is
+	// currently blocked waiting for another restore of the same (namespace, name)
+	// to finish. It is populated by the runtime manager via SetPodRestoreBlocked
+	// and read when generating the Restoring=False/RestoreInProgress condition
+	// (KEP-5823). It is node-local kubelet state, not an API-level lock.
+	restoreBlockedPods sync.Map // map[types.UID]struct{}
+	// checkpointsInFlight holds the UIDs of pods that currently have an
+	// asynchronous checkpoint running. It de-duplicates a duplicate checkpoint
+	// trigger (e.g. a controller retry after a restart) so a second checkpoint is
+	// not started for the same pod (KEP-5823). It is node-local and does not
+	// survive a kubelet restart; an interrupted checkpoint is finalized as failed
+	// on startup (see finalizeInterruptedCheckpoints).
+	checkpointsInFlight sync.Map // map[types.UID]struct{}
+	heartbeatClient     clientset.Interface
 	// mirrorPodClient is used to create and delete mirror pods in the API for static
 	// pods.
 	mirrorPodClient kubepod.MirrorClient
@@ -1689,6 +1706,11 @@ func (kl *Kubelet) setupDataDirs(logger klog.Logger) error {
 			return fmt.Errorf("error creating checkpoint directory: %v", err)
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		if err := utilfs.MkdirAll(kl.getPodCheckpointsDir(), 0700); err != nil {
+			return fmt.Errorf("error creating pod checkpoint directory: %v", err)
+		}
+	}
 	if selinux.GetEnabled() {
 		err := selinux.SetFileLabel(pluginRegistrationDir, kubeletconfig.KubeletPluginsDirSELinuxLabel)
 		if err != nil {
@@ -1946,6 +1968,18 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 		// Keep the previous detached behavior from context.Background while still
 		// propagating logging values for contextual logging.
 		go kl.fastStatusUpdateOnce(context.WithoutCancel(ctx))
+
+		// A CRI checkpoint is not resumable, so finalize any PodCheckpoint left
+		// CheckpointInProgress on this node by a checkpoint that was running when
+		// the kubelet stopped, marking it failed rather than leaving it hanging
+		// (KEP-5823). One-shot, detached from the run context.
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+			go kl.finalizeInterruptedCheckpoints(context.WithoutCancel(ctx))
+			// Watch PodCheckpoint objects and execute checkpoints for pods this
+			// kubelet runs (KEP-5823). The kubelet, not a controller, performs the
+			// checkpoint; see startPodCheckpointWatch.
+			go kl.startPodCheckpointWatch(context.WithoutCancel(ctx))
+		}
 
 		// Keep renewing the node lease until the kubelet exits.
 		// This intentionally does not use the kubelet context so lease renewal can
@@ -2235,6 +2269,23 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(ctx, pod)
 
+	// For pods being restored from checkpoint, prepare container paths that are normally
+	// created during container startup. These paths must exist before RestorePod is called
+	// because restored containers expect them immediately.
+	// This includes: /etc/hosts, termination log paths, and container directories.
+	// Only needed on the first sandbox creation (the actual restore); once a
+	// sandbox has existed, the pod follows the normal lifecycle. Gated on the
+	// PodLevelCheckpointRestore feature.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) &&
+		pod.Spec.RestoreFrom != nil && *pod.Spec.RestoreFrom != "" &&
+		(podStatus == nil || len(podStatus.SandboxStatuses) == 0) {
+		if err := kl.prepareContainerPathsForRestore(pod, podStatus); err != nil {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "error preparing container paths for restore: %v", err)
+			klog.ErrorS(err, "Unable to prepare container paths for pod restore", "pod", klog.KObj(pod))
+			return false, nil, err
+		}
+	}
+
 	// TODO(#113606): use cancellation from the incoming context parameter, which comes from the pod worker.
 	// Currently, using cancellation from that context causes test failures. To remove this WithoutCancel,
 	// any wait.Interrupted errors need to be filtered from result and bypass the reasonCache - cancelling
@@ -2356,6 +2407,10 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	//   the detection of a container shutdown or (for readiness) after the first failure. Tracked as
 	//   https://github.com/kubernetes/kubernetes/issues/107894 although may not be worth optimizing.
 	kl.probeManager.RemovePod(pod)
+
+	// Drop any node-local restore-blocked marker for this pod (KEP-5823); the pod
+	// is terminating, so it can no longer be waiting on a restore lock.
+	kl.restoreBlockedPods.Delete(pod.UID)
 
 	// Guard against consistency issues in KillPod implementations by checking that there are no
 	// running containers. This method is invoked infrequently so this is effectively free and can
@@ -3456,6 +3511,185 @@ func (kl *Kubelet) CheckpointContainer(
 	return nil
 }
 
+// CheckpointPod is the asynchronous execution step of a Pod-level checkpoint
+// (KEP-5823). It is called by the PodCheckpoint watch when a non-terminal
+// object names a pod this kubelet runs. It validates the request synchronously
+// and, on success, starts the checkpoint in the background and returns nil
+// immediately, so a single watch event never ties up a worker for the length of
+// the potentially multi-minute operation. The background worker performs the
+// CRI CheckpointPod call and writes the outcome to the named PodCheckpoint's
+// status itself (Completed+location, or Failed). podCheckpointNamespace is the
+// namespace of both the source pod and the PodCheckpoint object.
+//
+// Duplicate triggers for the same pod (for example a re-observed object after a
+// restart) are de-duplicated by the per-pod in-flight guard: a second trigger
+// returns nil without starting another checkpoint.
+func (kl *Kubelet) CheckpointPod(
+	ctx context.Context,
+	podUID types.UID,
+	podFullName string,
+	podCheckpointNamespace string,
+	podCheckpointName string,
+	timeout time.Duration,
+	options *runtimeapi.CheckpointPodRequest,
+) error {
+	logger := klog.FromContext(ctx)
+
+	// Get the pod status to find the sandbox ID
+	pod, podFound := kl.podManager.GetPodByUID(podUID)
+	if !podFound {
+		return fmt.Errorf("pod %v not found", podUID)
+	}
+
+	runtimePod, err := kl.containerRuntime.GetPod(ctx, pod.UID)
+	if err != nil {
+		return fmt.Errorf("failed to get runtime pod: %v", err)
+	}
+
+	podStatus, err := kl.containerRuntime.GetPodStatus(ctx, runtimePod)
+	if err != nil {
+		return err
+	}
+
+	if podStatus.SandboxStatuses == nil || len(podStatus.SandboxStatuses) == 0 {
+		return fmt.Errorf("pod %v has no sandbox", podFullName)
+	}
+
+	// Enforce the execution-time preconditions (KEP-5823) before reaching the
+	// container runtime: the pod must be bound to a node, all init containers
+	// completed, and all regular containers running.
+	if err := validateCheckpointPodPreconditions(pod, podStatus); err != nil {
+		return err
+	}
+
+	// Only set the default path if one was not provided. A Pod checkpoint is a
+	// directory the runtime writes its files into (a collection of runtime-defined
+	// files, not a single tar), so the generated path has no file extension.
+	if options.Path == "" {
+		options.Path = filepath.Join(
+			kl.getPodCheckpointsDir(),
+			fmt.Sprintf(
+				"checkpoint-%s-%s",
+				podFullName,
+				time.Now().Format(time.RFC3339),
+			),
+		)
+	}
+
+	options.PodSandboxId = podStatus.SandboxStatuses[0].Id
+
+	// De-duplicate concurrent triggers for the same pod. A duplicate trigger is
+	// not an error: the first checkpoint is already running and will finalize
+	// the PodCheckpoint status when it completes.
+	if _, alreadyInFlight := kl.checkpointsInFlight.LoadOrStore(podUID, struct{}{}); alreadyInFlight {
+		logger.V(2).Info("Checkpoint already in flight for pod; ignoring duplicate trigger", "pod", klog.KObj(pod), "podUID", podUID)
+		return nil
+	}
+
+	// Pause the pod's probes for the duration of the checkpoint: its containers
+	// are frozen while the archive is written, so a liveness/startup probe would
+	// time out and could get the pod killed mid-checkpoint.
+	kl.probeManager.SuspendProbes(podUID)
+
+	// Run the checkpoint asynchronously and finalize the PodCheckpoint status when
+	// it completes. Detach from the request context (which is canceled once the
+	// 202 response is written) but preserve its logger.
+	bgCtx := context.WithoutCancel(ctx)
+	// Bound the checkpoint operation with the gRPC call deadline (the bgCtx
+	// deadline) rather than the CRI CheckpointPodRequest.timeout field, which is
+	// redundant per the KEP-5823 API review. context.WithoutCancel above strips
+	// any deadline from ctx, so the deadline must be (re)applied to bgCtx here.
+	// cancel is invoked when the goroutine finishes (it outlives CheckpointPod),
+	// so the deadline covers the whole background CRI call.
+	//
+	// Clamp the caller's requested timeout (from the PodCheckpoint's
+	// spec.timeoutSeconds) to the kubelet's configured ceiling so the Pod cannot
+	// stay frozen longer than the deterministic maximum (KEP-5823). A requested
+	// timeout of 0 (unset) falls back to the ceiling. The ceiling is defaulted,
+	// so the operation always has a deadline.
+	if ceiling := kl.kubeletConfiguration.PodCheckpointTimeout.Duration; ceiling > 0 {
+		if timeout <= 0 || timeout > ceiling {
+			timeout = ceiling
+		}
+	}
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		bgCtx, cancel = context.WithTimeout(bgCtx, timeout)
+	}
+	go func() {
+		if cancel != nil {
+			defer cancel()
+		}
+		defer kl.checkpointsInFlight.Delete(podUID)
+		defer kl.probeManager.ResumeProbes(podUID)
+
+		err := kl.containerRuntime.CheckpointPod(bgCtx, options)
+		if err != nil {
+			logger.Error(err, "Pod checkpoint failed", "pod", klog.KObj(pod), "checkpointPath", options.Path)
+			kl.finalizePodCheckpoint(bgCtx, podCheckpointNamespace, podCheckpointName, false, "", fmt.Sprintf("checkpoint failed: %v", err))
+			return
+		}
+		logger.V(2).Info("Pod checkpoint completed", "pod", klog.KObj(pod), "checkpointPath", options.Path)
+		// KEP-5823: status.checkpointLocation must be implementation-agnostic and
+		// must not expose an absolute host filesystem path. Store the archive path
+		// relative to the kubelet's pod-checkpoints root; the restore side resolves
+		// it back against that root. The CRI CheckpointPod call above still used the
+		// absolute options.Path.
+		relLocation, err := filepath.Rel(kl.getPodCheckpointsDir(), options.Path)
+		if err != nil {
+			logger.Error(err, "Failed to compute relative checkpoint location", "pod", klog.KObj(pod), "checkpointPath", options.Path)
+			kl.finalizePodCheckpoint(bgCtx, podCheckpointNamespace, podCheckpointName, false, "", fmt.Sprintf("checkpoint failed: cannot compute checkpoint location relative to %q: %v", kl.getPodCheckpointsDir(), err))
+			return
+		}
+		kl.finalizePodCheckpoint(bgCtx, podCheckpointNamespace, podCheckpointName, true, relLocation, "")
+	}()
+
+	return nil
+}
+
+// validateCheckpointPodPreconditions enforces the execution-time gate from
+// KEP-5823: the pod must be bound to a node, all non-restartable init containers
+// must have completed successfully, and all regular containers (plus restartable
+// init/sidecar containers) must be running. Checkpoint requests that do not meet
+// these preconditions are rejected before reaching the container runtime.
+func validateCheckpointPodPreconditions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	if pod.Spec.NodeName == "" {
+		return fmt.Errorf("cannot checkpoint pod %v: pod is not bound to a node", klog.KObj(pod))
+	}
+
+	requireRunning := func(name string) error {
+		cs := podStatus.FindContainerStatusByName(name)
+		if cs == nil || cs.State != kubecontainer.ContainerStateRunning {
+			return fmt.Errorf("cannot checkpoint pod %v: container %q is not running", klog.KObj(pod), name)
+		}
+		return nil
+	}
+
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		if podutil.IsRestartableInitContainer(c) {
+			// Restartable init (sidecar) containers run alongside the regular
+			// containers, so they must be running like regular containers.
+			if err := requireRunning(c.Name); err != nil {
+				return err
+			}
+			continue
+		}
+		cs := podStatus.FindContainerStatusByName(c.Name)
+		if cs == nil || cs.State != kubecontainer.ContainerStateExited || cs.ExitCode != 0 {
+			return fmt.Errorf("cannot checkpoint pod %v: init container %q has not completed successfully", klog.KObj(pod), c.Name)
+		}
+	}
+
+	for i := range pod.Spec.Containers {
+		if err := requireRunning(pod.Spec.Containers[i].Name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
 func (kl *Kubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
 	return kl.containerRuntime.ListMetricDescriptors(ctx)
@@ -3597,4 +3831,24 @@ func (kl *Kubelet) OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error {
 	}()
 
 	return nil
+}
+
+// SetPodRestoreBlocked records whether pod podUID's restore-from-checkpoint is
+// currently blocked waiting for another restore of the same (namespace, name) to
+// finish. It is the RuntimeHelper callback invoked by the runtime manager from
+// the restore path so the kubelet can surface the Restoring=False/RestoreInProgress
+// condition (KEP-5823). This method implements the RuntimeHelper interface.
+func (kl *Kubelet) SetPodRestoreBlocked(podUID types.UID, blocked bool) {
+	if blocked {
+		kl.restoreBlockedPods.Store(podUID, struct{}{})
+		return
+	}
+	kl.restoreBlockedPods.Delete(podUID)
+}
+
+// podRestoreBlocked reports whether pod podUID's restore is currently blocked
+// waiting for another restore of the same (namespace, name) to finish.
+func (kl *Kubelet) podRestoreBlocked(podUID types.UID) bool {
+	_, ok := kl.restoreBlockedPods.Load(podUID)
+	return ok
 }

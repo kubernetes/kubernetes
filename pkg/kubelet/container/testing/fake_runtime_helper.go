@@ -71,6 +71,10 @@ func (f *FakeRuntimeHelper) GetPodDir(podUID kubetypes.UID) string {
 	return "/poddir/" + string(podUID)
 }
 
+func (f *FakeRuntimeHelper) GetPodCheckpointArchivePath(_ context.Context, pod *v1.Pod) (string, error) {
+	return "/fake/pod-checkpoints/archive.tar", nil
+}
+
 func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	return nil
 }
@@ -136,4 +140,8 @@ func (f *FakeRuntimeHelper) PodCPUAndMemoryStats(_ context.Context, pod *v1.Pod,
 func (f *FakeRuntimeHelper) OnPodSandboxReady(_ context.Context, _ *v1.Pod) error {
 	// Not implemented
 	return nil
+}
+
+func (f *FakeRuntimeHelper) SetPodRestoreBlocked(_ kubetypes.UID, _ bool) {
+	// Not implemented
 }

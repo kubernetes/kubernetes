@@ -69,6 +69,7 @@ import (
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -721,6 +722,13 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
 		if err != nil {
 			return fmt.Errorf("failed to initialize kubelet client: %w", err)
+		}
+
+		// Dynamic client, used to read built-in API types that have no typed
+		// client (e.g. checkpoint.k8s.io PodCheckpoint, resolved during restore).
+		kubeDeps.DynamicClient, err = dynamic.NewForConfig(clientConfig)
+		if err != nil {
+			return fmt.Errorf("failed to initialize kubelet dynamic client: %w", err)
 		}
 
 		// make a separate client for events

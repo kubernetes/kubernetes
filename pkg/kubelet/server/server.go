@@ -671,6 +671,10 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 		s.restfulCont.Add(ws)
 	}
 
+	// Note: pod-level checkpoint (KEP-5823) deliberately has no imperative HTTP
+	// endpoint. Checkpoints are driven declaratively: the kubelet watches
+	// PodCheckpoint objects and executes the ones whose source Pod it runs.
+
 	// must be done last so all paths are included in /statusz
 	s.InstallZPages()
 }

@@ -55,6 +55,12 @@ type RuntimeHelper interface {
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
+	// GetPodCheckpointArchivePath resolves the pod's spec.restoreFrom (the name
+	// of a PodCheckpoint in the pod's namespace) to the on-node checkpoint
+	// archive path. It returns an error if the checkpoint cannot be found, is
+	// not ready, or was taken on a different node (cross-node restore is out of
+	// scope).
+	GetPodCheckpointArchivePath(ctx context.Context, pod *v1.Pod) (string, error)
 	GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
@@ -79,6 +85,12 @@ type RuntimeHelper interface {
 	// OnPodSandboxReady callback is invoked after pod sandbox, networking, volume are ready.
 	// This is used to update the PodReadyToStartContainers condition.
 	OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error
+
+	// SetPodRestoreBlocked records whether a pod's restore-from-checkpoint is
+	// currently blocked waiting for another restore of the same (namespace, name)
+	// to finish, so the kubelet can surface the Restoring=False/RestoreInProgress
+	// condition (KEP-5823).
+	SetPodRestoreBlocked(podUID types.UID, blocked bool)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.

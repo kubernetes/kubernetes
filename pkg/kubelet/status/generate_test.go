@@ -29,6 +29,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
 )
@@ -711,6 +712,64 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 			require.Equal(t, test.expected.Status, condition.Status)
 			require.Equal(t, test.expected.Reason, condition.Reason)
 			require.Equal(t, test.expected.Message, condition.Message)
+		})
+	}
+}
+
+func TestGenerateRestoringCondition(t *testing.T) {
+	restoreFrom := "my-checkpoint"
+	restorePod := &v1.Pod{Spec: v1.PodSpec{RestoreFrom: &restoreFrom}}
+
+	readySandbox := &kubecontainer.PodStatus{
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+			{
+				Network:  &runtimeapi.PodSandboxNetworkStatus{Ip: "10.0.0.10"},
+				Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+				State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+			},
+		},
+	}
+
+	for desc, test := range map[string]struct {
+		pod          *v1.Pod
+		status       *kubecontainer.PodStatus
+		blocked      bool
+		expectOK     bool
+		expectStatus v1.ConditionStatus
+		expectReason string
+	}{
+		"restore in flight (no sandbox yet)": {
+			pod:          restorePod,
+			status:       &kubecontainer.PodStatus{},
+			blocked:      false,
+			expectOK:     true,
+			expectStatus: v1.ConditionTrue,
+			expectReason: RestoringSandbox,
+		},
+		"restore blocked on another restore": {
+			pod:          restorePod,
+			status:       &kubecontainer.PodStatus{},
+			blocked:      true,
+			expectOK:     true,
+			expectStatus: v1.ConditionFalse,
+			expectReason: events.RestoreInProgress,
+		},
+		"restore complete (sandbox ready) clears the condition": {
+			pod:      restorePod,
+			status:   readySandbox,
+			blocked:  false,
+			expectOK: false,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			condition, ok := GenerateRestoringCondition(test.pod, &v1.PodStatus{}, test.status, test.blocked)
+			require.Equal(t, test.expectOK, ok)
+			if !test.expectOK {
+				return
+			}
+			require.Equal(t, kubetypes.PodRestoring, condition.Type)
+			require.Equal(t, test.expectStatus, condition.Status)
+			require.Equal(t, test.expectReason, condition.Reason)
 		})
 	}
 }

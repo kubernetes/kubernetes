@@ -668,6 +668,45 @@ func resultsManager(m *manager, probeType probeType) results.Manager {
 	panic(fmt.Errorf("Unhandled case: %v", probeType))
 }
 
+func TestSuspendProbes(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	// A normal probe would fail (and, for liveness, record Failure).
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(true))
+
+	// Suspend probes for the pod: doProbe should keep the worker alive and skip
+	// probing, leaving no recorded result.
+	m.SuspendProbes(w.pod.UID)
+	if !m.isSuspended(w.pod.UID) {
+		t.Fatal("expected pod to be suspended")
+	}
+	if c := w.doProbe(ctx); !c {
+		t.Errorf("expected doProbe to keep going while suspended")
+	}
+	if _, ok := resultsManager(m, liveness).Get(testContainerID); ok {
+		t.Errorf("expected no probe result to be recorded while suspended")
+	}
+
+	// Resume: probing runs again and records the (failing) result.
+	m.ResumeProbes(w.pod.UID)
+	if m.isSuspended(w.pod.UID) {
+		t.Fatal("expected pod to no longer be suspended")
+	}
+	if c := w.doProbe(ctx); !c {
+		t.Errorf("expected doProbe to keep going after resume")
+	}
+	result, ok := resultsManager(m, liveness).Get(testContainerID)
+	if !ok {
+		t.Fatalf("expected a probe result to be recorded after resume")
+	}
+	if result != results.Failure {
+		t.Errorf("expected Failure result after resume, got %v", result)
+	}
+}
+
 func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()

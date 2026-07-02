@@ -22,6 +22,14 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// PodRestoring is a kubelet-owned pod condition (KEP-5823) set on a pod that is
+// being restored from a PodCheckpoint (spec.restoreFrom). It is True while the
+// pod's own sandbox restore is in flight and cleared once the pod is Running; it
+// is False with reason RestoreInProgress while the restore is blocked waiting for
+// another restore of the same (namespace, name) to finish. It reports node-local
+// kubelet state and is not an API-level lock.
+const PodRestoring v1.PodConditionType = "Restoring"
+
 // PodConditionsByKubelet is the list of pod conditions owned by kubelet
 var PodConditionsByKubelet = []v1.PodConditionType{
 	v1.PodScheduled,
@@ -46,6 +54,11 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
 		if conditionType == v1.AllContainersRestarting {
+			return true
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		if conditionType == PodRestoring {
 			return true
 		}
 	}

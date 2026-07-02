@@ -176,6 +176,139 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 	}
 }
 
+// TestRestorePodSandboxPidNamespaceFromSpec verifies that restorePodSandbox no
+// longer forces pod-level PID namespace sharing and instead derives the PID
+// namespace mode from the pod spec, matching the normal createPodSandbox path.
+func TestRestorePodSandboxPidNamespaceFromSpec(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	tests := []struct {
+		name     string
+		mutate   func(*v1.Pod)
+		expected runtimeapi.NamespaceMode
+	}{
+		{
+			name:     "default keeps per-container PID namespace",
+			mutate:   func(*v1.Pod) {},
+			expected: runtimeapi.NamespaceMode_CONTAINER,
+		},
+		{
+			name:     "ShareProcessNamespace shares the pod PID namespace",
+			mutate:   func(p *v1.Pod) { p.Spec.ShareProcessNamespace = ptr.To(true) },
+			expected: runtimeapi.NamespaceMode_POD,
+		},
+		{
+			name:     "HostPID uses the node PID namespace",
+			mutate:   func(p *v1.Pod) { p.Spec.HostPID = true },
+			expected: runtimeapi.NamespaceMode_NODE,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			pod := newTestPod()
+			pod.Spec.RestoreFrom = ptr.To("/var/lib/kubelet/pod-checkpoints/checkpoint.tar")
+			// NamespaceOptions are only derived when a PodSecurityContext is
+			// present (true on both the create and restore paths), so set one.
+			pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+			tc.mutate(pod)
+
+			_, _, err = m.restorePodSandbox(tCtx, pod, 0)
+			require.NoError(t, err)
+
+			require.Len(t, fakeRuntime.RestoredPods, 1)
+			cfg := fakeRuntime.RestoredPods[0].Config
+			require.NotNil(t, cfg)
+			require.NotNil(t, cfg.Linux)
+			require.NotNil(t, cfg.Linux.SecurityContext)
+			require.NotNil(t, cfg.Linux.SecurityContext.NamespaceOptions)
+			assert.Equal(t, tc.expected, cfg.Linux.SecurityContext.NamespaceOptions.Pid)
+		})
+	}
+}
+
+// TestRestorePodSandboxExcludesEphemeralContainers verifies that ephemeral
+// (debug) containers are not included in the container set sent to the runtime
+// on restore, while init and regular containers are.
+func TestRestorePodSandboxExcludesEphemeralContainers(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod := newTestPod()
+	pod.Spec.RestoreFrom = ptr.To("/var/lib/kubelet/pod-checkpoints/checkpoint.tar")
+	pod.Spec.InitContainers = []v1.Container{{Name: "init"}}
+	pod.Spec.EphemeralContainers = []v1.EphemeralContainer{
+		{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debugger"}},
+	}
+
+	_, _, err = m.restorePodSandbox(tCtx, pod, 0)
+	require.NoError(t, err)
+
+	require.Len(t, fakeRuntime.RestoredPods, 1)
+	var names []string
+	for _, cc := range fakeRuntime.RestoredPods[0].ContainerConfigs {
+		names = append(names, cc.Metadata.Name)
+	}
+	assert.Contains(t, names, "foo")  // regular container from newTestPod
+	assert.Contains(t, names, "init") // init container
+	assert.NotContains(t, names, "debugger")
+}
+
+// TestAcquireReleaseRestore verifies the per-pod in-flight restore guard:
+// acquiring a key succeeds once, blocks a second acquire of the same key, is
+// independent across keys, and can be re-acquired after release. The key is the
+// pod's namespace/name (not UID), since each restore attempt is admitted under
+// a fresh pod UID.
+func TestAcquireReleaseRestore(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	const keyA, keyB = "ns/pod-a", "ns/pod-b"
+
+	assert.True(t, m.acquireRestore(keyA), "first acquire should succeed")
+	assert.False(t, m.acquireRestore(keyA), "second acquire of the same key should be rejected")
+	assert.True(t, m.acquireRestore(keyB), "a different key is independent")
+
+	m.releaseRestore(keyA)
+	assert.True(t, m.acquireRestore(keyA), "acquire after release should succeed")
+}
+
+// TestRestorePodSandboxRejectsConcurrentRestore verifies that restorePodSandbox
+// rejects a restore while one is already in flight for the same pod UID without
+// calling the runtime, and that the guard is released after a restore finishes.
+func TestRestorePodSandboxRejectsConcurrentRestore(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod := newTestPod()
+	pod.Spec.RestoreFrom = ptr.To("checkpoint-1")
+	restoreKey := pod.Namespace + "/" + pod.Name
+
+	// Simulate a restore already running for this pod.
+	require.True(t, m.acquireRestore(restoreKey))
+
+	// A second restore for the same pod is rejected without reaching the runtime.
+	_, msg, err := m.restorePodSandbox(tCtx, pod, 0)
+	require.Error(t, err)
+	assert.Contains(t, msg, "already in progress")
+	assert.Empty(t, fakeRuntime.RestoredPods)
+
+	// Once the in-flight restore completes, a new restore proceeds.
+	m.releaseRestore(restoreKey)
+	_, _, err = m.restorePodSandbox(tCtx, pod, 0)
+	require.NoError(t, err)
+	require.Len(t, fakeRuntime.RestoredPods, 1)
+
+	// A successful restore releases the guard, so the pod can be acquired again.
+	assert.True(t, m.acquireRestore(restoreKey), "guard should be released after a successful restore")
+}
+
 func newTestPod() *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
