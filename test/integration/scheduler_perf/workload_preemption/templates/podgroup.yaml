@@ -1,0 +1,9 @@
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: PodGroup
+metadata:
+  name: gang-{{.Index}}
+spec:
+  priority: {{if .priority}}{{AddInt 0 .priority}}{{else}}8888888{{end}}
+  schedulingPolicy:
+    gang:
+      minCount: {{.podsPerGroup}}
