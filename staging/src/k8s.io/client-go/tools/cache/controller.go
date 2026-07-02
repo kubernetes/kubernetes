@@ -116,6 +116,7 @@ type controller struct {
 	config         Config
 	reflector      *Reflector
 	reflectorMutex sync.RWMutex
+	clientStore    Store
 	clock          clock.Clock
 }
 
@@ -186,6 +187,7 @@ func (c *controller) RunWithContext(ctx context.Context) {
 			Clock:           c.clock,
 		},
 	)
+	r.clientStore = c.clientStore
 	r.ShouldResync = c.config.ShouldResync
 	r.WatchListPageSize = c.config.WatchListPageSize
 	if c.config.WatchErrorHandler != nil {
