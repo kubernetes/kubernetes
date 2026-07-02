@@ -187,10 +187,11 @@ func TestRestorePod(t *testing.T) {
 
 	response, err := rtSvc.RestorePod(ctx, request)
 	require.NoError(t, err)
-	assert.Equal(t, "fake-restored-pod-id", response.GetPodSandboxId())
+	sandboxID := apitest.BuildSandboxName(request.Config.Metadata)
+	assert.Equal(t, sandboxID, response.GetPodSandboxId())
 	require.Len(t, response.GetRestoredContainers(), 1)
 	assert.Equal(t, "app", response.GetRestoredContainers()[0].GetName())
-	assert.NotEmpty(t, response.GetRestoredContainers()[0].GetContainerId())
+	assert.Equal(t, apitest.BuildContainerName(request.ContainerConfigs[0].Metadata, sandboxID), response.GetRestoredContainers()[0].GetContainerId())
 	require.Len(t, fakeRuntime.RuntimeService.RestoredPods, 1)
 	assert.True(t, proto.Equal(originalRequest, request))
 	assert.True(t, proto.Equal(request, fakeRuntime.RuntimeService.RestoredPods[0]))
