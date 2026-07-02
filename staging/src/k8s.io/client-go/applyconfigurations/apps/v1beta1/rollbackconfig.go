@@ -23,7 +23,7 @@ package v1beta1
 //
 // DEPRECATED.
 type RollbackConfigApplyConfiguration struct {
-	// The revision to rollback to. If set to 0, rollback to the last revision.
+	// revision to rollback to. If set to 0, rollback to the last revision.
 	Revision *int64 `json:"revision,omitempty"`
 }
 
