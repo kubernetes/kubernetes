@@ -1925,7 +1925,36 @@ func TestFastTrackInterPodAffinity(t *testing.T) {
 				},
 			}
 
-			node1 := framework.NewNodeInfo(podWithZoneAntiAffinity, podWithHostAntiAffinity, podWithNamespaceAntiAffinity)
+			podBlockedInRedNamespace := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-blocked-red", Namespace: "red-ns", Labels: map[string]string{"app": "blocked"}},
+				Spec:       v1.PodSpec{},
+			}
+
+			podWithDoesNotExistNamespaceAntiAffinity := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-4", Namespace: "default"},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "blocked"}},
+									TopologyKey:   "topology.kubernetes.io/zone",
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "team",
+												Operator: metav1.LabelSelectorOpDoesNotExist,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			node1 := framework.NewNodeInfo(podWithZoneAntiAffinity, podWithHostAntiAffinity, podWithNamespaceAntiAffinity, podBlockedInRedNamespace)
 			node1.SetNode(&v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-1",
@@ -2052,6 +2081,12 @@ func TestFastTrackInterPodAffinity(t *testing.T) {
 					name:         "Incoming pod is NOT blocked by existing pod's namespaceSelector anti-affinity (non-matching namespace)",
 					incomingPod:  podWithBlockedAppBlueTeam,
 					targetNode:   node2, // us-west-1a, same as node-1 where pod-3 is
+					wantSchedule: true,
+				},
+				{
+					name:         "DoesNotExist namespaceSelector anti-affinity does not block scheduling on node-1 since namespace doesn't match",
+					incomingPod:  podWithDoesNotExistNamespaceAntiAffinity,
+					targetNode:   node1,
 					wantSchedule: true,
 				},
 			} {

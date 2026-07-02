@@ -131,7 +131,7 @@ func getArgs(obj runtime.Object) (config.InterPodAffinityArgs, error) {
 // is set to Nothing()) or is Empty(), which means match everything. Therefore,
 // there when matching against this term, there is no need to lookup the existing
 // pod's namespace labels to match them against term's namespaceSelector explicitly.
-func (pl *InterPodAffinity) mergeAffinityTermNamespacesIfNotEmpty(at fwk.AffinityTerm) error {
+func (pl *InterPodAffinity) mergeAffinityTermNamespacesIfNotEmpty(at *fwk.AffinityTerm) error {
 	if at.NamespaceSelector.Empty() {
 		return nil
 	}
