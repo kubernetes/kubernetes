@@ -141,21 +141,52 @@ func NewMountError(mountErrorValue MountErrorType, format string, args ...interf
 	return mountError
 }
 
+type DiskIdentifier string
+
+type VolumeIdentifier string
+
+type StorageManager interface {
+	PartitionDisk(disk DiskIdentifier) error
+	ListVolumesOnDisk(disk DiskIdentifier) (volumeIDs []VolumeIdentifier, err error)
+}
+
 // SafeFormatAndMount probes a device to see if it is formatted.
-// Namely it checks to see if a file system is present. If so it
+// Namely, it checks to see if a file system is present. If so it
 // mounts it otherwise the device is formatted first then mounted.
 type SafeFormatAndMount struct {
 	Interface
-	Exec utilexec.Interface
+	Exec           utilexec.Interface
+	StorageManager StorageManager
 
 	formatSem     chan any
 	formatTimeout time.Duration
 }
 
+// NewSafeFormatAndMount creates a new SafeFormatAndMount.
+//
+// Deprecated: Use NewSafeFormatAndMountWithStorageManager instead, which requires
+// an explicit StorageManager to be provided.
 func NewSafeFormatAndMount(mounter Interface, exec utilexec.Interface, opts ...Option) *SafeFormatAndMount {
+	storageManager := NewDefaultStorageManager()
 	res := &SafeFormatAndMount{
-		Interface: mounter,
-		Exec:      exec,
+		Interface:      mounter,
+		Exec:           exec,
+		StorageManager: storageManager,
+	}
+	for _, opt := range opts {
+		opt(res)
+	}
+	return res
+}
+
+func NewSafeFormatAndMountWithStorageManager(mounter Interface, exec utilexec.Interface, storageManager StorageManager, opts ...Option) *SafeFormatAndMount {
+	if storageManager == nil {
+		storageManager = NewDefaultStorageManager()
+	}
+	res := &SafeFormatAndMount{
+		Interface:      mounter,
+		Exec:           exec,
+		StorageManager: storageManager,
 	}
 	for _, opt := range opts {
 		opt(res)

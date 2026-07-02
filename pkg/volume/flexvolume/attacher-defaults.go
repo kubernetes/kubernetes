@@ -68,7 +68,7 @@ func (a *attacherDefaults) MountDevice(spec *volume.Spec, devicePath string, dev
 		options = append(options, "rw")
 	}
 
-	diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: exec.New()}
+	diskMounter := mount.NewSafeFormatAndMountWithStorageManager(mounter, exec.New(), mount.NewDefaultStorageManager())
 
 	return diskMounter.FormatAndMount(devicePath, deviceMountPath, volSourceFSType, options)
 }
