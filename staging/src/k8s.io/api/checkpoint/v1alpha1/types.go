@@ -52,6 +52,7 @@ const (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.37
 
 // PodCheckpoint represents a checkpoint of a running pod.
 type PodCheckpoint struct {
@@ -216,6 +217,7 @@ type NodeLocalCheckpointSource struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.37
 
 // PodCheckpointList is a list of PodCheckpoint objects.
 type PodCheckpointList struct {
