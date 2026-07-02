@@ -5627,6 +5627,8 @@ message ResourceRequirements {
   //
   // This field is immutable. It can only be set for containers.
   //
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
   // +featureGate=DynamicResourceAllocation
