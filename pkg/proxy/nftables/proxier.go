@@ -108,18 +108,19 @@ func NewDualStackProxier(
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
 	initOnly bool,
+	snatNodeInternalIP bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ctx, config, v1.IPv4Protocol,
 		localDetectors[v1.IPv4Protocol], nodeName, nodeIPs[v1.IPv4Protocol],
-		recorder, healthzServer, initOnly)
+		recorder, healthzServer, initOnly, snatNodeInternalIP)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(ctx, config, v1.IPv6Protocol,
 		localDetectors[v1.IPv6Protocol], nodeName, nodeIPs[v1.IPv6Protocol],
-		recorder, healthzServer, initOnly)
+		recorder, healthzServer, initOnly, snatNodeInternalIP)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -158,14 +159,15 @@ type Proxier struct {
 	flushed              bool
 
 	// These are effectively const and do not need the mutex to be held.
-	nftables       knftables.Interface
-	masqueradeAll  bool
-	masqueradeMark string
-	masqueradeRule string
-	conntrack      conntrack.Interface
-	localDetector  proxyutil.LocalTrafficDetector
-	nodeName       string
-	nodeIP         net.IP
+	nftables           knftables.Interface
+	masqueradeAll      bool
+	masqueradeMark     string
+	masqueradeRule     string
+	snatNodeInternalIP bool
+	conntrack          conntrack.Interface
+	localDetector      proxyutil.LocalTrafficDetector
+	nodeName           string
+	nodeIP             net.IP
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxyHealthServer
@@ -208,6 +210,7 @@ func NewProxier(ctx context.Context,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
 	initOnly bool,
+	snatNodeInternalIP bool,
 ) (*Proxier, error) {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "ipFamily", ipFamily)
 
@@ -225,6 +228,16 @@ func NewProxier(ctx context.Context,
 	masqueradeValue := 1 << uint(*config.NFTables.MasqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 	logger.V(2).Info("Using nftables mark for masquerade", "mark", masqueradeMark)
+
+	if snatNodeInternalIP && nodeIP != nil && nodeIP.IsLoopback() {
+		logger.V(2).Info("snatNodeInternalIP enabled but nodeIP is a loopback address, falling back to MASQUERADE")
+		snatNodeInternalIP = false
+	} else if snatNodeInternalIP && nodeIP != nil && !nodeIP.IsLoopback() {
+		logger.V(2).Info("Using SNAT with node InternalIP for service traffic", "nodeIP", nodeIP.String())
+	} else if snatNodeInternalIP {
+		logger.V(2).Info("snatNodeInternalIP enabled but nodeIP is not available, using MASQUERADE")
+		snatNodeInternalIP = false
+	}
 
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, config.NodePortAddresses)
 
@@ -245,6 +258,7 @@ func NewProxier(ctx context.Context,
 		masqueradeAll:       config.Linux.MasqueradeAll,
 		masqueradeMark:      masqueradeMark,
 		masqueradeRule:      fmt.Sprintf("mark set mark or %s", masqueradeMark),
+		snatNodeInternalIP:  snatNodeInternalIP,
 		conntrack:           conntrack.New(),
 		localDetector:       localDetector,
 		nodeName:            nodeName,
@@ -466,15 +480,25 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Comment: ptr.To("service hairpin connections"),
 	})
 
-	// Add the rules in the masquerading chain
-	tx.Add(&knftables.Rule{
-		Chain: masqueradingChain,
-		Rule: knftables.Concat(
-			"mark", "and", proxier.masqueradeMark, "!=", "0",
-			"mark", "set", "mark", "xor", proxier.masqueradeMark,
-			"masquerade fully-random",
-		),
-	})
+	if proxier.snatNodeInternalIP && proxier.nodeIP != nil && !proxier.nodeIP.IsLoopback() {
+		tx.Add(&knftables.Rule{
+			Chain: masqueradingChain,
+			Rule: knftables.Concat(
+				"mark", "and", proxier.masqueradeMark, "!=", "0",
+				"mark", "set", "mark", "xor", proxier.masqueradeMark,
+				"snat to", proxier.nodeIP.String(),
+			),
+		})
+	} else {
+		tx.Add(&knftables.Rule{
+			Chain: masqueradingChain,
+			Rule: knftables.Concat(
+				"mark", "and", proxier.masqueradeMark, "!=", "0",
+				"mark", "set", "mark", "xor", proxier.masqueradeMark,
+				"masquerade fully-random",
+			),
+		})
+	}
 	tx.Add(&knftables.Rule{
 		Chain: masqueradingChain,
 		Rule: knftables.Concat(

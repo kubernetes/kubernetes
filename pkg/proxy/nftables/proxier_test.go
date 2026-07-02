@@ -145,6 +145,12 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 	return nft, p
 }
 
+func NewFakeProxierWithSNATNodeInternalIP(ipFamily v1.IPFamily, snatNodeInternalIP bool) (*knftables.Fake, *Proxier) {
+	nft, p := NewFakeProxier(ipFamily)
+	p.snatNodeInternalIP = snatNodeInternalIP
+	return nft, p
+}
+
 var baseRules = dedent.Dedent(`
 	add table ip kube-proxy { comment "rules for kube-proxy" ; }
 
@@ -4928,4 +4934,43 @@ func TestBadIPs(t *testing.T) {
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
+}
+
+func TestNFTablesSNATNodeInternalIP(t *testing.T) {
+	_, fp := NewFakeProxierWithSNATNodeInternalIP(v1.IPv4Protocol, true)
+	if err := fp.syncProxyRules(); err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+
+	masqueradeRule := "add rule ip kube-proxy masquerading mark and 0x4000 != 0 mark set mark xor 0x4000"
+	snatRule := masqueradeRule + " snat to 192.168.0.2"
+	masqueradeFallback := masqueradeRule + " masquerade fully-random"
+
+	result := fp.nftables.(*knftables.Fake).Dump()
+	if !strings.Contains(result, snatRule) {
+		t.Errorf("expected snat rule %q not found in:\n%s", snatRule, result)
+	}
+	if strings.Contains(result, masqueradeFallback) {
+		t.Errorf("did not expect masquerade fallback rule %q in:\n%s", masqueradeFallback, result)
+	}
+}
+
+func TestNFTablesSNATNodeInternalIPWithLoopback(t *testing.T) {
+	_, fp := NewFakeProxierWithSNATNodeInternalIP(v1.IPv4Protocol, true)
+	fp.nodeIP = netutils.ParseIPSloppy("127.0.0.1")
+	if err := fp.syncProxyRules(); err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+
+	masqueradeRule := "add rule ip kube-proxy masquerading mark and 0x4000 != 0 mark set mark xor 0x4000"
+	snatRule := masqueradeRule + " snat to 192.168.0.2"
+	fallbackRule := masqueradeRule + " masquerade fully-random"
+
+	result := fp.nftables.(*knftables.Fake).Dump()
+	if !strings.Contains(result, fallbackRule) {
+		t.Errorf("expected masquerade fallback rule %q not found in:\n%s", fallbackRule, result)
+	}
+	if strings.Contains(result, snatRule) {
+		t.Errorf("did not expect snat rule %q in:\n%s", snatRule, result)
+	}
 }
