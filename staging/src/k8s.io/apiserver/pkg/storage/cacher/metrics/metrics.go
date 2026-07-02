@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
@@ -28,8 +29,10 @@ import (
 )
 
 const (
-	namespace = "apiserver"
-	subsystem = "watch_cache"
+	namespace                 = "apiserver"
+	subsystem                 = "watch_cache"
+	dispatchOutcomeDelivered  = "delivered"
+	dispatchOutcomeTerminated = "terminated"
 )
 
 /*
@@ -234,6 +237,51 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+
+	dispatchDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_dispatch_duration_seconds",
+			Help:           "Histogram of time spent dispatching an event to a specific watcher, broken by resource type and outcome.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		}, []string{"group", "resource", "outcome"})
+
+	WatchCacheQueueDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "queue_duration_seconds",
+			Help:           "Histogram of time spent in the cacher's incoming channel before fan-out.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		}, []string{"group", "resource"})
+
+	watcherQueueDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Name:           "watcher_queue_duration_seconds",
+			Help:           "Histogram of time spent waiting in a specific watcher's input channel.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		}, []string{"group", "resource"})
+
+	watcherDispatchBlockedSeconds = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Name:           "watcher_dispatch_blocked_seconds_total",
+			Help:           "Counter of cumulative time in seconds a watcher was blocked on the input channel.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		}, []string{"group", "resource"})
+
+	watcherHandoffBlockedSeconds = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Name:           "watcher_handoff_blocked_seconds_total",
+			Help:           "Counter of cumulative time in seconds this watcher was blocked sending an event to the result channel.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		}, []string{"group", "resource"})
 )
 
 var registerMetrics sync.Once
@@ -263,6 +311,11 @@ func Register() {
 			legacyregistry.MustRegister(WatchShardsTotal)
 			legacyregistry.MustRegister(WatchFilteredEventsTotal)
 		}
+		legacyregistry.MustRegister(dispatchDuration)
+		legacyregistry.MustRegister(WatchCacheQueueDuration)
+		legacyregistry.MustRegister(watcherQueueDuration)
+		legacyregistry.MustRegister(watcherDispatchBlockedSeconds)
+		legacyregistry.MustRegister(watcherHandoffBlockedSeconds)
 	})
 }
 
@@ -304,4 +357,82 @@ func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, ne
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+type WatcherMetricsObservers struct {
+	queueDuration          compbasemetrics.ObserverMetric
+	dispatchBlockedSeconds compbasemetrics.CounterMetric
+	handoffBlockedSeconds  compbasemetrics.CounterMetric
+	deliveredDuration      compbasemetrics.ObserverMetric
+	terminatedDuration     compbasemetrics.ObserverMetric
+}
+
+// NewWatcherMetricsObservers creates a pre-resolved metrics observer for watch connections.
+func NewWatcherMetricsObservers(groupResource schema.GroupResource) *WatcherMetricsObservers {
+	return &WatcherMetricsObservers{
+		queueDuration:          watcherQueueDuration.WithLabelValues(groupResource.Group, groupResource.Resource),
+		dispatchBlockedSeconds: watcherDispatchBlockedSeconds.WithLabelValues(groupResource.Group, groupResource.Resource),
+		handoffBlockedSeconds:  watcherHandoffBlockedSeconds.WithLabelValues(groupResource.Group, groupResource.Resource),
+		deliveredDuration:      dispatchDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchOutcomeDelivered),
+		terminatedDuration:     dispatchDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchOutcomeTerminated),
+	}
+}
+
+func (d *WatcherMetricsObservers) ObserveQueueDuration(duration time.Duration) {
+	observe(d.queueDuration, duration)
+}
+
+func (d *WatcherMetricsObservers) AddDispatchBlockedSeconds(duration time.Duration) {
+	if duration < 0 {
+		duration = 0
+	}
+	d.dispatchBlockedSeconds.Add(duration.Seconds())
+}
+
+func (d *WatcherMetricsObservers) AddHandoffBlockedSeconds(duration time.Duration) {
+	if duration < 0 {
+		duration = 0
+	}
+	d.handoffBlockedSeconds.Add(duration.Seconds())
+}
+
+func (d *WatcherMetricsObservers) ObserveDelivered(duration time.Duration) {
+	observe(d.deliveredDuration, duration)
+}
+
+func (d *WatcherMetricsObservers) ObserveTerminated(duration time.Duration) {
+	observe(d.terminatedDuration, duration)
+}
+
+func observe(m compbasemetrics.ObserverMetric, duration time.Duration) {
+	if duration < 0 {
+		duration = 0
+	}
+	m.Observe(duration.Seconds())
+}
+
+type noopObserver struct{}
+
+func (noopObserver) Observe(float64) {}
+
+type noopCounter struct{}
+
+func (noopCounter) Inc()        {}
+func (noopCounter) Add(float64) {}
+
+var (
+	noopObs noopObserver
+	noopCnt noopCounter
+)
+
+// NewNoopWatcherMetricsObservers returns a metrics observers struct that does nothing.
+// Used primarily for testing to avoid registering test-related metric series.
+func NewNoopWatcherMetricsObservers() *WatcherMetricsObservers {
+	return &WatcherMetricsObservers{
+		queueDuration:          noopObs,
+		dispatchBlockedSeconds: noopCnt,
+		handoffBlockedSeconds:  noopCnt,
+		deliveredDuration:      noopObs,
+		terminatedDuration:     noopObs,
+	}
 }
