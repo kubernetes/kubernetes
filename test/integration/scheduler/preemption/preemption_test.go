@@ -158,7 +158,7 @@ func TestPreemption(t *testing.T) {
 
 	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
 		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
+		v1.ResourceMemory: *resource.NewQuantity(100*1024, resource.DecimalSI)},
 	}
 
 	maxTokens := 1000
@@ -180,7 +180,7 @@ func TestPreemption(t *testing.T) {
 					Priority: &lowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+						v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 					},
 				}),
 			},
@@ -189,7 +189,7 @@ func TestPreemption(t *testing.T) {
 				Priority: &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{0: {}},
@@ -203,7 +203,7 @@ func TestPreemption(t *testing.T) {
 					Priority: &lowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+						v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 					},
 				}),
 			},
@@ -212,7 +212,7 @@ func TestPreemption(t *testing.T) {
 				Priority: &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{0: {}},
@@ -231,7 +231,7 @@ func TestPreemption(t *testing.T) {
 					Priority: &lowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+						v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 					},
 				}),
 			},
@@ -240,7 +240,7 @@ func TestPreemption(t *testing.T) {
 				Priority: &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{0: {}},
@@ -256,7 +256,7 @@ func TestPreemption(t *testing.T) {
 					Priority: &lowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+						v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 					},
 				}),
 			},
@@ -265,7 +265,7 @@ func TestPreemption(t *testing.T) {
 				Priority: &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					v1.ResourceMemory: *resource.NewQuantity(200*1024, resource.DecimalSI)},
 				},
 			}),
 			preemptedPodIndexes: map[int]struct{}{},
@@ -401,7 +401,7 @@ func TestPreemption(t *testing.T) {
 	nodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
+		v1.ResourceMemory: "500Ki",
 	}
 	nodeObject := st.MakeNode().Name("node1").Capacity(nodeRes).Label("node", "node1").Obj()
 
