@@ -307,7 +307,6 @@ func TestPluginCanSupport(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			actual := plug.CanSupport(tc.spec)
 			if tc.canSupport != actual {
 				t.Errorf("expecting canSupport %t, got %t", tc.canSupport, actual)
@@ -574,7 +573,6 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			default:
 				t.Fatal("invalid volume.Spec constructed")
 			}
-
 		})
 	}
 }
@@ -781,7 +779,7 @@ func TestPluginNewUnmounter(t *testing.T) {
 
 	// save the data file to re-create client
 	dir := filepath.Join(getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host), "/mount")
-	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
+	if err := os.MkdirAll(dir, 0o755); err != nil && !os.IsNotExist(err) {
 		t.Errorf("failed to create dir [%s]: %v", dir, err)
 	}
 
@@ -1159,7 +1157,7 @@ func TestPluginNewUnmapper(t *testing.T) {
 
 	// save the data file to re-create client
 	dir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
-	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
+	if err := os.MkdirAll(dir, 0o755); err != nil && !os.IsNotExist(err) {
 		t.Errorf("failed to create dir [%s]: %v", dir, err)
 	}
 
@@ -1232,7 +1230,7 @@ func TestPluginConstructBlockVolumeSpec(t *testing.T) {
 
 		// create data file in csi plugin dir
 		if tc.data != nil {
-			if err := os.MkdirAll(deviceDataDir, 0755); err != nil && !os.IsNotExist(err) {
+			if err := os.MkdirAll(deviceDataDir, 0o755); err != nil && !os.IsNotExist(err) {
 				t.Errorf("failed to create dir [%s]: %v", deviceDataDir, err)
 			}
 			if err := saveVolumeData(deviceDataDir, volDataFileName, tc.data); err != nil {
@@ -1546,5 +1544,70 @@ func TestIsResourceExhaustError(t *testing.T) {
 				t.Errorf("Expected isResourceExhaustError to return %v, but got %v", tc.expected, actual)
 			}
 		})
+	}
+}
+
+// TestPluginConstructVolumeSpecFallsBackToGlobalMount covers issue #101791.
+//
+// Scenario: kubelet restarts, the pod-local vol_data.json is missing or
+// unreadable, but the global mount's vol_data.json (written by
+// csiAttacher.MountDevice) is intact. Before the fix, ConstructVolumeSpec
+// errored out, marking the volume as failed-reconstruction and letting the
+// global mount leak (corruption risk on RWO volumes).
+//
+// With the fix, ConstructVolumeSpec scans the CSI plugin dir for a
+// vol_data.json whose specVolID matches and reuses it, so reconstruction
+// succeeds and the volume follows the normal unmount path.
+func TestPluginConstructVolumeSpecFallsBackToGlobalMount(t *testing.T) {
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	const (
+		specVolID = "orphaned-pv"
+		volHandle = "orphaned-handle"
+	)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeReconstructionFallback, true)
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+
+	// Arrange: pod-local mount dir exists but has NO vol_data.json
+	// (corrupt or wiped case).
+	podLocalDir := filepath.Join(tmpDir, "pods", "pod-uid", "volumes", "kubernetes.io~csi", specVolID)
+	if err := os.MkdirAll(filepath.Join(podLocalDir, "mount"), 0o755); err != nil {
+		t.Fatalf("setup pod-local dir: %v", err)
+	}
+
+	// Arrange: global mount dir has a complete vol_data.json with
+	// specVolID (as MountDevice now writes).
+	pluginDir := plug.host.GetPluginDir(plug.GetPluginName())
+	globalDataDir := filepath.Join(pluginDir, testDriver, "anyhashhere")
+	if err := os.MkdirAll(globalDataDir, 0o755); err != nil {
+		t.Fatalf("setup global dir: %v", err)
+	}
+	globalData := map[string]string{
+		volDataKey.specVolID:           specVolID,
+		volDataKey.volHandle:           volHandle,
+		volDataKey.driverName:          testDriver,
+		volDataKey.volumeLifecycleMode: string(storage.VolumeLifecyclePersistent),
+	}
+	if err := saveVolumeData(globalDataDir, volDataFileName, globalData); err != nil {
+		t.Fatalf("save global vol_data.json: %v", err)
+	}
+
+	// Act
+	rec, err := plug.ConstructVolumeSpec(specVolID, podLocalDir)
+	if err != nil {
+		t.Fatalf("ConstructVolumeSpec did not fall back to global mount data: %v", err)
+	}
+
+	// Assert: spec carries the fields we stored in the global JSON.
+	if rec.Spec == nil || rec.Spec.PersistentVolume == nil || rec.Spec.PersistentVolume.Spec.CSI == nil {
+		t.Fatalf("ConstructVolumeSpec returned incomplete spec: %+v", rec)
+	}
+	csi := rec.Spec.PersistentVolume.Spec.CSI
+	if csi.Driver != testDriver {
+		t.Errorf("Driver: got %q, want %q", csi.Driver, testDriver)
+	}
+	if csi.VolumeHandle != volHandle {
+		t.Errorf("VolumeHandle: got %q, want %q", csi.VolumeHandle, volHandle)
 	}
 }
