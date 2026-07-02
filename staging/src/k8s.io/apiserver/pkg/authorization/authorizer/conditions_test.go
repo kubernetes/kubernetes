@@ -1410,7 +1410,7 @@ func TestSampleAuthorizer(t *testing.T) {
 
 						// Only object and oldObject is used in celEvaluateConditions, so let all other values be zero here, as they are anyways unused.
 						data := authorizer.ConditionsData{
-							AdmissionControl: admission.NewAttributesRecord(tc.object, tc.oldObject, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil, false, nil),
+							ObjectsAccessor: admission.NewAttributesRecord(tc.object, tc.oldObject, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil, false, nil),
 						}
 
 						// Wrap in the ConditionsAwareDecision format just to get an unified string comparison mechanism.
@@ -1437,16 +1437,16 @@ func celEvaluateConditions(ctx context.Context, conditionsMap authorizer.Conditi
 		return conditionsMap.FailureDecision(), "failed closed", fmt.Errorf("failed to create CEL env: %w", err)
 	}
 
-	if data.AdmissionControl == nil {
+	if data.ObjectsAccessor == nil {
 		return conditionsMap.FailureDecision(), "failed closed", errors.New("evaluating a CEL condition requires non-nil data.AdmissionControl")
 	}
 
-	obj, err := objectToResolveVal(data.AdmissionControl.GetObject())
+	obj, err := objectToResolveVal(data.ObjectsAccessor.GetObject())
 	if err != nil {
 		return conditionsMap.FailureDecision(), "failed closed", fmt.Errorf("failed to convert object to CEL ref.Val: %w", err)
 	}
 
-	oldObj, err := objectToResolveVal(data.AdmissionControl.GetOldObject())
+	oldObj, err := objectToResolveVal(data.ObjectsAccessor.GetOldObject())
 	if err != nil {
 		return conditionsMap.FailureDecision(), "failed closed", fmt.Errorf("failed to convert object to CEL ref.Val: %w", err)
 	}

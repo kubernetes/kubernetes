@@ -302,11 +302,10 @@ type EvaluateConditionFunc func(ctx context.Context, condition Condition, data C
 type MaybeEvaluateConditionFunc func(ctx context.Context, condition Condition, data ConditionsData) ConditionEvaluationResult
 
 // ConditionsData is an enum type for various evaluation targets conditions
-// can be written against.
+// can be written against. At least one getter must be non-nil.
 type ConditionsData struct {
-	// AdmissionControl holds the data available during admission control.
-	// Callers must verify that this is non-nil before using.
-	AdmissionControl ConditionsDataAdmissionControl
+	// ObjectsAccessor holds the request information plus old and new objects, and options, as applicable.
+	ObjectsAccessor ConditionsDataObjectsAccessor
 }
 
 // AdmissionOperation represents the admission operation,
@@ -316,9 +315,9 @@ type ConditionsData struct {
 // than the admission package (thus avoiding import cycles)
 type AdmissionOperation string
 
-// ConditionsDataAdmissionControl represents the data available during admission control, for conditions
+// ConditionsDataObjectsAccessor represents the data available during admission control, for conditions
 // to evaluate against. This is by design a subset of admission.Attributes.
-type ConditionsDataAdmissionControl interface {
+type ConditionsDataObjectsAccessor interface {
 	// GetName returns the name of the object as presented in the request. On a CREATE operation, the client
 	// may omit name and rely on the server to generate the name. If that is the case, this method will return
 	// the empty string
