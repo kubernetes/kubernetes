@@ -2429,6 +2429,64 @@ func BenchmarkCacher_GetList(b *testing.B) {
 	}
 }
 
+func benchmarkPods(n int) []example.Pod {
+	pods := make([]example.Pod, n)
+	for i := range pods {
+		pods[i].Namespace = "default"
+		pods[i].Name = fmt.Sprintf("pod-%d", i)
+		pods[i].ResourceVersion = strconv.Itoa(i)
+		// Give each pod ~2KB of unique payload so the benchmark operates on
+		// realistically sized objects.
+		data := make([]byte, 1024*2)
+		rand.Read(data)
+		pods[i].Spec.NodeSelector = map[string]string{
+			"key": string(data),
+		}
+	}
+	return pods
+}
+
+func newDelegatorWithPods(tb testing.TB, pods []example.Pod) *CacheDelegator {
+	store := &cachertesting.MockStorage{
+		GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+			podList := listObj.(*example.PodList)
+			podList.ListMeta = metav1.ListMeta{ResourceVersion: "12345"}
+			podList.Items = pods
+			return nil
+		},
+		GetRVFn: func(_ context.Context) (uint64, error) { return 12345, nil },
+	}
+	cacher, _, err := newTestCacher(store)
+	if err != nil {
+		tb.Fatalf("new cacher: %v", err)
+	}
+	tb.Cleanup(cacher.Stop)
+	delegator := NewCacheDelegator(cacher, store)
+	tb.Cleanup(delegator.Stop)
+	return delegator
+}
+
+func BenchmarkCacher_GetList_AllPods(b *testing.B) {
+	totalObjectNum := 10_000
+	delegator := newDelegatorWithPods(b, benchmarkPods(totalObjectNum))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		result := &example.PodList{}
+		err := delegator.GetList(context.TODO(), "/pods/", storage.ListOptions{
+			Predicate:       storage.Everything,
+			Recursive:       true,
+			ResourceVersion: "12345",
+		}, result)
+		if err != nil {
+			b.Fatalf("GetList cache: %v", err)
+		}
+		if len(result.Items) != totalObjectNum {
+			b.Fatalf("expect %d but got %d", totalObjectNum, len(result.Items))
+		}
+	}
+}
+
 // TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived makes sure that
 // a bookmark event will be delivered even if the cacher has not received an event.
 func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
@@ -3150,8 +3208,6 @@ func TestWatchListSemanticsSimple(t *testing.T) {
 	}
 }
 
-// --- Sharding unit tests for filterWithAttrsAndPrefixFunction ---
-
 // selectorIncludingUID builds a shard selector whose range contains the hash of uid.
 func selectorIncludingUID(uid string) sharding.Selector {
 	hash := "0x" + sharding.HashField(uid)
@@ -3381,5 +3437,99 @@ func TestFilterWithAttrsAndPrefixFunction_NamespaceShardingMismatch(t *testing.T
 
 	if filter("/pods/other-namespace/pod-ns2", labels.Set{}, fields.Set{"metadata.name": "pod-ns2", "metadata.namespace": ns}, pod) {
 		t.Error("expected filter to reject: namespace hash doesn't fall in shard range")
+	}
+}
+
+// --- Sharding unit tests for Cacher.GetList ---
+
+// selectorExcludingOnlyUID builds a shard selector covering the entire hash
+// space except the hash of uid, so it matches every object but that one.
+func selectorExcludingOnlyUID(uid string) sharding.Selector {
+	hash := "0x" + sharding.HashField(uid)
+	return sharding.NewSelector(
+		sharding.ShardRangeRequirement{
+			Key:   "object.metadata.uid",
+			Start: "0x0000000000000000",
+			End:   hash,
+		},
+		sharding.ShardRangeRequirement{
+			Key:   "object.metadata.uid",
+			Start: incrementHex(hash),
+			End:   "0x10000000000000000",
+		},
+	)
+}
+
+func shardTestPods(n int) []example.Pod {
+	pods := make([]example.Pod, n)
+	for i := range pods {
+		pods[i].Namespace = "default"
+		pods[i].Name = fmt.Sprintf("pod-%d", i)
+		pods[i].UID = types.UID(fmt.Sprintf("uid-%d", i))
+		pods[i].ResourceVersion = strconv.Itoa(i + 1)
+	}
+	return pods
+}
+
+func TestGetListWithShardedListAndWatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	delegator := newDelegatorWithPods(t, shardTestPods(3))
+
+	testCases := map[string]struct {
+		shardSelector   sharding.Selector
+		expectPodNames  []string
+		expectShardInfo bool
+	}{
+		"nil shard selector returns all items": {
+			shardSelector:  nil,
+			expectPodNames: []string{"pod-0", "pod-1", "pod-2"},
+		},
+		"empty shard selector returns all items": {
+			shardSelector:  sharding.Everything(),
+			expectPodNames: []string{"pod-0", "pod-1", "pod-2"},
+		},
+		"shard selector returns only the matching shard": {
+			shardSelector:   selectorIncludingUID("uid-1"),
+			expectPodNames:  []string{"pod-1"},
+			expectShardInfo: true,
+		},
+		"shard selector excludes items outside the shard": {
+			shardSelector:   selectorExcludingOnlyUID("uid-1"),
+			expectPodNames:  []string{"pod-0", "pod-2"},
+			expectShardInfo: true,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			result := &example.PodList{}
+			err := delegator.GetList(context.TODO(), "/pods/", storage.ListOptions{
+				Predicate: storage.SelectionPredicate{
+					Label:         labels.Everything(),
+					Field:         fields.Everything(),
+					ShardSelector: tc.shardSelector,
+				},
+				Recursive:       true,
+				ResourceVersion: "12345",
+			}, result)
+			if err != nil {
+				t.Fatalf("GetList failed: %v", err)
+			}
+			gotNames := make([]string, 0, len(result.Items))
+			for _, pod := range result.Items {
+				gotNames = append(gotNames, pod.Name)
+			}
+			if !reflect.DeepEqual(tc.expectPodNames, gotNames) {
+				t.Errorf("expected pods %v, got %v", tc.expectPodNames, gotNames)
+			}
+			if tc.expectShardInfo {
+				if result.ShardInfo == nil {
+					t.Error("expected ShardInfo to be set on the list")
+				} else if want := tc.shardSelector.String(); result.ShardInfo.Selector != want {
+					t.Errorf("expected ShardInfo selector %q, got %q", want, result.ShardInfo.Selector)
+				}
+			} else if result.ShardInfo != nil {
+				t.Errorf("expected no ShardInfo on the list, got %+v", result.ShardInfo)
+			}
+		})
 	}
 }
