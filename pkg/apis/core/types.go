@@ -5798,6 +5798,16 @@ const (
 	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
+	// GracefulNodeShutdownInProgress reports whether Graceful Node Shutdown is determined to be in progress on this Node.
+	GracefulNodeShutdownInProgress NodeConditionType = "GracefulNodeShutdownInProgress"
+	// DrainInProgress reports that this Node is actively being drained.
+	DrainInProgress NodeConditionType = "DrainInProgress"
+	// Drained reports that this Node has reached the drain criteria selected by the actor managing the lifecycle.
+	Drained NodeConditionType = "Drained"
+	// MaintenancePlanned reports that this Node is expected to undergo maintenance.
+	MaintenancePlanned NodeConditionType = "MaintenancePlanned"
+	// MaintenanceInProgress reports that this Node is actively undergoing maintenance.
+	MaintenanceInProgress NodeConditionType = "MaintenanceInProgress"
 )
 
 // NodeCondition represents the node's condition
