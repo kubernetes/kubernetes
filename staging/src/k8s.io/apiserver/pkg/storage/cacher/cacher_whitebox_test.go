@@ -2479,6 +2479,7 @@ func TestForgetWatcher(t *testing.T) {
 		forgetCounter++
 		forgetWatcherFn(drainWatcher)
 	}
+	groupResource := schema.GroupResource{Resource: "pods"}
 	w := newCacheWatcher(
 		0,
 		func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true },
@@ -2486,7 +2487,8 @@ func TestForgetWatcher(t *testing.T) {
 		storage.APIObjectVersioner{},
 		testingclock.NewFakeClock(time.Now()).Now().Add(2*time.Minute),
 		true,
-		schema.GroupResource{Resource: "pods"},
+		groupResource,
+		metrics.NewNoopWatcherMetricsObservers(),
 		"1",
 	)
 	forgetWatcherFn = forgetWatcher(cacher, w, 0, namespacedName{}, "", false)
