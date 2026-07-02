@@ -270,7 +270,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 		consistencyStore:        consistencyStore,
 	}
 
-	if _, err := jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := jobInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			jm.addJob(logger, obj)
 		},
@@ -280,13 +280,13 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 		DeleteFunc: func(obj interface{}) {
 			jm.deleteJob(logger, obj)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, fmt.Errorf("adding Job event handler: %w", err)
 	}
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
 
-	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			jm.addPod(logger, obj)
 		},
@@ -296,7 +296,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 		DeleteFunc: func(obj interface{}) {
 			jm.deletePod(logger, obj, true)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, fmt.Errorf("adding Pod event handler: %w", err)
 	}
 	jm.podStore = podInformer.Lister()
