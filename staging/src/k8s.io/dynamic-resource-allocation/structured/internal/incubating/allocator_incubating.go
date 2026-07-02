@@ -166,7 +166,6 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		deviceMatchesRequest: make(map[matchKey]bool),
 		constraints:          make([][]constraint, len(claims)),
 		consumedCounters:     make(map[draapi.UniqueString]counterSets),
-
 		requestData:        make(map[requestIndices]requestData),
 		result:             make([]internalAllocationResult, len(claims)),
 		allocatingCapacity: NewConsumedCapacityCollection(),
