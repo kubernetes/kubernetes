@@ -21,10 +21,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 var _ MetricRecorder = &fakePodsRecorder{}
@@ -192,4 +194,73 @@ func TestInFlightEventAsync(t *testing.T) {
 	if len(r.aggregatedInflightEventMetric) != 0 {
 		t.Errorf("aggregatedInflightEventMetric should be force-flushed, but got: %v", r.aggregatedInflightEventMetric)
 	}
+}
+
+func TestNewMetricsAsyncRecorder(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		Register()
+
+		bufferSize := 10
+		interval := 1 * time.Second
+		stop := make(chan struct{})
+
+		r := NewMetricsAsyncRecorder(bufferSize, interval, stop)
+
+		var buffered int
+		var flushed uint64
+		check := func(step string) {
+			t.Helper()
+
+			actualBuffered := len(r.bufferCh)
+			if actualBuffered != buffered {
+				t.Errorf("%s: expected %d elements in the buffer waiting to be flushed, got %d", step, buffered, actualBuffered)
+			}
+
+			actualFlushed, err := testutil.GetHistogramMetricCount(PluginExecutionDuration.WithLabelValues("", "", ""))
+			if err != nil {
+				t.Errorf("%s: error getting metric: %v", step, err)
+			}
+			if actualFlushed != flushed {
+				t.Errorf("%s: expected metric to have count %v, got %v", step, flushed, actualFlushed)
+			}
+		}
+
+		check("nothing should be buffered or flushed immediately after starting")
+
+		synctest.Wait()
+		r.ObservePluginDurationAsync("", "", "", 1)
+		buffered++
+		check("a metric observed immediately after flushing should only be buffered")
+
+		time.Sleep(interval / 2)
+		r.ObservePluginDurationAsync("", "", "", 1)
+		buffered++
+		check("a metric observed during the interval should only be buffered")
+
+		time.Sleep(interval / 2)
+		synctest.Wait()
+		flushed += uint64(buffered)
+		buffered = 0
+		check("when the interval is reached, buffered metrics should be flushed")
+
+		r.ObservePluginDurationAsync("", "", "", 1)
+		time.Sleep(interval)
+		synctest.Wait()
+		flushed++
+		check("metrics should be flushed at each interval")
+
+		r.ObservePluginDurationAsync("", "", "", 1)
+		time.Sleep(interval / 2)
+		buffered++
+		check("metrics should continue to be buffered during the last interval")
+
+		closedAt := time.Now()
+		close(stop)
+		<-r.IsStoppedCh
+		if actualStopDelay := time.Since(closedAt); actualStopDelay != 0 {
+			t.Errorf("recorder was stopped halfway through its %v interval, expected it to stop immediately but it actually stopped after %v", interval, actualStopDelay)
+		}
+
+		check("buffered metrics are not flushed after stopping")
+	})
 }
