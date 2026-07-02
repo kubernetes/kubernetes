@@ -496,8 +496,14 @@ detectLocalMode: "BridgeInterface"`)
 		name        string
 		proxyServer proxyRun
 		append      bool
+		cancel      bool
 		expectedErr string
 	}{
+		{
+			name:        "cancel context",
+			proxyServer: new(fakeProxyServerLongRun),
+			cancel:      true,
+		},
 		{
 			name:        "update config file",
 			proxyServer: new(fakeProxyServerLongRun),
@@ -512,7 +518,9 @@ detectLocalMode: "BridgeInterface"`)
 	}
 
 	for _, tc := range testCases {
-		_, ctx := ktesting.NewTestContext(t)
+		_, baseCtx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(baseCtx)
+		defer cancel()
 		file, tempDir, err := setUp()
 		if err != nil {
 			t.Fatalf("unexpected error when setting up environment: %v", err)
@@ -533,6 +541,9 @@ detectLocalMode: "BridgeInterface"`)
 
 		if tc.append {
 			file.WriteString("append fake content")
+		}
+		if tc.cancel {
+			cancel()
 		}
 
 		select {

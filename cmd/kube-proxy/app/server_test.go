@@ -52,9 +52,8 @@ type fakeProxyServerLongRun struct{}
 
 // Run runs the specified ProxyServer.
 func (s *fakeProxyServerLongRun) Run(ctx context.Context) error {
-	for {
-		time.Sleep(2 * time.Second)
-	}
+	<-ctx.Done()
+	return nil
 }
 
 // CleanupAndExit runs in the specified ProxyServer.
