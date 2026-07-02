@@ -285,7 +285,9 @@ type NodeScore struct {
 type NodePluginScores struct {
 	// Name is node name.
 	Name string
-	// Scores is scores from plugins and extenders.
+	// RawScores holds Score() output for each active scoring plugin, before normalization is applied.
+	RawScores []PluginScore
+	// Scores is normalized weighted scores from plugins and extenders.
 	Scores []PluginScore
 	// TotalScore is the total score in Scores.
 	TotalScore int64
