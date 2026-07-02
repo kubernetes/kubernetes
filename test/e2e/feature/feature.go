@@ -315,6 +315,10 @@ var (
 	// TODO: document the feature (when to use this feature for a test)
 	PodGarbageCollector = framework.WithFeature(framework.ValidFeatures.Add("PodGarbageCollector"))
 
+	// Owner: sig-node
+	// Marks test that exercise pod-level checkpointing
+	PodLevelCheckpointRestore = framework.WithFeature(framework.ValidFeatures.Add("PodLevelCheckpointRestore"))
+
 	// owner: sig-node
 	// Marks a test for pod-level resource managers feature that requires
 	// PodLevelResourceManagers feature gate to be enabled.
