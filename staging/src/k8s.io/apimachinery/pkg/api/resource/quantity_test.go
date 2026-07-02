@@ -1852,15 +1852,15 @@ func TestParseQuantity(t *testing.T) {
 		{input: "9999999999999999999", wantAsInt64: nil, wantAsDec: ptrDec("9999999999999999999")},
 		{input: "-1E", wantAsInt64: ptr.To[int64](-1000000000000000000), wantAsDec: ptrDec("-1000000000000000000")},
 		{input: "1E", wantAsInt64: ptr.To[int64](1000000000000000000), wantAsDec: ptrDec("1000000000000000000")},
-		{input: "-1000000000000000000", wantAsInt64: nil, wantAsDec: ptrDec("-1000000000000000000"), canonical: "-1E"}, // should be wantAsInt64: <value>
-		{input: "1000000000000000000", wantAsInt64: nil, wantAsDec: ptrDec("1000000000000000000"), canonical: "1E"},    // should be wantAsInt64: <value>
+		{input: "-1000000000000000000", wantAsInt64: ptr.To[int64](-1000000000000000000), wantAsDec: ptrDec("-1000000000000000000"), canonical: "-1E"},
+		{input: "1000000000000000000", wantAsInt64: ptr.To[int64](1000000000000000000), wantAsDec: ptrDec("1000000000000000000"), canonical: "1E"},
 		// .0
 		{input: "-9999999999999999999.0", wantAsInt64: nil, wantAsDec: ptrDec("-9999999999999999999"), canonical: "-9999999999999999999"},
 		{input: "9999999999999999999.0", wantAsInt64: nil, wantAsDec: ptrDec("9999999999999999999"), canonical: "9999999999999999999"},
 		{input: "-1.0E", wantAsInt64: ptr.To[int64](-1000000000000000000), wantAsDec: ptrDec("-1000000000000000000"), canonical: "-1E"},
 		{input: "1.0E", wantAsInt64: ptr.To[int64](1000000000000000000), wantAsDec: ptrDec("1000000000000000000"), canonical: "1E"},
-		{input: "-1000000000000000000.0", wantAsInt64: nil, wantAsDec: ptrDec("-1000000000000000000"), canonical: "-1E"}, // should be wantAsInt64: <value>
-		{input: "1000000000000000000.0", wantAsInt64: nil, wantAsDec: ptrDec("1000000000000000000"), canonical: "1E"},    // should be wantAsInt64: <value>
+		{input: "-1000000000000000000.0", wantAsInt64: nil, wantAsDec: ptrDec("-1000000000000000000"), canonical: "-1E"},
+		{input: "1000000000000000000.0", wantAsInt64: nil, wantAsDec: ptrDec("1000000000000000000"), canonical: "1E"},
 		// 000m
 		{input: "-9999999999999999999000m", wantAsInt64: nil, wantAsDec: ptrDec("-9999999999999999999"), canonical: "-9999999999999999999"},
 		{input: "9999999999999999999000m", wantAsInt64: nil, wantAsDec: ptrDec("9999999999999999999"), canonical: "9999999999999999999"},
@@ -1872,10 +1872,10 @@ func TestParseQuantity(t *testing.T) {
 		{input: "-1000000000000000000.1", wantAsInt64: nil, wantAsDec: ptrDec("-1000000000000000000.1"), canonical: "-1000000000000000000100m"},
 		{input: "1000000000000000000.1", wantAsInt64: nil, wantAsDec: ptrDec("1000000000000000000.1"), canonical: "1000000000000000000100m"},
 		// +1
-		{input: "-1.000000000000000001E", wantAsInt64: nil, wantAsDec: ptrDec("-1000000000000000001"), canonical: "-1000000000000000001"}, // should be wantAsInt64: <value>
-		{input: "1.000000000000000001E", wantAsInt64: nil, wantAsDec: ptrDec("1000000000000000001"), canonical: "1000000000000000001"},    // should be wantAsInt64: <value>
-		{input: "-1000000000000000001", wantAsInt64: nil, wantAsDec: ptrDec("-1000000000000000001")},                                      // should be wantAsInt64: <value>
-		{input: "1000000000000000001", wantAsInt64: nil, wantAsDec: ptrDec("1000000000000000001")},                                        // should be wantAsInt64: <value>
+		{input: "-1.000000000000000001E", wantAsInt64: ptr.To[int64](-1000000000000000001), wantAsDec: ptrDec("-1000000000000000001")},
+		{input: "1.000000000000000001E", wantAsInt64: ptr.To[int64](1000000000000000001), wantAsDec: ptrDec("1000000000000000001")},
+		{input: "-1000000000000000001", wantAsInt64: ptr.To[int64](-1000000000000000001), wantAsDec: ptrDec("-1000000000000000001")},
+		{input: "1000000000000000001", wantAsInt64: ptr.To[int64](1000000000000000001), wantAsDec: ptrDec("1000000000000000001")},
 
 		// min/max 20 digits
 		{input: "-10E", wantAsInt64: nil, wantAsDec: ptrDec("-10000000000000000000")},
@@ -1903,7 +1903,7 @@ func TestParseQuantity(t *testing.T) {
 
 		// min/max int64 - 1
 		{input: "-9223372036854775809", wantAsInt64: nil, wantAsDec: ptrDec("-9223372036854775809")},
-		{input: "9223372036854775806", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775806")}, // should be wantAsInt64: <value>
+		{input: "9223372036854775806", wantAsInt64: ptr.To[int64](9223372036854775806), wantAsDec: ptrDec("9223372036854775806")},
 		// .0
 		{input: "-9223372036854775809.0", wantAsInt64: nil, wantAsDec: ptrDec("-9223372036854775809"), canonical: "-9223372036854775809"},
 		{input: "9223372036854775806.0", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775806"), canonical: "9223372036854775806"}, // should be wantAsInt64: <value>
@@ -1915,8 +1915,8 @@ func TestParseQuantity(t *testing.T) {
 		{input: "9223372036854775806.1", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775806.1"), canonical: "9223372036854775806100m"},
 
 		// min/max int64
-		{input: "-9223372036854775808", wantAsInt64: nil, wantAsDec: ptrDec("-9223372036854775808")}, // should be wantAsInt64: <value>
-		{input: "9223372036854775807", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775807")},   // should be wantAsInt64: <value>
+		{input: "-9223372036854775808", wantAsInt64: ptr.To[int64](-9223372036854775808), wantAsDec: ptrDec("-9223372036854775808")},
+		{input: "9223372036854775807", wantAsInt64: ptr.To[int64](9223372036854775807), wantAsDec: ptrDec("9223372036854775807")},
 		// .0
 		{input: "-9223372036854775808.0", wantAsInt64: nil, wantAsDec: ptrDec("-9223372036854775808"), canonical: "-9223372036854775808"}, // should be wantAsInt64: <value>
 		{input: "9223372036854775807.0", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775807"), canonical: "9223372036854775807"},    // should be wantAsInt64: <value>
@@ -1928,7 +1928,7 @@ func TestParseQuantity(t *testing.T) {
 		{input: "9223372036854775807.1", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775807.1"), canonical: "9223372036854775807100m"},
 
 		// min/max int64 + 1
-		{input: "-9223372036854775807", wantAsInt64: nil, wantAsDec: ptrDec("-9223372036854775807")}, // should be wantAsInt64: <value>
+		{input: "-9223372036854775807", wantAsInt64: ptr.To[int64](-9223372036854775807), wantAsDec: ptrDec("-9223372036854775807")},
 		{input: "9223372036854775808", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775808")},
 		// .0
 		{input: "-9223372036854775807.0", wantAsInt64: nil, wantAsDec: ptrDec("-9223372036854775807"), canonical: "-9223372036854775807"}, // should be wantAsInt64: <value>
@@ -1977,6 +1977,49 @@ func TestParseQuantity(t *testing.T) {
 			}
 			if serialized != expectedString {
 				t.Errorf("expected input %q to reserialize to %q but got %q", tt.input, expectedString, serialized)
+			}
+		})
+	}
+}
+
+func TestMustParseNearMaxInt64(t *testing.T) {
+	tests := []struct {
+		input       string
+		wantErr     bool
+		wantAsInt64 bool
+	}{
+		{"9223372036854775807", false, true},  // math.MaxInt64 - should parse and fit in int64
+		{"9223372036854775806", false, true},  // MaxInt64 - 1 - should parse and fit in int64
+		{"9223372036854775808", false, false}, // MaxInt64 + 1 - valid quantity but won't fit in int64
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			q, err := ParseQuantity(tt.input)
+			if tt.wantErr && err == nil {
+				t.Errorf("expected error for input %q but got none", tt.input)
+				return
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error for input %q: %v", tt.input, err)
+				return
+			}
+			// Only verify round-trip for values that fit in int64 (integer path).
+			// Values in the decimal path may canonicalize differently.
+			if tt.wantAsInt64 {
+				if got := q.String(); got != tt.input {
+					t.Errorf("String() round-trip failed for input %q: got %q", tt.input, got)
+				}
+			}
+			val, ok := q.AsInt64()
+			if ok != tt.wantAsInt64 {
+				t.Errorf("AsInt64() returned ok=%v for input %q, want ok=%v", ok, tt.input, tt.wantAsInt64)
+				return
+			}
+			if ok {
+				t.Logf("parsed %q → %d", tt.input, val)
+			} else {
+				t.Logf("parsed %q → stored as decimal (too large for int64)", tt.input)
 			}
 		})
 	}
