@@ -168,26 +168,26 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			unified[cm.Cgroup2MemoryLow] = "0"
 		}
 
-		// Skip memory.high only for equal, positive memory request/limit (container guaranteed memory).
+		// Set memory.high only when memoryThrottlingFactor is explicitly configured.
+		// Skip for equal, positive memory request/limit (container guaranteed memory).
 		// For Burstable pods, memory.high uses the memory limit, for BestEffort pods (request=limit=0), node allocatable is used.
-		if memoryRequest != memoryLimit || memoryRequest == 0 {
+		if m.memoryThrottlingFactor != nil && (memoryRequest != memoryLimit || memoryRequest == 0) {
 			// The formula for memory.high for container cgroup is modified in Alpha stage of the feature in K8s v1.27.
 			// It will be set based on formula:
 			// `memory.high=floor[(requests.memory + memory throttling factor * (limits.memory or node allocatable memory - requests.memory))/pageSize] * pageSize`
-			// where default value of memory throttling factor is set to 0.9
 			// More info: https://git.k8s.io/enhancements/keps/sig-node/2570-memory-qos
 			memoryHigh := int64(0)
 			if memoryLimit != 0 {
 				memoryHigh = int64(math.Floor(
 					float64(memoryRequest)+
-						(float64(memoryLimit)-float64(memoryRequest))*float64(m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+						(float64(memoryLimit)-float64(memoryRequest))*(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
 			} else {
 				allocatable := m.getNodeAllocatable()
 				allocatableMemory, ok := allocatable[v1.ResourceMemory]
 				if ok && allocatableMemory.Value() > 0 {
 					memoryHigh = int64(math.Floor(
 						float64(memoryRequest)+
-							(float64(allocatableMemory.Value())-float64(memoryRequest))*float64(m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+							(float64(allocatableMemory.Value())-float64(memoryRequest))*(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
 				}
 			}
 			if memoryHigh != 0 && memoryHigh > memoryRequest {

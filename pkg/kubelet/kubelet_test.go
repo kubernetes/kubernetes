@@ -547,7 +547,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		false,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
-		*kubeCfg.MemoryThrottlingFactor,
+		kubeCfg.MemoryThrottlingFactor,
 		kubeCfg.MemoryReservationPolicy,
 		kubelet.podStartupLatencyTracker,
 		tracerProvider,

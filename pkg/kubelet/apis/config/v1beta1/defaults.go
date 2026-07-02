@@ -293,9 +293,6 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.FailCgroupV1 == nil {
 		obj.FailCgroupV1 = ptr.To(true)
 	}
-	if obj.MemoryThrottlingFactor == nil {
-		obj.MemoryThrottlingFactor = ptr.To(DefaultMemoryThrottlingFactor)
-	}
 	if obj.MemoryReservationPolicy == "" {
 		obj.MemoryReservationPolicy = DefaultMemoryReservationPolicy
 	}
