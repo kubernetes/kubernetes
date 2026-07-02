@@ -53,7 +53,7 @@ func newDeviceTaintEvictionController(ctx context.Context, controllerContext Con
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
 		controllerContext.InformerFactory.Resource().V1().ResourceSlices(),
-		controllerContext.InformerFactory.Resource().V1beta2().DeviceTaintRules(),
+		controllerContext.InformerFactory.Resource().V1().DeviceTaintRules(),
 		controllerContext.InformerFactory.Resource().V1().DeviceClasses(),
 		controllerName,
 		utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),

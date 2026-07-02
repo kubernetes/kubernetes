@@ -24,5 +24,5 @@ import (
 
 func TestDRA(t *testing.T) {
 	// Various special configurations with few tests.
-	dra.Run(t, "^(disabled|v1beta1|v1beta2|slice-taints|GA-opt-out)$")
+	dra.Run(t, "^(disabled|v1beta1|v1beta2|slice-taints|GA-opt-out|GA-1.*)$")
 }
