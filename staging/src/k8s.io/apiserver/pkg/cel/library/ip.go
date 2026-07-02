@@ -199,10 +199,7 @@ func (*ip) ProgramOptions() []cel.ProgramOption {
 }
 
 func stringToIP(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	s := arg.Value().(string)
 
 	addr, err := parseIPAddr(s)
 	if err != nil {
@@ -216,19 +213,12 @@ func stringToIP(arg ref.Val) ref.Val {
 }
 
 func ipToString(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.String(ip.Addr.String())
 }
 
 func family(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	ip := arg.(apiservercel.IP)
 
 	switch {
 	case ip.Addr.Is4():
@@ -241,10 +231,7 @@ func family(arg ref.Val) ref.Val {
 }
 
 func ipIsCanonical(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	s := arg.Value().(string)
 
 	addr, err := parseIPAddr(s)
 	if err != nil {
@@ -259,57 +246,33 @@ func ipIsCanonical(arg ref.Val) ref.Val {
 }
 
 func isIP(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	s := arg.Value().(string)
 	_, err := parseIPAddr(s)
 	return types.Bool(err == nil)
 }
 
 func isUnspecified(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.Bool(ip.Addr.IsUnspecified())
 }
 
 func isLoopback(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.Bool(ip.Addr.IsLoopback())
 }
 
 func isLinkLocalMulticast(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.Bool(ip.Addr.IsLinkLocalMulticast())
 }
 
 func isLinkLocalUnicast(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.Bool(ip.Addr.IsLinkLocalUnicast())
 }
 
 func isGlobalUnicast(arg ref.Val) ref.Val {
-	ip, ok := arg.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	ip := arg.(apiservercel.IP)
 	return types.Bool(ip.Addr.IsGlobalUnicast())
 }
 
