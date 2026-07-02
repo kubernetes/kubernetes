@@ -678,6 +678,17 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
+			name:   "list source pod scoped to own node",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", Namespace: "ns0", FieldSelectorRequirements: mustParseFields("metadata.name=deleted-source,spec.nodeName=node0")},
+			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:         "cannot list source pod scoped to another node",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", Namespace: "ns0", FieldSelectorRequirements: mustParseFields("metadata.name=source,spec.nodeName=node1")},
+			expect:       authorizer.DecisionNoOpinion,
+			expectReason: "can only list/watch pods with spec.nodeName field selector",
+		},
+		{
 			name:   "list single related pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: "", Name: "pod0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
@@ -1953,11 +1964,11 @@ func TestNodeAuthorizerPodCheckpoints(t *testing.T) {
 	graph := NewGraph()
 	graph.AddPodCheckpoint(&nodev1alpha1.PodCheckpoint{
 		ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns"},
-		Status:     nodev1alpha1.PodCheckpointStatus{NodeName: new("node0")},
+		Status:     &nodev1alpha1.PodCheckpointStatus{NodeName: new("node0")},
 	})
 	graph.AddPodCheckpoint(&nodev1alpha1.PodCheckpoint{
 		ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "other-ns"},
-		Status:     nodev1alpha1.PodCheckpointStatus{NodeName: new("node1")},
+		Status:     &nodev1alpha1.PodCheckpointStatus{NodeName: new("node1")},
 	})
 	graph.AddPodCheckpoint(&nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "unassigned", Namespace: "ns"}})
 	// Checkpoint access must not fall through to a broad static node rule.
@@ -2048,7 +2059,7 @@ func TestPodCheckpointGraphAssignment(t *testing.T) {
 		}
 	}
 	checkpoint := &nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns"},
-		Status: nodev1alpha1.PodCheckpointStatus{NodeName: new("node0")}}
+		Status: &nodev1alpha1.PodCheckpointStatus{NodeName: new("node0")}}
 	graph.AddPod(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "source", Namespace: "ns"}, Spec: corev1.PodSpec{NodeName: "node0"}})
 	graph.AddPodCheckpoint(checkpoint)
 	assertAccess("node0", true)

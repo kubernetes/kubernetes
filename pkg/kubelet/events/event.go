@@ -95,6 +95,11 @@ const (
 	FailedPrepareDynamicResources        = "FailedPrepareDynamicResources"
 	PossibleMemoryBackedVolumesOnDisk    = "PossibleMemoryBackedVolumesOnDisk"
 	CgroupV1                             = "CgroupV1"
+	// Pod-level checkpoint events.
+	PodCheckpointStarted   = "PodCheckpointStarted"
+	CheckpointSucceeded    = "CheckpointSucceeded"
+	CheckpointFailed       = "CheckpointFailed"
+	SourcePodCheckpointing = "SourcePodCheckpointing"
 )
 
 // Image manager event reason list
