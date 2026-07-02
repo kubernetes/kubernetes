@@ -19,6 +19,7 @@ limitations under the License.
 package nftables
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"reflect"
@@ -3908,9 +3909,35 @@ func assertNumOperations(t *testing.T, nft *knftables.Fake, ops ...int) {
 	}
 }
 
+// listAllCounter wraps a knftables.Interface and counts ListAll calls.
+type listAllCounter struct {
+	knftables.Interface
+	calls int
+}
+
+func (c *listAllCounter) ListAll(ctx context.Context) (map[string][]string, error) {
+	c.calls++
+	return c.Interface.ListAll(ctx)
+}
+
 // Test calling syncProxyRules() multiple times with various changes
 func TestSyncProxyRulesRepeated(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	counter := &listAllCounter{Interface: nft}
+	fp.nftables = counter
+	// checkListAll asserts whether ListAll was called (true = full sync, false = incremental),
+	// then resets the counter.
+	checkListAll := func(expectFull bool) {
+		t.Helper()
+		want := 0
+		if expectFull {
+			want = 1
+		}
+		if counter.calls != want {
+			t.Errorf("ListAll calls since last check: got %d, want %d", counter.calls, want)
+		}
+		counter.calls = 0
+	}
 
 	// Helper function to make it look like time has passed (from the point of view of
 	// the stale-chain-deletion code).
@@ -3973,6 +4000,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	)
 
 	fp.syncProxyRules()
+	checkListAll(true)
 
 	expected := baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
@@ -4019,6 +4047,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		}),
 	)
 	fp.syncProxyRules()
+	checkListAll(false)
 
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
@@ -4049,6 +4078,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// Delete a service; its chains will be flushed, but not immediately deleted.
 	fp.OnServiceDelete(svc2)
 	fp.syncProxyRules()
+	checkListAll(false)
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
@@ -4074,6 +4104,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// Fake the passage of time and confirm that the stale chains get deleted.
 	ageStaleChains()
 	fp.syncProxyRules()
+	checkListAll(false)
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
@@ -4105,6 +4136,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		}),
 	)
 	fp.syncProxyRules()
+	checkListAll(false)
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
@@ -4142,6 +4174,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		}),
 	)
 	fp.syncProxyRules()
+	checkListAll(false)
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
@@ -4174,6 +4207,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	eps3update.Endpoints[0].Addresses[0] = "10.0.3.2"
 	fp.OnEndpointSliceUpdate(eps3, eps3update)
 	fp.syncProxyRules()
+	checkListAll(false)
 
 	// The old endpoint chain (for 10.0.3.1) will not be deleted yet.
 	expected = baseRules + dedent.Dedent(`
@@ -4213,6 +4247,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	})
 	fp.OnEndpointSliceUpdate(eps3update, eps3update2)
 	fp.syncProxyRules()
+	checkListAll(false)
 
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
@@ -4247,6 +4282,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	eps3update3.Endpoints = []discovery.Endpoint{}
 	fp.OnEndpointSliceUpdate(eps3update2, eps3update3)
 	fp.syncProxyRules()
+	checkListAll(false)
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
@@ -4280,6 +4316,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// Restore endpoints to non-empty immediately; its chains will be restored, and deleted from staleChains.
 	fp.OnEndpointSliceUpdate(eps3update3, eps3update2)
 	fp.syncProxyRules()
+	checkListAll(false)
 	expected = baseRules + dedent.Dedent(`
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
@@ -4317,14 +4354,17 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// - its chains will be deleted first, then recreated in the second sync.
 	fp.OnEndpointSliceUpdate(eps3update2, eps3update3)
 	fp.syncProxyRules()
+	checkListAll(false)
 	ageStaleChains()
 	fp.OnEndpointSliceUpdate(eps3update3, eps3update2)
 	fp.syncProxyRules()
+	checkListAll(false)
 	// The second change counteracts the first one, so same expected rules as last time
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 
 	// Sync with no new changes, so same expected rules as last time
 	fp.syncProxyRules()
+	checkListAll(false)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft, 0)
 }
