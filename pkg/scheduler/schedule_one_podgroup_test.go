@@ -3185,3 +3185,93 @@ func TestScheduleOnePodGroup_PodGroupNotFound(t *testing.T) {
 		t.Errorf("Unexpected pods in scheduling queue (-want,+got)\n%s", diff)
 	}
 }
+
+func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
+	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("sched1").Obj()
+	p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("sched2").Obj()
+	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
+	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
+	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
+	podGroupInfo := &framework.QueuedPodGroupInfo{
+		QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2},
+		PodGroupInfo: &framework.PodGroupInfo{
+			Name:      "pg",
+			Namespace: "default",
+		},
+	}
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	registry := frameworkruntime.Registry{
+		queuesort.Name:     queuesort.New,
+		defaultbinder.Name: defaultbinder.New,
+	}
+	profileCfg1 := config.KubeSchedulerProfile{
+		SchedulerName: "sched1",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{
+				Enabled: []config.Plugin{{Name: queuesort.Name}},
+			},
+			Bind: config.PluginSet{
+				Enabled: []config.Plugin{{Name: defaultbinder.Name}},
+			},
+		},
+	}
+	schedFwk1, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg1,
+		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create new framework 1: %v", err)
+	}
+
+	profileCfg2 := profileCfg1
+	profileCfg2.SchedulerName = "sched2"
+	schedFwk2, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg2,
+		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create new framework 2: %v", err)
+	}
+
+	client := clientsetfake.NewClientset(testPodGroup)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	sched := &Scheduler{
+		Profiles:        profile.Map{"sched1": schedFwk1, "sched2": schedFwk2},
+		SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+		Cache:           internalcache.New(ctx, nil, true),
+		client:          client,
+		podGroupLister:  podGroupLister,
+		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+		},
+	}
+
+	sched.scheduleOnePodGroup(ctx, podGroupInfo)
+
+	pg, err := client.SchedulingV1alpha3().PodGroups("default").Get(ctx, "pg", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get PodGroup: %v", err)
+	}
+	expectedCondition := metav1.Condition{
+		Type:    schedulingapi.PodGroupInitiallyScheduled,
+		Status:  metav1.ConditionFalse,
+		Reason:  schedulingapi.PodGroupReasonSchedulerError,
+		Message: `all pods in a single pod group should have the same .spec.schedulerName set, got: "sched2" and "sched1"`,
+	}
+	var matchedCondition *metav1.Condition
+	for i := range pg.Status.Conditions {
+		if pg.Status.Conditions[i].Type == schedulingapi.PodGroupInitiallyScheduled {
+			matchedCondition = &pg.Status.Conditions[i]
+			break
+		}
+	}
+	if matchedCondition == nil {
+		t.Errorf("Expected PodGroup.Status.Conditions to contain PodGroupScheduled condition, got: %+v", pg.Status.Conditions)
+	} else if diff := cmp.Diff(expectedCondition, *matchedCondition, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "ObservedGeneration")); diff != "" {
+		t.Errorf("Unexpected condition (-want +got):\n%s", diff)
+	}
+}
