@@ -92,7 +92,7 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
+func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, qps *float32, burst *int, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
 	var runtimeConfig []string
 	if enabledFeatures[features.DynamicResourceAllocation] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapi.SchemeGroupVersion))
@@ -123,11 +123,23 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		tCtx.Cancel("test is done")
 	})
 
-	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
-	// support this when there is any testcase that depends on such configuration.
-	cfg := restclient.CopyConfig(server.ClientConfig)
-	cfg.QPS = 5000.0
-	cfg.Burst = 5000
+	// 1. Testing framework client configuration (default/static limits)
+	testingFrameworkCfg := restclient.CopyConfig(server.ClientConfig)
+	testingFrameworkCfg.QPS = 5000.0
+	testingFrameworkCfg.Burst = 5000
+	frameworkTCtx := tCtx.WithRESTConfig(testingFrameworkCfg)
+
+	// 2. Scheduler client configuration (custom limits)
+	schedulerCfg := restclient.CopyConfig(server.ClientConfig)
+	schedulerCfg.QPS = 5000.0
+	schedulerCfg.Burst = 5000
+	if qps != nil {
+		schedulerCfg.QPS = *qps
+	}
+	if burst != nil {
+		schedulerCfg.Burst = *burst
+	}
+	schedulerTCtx := tCtx.WithRESTConfig(schedulerCfg)
 
 	// use default component config if config here is nil
 	if config == nil {
@@ -138,14 +150,12 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		}
 	}
 
-	tCtx = tCtx.WithRESTConfig(cfg)
-
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	scheduler, informerFactory, done := util.StartSchedulerWithDone(tCtx, config, opts.outOfTreePluginRegistry)
-	util.StartFakePVController(tCtx, tCtx.Client(), informerFactory)
-	runGC := util.CreateGCController(tCtx, tCtx, *cfg, informerFactory)
-	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, informerFactory)
+	scheduler, informerFactory, done := util.StartSchedulerWithDone(schedulerTCtx, config, opts.outOfTreePluginRegistry)
+	util.StartFakePVController(frameworkTCtx, frameworkTCtx.Client(), informerFactory)
+	runGC := util.CreateGCController(frameworkTCtx, frameworkTCtx, *testingFrameworkCfg, informerFactory)
+	runNS := util.CreateNamespaceController(frameworkTCtx, frameworkTCtx, *testingFrameworkCfg, informerFactory)
 	runResourceClaimController := func() {}
 	if enabledFeatures[features.DynamicResourceAllocation] {
 		// Testing of DRA with inline resource claims depends on this
@@ -155,16 +165,16 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 			PrioritizedList:        true,
 			WorkloadResourceClaims: enabledFeatures[features.DRAWorkloadResourceClaims],
 		}
-		runResourceClaimController = util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory, features)
+		runResourceClaimController = util.CreateResourceClaimController(frameworkTCtx, frameworkTCtx, frameworkTCtx.Client(), informerFactory, features)
 	}
 
-	informerFactory.Start(tCtx.Done())
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.Start(frameworkTCtx.Done())
+	informerFactory.WaitForCacheSync(frameworkTCtx.Done())
 	go runGC()
 	go runNS()
 	go runResourceClaimController()
 
-	return scheduler, informerFactory, done, tCtx
+	return scheduler, informerFactory, done, frameworkTCtx
 }
 
 func isAttempted(pod *v1.Pod) bool {
