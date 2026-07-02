@@ -544,6 +544,15 @@ func claimWithDataSource(name, kind, apiGroup string, claims []*v1.PersistentVol
 	return claims
 }
 
+func claimWithDataSourceRef(name, kind, apiGroup string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Spec.DataSourceRef = &v1.TypedObjectReference{
+		Name:     name,
+		Kind:     kind,
+		APIGroup: &apiGroup,
+	}
+	return claims
+}
+
 func annotateClaim(claim *v1.PersistentVolumeClaim, ann map[string]string) *v1.PersistentVolumeClaim {
 	if claim.Annotations == nil {
 		claim.Annotations = map[string]string{}

@@ -82,6 +82,25 @@ const (
 	PVDeletionInTreeProtectionFinalizer = "kubernetes.io/pv-controller"
 )
 
+// IsPopulatorDataSource returns true if the PVC's DataSourceRef references a
+// custom resource (non-empty API group), indicating that the PVC uses a volume
+// populator. PVCs cloning from another PVC (core group) or restoring from a
+// VolumeSnapshot are handled natively by the CSI provisioner and do not use
+// the volume populator mechanism.
+func IsPopulatorDataSource(claim *v1.PersistentVolumeClaim) bool {
+	ref := claim.Spec.DataSourceRef
+	if ref == nil {
+		return false
+	}
+	if ref.APIGroup == nil || *ref.APIGroup == "" {
+		return false
+	}
+	if *ref.APIGroup == "snapshot.storage.k8s.io" && ref.Kind == "VolumeSnapshot" {
+		return false
+	}
+	return true
+}
+
 // IsDelayBindingProvisioning checks if claim provisioning with selected-node annotation
 func IsDelayBindingProvisioning(claim *v1.PersistentVolumeClaim) bool {
 	// When feature VolumeScheduling enabled,
