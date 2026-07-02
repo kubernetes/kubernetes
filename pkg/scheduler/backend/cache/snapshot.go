@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -119,7 +119,7 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 
 // NewTestSnapshotWithPodGroups initializes a Snapshot struct with pod groups and returns it.
 // It should be used only in the tests.
-func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1alpha3.PodGroup) *Snapshot {
+func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1beta1.PodGroup) *Snapshot {
 	s := NewSnapshot(pods, nodes)
 	for _, podGroup := range podGroups {
 		key := newPodGroupKey(podGroup.Namespace, podGroup.Name)
@@ -297,7 +297,7 @@ type podGroupSnapshotListerImpl struct {
 	snapshot *Snapshot
 }
 
-func (l *podGroupSnapshotListerImpl) Get(namespace, name string) (*schedulingv1alpha3.PodGroup, error) {
+func (l *podGroupSnapshotListerImpl) Get(namespace, name string) (*schedulingv1beta1.PodGroup, error) {
 	if !l.snapshot.genericWorkloadEnabled {
 		return nil, fmt.Errorf("generic workload feature gate is disabled")
 	}

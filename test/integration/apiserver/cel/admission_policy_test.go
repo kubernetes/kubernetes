@@ -447,7 +447,7 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 		// turn off admission plugins that add finalizers
-		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
+		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection,PodGroupProtection",
 		// force enable all resources so we can check storage.
 		"--runtime-config=api/all=true",
 	}, framework.SharedEtcd())

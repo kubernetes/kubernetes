@@ -1050,7 +1050,7 @@ func Test_UnionedGVKs(t *testing.T) {
 		},
 		{
 			name:    "plugins with default profile and GangScheduling",
-			plugins: schedulerapi.PluginSet{Enabled: append(defaults.PluginsV1.MultiPoint.Enabled, schedulerapi.Plugin{Name: names.GangScheduling})},
+			plugins: defaults.PluginsV1.MultiPoint,
 			want: map[fwk.EventResource]fwk.ActionType{
 				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
 				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodScaleDown | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Update,
@@ -1122,7 +1122,19 @@ func Test_UnionedGVKs(t *testing.T) {
 			defer cancel()
 			registry := plugins.NewInTreeRegistry()
 
-			cfgPls := &schedulerapi.Plugins{MultiPoint: tt.plugins}
+			cfgPls := &schedulerapi.Plugins{MultiPoint: schedulerapi.PluginSet{
+				Enabled:  slices.Clone(tt.plugins.Enabled),
+				Disabled: slices.Clone(tt.plugins.Disabled),
+			}}
+			if !tt.enableGenericWorkload {
+				var enabled []schedulerapi.Plugin
+				for _, pl := range cfgPls.MultiPoint.Enabled {
+					if pl.Name != names.GangScheduling {
+						enabled = append(enabled, pl)
+					}
+				}
+				cfgPls.MultiPoint.Enabled = enabled
+			}
 			plugins := []fwk.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}, &fakeAssignedPodPlugin{}, &filterWithoutEnqueueExtensionsPlugin{}, &emptyEventsToRegisterPlugin{}, &fakeQueueSortPlugin{}, &fakebindPlugin{}}
 			for _, pl := range plugins {
 				if err := registry.Register(pl.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {

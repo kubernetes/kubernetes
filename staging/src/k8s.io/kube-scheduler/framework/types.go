@@ -21,7 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -655,7 +655,7 @@ type PodGroupInfo interface {
 	// GetNamespace returns the namespace the pod group belongs to.
 	GetNamespace() string
 	// GetPodGroup returns the PodGroup API object.
-	GetPodGroup() *schedulingv1alpha3.PodGroup
+	GetPodGroup() *schedulingv1beta1.PodGroup
 }
 
 // Placement determines the resources to be considered when scheduling a pod group.

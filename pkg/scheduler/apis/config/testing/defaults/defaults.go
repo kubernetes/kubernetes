@@ -48,6 +48,7 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.DefaultBinder},
 			{Name: names.NodeDeclaredFeatures},
+			{Name: names.GangScheduling},
 		},
 	},
 }
@@ -59,6 +60,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.SchedulingGates},
 			{Name: names.DynamicResources},
 			{Name: names.DefaultPreemption},
+			{Name: names.GangScheduling},
 		},
 	},
 	QueueSort: config.PluginSet{
@@ -146,6 +148,11 @@ var ExpandedPluginsV1 = &config.Plugins{
 		Enabled: []config.Plugin{
 			{Name: names.VolumeBinding},
 			{Name: names.DynamicResources},
+		},
+	},
+	Permit: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.GangScheduling},
 		},
 	},
 	PreBind: config.PluginSet{

@@ -269,7 +269,12 @@ leaderElection:
 				"default-scheduler": func() *config.Plugins {
 					plugins := defaults.ExpandedPluginsV1.DeepCopy()
 					// With this (and only this?!) config comes DynamicResources after DefaultPreemption.
-					plugins.PreEnqueue.Enabled[1], plugins.PreEnqueue.Enabled[2] = plugins.PreEnqueue.Enabled[2], plugins.PreEnqueue.Enabled[1]
+					plugins.PreEnqueue.Enabled = []config.Plugin{
+						{Name: "SchedulingGates"},
+						{Name: "DefaultPreemption"},
+						{Name: "DynamicResources"},
+					}
+					plugins.Permit = config.PluginSet{}
 					plugins.PostFilter.Enabled[0], plugins.PostFilter.Enabled[1] = plugins.PostFilter.Enabled[1], plugins.PostFilter.Enabled[0]
 					plugins.Filter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},

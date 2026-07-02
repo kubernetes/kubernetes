@@ -1107,7 +1107,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *Workload, topicName st
 		scheduler:                    scheduler,
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
-		podGroupInformer:             informerFactory.Scheduling().V1alpha3().PodGroups(),
+		podGroupInformer:             informerFactory.Scheduling().V1beta1().PodGroups(),
 		throughputErrorMargin:        throughputErrorMargin,
 		testCase:                     tc,
 		workload:                     w,

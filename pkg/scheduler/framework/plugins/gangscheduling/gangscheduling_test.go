@@ -22,7 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -370,7 +370,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			cache := internalcache.New(ctx, nil, true)
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
-			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
 			fakeActivator := &podActivatorMock{}
 			snapshot := internalcache.NewEmptySnapshot()
 			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
@@ -696,7 +696,7 @@ func TestPlacementFeasible(t *testing.T) {
 			}
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(pg), 0)
-			informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+			informerFactory.Scheduling().V1beta1().PodGroups().Informer()
 			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSyncWithContext(ctx)
 

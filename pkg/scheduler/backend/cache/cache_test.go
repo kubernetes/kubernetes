@@ -28,7 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -698,7 +698,7 @@ func Test_AddPodGroupMember(t *testing.T) {
 
 	tests := []struct {
 		name                    string
-		initPodGroup            *schedulingv1alpha3.PodGroup
+		initPodGroup            *schedulingv1beta1.PodGroup
 		pod                     *v1.Pod
 		genericWorkloadEnabled  bool
 		expectInUnscheduledPods bool
@@ -881,7 +881,7 @@ func Test_RemovePodGroupMember(t *testing.T) {
 	tests := []struct {
 		name                     string
 		initPods                 []*v1.Pod
-		initPodGroup             *schedulingv1alpha3.PodGroup
+		initPodGroup             *schedulingv1beta1.PodGroup
 		podToDelete              *v1.Pod
 		expectPodGroupStateCount int
 		genericWorkloadEnabled   bool
@@ -965,9 +965,9 @@ func Test_AddPodGroup(t *testing.T) {
 	tests := []struct {
 		name                   string
 		initPod                *v1.Pod
-		podGroup               *schedulingv1alpha3.PodGroup
+		podGroup               *schedulingv1beta1.PodGroup
 		genericWorkloadEnabled bool
-		expectPodGroup         *schedulingv1alpha3.PodGroup
+		expectPodGroup         *schedulingv1beta1.PodGroup
 	}{
 		{
 			name:                   "add pod group with GenericWorkload disabled should be no-op",
@@ -1020,11 +1020,11 @@ func Test_UpdatePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name                   string
-		initPodGroup           *schedulingv1alpha3.PodGroup
-		oldPodGroup            *schedulingv1alpha3.PodGroup
-		newPodGroup            *schedulingv1alpha3.PodGroup
+		initPodGroup           *schedulingv1beta1.PodGroup
+		oldPodGroup            *schedulingv1beta1.PodGroup
+		newPodGroup            *schedulingv1beta1.PodGroup
 		genericWorkloadEnabled bool
-		expectPodGroup         *schedulingv1alpha3.PodGroup
+		expectPodGroup         *schedulingv1beta1.PodGroup
 	}{
 		{
 			name:                   "update pod group with GenericWorkload disabled should be no-op",
@@ -1072,7 +1072,7 @@ func Test_RemovePodGroup(t *testing.T) {
 	tests := []struct {
 		name                   string
 		initPod                *v1.Pod
-		podGroup               *schedulingv1alpha3.PodGroup
+		podGroup               *schedulingv1beta1.PodGroup
 		genericWorkloadEnabled bool
 		expectPodGroupExists   bool
 		expectStateExists      bool

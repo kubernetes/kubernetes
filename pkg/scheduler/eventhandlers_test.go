@@ -29,7 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcebetaapi "k8s.io/api/resource/v1beta2"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -584,9 +584,10 @@ func TestAddAllEventHandlersPodEventResources(t *testing.T) {
 	dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
 
 	expectStaticInformers := map[reflect.Type]bool{
-		reflect.TypeFor[*v1.Pod]():       true,
-		reflect.TypeFor[*v1.Node]():      true,
-		reflect.TypeFor[*v1.Namespace](): true,
+		reflect.TypeFor[*v1.Pod]():                 true,
+		reflect.TypeFor[*v1.Node]():                true,
+		reflect.TypeFor[*v1.Namespace]():           true,
+		reflect.TypeFor[*schedulingapi.PodGroup](): true,
 	}
 	if diff := cmp.Diff(expectStaticInformers, staticInformers); diff != "" {
 		t.Errorf("Unexpected diff (-want, +got):\n%s", diff)

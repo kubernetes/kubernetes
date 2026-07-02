@@ -576,6 +576,21 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/scheduling/v1beta1
+		gvr("scheduling.k8s.io", "v1beta1", "workloads"): {
+			Stub:              `{"metadata": {"name": "w1"}, "spec": {"podGroupTemplates": [{"name": "group1", "schedulingPolicy": {"basic": {}}}]}}`,
+			ExpectedEtcdPath:  "/registry/workloads/" + namespace + "/w1",
+			IntroducedVersion: "1.37",
+			RemovedVersion:    "1.43",
+		},
+		gvr("scheduling.k8s.io", "v1beta1", "podgroups"): {
+			Stub:              `{"metadata": {"name": "pg1"}, "spec": {"workloadRef": {"workloadName": "w", "templateName": "t"}, "schedulingPolicy": {"basic": {}}}}`,
+			ExpectedEtcdPath:  "/registry/podgroups/" + namespace + "/pg1",
+			IntroducedVersion: "1.37",
+			RemovedVersion:    "1.43",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/scheduling/v1alpha3
 		gvr("scheduling.k8s.io", "v1alpha3", "workloads"): {
 			Stub:              `{"metadata": {"name": "w1"}, "spec": {"podGroupTemplates": [{"name": "group1", "schedulingPolicy": {"basic": {}}}]}}`,

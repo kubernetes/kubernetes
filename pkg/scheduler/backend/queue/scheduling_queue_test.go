@@ -28,7 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -178,7 +178,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 			objs := []runtime.Object{medPod, unschedPod, highPod}
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 			if tt.usePodGroups {
-				podGroups := []*schedulingv1alpha3.PodGroup{
+				podGroups := []*schedulingv1beta1.PodGroup{
 					st.MakePodGroup().Name("pg-med").Namespace(medPod.Namespace).Priority(midPriority).Obj(),
 					st.MakePodGroup().Name("pg-unsched").Namespace(unschedPod.Namespace).Priority(lowPriority).Obj(),
 					st.MakePodGroup().Name("pg-high").Namespace(highPod.Namespace).Priority(highPriority).Obj(),
@@ -3022,7 +3022,7 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 	if diff := cmp.Diff(expectedSet, makeSet(gotPods)); diff != "" {
 		t.Errorf("Unexpected list of pending Pods (-want, +got):\n%s", diff)
 	}
-	if wantSummary := fmt.Sprintf(pendingPodsSummary, 1, 0, 2); wantSummary != gotSummary {
+	if wantSummary := fmt.Sprintf(pendingPodsExtendedSummary, 1, 0, 2, 0, 0); wantSummary != gotSummary {
 		t.Errorf("Unexpected pending pods summary: want %v, but got %v.", wantSummary, gotSummary)
 	}
 	// Move all to active queue. We should still see the same set of pods.
@@ -3031,7 +3031,7 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 	if diff := cmp.Diff(expectedSet, makeSet(gotPods)); diff != "" {
 		t.Errorf("Unexpected list of pending Pods (-want, +got):\n%s", diff)
 	}
-	if wantSummary := fmt.Sprintf(pendingPodsSummary, 1, 2, 0); wantSummary != gotSummary {
+	if wantSummary := fmt.Sprintf(pendingPodsExtendedSummary, 1, 2, 0, 0, 0); wantSummary != gotSummary {
 		t.Errorf("Unexpected pending pods summary: want %v, but got %v.", wantSummary, gotSummary)
 	}
 }
@@ -5998,7 +5998,7 @@ const (
 	stateIncomplete
 )
 
-func setupInitialPodGroupState(t *testing.T, ctx context.Context, q *PriorityQueue, initialPods []*v1.Pod, initialState initialQueueState, initialPodGroup *schedulingv1alpha3.PodGroup) {
+func setupInitialPodGroupState(t *testing.T, ctx context.Context, q *PriorityQueue, initialPods []*v1.Pod, initialState initialQueueState, initialPodGroup *schedulingv1beta1.PodGroup) {
 	t.Helper()
 
 	if initialState != stateIncomplete {
