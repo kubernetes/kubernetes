@@ -423,16 +423,17 @@ func WaitForNamedCacheSyncWithContext(ctx context.Context, cacheSyncs ...Informe
 // if the controller should shutdown
 // callers should prefer WaitForNamedCacheSync()
 func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool {
-	err := wait.PollImmediateUntil(syncedPollPeriod,
-		func() (bool, error) {
+	err := wait.PollUntilContextCancel(wait.ContextForChannel(stopCh),
+		syncedPollPeriod,
+		true,
+		func(ctx context.Context) (done bool, err error) {
 			for _, syncFunc := range cacheSyncs {
 				if !syncFunc() {
 					return false, nil
 				}
 			}
 			return true, nil
-		},
-		stopCh)
+		})
 	if err != nil {
 		return false
 	}
