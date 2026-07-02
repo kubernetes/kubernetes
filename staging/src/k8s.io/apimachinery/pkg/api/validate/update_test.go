@@ -434,14 +434,14 @@ func TestUpdateSlice(t *testing.T) {
 		Name  string
 		Value string
 	}
-	keyMatch := func(a, b keyed) bool { return a.Name == b.Name }
+	keyMatch := func(a, b *keyed) bool { return a.Name == b.Name }
 
 	tests := []struct {
 		name        string
 		op          operation.Type
 		value       []string
 		oldValue    []string
-		match       MatchFunc[string]
+		match       MatchFunc[*string]
 		constraints []UpdateConstraint
 		wantDetails []string
 	}{

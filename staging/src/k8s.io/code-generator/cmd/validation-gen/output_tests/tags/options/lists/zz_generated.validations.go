@@ -79,7 +79,7 @@ func Validate_Struct(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", true,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []ListItem) field.ErrorList {
 					return validate.Unique(ctx, op, fldPath, obj, oldObj,
-						func(a ListItem, b ListItem) bool { return a.Name == b.Name })
+						func(a *ListItem, b *ListItem) bool { return a.Name == b.Name })
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -107,7 +107,7 @@ func Validate_Struct(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", false,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []ListItem) field.ErrorList {
 					return validate.Unique(ctx, op, fldPath, obj, oldObj,
-						func(a ListItem, b ListItem) bool { return a.Name == b.Name })
+						func(a *ListItem, b *ListItem) bool { return a.Name == b.Name })
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}

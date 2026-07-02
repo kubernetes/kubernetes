@@ -36,6 +36,8 @@ type MatchItemFn[T any] func(*T) bool
 // and will match at most one element per list. If this assumption is violated,
 // changes in list order can lead this function to have inconsistent behavior.
 //
+// The match and equiv functions will never be called with nil arguments.
+//
 // The fldPath passed to itemValidator is indexed to the matched item's
 // position in newList.
 //
@@ -44,15 +46,15 @@ type MatchItemFn[T any] func(*T) bool
 func SliceItem[TList ~[]TItem, TItem any](
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	newList, oldList TList,
-	matches MatchItemFn[TItem],
-	equiv MatchFunc[TItem],
+	match MatchItemFn[TItem],
+	equiv MatchFunc[*TItem],
 	itemValidator func(ctx context.Context, op operation.Operation, fldPath *field.Path, newObj, oldObj *TItem) field.ErrorList,
 ) field.ErrorList {
 	var matchedNew, matchedOld *TItem
 	var newIndex int
 
 	for i := range newList {
-		if matches(&newList[i]) {
+		if match(&newList[i]) {
 			matchedNew = &newList[i]
 			newIndex = i
 			break
@@ -63,13 +65,13 @@ func SliceItem[TList ~[]TItem, TItem any](
 	}
 
 	for i := range oldList {
-		if matches(&oldList[i]) {
+		if match(&oldList[i]) {
 			matchedOld = &oldList[i]
 			break
 		}
 	}
 
-	if op.Type == operation.Update && matchedOld != nil && equiv(*matchedNew, *matchedOld) {
+	if op.Type == operation.Update && matchedOld != nil && equiv(matchedNew, matchedOld) {
 		return nil
 	}
 

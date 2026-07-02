@@ -103,7 +103,9 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a ItemWithMultipleKeys, b ItemWithMultipleKeys) bool { return a.Key1 == b.Key1 && a.Key2 == b.Key2 }); len(e) != 0 {
+				func(a *ItemWithMultipleKeys, b *ItemWithMultipleKeys) bool {
+					return a.Key1 == b.Key1 && a.Key2 == b.Key2
+				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -154,7 +156,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *Item, b *Item) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -210,7 +212,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a PtrKeyStruct, b PtrKeyStruct) bool {
+				func(a *PtrKeyStruct, b *PtrKeyStruct) bool {
 					return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
 				}); len(e) != 0 {
 				errs = append(errs, e...)
@@ -238,7 +240,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a ItemWithMixedKeys, b ItemWithMixedKeys) bool {
+				func(a *ItemWithMixedKeys, b *ItemWithMixedKeys) bool {
 					return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
 				}); len(e) != 0 {
 				errs = append(errs, e...)
@@ -266,7 +268,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a ItemWithMultiplePtrKeys, b ItemWithMultiplePtrKeys) bool {
+				func(a *ItemWithMultiplePtrKeys, b *ItemWithMultiplePtrKeys) bool {
 					return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && ((a.Key2 == nil && b.Key2 == nil) || (a.Key2 != nil && b.Key2 != nil && *a.Key2 == *b.Key2))
 				}); len(e) != 0 {
 				errs = append(errs, e...)

@@ -64,7 +64,7 @@ func Validate_FrozenUserList(
 
 	// lists with map semantics require unique keys
 	if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-		func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+		func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 
@@ -250,7 +250,7 @@ func Validate_UpdateListStruct(
 			// call field-attached validations
 			earlyReturn := false
 			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -259,7 +259,7 @@ func Validate_UpdateListStruct(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -285,7 +285,7 @@ func Validate_UpdateListStruct(
 			// call field-attached validations
 			earlyReturn := false
 			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -294,7 +294,7 @@ func Validate_UpdateListStruct(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -320,7 +320,9 @@ func Validate_UpdateListStruct(
 			// call field-attached validations
 			earlyReturn := false
 			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a CompositeKeyItem, b CompositeKeyItem) bool { return a.Name == b.Name && a.Priority == b.Priority }, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+				func(a *CompositeKeyItem, b *CompositeKeyItem) bool {
+					return a.Name == b.Name && a.Priority == b.Priority
+				}, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -329,7 +331,9 @@ func Validate_UpdateListStruct(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a CompositeKeyItem, b CompositeKeyItem) bool { return a.Name == b.Name && a.Priority == b.Priority }); len(e) != 0 {
+				func(a *CompositeKeyItem, b *CompositeKeyItem) bool {
+					return a.Name == b.Name && a.Priority == b.Priority
+				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -388,7 +392,7 @@ func Validate_UpdateListStruct(
 			// call field-attached validations
 			earlyReturn := false
 			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -397,7 +401,7 @@ func Validate_UpdateListStruct(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -456,7 +460,7 @@ func Validate_UpdateListStruct(
 			// call field-attached validations
 			earlyReturn := false
 			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -488,7 +492,7 @@ func Validate_UpdateListStruct(
 			// call field-attached validations
 			earlyReturn := false
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.DirectEqual,
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *UpdateItem) field.ErrorList {
 					return validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify)
 				}).MarkShortCircuit(); len(e) != 0 {
@@ -500,7 +504,7 @@ func Validate_UpdateListStruct(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
+				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

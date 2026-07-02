@@ -191,7 +191,7 @@ func Validate_Struct(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Task, b Task) bool { return a.Name == b.Name }); len(e) != 0 {
+				func(a *Task, b *Task) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -239,7 +239,7 @@ func Validate_Struct(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Task, b Task) bool { return a.Name == b.Name }); len(e) != 0 {
+				func(a *Task, b *Task) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

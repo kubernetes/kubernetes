@@ -589,7 +589,7 @@ func Validate_Struct(
 				errs = append(errs, e...)
 			}
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a OtherStruct, b OtherStruct) bool { return a.StringField == b.StringField }, validate.DirectEqual,
+				func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListMapOfStructField vals")
 				}); len(e) != 0 {
@@ -597,12 +597,12 @@ func Validate_Struct(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a OtherStruct, b OtherStruct) bool { return a.StringField == b.StringField }); len(e) != 0 {
+				func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a OtherStruct, b OtherStruct) bool { return a.StringField == b.StringField }, validate.DirectEqual, Validate_OtherStruct); len(e) != 0 {
+				func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }, validate.DirectEqual, Validate_OtherStruct); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -630,7 +630,7 @@ func Validate_Struct(
 				errs = append(errs, e...)
 			}
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a OtherStruct, b OtherStruct) bool { return a.StringField == b.StringField }, validate.DirectEqual,
+				func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListMapOfOpaqueStructField vals")
 				}); len(e) != 0 {
@@ -638,7 +638,7 @@ func Validate_Struct(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a OtherStruct, b OtherStruct) bool { return a.StringField == b.StringField }); len(e) != 0 {
+				func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

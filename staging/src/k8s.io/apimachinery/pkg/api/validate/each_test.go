@@ -122,7 +122,7 @@ func testEachSliceValUpdate[T any](t *testing.T, name string, input []T) {
 		old := make([]T, len(input))
 		copy(old, input)
 		slices.Reverse(old)
-		match := func(a, b T) bool { return reflect.DeepEqual(a, b) }
+		match := func(a, b *T) bool { return reflect.DeepEqual(*a, *b) }
 		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, match, match, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
@@ -158,7 +158,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		[]TestStructWithKey{
 			{Key: "a", I: 11, D: "a"}, {Key: "c", I: 13, D: "c"}, {Key: "b", I: 12, D: "b"},
 		},
-		MatchFunc[TestStructWithKey](func(a, b TestStructWithKey) bool {
+		MatchFunc[*TestStructWithKey](func(a, b *TestStructWithKey) bool {
 			return a.Key == b.Key
 		}),
 		DirectEqual,
@@ -170,7 +170,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		[]TestStructWithKey{
 			{Key: "a", I: 11, D: "a"}, {Key: "c", I: 13, D: "c"},
 		},
-		MatchFunc[TestStructWithKey](func(a, b TestStructWithKey) bool {
+		MatchFunc[*TestStructWithKey](func(a, b *TestStructWithKey) bool {
 			return a.Key == b.Key
 		}),
 		DirectEqual,
@@ -192,7 +192,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		[]NonComparableStructWithKey{
 			{Key: "a", I: 11, S: []string{"a"}}, {Key: "b", I: 12, S: []string{"b"}}, {Key: "c", I: 13, S: []string{"c"}},
 		},
-		MatchFunc[NonComparableStructWithKey](func(a, b NonComparableStructWithKey) bool {
+		MatchFunc[*NonComparableStructWithKey](func(a, b *NonComparableStructWithKey) bool {
 			return a.Key == b.Key
 		}),
 		SemanticDeepEqual,
@@ -200,7 +200,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 
 }
 
-func testEachSliceValRatcheting[T any](t *testing.T, name string, old, new []T, match, equiv MatchFunc[T]) {
+func testEachSliceValRatcheting[T any](t *testing.T, name string, old, new []T, match, equiv MatchFunc[*T]) {
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
@@ -349,7 +349,7 @@ func TestEachMapValRatcheting(t *testing.T) {
 	)
 }
 
-func testEachMapValRatcheting[K ~string, V any](t *testing.T, name string, old, new map[K]V, equiv MatchFunc[V], wantCalls int) {
+func testEachMapValRatcheting[K ~string, V any](t *testing.T, name string, old, new map[K]V, equiv MatchFunc[*V], wantCalls int) {
 	t.Helper()
 	var zero V
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {

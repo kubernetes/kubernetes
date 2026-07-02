@@ -78,7 +78,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool { return a.Key1 == b.Key1 }); len(e) != 0 {
+				func(a *Item, b *Item) bool { return a.Key1 == b.Key1 }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key1": "a"}"

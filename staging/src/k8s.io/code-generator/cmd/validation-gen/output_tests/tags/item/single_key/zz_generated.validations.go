@@ -93,7 +93,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *Item, b *Item) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key": "target"}"
@@ -135,7 +135,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a IntKeyItem, b IntKeyItem) bool { return a.IntField == b.IntField }); len(e) != 0 {
+				func(a *IntKeyItem, b *IntKeyItem) bool { return a.IntField == b.IntField }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"intField": 42}"
@@ -177,7 +177,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a BoolKeyItem, b BoolKeyItem) bool { return a.BoolField == b.BoolField }); len(e) != 0 {
+				func(a *BoolKeyItem, b *BoolKeyItem) bool { return a.BoolField == b.BoolField }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"boolField": true}"
@@ -219,7 +219,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a TypedefItem, b TypedefItem) bool { return a.ID == b.ID }); len(e) != 0 {
+				func(a *TypedefItem, b *TypedefItem) bool { return a.ID == b.ID }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"id": "typedef-target"}"
@@ -261,7 +261,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *Item, b *Item) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key": "target"}"
@@ -296,7 +296,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a PtrKeyItem, b PtrKeyItem) bool {
+				func(a *PtrKeyItem, b *PtrKeyItem) bool {
 					return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
 				}); len(e) != 0 {
 				errs = append(errs, e...)
@@ -344,7 +344,7 @@ func Validate_StructWithNestedTypedef(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a NestedTypedefItem, b NestedTypedefItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *NestedTypedefItem, b *NestedTypedefItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key": "nested-target"}"

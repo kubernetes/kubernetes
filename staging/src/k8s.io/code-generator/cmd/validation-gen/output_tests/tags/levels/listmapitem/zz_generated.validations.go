@@ -78,7 +78,7 @@ func Validate_ListMapItemStruct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key": "foo"}"
@@ -117,7 +117,7 @@ func Validate_ListMapItemStruct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key": "foo"}"
@@ -156,7 +156,7 @@ func Validate_ListMapItemStruct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key": "foo"}"
@@ -195,7 +195,7 @@ func Validate_ListMapItemStruct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key": "foo"}"
@@ -234,7 +234,7 @@ func Validate_ListMapItemStruct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key": "foo"}"
@@ -273,7 +273,7 @@ func Validate_ListMapItemStruct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key": "foo"}"
@@ -312,7 +312,7 @@ func Validate_ListMapItemStruct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key": "foo"}"

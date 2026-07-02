@@ -40,14 +40,18 @@ type MatchFunc[T any] func(T, T) bool
 // corresponding old value, enabling validation ratcheting. If equiv is nil but match is
 // provided, the match function is assumed to perform full value comparison.
 //
+// The match and equiv functions will never be called with nil arguments.
+//
 // Note: The slice element type must be non-nilable.
 func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []T,
-	match, equiv MatchFunc[T], validator ValidateFunc[*T]) field.ErrorList {
+	match, equiv MatchFunc[*T], validator ValidateFunc[*T]) field.ErrorList {
 	var errs field.ErrorList
-	for i, val := range newSlice {
+	for i := range newSlice {
+		val := &newSlice[i]
+
 		var old *T
 		if match != nil && len(oldSlice) > 0 {
-			old = lookup(oldSlice, val, match)
+			old = lookupPointer(oldSlice, val, match)
 		}
 		// If the operation is an update, for validation ratcheting, skip re-validating if the old
 		// value exists and either:
@@ -55,19 +59,30 @@ func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *f
 		// 2. The equiv function confirms the values are equivalent (either directly or semantically)
 		//
 		// The equiv function provides equality comparison when match uses partial comparison.
-		if op.Type == operation.Update && old != nil && (equiv == nil || equiv(val, *old)) {
+		if op.Type == operation.Update && old != nil && (equiv == nil || equiv(val, old)) {
 			continue
 		}
-		errs = append(errs, validator(ctx, op, fldPath.Index(i), &val, old)...)
+		errs = append(errs, validator(ctx, op, fldPath.Index(i), val, old)...)
 	}
 	return errs
 }
 
-// lookup returns a pointer to the first element in the list that matches the
-// target, according to the provided comparison function, or else nil.
-func lookup[T any](list []T, target T, match MatchFunc[T]) *T {
+// lookupValue returns a pointer to the first element in the list that matches
+// the target, according to the provided comparison function, or else nil.
+func lookupValue[T any](list []T, target T, match MatchFunc[T]) *T {
 	for i := range list {
 		if match(list[i], target) {
+			return &list[i]
+		}
+	}
+	return nil
+}
+
+// lookupPointer returns a pointer to the first element in the list that matches the
+// target, according to the provided comparison function, or else nil.
+func lookupPointer[T any](list []T, target *T, match MatchFunc[*T]) *T {
+	for i := range list {
+		if match(&list[i], target) {
 			return &list[i]
 		}
 	}
@@ -79,9 +94,12 @@ func lookup[T any](list []T, target T, match MatchFunc[T]) *T {
 // For update operations, it implements validation ratcheting by skipping validation
 // when the old value exists and the equiv function confirms the values are equivalent.
 // The value-type of the map is assumed to not be nilable.
+//
+// The equiv function will never be called with nil arguments.
+//
 // If equiv is nil, value-based ratcheting is disabled and all values will be validated.
 func EachMapVal[K ~string, V any](ctx context.Context, op operation.Operation, fldPath *field.Path, newMap, oldMap map[K]V,
-	equiv MatchFunc[V], validator ValidateFunc[*V]) field.ErrorList {
+	equiv MatchFunc[*V], validator ValidateFunc[*V]) field.ErrorList {
 	var errs field.ErrorList
 	for key, val := range newMap {
 		var old *V
@@ -90,7 +108,7 @@ func EachMapVal[K ~string, V any](ctx context.Context, op operation.Operation, f
 		}
 		// If the operation is an update, for validation ratcheting, skip re-validating if the old
 		// value is found and the equiv function confirms the values are equivalent.
-		if op.Type == operation.Update && old != nil && equiv != nil && equiv(val, *old) {
+		if op.Type == operation.Update && old != nil && equiv != nil && equiv(&val, old) {
 			continue
 		}
 		errs = append(errs, validator(ctx, op, fldPath.Key(string(key)), &val, old)...)
@@ -122,16 +140,17 @@ func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, f
 // Unique verifies that each element of newSlice is unique, according to the
 // match function. It compares every element of the slice with every other
 // element and returns errors for non-unique items.
-func Unique[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []T, match MatchFunc[T]) field.ErrorList {
+//
+// The match function will never be called with nil arguments.
+func Unique[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []T, match MatchFunc[*T]) field.ErrorList {
 	var dups []int
-	for i, val := range newSlice {
+	for i := range newSlice {
 		for j := i + 1; j < len(newSlice); j++ {
-			other := newSlice[j]
-			if match(val, other) {
+			if match(&newSlice[i], &newSlice[j]) {
 				if dups == nil {
 					dups = make([]int, 0, len(newSlice))
 				}
-				if lookup(dups, j, func(a, b int) bool { return a == b }) == nil {
+				if lookupValue(dups, j, func(a, b int) bool { return a == b }) == nil {
 					dups = append(dups, j)
 				}
 			}
@@ -166,8 +185,9 @@ func SemanticDeepEqual[T any](a, b T) bool {
 // DirectEqual is a MatchFunc that uses the == operator to compare two values.
 // It can be used by any other function that needs to compare two values
 // directly.
-func DirectEqual[T comparable](a, b T) bool {
-	return a == b
+// FIXME: do we still need DirectEqualPtr?
+func DirectEqual[T comparable](a, b *T) bool {
+	return *a == *b
 }
 
 // DirectEqualPtr is a MatchFunc that dereferences two pointers and uses the ==

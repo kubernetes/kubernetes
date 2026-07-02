@@ -183,12 +183,12 @@ func Validate_AllocatedDeviceStatus(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -423,14 +423,14 @@ func Validate_Device(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.DeviceCounterConsumption, b resourcev1beta2.DeviceCounterConsumption) bool {
+				func(a *resourcev1beta2.DeviceCounterConsumption, b *resourcev1beta2.DeviceCounterConsumption) bool {
 					return a.CounterSet == b.CounterSet
 				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.DeviceCounterConsumption, b resourcev1beta2.DeviceCounterConsumption) bool {
+				func(a *resourcev1beta2.DeviceCounterConsumption, b *resourcev1beta2.DeviceCounterConsumption) bool {
 					return a.CounterSet == b.CounterSet
 				}, validate.SemanticDeepEqual, Validate_DeviceCounterConsumption); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1069,12 +1069,12 @@ func Validate_DeviceClaim(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.DeviceRequest, b resourcev1beta2.DeviceRequest) bool { return a.Name == b.Name }).MarkBeta(); len(e) != 0 {
+				func(a *resourcev1beta2.DeviceRequest, b *resourcev1beta2.DeviceRequest) bool { return a.Name == b.Name }).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.DeviceRequest, b resourcev1beta2.DeviceRequest) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_DeviceRequest); len(e) != 0 {
+				func(a *resourcev1beta2.DeviceRequest, b *resourcev1beta2.DeviceRequest) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_DeviceRequest); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1687,14 +1687,14 @@ func Validate_DeviceRequest(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.DeviceSubRequest, b resourcev1beta2.DeviceSubRequest) bool {
+				func(a *resourcev1beta2.DeviceSubRequest, b *resourcev1beta2.DeviceSubRequest) bool {
 					return a.Name == b.Name
 				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.DeviceSubRequest, b resourcev1beta2.DeviceSubRequest) bool {
+				func(a *resourcev1beta2.DeviceSubRequest, b *resourcev1beta2.DeviceSubRequest) bool {
 					return a.Name == b.Name
 				}, validate.SemanticDeepEqual, Validate_DeviceSubRequest); len(e) != 0 {
 				errs = append(errs, e...)
@@ -2235,12 +2235,12 @@ func Validate_DeviceTaintRuleStatus(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -2797,7 +2797,7 @@ func Validate_ResourceClaimStatus(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.ResourceClaimConsumerReference, b resourcev1beta2.ResourceClaimConsumerReference) bool {
+				func(a *resourcev1beta2.ResourceClaimConsumerReference, b *resourcev1beta2.ResourceClaimConsumerReference) bool {
 					return a.UID == b.UID
 				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -2832,14 +2832,14 @@ func Validate_ResourceClaimStatus(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.AllocatedDeviceStatus, b resourcev1beta2.AllocatedDeviceStatus) bool {
+				func(a *resourcev1beta2.AllocatedDeviceStatus, b *resourcev1beta2.AllocatedDeviceStatus) bool {
 					return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
 				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.AllocatedDeviceStatus, b resourcev1beta2.AllocatedDeviceStatus) bool {
+				func(a *resourcev1beta2.AllocatedDeviceStatus, b *resourcev1beta2.AllocatedDeviceStatus) bool {
 					return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
 				}, validate.SemanticDeepEqual, Validate_AllocatedDeviceStatus); len(e) != 0 {
 				errs = append(errs, e...)
@@ -3028,12 +3028,12 @@ func Validate_ResourceSliceSpec(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.CounterSet, b resourcev1beta2.CounterSet) bool { return a.Name == b.Name }).MarkBeta(); len(e) != 0 {
+				func(a *resourcev1beta2.CounterSet, b *resourcev1beta2.CounterSet) bool { return a.Name == b.Name }).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta2.CounterSet, b resourcev1beta2.CounterSet) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_CounterSet); len(e) != 0 {
+				func(a *resourcev1beta2.CounterSet, b *resourcev1beta2.CounterSet) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_CounterSet); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

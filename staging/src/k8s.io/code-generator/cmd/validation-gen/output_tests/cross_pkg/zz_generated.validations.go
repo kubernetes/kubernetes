@@ -619,7 +619,7 @@ func Validate_T1(
 				errs = append(errs, e...)
 			}
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a other.StructType, b other.StructType) bool { return a.StringField == b.StringField }, validate.DirectEqual,
+				func(a *other.StructType, b *other.StructType) bool { return a.StringField == b.StringField }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *other.StructType) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.SliceOfOtherStruct values")
 				}); len(e) != 0 {
@@ -627,7 +627,7 @@ func Validate_T1(
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a other.StructType, b other.StructType) bool { return a.StringField == b.StringField }); len(e) != 0 {
+				func(a *other.StructType, b *other.StructType) bool { return a.StringField == b.StringField }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

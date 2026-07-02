@@ -172,7 +172,9 @@ func UpdateStruct[T any](_ context.Context, op operation.Operation, fldPath *fie
 // NoAddItem and NoRemoveItem use the match function to find corresponding
 // elements between value and oldValue. NoSet and NoUnset treat len == 0 as
 // "unset".
-func UpdateSlice[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue []T, match MatchFunc[T], constraints ...UpdateConstraint) field.ErrorList {
+//
+// The match function will never be called with nil arguments.
+func UpdateSlice[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue []T, match MatchFunc[*T], constraints ...UpdateConstraint) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}
@@ -194,14 +196,16 @@ func UpdateSlice[T any](_ context.Context, op operation.Operation, fldPath *fiel
 				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
 			}
 		case NoAddItem:
-			for i, newItem := range value {
-				if lookup(oldValue, newItem, match) == nil {
+			for i := range value {
+				newItem := &value[i]
+				if lookupPointer(oldValue, newItem, match) == nil {
 					errs = append(errs, field.Forbidden(fldPath.Index(i), "item may not be added").WithOrigin("update"))
 				}
 			}
 		case NoRemoveItem:
-			for _, oldItem := range oldValue {
-				if lookup(value, oldItem, match) == nil {
+			for i := range oldValue {
+				oldItem := &oldValue[i]
+				if lookupPointer(value, oldItem, match) == nil {
 					errs = append(errs, field.Forbidden(fldPath, "item may not be removed").WithOrigin("update"))
 				}
 			}

@@ -64,7 +64,7 @@ func Validate_ConflictingItemList(
 
 	// lists with map semantics require unique keys
 	if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-		func(a DualItem, b DualItem) bool { return a.ID == b.ID }); len(e) != 0 {
+		func(a *DualItem, b *DualItem) bool { return a.ID == b.ID }); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 	func() { // cohort = "{"id": "target"}"
@@ -88,7 +88,7 @@ func Validate_DualItemList(
 
 	// lists with map semantics require unique keys
 	if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-		func(a DualItem, b DualItem) bool { return a.ID == b.ID }); len(e) != 0 {
+		func(a *DualItem, b *DualItem) bool { return a.ID == b.ID }); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 	func() { // cohort = "{"id": "typedef-target"}"
@@ -112,7 +112,7 @@ func Validate_ItemList(
 
 	// lists with map semantics require unique keys
 	if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-		func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
+		func(a *Item, b *Item) bool { return a.Key == b.Key }); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 	func() { // cohort = "{"key": "immutable"}"
@@ -147,7 +147,7 @@ func Validate_ItemListAlias(
 
 	// lists with map semantics require unique keys
 	if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-		func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
+		func(a *Item, b *Item) bool { return a.Key == b.Key }); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 	func() { // cohort = "{"key": "aliased"}"

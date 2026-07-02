@@ -78,7 +78,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool {
+				func(a *Item, b *Item) bool {
 					return a.StringKey == b.StringKey && a.IntKey == b.IntKey && a.BoolKey == b.BoolKey
 				}); len(e) != 0 {
 				errs = append(errs, e...)
@@ -122,7 +122,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool {
+				func(a *Item, b *Item) bool {
 					return a.StringKey == b.StringKey && a.IntKey == b.IntKey && a.BoolKey == b.BoolKey
 				}); len(e) != 0 {
 				errs = append(errs, e...)
@@ -159,7 +159,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a PtrItem, b PtrItem) bool {
+				func(a *PtrItem, b *PtrItem) bool {
 					return ((a.StringKey == nil && b.StringKey == nil) || (a.StringKey != nil && b.StringKey != nil && *a.StringKey == *b.StringKey)) && a.IntKey == b.IntKey && a.BoolKey == b.BoolKey
 				}); len(e) != 0 {
 				errs = append(errs, e...)
@@ -198,7 +198,7 @@ func Validate_Struct(
 			// call field-attached validations
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MixedPtrItem, b MixedPtrItem) bool {
+				func(a *MixedPtrItem, b *MixedPtrItem) bool {
 					return ((a.StringPtrKey == nil && b.StringPtrKey == nil) || (a.StringPtrKey != nil && b.StringPtrKey != nil && *a.StringPtrKey == *b.StringPtrKey)) && a.StringKey == b.StringKey
 				}); len(e) != 0 {
 				errs = append(errs, e...)

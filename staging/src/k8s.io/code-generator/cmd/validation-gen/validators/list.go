@@ -106,7 +106,7 @@ func (lm *listMetadata) makeListMapMatchFunc(t *types.Type) FunctionLiteral {
 	// If no keys are defined, we will throw a good error later.
 
 	matchFn := FunctionLiteral{
-		Parameters: []ParamResult{{"a", t}, {"b", t}},
+		Parameters: []ParamResult{{"a", types.PointerTo(t)}, {"b", types.PointerTo(t)}},
 		Results:    []ParamResult{{"", types.Bool}},
 	}
 	buf := strings.Builder{}
