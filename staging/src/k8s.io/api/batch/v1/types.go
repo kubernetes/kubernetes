@@ -172,7 +172,7 @@ const (
 type PodFailurePolicyOnExitCodesRequirement struct {
 	// Restricts the check for exit codes to the container with the
 	// specified name. When null, the rule applies to all containers.
-	// When specified, it should match one the container or initContainer
+	// When specified, it should match one of the container or initContainer
 	// names in the pod template.
 	// +optional
 	ContainerName *string `json:"containerName,omitempty" protobuf:"bytes,1,opt,name=containerName"`
