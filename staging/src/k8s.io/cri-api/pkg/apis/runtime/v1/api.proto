@@ -2418,10 +2418,12 @@ message RestorePodRequest {
     // non-empty, unique metadata name, and those names must be the exact set of
     // container names in the checkpoint. The runtime must match containers by
     // metadata name. The checkpoint is authoritative for filesystem and
-    // process state. Image, command, args, working directory, environment, and
-    // process credentials describe the expected checkpointed process; they
-    // must not start or mutate it, and any mismatch the runtime can validate
-    // must fail the restore. The runtime applies restore-time settings outside
+    // process state. The runtime must validate the image, working directory,
+    // and process credentials against the checkpoint. Command, args, and
+    // environment can contain values resolved for the destination Pod (such as
+    // Downward API values); they must not start or mutate the checkpointed
+    // process. Its captured command, args, and environment remain in effect.
+    // The runtime applies restore-time settings outside
     // checkpoint-owned process state, including labels, annotations, mounts,
     // devices, Linux resources, logging, and security constraints, and must
     // fail settings incompatible with the checkpoint.
