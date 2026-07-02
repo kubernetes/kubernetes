@@ -54,6 +54,7 @@ type Snapshot struct {
 	havePodsWithRequiredAntiAffinityNodeInfoList []fwk.NodeInfo
 	// havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList is the list of nodes with at least one pod declaring
 	// required anti-affinity terms that are non-host-scoped.
+	// This list must be empty when the InterPodAffinityHostnameFastPath feature gate is disabled.
 	havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList []fwk.NodeInfo
 	// usedPVCRefCounts contains the number of nodes using each PVC across the cluster,
 	// keyed in the format "namespace/name".
@@ -328,7 +329,8 @@ func (s *Snapshot) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error
 }
 
 // HavePodsWithRequiredNonHostScopedAntiAffinityList returns the list of nodes with at least one pod with
-// required inter-pod anti-affinity that is non-host-scoped
+// required inter-pod anti-affinity that is non-host-scoped.
+// It returns an empty list and no error if the InterPodAffinityHostnameFastPath feature gate is disabled.
 func (s *Snapshot) HavePodsWithRequiredNonHostScopedAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return s.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList, nil
 }

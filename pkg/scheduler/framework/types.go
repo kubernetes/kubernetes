@@ -183,6 +183,7 @@ type NodeInfo struct {
 	PodsWithRequiredAntiAffinity []fwk.PodInfo
 
 	// The subset of pods with required anti-affinity that is non-host-scoped (topologyKey other than hostname).
+	// This slice must be empty when the InterPodAffinityHostnameFastPath feature gate is disabled.
 	PodsWithRequiredNonHostScopedAntiAffinity []fwk.PodInfo
 
 	// Ports allocated on the node.

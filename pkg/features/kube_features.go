@@ -1501,8 +1501,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	InterPodAffinityHostnameFastPath: {
-		// 1.31 history added to allow toggling this gate in integration tests that emulate version 1.32.
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 

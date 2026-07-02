@@ -734,47 +734,51 @@ func TestPodAffinityScoring(t *testing.T) {
 	}
 
 	for _, fastPathEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("fastPathEnabled=%v", fastPathEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
-			for _, tt := range tests {
-				t.Run(tt.name, func(t *testing.T) {
-			if !tt.enableMatchLabelKeysInAffinity {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
+		for _, tt := range tests {
+			if !tt.enableMatchLabelKeysInAffinity && fastPathEnabled {
+				// Avoid running the v1.32 emulation twice (once for fastPathEnabled=true and once for false).
+				// Since fastPath is not available in v1.32, it will run with fastPath disabled when fastPathEnabled=false.
+				continue
 			}
-
-			testCtx := initTestSchedulerForScoringTests(t, interpodaffinity.Name, interpodaffinity.Name)
-			if err := createNamespacesWithLabels(testCtx.ClientSet, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
-				t.Fatal(err)
-			}
-
-			for _, n := range tt.nodes {
-				if _, err := createNode(testCtx.ClientSet, n); err != nil {
-					t.Fatalf("failed to create node: %v", err)
+			t.Run(fmt.Sprintf("%s/fastPathEnabled=%v", tt.name, fastPathEnabled), func(t *testing.T) {
+				if !tt.enableMatchLabelKeysInAffinity {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
+				} else {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
 				}
-			}
-			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
-				t.Fatalf("failed to wait for nodes in cache: %v", err)
-			}
 
-			for _, p := range tt.existingPods {
-				if _, err := runPausePod(testCtx.ClientSet, initPausePod(p)); err != nil {
-					t.Fatalf("failed to create existing pod: %v", err)
+				testCtx := initTestSchedulerForScoringTests(t, interpodaffinity.Name, interpodaffinity.Name)
+				if err := createNamespacesWithLabels(testCtx.ClientSet, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
+					t.Fatal(err)
 				}
-			}
 
-			pod, err := runPausePod(testCtx.ClientSet, initPausePod(tt.pod))
-			if err != nil {
-				t.Fatalf("Error running pause pod: %v", err)
-			}
+				for _, n := range tt.nodes {
+					if _, err := createNode(testCtx.ClientSet, n); err != nil {
+						t.Fatalf("failed to create node: %v", err)
+					}
+				}
+				if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+					t.Fatalf("failed to wait for nodes in cache: %v", err)
+				}
 
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, podScheduledIn(testCtx.ClientSet, pod.Namespace, pod.Name, tt.expectedNodeName))
-			if err != nil {
-				t.Errorf("Error while trying to wait for a pod to be scheduled: %v", err)
-			}
-		})
-	}
-		})
+				for _, p := range tt.existingPods {
+					if _, err := runPausePod(testCtx.ClientSet, initPausePod(p)); err != nil {
+						t.Fatalf("failed to create existing pod: %v", err)
+					}
+				}
+
+				pod, err := runPausePod(testCtx.ClientSet, initPausePod(tt.pod))
+				if err != nil {
+					t.Fatalf("Error running pause pod: %v", err)
+				}
+
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, podScheduledIn(testCtx.ClientSet, pod.Namespace, pod.Name, tt.expectedNodeName))
+				if err != nil {
+					t.Errorf("Error while trying to wait for a pod to be scheduled: %v", err)
+				}
+			})
+		}
 	}
 }
 

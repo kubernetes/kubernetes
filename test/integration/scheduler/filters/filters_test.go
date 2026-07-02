@@ -1171,106 +1171,132 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 	}
 
-	for _, fastPathEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("fp=%t", fastPathEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
-			for _, v := range []string{"1.32", "1.37"} {
-				t.Run(fmt.Sprintf("v=%s", v), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(v))
-					for _, test := range tests {
-						t.Run(test.name, func(t *testing.T) {
-					if !test.enableMatchLabelKeysInAffinity {
-						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var configs []struct {
+				name             string
+				emulationVersion string
+				fastPathEnabled  *bool
+				matchLabelKeys   bool
+			}
+			if !test.enableMatchLabelKeysInAffinity {
+				configs = []struct {
+					name             string
+					emulationVersion string
+					fastPathEnabled  *bool
+					matchLabelKeys   bool
+				}{
+					{name: "v1.32", emulationVersion: "1.32", fastPathEnabled: nil, matchLabelKeys: false},
+					{name: "v1.37/fp=true", emulationVersion: "1.37", fastPathEnabled: ptr.To(true), matchLabelKeys: true},
+					{name: "v1.37/fp=false", emulationVersion: "1.37", fastPathEnabled: ptr.To(false), matchLabelKeys: true},
+				}
+			} else {
+				configs = []struct {
+					name             string
+					emulationVersion string
+					fastPathEnabled  *bool
+					matchLabelKeys   bool
+				}{
+					{name: "v1.37/fp=true", emulationVersion: "1.37", fastPathEnabled: ptr.To(true), matchLabelKeys: true},
+					{name: "v1.37/fp=false", emulationVersion: "1.37", fastPathEnabled: ptr.To(false), matchLabelKeys: true},
+				}
+			}
+
+			for _, cfg := range configs {
+				t.Run(cfg.name, func(t *testing.T) {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(cfg.emulationVersion))
+					if cfg.fastPathEnabled != nil {
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, *cfg.fastPathEnabled)
+					}
+					if !cfg.matchLabelKeys {
 						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
 					}
 					testCtx := initTest(t, "")
-			cs := testCtx.ClientSet
+					cs := testCtx.ClientSet
 
-			if _, err := createNode(cs, st.MakeNode().Name("testnode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n1").Label(v1.LabelHostname, "testnode-0").Capacity(
-				map[v1.ResourceName]string{
-					v1.ResourceMemory: "1G",
-				},
-			).Obj()); err != nil {
-				t.Fatalf("failed to create node: %v", err)
-			}
+					if _, err := createNode(cs, st.MakeNode().Name("testnode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n1").Label(v1.LabelHostname, "testnode-0").Capacity(
+						map[v1.ResourceName]string{
+							v1.ResourceMemory: "1G",
+						},
+					).Obj()); err != nil {
+						t.Fatalf("failed to create node: %v", err)
+					}
 
-			// another test node has the same "region" and "zone" labels as testnode, but has a different "node" label.
-			if _, err := createNode(cs, st.MakeNode().Name("anothernode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n2").Label(v1.LabelHostname, "anothernode-0").Capacity(
-				map[v1.ResourceName]string{
-					v1.ResourceMemory: "1G",
-				},
-			).Obj()); err != nil {
-				t.Fatalf("failed to create node: %v", err)
-			}
+					// another test node has the same "region" and "zone" labels as testnode, but has a different "node" label.
+					if _, err := createNode(cs, st.MakeNode().Name("anothernode-0").Label("region", "r1").Label("zone", "z11").Label("node", "n2").Label(v1.LabelHostname, "anothernode-0").Capacity(
+						map[v1.ResourceName]string{
+							v1.ResourceMemory: "1G",
+						},
+					).Obj()); err != nil {
+						t.Fatalf("failed to create node: %v", err)
+					}
 
-			if err := createNamespacesWithLabels(cs, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
-				t.Fatal(err)
-			}
-			if err := createNamespacesWithLabels(cs, []string{"ns3"}, map[string]string{"team": "team2"}); err != nil {
-				t.Fatal(err)
-			}
+					if err := createNamespacesWithLabels(cs, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
+						t.Fatal(err)
+					}
+					if err := createNamespacesWithLabels(cs, []string{"ns3"}, map[string]string{"team": "team2"}); err != nil {
+						t.Fatal(err)
+					}
 
-			for _, pod := range test.pods {
-				if pod.Namespace == "" {
-					pod.Namespace = defaultNS
-				}
-				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Error while creating pod: %v", err)
-				}
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
-				if err != nil {
-					t.Errorf("Error while creating pod: %v", err)
-				}
-			}
-			if test.pod.Namespace == "" {
-				test.pod.Namespace = defaultNS
-			}
+					for _, pod := range test.pods {
+						if pod.Namespace == "" {
+							pod.Namespace = defaultNS
+						}
+						createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+						if err != nil {
+							t.Fatalf("Error while creating pod: %v", err)
+						}
+						err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+							testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+						if err != nil {
+							t.Errorf("Error while creating pod: %v", err)
+						}
+					}
+					if test.pod.Namespace == "" {
+						test.pod.Namespace = defaultNS
+					}
 
-			testPod, err := cs.CoreV1().Pods(test.pod.Namespace).Create(testCtx.Ctx, test.pod, metav1.CreateOptions{})
-			if err != nil {
-				if !(test.errorType == "invalidPod" && apierrors.IsInvalid(err)) {
-					t.Fatalf("Error while creating pod: %v", err)
-				}
-			}
+					testPod, err := cs.CoreV1().Pods(test.pod.Namespace).Create(testCtx.Ctx, test.pod, metav1.CreateOptions{})
+					if err != nil {
+						if !(test.errorType == "invalidPod" && apierrors.IsInvalid(err)) {
+							t.Fatalf("Error while creating pod: %v", err)
+						}
+					}
 
-			if test.fits {
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
-			} else {
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					podUnschedulable(cs, testPod.Namespace, testPod.Name))
-			}
-			if err != nil {
-				t.Errorf("Error while trying to fit a pod: %v", err)
-				return
-			}
+					if test.fits {
+						err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+							testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
+					} else {
+						err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+							podUnschedulable(cs, testPod.Namespace, testPod.Name))
+					}
+					if err != nil {
+						t.Errorf("Error while trying to fit a pod: %v", err)
+						return
+					}
 
-			err = cs.CoreV1().Pods(test.pod.Namespace).Delete(testCtx.Ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
-			if err != nil {
-				t.Errorf("Error while deleting pod: %v", err)
+					err = cs.CoreV1().Pods(test.pod.Namespace).Delete(testCtx.Ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
+					if err != nil {
+						t.Errorf("Error while deleting pod: %v", err)
+					}
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
+						testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, test.pod.Name))
+					if err != nil {
+						t.Errorf("Error while waiting for pod to get deleted: %v", err)
+					}
+					for _, pod := range test.pods {
+						err = cs.CoreV1().Pods(pod.Namespace).Delete(testCtx.Ctx, pod.Name, *metav1.NewDeleteOptions(0))
+						if err != nil {
+							t.Errorf("Error while deleting pod: %v", err)
+						}
+						err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
+							testutils.PodDeleted(testCtx.Ctx, cs, pod.Namespace, pod.Name))
+						if err != nil {
+							t.Errorf("Error while waiting for pod to get deleted: %v", err)
+						}
+					}
+				})
 			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
-				testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, test.pod.Name))
-			if err != nil {
-				t.Errorf("Error while waiting for pod to get deleted: %v", err)
-			}
-			for _, pod := range test.pods {
-				err = cs.CoreV1().Pods(pod.Namespace).Delete(testCtx.Ctx, pod.Name, *metav1.NewDeleteOptions(0))
-				if err != nil {
-					t.Errorf("Error while deleting pod: %v", err)
-				}
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
-					testutils.PodDeleted(testCtx.Ctx, cs, pod.Namespace, pod.Name))
-				if err != nil {
-					t.Errorf("Error while waiting for pod to get deleted: %v", err)
-				}
-			}
-		})
-	}
-		})
-	}
 		})
 	}
 }
@@ -1385,86 +1411,105 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 		},
 	}
 
-	for _, fastPathEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("fp=%t", fastPathEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, fastPathEnabled)
-			for _, v := range []string{"1.32", "1.37"} {
-				t.Run(fmt.Sprintf("v=%s", v), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(v))
-					for _, test := range tests {
-						t.Run(test.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var configs []struct {
+				name             string
+				emulationVersion string
+				fastPathEnabled  *bool
+				matchLabelKeys   bool
+			}
+			// NamespaceSelector tests don't have enableMatchLabelKeysInAffinity field, they are legacy tests.
+			configs = []struct {
+				name             string
+				emulationVersion string
+				fastPathEnabled  *bool
+				matchLabelKeys   bool
+			}{
+				{name: "v1.32", emulationVersion: "1.32", fastPathEnabled: nil, matchLabelKeys: false},
+				{name: "v1.37/fp=true", emulationVersion: "1.37", fastPathEnabled: ptr.To(true), matchLabelKeys: true},
+				{name: "v1.37/fp=false", emulationVersion: "1.37", fastPathEnabled: ptr.To(false), matchLabelKeys: true},
+			}
+
+			for _, cfg := range configs {
+				t.Run(cfg.name, func(t *testing.T) {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(cfg.emulationVersion))
+					if cfg.fastPathEnabled != nil {
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, *cfg.fastPathEnabled)
+					}
+					if !cfg.matchLabelKeys {
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
+					}
 					testCtx := initTest(t, "")
 
-			// Add a few nodes with labels
-			nodes, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Label("region", "r1").Label("zone", "z11"), 2)
-			if err != nil {
-				t.Fatal(err)
-			}
-			test.existingPod.Spec.NodeName = nodes[0].Name
+					// Add a few nodes with labels
+					nodes, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Label("region", "r1").Label("zone", "z11"), 2)
+					if err != nil {
+						t.Fatal(err)
+					}
+					test.existingPod.Spec.NodeName = nodes[0].Name
 
-			cs := testCtx.ClientSet
+					cs := testCtx.ClientSet
 
-			if err := createNamespacesWithLabels(cs, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
-				t.Fatal(err)
-			}
-			if err := createNamespacesWithLabels(cs, []string{"ns3"}, map[string]string{"team": "team2"}); err != nil {
-				t.Fatal(err)
-			}
-			defaultNS := "ns1"
+					if err := createNamespacesWithLabels(cs, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
+						t.Fatal(err)
+					}
+					if err := createNamespacesWithLabels(cs, []string{"ns3"}, map[string]string{"team": "team2"}); err != nil {
+						t.Fatal(err)
+					}
+					defaultNS := "ns1"
 
-			createdPod, err := cs.CoreV1().Pods(test.existingPod.Namespace).Create(testCtx.Ctx, test.existingPod, metav1.CreateOptions{})
-			if err != nil {
-				t.Fatalf("Error while creating pod: %v", err)
-			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-				testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
-			if err != nil {
-				t.Errorf("Error while creating pod: %v", err)
-			}
+					createdPod, err := cs.CoreV1().Pods(test.existingPod.Namespace).Create(testCtx.Ctx, test.existingPod, metav1.CreateOptions{})
+					if err != nil {
+						t.Fatalf("Error while creating pod: %v", err)
+					}
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+						testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+					if err != nil {
+						t.Errorf("Error while creating pod: %v", err)
+					}
 
-			if test.pod.Namespace == "" {
-				test.pod.Namespace = defaultNS
-			}
+					if test.pod.Namespace == "" {
+						test.pod.Namespace = defaultNS
+					}
 
-			testPod, err := cs.CoreV1().Pods(test.pod.Namespace).Create(testCtx.Ctx, test.pod, metav1.CreateOptions{})
-			if err != nil {
-				if !(test.errorType == "invalidPod" && apierrors.IsInvalid(err)) {
-					t.Fatalf("Error while creating pod: %v", err)
-				}
-			}
+					testPod, err := cs.CoreV1().Pods(test.pod.Namespace).Create(testCtx.Ctx, test.pod, metav1.CreateOptions{})
+					if err != nil {
+						if !(test.errorType == "invalidPod" && apierrors.IsInvalid(err)) {
+							t.Fatalf("Error while creating pod: %v", err)
+						}
+					}
 
-			if test.fits {
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
-			} else {
-				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					podUnschedulable(cs, testPod.Namespace, testPod.Name))
+					if test.fits {
+						err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+							testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
+					} else {
+						err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+							podUnschedulable(cs, testPod.Namespace, testPod.Name))
+					}
+					if err != nil {
+						t.Errorf("Error while trying to fit a pod: %v", err)
+					}
+					err = cs.CoreV1().Pods(test.pod.Namespace).Delete(testCtx.Ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
+					if err != nil {
+						t.Errorf("Error while deleting pod: %v", err)
+					}
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
+						testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, test.pod.Name))
+					if err != nil {
+						t.Errorf("Error while waiting for pod to get deleted: %v", err)
+					}
+					err = cs.CoreV1().Pods(test.existingPod.Namespace).Delete(testCtx.Ctx, test.existingPod.Name, *metav1.NewDeleteOptions(0))
+					if err != nil {
+						t.Errorf("Error while deleting pod: %v", err)
+					}
+					err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
+						testutils.PodDeleted(testCtx.Ctx, cs, test.existingPod.Namespace, test.existingPod.Name))
+					if err != nil {
+						t.Errorf("Error while waiting for pod to get deleted: %v", err)
+					}
+				})
 			}
-			if err != nil {
-				t.Errorf("Error while trying to fit a pod: %v", err)
-			}
-			err = cs.CoreV1().Pods(test.pod.Namespace).Delete(testCtx.Ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
-			if err != nil {
-				t.Errorf("Error while deleting pod: %v", err)
-			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
-				testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, test.pod.Name))
-			if err != nil {
-				t.Errorf("Error while waiting for pod to get deleted: %v", err)
-			}
-			err = cs.CoreV1().Pods(test.existingPod.Namespace).Delete(testCtx.Ctx, test.existingPod.Name, *metav1.NewDeleteOptions(0))
-			if err != nil {
-				t.Errorf("Error while deleting pod: %v", err)
-			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
-				testutils.PodDeleted(testCtx.Ctx, cs, test.existingPod.Namespace, test.existingPod.Name))
-			if err != nil {
-				t.Errorf("Error while waiting for pod to get deleted: %v", err)
-			}
-		})
-	}
-		})
-	}
 		})
 	}
 }

@@ -1036,31 +1036,31 @@ func TestSnapshot_HavePodsWithRequiredNonHostScopedAntiAffinityList(t *testing.T
 	podWithoutAntiAffinity := st.MakePod().Name("pod-3").UID("pod-3").Namespace("ns").Node("node-2").Obj()
 
 	testCases := []struct {
-		name               string
-		pods               []*v1.Pod
-		nodes              []*v1.Node
-		featureGateEnabled bool
-		expectedNodes      int
+		name                                    string
+		pods                                    []*v1.Pod
+		nodes                                   []*v1.Node
+		interPodAffinityHostnameFastPathEnabled bool
+		expectedNodes                           int
 	}{
 		{
-			name:               "feature gate enabled, has non-host-scoped",
-			pods:               []*v1.Pod{podWithNonHostScopedAntiAffinity, podWithHostScopedAntiAffinity, podWithoutAntiAffinity},
-			nodes:              []*v1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}, {ObjectMeta: metav1.ObjectMeta{Name: "node-2"}}},
-			featureGateEnabled: true,
-			expectedNodes:      1,
+			name:                                    "feature gate enabled, has non-host-scoped",
+			pods:                                    []*v1.Pod{podWithNonHostScopedAntiAffinity, podWithHostScopedAntiAffinity, podWithoutAntiAffinity},
+			nodes:                                   []*v1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}, {ObjectMeta: metav1.ObjectMeta{Name: "node-2"}}},
+			interPodAffinityHostnameFastPathEnabled: true,
+			expectedNodes:                           1,
 		},
 		{
-			name:               "feature gate disabled, has non-host-scoped",
-			pods:               []*v1.Pod{podWithNonHostScopedAntiAffinity, podWithHostScopedAntiAffinity, podWithoutAntiAffinity},
-			nodes:              []*v1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}, {ObjectMeta: metav1.ObjectMeta{Name: "node-2"}}},
-			featureGateEnabled: false,
-			expectedNodes:      0,
+			name:                                    "feature gate disabled, has non-host-scoped",
+			pods:                                    []*v1.Pod{podWithNonHostScopedAntiAffinity, podWithHostScopedAntiAffinity, podWithoutAntiAffinity},
+			nodes:                                   []*v1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}, {ObjectMeta: metav1.ObjectMeta{Name: "node-2"}}},
+			interPodAffinityHostnameFastPathEnabled: false,
+			expectedNodes:                           0,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, tc.featureGateEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, tc.interPodAffinityHostnameFastPathEnabled)
 			snapshot := NewSnapshot(tc.pods, tc.nodes)
 			antiAffinityList, err := snapshot.HavePodsWithRequiredNonHostScopedAntiAffinityList()
 			if err != nil {

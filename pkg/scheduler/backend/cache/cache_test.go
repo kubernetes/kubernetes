@@ -2896,16 +2896,25 @@ func TestCache_HavePodsWithRequiredNonHostScopedAntiAffinity(t *testing.T) {
 		PodAntiAffinityExists("label", "zone", st.PodAntiAffinityWithRequiredReq).Obj()
 
 	testCases := []struct {
-		name               string
-		featureGateEnabled bool
+		name                                    string
+		interPodAffinityHostnameFastPathEnabled bool
+		expectAntiAffinityListLen               int
 	}{
-		{name: "feature gate enabled", featureGateEnabled: true},
-		{name: "feature gate disabled", featureGateEnabled: false},
+		{
+			name:                                    "feature gate enabled",
+			interPodAffinityHostnameFastPathEnabled: true,
+			expectAntiAffinityListLen:               1,
+		},
+		{
+			name:                                    "feature gate disabled",
+			interPodAffinityHostnameFastPathEnabled: false,
+			expectAntiAffinityListLen:               0,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, tc.featureGateEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, tc.interPodAffinityHostnameFastPathEnabled)
 
 			cache := newCache(context.Background(), time.Second, nil, false)
 			node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
@@ -2923,11 +2932,8 @@ func TestCache_HavePodsWithRequiredNonHostScopedAntiAffinity(t *testing.T) {
 			if err != nil {
 				t.Fatalf("HavePodsWithRequiredNonHostScopedAntiAffinityList failed: %v", err)
 			}
-			if tc.featureGateEnabled && len(antiAffinityList) != 1 {
-				t.Errorf("expected 1 node with non-host-scoped anti-affinity, got %d", len(antiAffinityList))
-			}
-			if !tc.featureGateEnabled && len(antiAffinityList) != 0 {
-				t.Errorf("expected 0 nodes with non-host-scoped anti-affinity when feature gate is disabled, got %d", len(antiAffinityList))
+			if len(antiAffinityList) != tc.expectAntiAffinityListLen {
+				t.Errorf("expected %d node(s) with non-host-scoped anti-affinity, got %d", tc.expectAntiAffinityListLen, len(antiAffinityList))
 			}
 
 			// Update (to something else, e.g. change labels)
@@ -2941,11 +2947,8 @@ func TestCache_HavePodsWithRequiredNonHostScopedAntiAffinity(t *testing.T) {
 				t.Fatalf("UpdateSnapshot failed: %v", err)
 			}
 			antiAffinityList, _ = snapshot.HavePodsWithRequiredNonHostScopedAntiAffinityList()
-			if tc.featureGateEnabled && len(antiAffinityList) != 1 {
-				t.Errorf("expected 1 node after update, got %d", len(antiAffinityList))
-			}
-			if !tc.featureGateEnabled && len(antiAffinityList) != 0 {
-				t.Errorf("expected 0 nodes after update when feature gate is disabled, got %d", len(antiAffinityList))
+			if len(antiAffinityList) != tc.expectAntiAffinityListLen {
+				t.Errorf("expected %d node(s) after update, got %d", tc.expectAntiAffinityListLen, len(antiAffinityList))
 			}
 
 			// Remove
