@@ -38,7 +38,7 @@ import (
 // is true it enables the alpha node.k8s.io/v1alpha1 group via --runtime-config;
 // the PodLevelCheckpointRestore feature gate must be toggled separately by the caller
 // (the gate also guards whether the group is served, see storage_checkpoint.go).
-func startAPIServer(tCtx ktesting.TContext, t *testing.T, serveCheckpointAPI bool) (clientset.Interface, *restclient.Config, framework.TearDownFunc) {
+func startAPIServer(tCtx ktesting.TContext, t *testing.T, serveCheckpointAPI bool, configure ...func(*options.ServerRunOptions)) (clientset.Interface, *restclient.Config, framework.TearDownFunc) {
 	return framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable admission plugins that interfere with a minimal pod/node setup.
@@ -47,6 +47,9 @@ func startAPIServer(tCtx ktesting.TContext, t *testing.T, serveCheckpointAPI boo
 				opts.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
 					nodev1alpha1.SchemeGroupVersion.String(): "true",
 				}
+			}
+			for _, f := range configure {
+				f(opts)
 			}
 		},
 	})
