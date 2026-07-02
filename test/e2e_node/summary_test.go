@@ -489,6 +489,47 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
 			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
 		})
+
+		ginkgo.It("should report 0 UsageNanoCores for a light command", func(ctx context.Context) {
+			podName := "light-pod"
+			ginkgo.By("Creating a pod with a light command")
+			podSpec := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    "light-container",
+							Image:   busyboxImage,
+							Command: []string{"sleep", "3600"},
+						},
+					},
+				},
+			}
+			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
+
+			ginkgo.By("Waiting for the pod to start")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+
+			ginkgo.By("Validating that CPU UsageNanoCores is 0")
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				summary, err := getNodeSummary(ctx)
+				framework.ExpectNoError(err)
+				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Containers": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
+							"light-container": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"CPU": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+									"UsageNanoCores": gomega.PointTo(gomega.BeZero()),
+								})),
+							}),
+						}),
+					}),
+				}))
+			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
+			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+		})
 	})
 })
 
