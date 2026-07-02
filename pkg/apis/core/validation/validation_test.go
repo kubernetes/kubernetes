@@ -19831,6 +19831,36 @@ func mkValidReplicationController(tweaks ...func(rc *core.ReplicationController)
 	return rc
 }
 
+func TestValidatePodTemplateSpecRestoreFrom(t *testing.T) {
+	template := &core.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"a": "b"}},
+		Spec:       podtest.MakePodSpec(podtest.SetRestoreFrom("checkpoint")),
+	}
+	fldPath := field.NewPath("template")
+	for name, tc := range map[string]struct {
+		opts         PodValidationOptions
+		expectedErrs field.ErrorList
+	}{
+		"feature enabled": {
+			opts: PodValidationOptions{AllowRestoreFrom: true},
+			expectedErrs: field.ErrorList{
+				field.Forbidden(fldPath.Child("spec", "restoreFrom"), "not allowed in pod template"),
+			},
+		},
+		"feature disabled": {
+			expectedErrs: field.ErrorList{
+				field.Forbidden(fldPath.Child("spec", "restoreFrom"), "feature gate is disabled"),
+				field.Forbidden(fldPath.Child("spec", "restoreFrom"), "not allowed in pod template"),
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidatePodTemplateSpec(template, fldPath, tc.opts)
+			field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring().Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
 func TestValidateReplicationControllerUpdate(t *testing.T) {
 	successCases := []struct {
 		old    core.ReplicationController
@@ -24943,6 +24973,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ResourceClaims[*].ResourceClaimTemplateName",
 		"Resources",
 		"RestartPolicy",
+		"RestoreFrom",
 		"RuntimeClassName",
 		"SchedulerName",
 		"SchedulingGates[*].Name",

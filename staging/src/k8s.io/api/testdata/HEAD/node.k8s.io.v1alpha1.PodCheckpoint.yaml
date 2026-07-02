@@ -388,6 +388,11 @@ status:
             user: userValue
           seccompProfile:
             localhostProfile: localhostProfileValue
+            oci:
+              baseProfile:
+                localhostProfile: localhostProfileValue
+                type: typeValue
+              ref: refValue
             type: typeValue
           windowsOptions:
             gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -626,6 +631,11 @@ status:
             user: userValue
           seccompProfile:
             localhostProfile: localhostProfileValue
+            oci:
+              baseProfile:
+                localhostProfile: localhostProfileValue
+                type: typeValue
+              ref: refValue
             type: typeValue
           windowsOptions:
             gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -870,6 +880,11 @@ status:
             user: userValue
           seccompProfile:
             localhostProfile: localhostProfileValue
+            oci:
+              baseProfile:
+                localhostProfile: localhostProfileValue
+                type: typeValue
+              ref: refValue
             type: typeValue
           windowsOptions:
             gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -946,6 +961,8 @@ status:
         requests:
           requestsKey: "0"
       restartPolicy: restartPolicyValue
+      restoreFrom:
+        name: nameValue
       runtimeClassName: runtimeClassNameValue
       schedulerName: schedulerNameValue
       schedulingGates:
@@ -969,6 +986,11 @@ status:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         supplementalGroups:
         - 4

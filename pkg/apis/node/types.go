@@ -114,6 +114,18 @@ type RuntimeClassList struct {
 	Items []RuntimeClass
 }
 
+// PodRestoreProtectionFinalizer retains a restoring Pod until the kubelet has
+// confirmed that the runtime no longer depends on its checkpoint.
+const PodRestoreProtectionFinalizer = "node.k8s.io/pod-restore-protection"
+
+const (
+	// PodRestoreReasonCleanupCompleted acknowledges that failed restore work and
+	// its runtime resources have been cleaned up.
+	PodRestoreReasonCleanupCompleted = "RestoreCleanupCompleted"
+	// PodRestoreReasonNotStarted acknowledges that no restore reached the runtime.
+	PodRestoreReasonNotStarted = "RestoreNotStarted"
+)
+
 const (
 	// PodCheckpointConditionReady is the summary condition type for a PodCheckpoint.
 	// It is True once the checkpoint data has been written and is ready to
