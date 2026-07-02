@@ -32,6 +32,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/ptr"
 )
 
@@ -1726,5 +1727,37 @@ func TestSecurityProfileOCIRefs(t *testing.T) {
 	}
 	if got := SecurityProfileOCIRefs(&v1.Pod{}); got != nil {
 		t.Errorf("SecurityProfileOCIRefs() of an empty pod = %v, want nil", got)
+	}
+}
+
+func TestCheckpointContainers(t *testing.T) {
+	always := v1.ContainerRestartPolicyAlways
+	spec := &v1.PodSpec{
+		InitContainers: []v1.Container{
+			{Name: "setup"},
+			{Name: "sidecar", RestartPolicy: &always},
+		},
+		Containers:          []v1.Container{{Name: "app"}, {Name: "worker"}},
+		EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"}}},
+	}
+	type selected struct {
+		name          string
+		containerType podutil.ContainerType
+	}
+	var got []selected
+	for container, containerType := range CheckpointContainers(spec) {
+		got = append(got, selected{container.Name, containerType})
+		container.Image = "pinned"
+	}
+	want := []selected{
+		{"sidecar", podutil.InitContainers},
+		{"app", podutil.Containers},
+		{"worker", podutil.Containers},
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("CheckpointContainers() = %v, want %v", got, want)
+	}
+	if spec.InitContainers[1].Image != "pinned" || spec.Containers[0].Image != "pinned" || spec.InitContainers[0].Image != "" {
+		t.Fatal("CheckpointContainers must yield pointers into the spec for the selected containers only")
 	}
 }

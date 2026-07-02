@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"sync/atomic"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -55,6 +56,9 @@ type containerBoundWorkerOptions struct {
 	// Initial probe timing is jittered to prevent a thundering herd.
 	adopted bool
 
+	// suspended starts the worker with probes paused.
+	suspended bool
+
 	onExit             func(*containerBoundWorker)
 	onStartupSucceeded func(*containerBoundWorker)
 }
@@ -74,8 +78,12 @@ type containerBoundWorker struct {
 	onExit             func(*containerBoundWorker)
 	onStartupSucceeded func(*containerBoundWorker)
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx       context.Context
+	cancel    context.CancelFunc
+	probeLock chan struct{}
+	// suspended pauses probes while the pod is checkpointed. It is atomic so
+	// each probe can check it without taking the manager lock.
+	suspended atomic.Bool
 
 	probeResultState
 }
@@ -89,10 +97,12 @@ func newContainerBoundWorker(ctx context.Context, opts containerBoundWorkerOptio
 		prober:             opts.prober,
 		resultsManager:     opts.resultsManager,
 		adopted:            opts.adopted,
+		probeLock:          make(chan struct{}, 1),
 		onExit:             opts.onExit,
 		onStartupSucceeded: opts.onStartupSucceeded,
 	}
 	w.ctx, w.cancel = context.WithCancel(ctx)
+	w.suspended.Store(opts.suspended)
 
 	w.spec = probeSpec(opts.probeType, &w.container)
 
@@ -163,6 +173,15 @@ func (w *containerBoundWorker) wait(d time.Duration) bool {
 // Returns whether the worker should continue.
 func (w *containerBoundWorker) doProbe() (keepGoing bool) {
 	ctx := w.ctx
+	select {
+	case w.probeLock <- struct{}{}:
+		defer func() { <-w.probeLock }()
+	case <-ctx.Done():
+		return false
+	}
+	if w.suspended.Load() {
+		return true
+	}
 	defer func() { _ = recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrashWithContext(ctx, func(ctx context.Context, _ interface{}) { keepGoing = true })
 
