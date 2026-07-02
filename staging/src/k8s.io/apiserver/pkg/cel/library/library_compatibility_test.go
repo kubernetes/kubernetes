@@ -59,6 +59,8 @@ func TestLibraryCompatibility(t *testing.T) {
 		"jsonpatch.escapeKey",
 		// Kubernetes <1.33>:
 		"semver", "isSemver", "major", "minor", "patch",
+		// Kubernetes <1.37>:
+		"isMask",
 		// Kubernetes <1.??>:
 	)
 
@@ -104,7 +106,7 @@ func TestTypeRegistration(t *testing.T) {
 		}
 		for _, lb := range lib.Types() {
 			registeredTypes.Insert(lb)
-			if !strings.HasPrefix(lb.TypeName(), "kubernetes.") && !legacyTypeNames.Has(lb.TypeName()) {
+			if !strings.HasPrefix(lb.TypeName(), "kubernetes.") && !upstreamTypeNames.Has(lb.TypeName()) {
 				t.Errorf("Expected all types in kubernetes CEL libraries to have a type name packaged with a 'kubernetes.' prefix but got %v", lb.TypeName())
 			}
 		}
@@ -115,5 +117,5 @@ func TestTypeRegistration(t *testing.T) {
 	}
 }
 
-// TODO: Consider renaming these to "kubernetes.net.IP" and "kubernetes.net.CIDR" if we decide not to promote them to cel-go
-var legacyTypeNames = sets.New[string]("net.IP", "net.CIDR")
+// We have our own implementation of these, but they are also cel-go types
+var upstreamTypeNames = sets.New[string]("net.IP", "net.CIDR")
