@@ -1431,3 +1431,31 @@ func TestIsRetriableAPIError(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckpointMissingFromNode(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		cached  bool
+		synced  bool
+		missing bool
+	}{
+		{name: "cached", cached: true, synced: true},
+		{name: "not cached", synced: true, missing: true},
+		// Before the watch syncs, a missing object may just not be cached yet.
+		{name: "not synced"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newTestManager(t)
+			defer fixture.Cleanup()
+			kl := fixture.manager
+			var objects []runtime.Object
+			if tc.cached {
+				objects = append(objects, &nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "checkpoint"}})
+			}
+			kl.kubeClient = fake.NewClientset(objects...)
+			seedCheckpointCache(t, kl)
+			kl.podCheckpointWatch.hasSynced = func() bool { return tc.synced }
+			require.Equal(t, tc.missing, kl.CheckpointMissingFromNode("ns", "checkpoint"))
+		})
+	}
+}

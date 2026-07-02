@@ -66,6 +66,7 @@ import (
 	cmtesting "k8s.io/kubernetes/pkg/kubelet/cm/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -7441,6 +7442,21 @@ func (t *testRuntimeHelper) PrepareDynamicResources(ctx context.Context, pod *v1
 	return t.prepareDynamicResourcesError
 }
 
+func (t *testRuntimeHelper) ValidateRestoreCheckpoint(ctx context.Context, pod *v1.Pod) (string, func(), error) {
+	if t.getPodCheckpointPathError != nil {
+		return "", nil, t.getPodCheckpointPathError
+	}
+	return t.FakeRuntimeHelper.ValidateRestoreCheckpoint(ctx, pod)
+}
+
+func (t *testRuntimeHelper) UpdatePodRestoreHosts(ctx context.Context, pod *v1.Pod, podIPs []string) error {
+	t.updatePodRestoreHostsCalls++
+	if t.updatePodRestoreHostsError != nil {
+		return t.updatePodRestoreHostsError
+	}
+	return t.FakeRuntimeHelper.UpdatePodRestoreHosts(ctx, pod, podIPs)
+}
+
 // TestOnPodSandboxReadyInvocation verifies OnPodSandboxReady is called at the correct time
 // and validates the order between the DRA allocate calls and PodReadytoStartContainers condition.
 // It works in the following order:
@@ -8706,4 +8722,143 @@ func TestComputePodActions_DynamicVolumeContainerStartReadiness(t *testing.T) {
 	actVols, ok := m.actuatedState.GetPodVolumes(pod.UID)
 	require.True(t, ok)
 	assert.Equal(t, []v1.Volume{cmVol, imgVol}, actVols, "pulled OCI Image volume must be recorded in actuatedState")
+}
+
+func TestSyncPodRestoreRetriesHostsForStartedContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	ctx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(ctx)
+	require.NoError(t, err)
+	helper := &testRuntimeHelper{FakeRuntimeHelper: m.runtimeHelper.(*containertest.FakeRuntimeHelper)}
+	m.runtimeHelper = helper
+	pod := newTestPod()
+	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+	backoff := flowcontrol.NewBackOff(time.Second, time.Minute)
+
+	result := m.SyncPod(ctx, pod, &kubecontainer.PodStatus{}, nil, backoff, false)
+	require.NoError(t, result.Error())
+	require.Len(t, fakeRuntime.RestoredPods, 1)
+	require.Equal(t, 1, helper.updatePodRestoreHostsCalls, "the initial hosts update must not be repeated after start")
+	statusCalls := 0
+	startCalls := 0
+	for _, call := range fakeRuntime.GetCalls() {
+		if call == "PodSandboxStatus" {
+			statusCalls++
+		}
+		if call == "StartContainer" {
+			startCalls++
+		}
+	}
+	require.Equal(t, 1, statusCalls, "initial restore must reuse the validated sandbox status")
+	require.Equal(t, len(pod.Spec.Containers), startCalls)
+	runtimePod, err := m.GetPod(ctx, pod.UID)
+	require.NoError(t, err)
+	podStatus, err := m.GetPodStatus(ctx, runtimePod)
+	require.NoError(t, err)
+	helper.updatePodRestoreHostsError = errors.New("temporary hosts write failure")
+
+	result = m.SyncPod(ctx, pod, podStatus, nil, backoff, false)
+	require.Error(t, result.Error())
+	require.Equal(t, events.RestorePostProcessingFailed, kubecontainer.RestoreErrorReason(result.Error()))
+	helper.updatePodRestoreHostsError = nil
+	result = m.SyncPod(ctx, pod, podStatus, nil, backoff, false)
+	require.NoError(t, result.Error())
+	require.Equal(t, 3, helper.updatePodRestoreHostsCalls)
+	require.Len(t, fakeRuntime.RestoredPods, 1, "bookkeeping retries must not repeat restore")
+	startsAfterRetry := 0
+	for _, call := range fakeRuntime.GetCalls() {
+		if call == "StartContainer" {
+			startsAfterRetry++
+		}
+	}
+	require.Equal(t, startCalls, startsAfterRetry, "bookkeeping retries must not repeat restored process startup")
+	require.NotContains(t, fakeRuntime.GetCalls(), "CreateContainer")
+	for _, container := range fakeRuntime.Containers {
+		require.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, container.State)
+	}
+}
+
+func TestRestoreContainerStartBookkeeping(t *testing.T) {
+	metrics.Register()
+	for _, tc := range []struct {
+		name      string
+		errorCode error
+		attempts  float64
+		created   int
+		started   int
+	}{
+		{name: "success", attempts: 2, created: 3, started: 3},
+		{name: "pre-start failure", errorCode: ErrPreStartHook, attempts: 1, created: 1, started: 1},
+		{name: "start failure", errorCode: kubecontainer.ErrRunContainer, attempts: 1, created: 2, started: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			recorder := record.NewFakeRecorder(30)
+			runtime, _, m, err := createTestRuntimeManager(ctx, withRecorder(recorder))
+			require.NoError(t, err)
+			failure := errors.New("container operation failed")
+			lifecycle := &recordingInternalContainerLifecycle{}
+			m.internalLifecycle = lifecycle
+			if tc.name == "pre-start failure" {
+				lifecycle.preStart = func(container *v1.Container, _ string) error {
+					if container.Name == "foo" {
+						return failure
+					}
+					return nil
+				}
+			}
+			if tc.name == "start failure" {
+				runtime.InjectError("StartContainer", nil)
+				runtime.InjectError("StartContainer", failure)
+			}
+			beforeRegular, err := testutil.GetCounterMetricValue(metrics.StartedContainersTotal.WithLabelValues(metrics.Container))
+			require.NoError(t, err)
+			beforeInit, err := testutil.GetCounterMetricValue(metrics.StartedContainersTotal.WithLabelValues(metrics.InitContainer))
+			require.NoError(t, err)
+			beforeErrors := float64(0)
+			if tc.errorCode != nil {
+				beforeErrors, err = testutil.GetCounterMetricValue(metrics.StartedContainersErrorsTotal.WithLabelValues(metrics.Container, tc.errorCode.Error()))
+				require.NoError(t, err)
+			}
+			pod := newTestPod()
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{Name: "other", Image: "busybox"})
+			pod.Spec.InitContainers = []v1.Container{{Name: "sidecar", Image: "busybox", RestartPolicy: &containerRestartPolicyAlways}}
+			_, _, err = m.restorePodSandbox(ctx, pod, 0, nil)
+			if tc.errorCode == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, failure)
+				afterErrors, metricErr := testutil.GetCounterMetricValue(metrics.StartedContainersErrorsTotal.WithLabelValues(metrics.Container, tc.errorCode.Error()))
+				require.NoError(t, metricErr)
+				require.InDelta(t, float64(1), afterErrors-beforeErrors, 0.001)
+			}
+			afterRegular, err := testutil.GetCounterMetricValue(metrics.StartedContainersTotal.WithLabelValues(metrics.Container))
+			require.NoError(t, err)
+			afterInit, err := testutil.GetCounterMetricValue(metrics.StartedContainersTotal.WithLabelValues(metrics.InitContainer))
+			require.NoError(t, err)
+			require.InDelta(t, tc.attempts, afterRegular-beforeRegular, 0.001)
+			require.InDelta(t, float64(1), afterInit-beforeInit, 0.001)
+			created, started, failures := 0, 0, 0
+			for len(recorder.Events) > 0 {
+				event := <-recorder.Events
+				if strings.HasPrefix(event, v1.EventTypeNormal+" "+events.CreatedContainer+" ") {
+					created++
+				}
+				if strings.HasPrefix(event, v1.EventTypeNormal+" "+events.StartedContainer+" ") {
+					started++
+				}
+				if strings.HasPrefix(event, v1.EventTypeWarning+" "+events.FailedToStartContainer+" ") {
+					failures++
+				}
+			}
+			require.Equal(t, tc.created, created)
+			require.Equal(t, tc.started, started)
+			if tc.errorCode != nil {
+				require.Equal(t, 1, failures)
+			} else {
+				require.Zero(t, failures)
+			}
+		})
+	}
 }

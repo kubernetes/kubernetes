@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/logs/logreduction"
@@ -119,6 +120,8 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		podLogsDirectory:        fakePodLogsDirectory,
 		actuatedState:           state.NewStateMemory(logger, nil, KeepOnlyResourceValues),
 		memoryReservationPolicy: kubeletconfiginternal.NoneMemoryReservationPolicy,
+		podRestoreTimeout:       time.Minute,
+		restoresInFlight:        sets.New[string](),
 	}
 
 	// Initialize swap controller availability check (always false for tests)

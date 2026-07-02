@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -107,13 +108,18 @@ func (m *manager) sweepPodCheckpointData(ctx context.Context) error {
 		return nil
 	}
 	logger := klog.FromContext(ctx)
-	for uid := range m.podCheckpointDataInUse() {
-		delete(deleted, uid)
-	}
 	// A synced cache cannot miss a PodCheckpoint whose data exists, and a
 	// deleted PodCheckpoint cannot return, so cache lag only delays removal.
+	// Holding checkpointDataLock keeps a restore from starting to use the data
+	// before it is removed.
+	m.checkpointDataLock.Lock()
+	defer m.checkpointDataLock.Unlock()
+	inUse := m.podCheckpointDataInUse()
 	var errs []error
 	for uid, path := range deleted {
+		if inUse.Has(uid) {
+			continue
+		}
 		if err := removeall.RemoveAllOneFilesystem(m.mounter, path); err != nil {
 			errs = append(errs, err)
 			continue
@@ -124,7 +130,8 @@ func (m *manager) sweepPodCheckpointData(ctx context.Context) error {
 }
 
 // podCheckpointDataInUse returns the UIDs of PodCheckpoints whose data a
-// capture or a publication may still use.
+// capture, a publication or a restore may still use. The caller must hold
+// checkpointDataLock.
 func (m *manager) podCheckpointDataInUse() sets.Set[types.UID] {
 	m.stateLock.Lock()
 	defer m.stateLock.Unlock()
@@ -132,5 +139,30 @@ func (m *manager) podCheckpointDataInUse() sets.Set[types.UID] {
 	for _, state := range m.podCheckpoints {
 		inUse.Insert(state.checkpointUID)
 	}
+	for uid := range m.restoreDataUsers {
+		inUse.Insert(uid)
+	}
 	return inUse
+}
+
+// UseCheckpointData keeps the data of a PodCheckpoint while a restore reads it,
+// even if the PodCheckpoint is deleted meanwhile. The caller must call the
+// returned function once the runtime no longer reads the data.
+func (m *manager) UseCheckpointData(checkpointUID types.UID) (release func()) {
+	m.checkpointDataLock.Lock()
+	defer m.checkpointDataLock.Unlock()
+	if m.restoreDataUsers == nil {
+		m.restoreDataUsers = make(map[types.UID]int)
+	}
+	m.restoreDataUsers[checkpointUID]++
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			m.checkpointDataLock.Lock()
+			defer m.checkpointDataLock.Unlock()
+			if m.restoreDataUsers[checkpointUID]--; m.restoreDataUsers[checkpointUID] <= 0 {
+				delete(m.restoreDataUsers, checkpointUID)
+			}
+		})
+	}
 }

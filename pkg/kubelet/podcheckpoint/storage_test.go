@@ -159,6 +159,28 @@ func TestPodCheckpointDataSweepWaitsForCacheSync(t *testing.T) {
 	require.DirExists(t, path)
 }
 
+// Data that a restore reads stays after its PodCheckpoint is deleted.
+func TestPodCheckpointDataSweepKeepsRestoreData(t *testing.T) {
+	ctx := ktesting.Init(t)
+	fixture := newTestManager(t)
+	defer fixture.Cleanup()
+	kl := fixture.manager
+	kl.kubeClient = fake.NewClientset()
+	seedCheckpointCache(t, kl)
+	uid := types.UID("deleted")
+	_, path, err := kl.podCheckpointOutputPath(uid)
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(path, 0o700))
+	release := kl.UseCheckpointData(uid)
+
+	require.NoError(t, kl.sweepPodCheckpointData(ctx))
+	require.DirExists(t, path, "a restore is using the data")
+	release()
+	release()
+	require.NoError(t, kl.sweepPodCheckpointData(ctx))
+	require.NoDirExists(t, path, "released data must be removed")
+}
+
 func TestPodCheckpointStorageRejectionPrecedesProbeSuspension(t *testing.T) {
 	for _, reason := range []string{"storage headroom", "missing policy"} {
 		t.Run(reason, func(t *testing.T) {

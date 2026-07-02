@@ -97,10 +97,19 @@ const (
 	CgroupV1                             = "CgroupV1"
 	// PodCheckpointStarted is recorded on a PodCheckpoint; SourcePodCheckpointing
 	// is recorded on the source Pod while capture is active.
-	PodCheckpointStarted   = "PodCheckpointStarted"
-	CheckpointSucceeded    = "CheckpointSucceeded"
-	CheckpointFailed       = "CheckpointFailed"
-	SourcePodCheckpointing = "SourcePodCheckpointing"
+	PodCheckpointStarted        = "PodCheckpointStarted"
+	CheckpointSucceeded         = "CheckpointSucceeded"
+	CheckpointFailed            = "CheckpointFailed"
+	SourcePodCheckpointing      = "SourcePodCheckpointing"
+	RestoreSucceeded            = "RestoreSucceeded"
+	RestoreInterrupted          = "RestoreInterrupted"
+	CheckpointNotReady          = "CheckpointNotReady"
+	CheckpointWrongNode         = "CheckpointWrongNode"
+	PodSpecMismatch             = "PodSpecMismatch"
+	RestoreInProgress           = "RestoreInProgress"
+	RestorePreparationFailed    = "RestorePreparationFailed"
+	RestorePostProcessingFailed = "RestorePostProcessingFailed"
+	RestoreFailed               = "RestoreFailed"
 )
 
 // Image manager event reason list
