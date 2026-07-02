@@ -36,7 +36,7 @@ import (
 )
 
 // podCheckpointDataSweepPeriod bounds how long data of a deleted PodCheckpoint
-// stays after the last operation that used it has settled.
+// stays after the last operation or restore that used it has settled.
 const podCheckpointDataSweepPeriod = time.Minute
 
 type podCheckpointStorageInfo struct {
@@ -127,8 +127,8 @@ func countCheckpointOperationFiles(root string, count *int, limit int) error {
 
 // sweepPodCheckpointData removes the data of PodCheckpoints that left this
 // node's synced cache. Deleting the object releases its data; data of an
-// existing object is never removed. Data stays while a capture, a publication
-// or an operation record may still use it.
+// existing object is never removed. Data stays while a capture, a publication,
+// an operation record or a restore that has not settled may still use it.
 func (kl *Kubelet) sweepPodCheckpointData(ctx context.Context) error {
 	state := kl.podCheckpointWatch.Load()
 	if state == nil || state.hasSynced == nil || !state.hasSynced() {
@@ -185,8 +185,18 @@ func (kl *Kubelet) sweepPodCheckpointData(ctx context.Context) error {
 	for i := range live.Items {
 		delete(deleted, live.Items[i].UID)
 	}
+	kl.checkpointDataLock.Lock()
+	defer kl.checkpointDataLock.Unlock()
+	// A restore may have acquired ownership while the live read was pending.
+	inUse, err = kl.podCheckpointDataInUse()
+	if err != nil {
+		return nil
+	}
 	var errs []error
 	for uid, path := range deleted {
+		if inUse.Has(uid) {
+			continue
+		}
 		if err := os.RemoveAll(path); err != nil {
 			errs = append(errs, err)
 			continue
@@ -197,8 +207,8 @@ func (kl *Kubelet) sweepPodCheckpointData(ctx context.Context) error {
 }
 
 // podCheckpointDataInUse returns the UIDs of PodCheckpoints whose data a
-// capture, a publication or an operation record may still use. It fails when
-// that use cannot be determined.
+// capture, a publication, an operation record or a restore that has not
+// settled may still use. It fails when that use cannot be determined.
 func (kl *Kubelet) podCheckpointDataInUse() (sets.Set[types.UID], error) {
 	inUse := sets.New[types.UID]()
 	insert := func(value any) bool {
@@ -223,6 +233,9 @@ func (kl *Kubelet) podCheckpointDataInUse() (sets.Set[types.UID], error) {
 		for _, operation := range operations {
 			inUse.Insert(operation.CheckpointUID)
 		}
+	}
+	if err := kl.collectRestoreCheckpointUIDs(inUse); err != nil {
+		return nil, err
 	}
 	return inUse, nil
 }

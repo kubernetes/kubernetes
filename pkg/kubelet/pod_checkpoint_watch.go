@@ -261,7 +261,7 @@ func (s *podCheckpointWatchState) requestDataSweep() {
 
 // runDataSweeper removes data of deleted PodCheckpoints once the cache has
 // synced and after each deletion. The periodic pass removes data that an
-// operation still used when its PodCheckpoint was deleted.
+// operation or a restore still used when its PodCheckpoint was deleted.
 func (s *podCheckpointWatchState) runDataSweeper(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	ticker := s.kubelet.clock.NewTicker(podCheckpointDataSweepPeriod)
