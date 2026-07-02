@@ -23,6 +23,8 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -193,6 +195,18 @@ type client interface {
 func endpointSupportsRequestWatchProgress(ctx context.Context, c client, endpoint string) (bool, error) {
 	resp, err := c.Status(ctx, endpoint)
 	if err != nil {
+		// etcd >= 3.6 requires admin permission on the Maintenance.Status RPC
+		// (etcd-io/etcd#21466), so an apiserver configured with a non-root etcd
+		// user gets PermissionDenied here. That error is permanent, not
+		// transient: retrying cannot succeed, and we cannot read the etcd
+		// version to decide support. Rather than silently disabling
+		// RequestWatchProgress (and spinning forever in the retry loop), assume
+		// the feature is supported and stop retrying. Any etcd new enough to
+		// enforce this permission (>= 3.6) supports RequestWatchProgress.
+		if grpcstatus.Code(err) == codes.PermissionDenied {
+			klog.Warningf("Cannot detect RequestWatchProgress support: etcd Maintenance.Status requires admin permission on endpoint %q (etcd-io/etcd#21466); assuming supported", endpoint)
+			return true, nil
+		}
 		return false, fmt.Errorf("failed checking etcd version, endpoint: %q: %w", endpoint, err)
 	}
 	ver, err := version.ParseSemantic(resp.Version)
