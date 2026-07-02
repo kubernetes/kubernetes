@@ -155,6 +155,12 @@ github.com/fxamacker/cbor/v2
 # github.com/go-errors/errors v1.4.2
 ## explicit; go 1.14
 github.com/go-errors/errors
+# github.com/go-jose/go-jose/v4 v4.1.4
+## explicit; go 1.24.0
+github.com/go-jose/go-jose/v4
+github.com/go-jose/go-jose/v4/cipher
+github.com/go-jose/go-jose/v4/json
+github.com/go-jose/go-jose/v4/jwt
 # github.com/go-logr/logr v1.4.3
 ## explicit; go 1.18
 github.com/go-logr/logr
@@ -1048,7 +1054,6 @@ gopkg.in/evanphx/json-patch.v4
 gopkg.in/go-jose/go-jose.v2
 gopkg.in/go-jose/go-jose.v2/cipher
 gopkg.in/go-jose/go-jose.v2/json
-gopkg.in/go-jose/go-jose.v2/jwt
 # gopkg.in/inf.v0 v0.9.1
 ## explicit
 gopkg.in/inf.v0
