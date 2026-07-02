@@ -1144,6 +1144,8 @@ func testSubpathStaleBindMountRemount(ctx context.Context, f *framework.Framewor
 						return true, nil
 					}
 				}
+			} else {
+				framework.Logf("crictl stop failed (will retry): %v — failed to get pod: %v", err, getErr)
 			}
 			framework.Logf("crictl stop failed (will retry): %v — %s", err, out)
 			return false, nil
