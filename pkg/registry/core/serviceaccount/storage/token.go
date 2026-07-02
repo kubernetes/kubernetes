@@ -170,26 +170,24 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with different serviceaccount name.", name))
 			}
 			uid = pod.UID
-			if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
-				if nodeName := pod.Spec.NodeName; nodeName != "" {
-					newCtx := newContext(ctx, "nodes", nodeName, "", api.SchemeGroupVersion.WithKind("Node"))
-					// set ResourceVersion=0 to allow this to be read/served from the apiservers watch cache
-					nodeObj, err := r.nodes.Get(newCtx, nodeName, &metav1.GetOptions{ResourceVersion: "0"})
-					if err != nil {
-						nodeObj, err = r.nodes.Get(newCtx, nodeName, &metav1.GetOptions{}) // fallback to a live lookup on any error
-					}
-					switch {
-					case errors.IsNotFound(err):
-						// if the referenced Node object does not exist, we still embed just the pod name into the
-						// claims so that clients still have some indication of what node a pod is assigned to when
-						// inspecting a token (even if the UID is not present).
-						klog.V(4).ErrorS(err, "failed fetching node for pod", "pod", klog.KObj(pod), "podUID", pod.UID, "nodeName", nodeName)
-						node = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-					case err != nil:
-						return nil, errors.NewInternalError(err)
-					default:
-						node = nodeObj.(*api.Node)
-					}
+			if nodeName := pod.Spec.NodeName; nodeName != "" {
+				newCtx := newContext(ctx, "nodes", nodeName, "", api.SchemeGroupVersion.WithKind("Node"))
+				// set ResourceVersion=0 to allow this to be read/served from the apiservers watch cache
+				nodeObj, err := r.nodes.Get(newCtx, nodeName, &metav1.GetOptions{ResourceVersion: "0"})
+				if err != nil {
+					nodeObj, err = r.nodes.Get(newCtx, nodeName, &metav1.GetOptions{}) // fallback to a live lookup on any error
+				}
+				switch {
+				case errors.IsNotFound(err):
+					// if the referenced Node object does not exist, we still embed just the pod name into the
+					// claims so that clients still have some indication of what node a pod is assigned to when
+					// inspecting a token (even if the UID is not present).
+					klog.V(4).ErrorS(err, "failed fetching node for pod", "pod", klog.KObj(pod), "podUID", pod.UID, "nodeName", nodeName)
+					node = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+				case err != nil:
+					return nil, errors.NewInternalError(err)
+				default:
+					node = nodeObj.(*api.Node)
 				}
 			}
 		case gvk.Group == "" && gvk.Kind == "Node":
