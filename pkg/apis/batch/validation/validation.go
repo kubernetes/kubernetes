@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
@@ -272,6 +273,11 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	}
 
 	allErrs = append(allErrs, validatePodReplacementPolicy(spec, fldPath.Child("podReplacementPolicy"))...)
+
+	// The scheduling gang minCount must not exceed parallelism. This runs on both
+	// create and update, and for Jobs embedded in a CronJob jobTemplate. It is a
+	// no-op when spec.scheduling is unset.
+	allErrs = append(allErrs, validateGangMinCount(spec, fldPath)...)
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
 
@@ -625,7 +631,74 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.BackoffLimitPerIndex, oldSpec.BackoffLimitPerIndex, fldPath.Child("backoffLimitPerIndex"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.ManagedBy, oldSpec.ManagedBy, fldPath.Child("managedBy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SuccessPolicy, oldSpec.SuccessPolicy, fldPath.Child("successPolicy"))...)
+	if opts.AllowSchedulingConfiguration {
+		allErrs = append(allErrs, validateJobSchedulingUpdate(spec.Scheduling, oldSpec.Scheduling, fldPath.Child("scheduling"))...)
+	}
 	return allErrs
+}
+
+// validateJobSchedulingUpdate enforces that spec.scheduling is immutable after
+// creation, except for the mutable gang.minCount.
+func validateJobSchedulingUpdate(newConfig, oldConfig *batch.JobSchedulingConfiguration, fldPath *field.Path) field.ErrorList {
+	if oldConfig == nil {
+		// The Job was created without spec.scheduling, so it already behaves as
+		// Basic (an absent config and a Basic-only config are equivalent). We
+		// therefore allow the update to leave it absent or set that equivalent
+		// Basic-only config, but reject anything that actually changes scheduling
+		// behavior (Gang, constraints, a disruption mode, or shared resource
+		// claims), since those fields are immutable once the Job exists.
+		if newConfig == nil || isBasicOnlyScheduling(newConfig) {
+			return nil
+		}
+		return field.ErrorList{field.Invalid(fldPath, newConfig, "may only be set to the basic policy after creation")}
+	}
+	// Compare everything except the mutable gang.minCount by normalizing it to the old value.
+	normalized := newConfig.DeepCopy()
+	if normalized != nil && normalized.Policy != nil && normalized.Policy.Gang != nil &&
+		oldConfig.Policy != nil && oldConfig.Policy.Gang != nil {
+		normalized.Policy.Gang.MinCount = oldConfig.Policy.Gang.MinCount // +k8s:verify-mutation:reason=clone
+	}
+	return apivalidation.ValidateImmutableField(normalized, oldConfig, fldPath)
+}
+
+// isBasicOnlyScheduling reports whether cfg sets nothing beyond the Basic
+// scheduling policy, i.e. it is equivalent to omitting spec.scheduling. It
+// compares against the canonical Basic-only value instead of inspecting
+// individual fields so it stays correct as new fields are added to
+// JobSchedulingConfiguration.
+func isBasicOnlyScheduling(cfg *batch.JobSchedulingConfiguration) bool {
+	basicOnly := &batch.JobSchedulingConfiguration{
+		Policy: &scheduling.PodGroupSchedulingPolicy{Basic: &scheduling.BasicSchedulingPolicy{}},
+	}
+	return apiequality.Semantic.DeepEqual(cfg, basicOnly)
+}
+
+// gangMinCountExceedsParallelism reports whether spec sets an explicit gang
+// minCount greater than parallelism.
+func gangMinCountExceedsParallelism(spec *batch.JobSpec) bool {
+	if spec == nil || spec.Scheduling == nil || spec.Scheduling.Policy == nil || spec.Scheduling.Policy.Gang == nil {
+		return false
+	}
+	parallelism := int32(1)
+	if spec.Parallelism != nil {
+		parallelism = *spec.Parallelism
+	}
+	return spec.Scheduling.Policy.Gang.MinCount > parallelism
+}
+
+// validateGangMinCount rejects a gang minCount that exceeds the Job's parallelism.
+func validateGangMinCount(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	if !gangMinCountExceedsParallelism(spec) {
+		return nil
+	}
+	parallelism := int32(1)
+	if spec.Parallelism != nil {
+		parallelism = *spec.Parallelism
+	}
+	return field.ErrorList{field.Invalid(
+		fldPath.Child("scheduling", "policy", "gang", "minCount"),
+		spec.Scheduling.Policy.Gang.MinCount,
+		fmt.Sprintf("must not be greater than parallelism (%d)", parallelism))}
 }
 
 func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
@@ -763,10 +836,14 @@ func ValidateCronJobCreate(cronJob *batch.CronJob, opts apivalidation.PodValidat
 }
 
 // ValidateCronJobUpdate validates an update to a CronJob and returns an ErrorList with any errors.
+//
+// spec.scheduling immutability is intentionally not enforced for a CronJob's
+// jobTemplate: each Job created from a CronJob gets its own Workload/PodGroup, so
+// the template may be freely changed. The structural gang minCount check still
+// runs via validateCronJobSpec -> ValidateJobTemplateSpec -> validateJobSpec.
 func ValidateCronJobUpdate(job, oldJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateCronJobSpec(&job.Spec, &oldJob.Spec, field.NewPath("spec"), opts)...)
-
 	// skip the 52-character name validation limit on update validation
 	// to allow old cronjobs with names > 52 chars to be updated/deleted
 	return allErrs
@@ -1061,6 +1138,11 @@ type JobValidationOptions struct {
 	RequirePrefixedLabels bool
 	// Allow mutable pod resources
 	AllowMutablePodResources bool
+	// AllowSchedulingConfiguration enables the spec.scheduling field. It is
+	// set when the WorkloadWithJob feature is enabled and gates the scheduling
+	// immutability check on update. When the feature is disabled, the field is
+	// dropped on create and updates.
+	AllowSchedulingConfiguration bool
 }
 
 type JobStatusValidationOptions struct {

@@ -3520,6 +3520,26 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.batch.v1.JobSchedulingConfiguration
+  map:
+    fields:
+    - name: constraints
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.PodGroupSchedulingConstraints
+    - name: disruptionMode
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.DisruptionMode
+    - name: policy
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.PodGroupSchedulingPolicy
+    - name: resourceClaims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha3.PodGroupResourceClaim
+          elementRelationship: associative
+          keys:
+          - name
 - name: io.k8s.api.batch.v1.JobSpec
   map:
     fields:
@@ -3556,6 +3576,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: podReplacementPolicy
       type:
         scalar: string
+    - name: scheduling
+      type:
+        namedType: io.k8s.api.batch.v1.JobSchedulingConfiguration
     - name: selector
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector

@@ -22,6 +22,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/randfill"
 )
@@ -66,6 +67,21 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.PodReplacementPolicy = &podReplacementPolicy
 			if c.Bool() {
 				c.Fill(j.ManagedBy)
+			}
+			// spec.scheduling has structural invariants the random filler can't know
+			// about: a policy is a union (one of basic or gang), and a gang
+			// minCount must be a positive integer.
+			if j.Scheduling != nil && j.Scheduling.Policy != nil {
+				if c.Bool() {
+					j.Scheduling.Policy = &scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					}
+				} else {
+					minCount := max(c.Int31(), 1)
+					j.Scheduling.Policy = &scheduling.PodGroupSchedulingPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{MinCount: minCount},
+					}
+				}
 			}
 		},
 		func(sj *batch.CronJobSpec, c randfill.Continue) {
