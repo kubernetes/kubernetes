@@ -1286,6 +1286,11 @@ func (in *ResourceSliceSpec) DeepCopyInto(out *ResourceSliceSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.PartitionTypeAttribute != nil {
+		in, out := &in.PartitionTypeAttribute, &out.PartitionTypeAttribute
+		*out = new(FullyQualifiedName)
+		**out = **in
+	}
 	return
 }
 

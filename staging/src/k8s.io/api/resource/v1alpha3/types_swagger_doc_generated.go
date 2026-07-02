@@ -36,6 +36,27 @@ func (CELDeviceSelector) SwaggerDoc() map[string]string {
 	return map_CELDeviceSelector
 }
 
+var map_CounterSetStatus = map[string]string{
+	"":         "CounterSetStatus reports capacity, consumption, and availability for the counters of a single shared counter set.",
+	"name":     "Name is the name of the counter set, matching a SharedCounters entry.",
+	"counters": "Counters reports per-counter status, keyed by counter name.",
+}
+
+func (CounterSetStatus) SwaggerDoc() map[string]string {
+	return map_CounterSetStatus
+}
+
+var map_CounterStatus = map[string]string{
+	"":          "CounterStatus reports the capacity, consumption, and remaining availability of a single counter.",
+	"capacity":  "Capacity is the total value the counter provides.",
+	"consumed":  "Consumed is the amount drawn by currently allocated devices.",
+	"available": "Available is Capacity minus Consumed, never negative.",
+}
+
+func (CounterStatus) SwaggerDoc() map[string]string {
+	return map_CounterStatus
+}
+
 var map_DeviceSelector = map[string]string{
 	"":    "DeviceSelector must have exactly one field set.",
 	"cel": "CEL contains a CEL expression for selecting a device.",
@@ -108,6 +129,17 @@ func (DeviceTaintSelector) SwaggerDoc() map[string]string {
 	return map_DeviceTaintSelector
 }
 
+var map_PartitionTypeStatus = map[string]string{
+	"":            "PartitionTypeStatus reports allocatability for a single partition type, identified by the value of the pool's PartitionTypeAttribute.",
+	"type":        "Type is the partition type value (e.g. \"Full\" or \"Half\").",
+	"total":       "Total is the number of devices of this partition type in the pool.",
+	"allocatable": "Allocatable is the number of additional devices of this partition type that could still be allocated given current shared-counter consumption.",
+}
+
+func (PartitionTypeStatus) SwaggerDoc() map[string]string {
+	return map_PartitionTypeStatus
+}
+
 var map_PoolStatus = map[string]string{
 	"":                   "PoolStatus contains status information for a single resource pool.",
 	"driver":             "Driver is the DRA driver name for this pool. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
@@ -120,6 +152,9 @@ var map_PoolStatus = map[string]string{
 	"unavailableDevices": "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated. A value of 0 means all unallocated devices are available. May be unset when validationError is set.",
 	"nodeName":           "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node. Must be a valid DNS subdomain name (RFC1123).",
 	"validationError":    "ValidationError is set when the pool's data could not be fully validated (e.g., incomplete slice publication). When set, device count fields and ResourceSliceCount may be unset.",
+	"partitionSummary":   "PartitionSummary reports allocatability per partition type for a partitionable pool. It is populated only when the pool's slices set PartitionTypeAttribute and publish SharedCounters. Mutually exclusive with CounterSets.",
+	"counterSets":        "CounterSets reports per-counter capacity, consumption, and availability for a partitionable pool that publishes SharedCounters without a PartitionTypeAttribute. Mutually exclusive with PartitionSummary.",
+	"shareableSummary":   "ShareableSummary reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations. It is populated only when at least one device in the pool is shareable.",
 }
 
 func (PoolStatus) SwaggerDoc() map[string]string {
@@ -167,6 +202,29 @@ var map_ResourcePoolStatusRequestStatus = map[string]string{
 
 func (ResourcePoolStatusRequestStatus) SwaggerDoc() map[string]string {
 	return map_ResourcePoolStatusRequestStatus
+}
+
+var map_ShareableCapacityStatus = map[string]string{
+	"":          "ShareableCapacityStatus reports aggregate amounts for a single shareable capacity key.",
+	"name":      "Name is the capacity name.",
+	"total":     "Total is the sum of this capacity across shareable devices in the pool.",
+	"consumed":  "Consumed is the amount drawn by current allocations.",
+	"available": "Available is Total minus Consumed, never negative.",
+}
+
+func (ShareableCapacityStatus) SwaggerDoc() map[string]string {
+	return map_ShareableCapacityStatus
+}
+
+var map_ShareableSummaryStatus = map[string]string{
+	"":                          "ShareableSummaryStatus reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations.",
+	"fullyAvailableDevices":     "FullyAvailableDevices is the number of shareable devices with no capacity consumed.",
+	"partiallyAvailableDevices": "PartiallyAvailableDevices is the number of shareable devices with some but not all capacity consumed.",
+	"capacity":                  "Capacity reports aggregate total, consumed, and available amounts per shareable capacity key across the pool.",
+}
+
+func (ShareableSummaryStatus) SwaggerDoc() map[string]string {
+	return map_ShareableSummaryStatus
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

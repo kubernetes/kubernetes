@@ -61,7 +61,38 @@
         "availableDevices": 6,
         "unavailableDevices": 7,
         "nodeName": "nodeNameValue",
-        "validationError": "validationErrorValue"
+        "validationError": "validationErrorValue",
+        "partitionSummary": [
+          {
+            "type": "typeValue",
+            "total": 2,
+            "allocatable": 3
+          }
+        ],
+        "counterSets": [
+          {
+            "name": "nameValue",
+            "counters": {
+              "countersKey": {
+                "capacity": "0",
+                "consumed": "0",
+                "available": "0"
+              }
+            }
+          }
+        ],
+        "shareableSummary": {
+          "fullyAvailableDevices": 1,
+          "partiallyAvailableDevices": 2,
+          "capacity": [
+            {
+              "name": "nameValue",
+              "total": "0",
+              "consumed": "0",
+              "available": "0"
+            }
+          ]
+        }
       }
     ],
     "conditions": [

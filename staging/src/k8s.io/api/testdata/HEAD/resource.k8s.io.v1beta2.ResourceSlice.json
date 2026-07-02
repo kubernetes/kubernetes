@@ -185,6 +185,7 @@
           }
         }
       }
-    ]
+    ],
+    "partitionTypeAttribute": "partitionTypeAttributeValue"
   }
 }

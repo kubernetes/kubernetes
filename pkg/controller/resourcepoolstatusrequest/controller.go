@@ -23,21 +23,28 @@ import (
 	"sync"
 	"time"
 
+	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcev1informers "k8s.io/client-go/informers/resource/v1"
 	resourcev1alpha3informers "k8s.io/client-go/informers/resource/v1alpha3"
+	resourcev1beta2informers "k8s.io/client-go/informers/resource/v1beta2"
 	clientset "k8s.io/client-go/kubernetes"
 	resourcev1listers "k8s.io/client-go/listers/resource/v1"
 	resourcev1alpha3listers "k8s.io/client-go/listers/resource/v1alpha3"
+	resourcev1beta2listers "k8s.io/client-go/listers/resource/v1beta2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/resourcepoolstatusrequest/metrics"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -72,6 +79,10 @@ type Controller struct {
 	// claimLister can list/get ResourceClaims from the shared informer's store
 	claimLister resourcev1listers.ResourceClaimLister
 
+	// taintRuleLister can list/get DeviceTaintRules from the shared informer's store.
+	// Only consulted when the DRADeviceTaintRules feature gate is enabled.
+	taintRuleLister resourcev1beta2listers.DeviceTaintRuleLister
+
 	// requestSynced returns true if the ResourcePoolStatusRequest store has been synced
 	requestSynced cache.InformerSynced
 
@@ -80,6 +91,9 @@ type Controller struct {
 
 	// claimSynced returns true if the ResourceClaim store has been synced
 	claimSynced cache.InformerSynced
+
+	// taintRuleSynced returns true if the DeviceTaintRule store has been synced
+	taintRuleSynced cache.InformerSynced
 
 	// workqueue is a rate limited work queue for processing ResourcePoolStatusRequests
 	workqueue workqueue.TypedRateLimitingInterface[string]
@@ -92,6 +106,7 @@ func NewController(
 	requestInformer resourcev1alpha3informers.ResourcePoolStatusRequestInformer,
 	sliceInformer resourcev1informers.ResourceSliceInformer,
 	claimInformer resourcev1informers.ResourceClaimInformer,
+	taintRuleInformer resourcev1beta2informers.DeviceTaintRuleInformer,
 ) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 
@@ -104,6 +119,13 @@ func NewController(
 		sliceSynced:   sliceInformer.Informer().HasSynced,
 		claimSynced:   claimInformer.Informer().HasSynced,
 		workqueue:     workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+	}
+
+	// Only consume the DeviceTaintRule informer when the gate is enabled, so
+	// clusters that don't serve the v1beta2 API don't block on its cache sync.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		c.taintRuleLister = taintRuleInformer.Lister()
+		c.taintRuleSynced = taintRuleInformer.Informer().HasSynced
 	}
 
 	// Register metrics
@@ -142,7 +164,11 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 	// Wait for the caches to be synced before starting workers
 	logger.Info("Waiting for informer caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.requestSynced, c.sliceSynced, c.claimSynced) {
+	syncs := []cache.InformerSynced{c.requestSynced, c.sliceSynced, c.claimSynced}
+	if c.taintRuleSynced != nil {
+		syncs = append(syncs, c.taintRuleSynced)
+	}
+	if !cache.WaitForCacheSync(ctx.Done(), syncs...) {
 		logger.Error(nil, "Failed to wait for caches to sync")
 		return
 	}
@@ -263,6 +289,56 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 	return nil
 }
 
+// deviceUnavailable reports whether a device should count as unavailable,
+// considering both its embedded taints and any matching DeviceTaintRules.
+func deviceUnavailable(driver, pool string, device *resourcev1.Device, rules []*resourcev1beta2.DeviceTaintRule) bool {
+	if hasUnavailableTaint(device) {
+		return true
+	}
+	for _, rule := range rules {
+		if ruleMakesDeviceUnavailable(rule, driver, pool, device.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasUnavailableTaint reports whether the device carries an embedded taint that
+// makes it unschedulable (NoSchedule or NoExecute).
+func hasUnavailableTaint(device *resourcev1.Device) bool {
+	for _, taint := range device.Taints {
+		switch taint.Effect {
+		case resourcev1.DeviceTaintEffectNoSchedule, resourcev1.DeviceTaintEffectNoExecute:
+			return true
+		}
+	}
+	return false
+}
+
+// ruleMakesDeviceUnavailable reports whether a DeviceTaintRule selects the given
+// device and applies a NoSchedule/NoExecute taint. A nil selector matches nothing.
+func ruleMakesDeviceUnavailable(rule *resourcev1beta2.DeviceTaintRule, driver, pool, device string) bool {
+	switch rule.Spec.Taint.Effect {
+	case resourcev1beta2.DeviceTaintEffectNoSchedule, resourcev1beta2.DeviceTaintEffectNoExecute:
+	default:
+		return false
+	}
+	sel := rule.Spec.DeviceSelector
+	if sel == nil {
+		return false
+	}
+	if sel.Driver != nil && *sel.Driver != driver {
+		return false
+	}
+	if sel.Pool != nil && *sel.Pool != pool {
+		return false
+	}
+	if sel.Device != nil && *sel.Device != device {
+		return false
+	}
+	return true
+}
+
 // calculatePoolStatus computes the pool status on-demand by reading directly
 // from the shared informer listers. No caches are maintained between requests.
 func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev1alpha3.ResourcePoolStatusRequest) resourcev1alpha3.ResourcePoolStatusRequestStatus {
@@ -284,15 +360,32 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		nodeName           string
 		nodeNameMixed      bool // true when slices have different NodeNames
 		totalDevices       int32
+		unavailableDevices int32 // devices carrying a NoSchedule/NoExecute taint
 		sliceCount         int32
 		expectedSliceCount int64
 		generation         int64
+		// Data for the partition/counter/shareable views (Alpha 1.37).
+		devices         []deviceRecord
+		sharedCounters  []resourcev1.CounterSet
+		partitionValues map[string]struct{} // distinct PartitionTypeAttribute values across slices
+		slicesWithAttr  int32               // slices that declared PartitionTypeAttribute
 	}
 
 	slices, err := c.sliceLister.List(labels.Everything())
 	if err != nil {
 		logger.Error(err, "Failed to list ResourceSlices")
 		return errorStatus("Failed to list ResourceSlices: " + err.Error())
+	}
+
+	// DeviceTaintRules taint devices externally (admin-applied), independent of
+	// the driver's embedded taints. Only consulted when the gate is enabled.
+	var taintRules []*resourcev1beta2.DeviceTaintRule
+	if c.taintRuleLister != nil && utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		taintRules, err = c.taintRuleLister.List(labels.Everything())
+		if err != nil {
+			logger.Error(err, "Failed to list DeviceTaintRules")
+			return errorStatus("Failed to list DeviceTaintRules: " + err.Error())
+		}
 	}
 
 	// Pass 1: Find max generation per pool
@@ -330,23 +423,33 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		}
 
 		deviceCount := int32(len(slice.Spec.Devices))
+		unavailCount := int32(0)
+		for i := range slice.Spec.Devices {
+			if deviceUnavailable(slice.Spec.Driver, slicePoolName, &slice.Spec.Devices[i], taintRules) {
+				unavailCount++
+			}
+		}
 		info, exists := poolData[key]
 		if !exists {
 			var nodeName string
 			if slice.Spec.NodeName != nil {
 				nodeName = *slice.Spec.NodeName
 			}
-			poolData[key] = &poolInfo{
+			info = &poolInfo{
 				driver:             slice.Spec.Driver,
 				poolName:           slicePoolName,
 				nodeName:           nodeName,
 				totalDevices:       deviceCount,
+				unavailableDevices: unavailCount,
 				sliceCount:         1,
 				expectedSliceCount: slice.Spec.Pool.ResourceSliceCount,
 				generation:         maxGeneration[key],
+				partitionValues:    make(map[string]struct{}),
 			}
+			poolData[key] = info
 		} else {
 			info.totalDevices += deviceCount
+			info.unavailableDevices += unavailCount
 			info.sliceCount++
 			// Check NodeName consistency across slices
 			sliceNodeName := ""
@@ -357,10 +460,24 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				info.nodeNameMixed = true
 			}
 		}
+
+		// Per-device data and pool-level counters/attribute for the advanced views.
+		info.devices = append(info.devices, sliceDeviceRecords(slice)...)
+		info.sharedCounters = append(info.sharedCounters, slice.Spec.SharedCounters...)
+		if slice.Spec.PartitionTypeAttribute != nil {
+			info.partitionValues[string(*slice.Spec.PartitionTypeAttribute)] = struct{}{}
+			info.slicesWithAttr++
+		}
 	}
 
-	// Step 2: Count allocations from ResourceClaims
-	allocationData := make(map[string]int32)
+	// Step 2: Count allocated devices from ResourceClaims.
+	// Keyed by pool ("driver/pool") then device name so each physical device
+	// counts at most once even when shared by multiple claims
+	// (allowMultipleAllocations). AdminAccess results are observers, not
+	// consumers, and are skipped.
+	allocatedDevices := make(map[string]map[string]struct{})
+	// Per-pool consumed capacity over non-AdminAccess claims; feeds shareableSummary.
+	consumedCapacity := make(map[string]map[resourcev1.QualifiedName]resource.Quantity)
 
 	claims, err := c.claimLister.List(labels.Everything())
 	if err != nil {
@@ -373,8 +490,27 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			continue
 		}
 		for _, result := range claim.Status.Allocation.Devices.Results {
+			if result.AdminAccess != nil && *result.AdminAccess {
+				continue
+			}
 			key := result.Driver + "/" + result.Pool
-			allocationData[key]++
+			devices, ok := allocatedDevices[key]
+			if !ok {
+				devices = make(map[string]struct{})
+				allocatedDevices[key] = devices
+			}
+			devices[result.Device] = struct{}{}
+
+			for capacityName, quantity := range result.ConsumedCapacity {
+				m := consumedCapacity[key]
+				if m == nil {
+					m = make(map[resourcev1.QualifiedName]resource.Quantity)
+					consumedCapacity[key] = m
+				}
+				cur := m[capacityName].DeepCopy()
+				cur.Add(quantity)
+				m[capacityName] = cur
+			}
 		}
 	}
 
@@ -392,8 +528,9 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		}
 
 		if int64(info.sliceCount) < info.expectedSliceCount {
-			// Incomplete pool: set validation error, leave device counts and slice count nil
-			errMsg := fmt.Sprintf("pool %s/%s is incomplete: observed %d/%d slices at generation %d",
+			// Incomplete pool: set validation error, leave device counts and slice count nil.
+			// PoolIncomplete: is a stable machine-readable prefix.
+			errMsg := fmt.Sprintf("PoolIncomplete: pool %s/%s is incomplete: observed %d/%d slices at generation %d",
 				info.driver, info.poolName, info.sliceCount, info.expectedSliceCount, info.generation)
 			// Truncate to 256 bytes to stay within the API field's +k8s:maxBytes=256 limit.
 			if len(errMsg) > 256 {
@@ -402,15 +539,13 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			pool.ValidationError = &errMsg
 		} else {
 			// Complete pool: populate device counts and slice count
-			allocatedDevices := allocationData[key]
-			// UnavailableDevices is currently always 0 in Alpha because the controller
-			// does not yet inspect device conditions/taints. This will be computed from
-			// real data when device health tracking is wired in.
-			unavailDevices := int32(0)
-			availableDevices := max(0, info.totalDevices-allocatedDevices-unavailDevices)
+			inUse := allocatedDevices[key]
+			allocDeviceCount := int32(len(inUse))
+			unavailDevices := info.unavailableDevices
+			availableDevices := max(0, info.totalDevices-allocDeviceCount-unavailDevices)
 
 			totalDevices := info.totalDevices
-			allocDevices := allocatedDevices
+			allocDevices := allocDeviceCount
 			availDevices := availableDevices
 			sliceCount := info.sliceCount
 			pool.ResourceSliceCount = &sliceCount
@@ -418,6 +553,28 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			pool.AllocatedDevices = &allocDevices
 			pool.AvailableDevices = &availDevices
 			pool.UnavailableDevices = &unavailDevices
+
+			// Advanced views. Counts above stay valid even if a view flags an error.
+			viewInput := poolViewInput{
+				driver:           info.driver,
+				poolName:         info.poolName,
+				devices:          info.devices,
+				sharedCounters:   info.sharedCounters,
+				inUse:            inUse,
+				consumedCapacity: consumedCapacity[key],
+			}
+			resolvePartitionAttribute(info.partitionValues, info.slicesWithAttr, info.sliceCount, &viewInput)
+
+			partitionSummary, counterSets, shareable, viewErr := computePoolViews(viewInput)
+			pool.PartitionSummary = partitionSummary
+			pool.CounterSets = counterSets
+			pool.ShareableSummary = shareable
+			if viewErr != "" {
+				if len(viewErr) > 256 {
+					viewErr = viewErr[:256]
+				}
+				pool.ValidationError = &viewErr
+			}
 		}
 		pools = append(pools, pool)
 	}

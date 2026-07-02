@@ -126,6 +126,7 @@ func newResourcePoolStatusRequestController(ctx context.Context, controllerConte
 		controllerContext.InformerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		controllerContext.InformerFactory.Resource().V1().ResourceSlices(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
+		controllerContext.InformerFactory.Resource().V1beta2().DeviceTaintRules(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init resourcepoolstatusrequest controller: %w", err)

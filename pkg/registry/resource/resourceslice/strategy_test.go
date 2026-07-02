@@ -210,6 +210,12 @@ var sliceWithListTypeAttributes = func() *resource.ResourceSlice {
 	return obj
 }()
 
+var sliceWithPartitionTypeAttribute = func() *resource.ResourceSlice {
+	obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+	obj.Spec.PartitionTypeAttribute = ptr.To(resource.FullyQualifiedName("gpu.example.com/profile"))
+	return obj
+}()
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -230,6 +236,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		consumableCapacity          bool
 		draNodeAllocatableResources bool
 		listTypeAttributes          bool
+		resourcePoolStatus          bool
 		expectedValidationError     bool
 		expectObj                   *resource.ResourceSlice
 	}{
@@ -408,6 +415,26 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			listTypeAttributes:      false,
 			expectedValidationError: true,
 		},
+		"keep-fields-partition-type-attribute": {
+			obj:                  sliceWithPartitionTypeAttribute,
+			partitionableDevices: true,
+			resourcePoolStatus:   true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionTypeAttribute.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-partition-type-attribute": {
+			obj:                  sliceWithPartitionTypeAttribute,
+			partitionableDevices: true,
+			resourcePoolStatus:   false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testCases {
@@ -420,6 +447,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
 				features.DRANodeAllocatableResources:  tc.draNodeAllocatableResources,
 				features.DRAListTypeAttributes:        tc.listTypeAttributes,
+				features.DRAResourcePoolStatus:        tc.resourcePoolStatus,
 			})
 
 			obj := tc.obj.DeepCopy()
@@ -452,6 +480,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 		bindingConditions     bool
 		consumableCapacity    bool
 		listTypeAttributes    bool
+		resourcePoolStatus    bool
 		expectValidationError bool
 		expectObj             *resource.ResourceSlice
 	}{
@@ -531,6 +560,21 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			deviceTaints: false,
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithDeviceTaints.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-partition-type-attribute-disabled-feature": {
+			oldObj: sliceWithPartitionTypeAttribute,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionTypeAttribute.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices: true,
+			resourcePoolStatus:   false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionTypeAttribute.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
@@ -874,6 +918,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
 				features.DRAListTypeAttributes:        tc.listTypeAttributes,
+				features.DRAResourcePoolStatus:        tc.resourcePoolStatus,
 			})
 
 			oldObj := tc.oldObj.DeepCopy()

@@ -738,6 +738,10 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			return counterSet.Name
 		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
 
+	if spec.PartitionTypeAttribute != nil {
+		allErrs = append(allErrs, validateFullyQualifiedName(*spec.PartitionTypeAttribute, fldPath.Child("partitionTypeAttribute"))...)
+	}
+
 	return allErrs
 }
 
