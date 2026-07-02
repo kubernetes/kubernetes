@@ -1002,3 +1002,73 @@ func TestPodDeletionEvent(t *testing.T) {
 		}
 	})
 }
+
+func TestNoExecuteTaintManagerRaceCondition(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	fakeClientset := fake.NewSimpleClientset()
+	controller, _, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	// 1. Create a node with a NoExecute taint in the fake clientset.
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+		},
+		Spec: corev1.NodeSpec{
+			Taints: []corev1.Taint{
+				{
+					Key:    "node.cilium.io/agent-not-ready",
+					Value:  "true",
+					Effect: corev1.TaintEffectNoExecute,
+				},
+			},
+		},
+	}
+	_, err := fakeClientset.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	// 2. Create a pod on node1 in the fake clientset without tolerations.
+	pod := testutil.NewPod("pod1", "node1")
+	_, err = fakeClientset.CoreV1().Pods("default").Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+
+	// 3. Populate the controller's stale taintedNodes map with the taint.
+	controller.taintedNodes["node1"] = []corev1.Taint{
+		{
+			Key:    "node.cilium.io/agent-not-ready",
+			Value:  "true",
+			Effect: corev1.TaintEffectNoExecute,
+		},
+	}
+
+	// 4. Simulate CNI operator removing the taint in the API server (fake clientset)
+	node.Spec.Taints = nil
+	_, err = fakeClientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update node: %v", err)
+	}
+
+	// 5. Trigger PodUpdated with stale node state
+	controller.PodUpdated(pod, nil)
+
+	// Wait for controller to process the pod update.
+	time.Sleep(timeForControllerToProgressForSanityCheck)
+
+	// 6. Verify that pod1 was NOT deleted
+	_, err = fakeClientset.CoreV1().Pods("default").Get(ctx, "pod1", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Expected pod to NOT be deleted, but got error: %v", err)
+	}
+}

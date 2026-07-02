@@ -108,11 +108,35 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 	return func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
 		ns := args.Object.Namespace
 		name := args.Object.Name
-		klog.FromContext(ctx).Info("Deleting pod", "controller", controllerName, "pod", args.Object)
+
+		logger := klog.FromContext(ctx)
+
+		// Fetch the latest Pod status from API server to check its spec
+		pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+
+		// Double-check the node's taints from API server to prevent race conditions due to stale cache
+		if pod.Spec.NodeName != "" {
+			node, err := c.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
+			if err == nil {
+				taints := getNoExecuteTaints(node.Spec.Taints)
+				allTolerated, _ := v1helper.GetMatchingTolerations(logger, taints, pod.Spec.Tolerations)
+				if allTolerated {
+					logger.Info("Cancelling deletion of pod as node NoExecute taints are now tolerated", "pod", klog.KObj(pod), "node", pod.Spec.NodeName)
+					return nil
+				}
+			}
+		}
+
+		logger.Info("Deleting pod", "controller", controllerName, "pod", args.Object)
 		if emitEventFunc != nil {
 			emitEventFunc(args.Object.NamespacedName)
 		}
-		var err error
 		for i := 0; i < retries; i++ {
 			err = addConditionAndDeletePod(ctx, c, name, ns)
 			if err == nil {
