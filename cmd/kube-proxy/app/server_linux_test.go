@@ -548,3 +548,106 @@ detectLocalMode: "BridgeInterface"`)
 		tearDown(file, tempDir)
 	}
 }
+
+func TestConfigChangeWithConfigMapVolume(t *testing.T) {
+	configContent := `apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: 0.0.0.0
+bindAddressHardFail: false
+clientConnection:
+  acceptContentTypes: ""
+  burst: 10
+  contentType: application/vnd.kubernetes.protobuf
+  kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
+  qps: 5
+clusterCIDR: 10.244.0.0/16
+configSyncPeriod: 15m0s
+conntrack:
+  maxPerCore: 32768
+  min: 131072
+  tcpCloseWaitTimeout: 1h0m0s
+  tcpEstablishedTimeout: 24h0m0s
+enableProfiling: false
+healthzBindAddress: 0.0.0.0:10256
+hostnameOverride: ""
+iptables:
+  masqueradeAll: false
+  masqueradeBit: 14
+  minSyncPeriod: 0s
+  syncPeriod: 30s
+ipvs:
+  excludeCIDRs: null
+  minSyncPeriod: 0s
+  scheduler: ""
+  syncPeriod: 30s
+kind: KubeProxyConfiguration
+metricsBindAddress: 127.0.0.1:10249
+mode: ""
+nodePortAddresses: null
+oomScoreAdj: -999
+portRange: ""
+detectLocalMode: "BridgeInterface"`
+
+	tempDir, err := os.MkdirTemp("", "kubeproxy-config-volume")
+	if err != nil {
+		t.Fatalf("unable to create temporary directory: %v", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Fatalf("unable to remove temp directory: %v", err)
+		}
+	}()
+
+	configPath := filepath.Join(tempDir, "config.conf")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("unexpected error when creating config file: %v", err)
+	}
+
+	ts1Dir := filepath.Join(tempDir, "..ts1")
+	if err := os.MkdirAll(ts1Dir, 0755); err != nil {
+		t.Fatalf("unable to create ts1 directory: %v", err)
+	}
+	if err := os.Symlink("..ts1", filepath.Join(tempDir, "..data")); err != nil {
+		t.Fatalf("unable to create ..data symlink: %v", err)
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	opt := NewOptions()
+	opt.ConfigFile = configPath
+	if err := opt.Complete(new(pflag.FlagSet)); err != nil {
+		t.Fatal(err)
+	}
+	opt.proxyServer = new(fakeProxyServerLongRun)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- opt.runLoop(ctx)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	ts2Dir := filepath.Join(tempDir, "..ts2")
+	if err := os.MkdirAll(ts2Dir, 0755); err != nil {
+		t.Fatalf("unable to create ts2 directory: %v", err)
+	}
+	if err := os.Symlink("..ts2", filepath.Join(tempDir, "..data_tmp")); err != nil {
+		t.Fatalf("unable to create ..data_tmp symlink: %v", err)
+	}
+	if err := os.Rename(
+		filepath.Join(tempDir, "..data_tmp"),
+		filepath.Join(tempDir, "..data"),
+	); err != nil {
+		t.Fatalf("unable to rename ..data_tmp to ..data: %v", err)
+	}
+
+	expectedErr := "content of the proxy server's configuration file was updated"
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Errorf("expected error, got nil")
+		} else if !strings.Contains(err.Error(), expectedErr) {
+			t.Errorf("Expected error containing %q, got %v", expectedErr, err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Errorf("Timeout: config change event not received after ConfigMap volume update")
+	}
+}
