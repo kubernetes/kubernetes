@@ -142,3 +142,16 @@ func testRemovedOptionField(t *testing.T, client rest.Interface, collection stri
 		}
 	}
 }
+
+func TestRemovedRestoreOptions(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	ctx := ktesting.Init(t)
+	client, _, closeFn := startAPIServer(ctx, t, true)
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(client, "removed-restore-options", t)
+	checkpoint := createReadyRestoreCheckpoint(ctx, t, client, ns.Name, "checkpoint")
+	pod := preparedRestorePod(checkpoint, "restore-defaults")
+	pod.APIVersion, pod.Kind = "v1", "Pod"
+	testRemovedOptionField(t, client.CoreV1().RESTClient(), "/api/v1/namespaces/"+ns.Name+"/pods", pod,
+		[]string{"spec", "restoreFrom", "options"}, map[string]interface{}{"tcp": "close"})
+}
