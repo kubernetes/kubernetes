@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -50,6 +51,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -1882,6 +1884,146 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(appContainerName, onlineCPUs))
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, reservedCPUs))
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, nonReusableCPUs))
+		})
+	})
+
+	f.Context("WhenRestartAllContainers", f.WithFeatureGate(features.ContainerRestartRules), f.WithFeatureGate(features.RestartAllContainersOnContainerExits), func() {
+		var (
+			containerRestartPolicyNever = v1.ContainerRestartPolicyNever
+		)
+		restartAllContainersRules := []v1.ContainerRestartRule{
+			{
+				Action: v1.ContainerRestartRuleActionRestartAllContainers,
+				ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+					Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+					Values:   []int32{42},
+				},
+			},
+		}
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0)
+		})
+
+		ginkgo.It("should preserve CPU affinity after restarting all containers", func(ctx context.Context) {
+			cpuCount := 2 // total
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			podName := "restart-all-preserve-affinity-" + string(uuid.NewUUID())
+			// We use a Guaranteed pod to ensure managers (like CPU Manager) are engaged.
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:  "affinity-checker",
+							Image: imageutils.GetE2EImage(imageutils.BusyBox),
+							// Script logic:
+							// 1. Check if "affinity.txt" exists in shared volume.
+							// 2. If not: verify isolation, record current affinity, and exit 42 to trigger RestartAll.
+							// 3. If yes: compare current affinity with "affinity.txt". If match, sleep forever (success).
+							Command: []string{"/bin/sh", "-c", `
+								AFFINITY_FILE="/mnt/affinity.txt"
+								CURRENT_AFFINITY=$(grep Cpus_allowed_list /proc/self/status | cut -f2)
+								if [ ! -f $AFFINITY_FILE ]; then
+									echo "First run. Recording affinity: $CURRENT_AFFINITY"
+									if echo "$CURRENT_AFFINITY" | grep -E [,-]; then
+										echo "ERROR: CPU Manager did not assign an exclusive CPU. Affinity list: $CURRENT_AFFINITY"
+										exit 1
+									fi
+									echo "$CURRENT_AFFINITY" > $AFFINITY_FILE
+									exit 42
+								else
+									OLD_AFFINITY=$(cat $AFFINITY_FILE)
+									echo "Restarted. Old: $OLD_AFFINITY, New: $CURRENT_AFFINITY"
+									if [ "$OLD_AFFINITY" != "$CURRENT_AFFINITY" ]; then
+										echo "ERROR: Affinity not preserved!"
+										exit 1
+									fi
+									echo "Affinity preserved. Success."
+									sleep 10000
+								fi
+							`},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1000m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1000m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+						{
+							Name:    "regular",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("10m"),
+									v1.ResourceMemory: resource.MustParse("10Mi"),
+								},
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("10m"),
+									v1.ResourceMemory: resource.MustParse("10Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+			createPodSync(ctx, pod)
+
+			// All containers should be restarted once
+			ginkgo.By("Waiting for all containers to restart")
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "all containers restarted", 3*time.Minute, func(pod *v1.Pod) (bool, error) {
+				restartedCount := 0
+				containers := []string{"affinity-checker", "regular"}
+				for _, cName := range containers {
+					restarted := false
+					for _, status := range pod.Status.ContainerStatuses {
+						if status.Name == cName && status.RestartCount > 0 {
+							restarted = true
+						}
+					}
+					if restarted {
+						restartedCount++
+					} else {
+						framework.Logf("container %s did not restart", cName)
+					}
+				}
+				framework.Logf("%d out of %d containers restarted", restartedCount, len(containers))
+				return restartedCount == len(containers), nil
+			})
+			framework.ExpectNoError(err, "failed to see all containers restart")
+
+			// Wait for the container to be running which indicates that CPU assignment is kept
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "affinity-checker", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
 		})
 	})
 })
