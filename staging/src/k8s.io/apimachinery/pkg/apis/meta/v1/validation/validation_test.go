@@ -446,6 +446,26 @@ func TestValidateConditions(t *testing.T) {
 			if !hasError(errs, needle) {
 				t.Errorf("missing %q in\n%v", needle, errorsAsString(errs))
 			}
+			needle = `status.conditions[0].message: Required value`
+			if !hasError(errs, needle) {
+				t.Errorf("missing %q in\n%v", needle, errorsAsString(errs))
+			}
+		},
+	}, {
+		name: "message-too-long",
+		conditions: []metav1.Condition{{
+			Type:               "Available",
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: 1,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "Reason",
+			Message:            strings.Repeat("a", 32*1024+1),
+		}},
+		validateErrs: func(t *testing.T, errs field.ErrorList) {
+			needle := `status.conditions[0].message: Too long: may not be more than 32768 bytes`
+			if !hasError(errs, needle) {
+				t.Errorf("missing %q in\n%v", needle, errorsAsString(errs))
+			}
 		},
 	}, {
 		name: "duplicates",
