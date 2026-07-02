@@ -73,8 +73,6 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	if utilfeature.DefaultFeatureGate.Enabled(features.HPAGeneration) {
 		newHPA.Generation = 1
 	}
-
-	dropDisabledFields(newHPA, nil)
 }
 
 // Validate validates a new autoscaler.
@@ -124,8 +122,6 @@ func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
 	// Update is not allowed to set status
 	newHPA.Status = oldHPA.Status
-
-	dropDisabledFields(newHPA, oldHPA)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.HPAGeneration) {
 		if !apiequality.Semantic.DeepEqual(newHPA.Spec, oldHPA.Spec) {
@@ -224,37 +220,4 @@ func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.Hor
 		}
 	}
 	return opts
-}
-
-// dropDisabledFields will drop any disabled fields that have not previously been
-// set on the old HPA. oldHPA is ignored if nil.
-func dropDisabledFields(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance) {
-		return
-	}
-	if toleranceInUse(oldHPA) {
-		return
-	}
-	newBehavior := newHPA.Spec.Behavior
-	if newBehavior == nil {
-		return
-	}
-
-	for _, sr := range []*autoscaling.HPAScalingRules{newBehavior.ScaleDown, newBehavior.ScaleUp} {
-		if sr != nil {
-			sr.Tolerance = nil
-		}
-	}
-}
-
-func toleranceInUse(hpa *autoscaling.HorizontalPodAutoscaler) bool {
-	if hpa == nil || hpa.Spec.Behavior == nil {
-		return false
-	}
-	for _, sr := range []*autoscaling.HPAScalingRules{hpa.Spec.Behavior.ScaleDown, hpa.Spec.Behavior.ScaleUp} {
-		if sr != nil && sr.Tolerance != nil {
-			return true
-		}
-	}
-	return false
 }

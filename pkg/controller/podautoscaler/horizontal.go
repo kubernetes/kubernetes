@@ -1599,13 +1599,10 @@ func (a *HorizontalController) updateStatus(ctx context.Context, hpa *autoscalin
 }
 
 // tolerancesForHpa returns the metrics usage ratio tolerances for a given HPA.
-// It ignores configurable tolerances set in the HPA spec.behavior field if the
-// HPAConfigurableTolerance feature gate is disabled.
 func (a *HorizontalController) tolerancesForHpa(hpa *autoscalingv2.HorizontalPodAutoscaler) Tolerances {
 	t := Tolerances{a.tolerance, a.tolerance}
 	behavior := hpa.Spec.Behavior
-	allowConfigurableTolerances := utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance)
-	if behavior == nil || !allowConfigurableTolerances {
+	if behavior == nil {
 		return t
 	}
 	if behavior.ScaleDown != nil && behavior.ScaleDown.Tolerance != nil {

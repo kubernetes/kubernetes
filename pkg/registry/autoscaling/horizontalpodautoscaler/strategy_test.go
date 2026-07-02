@@ -32,14 +32,11 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-type toleranceSet bool
 type zeroMinReplicasSet bool
 
 const (
-	withTolerance    toleranceSet       = true
-	withoutTolerance                    = false
-	zeroMinReplicas  zeroMinReplicasSet = true
-	oneMinReplicas                      = false
+	zeroMinReplicas zeroMinReplicasSet = true
+	oneMinReplicas                     = false
 )
 
 func TestPrepareForGeneration(t *testing.T) {
@@ -68,7 +65,7 @@ func TestPrepareForGeneration(t *testing.T) {
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, tc.featureGateEnabled)
 
-			hpa := prepareHPA(oneMinReplicas, withTolerance)
+			hpa := prepareHPA(oneMinReplicas)
 			Strategy.PrepareForCreate(context.Background(), &hpa)
 
 			if hpa.Generation != tc.expectedGenerationOnCreate {
@@ -76,7 +73,7 @@ func TestPrepareForGeneration(t *testing.T) {
 			}
 
 			// Create an updated HPA with a different spec
-			hpaUpdated := hpa.DeepCopy() // prepareHPA(zeroMinReplicas, withoutTolerance)
+			hpaUpdated := hpa.DeepCopy() // prepareHPA(zeroMinReplicas)
 			hpaUpdated.Spec.MaxReplicas = 100
 			Strategy.PrepareForUpdate(context.Background(), hpaUpdated, &hpa)
 
@@ -87,58 +84,9 @@ func TestPrepareForGeneration(t *testing.T) {
 	}
 }
 
-func TestPrepareForCreateConfigurableToleranceEnabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
-	hpa := prepareHPA(oneMinReplicas, withTolerance)
-
-	Strategy.PrepareForCreate(context.Background(), &hpa)
-	if hpa.Spec.Behavior.ScaleUp.Tolerance == nil {
-		t.Error("Expected tolerance field, got none")
-	}
-}
-
-func TestPrepareForCreateConfigurableToleranceDisabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
-	hpa := prepareHPA(oneMinReplicas, withTolerance)
-
-	Strategy.PrepareForCreate(context.Background(), &hpa)
-	if hpa.Spec.Behavior.ScaleUp.Tolerance != nil {
-		t.Errorf("Expected tolerance field wiped out, got %v", hpa.Spec.Behavior.ScaleUp.Tolerance)
-	}
-}
-
-func TestPrepareForUpdateConfigurableToleranceEnabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
-	newHPA := prepareHPA(oneMinReplicas, withTolerance)
-	oldHPA := prepareHPA(oneMinReplicas, withTolerance)
-
-	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
-	if newHPA.Spec.Behavior.ScaleUp.Tolerance == nil {
-		t.Error("Expected tolerance field, got none")
-	}
-}
-
-func TestPrepareForUpdateConfigurableToleranceDisabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
-	newHPA := prepareHPA(oneMinReplicas, withTolerance)
-	oldHPA := prepareHPA(oneMinReplicas, withoutTolerance)
-
-	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
-	if newHPA.Spec.Behavior.ScaleUp.Tolerance != nil {
-		t.Errorf("Expected tolerance field wiped out, got %v", newHPA.Spec.Behavior.ScaleUp.Tolerance)
-	}
-
-	newHPA = prepareHPA(oneMinReplicas, withTolerance)
-	oldHPA = prepareHPA(oneMinReplicas, withTolerance)
-	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
-	if newHPA.Spec.Behavior.ScaleUp.Tolerance == nil {
-		t.Errorf("Expected tolerance field not wiped out, got nil")
-	}
-}
-
 func TestValidateOptionsScaleToZeroEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)
-	oneReplicasHPA := prepareHPA(oneMinReplicas, withoutTolerance)
+	oneReplicasHPA := prepareHPA(oneMinReplicas)
 
 	opts := validationOptionsForHorizontalPodAutoscaler(&oneReplicasHPA, &oneReplicasHPA)
 	if opts.MinReplicasLowerBound != 0 {
@@ -148,8 +96,8 @@ func TestValidateOptionsScaleToZeroEnabled(t *testing.T) {
 
 func TestValidateOptionsScaleToZeroDisabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, false)
-	zeroReplicasHPA := prepareHPA(zeroMinReplicas, withoutTolerance)
-	oneReplicasHPA := prepareHPA(oneMinReplicas, withoutTolerance)
+	zeroReplicasHPA := prepareHPA(zeroMinReplicas)
+	oneReplicasHPA := prepareHPA(oneMinReplicas)
 
 	// MinReplicas should be 0 despite the gate being disabled since the old HPA
 	// had MinReplicas set to 0 already.
@@ -435,12 +383,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 	}
 }
 
-func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet, hasTolerance toleranceSet) autoscaling.HorizontalPodAutoscaler {
-	tolerance := ptr.To(resource.MustParse("0.1"))
-	if !hasTolerance {
-		tolerance = nil
-	}
-
+func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet) autoscaling.HorizontalPodAutoscaler {
 	minReplicas := int32(0)
 	if !hasZeroMinReplicas {
 		minReplicas = 1
@@ -469,11 +412,6 @@ func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet, hasTolerance toleranceSet
 					},
 				},
 			}},
-			Behavior: &autoscaling.HorizontalPodAutoscalerBehavior{
-				ScaleUp: &autoscaling.HPAScalingRules{
-					Tolerance: tolerance,
-				},
-			},
 		},
 	}
 }
