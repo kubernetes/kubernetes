@@ -33,7 +33,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -4731,7 +4731,7 @@ func setup(t testing.TB, nsBaseName string) (framework.TearDownFunc, *restclient
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	flags := framework.DefaultTestServerFlags()
 	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1alpha3=true")
+		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1beta1=true")
 	}
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 
@@ -4787,8 +4787,8 @@ func createJobControllerWithSharedInformers(tb testing.TB, restConfig *restclien
 	var err error
 	if feature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
 		jc, err = jobcontroller.NewController(ctx, clientSet, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(),
-			informerSet.Scheduling().V1alpha3().Workloads(),
-			informerSet.Scheduling().V1alpha3().PodGroups())
+			informerSet.Scheduling().V1beta1().Workloads(),
+			informerSet.Scheduling().V1beta1().PodGroups())
 	} else {
 		jc, err = jobcontroller.NewController(ctx, clientSet, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), nil, nil)
 	}
@@ -4853,11 +4853,11 @@ func waitForPodsToBeActive(ctx context.Context, t *testing.T, jobClient typedv1.
 
 // waitForWorkload waits for a Workload owned by the given Job to appear
 // (expectAbsent=false) or to not exist (expectAbsent=true).
-func waitForWorkload(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1alpha3.Workload {
+func waitForWorkload(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1beta1.Workload {
 	t.Helper()
-	var workload *schedulingv1alpha3.Workload
+	var workload *schedulingv1beta1.Workload
 	err := wait.PollUntilContextTimeout(ctx, waitInterval, timeout, true, func(ctx context.Context) (bool, error) {
-		workloads, listErr := clientSet.SchedulingV1alpha3().Workloads(job.Namespace).List(ctx, metav1.ListOptions{})
+		workloads, listErr := clientSet.SchedulingV1beta1().Workloads(job.Namespace).List(ctx, metav1.ListOptions{})
 		if listErr != nil {
 			return false, listErr
 		}
@@ -4882,11 +4882,11 @@ func waitForWorkload(ctx context.Context, t *testing.T, clientSet clientset.Inte
 
 // waitForPodGroup waits for a PodGroup owned by the given Job to appear
 // (expectAbsent=false) or to not exist (expectAbsent=true).
-func waitForPodGroup(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1alpha3.PodGroup {
+func waitForPodGroup(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1beta1.PodGroup {
 	t.Helper()
-	var podGroup *schedulingv1alpha3.PodGroup
+	var podGroup *schedulingv1beta1.PodGroup
 	err := wait.PollUntilContextTimeout(ctx, waitInterval, timeout, true, func(ctx context.Context) (bool, error) {
-		podGroups, listErr := clientSet.SchedulingV1alpha3().PodGroups(job.Namespace).List(ctx, metav1.ListOptions{})
+		podGroups, listErr := clientSet.SchedulingV1beta1().PodGroups(job.Namespace).List(ctx, metav1.ListOptions{})
 		if listErr != nil {
 			return false, listErr
 		}
@@ -5331,8 +5331,8 @@ func TestJobGangScheduling(t *testing.T) {
 
 			// Wait for Workload and PodGroup (present or absent).
 			absentTimeout := 10 * time.Second
-			var workload *schedulingv1alpha3.Workload
-			var podGroup *schedulingv1alpha3.PodGroup
+			var workload *schedulingv1beta1.Workload
+			var podGroup *schedulingv1beta1.PodGroup
 			if tc.expectWorkload {
 				workload = waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
 			} else {

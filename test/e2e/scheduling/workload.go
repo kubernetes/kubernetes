@@ -19,7 +19,7 @@ package scheduling
 import (
 	"context"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
@@ -36,25 +36,25 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 		/*
 			Testname: CRUD operations for Workloads
 			Description: kube-apiserver must support create/get/list/update/patch/delete
-			operations for scheduling.k8s.io/v1alpha3 Workload.
+			operations for scheduling.k8s.io/v1beta1 Workload.
 		*/
 		framework.It("Workload API availability", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
-				&e2econformance.ResourceTestcase[*schedulingv1alpha3.Workload]{
-					GVR:        schedulingv1alpha3.SchemeGroupVersion.WithResource("workloads"),
+				&e2econformance.ResourceTestcase[*schedulingv1beta1.Workload]{
+					GVR:        schedulingv1beta1.SchemeGroupVersion.WithResource("workloads"),
 					Namespaced: new(true),
-					InitialSpec: &schedulingv1alpha3.Workload{
-						Spec: schedulingv1alpha3.WorkloadSpec{
-							ControllerRef: &schedulingv1alpha3.TypedLocalObjectReference{
+					InitialSpec: &schedulingv1beta1.Workload{
+						Spec: schedulingv1beta1.WorkloadSpec{
+							ControllerRef: &schedulingv1beta1.TypedLocalObjectReference{
 								APIGroup: "batch",
 								Kind:     "Job",
 								Name:     "foo",
 							},
-							PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
+							PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
 								{
 									Name: "pg1",
-									SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-										Gang: &schedulingv1alpha3.GangSchedulingPolicy{
+									SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+										Gang: &schedulingv1beta1.GangSchedulingPolicy{
 											MinCount: 5,
 										},
 									},
@@ -62,7 +62,7 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 							},
 						},
 					},
-					UpdateSpec: func(obj *schedulingv1alpha3.Workload) *schedulingv1alpha3.Workload {
+					UpdateSpec: func(obj *schedulingv1beta1.Workload) *schedulingv1beta1.Workload {
 						obj.Labels["foo"] = "bar"
 						return obj
 					},
@@ -74,27 +74,27 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 		/*
 			Testname: CRUD operations for PodGroups
 			Description: kube-apiserver must support create/get/list/update/patch/delete
-			operations for scheduling.k8s.io/v1alpha3 PodGroup.
+			operations for scheduling.k8s.io/v1beta1 PodGroup.
 		*/
 		framework.It("PodGroup API availability", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
-				&e2econformance.ResourceTestcase[*schedulingv1alpha3.PodGroup]{
-					GVR:        schedulingv1alpha3.SchemeGroupVersion.WithResource("podgroups"),
+				&e2econformance.ResourceTestcase[*schedulingv1beta1.PodGroup]{
+					GVR:        schedulingv1beta1.SchemeGroupVersion.WithResource("podgroups"),
 					Namespaced: new(true),
-					InitialSpec: &schedulingv1alpha3.PodGroup{
-						Spec: schedulingv1alpha3.PodGroupSpec{
-							SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-								Gang: &schedulingv1alpha3.GangSchedulingPolicy{
+					InitialSpec: &schedulingv1beta1.PodGroup{
+						Spec: schedulingv1beta1.PodGroupSpec{
+							SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+								Gang: &schedulingv1beta1.GangSchedulingPolicy{
 									MinCount: 5,
 								},
 							},
 						},
 					},
-					UpdateSpec: func(obj *schedulingv1alpha3.PodGroup) *schedulingv1alpha3.PodGroup {
+					UpdateSpec: func(obj *schedulingv1beta1.PodGroup) *schedulingv1beta1.PodGroup {
 						obj.Labels["foo"] = "bar"
 						return obj
 					},
-					UpdateStatus: func(obj *schedulingv1alpha3.PodGroup) *schedulingv1alpha3.PodGroup {
+					UpdateStatus: func(obj *schedulingv1beta1.PodGroup) *schedulingv1beta1.PodGroup {
 						obj.Status.Conditions = append(obj.Status.Conditions, metav1.Condition{
 							Type:               scheduling.PodGroupInitiallyScheduled,
 							Status:             metav1.ConditionFalse,

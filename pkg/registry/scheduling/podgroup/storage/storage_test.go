@@ -79,7 +79,7 @@ func validNewPodGroup() *scheduling.PodGroup {
 func newTester(t *testing.T, storage *genericregistry.Store) *genericregistrytest.Tester {
 	return genericregistrytest.New(t, storage).SetRequestInfo(&genericapirequest.RequestInfo{
 		APIGroup:   "scheduling.k8s.io",
-		APIVersion: "v1alpha3",
+		APIVersion: "v1beta1",
 		Resource:   "podgroups",
 	})
 }
@@ -226,7 +226,7 @@ func TestUpdateStatus(t *testing.T) {
 	statusCtx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:   "apis",
 		APIGroup:    "scheduling.k8s.io",
-		APIVersion:  "v1alpha3",
+		APIVersion:  "v1beta1",
 		Resource:    "podgroups",
 		Subresource: "status",
 		Verb:        "update",

@@ -22,7 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -303,7 +303,7 @@ func TestIncompletePodGroupPods_Clear(t *testing.T) {
 	tests := []struct {
 		name        string
 		podsToAdd   []*framework.QueuedPodInfo
-		clearGroup  *v1alpha3.PodGroup
+		clearGroup  *v1beta1.PodGroup
 		wantCleared sets.Set[*framework.QueuedPodInfo]
 		want        map[string]map[string]*framework.QueuedPodInfo
 	}{

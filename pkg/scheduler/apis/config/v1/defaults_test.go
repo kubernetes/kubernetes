@@ -382,6 +382,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 									{Name: names.DefaultBinder},
 									{Name: names.NodeDeclaredFeatures},
+									{Name: names.GangScheduling},
 								},
 							},
 							Bind: configv1.PluginSet{

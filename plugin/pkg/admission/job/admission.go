@@ -26,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
-	schedulingv1alpha3listers "k8s.io/client-go/listers/scheduling/v1alpha3"
+	schedulingv1beta1listers "k8s.io/client-go/listers/scheduling/v1beta1"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/features"
@@ -57,7 +57,7 @@ type Plugin struct {
 	genericWorkloadEnabled bool
 	workloadWithJobEnabled bool
 	inspectedFeatureGates  bool
-	pgLister               schedulingv1alpha3listers.PodGroupLister
+	pgLister               schedulingv1beta1listers.PodGroupLister
 }
 
 // NewPlugin creates a new JobValidation admission plugin.
@@ -77,7 +77,7 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 	if !p.genericWorkloadEnabled {
 		return
 	}
-	pgInformer := f.Scheduling().V1alpha3().PodGroups()
+	pgInformer := f.Scheduling().V1beta1().PodGroups()
 	p.pgLister = pgInformer.Lister()
 	p.SetReadyFunc(pgInformer.Informer().HasSynced)
 }

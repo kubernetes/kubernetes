@@ -18,7 +18,7 @@ package queue
 
 import (
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 )
 
 // workloadForest maintains a consistent view of observed PodGroup objects.
@@ -27,38 +27,38 @@ import (
 // Outside of the scheduling queue, cache should be used as the source of truth.
 // This structure is not thread-safe and should be accessed only under the lock of the PriorityQueue.
 type workloadForest struct {
-	podGroups map[string]*schedulingv1alpha3.PodGroup
+	podGroups map[string]*schedulingv1beta1.PodGroup
 }
 
 func newWorkloadForest() *workloadForest {
 	return &workloadForest{
-		podGroups: make(map[string]*schedulingv1alpha3.PodGroup),
+		podGroups: make(map[string]*schedulingv1beta1.PodGroup),
 	}
 }
 
 // addPodGroup adds a PodGroup to the forest.
-func (wf *workloadForest) addPodGroup(podGroup *schedulingv1alpha3.PodGroup) {
+func (wf *workloadForest) addPodGroup(podGroup *schedulingv1beta1.PodGroup) {
 	wf.podGroups[podGroupKey(podGroup)] = podGroup
 }
 
 // updatePodGroup updates a PodGroup in the forest.
-func (wf *workloadForest) updatePodGroup(podGroup *schedulingv1alpha3.PodGroup) {
+func (wf *workloadForest) updatePodGroup(podGroup *schedulingv1beta1.PodGroup) {
 	wf.podGroups[podGroupKey(podGroup)] = podGroup
 }
 
 // deletePodGroup removes a PodGroup from the forest.
-func (wf *workloadForest) deletePodGroup(podGroup *schedulingv1alpha3.PodGroup) {
+func (wf *workloadForest) deletePodGroup(podGroup *schedulingv1beta1.PodGroup) {
 	delete(wf.podGroups, podGroupKey(podGroup))
 }
 
 // getRootForPod returns the current root PodGroup object for a given pod.
-func (wf *workloadForest) getRootForPod(pod *v1.Pod) (*schedulingv1alpha3.PodGroup, bool) {
+func (wf *workloadForest) getRootForPod(pod *v1.Pod) (*schedulingv1beta1.PodGroup, bool) {
 	podGroup, ok := wf.podGroups[podGroupKeyForPod(pod)]
 	return podGroup, ok
 }
 
 // getPodGroup returns the current PodGroup object for a given lookup.
-func (wf *workloadForest) getPodGroup(pgLookup *schedulingv1alpha3.PodGroup) (*schedulingv1alpha3.PodGroup, bool) {
+func (wf *workloadForest) getPodGroup(pgLookup *schedulingv1beta1.PodGroup) (*schedulingv1beta1.PodGroup, bool) {
 	podGroup, ok := wf.podGroups[podGroupKey(pgLookup)]
 	return podGroup, ok
 }

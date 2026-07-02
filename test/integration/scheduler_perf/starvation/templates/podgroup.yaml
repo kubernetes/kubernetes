@@ -1,4 +1,4 @@
-apiVersion: scheduling.k8s.io/v1alpha3
+apiVersion: scheduling.k8s.io/v1beta1
 kind: PodGroup
 metadata:
   name: podgroup-{{.Index}}

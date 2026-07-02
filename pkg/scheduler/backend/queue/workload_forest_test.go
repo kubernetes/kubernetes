@@ -21,7 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -31,20 +31,20 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		podGroupsToAdd []*schedulingv1alpha3.PodGroup
-		want           map[string]*schedulingv1alpha3.PodGroup
+		podGroupsToAdd []*schedulingv1beta1.PodGroup
+		want           map[string]*schedulingv1beta1.PodGroup
 	}{
 		{
 			name:           "add single pod group",
-			podGroupsToAdd: []*schedulingv1alpha3.PodGroup{pg1},
-			want: map[string]*schedulingv1alpha3.PodGroup{
+			podGroupsToAdd: []*schedulingv1beta1.PodGroup{pg1},
+			want: map[string]*schedulingv1beta1.PodGroup{
 				"pg/ns1/pg1": pg1,
 			},
 		},
 		{
 			name:           "add multiple pod groups",
-			podGroupsToAdd: []*schedulingv1alpha3.PodGroup{pg1, pg2},
-			want: map[string]*schedulingv1alpha3.PodGroup{
+			podGroupsToAdd: []*schedulingv1beta1.PodGroup{pg1, pg2},
+			want: map[string]*schedulingv1beta1.PodGroup{
 				"pg/ns1/pg1": pg1,
 				"pg/ns1/pg2": pg2,
 			},
@@ -72,23 +72,23 @@ func TestWorkloadForest_UpdatePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		initialPodGroups []*schedulingv1alpha3.PodGroup
-		podGroupToUpdate *schedulingv1alpha3.PodGroup
-		want             map[string]*schedulingv1alpha3.PodGroup
+		initialPodGroups []*schedulingv1beta1.PodGroup
+		podGroupToUpdate *schedulingv1beta1.PodGroup
+		want             map[string]*schedulingv1beta1.PodGroup
 	}{
 		{
 			name:             "update existing pod group",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{pg1},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			podGroupToUpdate: updatedPG1,
-			want: map[string]*schedulingv1alpha3.PodGroup{
+			want: map[string]*schedulingv1beta1.PodGroup{
 				"pg/ns1/pg1": updatedPG1,
 			},
 		},
 		{
 			name:             "update non-existent pod group adds it",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{pg1},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			podGroupToUpdate: pg2,
-			want: map[string]*schedulingv1alpha3.PodGroup{
+			want: map[string]*schedulingv1beta1.PodGroup{
 				"pg/ns1/pg1": pg1,
 				"pg/ns1/pg2": pg2,
 			},
@@ -117,23 +117,23 @@ func TestWorkloadForest_DeletePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		initialPodGroups []*schedulingv1alpha3.PodGroup
-		podGroupToDelete *schedulingv1alpha3.PodGroup
-		want             map[string]*schedulingv1alpha3.PodGroup
+		initialPodGroups []*schedulingv1beta1.PodGroup
+		podGroupToDelete *schedulingv1beta1.PodGroup
+		want             map[string]*schedulingv1beta1.PodGroup
 	}{
 		{
 			name:             "delete existing pod group",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{pg1, pg2},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1, pg2},
 			podGroupToDelete: pg1,
-			want: map[string]*schedulingv1alpha3.PodGroup{
+			want: map[string]*schedulingv1beta1.PodGroup{
 				"pg/ns1/pg2": pg2,
 			},
 		},
 		{
 			name:             "delete non-existent pod group is no-op",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{pg1},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			podGroupToDelete: pg2,
-			want: map[string]*schedulingv1alpha3.PodGroup{
+			want: map[string]*schedulingv1beta1.PodGroup{
 				"pg/ns1/pg1": pg1,
 			},
 		},
@@ -162,19 +162,19 @@ func TestWorkloadForest_GetRootForPod(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		initialPodGroups []*schedulingv1alpha3.PodGroup
+		initialPodGroups []*schedulingv1beta1.PodGroup
 		pod              *v1.Pod
-		wantPodGroup     *schedulingv1alpha3.PodGroup
+		wantPodGroup     *schedulingv1beta1.PodGroup
 	}{
 		{
 			name:             "pod belongs to existing pod group",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{pg1},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			pod:              podWithPG1,
 			wantPodGroup:     pg1,
 		},
 		{
 			name:             "pod belongs to non-existent pod group",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{pg1},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			pod:              podWithNonExistentPG,
 			wantPodGroup:     nil,
 		},
@@ -203,19 +203,19 @@ func TestWorkloadForest_GetPodGroup(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		initialPodGroups []*schedulingv1alpha3.PodGroup
-		podGroupLookup   *schedulingv1alpha3.PodGroup
-		wantPodGroup     *schedulingv1alpha3.PodGroup
+		initialPodGroups []*schedulingv1beta1.PodGroup
+		podGroupLookup   *schedulingv1beta1.PodGroup
+		wantPodGroup     *schedulingv1beta1.PodGroup
 	}{
 		{
 			name:             "get existing pod group",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{pg1},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			podGroupLookup:   pg1,
 			wantPodGroup:     pg1,
 		},
 		{
 			name:             "get non-existent pod group",
-			initialPodGroups: []*schedulingv1alpha3.PodGroup{},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{},
 			podGroupLookup:   pg1,
 			wantPodGroup:     nil,
 		},

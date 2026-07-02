@@ -26,7 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -962,7 +962,7 @@ type PodGroupInfo struct {
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	UnscheduledPods []*v1.Pod
 	// PodGroup is a PodGroup API object.
-	PodGroup *schedulingv1alpha3.PodGroup
+	PodGroup *schedulingv1beta1.PodGroup
 }
 
 func (pgi *PodGroupInfo) GetName() string {
@@ -977,7 +977,7 @@ func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
 	return pgi.UnscheduledPods
 }
 
-func (pgi *PodGroupInfo) GetPodGroup() *schedulingv1alpha3.PodGroup {
+func (pgi *PodGroupInfo) GetPodGroup() *schedulingv1beta1.PodGroup {
 	return pgi.PodGroup
 }
 

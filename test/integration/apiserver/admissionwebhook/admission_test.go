@@ -520,7 +520,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool, reconfigureClient func(
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
 		fmt.Sprintf("--watch-cache=%v", watchCache),
 		// turn off admission plugins that add finalizers
-		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
+		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection,PodGroupProtection",
 		// force enable all resources so we can check storage.
 		"--runtime-config=api/all=true",
 		// enable feature-gates that protect resources to check their storage, too.

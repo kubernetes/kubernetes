@@ -18,7 +18,7 @@ package queue
 
 import (
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -92,7 +92,7 @@ func (ip *incompletePodGroupPods) delete(pod *v1.Pod) *framework.QueuedPodInfo {
 }
 
 // clear removes and returns all pod infos waiting for the pod group.
-func (ip *incompletePodGroupPods) clear(podGroup *schedulingv1alpha3.PodGroup) []*framework.QueuedPodInfo {
+func (ip *incompletePodGroupPods) clear(podGroup *schedulingv1beta1.PodGroup) []*framework.QueuedPodInfo {
 	pgKey := podGroupKey(podGroup)
 	if pods, ok := ip.podGroupToPodInfos[pgKey]; ok {
 		delete(ip.podGroupToPodInfos, pgKey)
