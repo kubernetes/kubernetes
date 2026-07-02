@@ -21,7 +21,9 @@ package app
 
 import (
 	"context"
+	"crypto"
 	"fmt"
+	"os"
 	"time"
 
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
@@ -30,12 +32,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/kubernetes"
+	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	ctbpublisher "k8s.io/kubernetes/pkg/controller/certificates/clustertrustbundlepublisher"
+	"k8s.io/kubernetes/pkg/controller/certificates/podcertssigner"
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
@@ -385,4 +390,97 @@ func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte
 	}
 	return rootCA, nil
 
+}
+
+func newKubeServiceCASignerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:                 "TODO:MOVEMETOCONSTANTS KubeServiceCASigner",
+		constructor:          newKubeServiceCASignerControllers,
+		requiredFeatureGates: []featuregate.Feature{features.KubeServingCertificatesSigner},
+	}
+}
+
+type signerControllers struct {
+	controllerName string
+	publisher      ctbpublisher.PublisherRunner
+	signer         *podcertssigner.PodCertsSignerController
+}
+
+func (cs *signerControllers) Name() string {
+	return cs.controllerName
+}
+
+func (cs *signerControllers) Run(ctx context.Context) {
+	go cs.publisher.Run(ctx)
+	go cs.signer.Run(ctx)
+	<-ctx.Done()
+}
+
+func newKubeServiceCASignerControllers(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	caCertPath := controllerContext.ComponentConfig.ServiceCAController.ServiceCACertPath
+	caKeyPath := controllerContext.ComponentConfig.ServiceCAController.ServiceCAKeyPath
+	if len(caCertPath) == 0 || len(caKeyPath) == 0 {
+		// TODO: this here is just for the PoC
+		caCertPath = "/tmp/service-ca.crt"
+		caKeyPath = "/tmp/service-ca.key"
+		//	return nil, fmt.Errorf("path to the Service CA cert/key PEM bundle unset")
+		keyBytes, _, err := keyutil.LoadOrGenerateKeyFile(caKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't generate key: %w", err)
+		}
+		key, err := keyutil.ParsePrivateKeyPEM(keyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("key gen err: %w", err)
+		}
+		cert, err := certutil.NewSelfSignedCACert(certutil.Config{CommonName: "testsigner"}, key.(crypto.Signer))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cert: %w", err)
+		}
+		certs, _ := certutil.EncodeCertificates(cert)
+		f, _ := os.OpenFile(caCertPath, os.O_CREATE|os.O_RDWR, os.FileMode(0755))
+		f.Write(append([]byte("\n"), certs...))
+		f.Close()
+	}
+
+	client, err := controllerContext.NewClient("kube-service-ca-signer")
+	if err != nil {
+		return nil, err
+	}
+
+	const signerName = "kubernetes.io/service-ca"
+	signer, err := podcertssigner.NewPodCertificatesSigner(
+		ctx,
+		signerName,
+		caCertPath,
+		caKeyPath,
+		&podcertssigner.KubeServiceCATemplateMapper{
+			ServiceLister: controllerContext.InformerFactory.Core().V1().Services().Lister(), // FIXME: make sure this is synced before first use
+			ClusterDomain: "cluster.local",                                                   // FIXME: controllerContext.ComponentConfig.ServiceCAController.ServiceCAPEMBundle is currently completely unwired
+		},
+		client,
+		controllerContext.InformerFactory.Core().V1().Pods(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceCACert, err := dynamiccertificates.NewDynamicCAContentFromFile("kube-service-ca", caCertPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a static CA content provider for the kube-apiserver-serving signer: %w", err)
+	}
+
+	publisher, err := ctbpublisher.NewBetaClusterTrustBundlePublisher(
+		signerName,
+		serviceCACert,
+		client,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &signerControllers{
+		controllerName: controllerName,
+		publisher:      publisher,
+		signer:         signer,
+	}, nil
 }

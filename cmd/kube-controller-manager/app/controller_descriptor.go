@@ -210,6 +210,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newTTLAfterFinishedControllerDescriptor())
 	register(newRootCACertificatePublisherControllerDescriptor())
 	register(newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor())
+	register(newKubeServiceCASignerDescriptor())
 	register(newEphemeralVolumeControllerDescriptor())
 
 	// feature gated
