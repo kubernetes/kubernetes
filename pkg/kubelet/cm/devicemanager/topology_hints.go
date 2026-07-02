@@ -32,7 +32,7 @@ import (
 // container are created.
 func (m *ManagerImpl) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded device resources before providing TopologyHints
-	m.UpdateAllocatedDevices()
+	m.UpdateAllocatedDevices(logger)
 
 	// Loop through all device resources and generate TopologyHints for them.
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
@@ -84,7 +84,7 @@ func (m *ManagerImpl) GetTopologyHints(logger klog.Logger, pod *v1.Pod, containe
 // ensures the Device Manager is consulted when Topology Aware Hints for Pod are created.
 func (m *ManagerImpl) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded device resources before providing TopologyHints
-	m.UpdateAllocatedDevices()
+	m.UpdateAllocatedDevices(logger)
 
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 	accumulatedResourceRequests := m.getPodDeviceRequest(pod)

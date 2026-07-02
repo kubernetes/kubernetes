@@ -52,13 +52,11 @@ type FakeContainerManager struct {
 
 var _ ContainerManager = &FakeContainerManager{}
 
-func NewFakeContainerManager() *FakeContainerManager {
+func NewFakeContainerManager(logger klog.Logger) *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
-		// Use klog.TODO() because we currently do not have a proper logger to pass in.
-		// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-		cpuManager:    cpumanager.NewFakeManager(klog.TODO()),
-		memoryManager: memorymanager.NewFakeManager(klog.TODO()),
+		cpuManager:          cpumanager.NewFakeManager(logger),
+		memoryManager:       memorymanager.NewFakeManager(logger),
 	}
 }
 
@@ -203,7 +201,7 @@ func (cm *FakeContainerManager) GetDevices(_, _ string) []*podresourcesapi.Conta
 	return nil
 }
 
-func (cm *FakeContainerManager) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+func (cm *FakeContainerManager) GetAllocatableDevices(_ klog.Logger) []*podresourcesapi.ContainerDevices {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocatableDevices")
@@ -224,7 +222,7 @@ func (cm *FakeContainerManager) GetAllocateResourcesPodAdmitHandler(logger klog.
 	return topologymanager.NewFakeManager(logger)
 }
 
-func (cm *FakeContainerManager) UpdateAllocatedDevices() {
+func (cm *FakeContainerManager) UpdateAllocatedDevices(_ klog.Logger) {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "UpdateAllocatedDevices")
@@ -244,14 +242,14 @@ func (cm *FakeContainerManager) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
-func (cm *FakeContainerManager) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
+func (cm *FakeContainerManager) GetMemory(_ klog.Logger, _, _ string) []*podresourcesapi.ContainerMemory {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetMemory")
 	return nil
 }
 
-func (cm *FakeContainerManager) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
+func (cm *FakeContainerManager) GetAllocatableMemory(_ klog.Logger) []*podresourcesapi.ContainerMemory {
 	cm.Lock()
 	defer cm.Unlock()
 	return nil

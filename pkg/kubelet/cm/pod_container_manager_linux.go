@@ -256,10 +256,7 @@ func (m *podContainerManagerImpl) IsPodCgroup(cgroupfs string) (bool, types.UID)
 
 // GetAllPodsFromCgroups scans through all the subsystems of pod cgroups
 // Get list of pods whose cgroup still exist on the cgroup mounts
-func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *podContainerManagerImpl) GetAllPodsFromCgroups(logger klog.Logger) (map[types.UID]CgroupName, error) {
 	// Map for storing all the found pods on the disk
 	foundPods := make(map[types.UID]CgroupName)
 	qosContainersList := [3]CgroupName{m.qosContainersInfo.BestEffort, m.qosContainersInfo.Burstable, m.qosContainersInfo.Guaranteed}
@@ -348,7 +345,7 @@ func (m *podContainerManagerNoop) ReduceCPULimits(_ klog.Logger, _ CgroupName) e
 	return nil
 }
 
-func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+func (m *podContainerManagerNoop) GetAllPodsFromCgroups(_ klog.Logger) (map[types.UID]CgroupName, error) {
 	return nil, nil
 }
 

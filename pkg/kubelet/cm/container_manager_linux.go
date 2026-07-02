@@ -296,6 +296,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	}
 
 	cm.topologyManager, err = topologymanager.NewManager(
+		logger,
 		machineInfo.Topology,
 		nodeConfig.TopologyManagerPolicy,
 		nodeConfig.TopologyManagerScope,
@@ -307,7 +308,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	}
 
 	logger.Info("Creating device plugin manager")
-	cm.deviceManager, err = devicemanager.NewManagerImpl(machineInfo.Topology, cm.topologyManager)
+	cm.deviceManager, err = devicemanager.NewManagerImpl(logger, machineInfo.Topology, cm.topologyManager)
 	if err != nil {
 		return nil, err
 	}
@@ -999,8 +1000,8 @@ func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podr
 	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
 }
 
-func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
-	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetAllocatableDevices())
+func (cm *containerManagerImpl) GetAllocatableDevices(logger klog.Logger) []*podresourcesapi.ContainerDevices {
+	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetAllocatableDevices(logger))
 }
 
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
@@ -1017,24 +1018,24 @@ func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return []int64{}
 }
 
-func (cm *containerManagerImpl) GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetMemory(logger klog.Logger, podUID, containerName string) []*podresourcesapi.ContainerMemory {
 	if cm.memoryManager == nil {
 		return []*podresourcesapi.ContainerMemory{}
 	}
 
 	// This is tempporary as part of migration of memory manager to Contextual logging.
 	// Direct context to be passed when container manager is migrated.
-	return containerMemoryFromBlock(cm.memoryManager.GetMemory(podUID, containerName))
+	return containerMemoryFromBlock(cm.memoryManager.GetMemory(logger, podUID, containerName))
 }
 
-func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetAllocatableMemory(logger klog.Logger) []*podresourcesapi.ContainerMemory {
 	if cm.memoryManager == nil {
 		return []*podresourcesapi.ContainerMemory{}
 	}
 
 	// This is tempporary as part of migration of memory manager to Contextual logging.
 	// Direct context to be passed when container manager is migrated.
-	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory())
+	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory(logger))
 }
 
 func (cm *containerManagerImpl) GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
@@ -1080,8 +1081,8 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
 }
 
-func (cm *containerManagerImpl) UpdateAllocatedDevices() {
-	cm.deviceManager.UpdateAllocatedDevices()
+func (cm *containerManagerImpl) UpdateAllocatedDevices(logger klog.Logger) {
+	cm.deviceManager.UpdateAllocatedDevices(logger)
 }
 
 func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresourcesapi.ContainerMemory {

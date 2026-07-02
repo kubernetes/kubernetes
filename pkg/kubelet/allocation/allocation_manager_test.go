@@ -2436,7 +2436,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 	var containerManager *cm.FakeContainerManager
 	if nodeConfig == nil {
-		containerManager = cm.NewFakeContainerManager()
+		containerManager = cm.NewFakeContainerManager(logger)
 	} else {
 		containerManager = cm.NewFakeContainerManagerWithNodeConfig(*nodeConfig)
 	}
