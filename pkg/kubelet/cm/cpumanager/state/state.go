@@ -27,6 +27,7 @@ import (
 )
 
 // ContainerCPUAssignments type used in cpu manager state
+// without InPlacePodVerticalScalingExclusiveCPUs
 type ContainerCPUAssignments map[string]map[string]cpuset.CPUSet
 
 // Clone returns a copy of ContainerCPUAssignments
@@ -109,6 +110,30 @@ func (a PodCPUAssignments) Clone() PodCPUAssignments {
 	return clone
 }
 
+// ContainerCPUAllocation and ContainerCPUOriginals types are used in cpu manager state
+// with InPlacePodVerticalScalingExclusiveCPUs to store historical data, original
+// CPU allocation, when InPlacePodVerticalScalingExclusiveCPUs is enabled.
+
+type ContainerCPUOriginal struct {
+	Original cpuset.CPUSet
+}
+
+type ContainerCPUOriginals map[string]map[string]ContainerCPUOriginal
+
+// Clone returns a copy of ContainerCPUOriginals
+func (as ContainerCPUOriginals) Clone() ContainerCPUOriginals {
+	ret := make(ContainerCPUOriginals, len(as))
+	for pod := range as {
+		ret[pod] = make(map[string]ContainerCPUOriginal, len(as[pod]))
+		for container, orig := range as[pod] {
+			ret[pod][container] = ContainerCPUOriginal{
+				Original: orig.Original.Clone(),
+			}
+		}
+	}
+	return ret
+}
+
 // Reader interface used to read current cpu/pod assignment state
 type Reader interface {
 	GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
@@ -119,6 +144,11 @@ type Reader interface {
 	GetPodCPUSet(podUID string) (cpuset.CPUSet, bool)
 	// GetPodCPUAssignments returns all pod-level CPU assignments
 	GetPodCPUAssignments() PodCPUAssignments
+	// GetCPUOriginals, GetOriginalCPUSet are used
+	// with InPlacePodVerticalScalingExclusiveCPUs to checkpoint CPU
+	// original assignments.
+	GetCPUOriginals() ContainerCPUOriginals
+	GetOriginalCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
 }
 
 type writer interface {
@@ -133,6 +163,8 @@ type writer interface {
 	SetPodCPUAssignments(PodCPUAssignments)
 	// DeletePod deletes pod-level CPU assignments for specified pod
 	DeletePod(podUID string)
+	// SetCPUOriginals is used with InPlacePodVerticalScalingExclusiveCPUs
+	SetCPUOriginals(ContainerCPUOriginals)
 }
 
 // State interface provides methods for tracking and setting cpu/pod assignment

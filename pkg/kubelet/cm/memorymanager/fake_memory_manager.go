@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -44,7 +45,7 @@ func (m *fakeManager) Policy(logger klog.Logger) Policy {
 	return NewPolicyNone(logger)
 }
 
-func (m *fakeManager) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error {
+func (m *fakeManager) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
@@ -64,17 +65,17 @@ func (m *fakeManager) RemoveContainer(logger klog.Logger, containerID string) er
 	return nil
 }
 
-func (m *fakeManager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *fakeManager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger.Info("Get Topology Hints", "pod", klog.KObj(pod), "containerName", container.Name)
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (m *fakeManager) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger.Info("Get Pod Topology Hints", "pod", klog.KObj(pod))
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) AllocatePod(logger klog.Logger, pod *v1.Pod) error {
+func (m *fakeManager) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) error {
 	logger.Info("AllocatePod", "pod", klog.KObj(pod))
 	return nil
 }

@@ -107,6 +107,18 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			featureGateEnable: true,
 			expectedAvailable: false,
 		},
+		{
+			option:            ScaleDelayTimeOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            ScaleDelayTimeOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
+			featureGateEnable: true,
+			expectedAvailable: false,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
@@ -202,6 +214,65 @@ func TestValidateStaticPolicyOptions(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 			policyOpt, _ := NewStaticPolicyOptions(testCase.policyOption)
 			err := ValidateStaticPolicyOptions(policyOpt, testCase.topology, topoMgrStore)
+			gotError := (err != nil)
+			if gotError != testCase.expectedErr {
+				t.Errorf("testCase %q failed, got %v expected %v", testCase.description, gotError, testCase.expectedErr)
+			}
+		})
+	}
+}
+
+func TestValidateStaticPolicyOptions_ScaleDelayTimeFeatureGate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testCases := []struct {
+		description              string
+		policyOption             map[string]string
+		exclusiveCPUsFeatureGate bool
+		expectedErr              bool
+	}{
+		{
+			description:              "ScaleDelayTime with 0s when InPlacePodVerticalScalingExclusiveCPUs disable",
+			policyOption:             map[string]string{ScaleDelayTimeOption: "0s"},
+			exclusiveCPUsFeatureGate: false,
+			expectedErr:              false,
+		},
+		{
+			description:              "ScaleDelayTime with 5s when InPlacePodVerticalScalingExclusiveCPUs disable",
+			policyOption:             map[string]string{ScaleDelayTimeOption: "5s"},
+			exclusiveCPUsFeatureGate: false,
+			expectedErr:              true,
+		},
+		{
+			description:              "ScaleDelayTime with valid 5s when InPlacePodVerticalScalingExclusiveCPUs enable",
+			policyOption:             map[string]string{ScaleDelayTimeOption: "5s"},
+			exclusiveCPUsFeatureGate: true,
+			expectedErr:              false,
+		},
+		{
+			description:              "ScaleDelayTime with valid 10000ms when InPlacePodVerticalScalingExclusiveCPUs enable",
+			policyOption:             map[string]string{ScaleDelayTimeOption: "10000ms"},
+			exclusiveCPUsFeatureGate: true,
+			expectedErr:              false,
+		},
+		{
+			description:              "ScaleDelayTime with invalid 11s (exceeds 10s limit) when InPlacePodVerticalScalingExclusiveCPUs enable",
+			policyOption:             map[string]string{ScaleDelayTimeOption: "11s"},
+			exclusiveCPUsFeatureGate: true,
+			expectedErr:              true,
+		},
+		{
+			description:              "ScaleDelayTime with invalid -1s (negative value) when InPlacePodVerticalScalingExclusiveCPUs enable",
+			policyOption:             map[string]string{ScaleDelayTimeOption: "-1s"},
+			exclusiveCPUsFeatureGate: true,
+			expectedErr:              true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, testCase.exclusiveCPUsFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+			policyOpt, _ := NewStaticPolicyOptions(testCase.policyOption)
+			err := ValidateStaticPolicyOptions(policyOpt, topoDualSocketMultiNumaPerSocketHT, topologymanager.NewFakeManagerWithPolicy(logger, topologymanager.NewNonePolicy()))
 			gotError := (err != nil)
 			if gotError != testCase.expectedErr {
 				t.Errorf("testCase %q failed, got %v expected %v", testCase.description, gotError, testCase.expectedErr)
