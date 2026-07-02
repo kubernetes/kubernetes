@@ -105,6 +105,13 @@ type Manager interface {
 
 	// RetryPendingResizes retries all pending resizes.
 	RetryPendingResizes(ctx context.Context, trigger string)
+
+	// HasPodAllocatedResources returns whether a pod has been allocated resources.
+	HasPodAllocatedResources(podUID types.UID) bool
+
+	// PodWillNeedAllocation returns whether a pod needs allocation but hasn't been allocated yet.
+	// Returns false if the pod is already allocated, or if the pod has no resource requests/limits.
+	PodWillNeedAllocation(pod *v1.Pod) bool
 }
 
 type manager struct {
@@ -476,6 +483,38 @@ func (m *manager) SetAllocatedResources(logger klog.Logger, pod *v1.Pod) error {
 	return m.allocated.SetPodResourceInfo(logger, pod.UID, allocationFromPod(pod))
 }
 
+// hasPodAllocatedResources returns whether a pod has been allocated.
+func (m *manager) hasPodAllocatedResources(pod *v1.Pod) bool {
+	return m.HasPodAllocatedResources(pod.UID)
+}
+
+// HasPodAllocatedResources returns whether a pod has been allocated resources.
+func (m *manager) HasPodAllocatedResources(podUID types.UID) bool {
+	_, allocated := m.allocated.GetPodResourceInfo(podUID)
+	return allocated
+}
+
+func (m *manager) PodWillNeedAllocation(pod *v1.Pod) bool {
+	// If already allocated, doesn't need allocation
+	if m.HasPodAllocatedResources(pod.UID) {
+		return false
+	}
+
+	// Check if pod has CPU/memory requests/limits that would require allocation
+	for _, container := range pod.Spec.Containers {
+		if len(container.Resources.Requests) > 0 || len(container.Resources.Limits) > 0 {
+			return true
+		}
+	}
+	for _, container := range pod.Spec.InitContainers {
+		if len(container.Resources.Requests) > 0 || len(container.Resources.Limits) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
 func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 	var podAlloc state.PodResourceInfo
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && pod.Spec.Resources != nil {
@@ -607,9 +646,14 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 		return activePods
 	}
 
-	allocatedPods := make([]*v1.Pod, len(activePods))
-	for i, pod := range activePods {
-		allocatedPods[i], _ = m.UpdatePodFromAllocation(pod)
+	allocatedPods := make([]*v1.Pod, 0, len(activePods))
+	for _, pod := range activePods {
+		// Filter out pods that don't yet have an allocation, which will filter pods that
+		// are potentially going to be denied at admission.
+		if m.hasPodAllocatedResources(pod) {
+			allocatedPod, _ := m.UpdatePodFromAllocation(pod)
+			allocatedPods = append(allocatedPods, allocatedPod)
+		}
 	}
 	return allocatedPods
 }

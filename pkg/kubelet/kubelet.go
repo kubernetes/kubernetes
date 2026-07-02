@@ -2998,6 +2998,15 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			}
 		}
 
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			// Skip pods that need allocation but haven't been allocated yet to avoid counting
+			// them against node capacity before they've been admitted.
+			if kl.allocationManager.PodWillNeedAllocation(pod) {
+				logger.V(4).Info("Skipping pod update for non-allocated pod with resource requests", "pod", klog.KObj(pod), "podUID", pod.UID)
+				continue
+			}
+		}
+
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
@@ -3142,6 +3151,15 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		// to the pod manager.
 		oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
 		kl.podManager.UpdatePod(pod)
+
+		// Skip further reconciliation for pods that need allocation but haven't been allocated yet.
+		// We still updated podManager above to keep status in sync with the API server.
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if kl.allocationManager.PodWillNeedAllocation(pod) {
+				logger.V(4).Info("Skipping pod reconcile operations for non-allocated pod with resource requests", "pod", klog.KObj(pod), "podUID", pod.UID)
+				continue
+			}
+		}
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
