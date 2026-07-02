@@ -1289,6 +1289,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+- name: PerPodPIDLimit
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: PersistentVolumeClaimUnusedSinceTime
   versionedSpecs:
   - default: false

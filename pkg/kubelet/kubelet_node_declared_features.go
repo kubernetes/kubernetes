@@ -18,8 +18,9 @@ package kubelet
 
 import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate" // Import for the type conversion
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
+	util "k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 // FeatureGateAdapter adapts a component-base FeatureGate to the nodedeclaredfeatures FeatureGate interface.
@@ -47,6 +48,9 @@ func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 		FeatureGates:    adaptedFG,
 		Version:         kl.version,
 		RuntimeFeatures: runtimeFeatures,
+		StaticConfig: nodedeclaredfeatures.StaticConfiguration{
+			Cgroupsv2: util.IsCgroup2UnifiedMode(),
+		},
 	}
 	return kl.nodeDeclaredFeaturesFramework.DiscoverNodeFeatures(cfg)
 }

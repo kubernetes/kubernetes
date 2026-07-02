@@ -205,6 +205,9 @@ const (
 
 	// Metric key for podsapi
 	PodWatchEventsDroppedKey = "pod_watch_events_dropped_total"
+
+	// Metric key for per-pod PID limit
+	PodPIDLimitAppliedKey = "pod_pid_limit_applied_total"
 )
 
 type imageSizeBucket struct {
@@ -1303,6 +1306,15 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	PodPIDLimitApplied = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodPIDLimitAppliedKey,
+			Help:           "Cumulative number of pods where a per-pod PID limit was applied.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1433,6 +1445,10 @@ func Register() {
 		}
 
 		legacyregistry.MustRegister(PodWatchEventsDroppedTotal)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.PerPodPIDLimit) {
+			legacyregistry.MustRegister(PodPIDLimitApplied)
+		}
 	})
 }
 
