@@ -340,6 +340,17 @@ type KubeletConfiguration struct {
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	RuntimeRequestTimeout metav1.Duration
+	// podCheckpointTimeout limits probe draining and the CheckpointPod request
+	// before cancellation. The kubelet clamps spec.timeoutSeconds to this
+	// ceiling. Runtime completion is confirmed separately before probes resume;
+	// cleanup can outlive this deadline.
+	PodCheckpointTimeout metav1.Duration
+
+	// podCheckpointStorage limits the dedicated checkpoint filesystem and the number
+	// of retained operation records. Without it, the kubelet rejects new checkpoint
+	// captures on this node. No storage is allocated or formatted by the kubelet.
+	// +optional
+	PodCheckpointStorage *PodCheckpointStorageConfiguration
 	// hairpinMode specifies how the Kubelet should configure the container
 	// bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
@@ -1040,4 +1051,21 @@ type UserNamespaces struct {
 	// +featureGate=UserNamespacesSupport
 	// +optional
 	IDsPerPod *int64
+}
+
+// PodCheckpointStorageConfiguration requires an administrator-provisioned, fixed-capacity
+// filesystem at <root-dir>/pod-checkpoints. Archive and runtime scratch data must
+// stay on that filesystem; operation records remain outside it. Successful archives
+// are retained until removed by the administrator and continue consuming capacity.
+type PodCheckpointStorageConfiguration struct {
+	// Maximum capacity in bytes of the dedicated checkpoint filesystem.
+	MaxBytes int64
+	// Maximum inode capacity of the dedicated checkpoint filesystem.
+	MaxInodes int64
+	// Minimum available bytes required to admit a new capture. Must be positive and less than maxBytes.
+	MinAvailableBytes int64
+	// Minimum free inodes required to admit a new capture. Must be positive and less than maxInodes.
+	MinAvailableInodes int64
+	// Maximum retained operation records, from 1 to 1024. Completed records awaiting publication count toward this limit.
+	MaxOperations int32
 }

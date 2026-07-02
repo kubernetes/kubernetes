@@ -34,6 +34,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -74,7 +75,8 @@ type ManagerImpl struct {
 	// activePods is a method for listing active pods on the node
 	// so the amount of pluginResources requested by existing pods
 	// could be counted when updating allocated devices
-	activePods ActivePodsFunc
+	activePods                     ActivePodsFunc
+	podOperationMayUsePodResources func(types.UID) bool
 
 	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
 	// We use it to determine when we can purge inactive pods from checkpointed state.
@@ -396,10 +398,11 @@ func (m *ManagerImpl) checkpointFile() string {
 // Start starts the Device Plugin Manager and start initialization of
 // podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
-func (m *ManagerImpl) Start(logger klog.Logger, activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.Set[string]) error {
+func (m *ManagerImpl) Start(logger klog.Logger, activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.Set[string], podOperationMayUsePodResources func(types.UID) bool) error {
 	logger.V(2).Info("Starting Device Plugin manager")
 
 	m.activePods = activePods
+	m.podOperationMayUsePodResources = podOperationMayUsePodResources
 	m.sourcesReady = sourcesReady
 	m.containerMap = initialContainers
 	m.containerRunningSet = initialContainerRunningSet
@@ -634,6 +637,13 @@ func (m *ManagerImpl) UpdateAllocatedDevices(logger klog.Logger) {
 	podsToBeRemoved := m.podDevices.pods()
 	for _, pod := range activePods {
 		podsToBeRemoved.Delete(string(pod.UID))
+	}
+	if m.podOperationMayUsePodResources != nil {
+		for podUID := range podsToBeRemoved {
+			if m.podOperationMayUsePodResources(types.UID(podUID)) {
+				podsToBeRemoved.Delete(podUID)
+			}
+		}
 	}
 	if len(podsToBeRemoved) <= 0 {
 		return

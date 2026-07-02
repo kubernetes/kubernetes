@@ -1627,6 +1627,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		kubeletconfigv1beta1.KubeletX509Authentication{}.OpenAPIModelName():                                             schema_k8sio_kubelet_config_v1beta1_KubeletX509Authentication(ref),
 		kubeletconfigv1beta1.MemoryReservation{}.OpenAPIModelName():                                                     schema_k8sio_kubelet_config_v1beta1_MemoryReservation(ref),
 		kubeletconfigv1beta1.MemorySwapConfiguration{}.OpenAPIModelName():                                               schema_k8sio_kubelet_config_v1beta1_MemorySwapConfiguration(ref),
+		kubeletconfigv1beta1.PodCheckpointStorageConfiguration{}.OpenAPIModelName():                                     schema_k8sio_kubelet_config_v1beta1_PodCheckpointStorageConfiguration(ref),
 		kubeletconfigv1beta1.SerializedNodeConfigSource{}.OpenAPIModelName():                                            schema_k8sio_kubelet_config_v1beta1_SerializedNodeConfigSource(ref),
 		kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName():                                      schema_k8sio_kubelet_config_v1beta1_ShutdownGracePeriodByPodPriority(ref),
 		kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName():                                                        schema_k8sio_kubelet_config_v1beta1_UserNamespaces(ref),
@@ -77918,6 +77919,18 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},
+					"podCheckpointTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podCheckpointTimeout limits probe draining and the CheckpointPod request before cancellation. The kubelet clamps a PodCheckpoint's spec.timeoutSeconds to this ceiling. Runtime cleanup can outlive the deadline; probes resume after completion is confirmed, so this does not promise a hard freeze bound. Checkpoint time grows with the Pod's memory and depends on disk throughput, so raise this value on nodes that checkpoint Pods with large memory footprints. Requires the PodLevelCheckpointRestore feature gate to be enabled. Default: \"5m\"",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
+					"podCheckpointStorage": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podCheckpointStorage limits the dedicated checkpoint filesystem and the number of retained operation records. Without it, the kubelet rejects new checkpoint captures on this node. No storage is allocated or formatted by the kubelet.",
+							Ref:         ref(kubeletconfigv1beta1.PodCheckpointStorageConfiguration{}.OpenAPIModelName()),
+						},
+					},
 					"hairpinMode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "hairpinMode specifies how the Kubelet should configure the container bridge for hairpin packets. Setting this flag allows endpoints in a Service to loadbalance back to themselves if they should try to access their own Service. Values:\n\n- \"promiscuous-bridge\": make the container bridge promiscuous. - \"hairpin-veth\":       set the hairpin flag on container veth interfaces. - \"none\":               do nothing.\n\nGenerally, one must set `--hairpin-mode=hairpin-veth to` achieve hairpin NAT, because promiscuous-bridge assumes the existence of a container bridge named cbr0. Default: \"promiscuous-bridge\"",
@@ -78496,7 +78509,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 			},
 		},
 		Dependencies: []string{
-			corev1.Taint{}.OpenAPIModelName(), metav1.Duration{}.OpenAPIModelName(), logsapiv1.LoggingConfiguration{}.OpenAPIModelName(), apiv1.TracingConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.CrashLoopBackOffConfig{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthentication{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthorization{}.OpenAPIModelName(), kubeletconfigv1beta1.MemoryReservation{}.OpenAPIModelName(), kubeletconfigv1beta1.MemorySwapConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName(), kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName()},
+			corev1.Taint{}.OpenAPIModelName(), metav1.Duration{}.OpenAPIModelName(), logsapiv1.LoggingConfiguration{}.OpenAPIModelName(), apiv1.TracingConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.CrashLoopBackOffConfig{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthentication{}.OpenAPIModelName(), kubeletconfigv1beta1.KubeletAuthorization{}.OpenAPIModelName(), kubeletconfigv1beta1.MemoryReservation{}.OpenAPIModelName(), kubeletconfigv1beta1.MemorySwapConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.PodCheckpointStorageConfiguration{}.OpenAPIModelName(), kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName(), kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName()},
 	}
 }
 
@@ -78622,6 +78635,60 @@ func schema_k8sio_kubelet_config_v1beta1_MemorySwapConfiguration(ref common.Refe
 						},
 					},
 				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_PodCheckpointStorageConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCheckpointStorageConfiguration requires an administrator-provisioned, fixed-capacity filesystem at <root-dir>/pod-checkpoints. Archive and runtime scratch data must stay on that filesystem; operation records remain outside it. Successful archives are retained until removed by the administrator and continue consuming capacity.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"maxBytes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Maximum capacity in bytes of the dedicated checkpoint filesystem.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"maxInodes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Maximum inode capacity of the dedicated checkpoint filesystem.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"minAvailableBytes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum available bytes required to admit a new capture. Must be positive and less than maxBytes.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"minAvailableInodes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum free inodes required to admit a new capture. Must be positive and less than maxInodes.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"maxOperations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Maximum retained operation records, from 1 to 1024. Completed records awaiting publication count toward this limit.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"maxBytes", "maxInodes", "minAvailableBytes", "minAvailableInodes", "maxOperations"},
 			},
 		},
 	}

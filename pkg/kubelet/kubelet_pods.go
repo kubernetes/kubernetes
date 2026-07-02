@@ -33,18 +33,24 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
 
 	v1 "k8s.io/api/core/v1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/util/retry"
 	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
@@ -60,6 +66,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -75,6 +82,7 @@ import (
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 	utilnet "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -1120,6 +1128,225 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	return nil
 }
 
+// finalizePodCheckpointOutcome writes the terminal outcome while preserving the
+// routing assignment and captured template. It retries conflicts and checks the
+// live UID and terminal status before updating the object. With
+// recordObservedOutcome, it also reports an outcome observed after a lost update
+// response when the operation still owns publication of that result.
+func (kl *Kubelet) finalizePodCheckpointOutcome(ctx context.Context, namespace, name string, checkpointUID types.UID, success bool, checkpointLocation, failureMessage string, recordObservedOutcome bool) error {
+	if kl.kubeClient == nil {
+		return goerrors.New("cannot finalize PodCheckpoint: kubelet has no API client")
+	}
+
+	status := metav1.ConditionTrue
+	reason := nodev1alpha1.PodCheckpointReasonCompleted
+	message := "checkpoint completed successfully"
+	if !success {
+		status = metav1.ConditionFalse
+		reason = nodev1alpha1.PodCheckpointReasonFailed
+		message = failureMessage
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, podCheckpointAPITimeout)
+	defer cancel()
+	recordOutcome := false
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pc, err := kl.kubeClient.NodeV1alpha1().PodCheckpoints(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if pc.UID != checkpointUID || (pc.Status.NodeName != nil && *pc.Status.NodeName != string(kl.nodeName)) {
+			return errPodCheckpointNotPending
+		}
+		if podCheckpointTerminal(pc) {
+			condition := apimeta.FindStatusCondition(pc.Status.Conditions, nodev1alpha1.PodCheckpointConditionReady)
+			matches := condition != nil && condition.Status == status && condition.Reason == reason
+			if success && condition != nil && condition.Status == metav1.ConditionTrue &&
+				pc.Status.CheckpointLocation != nil && pc.Status.CheckpointLocation.NodeLocal != nil &&
+				pc.Status.CheckpointLocation.NodeLocal.Path == checkpointLocation {
+				recordOutcome = recordObservedOutcome && matches && pc.DeletionTimestamp == nil
+				return nil
+			}
+			if !success && recordObservedOutcome && matches && condition.Message == message {
+				recordOutcome = pc.DeletionTimestamp == nil
+				return nil
+			}
+			return errPodCheckpointNotPending
+		}
+
+		apimeta.SetStatusCondition(&pc.Status.Conditions, metav1.Condition{
+			Type:               nodev1alpha1.PodCheckpointConditionReady,
+			Status:             status,
+			Reason:             reason,
+			Message:            message,
+			ObservedGeneration: pc.Generation,
+		})
+		pc.Status.CompletionTime = new(metav1.NewTime(kl.clock.Now()))
+		if success {
+			if checkpointLocation != "" {
+				pc.Status.CheckpointLocation = &nodev1alpha1.CheckpointSource{
+					Type:      nodev1alpha1.CheckpointSourceTypeNodeLocal,
+					NodeLocal: &nodev1alpha1.NodeLocalCheckpointSource{Path: checkpointLocation},
+				}
+			}
+		}
+
+		_, err = kl.kubeClient.NodeV1alpha1().PodCheckpoints(namespace).UpdateStatus(ctx, pc, metav1.UpdateOptions{})
+		if err == nil && pc.DeletionTimestamp == nil {
+			recordOutcome = true
+		}
+		return err
+	})
+	if err == nil && recordOutcome {
+		eventType, eventReason := v1.EventTypeNormal, events.CheckpointSucceeded
+		eventMessage := "Checkpoint completed successfully"
+		if !success {
+			eventType, eventReason = v1.EventTypeWarning, events.CheckpointFailed
+			eventMessage = "Checkpoint failed. See PodCheckpoint status for details"
+		}
+		kl.recordPodCheckpointEvent(ctx, namespace, name, checkpointUID, eventType, eventReason, eventMessage)
+	}
+	return err
+}
+
+// finalizeInterruptedCheckpoints runs on kubelet startup. Durable operation
+// records distinguish checkpoints that may have reached the runtime from ones
+// interrupted before capture. Recovery confirms runtime completion before cleanup
+// and publishes recorded outcomes without repeating capture. A checkpoint without
+// an operation record can be captured again. The initial list is retried until it
+// succeeds or ctx is canceled, so the watch cannot race recovery after an outage.
+// It reports whether the watch can start.
+func (kl *Kubelet) finalizeInterruptedCheckpoints(ctx context.Context) bool {
+	return kl.finalizeInterruptedCheckpointsWithRetry(ctx, 5*time.Second)
+}
+
+func (kl *Kubelet) finalizeInterruptedCheckpointsWithRetry(ctx context.Context, retryPeriod time.Duration) bool {
+	logger := klog.FromContext(ctx)
+	if kl.kubeClient == nil {
+		return false
+	}
+	var list *nodev1alpha1.PodCheckpointList
+	if err := wait.PollUntilContextCancel(ctx, retryPeriod, true, func(ctx context.Context) (bool, error) {
+		var err error
+		requestCtx, cancel := context.WithTimeout(ctx, podCheckpointAPITimeout)
+		defer cancel()
+		list, err = kl.kubeClient.NodeV1alpha1().PodCheckpoints(metav1.NamespaceAll).List(requestCtx, metav1.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector("status.nodeName", string(kl.nodeName)).String(),
+		})
+		switch {
+		case err == nil:
+			return true, nil
+		case errors.IsNotFound(err) || errors.IsForbidden(err) || errors.IsUnauthorized(err):
+			return false, err
+		default:
+			logger.Error(err, "Failed to list PodCheckpoints for startup checkpoint recovery; retrying before starting the watch")
+			return false, nil
+		}
+	}); err != nil {
+		if ctx.Err() != nil {
+			logger.V(2).Info("Stopped startup checkpoint recovery before the PodCheckpoint list succeeded", "err", err)
+			return false
+		}
+		// These errors last until the API server configuration or the node's
+		// credentials change, and the watch informer retries the same list with
+		// backoff. A saved operation still keeps the watch from repeating its capture.
+		logger.Error(err, "Cannot list PodCheckpoints for startup checkpoint recovery; starting the watch without it. Check that the API server serves node.k8s.io/v1alpha1, enables PodLevelCheckpointRestore and authorizes this node")
+		return true
+	}
+	for i := range list.Items {
+		pc := &list.Items[i]
+		// Only this node's checkpoints, and only ones still recorded in progress.
+		if ptr.Deref(pc.Status.NodeName, "") != string(kl.nodeName) {
+			continue
+		}
+		cond := apimeta.FindStatusCondition(pc.Status.Conditions, nodev1alpha1.PodCheckpointConditionReady)
+		if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != nodev1alpha1.PodCheckpointReasonInProgress {
+			continue
+		}
+		operation, operationErr := kl.findPodCheckpointOperation(pc.UID)
+		if operationErr != nil {
+			logger.Error(operationErr, "Cannot inspect checkpoint operation", "podCheckpoint", klog.KObj(pc))
+			continue
+		}
+		if operation != nil {
+			kl.checkpointRecoveryPending.Store(pc.UID, struct{}{})
+			pod := &v1.Pod{}
+			pod.UID, pod.Namespace, pod.Name = operation.PodUID, operation.Namespace, operation.PodName
+			if err := kl.reconcilePodCheckpointOperations(ctx, pod, false); err != nil {
+				logger.Error(err, "Interrupted checkpoint runtime completion remains pending", "podCheckpoint", klog.KObj(pc))
+			} else if err := kl.finalizeRecoveredPodCheckpoint(ctx, pc); err != nil {
+				logger.Error(err, "Interrupted checkpoint outcome publication remains pending", "podCheckpoint", klog.KObj(pc))
+			}
+			if ctx.Err() != nil {
+				return false
+			}
+			continue
+		}
+		_, outputPath, pathErr := kl.podCheckpointOutputPath(pc.UID)
+		if pathErr != nil {
+			if _, blocked := kl.checkpointCleanupBlocked.LoadOrStore(pc.UID, struct{}{}); !blocked && pc.DeletionTimestamp == nil {
+				kl.recordPodCheckpointEvent(ctx, pc.Namespace, pc.Name, pc.UID, v1.EventTypeWarning, events.CheckpointFailed, "Interrupted checkpoint data could not be located for cleanup")
+			}
+			logger.Error(pathErr, "Failed to resolve interrupted checkpoint output", "podCheckpoint", klog.KObj(pc))
+			continue
+		}
+		if cleanupErr := os.RemoveAll(outputPath); cleanupErr != nil {
+			kl.checkpointCleanupBlocked.Store(pc.UID, struct{}{})
+			logger.Error(cleanupErr, "Failed to remove checkpoint output created before runtime admission", "podCheckpoint", klog.KObj(pc))
+			continue
+		}
+		logger.Info("Retrying checkpoint interrupted before the runtime call", "podCheckpoint", klog.KObj(pc))
+
+		if ctx.Err() != nil {
+			return false
+		}
+	}
+	return ctx.Err() == nil
+}
+
+// finalizeRecoveredPodCheckpoint leaves the UID blocked until the recorded
+// outcome is published or the object can no longer be retried under that UID.
+func (kl *Kubelet) finalizeRecoveredPodCheckpoint(ctx context.Context, pc *nodev1alpha1.PodCheckpoint) error {
+	if _, publishing := kl.checkpointPublications.LoadOrStore(pc.UID, struct{}{}); publishing {
+		return errPodCheckpointCompletionPending
+	}
+	defer kl.checkpointPublications.Delete(pc.UID)
+	operation, err := kl.findPodCheckpointOperation(pc.UID)
+	if err != nil {
+		return err
+	}
+	if operation == nil {
+		if _, pending := kl.checkpointRecoveryPending.Load(pc.UID); pending {
+			return errPodCheckpointCompletionPending
+		}
+		return nil
+	}
+	pod := &v1.Pod{}
+	pod.UID, pod.Namespace, pod.Name = operation.PodUID, operation.Namespace, operation.PodName
+	if err := kl.reconcilePodCheckpointOperations(ctx, pod, false); err != nil {
+		return err
+	}
+	operation, err = kl.findPodCheckpointOperation(pc.UID)
+	if err != nil {
+		return err
+	}
+	if operation == nil || !operation.Complete {
+		return errPodCheckpointCompletionPending
+	}
+	_, output, err := kl.podCheckpointOutputPath(pc.UID)
+	if err != nil {
+		return err
+	}
+	run := &podCheckpointRun{pod: pod, namespace: operation.Namespace, name: operation.Name, uid: pc.UID, outputPath: output}
+	_, recovering := kl.checkpointRecoveryPending.Load(pc.UID)
+	if err := kl.finalizePodCheckpointPublication(ctx, run, operation.Succeeded, operation.Location, operation.Message, recovering); err != nil {
+		return err
+	}
+	kl.finishPodCheckpoint(operation.PodUID, operation.CheckpointUID)
+	return nil
+}
+
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets. The names of secrets that cannot be found are returned so we can
 // emit an event later if the image pull fails too.
@@ -1352,7 +1579,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 
 	// Remove orphaned pod user namespace allocations (if any).
 	logger.V(3).Info("Clean up orphaned pod user namespace allocations")
-	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(ctx, allPods, runningRuntimePods); err != nil {
+	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(ctx, allPods, runningRuntimePods, kl.podOperationMayUsePodResources); err != nil {
 		logger.Error(err, "Failed cleaning up orphaned pod user namespaces allocations")
 	}
 
@@ -3056,7 +3283,7 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(logger klog.Logger, pcm cm.PodConta
 	// Iterate over all the found pods to verify if they should be running
 	for uid, val := range cgroupPods {
 		// if the pod is in the running set, its not a candidate for cleanup
-		if _, ok := possiblyRunningPods[uid]; ok {
+		if _, ok := possiblyRunningPods[uid]; ok || kl.podOperationMayUsePodResources(uid) {
 			continue
 		}
 

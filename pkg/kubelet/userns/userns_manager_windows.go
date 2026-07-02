@@ -44,7 +44,7 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(klog.Logger, *v1.Pod, s
 // CleanupOrphanedPodUsernsAllocations reconciliates the state of user namespace
 // allocations with the pods actually running. It frees any user namespace
 // allocation for orphaned pods.
-func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(context.Context, []*v1.Pod, []*kubecontainer.Pod) error {
+func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(context.Context, []*v1.Pod, []*kubecontainer.Pod, func(types.UID) bool) error {
 	return nil
 }
 
