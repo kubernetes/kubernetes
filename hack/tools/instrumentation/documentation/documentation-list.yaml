@@ -6475,6 +6475,19 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: podgroup_cache_missed_events_total
+  subsystem: scheduler
+  help: Number of scheduler cache operations on a pod group member that did not find
+    the expected pod group state, indicating a missed prior add/assume event. Labeled
+    by the cache operation ('update' or 'forget'). A non-zero value points to a cache
+    consistency bug.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: podgroup_schedule_attempts_total
   subsystem: scheduler
   help: Number of attempts to schedule pod group, by the result. 'unschedulable' means

@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -3088,4 +3089,71 @@ func (cache *cacheImpl) getNodeInfo(nodeName string) (*v1.Node, error) {
 	}
 
 	return n.info.Node(), nil
+}
+
+func TestPodGroupCacheMissedEventsMetric(t *testing.T) {
+	// In production this metric is only registered when the GenericWorkload
+	// feature gate is enabled (see metrics.Register). The package-level
+	// metrics.Register() in init() runs with the gate off, so the metric is not
+	// created and Inc() would be a no-op. Force-create it here for the test.
+	if !metrics.PodGroupCacheMissedEvents.IsCreated() {
+		metrics.RegisterMetrics(metrics.PodGroupCacheMissedEvents)
+	}
+
+	podGroupName := "pg"
+	pod := st.MakePod().Namespace("namespace").Name("member").UID("member-uid").
+		PodGroupName(podGroupName).Obj()
+
+	tests := []struct {
+		name          string
+		operation     string
+		trigger       func(cache *cacheImpl, logger klog.Logger)
+		wantIncrement float64
+	}{
+		{
+			name:      "update without prior add records a missed 'update' event",
+			operation: "update",
+			trigger: func(cache *cacheImpl, logger klog.Logger) {
+				// No AddPodGroupMember first, so the pod group state is missing.
+				cache.updatePodGroupMember(logger, pod, pod)
+			},
+			wantIncrement: 1,
+		},
+		{
+			name:      "forget without prior add/assume records a missed 'forget' event",
+			operation: "forget",
+			trigger: func(cache *cacheImpl, logger klog.Logger) {
+				// No AddPodGroupMember/assume first, so the pod group state is missing.
+				cache.forgetPodGroupMember(logger, pod)
+			},
+			wantIncrement: 1,
+		},
+		{
+			name:      "update after add does not record a missed event",
+			operation: "update",
+			trigger: func(cache *cacheImpl, logger klog.Logger) {
+				cache.addPodGroupMember(pod)
+				cache.updatePodGroupMember(logger, pod, pod)
+			},
+			wantIncrement: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metrics.PodGroupCacheMissedEvents.Reset()
+			logger, _ := ktesting.NewTestContext(t)
+			cache := newCache(context.Background(), time.Second, nil, true /* genericWorkloadEnabled */)
+
+			tt.trigger(cache, logger)
+
+			got, err := testutil.GetCounterMetricValue(metrics.PodGroupCacheMissedEvents.WithLabelValues(tt.operation))
+			if err != nil {
+				t.Fatalf("failed to read metric: %v", err)
+			}
+			if got != tt.wantIncrement {
+				t.Errorf("PodGroupCacheMissedEvents{operation=%q} = %v, want %v", tt.operation, got, tt.wantIncrement)
+			}
+		})
+	}
 }

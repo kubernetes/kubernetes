@@ -175,6 +175,10 @@ var (
 	podGroupScheduleAttempts           *metrics.CounterVec
 	podGroupSchedulingLatency          *metrics.HistogramVec
 	PodGroupSchedulingAlgorithmLatency *metrics.Histogram
+	// PodGroupCacheMissedEvents counts scheduler cache operations on a pod group
+	// member that could not find the expected pod group state, which indicates a
+	// missed prior add/assume event. Only available when GenericWorkload is enabled.
+	PodGroupCacheMissedEvents *metrics.CounterVec
 	// The below are only available when the DRADeviceBindingConditions feature gate is enabled.
 	DRABindingConditionsAllocationsTotal *metrics.CounterVec
 	DRABindingConditionsPreBindDuration  *metrics.HistogramVec
@@ -211,6 +215,7 @@ func Register() {
 				podGroupScheduleAttempts,
 				podGroupSchedulingLatency,
 				PodGroupSchedulingAlgorithmLatency,
+				PodGroupCacheMissedEvents,
 			)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) {
@@ -506,7 +511,7 @@ func InitMetrics() {
 		},
 		[]string{"profile"})
 
-	// The below (podGroupScheduleAttempts, podGroupSchedulingLatency and PodGroupSchedulingAlgorithmLatency) are only available when the GenericWorkload feature gate is enabled.
+	// The below (podGroupScheduleAttempts, podGroupSchedulingLatency, PodGroupSchedulingAlgorithmLatency and PodGroupCacheMissedEvents) are only available when the GenericWorkload feature gate is enabled.
 	podGroupScheduleAttempts = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -530,6 +535,13 @@ func InitMetrics() {
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		})
+	PodGroupCacheMissedEvents = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "podgroup_cache_missed_events_total",
+			Help:           "Number of scheduler cache operations on a pod group member that did not find the expected pod group state, indicating a missed prior add/assume event. Labeled by the cache operation ('update' or 'forget'). A non-zero value points to a cache consistency bug.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"operation"})
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
