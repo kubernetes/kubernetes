@@ -18,7 +18,10 @@ package podcheckpoint
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -27,6 +30,7 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -40,18 +44,31 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 )
+
+// RestoreLockFinalizer is installed at creation, before a restore Pod can
+// reference the checkpoint. It is removed only during deletion, after checking
+// live Pods as well as the informer cache.
+const RestoreLockFinalizer = nodeapi.PodCheckpointRestoreProtectionFinalizer
+
+// podRestoreFromIndex indexes Pods by the PodCheckpoint they restore from, so
+// release checks visit only those Pods instead of every Pod in the namespace.
+const podRestoreFromIndex = "podcheckpoint-restore-from"
 
 // Controller manages the lifecycle of PodCheckpoint objects.
 //
 // The controller assigns each checkpoint to the node running its source Pod,
 // so kubelets can watch only their own checkpoints. The kubelet executes the
 // checkpoint and finalizes its status (see Kubelet.startPodCheckpointWatch).
-// Garbage collection of checkpoint objects/archives is a follow-up.
+// The controller also keeps the restore-lock finalizer while a Pod is restoring
+// from a checkpoint. Garbage collection of checkpoint objects/archives is a
+// follow-up.
 type Controller struct {
 	kubeClient clientset.Interface
 	recorder   record.EventRecorder
 	podLister  corelisters.PodLister
+	podIndexer cache.Indexer
 	podsSynced cache.InformerSynced
 	queue      workqueue.TypedRateLimitingInterface[string]
 	informer   cache.Controller
@@ -59,14 +76,22 @@ type Controller struct {
 }
 
 // NewController creates a new PodCheckpoint lifecycle controller. It watches
-// PodCheckpoint objects (via the typed client) and reads source Pods from the
-// shared informer so it can assign checkpoints.
-func NewController(kubeClient clientset.Interface, podInformer coreinformers.PodInformer) *Controller {
+// PodCheckpoint objects (via the typed client) and Pods (via the shared
+// informer) so it can assign checkpoints and maintain the restore-lock finalizer.
+func NewController(kubeClient clientset.Interface, podInformer coreinformers.PodInformer) (*Controller, error) {
 	c := &Controller{
 		kubeClient: kubeClient,
 		podLister:  podInformer.Lister(),
+		podIndexer: podInformer.Informer().GetIndexer(),
 		podsSynced: podInformer.Informer().HasSynced,
 		queue:      workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+	}
+
+	// The Pod informer is shared, so another instance may have added the index.
+	if _, ok := c.podIndexer.GetIndexers()[podRestoreFromIndex]; !ok {
+		if err := c.podIndexer.AddIndexers(cache.Indexers{podRestoreFromIndex: podRestoreFromIndexFunc}); err != nil {
+			return nil, fmt.Errorf("failed to add Pod index: %w", err)
+		}
 	}
 
 	listWatcher := &cache.ListWatch{
@@ -88,7 +113,29 @@ func NewController(kubeClient clientset.Interface, podInformer coreinformers.Pod
 	c.store = store
 	c.informer = controller
 
-	return c
+	// A Pod referencing a PodCheckpoint via spec.restoreFrom changing state may
+	// flip whether a restore is active, so re-reconcile the referenced checkpoint
+	// on Pod events.
+	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.enqueuePod,
+		UpdateFunc: func(_, newObj interface{}) { c.enqueuePod(newObj) },
+		DeleteFunc: c.enqueuePod,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to add Pod event handler: %w", err)
+	}
+
+	return c, nil
+}
+
+func podRestoreFromIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		return nil, fmt.Errorf("expected Pod, got %T", obj)
+	}
+	if pod.Spec.RestoreFrom == nil || pod.Spec.RestoreFrom.Name == "" {
+		return nil, nil
+	}
+	return []string{pod.Namespace + "/" + pod.Spec.RestoreFrom.Name}, nil
 }
 
 func (c *Controller) enqueueCheckpoint(obj interface{}) {
@@ -98,6 +145,25 @@ func (c *Controller) enqueueCheckpoint(obj interface{}) {
 		return
 	}
 	c.queue.Add(key)
+}
+
+func (c *Controller) enqueuePod(obj interface{}) {
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			return
+		}
+		pod, ok = tombstone.Obj.(*v1.Pod)
+		if !ok {
+			return
+		}
+	}
+	if pod.Spec.RestoreFrom == nil || pod.Spec.RestoreFrom.Name == "" {
+		return
+	}
+	c.queue.Add(pod.Namespace + "/" + pod.Spec.RestoreFrom.Name)
+	c.queue.Add("pod:" + pod.Namespace + "/" + pod.Name)
 }
 
 // Run starts the controller.
@@ -150,10 +216,14 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-// syncHandler assigns pending checkpoints. Decisions start from the informer
-// caches; API reads happen only before a write that the caches cannot justify
-// on their own.
+// syncHandler assigns pending checkpoints and keeps protection until deletion,
+// then releases it once neither cached nor live Pods still need the checkpoint.
+// Decisions start from the informer caches; API reads happen only before a
+// write that the caches cannot justify on their own.
 func (c *Controller) syncHandler(ctx context.Context, key string) error {
+	if podKey, ok := strings.CutPrefix(key, "pod:"); ok {
+		return c.syncRestorePod(ctx, podKey)
+	}
 	obj, exists, err := c.store.GetByKey(key)
 	if err != nil {
 		return err
@@ -170,7 +240,37 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	return c.assignCheckpoint(ctx, checkpoint)
+	has := slices.Contains(checkpoint.Finalizers, RestoreLockFinalizer)
+	if checkpoint.DeletionTimestamp == nil {
+		if !has {
+			return c.setRestoreLock(ctx, checkpoint, true)
+		}
+		return c.assignCheckpoint(ctx, checkpoint)
+	}
+	if !has {
+		return nil
+	}
+
+	active, err := c.hasActiveRestore(checkpoint.Namespace, checkpoint.Name)
+	if err != nil {
+		return err
+	}
+	if active {
+		return nil
+	}
+
+	// A Pod can have been admitted before deletion without reaching our cache.
+	// Pod field selectors do not support spec.restoreFrom, so list the namespace.
+	pods, err := c.kubeClient.CoreV1().Pods(checkpoint.Namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for i := range pods.Items {
+		if restoreActive(&pods.Items[i], checkpoint.Name) {
+			return nil
+		}
+	}
+	return c.setRestoreLock(ctx, checkpoint, false)
 }
 
 // assignCheckpoint publishes routing before the kubelet can observe the object
@@ -269,4 +369,138 @@ func (c *Controller) getSourcePod(ctx context.Context, namespace string, ref *no
 		return pod, nil
 	}
 	return c.kubeClient.CoreV1().Pods(namespace).Get(ctx, ref.Name, metav1.GetOptions{})
+}
+
+// hasActiveRestore reports whether any cached Pod is currently restoring from
+// the named checkpoint.
+func (c *Controller) hasActiveRestore(namespace, name string) (bool, error) {
+	objs, err := c.podIndexer.ByIndex(podRestoreFromIndex, namespace+"/"+name)
+	if err != nil {
+		return false, err
+	}
+	for _, obj := range objs {
+		pod, ok := obj.(*v1.Pod)
+		if ok && restoreActive(pod, name) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// PodGC can make a Pod terminal before runtime rollback finishes. Protected
+// Pods retain the dependency until the kubelet acknowledges completion.
+func restoreActive(pod *v1.Pod, checkpointName string) bool {
+	if pod.Spec.RestoreFrom == nil || pod.Spec.RestoreFrom.Name != checkpointName {
+		return false
+	}
+	if slices.Contains(pod.Finalizers, nodeapi.PodRestoreProtectionFinalizer) {
+		return true
+	}
+	if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+		return false
+	}
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodRestored && condition.Status == v1.ConditionTrue {
+			return false
+		}
+	}
+	return true
+}
+
+func restoreCleanupConfirmed(pod *v1.Pod) bool {
+	if pod.DeletionTimestamp != nil && pod.Spec.NodeName == "" {
+		return true
+	}
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type != v1.PodRestored {
+			continue
+		}
+		return condition.Status == v1.ConditionTrue || condition.Status == v1.ConditionFalse &&
+			(condition.Reason == nodeapi.PodRestoreReasonCleanupCompleted || condition.Reason == nodeapi.PodRestoreReasonNotStarted)
+	}
+	return false
+}
+
+// Reconcile the Pod independently of its checkpoint, which may have disappeared
+// through an administrator's explicit removal of checkpoint protection.
+func (c *Controller) syncRestorePod(ctx context.Context, key string) error {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	pod, err := c.podLister.Pods(namespace).Get(name)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(pod.Finalizers, nodeapi.PodRestoreProtectionFinalizer) || !restoreCleanupConfirmed(pod) {
+		return nil
+	}
+	uid := pod.UID
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if pod == nil {
+			pod, err = c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+		}
+		if pod.UID != uid || !slices.Contains(pod.Finalizers, nodeapi.PodRestoreProtectionFinalizer) || !restoreCleanupConfirmed(pod) {
+			return nil
+		}
+		finalizers := slices.DeleteFunc(slices.Clone(pod.Finalizers), func(finalizer string) bool {
+			return finalizer == nodeapi.PodRestoreProtectionFinalizer
+		})
+		patch, err := json.Marshal(map[string]any{"metadata": map[string]any{
+			"uid": pod.UID, "resourceVersion": pod.ResourceVersion, "finalizers": finalizers,
+		}})
+		if err != nil {
+			return err
+		}
+		_, err = c.kubeClient.CoreV1().Pods(namespace).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			pod = nil
+		}
+		return err
+	})
+}
+
+// setRestoreLock adds or removes the restore-lock finalizer on the PodCheckpoint.
+// Like assignCheckpoint, it reads the latest object only after a conflict.
+func (c *Controller) setRestoreLock(ctx context.Context, cached *nodev1alpha1.PodCheckpoint, present bool) error {
+	current := cached
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if current == nil {
+			latest, err := c.kubeClient.NodeV1alpha1().PodCheckpoints(cached.Namespace).Get(ctx, cached.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			current = latest
+		}
+
+		had := slices.Contains(current.Finalizers, RestoreLockFinalizer)
+		update := current.DeepCopy()
+		switch {
+		case present && !had:
+			update.Finalizers = append(update.Finalizers, RestoreLockFinalizer)
+		case !present && had:
+			update.Finalizers = slices.DeleteFunc(update.Finalizers, func(s string) bool { return s == RestoreLockFinalizer })
+		default:
+			return nil
+		}
+		_, err := c.kubeClient.NodeV1alpha1().PodCheckpoints(update.Namespace).Update(ctx, update, metav1.UpdateOptions{})
+		if err != nil {
+			current = nil
+		}
+		return err
+	})
 }

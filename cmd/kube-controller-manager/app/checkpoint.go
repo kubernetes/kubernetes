@@ -18,6 +18,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -39,7 +40,10 @@ func newPodCheckpointController(ctx context.Context, controllerContext Controlle
 		return nil, err
 	}
 
-	pc := podcheckpoint.NewController(kubeClient, controllerContext.InformerFactory.Core().V1().Pods())
+	pc, err := podcheckpoint.NewController(kubeClient, controllerContext.InformerFactory.Core().V1().Pods())
+	if err != nil {
+		return nil, fmt.Errorf("creating PodCheckpoint controller: %w", err)
+	}
 
 	return newControllerLoop(func(ctx context.Context) {
 		pc.Run(ctx, 1)

@@ -114,6 +114,10 @@ type RuntimeClassList struct {
 	Items []RuntimeClass
 }
 
+// PodCheckpointRestoreProtectionFinalizer retains a deleting checkpoint while
+// an admitted Pod still depends on it for restore.
+const PodCheckpointRestoreProtectionFinalizer = "node.k8s.io/restore-lock"
+
 // PodRestoreProtectionFinalizer retains a restoring Pod until the kubelet has
 // confirmed that the runtime no longer depends on its checkpoint.
 const PodRestoreProtectionFinalizer = "node.k8s.io/pod-restore-protection"
