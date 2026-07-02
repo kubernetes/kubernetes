@@ -1294,6 +1294,7 @@ items:
     verbs:
     - get
     - list
+    - patch
     - watch
   - apiGroups:
     - node.k8s.io
@@ -1305,6 +1306,21 @@ items:
     - ""
     resources:
     - pods
+    verbs:
+    - get
+    - list
+    - patch
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - pods/finalizers
+    verbs:
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - nodes
     verbs:
     - get
     - list

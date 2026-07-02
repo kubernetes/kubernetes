@@ -99,7 +99,7 @@ type PodCheckpointStatusApplyConfiguration struct {
 	// restoreGeneration advances when a kubelet releases a restore reservation,
 	// including one whose registration response was lost. The resulting write
 	// fences a delayed registration that still carries an older resourceVersion.
-	// It is nonnegative and cannot decrease.
+	// It is nonnegative and cannot decrease or be cleared once set.
 	RestoreGeneration *int64 `json:"restoreGeneration,omitempty"`
 }
 

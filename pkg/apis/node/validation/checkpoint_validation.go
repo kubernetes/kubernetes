@@ -25,6 +25,7 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	nodeapi "k8s.io/kubernetes/pkg/apis/node"
@@ -43,7 +44,11 @@ func ValidatePodCheckpoint(pc *nodeapi.PodCheckpoint) field.ErrorList {
 
 // ValidatePodCheckpointUpdate validates a PodCheckpoint update.
 func ValidatePodCheckpointUpdate(newPC, oldPC *nodeapi.PodCheckpoint) field.ErrorList {
-	return apimachineryvalidation.ValidateObjectMetaUpdate(&newPC.ObjectMeta, &oldPC.ObjectMeta, field.NewPath("metadata"))
+	allErrs := apimachineryvalidation.ValidateObjectMetaUpdate(&newPC.ObjectMeta, &oldPC.ObjectMeta, field.NewPath("metadata"))
+	if len(oldPC.Status.ActiveRestores) != 0 && slices.Contains(oldPC.Finalizers, nodeapi.PodCheckpointRestoreProtectionFinalizer) && !slices.Contains(newPC.Finalizers, nodeapi.PodCheckpointRestoreProtectionFinalizer) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "finalizers"), "cannot remove restore protection while active restores remain"))
+	}
+	return allErrs
 }
 
 // ValidatePodCheckpointStatusUpdate validates a status update of a PodCheckpoint.
@@ -60,6 +65,7 @@ func ValidatePodCheckpointStatusUpdate(newPC, oldPC *nodeapi.PodCheckpoint) fiel
 		allErrs = append(allErrs, validateCheckpointedContainers(newPC)...)
 	}
 
+	allErrs = append(allErrs, validateActiveRestores(newPC, oldPC)...)
 	oldReady := meta.FindStatusCondition(oldPC.Status.Conditions, nodeapi.PodCheckpointConditionReady)
 	if oldReady == nil || (oldReady.Status != metav1.ConditionTrue && oldReady.Reason != nodeapi.PodCheckpointReasonFailed && oldReady.Reason != nodeapi.PodCheckpointReasonSourcePodReplaced) {
 		return allErrs
@@ -71,6 +77,8 @@ func ValidatePodCheckpointStatusUpdate(newPC, oldPC *nodeapi.PodCheckpoint) fiel
 	}
 	oldStatus, newStatus := oldPC.Status.DeepCopy(), newPC.Status.DeepCopy()
 	oldStatus.Conditions, newStatus.Conditions = nil, nil
+	oldStatus.ActiveRestores, newStatus.ActiveRestores = nil, nil
+	oldStatus.RestoreGeneration, newStatus.RestoreGeneration = nil, nil
 	// Container names are map-list keys; their order does not change the outcome.
 	byName := func(a, b nodeapi.PodCheckpointContainerStatus) int { return cmp.Compare(a.Name, b.Name) }
 	slices.SortFunc(oldStatus.CheckpointedContainers, byName)
@@ -99,7 +107,7 @@ func validateCheckpointedContainers(pc *nodeapi.PodCheckpoint) field.ErrorList {
 	path := field.NewPath("status", "checkpointedContainers")
 	template := pc.Status.CheckpointedPodTemplate
 	if template == nil {
-		return field.ErrorList{field.Forbidden(path, "requires a captured Pod template")}
+		return nil
 	}
 
 	expected := make([]string, 0, len(template.Spec.Containers)+len(template.Spec.InitContainers))
@@ -121,4 +129,17 @@ func validateCheckpointedContainers(pc *nodeapi.PodCheckpoint) field.ErrorList {
 		return field.ErrorList{field.Invalid(path, actual, "must list exactly the regular and restartable init containers in checkpointedPodTemplate")}
 	}
 	return nil
+}
+
+func validateActiveRestores(newPC, oldPC *nodeapi.PodCheckpoint) field.ErrorList {
+	path := field.NewPath("status", "activeRestores")
+	var allErrs field.ErrorList
+	oldConsumers := sets.New(oldPC.Status.ActiveRestores...)
+	for i, consumer := range newPC.Status.ActiveRestores {
+		item := path.Index(i)
+		if !oldConsumers.Has(consumer) && (oldPC.DeletionTimestamp != nil || !meta.IsStatusConditionTrue(oldPC.Status.Conditions, nodeapi.PodCheckpointConditionReady) || oldPC.Status.NodeName == nil || *oldPC.Status.NodeName == "" || !slices.Contains(oldPC.Finalizers, nodeapi.PodCheckpointRestoreProtectionFinalizer)) {
+			allErrs = append(allErrs, field.Forbidden(item, "new restore reservations require a ready, assigned, protected checkpoint that is not being deleted"))
+		}
+	}
+	return allErrs
 }

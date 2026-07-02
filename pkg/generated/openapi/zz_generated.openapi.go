@@ -45646,7 +45646,7 @@ func schema_k8sio_api_node_v1alpha1_PodCheckpointStatus(ref common.ReferenceCall
 					},
 					"restoreGeneration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "restoreGeneration advances when a kubelet releases a restore reservation, including one whose registration response was lost. The resulting write fences a delayed registration that still carries an older resourceVersion. It is nonnegative and cannot decrease.",
+							Description: "restoreGeneration advances when a kubelet releases a restore reservation, including one whose registration response was lost. The resulting write fences a delayed registration that still carries an older resourceVersion. It is nonnegative and cannot decrease or be cleared once set.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},

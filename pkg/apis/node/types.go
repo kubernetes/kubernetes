@@ -101,6 +101,10 @@ type RuntimeClassList struct {
 	Items []RuntimeClass
 }
 
+// PodCheckpointRestoreProtectionFinalizer retains a deleting checkpoint while
+// an admitted Pod still depends on it for restore.
+const PodCheckpointRestoreProtectionFinalizer = "node.k8s.io/restore-lock"
+
 // PodRestoreProtectionFinalizer retains a restoring Pod until the kubelet has
 // confirmed that the runtime no longer depends on its checkpoint.
 const PodRestoreProtectionFinalizer = "node.k8s.io/pod-restore-protection"
@@ -270,9 +274,9 @@ type PodCheckpointStatus struct {
 	// restoreGeneration advances when a kubelet releases a restore reservation,
 	// including one whose registration response was lost. The resulting write
 	// fences a delayed registration that still carries an older resourceVersion.
-	// It is nonnegative and cannot decrease.
+	// It is nonnegative and cannot decrease or be cleared once set.
 	// +optional
-	RestoreGeneration int64
+	RestoreGeneration *int64
 }
 
 // PodCheckpointActiveRestoresMaxSize bounds the number of concurrent consumers.
@@ -281,8 +285,11 @@ const PodCheckpointActiveRestoresMaxSize = 256
 // PodCheckpointConsumerReference identifies a restoring Pod in this namespace.
 type PodCheckpointConsumerReference struct {
 	// name is the name of the restoring Pod.
+	// +required
 	Name string
+
 	// uid identifies the restore operation even after the Pod leaves the API.
+	// +required
 	UID types.UID
 }
 

@@ -81,6 +81,19 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"status.activeRestores": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.activeRestores[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.activeRestores[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.activeRestores[*].uid": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.checkpointLocation.nodeLocal": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
@@ -234,6 +247,11 @@ func init() {
 			},
 			"status.nodeName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"status.restoreGeneration": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
 				{ErrorType: "FieldValueInvalid", Origin: "update"},
 			},
 			"status.sourcePodUID": {

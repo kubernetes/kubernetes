@@ -405,9 +405,11 @@ func (m *PodCheckpointStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	i = encodeVarintGenerated(dAtA, i, uint64(m.RestoreGeneration))
-	i--
-	dAtA[i] = 0x48
+	if m.RestoreGeneration != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.RestoreGeneration))
+		i--
+		dAtA[i] = 0x48
+	}
 	if len(m.ActiveRestores) > 0 {
 		for iNdEx := len(m.ActiveRestores) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -910,7 +912,9 @@ func (m *PodCheckpointStatus) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
-	n += 1 + sovGenerated(uint64(m.RestoreGeneration))
+	if m.RestoreGeneration != nil {
+		n += 1 + sovGenerated(uint64(*m.RestoreGeneration))
+	}
 	return n
 }
 
@@ -1136,7 +1140,7 @@ func (this *PodCheckpointStatus) String() string {
 		`CheckpointedPodTemplate:` + strings.Replace(fmt.Sprintf("%v", this.CheckpointedPodTemplate), "PodTemplateSpec", "v11.PodTemplateSpec", 1) + `,`,
 		`CheckpointedContainers:` + repeatedStringForCheckpointedContainers + `,`,
 		`ActiveRestores:` + repeatedStringForActiveRestores + `,`,
-		`RestoreGeneration:` + fmt.Sprintf("%v", this.RestoreGeneration) + `,`,
+		`RestoreGeneration:` + valueToStringGenerated(this.RestoreGeneration) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2478,7 +2482,7 @@ func (m *PodCheckpointStatus) Unmarshal(dAtA []byte) error {
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field RestoreGeneration", wireType)
 			}
-			m.RestoreGeneration = 0
+			var v int64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowGenerated
@@ -2488,11 +2492,12 @@ func (m *PodCheckpointStatus) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.RestoreGeneration |= int64(b&0x7F) << shift
+				v |= int64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			m.RestoreGeneration = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

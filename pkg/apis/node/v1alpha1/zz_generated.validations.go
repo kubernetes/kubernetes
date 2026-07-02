@@ -297,6 +297,76 @@ func Validate_PodCheckpoint(
 	return errs
 }
 
+// Validate_PodCheckpointConsumerReference validates an instance of PodCheckpointConsumerReference according
+// to declarative validation rules in the API schema.
+func Validate_PodCheckpointConsumerReference(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *nodev1alpha1.PodCheckpointConsumerReference) (errs field.ErrorList) {
+
+	{ // field nodev1alpha1.PodCheckpointConsumerReference.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *nodev1alpha1.PodCheckpointConsumerReference) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field nodev1alpha1.PodCheckpointConsumerReference.UID
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *types.UID,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *nodev1alpha1.PodCheckpointConsumerReference) *types.UID {
+				return &oldObj.UID
+			})
+		errs = append(errs, fn(fldPath.Child("uid"), &obj.UID, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_PodCheckpointContainerStatus validates an instance of PodCheckpointContainerStatus according
 // to declarative validation rules in the API schema.
 func Validate_PodCheckpointContainerStatus(
@@ -669,8 +739,90 @@ func Validate_PodCheckpointStatus(
 		errs = append(errs, fn(fldPath.Child("checkpointedContainers"), obj.CheckpointedContainers, oldVal, oldObj != nil)...)
 	}
 
-	// field nodev1alpha1.PodCheckpointStatus.ActiveRestores has no validation
-	// field nodev1alpha1.PodCheckpointStatus.RestoreGeneration has no validation
+	{ // field nodev1alpha1.PodCheckpointStatus.ActiveRestores
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []nodev1alpha1.PodCheckpointConsumerReference,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 256).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *nodev1alpha1.PodCheckpointConsumerReference, b *nodev1alpha1.PodCheckpointConsumerReference) bool {
+					return a.UID == b.UID
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *nodev1alpha1.PodCheckpointConsumerReference, b *nodev1alpha1.PodCheckpointConsumerReference) bool {
+					return a.UID == b.UID
+				}, validate.DirectEqual, Validate_PodCheckpointConsumerReference); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *nodev1alpha1.PodCheckpointStatus) []nodev1alpha1.PodCheckpointConsumerReference {
+				return oldObj.ActiveRestores
+			})
+		errs = append(errs, fn(fldPath.Child("activeRestores"), obj.ActiveRestores, oldVal, oldObj != nil)...)
+	}
+
+	{ // field nodev1alpha1.PodCheckpointStatus.RestoreGeneration
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int64,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.Monotonic(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *nodev1alpha1.PodCheckpointStatus) *int64 {
+				return oldObj.RestoreGeneration
+			})
+		errs = append(errs, fn(fldPath.Child("restoreGeneration"), obj.RestoreGeneration, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 

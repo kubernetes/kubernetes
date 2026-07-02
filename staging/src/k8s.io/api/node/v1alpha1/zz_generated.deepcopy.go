@@ -247,6 +247,11 @@ func (in *PodCheckpointStatus) DeepCopyInto(out *PodCheckpointStatus) {
 		*out = make([]PodCheckpointConsumerReference, len(*in))
 		copy(*out, *in)
 	}
+	if in.RestoreGeneration != nil {
+		in, out := &in.RestoreGeneration, &out.RestoreGeneration
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 

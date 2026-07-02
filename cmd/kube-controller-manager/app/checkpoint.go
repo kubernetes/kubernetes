@@ -45,6 +45,7 @@ func newPodCheckpointController(ctx context.Context, controllerContext Controlle
 		controllerName,
 		controllerContext.InformerFactory.Node().V1alpha1().PodCheckpoints(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Core().V1().Nodes(),
 		kubeClient,
 	)
 	if err != nil {

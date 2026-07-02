@@ -636,12 +636,15 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "podcheckpoint-controller"},
 			Rules: []rbacv1.PolicyRule{
-				// Assign checkpoint requests to source nodes. The kubelet executes
-				// capture and writes its outcome.
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(nodeGroup).Resources("podcheckpoints").RuleOrDie(),
+				// Assign checkpoint requests to source nodes and protect active restores.
+				// The kubelet executes capture and writes its outcome.
+				rbacv1helpers.NewRule("get", "list", "watch", "patch").Groups(nodeGroup).Resources("podcheckpoints").RuleOrDie(),
 				rbacv1helpers.NewRule("patch").Groups(nodeGroup).Resources("podcheckpoints/status").RuleOrDie(),
-				// Reads source Pods to find their node and UID.
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				// Retain restoring Pods until the kubelet confirms runtime cleanup.
+				rbacv1helpers.NewRule("get", "list", "watch", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
+				// Release restoring Pods whose Node was deleted or marked out of service.
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 				eventsRule(),
 			},
 		})
