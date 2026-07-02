@@ -59,6 +59,8 @@ type cadvisorStatsProvider struct {
 	hostStatsProvider HostStatsProvider
 	// containerManager is used to generate the cgroup path for a pod.
 	containerManager cm.ContainerManager
+	// podManager is used to check whether a pod is still known to the kubelet.
+	podManager PodManager
 }
 
 // newCadvisorStatsProvider returns a containerStatsProvider that provides
@@ -70,6 +72,7 @@ func newCadvisorStatsProvider(
 	statusProvider status.PodStatusProvider,
 	hostStatsProvider HostStatsProvider,
 	containerManager cm.ContainerManager,
+	podManager PodManager,
 ) containerStatsProvider {
 	return &cadvisorStatsProvider{
 		cadvisor:          cadvisor,
@@ -78,6 +81,7 @@ func newCadvisorStatsProvider(
 		statusProvider:    statusProvider,
 		hostStatsProvider: hostStatsProvider,
 		containerManager:  containerManager,
+		podManager:        podManager,
 	}
 }
 
@@ -115,6 +119,11 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 			continue
 		}
 		ref := buildPodRef(cinfo.Spec.Labels)
+
+		// Skip containers whose Pod is no longer known to the kubelet
+		if _, found := p.podManager.GetPodByUID(types.UID(ref.UID)); !found {
+			continue
+		}
 
 		// Lookup the PodStats for the pod using the PodRef. If none exists,
 		// initialize a new entry.
@@ -246,6 +255,11 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([
 			continue
 		}
 		ref := buildPodRef(cinfo.Spec.Labels)
+
+		// Skip containers whose Pod is no longer known to the kubelet
+		if _, found := p.podManager.GetPodByUID(types.UID(ref.UID)); !found {
+			continue
+		}
 
 		// Lookup the PodStats for the pod using the PodRef. If none exists,
 		// initialize a new entry.
