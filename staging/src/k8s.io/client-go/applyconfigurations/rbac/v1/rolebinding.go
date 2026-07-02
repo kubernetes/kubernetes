@@ -35,11 +35,11 @@ import (
 // namespace only have effect in that namespace.
 type RoleBindingApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Subjects holds references to the objects the role applies to.
+	// subjects holds references to the objects the role applies to.
 	Subjects []SubjectApplyConfiguration `json:"subjects,omitempty"`
-	// RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
+	// roleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
 	// This field is immutable.
 	RoleRef *RoleRefApplyConfiguration `json:"roleRef,omitempty"`

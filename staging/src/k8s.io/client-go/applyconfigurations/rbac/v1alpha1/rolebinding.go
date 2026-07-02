@@ -36,11 +36,11 @@ import (
 // Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 RoleBinding, and will no longer be served in v1.22.
 type RoleBindingApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Subjects holds references to the objects the role applies to.
+	// subjects holds references to the objects the role applies to.
 	Subjects []SubjectApplyConfiguration `json:"subjects,omitempty"`
-	// RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
+	// roleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
 	RoleRef *RoleRefApplyConfiguration `json:"roleRef,omitempty"`
 }
