@@ -23,6 +23,7 @@ import (
 
 	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -78,6 +79,7 @@ func (e *destinationEdge) DestinationID() int { return e.Destination.ID() }
 // All edges point toward the vertices representing Kubernetes nodes:
 //
 // node <- pod
+// node <- podcheckpoint
 // pod  <- secret,configmap,pvc
 // pvc  <- pv
 // pv   <- secret
@@ -128,6 +130,7 @@ const (
 	vaVertexType
 	serviceAccountVertexType
 	pcrVertexType
+	podCheckpointVertexType
 )
 
 var vertexTypes = map[vertexType]string{
@@ -142,6 +145,7 @@ var vertexTypes = map[vertexType]string{
 	vaVertexType:             "volumeattachment",
 	serviceAccountVertexType: "serviceAccount",
 	pcrVertexType:            "podcertificaterequest",
+	podCheckpointVertexType:  "podcheckpoint",
 }
 
 // vertexTypeWithAuthoritativeIndex indicates which types of vertices can hold
@@ -157,6 +161,7 @@ var vertexTypeWithAuthoritativeIndex = map[vertexType]bool{
 	vaVertexType:             true,
 	serviceAccountVertexType: true,
 	pcrVertexType:            true,
+	podCheckpointVertexType:  true,
 }
 
 // must be called under a write lock
@@ -627,4 +632,33 @@ func (g *Graph) DeleteResourceSlice(sliceName string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertexLocked(sliceVertexType, "", sliceName)
+}
+
+// AddPodCheckpoint replaces the assignment edge. It remains after the source Pod
+// is deleted because the assigned node retains the checkpoint data for restore.
+func (g *Graph) AddPodCheckpoint(checkpoint *nodev1alpha1.PodCheckpoint) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("AddPodCheckpoint").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	g.deleteVertexLocked(podCheckpointVertexType, checkpoint.Namespace, checkpoint.Name)
+	if checkpoint.Status.NodeName == nil || *checkpoint.Status.NodeName == "" {
+		return
+	}
+	checkpointVertex := g.getOrCreateVertexLocked(podCheckpointVertexType, checkpoint.Namespace, checkpoint.Name)
+	nodeVertex := g.getOrCreateVertexLocked(nodeVertexType, "", *checkpoint.Status.NodeName)
+	g.addEdgeLocked(checkpointVertex, nodeVertex, nodeVertex)
+}
+
+func (g *Graph) DeletePodCheckpoint(namespace, name string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("DeletePodCheckpoint").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.deleteVertexLocked(podCheckpointVertexType, namespace, name)
 }

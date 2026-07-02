@@ -1266,6 +1266,13 @@ items:
     verbs:
     - get
   - apiGroups:
+    - node.k8s.io
+    resources:
+    - podcheckpoints/status
+    verbs:
+    - patch
+    - update
+  - apiGroups:
     - ""
     resources:
     - endpoints

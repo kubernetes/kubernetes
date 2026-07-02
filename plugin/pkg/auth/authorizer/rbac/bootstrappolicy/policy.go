@@ -253,6 +253,15 @@ func NodeRules() []rbacv1.PolicyRule {
 		// Use the Node authorization mode to limit a node to get pv/pvc objects referenced by pods bound to itself.
 		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
 
+		// Node authorization permits checkpoint reads only for assigned nodes;
+		// a static read rule would expose captured Pod specs across nodes.
+		// Needed for the asynchronous checkpoint flow (KEP-5823): the kubelet
+		// writes the checkpoint result to the PodCheckpoint status. The
+		// NodeRestriction admission plugin requires the assigned node and source
+		// UID to be preserved, even after the source Pod is deleted. An initial
+		// claim must match the live source Pod's node and UID.
+		rbacv1helpers.NewRule("update", "patch").Groups(checkpointGroup).Resources("podcheckpoints/status").RuleOrDie(),
+
 		// TODO: add to the Node authorizer and restrict to endpoints referenced by pods or PVs bound to the node
 		// Needed for glusterfs volumes
 		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),

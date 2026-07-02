@@ -23,6 +23,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -52,6 +53,7 @@ import (
 	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	checkpoint "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -245,6 +247,221 @@ type admitTestCase struct {
 	setupFunc            func(t *testing.T)
 	err                  string
 	authz                authorizer.UnconditionalAuthorizer
+}
+
+func Test_nodePlugin_Admit_PodCheckpointStatus(t *testing.T) {
+	var (
+		mynode = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
+
+		pcResource = checkpoint.SchemeGroupVersion.WithResource("podcheckpoints")
+		pcKind     = checkpoint.SchemeGroupVersion.WithKind("PodCheckpoint")
+	)
+	mkPC := func(statusNode, sourcePodName string) *checkpoint.PodCheckpoint {
+		pc := &checkpoint.PodCheckpoint{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "cp"},
+			Spec:       checkpoint.PodCheckpointSpec{SourcePod: &checkpoint.PodReference{Name: sourcePodName}},
+		}
+		if statusNode != "" {
+			pc.Status.NodeName = &statusNode
+			pc.Status.SourcePodUID = ptr.To(types.UID("u1"))
+		}
+		return pc
+	}
+	attrs := func(old, obj runtime.Object, subresource string, op admission.Operation) admission.Attributes {
+		var opts runtime.Object = &metav1.UpdateOptions{}
+		if op == admission.Create {
+			opts = &metav1.CreateOptions{}
+		}
+		return admission.NewAttributesRecord(obj, old, pcKind, "ns", "cp", pcResource, subresource, op, opts, false, mynode)
+	}
+
+	// Pod lister for the first-write path: a node may claim a checkpoint only if
+	// its source pod is bound to that node.
+	podsIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	if err := podsIndex.Add(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "mypod", UID: "u1"}, Spec: corev1.PodSpec{NodeName: "mynode"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := podsIndex.Add(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "otherpod"}, Spec: corev1.PodSpec{NodeName: "othernode"}}); err != nil {
+		t.Fatal(err)
+	}
+	pods := corev1lister.NewPodLister(podsIndex)
+	emptyNodePC := mkPC("", "mypod")
+	emptyNodePC.Status.NodeName = new(string)
+
+	tests := []admitTestCase{
+		{
+			name:       "node finalizes status of its own checkpoint",
+			podsGetter: pods,
+			attributes: attrs(mkPC("mynode", "mypod"), mkPC("mynode", "mypod"), "status", admission.Update),
+		},
+		{
+			name:       "node finalizes its checkpoint after source pod deletion",
+			podsGetter: pods,
+			attributes: attrs(mkPC("mynode", "ghost"), mkPC("mynode", "ghost"), "status", admission.Update),
+		},
+		{
+			name:       "node cannot finalize status of another node's checkpoint",
+			podsGetter: pods,
+			attributes: attrs(mkPC("othernode", "mypod"), mkPC("mynode", "mypod"), "status", admission.Update),
+			err:        "recorded on node \"othernode\"",
+		},
+		{
+			name:       "node cannot transfer its checkpoint to another node",
+			podsGetter: pods,
+			attributes: attrs(mkPC("mynode", "mypod"), mkPC("othernode", "mypod"), "status", admission.Update),
+			err:        "must set status.nodeName to \"mynode\"",
+		},
+		{
+			name:       "node cannot unset its checkpoint's node name",
+			podsGetter: pods,
+			attributes: attrs(mkPC("mynode", "mypod"), mkPC("", "mypod"), "status", admission.Update),
+			err:        "must set status.nodeName to \"mynode\"",
+		},
+		{
+			name:       "node cannot empty its checkpoint's node name",
+			podsGetter: pods,
+			attributes: attrs(mkPC("mynode", "mypod"), emptyNodePC, "status", admission.Update),
+			err:        "must set status.nodeName to \"mynode\"",
+		},
+		{
+			name:       "node claims first write when source pod is bound to it",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", "mypod"), mkPC("mynode", "mypod"), "status", admission.Update),
+		},
+		{
+			name:       "node cannot name another node on first write",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", "mypod"), mkPC("othernode", "mypod"), "status", admission.Update),
+			err:        "must set status.nodeName to \"mynode\"",
+		},
+		{
+			name:       "node cannot omit its node name on first write",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", "mypod"), mkPC("", "mypod"), "status", admission.Update),
+			err:        "must set status.nodeName to \"mynode\"",
+		},
+		{
+			name:       "node cannot set an empty node name on first write",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", "mypod"), emptyNodePC, "status", admission.Update),
+			err:        "must set status.nodeName to \"mynode\"",
+		},
+		{
+			name:       "node cannot claim first write when source pod is on another node",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", "otherpod"), mkPC("mynode", "otherpod"), "status", admission.Update),
+			err:        "assigned to node \"othernode\"",
+		},
+		{
+			name:       "node cannot claim first write with no source pod recorded",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", ""), mkPC("mynode", ""), "status", admission.Update),
+			err:        "no source pod recorded",
+		},
+		{
+			name:       "node cannot claim first write when source pod is missing",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", "ghost"), mkPC("mynode", "ghost"), "status", admission.Update),
+			err:        "cannot update PodCheckpoint",
+		},
+		{
+			name:       "node cannot submit an unexpected object type",
+			podsGetter: pods,
+			attributes: attrs(mkPC("mynode", "mypod"), &api.Pod{}, "status", admission.Update),
+			err:        "unexpected type *core.Pod",
+		},
+		{
+			name:       "node cannot update non-status subresource",
+			podsGetter: pods,
+			attributes: attrs(mkPC("mynode", "mypod"), mkPC("mynode", "mypod"), "", admission.Update),
+			err:        "may only update the status subresource",
+		},
+		{
+			name:       "node cannot create podcheckpoint status",
+			podsGetter: pods,
+			attributes: attrs(nil, mkPC("mynode", "mypod"), "status", admission.Create),
+			err:        "unexpected operation",
+		},
+	}
+
+	for _, test := range []struct {
+		name   string
+		mutate func(*checkpoint.PodCheckpoint, *checkpoint.PodCheckpoint)
+		err    string
+	}{
+		{name: "completion after source deletion preserves claimed UID", mutate: func(old, obj *checkpoint.PodCheckpoint) {
+			old.Status = obj.Status
+			old.Spec.SourcePod.Name = "deleted-source"
+			obj.Status.Conditions = []metav1.Condition{{Type: checkpoint.PodCheckpointConditionReady, Status: metav1.ConditionTrue, Reason: checkpoint.PodCheckpointReasonCompleted}}
+		}},
+		{name: "matching pinned UID", mutate: func(old, obj *checkpoint.PodCheckpoint) { old.Spec.SourcePod.UID = ptr.To(types.UID("u1")) }},
+		{name: "missing observed UID", mutate: func(old, obj *checkpoint.PodCheckpoint) { obj.Status.SourcePodUID = nil }, err: "must set status.sourcePodUID"},
+		{name: "forged observed UID", mutate: func(old, obj *checkpoint.PodCheckpoint) { obj.Status.SourcePodUID = ptr.To(types.UID("forged")) }, err: "must set status.sourcePodUID"},
+		{name: "replacement cannot claim success", mutate: func(old, obj *checkpoint.PodCheckpoint) {
+			old.Spec.SourcePod.UID = ptr.To(types.UID("original-on-other-node"))
+			obj.Status.Conditions = []metav1.Condition{{Type: checkpoint.PodCheckpointConditionReady, Status: metav1.ConditionTrue, Reason: checkpoint.PodCheckpointReasonCompleted}}
+		}, err: "may only report SourcePodReplaced"},
+		{name: "replacement can report rejection", mutate: func(old, obj *checkpoint.PodCheckpoint) {
+			old.Spec.SourcePod.UID = ptr.To(types.UID("original-on-other-node"))
+			obj.Status.Conditions = []metav1.Condition{{Type: checkpoint.PodCheckpointConditionReady, Status: metav1.ConditionFalse, Reason: checkpoint.PodCheckpointReasonSourcePodReplaced}}
+		}},
+		{name: "claimed UID cannot change", mutate: func(old, obj *checkpoint.PodCheckpoint) {
+			old.Status = obj.Status
+			obj.Status.SourcePodUID = ptr.To(types.UID("replacement"))
+		}, err: "must preserve status.sourcePodUID"},
+		{name: "claimed UID cannot be cleared", mutate: func(old, obj *checkpoint.PodCheckpoint) {
+			old.Status = obj.Status
+			obj.Status.SourcePodUID = nil
+		}, err: "must preserve status.sourcePodUID"},
+	} {
+		old, obj := mkPC("", "mypod"), mkPC("mynode", "mypod")
+		test.mutate(old, obj)
+		obj.Spec = old.Spec
+		tests = append(tests, admitTestCase{name: test.name, podsGetter: pods, attributes: attrs(old, obj, "status", admission.Update), err: test.err})
+	}
+	for _, claimed := range []bool{false, true} {
+		for _, test := range []struct {
+			name   string
+			mutate func(*checkpoint.PodCheckpoint)
+		}{
+			{name: "success", mutate: func(obj *checkpoint.PodCheckpoint) { obj.Status.Conditions[0].Status = metav1.ConditionTrue }},
+			{name: "duplicate Ready condition", mutate: func(obj *checkpoint.PodCheckpoint) {
+				obj.Status.Conditions = append(obj.Status.Conditions, obj.Status.Conditions[0])
+			}},
+			{name: "clear rejection", mutate: func(obj *checkpoint.PodCheckpoint) { obj.Status.Conditions = nil }},
+			{name: "location", mutate: func(obj *checkpoint.PodCheckpoint) { obj.Status.CheckpointLocation = &checkpoint.CheckpointSource{} }},
+			{name: "template", mutate: func(obj *checkpoint.PodCheckpoint) { obj.Status.CheckpointedPodTemplate = &api.PodTemplateSpec{} }},
+			{name: "containers", mutate: func(obj *checkpoint.PodCheckpoint) {
+				obj.Status.CheckpointedContainers = []checkpoint.PodCheckpointContainerStatus{{Name: "app"}}
+			}},
+			{name: "completion time", mutate: func(obj *checkpoint.PodCheckpoint) { obj.Status.CompletionTime = new(metav1.Now()) }},
+		} {
+			old, obj := mkPC("", "mypod"), mkPC("mynode", "mypod")
+			old.Spec.SourcePod.UID = ptr.To(types.UID("original-on-other-node"))
+			obj.Spec = old.Spec
+			obj.Status.Conditions = []metav1.Condition{{Type: checkpoint.PodCheckpointConditionReady, Status: metav1.ConditionFalse, Reason: checkpoint.PodCheckpointReasonSourcePodReplaced}}
+			wantErr := "may only report SourcePodReplaced"
+			if claimed {
+				old.Status = *obj.Status.DeepCopy()
+				wantErr = "cannot change a checkpoint rejected as SourcePodReplaced"
+			}
+			test.mutate(obj)
+			tests = append(tests, admitTestCase{name: fmt.Sprintf("replacement claimed=%t rejects %s", claimed, test.name), podsGetter: pods, attributes: attrs(old, obj, "status", admission.Update), err: wantErr})
+		}
+	}
+
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("gate=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+			for _, tc := range tests {
+				tc.features = feature.DefaultFeatureGate
+				if !enabled {
+					tc.err = ""
+				}
+				tc.run(t)
+			}
+		})
+	}
 }
 
 func (a *admitTestCase) run(t *testing.T) {
