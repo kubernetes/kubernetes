@@ -38,15 +38,14 @@ import (
 const maxElementsListTypeEnabled = uint64(max(resourceapi.DeviceAttributeMaxValueLength, resourceapi.ResourceSliceMaxAttributeValuesPerDevice))
 
 var testcases = map[string]struct {
-	// environment.StoredExpressions is the default (= all CEL fields and features from the current version available).
-	// environment.NewExpressions can be used to enforce that only fields and features from the previous version are available.
+	// If nil, the testcase is executed with stored and new expressions.
+	// If non-nil, it must point to environment.StoredExpressions or environment.NewExpressions
+	// to select that kind of expression.
 	envType *environment.Type
-	// The feature gate only has an effect in combination with environment.NewExpressions.
-	enableConsumableCapacity bool
-	// if enableListTypeAttributes is nil, the test will be run twice: once with it set to false and once with it set to true.
-	// This allows testing both the old and new behavior of CEL expressions without having to duplicate all test cases.
-	// If set, it controls whether the test is run with list-type attributes enabled or not.
-	enableListTypeAttributes *bool
+	// If nil, the testcase is executed with all combination of features,
+	// otherwise only with the given combination.
+	features *Features
+
 	expression               string
 	driver                   string
 	allowMultipleAllocations *bool
@@ -160,7 +159,15 @@ var testcases = map[string]struct {
 		expectMatch: true,
 		expectCost:  5,
 	},
+	"macro-compilation-error-new-expressions": {
+		features:           &Features{EnableListTypeAttributes: false},
+		envType:            new(environment.NewExpressions),
+		expression:         `device.attributes["dra.example.com"].ids.exists(id, id == 1)`,
+		driver:             "dra.example.com",
+		expectCompileError: "compilation failed",
+	},
 	"macro-exists-on-int": {
+		features:         &Features{EnableListTypeAttributes: true},
 		expression:       `device.attributes["dra.example.com"].name.exists(x, x > 0)`,
 		attributes:       map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValue: new(int64(1))}},
 		driver:           "dra.example.com",
@@ -168,6 +175,7 @@ var testcases = map[string]struct {
 		expectCost:       5 + ((3 + 3) * maxElementsListTypeEnabled /* (cost(loopCondition=="not_strictly_false(!accu)") + cost(loopStep=="accu && (x > 0)")) * maxElementsListTypeEnabled */),
 	},
 	"macro-exists-on-bool": {
+		features:         &Features{EnableListTypeAttributes: true},
 		expression:       `device.attributes["dra.example.com"].name.exists(x, x == true)`,
 		attributes:       map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: new(true)}},
 		driver:           "dra.example.com",
@@ -175,6 +183,7 @@ var testcases = map[string]struct {
 		expectCost:       5 + ((3 + 3) * maxElementsListTypeEnabled /* (cost(loopCondition=="not_strictly_false(!accu)") + cost(loopStep=="accu && (x > 0)")) * maxElementsListTypeEnabled */),
 	},
 	"macro-exists-on-string": {
+		features:         &Features{EnableListTypeAttributes: true},
 		expression:       `device.attributes["dra.example.com"].name.exists(x, x == "fish")`,
 		attributes:       map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValue: new("fish")}},
 		driver:           "dra.example.com",
@@ -189,6 +198,7 @@ var testcases = map[string]struct {
 		expectCost:       4,
 	},
 	"includes-function-can-evaluate": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes("fish")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: []string{"fish", "bird"}}},
 		driver:      "dra.example.com",
@@ -224,6 +234,7 @@ var testcases = map[string]struct {
 		expectCost:  6,
 	},
 	"macro-on-list-of-int": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].names.exists(x, x > 0)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"names": {IntValues: []int64{1, 2}}},
 		driver:      "dra.example.com",
@@ -231,6 +242,7 @@ var testcases = map[string]struct {
 		expectCost:  5 + ((3 + 3) * maxElementsListTypeEnabled /* (cost(loopCondition=="not_strictly_false(!accu)") + cost(loopStep=="accu && (x > 0)")) * maxElementsListTypeEnabled */),
 	},
 	"macro-on-list-of-string": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].names.all(x, x != "")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"names": {StringValues: []string{"fish", "bird"}}},
 		driver:      "dra.example.com",
@@ -238,6 +250,7 @@ var testcases = map[string]struct {
 		expectCost:  5 + ((2 + 2) * maxElementsListTypeEnabled /* (cost(loopCondition=="not_strictly_false(accu)") + cost(loopStep=="accu && (x != "")")) * maxElementsListTypeEnabled */),
 	},
 	"macro-on-list-of-semver": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].names.all(x, x.isGreaterThan(semver("0.0.1")))`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"names": {VersionValues: []string{"1.0.0", "2.0.0"}}},
 		driver:      "dra.example.com",
@@ -245,19 +258,14 @@ var testcases = map[string]struct {
 		expectCost:  5 + ((2 + 4) * maxElementsListTypeEnabled /* (cost(loopCondition=="not_strictly_false(accu)") + cost(loopStep=="accu && (x.isGreaterThan(semver("0.0.1"))")) * maxElementsListTypeEnabled */),
 	},
 	"includes-function-compilation-error": {
-		enableListTypeAttributes: new(false),
-		// "includes" is injected via VersionedOptions.FeatureEnabled.
-		// Use NewExpressions here because normal StoredExpressions ignores VersionedOptions.FeatureEnabled.
+		features:           &Features{EnableListTypeAttributes: false},
 		envType:            ptr.To(environment.NewExpressions),
 		expression:         `device.attributes["dra.example.com"].attr.includes("fish")`,
 		driver:             "dra.example.com",
 		expectCompileError: "undeclared reference to 'includes'",
 	},
 	"includes-function-compilation-and-eval-success": {
-		enableListTypeAttributes: new(true),
-		// "includes" is injected via VersionedOptions.FeatureEnabled.
-		// Use NewExpressions here because normal StoredExpressions ignores VersionedOptions.FeatureEnabled.
-		envType:     ptr.To(environment.NewExpressions),
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].attr.includes("fish")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"attr": {StringValue: new("fish")}},
 		driver:      "dra.example.com",
@@ -265,6 +273,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-bool-scalar-positive": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(true)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: new(true)}},
 		driver:      "dra.example.com",
@@ -272,6 +281,8 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-bool-scalar-negative": {
+		features:    &Features{EnableListTypeAttributes: true},
+		envType:     ptr.To(environment.NewExpressions),
 		expression:  `device.attributes["dra.example.com"].name.includes(true)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: new(false)}},
 		driver:      "dra.example.com",
@@ -279,6 +290,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-bool-list-positive": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(true)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValues: []bool{true, false}}},
 		driver:      "dra.example.com",
@@ -286,6 +298,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-bool-list-negative": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(false)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValues: []bool{true, true}}},
 		driver:      "dra.example.com",
@@ -293,6 +306,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-int-scalar-positive": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(1)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValue: new(int64(1))}},
 		driver:      "dra.example.com",
@@ -300,6 +314,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-int-scalar-negative": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(1)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValue: new(int64(2))}},
 		driver:      "dra.example.com",
@@ -307,6 +322,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-int-list-positive": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(1)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValues: []int64{1, 2}}},
 		driver:      "dra.example.com",
@@ -314,6 +330,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-int-list-negative": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(3)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValues: []int64{1, 2}}},
 		driver:      "dra.example.com",
@@ -321,6 +338,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-string-scalar-positive": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes("fish")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValue: new("fish")}},
 		driver:      "dra.example.com",
@@ -328,6 +346,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-string-scalar-negative": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes("bird")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValue: new("fish")}},
 		driver:      "dra.example.com",
@@ -335,6 +354,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-string-list-positive": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes("fish")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: []string{"fish", "bird"}}},
 		driver:      "dra.example.com",
@@ -342,6 +362,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-string-list-negative": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes("cat")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: []string{"fish", "bird"}}},
 		driver:      "dra.example.com",
@@ -349,6 +370,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-semver-scalar-positive": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(semver("1.0.0"))`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValue: new("1.0.0")}},
 		driver:      "dra.example.com",
@@ -356,6 +378,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48 /* cost of "includes" is max list length */ + 1,
 	},
 	"includes-function-on-semver-scalar-negative": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(semver("2.0.0"))`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValue: new("1.0.0")}},
 		driver:      "dra.example.com",
@@ -363,6 +386,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48 /* cost of "includes" is max list length */ + 1,
 	},
 	"includes-function-on-semver-list-positive": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(semver("1.0.0"))`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValues: []string{"1.0.0", "2.0.0"}}},
 		driver:      "dra.example.com",
@@ -370,6 +394,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48 /* cost of "includes" is max list length */ + 1,
 	},
 	"includes-function-on-semver-list-negative": {
+		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].name.includes(semver("3.0.0"))`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValues: []string{"1.0.0", "2.0.0"}}},
 		driver:      "dra.example.com",
@@ -377,6 +402,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48 /* cost of "includes" is max list length */ + 1,
 	},
 	"includes-function-on-very-long-list-positive": {
+		features:   &Features{EnableListTypeAttributes: true},
 		expression: fmt.Sprintf(`device.attributes["dra.example.com"].name.includes("value-%d")`, resourceapi.ResourceSliceMaxAttributeValuesPerDevice),
 		attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: func() []string {
 			values := make([]string, resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
@@ -390,6 +416,7 @@ var testcases = map[string]struct {
 		expectCost:  4 + 48, /* cost of "includes" is max list length */
 	},
 	"includes-function-on-very-long-list-runtime-error": {
+		features:   &Features{EnableListTypeAttributes: true},
 		expression: fmt.Sprintf(`device.attributes["dra.example.com"].name.includes("value-%d")`, resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1),
 		attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: func() []string {
 			values := make([]string, resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1)
@@ -431,6 +458,7 @@ var testcases = map[string]struct {
 		expectCost:  7,
 	},
 	"macro-exists-on-version": {
+		features:         &Features{EnableListTypeAttributes: true},
 		expression:       `device.attributes["dra.example.com"].name.exists(x, x.isGreaterThan(semver("0.0.1")))`,
 		attributes:       map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValue: new("1.0.0")}},
 		driver:           "dra.example.com",
@@ -561,7 +589,7 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		expectCost:       85555551, // Exceed limit!
 	},
 	"allow_multiple_allocations": {
-		enableConsumableCapacity: true,
+		features:                 &Features{EnableConsumableCapacity: true},
 		expression:               `device.allowMultipleAllocations == true`,
 		allowMultipleAllocations: ptr.To(true),
 		driver:                   "dra.example.com",
@@ -569,7 +597,7 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		expectCost:               3,
 	},
 	"allow_multiple_allocations_default": {
-		enableConsumableCapacity: true,
+		features:                 &Features{EnableConsumableCapacity: true},
 		expression:               `device.allowMultipleAllocations == false`,
 		allowMultipleAllocations: nil,
 		driver:                   "dra.example.com",
@@ -577,7 +605,7 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		expectCost:               3,
 	},
 	"allow_multiple_allocations_false": {
-		enableConsumableCapacity: true,
+		features:                 &Features{EnableConsumableCapacity: true},
 		expression:               `device.allowMultipleAllocations == false`,
 		allowMultipleAllocations: ptr.To(false),
 		driver:                   "dra.example.com",
@@ -585,8 +613,7 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		expectCost:               3,
 	},
 	"allow_multiple_allocations_new": {
-		enableConsumableCapacity: true,
-		envType:                  ptr.To(environment.NewExpressions),
+		features:                 &Features{EnableConsumableCapacity: true},
 		expression:               `device.allowMultipleAllocations == false`,
 		allowMultipleAllocations: ptr.To(false),
 		driver:                   "dra.example.com",
@@ -594,8 +621,7 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		expectCost:               3,
 	},
 	"allow_multiple_allocations_enabled": {
-		envType:                  ptr.To(environment.NewExpressions),
-		enableConsumableCapacity: true,
+		features:                 &Features{EnableConsumableCapacity: true},
 		expression:               `device.allowMultipleAllocations == false`,
 		allowMultipleAllocations: ptr.To(false),
 		driver:                   "dra.example.com",
@@ -603,22 +629,19 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		expectCost:               3,
 	},
 	"allow_multiple_allocations_disabled": {
-		envType:                  ptr.To(environment.NewExpressions),
-		enableConsumableCapacity: false,
-		expression:               `device.allowMultipleAllocations == false`,
-		driver:                   "dra.example.com",
-		expectCompileError:       `undefined field 'allowMultipleAllocations'`,
+		envType:            ptr.To(environment.NewExpressions),
+		features:           &Features{EnableConsumableCapacity: false},
+		expression:         `device.allowMultipleAllocations == false`,
+		driver:             "dra.example.com",
+		expectCompileError: `undefined field 'allowMultipleAllocations'`,
 	},
 }
 
 func TestCEL(t *testing.T) {
 	for name, scenario := range testcases {
-		run := func(t *testing.T, enableListTypeAttributes bool) {
+		run := func(t *testing.T, features Features, envType environment.Type) {
 			_, ctx := ktesting.NewTestContext(t)
-			result := GetCompiler(Features{
-				EnableConsumableCapacity: scenario.enableConsumableCapacity,
-				EnableListTypeAttributes: enableListTypeAttributes,
-			}).CompileCELExpression(scenario.expression, Options{EnvType: scenario.envType})
+			result := GetCompiler(features).CompileCELExpression(scenario.expression, Options{EnvType: &envType})
 			if scenario.expectCompileError != "" && result.Error == nil {
 				t.Fatalf("FAILURE: expected compile error %q, got none", scenario.expectCompileError)
 			}
@@ -668,191 +691,30 @@ func TestCEL(t *testing.T) {
 				t.Fatalf("FAILURE: expected result %v, got %v", scenario.expectMatch, match)
 			}
 		}
+
 		t.Run(name, func(t *testing.T) {
-			if scenario.enableListTypeAttributes == nil {
-				t.Run("list-type-attributes=false", func(t *testing.T) {
-					run(t, false)
-				})
-				t.Run("list-type-attributes=true", func(t *testing.T) {
-					run(t, true)
-				})
-			} else {
-				t.Run(fmt.Sprintf("list-type-attributes=%v", *scenario.enableListTypeAttributes), func(t *testing.T) {
-					run(t, *scenario.enableListTypeAttributes)
-				})
+			stateListType := []bool{true, false}
+			stateConsumable := []bool{true, false}
+			if scenario.features != nil {
+				stateConsumable = []bool{scenario.features.EnableConsumableCapacity}
+				stateListType = []bool{scenario.features.EnableListTypeAttributes}
 			}
-		})
-	}
-}
+			envTypes := []environment.Type{environment.NewExpressions, environment.StoredExpressions}
+			if scenario.envType != nil {
+				envTypes = []environment.Type{*scenario.envType}
+			}
 
-// TestCEL's main table focuses on expression behavior. This covers the env x feature
-// matrix explicitly with small expressions tied to each feature-dependent declaration.
-func TestCELFeatureCombinations(t *testing.T) {
-	// compileExpectations lists which feature-dependent expression categories should
-	// compile for one environment and feature-gate combination.
-	type compileExpectations struct {
-		// scalarAttribute covers expressions that access a scalar attribute.
-		scalarAttribute bool
-		// listTypeAttributes covers list-valued attribute access.
-		listTypeAttributes bool
-		// includesFunc covers the includes function introduced by DRAListTypeAttributes.
-		includesFunc bool
-		// multipleAllocations covers fields introduced by DRAConsumableCapacity.
-		multipleAllocations bool
-	}
-
-	type expressionTest struct {
-		expression     string
-		device         Device
-		expectsCompile bool
-	}
-
-	// StoredExpressions ignores FeatureEnabled() in VersionedOptions,
-	// so it always compiles all expressions that are valid in the current version
-	storedExpressionsCompileExpectations := compileExpectations{
-		scalarAttribute:     true,
-		listTypeAttributes:  true,
-		includesFunc:        true,
-		multipleAllocations: true,
-	}
-
-	tests := map[string]struct {
-		envType        environment.Type
-		features       Features
-		expectsCompile compileExpectations
-	}{
-		"stored-expressions-no-features": {
-			envType:        environment.StoredExpressions,
-			expectsCompile: storedExpressionsCompileExpectations,
-		},
-		"stored-expressions-consumable-capacity": {
-			envType:        environment.StoredExpressions,
-			features:       Features{EnableConsumableCapacity: true},
-			expectsCompile: storedExpressionsCompileExpectations,
-		},
-		"stored-expressions-list-type-attributes": {
-			envType:        environment.StoredExpressions,
-			features:       Features{EnableListTypeAttributes: true},
-			expectsCompile: storedExpressionsCompileExpectations,
-		},
-		"stored-expressions-all-features": {
-			envType:        environment.StoredExpressions,
-			features:       Features{EnableConsumableCapacity: true, EnableListTypeAttributes: true},
-			expectsCompile: storedExpressionsCompileExpectations,
-		},
-		"new-expressions-no-features": {
-			envType: environment.NewExpressions,
-			expectsCompile: compileExpectations{
-				scalarAttribute: true,
-			},
-		},
-		"new-expressions-consumable-capacity": {
-			envType:  environment.NewExpressions,
-			features: Features{EnableConsumableCapacity: true},
-			expectsCompile: compileExpectations{
-				scalarAttribute:     true,
-				multipleAllocations: true,
-			},
-		},
-		"new-expressions-list-type-attributes": {
-			envType:  environment.NewExpressions,
-			features: Features{EnableListTypeAttributes: true},
-			expectsCompile: compileExpectations{
-				scalarAttribute:    true,
-				listTypeAttributes: true,
-				includesFunc:       true,
-			},
-		},
-		"new-expressions-all-features": {
-			envType:  environment.NewExpressions,
-			features: Features{EnableConsumableCapacity: true, EnableListTypeAttributes: true},
-			expectsCompile: compileExpectations{
-				scalarAttribute:     true,
-				listTypeAttributes:  true,
-				includesFunc:        true,
-				multipleAllocations: true,
-			},
-		},
-	}
-
-	expressions := func(expectsCompile compileExpectations) map[string]expressionTest {
-		return map[string]expressionTest{
-			"scalar-attribute": {
-				expression: `device.attributes["dra.example.com"].ready`,
-				device: Device{
-					Driver: "dra.example.com",
-					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"ready": {BoolValue: new(true)},
-					},
-				},
-				expectsCompile: expectsCompile.scalarAttribute,
-			},
-			"list-attribute": {
-				expression: `device.attributes["dra.example.com"].ids.exists(id, id == 1)`,
-				device: Device{
-					Driver: "dra.example.com",
-					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"ids": {IntValues: []int64{1, 2}},
-					},
-				},
-				expectsCompile: expectsCompile.listTypeAttributes,
-			},
-			"includes-function": {
-				expression: `device.attributes["dra.example.com"].name.includes("fish")`,
-				device: Device{
-					Driver: "dra.example.com",
-					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"name": {StringValue: new("fish")},
-					},
-				},
-				expectsCompile: expectsCompile.includesFunc,
-			},
-			"multiple-allocations": {
-				expression: `device.allowMultipleAllocations`,
-				device: Device{
-					Driver:                   "dra.example.com",
-					AllowMultipleAllocations: new(true),
-					Attributes:               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{},
-				},
-				expectsCompile: expectsCompile.multipleAllocations,
-			},
-			"list-attribute-with-multiple-allocations": {
-				expression: `device.allowMultipleAllocations && device.attributes["dra.example.com"].ids.exists(id, id == 1)`,
-				device: Device{
-					Driver:                   "dra.example.com",
-					AllowMultipleAllocations: new(true),
-					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"ids": {IntValues: []int64{1, 2}},
-					},
-				},
-				expectsCompile: expectsCompile.listTypeAttributes && expectsCompile.multipleAllocations,
-			},
-		}
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			for exprName, exprTC := range expressions(tc.expectsCompile) {
-				t.Run(exprName, func(t *testing.T) {
-					_, ctx := ktesting.NewTestContext(t)
-					envType := tc.envType
-					result := GetCompiler(tc.features).CompileCELExpression(exprTC.expression, Options{EnvType: &envType})
-					if result.Error != nil {
-						if exprTC.expectsCompile {
-							t.Fatalf("unexpected compile error: %v", result.Error)
-						}
-						return
-					}
-					if !exprTC.expectsCompile {
-						t.Fatalf("expected compile error")
-					}
-
-					match, _, err := result.DeviceMatches(ctx, exprTC.device)
-					if err != nil {
-						t.Fatalf("unexpected evaluation error: %v", err)
-					}
-					if !match {
-						t.Fatalf("expected match")
+			var features Features
+			for _, features.EnableListTypeAttributes = range stateListType {
+				t.Run(fmt.Sprintf("list-type-attributes=%v", features.EnableListTypeAttributes), func(t *testing.T) {
+					for _, features.EnableConsumableCapacity = range stateConsumable {
+						t.Run(fmt.Sprintf("consumable-capacity=%v", features.EnableConsumableCapacity), func(t *testing.T) {
+							for _, envType := range envTypes {
+								t.Run(string(envType), func(t *testing.T) {
+									run(t, features, envType)
+								})
+							}
+						})
 					}
 				})
 			}
@@ -912,9 +774,9 @@ func BenchmarkDeviceMatches(b *testing.B) {
 			continue
 		}
 
-		run := func(b *testing.B, enableListTypeAttributes bool) {
+		run := func(b *testing.B, features Features, envType environment.Type) {
 			_, ctx := ktesting.NewTestContext(b)
-			result := GetCompiler(Features{EnableListTypeAttributes: enableListTypeAttributes}).CompileCELExpression(scenario.expression, Options{})
+			result := GetCompiler(features).CompileCELExpression(scenario.expression, Options{EnvType: &envType})
 			if result.Error != nil {
 				b.Fatalf("unexpected compile error: %s", result.Error.Error())
 			}
@@ -945,17 +807,10 @@ func BenchmarkDeviceMatches(b *testing.B) {
 				}
 			}
 		}
-		if scenario.enableListTypeAttributes == nil {
-			b.Run(name+"-list-type-attributes-false", func(b *testing.B) {
-				run(b, false)
-			})
-			b.Run(name+"-list-type-attributes-true", func(b *testing.B) {
-				run(b, true)
-			})
-		} else {
-			b.Run(fmt.Sprintf("%s-list-type-attributes-%v", name, *scenario.enableListTypeAttributes), func(b *testing.B) {
-				run(b, *scenario.enableListTypeAttributes)
-			})
-		}
+
+		b.Run(name, func(b *testing.B) {
+			// Performance shouldn't depend on feature enablement, so don't bother testing all variants.
+			run(b, Features{ /* ignored because of stored expression */ }, environment.StoredExpressions)
+		})
 	}
 }
