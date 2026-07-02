@@ -1081,6 +1081,52 @@ func genStringWithRule(rule string) func(maxLength *int64) *schema.Structural {
 	}
 }
 
+// genWithAllOfMaxLength wraps a schema generator so that the maxLength bound is declared inside
+// an allOf member instead of directly on the schema, as emitted by tools like controller-gen.
+// See https://github.com/kubernetes/kubernetes/issues/134029.
+func genWithAllOfMaxLength(gen func(maxLength *int64) *schema.Structural) func(maxLength *int64) *schema.Structural {
+	return func(maxLength *int64) *schema.Structural {
+		s := gen(nil)
+		if s.ValueValidation == nil {
+			s.ValueValidation = &schema.ValueValidation{}
+		}
+		s.ValueValidation.AllOf = append(s.ValueValidation.AllOf, schema.NestedValueValidation{
+			ValueValidation: schema.ValueValidation{MaxLength: maxLength},
+		})
+		return s
+	}
+}
+
+// genWithAllOfMaxItems wraps a schema generator so that the maxItems bound is declared inside
+// an allOf member instead of directly on the schema.
+func genWithAllOfMaxItems(gen func(maxItems *int64) *schema.Structural) func(maxItems *int64) *schema.Structural {
+	return func(maxItems *int64) *schema.Structural {
+		s := gen(nil)
+		if s.ValueValidation == nil {
+			s.ValueValidation = &schema.ValueValidation{}
+		}
+		s.ValueValidation.AllOf = append(s.ValueValidation.AllOf, schema.NestedValueValidation{
+			ValueValidation: schema.ValueValidation{MaxItems: maxItems},
+		})
+		return s
+	}
+}
+
+// genWithAllOfMaxProperties wraps a schema generator so that the maxProperties bound is declared
+// inside an allOf member instead of directly on the schema.
+func genWithAllOfMaxProperties(gen func(maxProperties *int64) *schema.Structural) func(maxProperties *int64) *schema.Structural {
+	return func(maxProperties *int64) *schema.Structural {
+		s := gen(nil)
+		if s.ValueValidation == nil {
+			s.ValueValidation = &schema.ValueValidation{}
+		}
+		s.ValueValidation.AllOf = append(s.ValueValidation.AllOf, schema.NestedValueValidation{
+			ValueValidation: schema.ValueValidation{MaxProperties: maxProperties},
+		})
+		return s
+	}
+}
+
 // genEnumWithRuleAndValues creates a function that accepts an optional maxLength
 // with given validation rule and a set of enum values, following the convention of existing tests.
 // The test has two checks, first with maxLength unset to check if maxLength can be concluded from enums,
@@ -1878,6 +1924,126 @@ func TestCostEstimation(t *testing.T) {
 				intOrString := intOrStringType()
 				intOrString = withRule(intOrString, "isQuantity(self)")
 				intOrString = withMaxLength(intOrString, max)
+				return &intOrString
+			},
+			expectedCalcCost: 314574,
+			setMaxElements:   20,
+			expectedSetCost:  9,
+		},
+		// The following cases verify that bounds declared only inside allOf members drive cost
+		// estimation the same way directly attached bounds do.
+		// See https://github.com/kubernetes/kubernetes/issues/134029.
+		{
+			name:             "string with contains and allOf maxLength",
+			schemaGenerator:  genWithAllOfMaxLength(genStringWithRule("self.contains('test')")),
+			expectedCalcCost: 314574,
+			setMaxElements:   10,
+			expectedSetCost:  5,
+		},
+		{
+			name: "string with contains and multiple allOf maxLengths",
+			schemaGenerator: func(maxLength *int64) *schema.Structural {
+				s := genStringWithRule("self.contains('test')")(nil)
+				var looser *int64
+				if maxLength != nil {
+					looser = new(*maxLength * 3)
+				}
+				s.ValueValidation.AllOf = []schema.NestedValueValidation{
+					{ValueValidation: schema.ValueValidation{MaxLength: looser}},
+					{ValueValidation: schema.ValueValidation{MaxLength: maxLength}},
+				}
+				return s
+			},
+			expectedCalcCost: 314574,
+			setMaxElements:   10,
+			expectedSetCost:  5,
+		},
+		{
+			name: "string with contains and nested allOf maxLength",
+			schemaGenerator: func(maxLength *int64) *schema.Structural {
+				s := genStringWithRule("self.contains('test')")(nil)
+				s.ValueValidation.AllOf = []schema.NestedValueValidation{
+					{ValueValidation: schema.ValueValidation{AllOf: []schema.NestedValueValidation{
+						{ValueValidation: schema.ValueValidation{MaxLength: maxLength}},
+					}}},
+				}
+				return s
+			},
+			expectedCalcCost: 314574,
+			setMaxElements:   10,
+			expectedSetCost:  5,
+		},
+		{
+			name: "string with contains and allOf maxLength tighter than direct maxLength",
+			schemaGenerator: func(maxLength *int64) *schema.Structural {
+				var looser *int64
+				if maxLength != nil {
+					looser = new(*maxLength * 5)
+				}
+				s := genStringWithRule("self.contains('test')")(looser)
+				s.ValueValidation.AllOf = []schema.NestedValueValidation{
+					{ValueValidation: schema.ValueValidation{MaxLength: maxLength}},
+				}
+				return s
+			},
+			expectedCalcCost: 314574,
+			setMaxElements:   10,
+			expectedSetCost:  5,
+		},
+		{
+			name: "string with contains and direct maxLength tighter than allOf maxLength",
+			schemaGenerator: func(maxLength *int64) *schema.Structural {
+				s := genStringWithRule("self.contains('test')")(maxLength)
+				var looser *int64
+				if maxLength != nil {
+					looser = new(*maxLength * 5)
+				}
+				s.ValueValidation.AllOf = []schema.NestedValueValidation{
+					{ValueValidation: schema.ValueValidation{MaxLength: looser}},
+				}
+				return s
+			},
+			expectedCalcCost: 314574,
+			setMaxElements:   10,
+			expectedSetCost:  5,
+		},
+		{
+			name: "string with contains and allOf maxItems not applied to strings",
+			schemaGenerator: func(maxItems *int64) *schema.Structural {
+				s := genStringWithRule("self.contains('test')")(nil)
+				s.ValueValidation.AllOf = []schema.NestedValueValidation{
+					{ValueValidation: schema.ValueValidation{MaxItems: maxItems}},
+				}
+				return s
+			},
+			expectedCalcCost: 314574,
+			setMaxElements:   10,
+			expectedSetCost:  314574,
+		},
+		{
+			name:             "number array with all and allOf maxItems",
+			schemaGenerator:  genWithAllOfMaxItems(genArrayWithRule("number", "self.all(x, true)")),
+			expectedCalcCost: 4718591,
+			setMaxElements:   10,
+			expectedSetCost:  32,
+		},
+		{
+			name:             "map of numbers with all and allOf maxProperties",
+			schemaGenerator:  genWithAllOfMaxProperties(genMapWithRule("number", "self.all(x, true)")),
+			expectedCalcCost: 1348169,
+			setMaxElements:   10,
+			expectedSetCost:  32,
+		},
+		{
+			name: "IntOrString type with quantity rule and allOf maxLength",
+			schemaGenerator: func(maxLength *int64) *schema.Structural {
+				intOrString := intOrStringType()
+				intOrString = withRule(intOrString, "isQuantity(self)")
+				intOrString.ValueValidation = &schema.ValueValidation{
+					AllOf: []schema.NestedValueValidation{
+						{ValueValidation: schema.ValueValidation{MaxLength: maxLength}},
+					},
+				}
 				return &intOrString
 			},
 			expectedCalcCost: 314574,
