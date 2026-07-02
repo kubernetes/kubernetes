@@ -960,6 +960,27 @@ func TestSetupHugepages(t *testing.T) {
 			},
 			shouldFail: true,
 		},
+		"Invalid: directory does not exist": {
+			path: filepath.Join(tmpdir, "nonexistent-subdir", "gone"),
+			ed: &emptyDir{
+				medium: v1.StorageMediumHugePages,
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				mounter: &mount.FakeMounter{},
+			},
+			shouldFail: true,
+		},
 	}
 
 	for testCaseName, testCase := range testCases {
@@ -1203,6 +1224,136 @@ func TestTmpfsMountOptions(t *testing.T) {
 			}
 			if expectedOption := fmt.Sprintf("size=%d", testCase.sizeLimit.Value()); !testCase.sizeLimit.IsZero() && !doesStringArrayContainSubstring(options, expectedOption) {
 				t.Errorf("size option is not expected when is zero. options: %v", options)
+			}
+		})
+	}
+}
+
+type testTmpfsMountDetector struct {
+	medium   v1.StorageMedium
+	isMnt    bool
+	pageSize *resource.Quantity
+	err      error
+}
+
+func (md *testTmpfsMountDetector) GetMountMedium(path string, requestedMedium v1.StorageMedium) (v1.StorageMedium, bool, *resource.Quantity, error) {
+	return md.medium, md.isMnt, md.pageSize, md.err
+}
+
+func TestSetupTmpfs(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "TestSetupTmpfs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	testCases := map[string]struct {
+		path       string
+		ed         *emptyDir
+		shouldFail bool
+	}{
+		"Valid: already mounted with memory medium": {
+			path: tmpdir,
+			ed: &emptyDir{
+				medium:  v1.StorageMediumMemory,
+				mounter: mount.NewFakeMounter([]mount.MountPoint{{Path: tmpdir}}),
+				mountDetector: &testTmpfsMountDetector{
+					medium: v1.StorageMediumMemory,
+					isMnt:  true,
+				},
+			},
+			shouldFail: false,
+		},
+		"Invalid: mounter is nil": {
+			path: tmpdir,
+			ed: &emptyDir{
+				medium:  v1.StorageMediumMemory,
+				mounter: nil,
+			},
+			shouldFail: true,
+		},
+		"Invalid: directory does not exist": {
+			path: filepath.Join(tmpdir, "nonexistent-subdir", "gone"),
+			ed: &emptyDir{
+				medium:  v1.StorageMediumMemory,
+				mounter: &mount.FakeMounter{},
+			},
+			shouldFail: true,
+		},
+		"Invalid: GetMountMedium error": {
+			path: tmpdir,
+			ed: &emptyDir{
+				medium:  v1.StorageMediumMemory,
+				mounter: &mount.FakeMounter{},
+				mountDetector: &testTmpfsMountDetector{
+					err: fmt.Errorf("GetMountMedium error"),
+				},
+			},
+			shouldFail: true,
+		},
+	}
+
+	for testCaseName, testCase := range testCases {
+		t.Run(testCaseName, func(t *testing.T) {
+			err := testCase.ed.setupTmpfs(testCase.path)
+			if testCase.shouldFail && err == nil {
+				t.Errorf("%s: Unexpected success", testCaseName)
+			} else if !testCase.shouldFail && err != nil {
+				t.Errorf("%s: Unexpected error: %v", testCaseName, err)
+			}
+		})
+	}
+}
+
+func TestSetupDir(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "TestSetupDir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	testCases := map[string]struct {
+		preCreate bool
+		prePerm   os.FileMode
+	}{
+		"Valid: creates new directory": {
+			preCreate: false,
+		},
+		"Valid: existing directory with correct permissions": {
+			preCreate: true,
+			prePerm:   perm,
+		},
+		"Valid: existing directory with wrong permissions gets corrected": {
+			preCreate: true,
+			prePerm:   0700,
+		},
+	}
+
+	ed := &emptyDir{}
+
+	for testCaseName, testCase := range testCases {
+		t.Run(testCaseName, func(t *testing.T) {
+			dir := filepath.Join(tmpdir, testCaseName)
+			if testCase.preCreate {
+				if err := os.MkdirAll(dir, testCase.prePerm); err != nil {
+					t.Errorf("failed to pre-create directory: %v", err)
+				}
+				if err := os.Chmod(dir, testCase.prePerm); err != nil {
+					t.Errorf("failed to set pre-permissions: %v", err)
+				}
+			}
+
+			err := ed.setupDir(dir)
+			if err != nil {
+				t.Errorf("%s: Unexpected error: %v", testCaseName, err)
+			}
+
+			info, err := os.Lstat(dir)
+			if err != nil {
+				t.Errorf("%s: failed to stat directory after setupDir: %v", testCaseName, err)
+			}
+			if err == nil && info.Mode().Perm() != perm.Perm() {
+				t.Errorf("%s: Expected permissions %v, got %v", testCaseName, perm.Perm(), info.Mode().Perm())
 			}
 		})
 	}
