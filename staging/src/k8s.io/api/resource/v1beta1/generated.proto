@@ -402,6 +402,10 @@ message CapacityRequestPolicy {
 
 // CapacityRequestPolicyRange defines a valid range for consumable capacity values.
 //
+// All values (Min, Max, Step) and the requested amount are compared in milli-units
+// via resource.Quantity.MilliValue(), so fractional quantities with up to 3 decimal
+// places (e.g. 100m = 0.1) are supported. Finer granularity is not.
+//
 //   - If the requested amount is less than Min, it is rounded up to the Min value.
 //   - If Step is set and the requested amount is between Min and Max but not aligned with Step,
 //     it will be rounded up to the next value equal to Min + (n * Step).

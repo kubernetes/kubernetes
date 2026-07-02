@@ -37,6 +37,12 @@ var (
 	one   = resource.MustParse("1")
 	two   = resource.MustParse("2")
 	three = resource.MustParse("3")
+
+	pointTwoFive = resource.MustParse("250m")
+	pointFour    = resource.MustParse("400m")
+	pointThree   = resource.MustParse("300m")
+	pointTwo     = resource.MustParse("200m")
+	pointOne     = resource.MustParse("100m")
 )
 
 func deviceConsumedCapacity(deviceID DeviceID) DeviceConsumedCapacity {
@@ -155,6 +161,31 @@ func testViolateCapacityRequestPolicy(t *testing.T) {
 			},
 			true,
 		},
+		// fractional step: min=0.2, step=0.1, max=1
+		"fractional step aligned (0.3 = min+1*step)": {
+			pointThree,
+			&resourceapi.CapacityRequestPolicy{
+				Default: &pointTwo,
+				ValidRange: &resourceapi.CapacityRequestPolicyRange{
+					Min:  &pointTwo,
+					Max:  &one,
+					Step: &pointOne,
+				},
+			},
+			false,
+		},
+		"fractional step not aligned (0.25 is not a multiple of 0.1 from 0.2)": {
+			pointTwoFive,
+			&resourceapi.CapacityRequestPolicy{
+				Default: &pointTwo,
+				ValidRange: &resourceapi.CapacityRequestPolicyRange{
+					Min:  &pointTwo,
+					Max:  &one,
+					Step: &pointOne,
+				},
+			},
+			true,
+		},
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
@@ -209,6 +240,34 @@ func testCalculateConsumedCapacity(t *testing.T) {
 			two,
 			&resourceapi.CapacityRequestPolicy{Default: ptr.To(one), ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: ptr.To(one), Step: ptr.To(one.DeepCopy())}},
 			two,
+		},
+		// fractional step: min=0.2, step=0.1, max=1; request=0.25; rounds up to 0.3
+		"fractional step round up (0.25 to 0.3)": {
+			&pointTwoFive,
+			resource.MustParse("1"),
+			&resourceapi.CapacityRequestPolicy{
+				Default: &pointTwo,
+				ValidRange: &resourceapi.CapacityRequestPolicyRange{
+					Min:  &pointTwo,
+					Max:  &one,
+					Step: &pointOne,
+				},
+			},
+			resource.MustParse("300m"),
+		},
+		// fractional step: request already aligned; no rounding
+		"fractional step already aligned (0.4 = min+2*step)": {
+			&pointFour,
+			resource.MustParse("1"),
+			&resourceapi.CapacityRequestPolicy{
+				Default: &pointTwo,
+				ValidRange: &resourceapi.CapacityRequestPolicyRange{
+					Min:  &pointTwo,
+					Max:  &one,
+					Step: &pointOne,
+				},
+			},
+			resource.MustParse("400m"),
 		},
 		"valid value in set": {
 			&two,

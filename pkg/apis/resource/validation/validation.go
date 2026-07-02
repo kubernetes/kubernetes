@@ -1194,9 +1194,9 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 
 func validateRequestPolicyRangeStep(value, min, step apiresource.Quantity, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	stepVal := step.Value()
-	minVal := min.Value()
-	val := value.Value()
+	stepVal := step.MilliValue()
+	minVal := min.MilliValue()
+	val := value.MilliValue()
 	added := (val - minVal)
 	if added%stepVal != 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), fmt.Sprintf("value is not a multiple of a given step (%s) from (%s)", step.String(), min.String())))

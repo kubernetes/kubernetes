@@ -46407,7 +46407,7 @@ func schema_k8sio_api_resource_v1_CapacityRequestPolicyRange(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CapacityRequestPolicyRange defines a valid range for consumable capacity values.\n\n  - If the requested amount is less than Min, it is rounded up to the Min value.\n  - If Step is set and the requested amount is between Min and Max but not aligned with Step,\n    it will be rounded up to the next value equal to Min + (n * Step).\n  - If Step is not set, the requested amount is used as-is if it falls within the range Min to Max (if set).\n  - If the requested or rounded amount exceeds Max (if set), the request does not satisfy the policy,\n    and the device cannot be allocated.",
+				Description: "CapacityRequestPolicyRange defines a valid range for consumable capacity values.\n\nAll values (Min, Max, Step) and the requested amount are compared in milli-units via resource.Quantity.MilliValue(), so fractional quantities with up to 3 decimal places (e.g. 100m = 0.1) are supported. Finer granularity is not.\n\n  - If the requested amount is less than Min, it is rounded up to the Min value.\n  - If Step is set and the requested amount is between Min and Max but not aligned with Step,\n    it will be rounded up to the next value equal to Min + (n * Step).\n  - If Step is not set, the requested amount is used as-is if it falls within the range Min to Max (if set).\n  - If the requested or rounded amount exceeds Max (if set), the request does not satisfy the policy,\n    and the device cannot be allocated.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"min": {
@@ -49421,7 +49421,7 @@ func schema_k8sio_api_resource_v1beta1_CapacityRequestPolicyRange(ref common.Ref
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CapacityRequestPolicyRange defines a valid range for consumable capacity values.\n\n  - If the requested amount is less than Min, it is rounded up to the Min value.\n  - If Step is set and the requested amount is between Min and Max but not aligned with Step,\n    it will be rounded up to the next value equal to Min + (n * Step).\n  - If Step is not set, the requested amount is used as-is if it falls within the range Min to Max (if set).\n  - If the requested or rounded amount exceeds Max (if set), the request does not satisfy the policy,\n    and the device cannot be allocated.",
+				Description: "CapacityRequestPolicyRange defines a valid range for consumable capacity values.\n\nAll values (Min, Max, Step) and the requested amount are compared in milli-units via resource.Quantity.MilliValue(), so fractional quantities with up to 3 decimal places (e.g. 100m = 0.1) are supported. Finer granularity is not.\n\n  - If the requested amount is less than Min, it is rounded up to the Min value.\n  - If Step is set and the requested amount is between Min and Max but not aligned with Step,\n    it will be rounded up to the next value equal to Min + (n * Step).\n  - If Step is not set, the requested amount is used as-is if it falls within the range Min to Max (if set).\n  - If the requested or rounded amount exceeds Max (if set), the request does not satisfy the policy,\n    and the device cannot be allocated.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"min": {
@@ -51527,7 +51527,7 @@ func schema_k8sio_api_resource_v1beta2_CapacityRequestPolicyRange(ref common.Ref
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CapacityRequestPolicyRange defines a valid range for consumable capacity values.\n\n  - If the requested amount is less than Min, it is rounded up to the Min value.\n  - If Step is set and the requested amount is between Min and Max but not aligned with Step,\n    it will be rounded up to the next value equal to Min + (n * Step).\n  - If Step is not set, the requested amount is used as-is if it falls within the range Min to Max (if set).\n  - If the requested or rounded amount exceeds Max (if set), the request does not satisfy the policy,\n    and the device cannot be allocated.",
+				Description: "CapacityRequestPolicyRange defines a valid range for consumable capacity values.\n\nAll values (Min, Max, Step) and the requested amount are compared in milli-units via resource.Quantity.MilliValue(), so fractional quantities with up to 3 decimal places (e.g. 100m = 0.1) are supported. Finer granularity is not.\n\n  - If the requested amount is less than Min, it is rounded up to the Min value.\n  - If Step is set and the requested amount is between Min and Max but not aligned with Step,\n    it will be rounded up to the next value equal to Min + (n * Step).\n  - If Step is not set, the requested amount is used as-is if it falls within the range Min to Max (if set).\n  - If the requested or rounded amount exceeds Max (if set), the request does not satisfy the policy,\n    and the device cannot be allocated.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"min": {

@@ -118,17 +118,23 @@ func roundUpRange(requestedVal *resource.Quantity, validRange *resourceapi.Capac
 	if validRange.Step == nil {
 		return *requestedVal
 	}
-	requestedInt64 := requestedVal.Value()
-	step := validRange.Step.Value()
-	min := validRange.Min.Value()
-	added := (requestedInt64 - min)
-	n := added / step
-	mod := added % step
-	if mod != 0 {
+	requestedMilli := requestedVal.MilliValue()
+	stepMilli := validRange.Step.MilliValue()
+	minMilli := validRange.Min.MilliValue()
+	added := requestedMilli - minMilli
+	n := added / stepMilli
+	if added%stepMilli != 0 {
 		n += 1
 	}
-	val := min + step*n
-	return *resource.NewQuantity(val, resource.BinarySI)
+	valMilli := minMilli + stepMilli*n
+	// Return in the same format as the step quantity. If the result is a
+	// whole number, use NewQuantity to keep the representation compact and
+	// compatible with quantities parsed from whole-number strings.
+	format := validRange.Step.Format
+	if valMilli%1000 == 0 {
+		return *resource.NewQuantity(valMilli/1000, format)
+	}
+	return *resource.NewMilliQuantity(valMilli, format)
 }
 
 // roundUpValidValues returns the first value in validValues that is greater than or equal to requestedVal.
@@ -188,9 +194,9 @@ func violateValidRange(requestedVal resource.Quantity, validRange resourceapi.Ca
 		return true
 	}
 	if validRange.Step != nil {
-		requestedInt64 := requestedVal.Value()
-		step := validRange.Step.Value()
-		min := validRange.Min.Value()
+		requestedInt64 := requestedVal.MilliValue()
+		step := validRange.Step.MilliValue()
+		min := validRange.Min.MilliValue()
 		added := (requestedInt64 - min)
 		mod := added % step
 		// must be a multiply of step
