@@ -432,6 +432,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowRestartAllContainers:                               utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
 		AllowImageVolumeWithDigest:                              utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
 		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
+		AllowGRPCContainerProbeTLS:                              utilfeature.DefaultFeatureGate.Enabled(features.GRPCContainerProbeTLS),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -479,6 +480,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
 		opts.AllowRestartAllContainers = opts.AllowRestartAllContainers || restartAllContainersActionInUse(oldPodSpec)
+		opts.AllowGRPCContainerProbeTLS = opts.AllowGRPCContainerProbeTLS || grpcProbeTLSInUse(oldPodSpec)
 
 		// If old spec has userns and volume devices (doesn't work), we still allow
 		// modifications to it.
@@ -729,6 +731,7 @@ func dropDisabledFields(
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
 	dropDisabledSchedulingGroup(podSpec, oldPodSpec)
+	dropDisabledGRPCContainerProbeTLS(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -868,6 +871,43 @@ func dropDisabledPodLevelResources(podSpec, oldPodSpec *api.PodSpec) {
 	// from PodSpec.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && !podLevelResourcesInUse(oldPodSpec) {
 		podSpec.Resources = nil
+	}
+}
+
+func grpcProbeTLSInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		if probeUsesGRPCTLS(c.LivenessProbe) || probeUsesGRPCTLS(c.ReadinessProbe) || probeUsesGRPCTLS(c.StartupProbe) {
+			inUse = true
+			return false
+		}
+		return true
+	})
+	return inUse
+}
+
+func probeUsesGRPCTLS(probe *api.Probe) bool {
+	return probe != nil && probe.GRPC != nil && probe.GRPC.Mode != nil
+}
+
+func dropDisabledGRPCContainerProbeTLS(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.GRPCContainerProbeTLS) || grpcProbeTLSInUse(oldPodSpec) {
+		return
+	}
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		dropProbeGRPCTLS(c.LivenessProbe)
+		dropProbeGRPCTLS(c.ReadinessProbe)
+		dropProbeGRPCTLS(c.StartupProbe)
+		return true
+	})
+}
+
+func dropProbeGRPCTLS(p *api.Probe) {
+	if p != nil && p.GRPC != nil {
+		p.GRPC.Mode = nil
 	}
 }
 

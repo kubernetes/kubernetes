@@ -4595,6 +4595,13 @@ func (m *GRPCAction) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Mode != nil {
+		i -= len(*m.Mode)
+		copy(dAtA[i:], *m.Mode)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.Mode)))
+		i--
+		dAtA[i] = 0x1a
+	}
 	if m.Service != nil {
 		i -= len(*m.Service)
 		copy(dAtA[i:], *m.Service)
@@ -16611,6 +16618,10 @@ func (m *GRPCAction) Size() (n int) {
 		l = len(*m.Service)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.Mode != nil {
+		l = len(*m.Mode)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -21607,6 +21618,7 @@ func (this *GRPCAction) String() string {
 	s := strings.Join([]string{`&GRPCAction{`,
 		`Port:` + fmt.Sprintf("%v", this.Port) + `,`,
 		`Service:` + valueToStringGenerated(this.Service) + `,`,
+		`Mode:` + valueToStringGenerated(this.Mode) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -37432,6 +37444,39 @@ func (m *GRPCAction) Unmarshal(dAtA []byte) error {
 			}
 			s := string(dAtA[iNdEx:postIndex])
 			m.Service = &s
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Mode", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := GRPCProbeMode(dAtA[iNdEx:postIndex])
+			m.Mode = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
