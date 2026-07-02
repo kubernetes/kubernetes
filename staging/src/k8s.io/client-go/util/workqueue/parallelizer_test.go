@@ -61,17 +61,21 @@ var cases = []testCase{
 func TestParallelizeUntil(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.String(), func(t *testing.T) {
-			seen := make([]int32, tc.pieces)
+			seen := make([]atomic.Int32, tc.pieces)
 			ctx := context.Background()
 			ParallelizeUntil(ctx, tc.workers, tc.pieces, func(p int) {
-				atomic.AddInt32(&seen[p], 1)
+				seen[p].Add(1)
 			}, WithChunkSize(tc.chunkSize))
 
+			gotSeen := make([]int32, tc.pieces)
+			for i := range seen {
+				gotSeen[i] = seen[i].Load()
+			}
 			wantSeen := make([]int32, tc.pieces)
 			for i := 0; i < tc.pieces; i++ {
 				wantSeen[i] = 1
 			}
-			if diff := cmp.Diff(wantSeen, seen); diff != "" {
+			if diff := cmp.Diff(wantSeen, gotSeen); diff != "" {
 				t.Errorf("bad number of visits (-want,+got):\n%s", diff)
 			}
 		})

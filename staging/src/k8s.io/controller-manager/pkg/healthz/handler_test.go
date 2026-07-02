@@ -140,9 +140,9 @@ func TestConcurrentChecks(t *testing.T) {
 	stopChan := make(chan interface{})
 	defer close(stopChan) // always close no matter passing or not
 	concurrentChan := make(chan interface{}, N)
-	var concurrentCount int32
+	var concurrentCount atomic.Int32
 	pausingCheck := healthz.NamedCheck("pausing", func(r *http.Request) error {
-		atomic.AddInt32(&concurrentCount, 1)
+		concurrentCount.Add(1)
 		concurrentChan <- nil
 		<-stopChan
 		return nil
@@ -168,7 +168,7 @@ func TestConcurrentChecks(t *testing.T) {
 		}
 	}
 
-	if concurrentCount != N {
-		t.Errorf("expected %v concurrency, got %v", N, concurrentCount)
+	if concurrentCount.Load() != N {
+		t.Errorf("expected %v concurrency, got %v", N, concurrentCount.Load())
 	}
 }

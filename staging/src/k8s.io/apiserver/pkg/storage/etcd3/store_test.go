@@ -267,9 +267,9 @@ type storeWithPrefixTransformer struct {
 
 func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetesting.PrefixTransformerModifier) func() {
 	originalTransformer := s.transformer.(*storagetesting.PrefixTransformer)
-	transformer := *originalTransformer
-	s.transformer = modifier(&transformer)
-	s.watcher.transformer = modifier(&transformer)
+	transformer := originalTransformer.Clone()
+	s.transformer = modifier(transformer)
+	s.watcher.transformer = modifier(transformer)
 	return func() {
 		s.transformer = originalTransformer
 		s.watcher.transformer = originalTransformer

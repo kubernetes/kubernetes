@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var requestID int64
+var requestID atomic.Int64
 
 type grpcServer struct {
 	grpcVerbosity int
@@ -143,7 +143,7 @@ func (m mergeCtx) Value(i interface{}) interface{} {
 // sequentially increasing request ID and adds that logger to the context. It
 // also logs request and response.
 func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-	requestID := atomic.AddInt64(&requestID, 1)
+	requestID := requestID.Add(1)
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithValues(logger, "requestID", requestID, "method", info.FullMethod)
 	ctx = klog.NewContext(ctx, logger)
@@ -164,7 +164,7 @@ func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grp
 }
 
 func (s *grpcServer) streamInterceptor(server interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	requestID := atomic.AddInt64(&requestID, 1)
+	requestID := requestID.Add(1)
 	ctx := stream.Context()
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithValues(logger, "requestID", requestID, "method", info.FullMethod)
