@@ -237,39 +237,15 @@ func (d ConditionsAwareDecision) UnionedDecisions() iter.Seq2[string, Conditions
 	}
 }
 
-// Reason returns the reason supplied when constructing the decision
-// (if Allow/Deny/NoOpinion/ConditionsMap), or an aggregated reason (if Union).
+// Reason returns the reason supplied when constructing
+// an unconditional decision. An empty string for conditional decisions.
 func (d ConditionsAwareDecision) Reason() string {
-	if d.IsUnion() {
-		b := strings.Builder{}
-		b.WriteByte('[')
-		for i, sub := range d.union.inner {
-			if i != 0 {
-				b.WriteString(", ")
-			}
-			reason := sub.d.Reason()
-			if len(reason) != 0 {
-				b.WriteString(reason)
-			} else {
-				b.WriteString(`""`)
-			}
-		}
-		b.WriteByte(']')
-		return b.String()
-	}
 	return d.reason
 }
 
-// Error returns the error supplied when constructing the decision
-// (if Allow/Deny/NoOpinion/ConditionsMap), or an aggregated error (if Union).
+// Error returns the error supplied when constructing
+// an unconditional decision. Error is nil for conditional decisions.
 func (d ConditionsAwareDecision) Error() error {
-	if d.IsUnion() {
-		errlist := make([]error, len(d.union.inner))
-		for i, sub := range d.union.inner {
-			errlist[i] = sub.d.Error()
-		}
-		return utilerrors.NewAggregate(errlist)
-	}
 	return d.err
 }
 
