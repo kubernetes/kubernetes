@@ -1294,7 +1294,7 @@ func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]
 		topologymanager.PolicyNone,
 	}
 
-	ginkgo.It("run Topology Manager policy test suite", func(ctx context.Context) {
+	ginkgo.FIt("run Topology Manager policy test suite", func(ctx context.Context) {
 		oldCfg, err = getCurrentKubeletConfig(ctx)
 		framework.ExpectNoError(err)
 
@@ -1503,6 +1503,17 @@ func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap 
 	var ctnAttrs []ctnAttribute
 	var pod1, pod2 *v1.Pod
 
+	framework.Logf("Debug: isMultiNUMA=%v, isHTEnabled=%v", isMultiNUMA(), isHTEnabled())
+	framework.Logf("Debug: getCPUSiblingList(0)=%s", getCPUSiblingList(0))
+	framework.Logf("Debug: getCoreSiblingList(0)=%s", getCoreSiblingList(0))
+	numaCPUs, err := getNumaNodeCPUs()
+	if err == nil {
+		framework.Logf("Debug: actual number of NUMA nodes=%d", len(numaCPUs))
+		for id, cpus := range numaCPUs {
+			framework.Logf("Debug: NUMA node %d CPUs: %s", id, cpus.String())
+		}
+	}
+
 	ctnAttrs = []ctnAttribute{
 		{
 			ctnName:    "gu-container",
@@ -1525,16 +1536,24 @@ func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap 
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpu1 = 1
+	framework.Logf("Debug: initialized cpu1=%d", cpu1)
 	if isHTEnabled() {
+		framework.Logf("Debug: reached path isHTEnabled=true")
 		cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
+		framework.Logf("Debug: overwriting cpu1 with %d", cpuList[1])
 		cpu1 = cpuList[1]
 	} else if isMultiNUMA() {
+		framework.Logf("Debug: reached path isMultiNUMA=true")
 		cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
 		if len(cpuList) > 1 {
+			framework.Logf("Debug: overwriting cpu1 with %d", cpuList[1])
 			cpu1 = cpuList[1]
 		}
+	} else {
+		framework.Logf("Debug: reached fallback path (single NUMA, no HT)")
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
+	framework.Logf("Debug: expAllowedCPUsListRegex=%s", expAllowedCPUsListRegex)
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod1.Spec.Containers[0].Name, pod1.Name)
@@ -1562,6 +1581,17 @@ func runMultipleCPUGuPod(ctx context.Context, f *framework.Framework) {
 	var ctnAttrs []ctnAttribute
 	var pod *v1.Pod
 
+	framework.Logf("Debug: isMultiNUMA=%v, isHTEnabled=%v", isMultiNUMA(), isHTEnabled())
+	framework.Logf("Debug: getCPUSiblingList(0)=%s", getCPUSiblingList(0))
+	framework.Logf("Debug: getCoreSiblingList(0)=%s", getCoreSiblingList(0))
+	numaCPUs, err := getNumaNodeCPUs()
+	if err == nil {
+		framework.Logf("Debug: actual number of NUMA nodes=%d", len(numaCPUs))
+		for id, cpus := range numaCPUs {
+			framework.Logf("Debug: NUMA node %d CPUs: %s", id, cpus.String())
+		}
+	}
+
 	ctnAttrs = []ctnAttribute{
 		{
 			ctnName:    "gu-container",
@@ -1574,24 +1604,32 @@ func runMultipleCPUGuPod(ctx context.Context, f *framework.Framework) {
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpuListString = "1-2"
+	framework.Logf("Debug: initialized cpuListString=%s", cpuListString)
 	if isMultiNUMA() {
+		framework.Logf("Debug: reached path isMultiNUMA=true")
 		cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
 		if len(cpuList) > 1 {
 			cset = mustParseCPUSet(getCPUSiblingList(int64(cpuList[1])))
 			if !isHTEnabled() && len(cpuList) > 2 {
+				framework.Logf("Debug: non-HT case, using cset range")
 				cset = mustParseCPUSet(fmt.Sprintf("%d-%d", cpuList[1], cpuList[2]))
 			}
 			cpuListString = cset.String()
 		}
 	} else if isHTEnabled() {
+		framework.Logf("Debug: reached path isHTEnabled=true")
 		cpuListString = "2-3"
 		cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
 		if cpuList[1] != 1 {
+			framework.Logf("Debug: cpuList[1] != 1, using cset from sibling of 1")
 			cset = mustParseCPUSet(getCPUSiblingList(1))
 			cpuListString = cset.String()
 		}
+	} else {
+		framework.Logf("Debug: reached fallback path (single NUMA, no HT)")
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
+	framework.Logf("Debug: expAllowedCPUsListRegex=%s", expAllowedCPUsListRegex)
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[0].Name, pod.Name)
