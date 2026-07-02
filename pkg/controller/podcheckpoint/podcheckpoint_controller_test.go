@@ -43,6 +43,8 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	nodeapi "k8s.io/kubernetes/pkg/apis/node"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
@@ -50,21 +52,55 @@ import (
 // do after their initial sync. API objects live in the client.
 func newTestController(t *testing.T, client clientset.Interface, checkpoints []*nodev1alpha1.PodCheckpoint, pods []*v1.Pod) *Controller {
 	t.Helper()
-	podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	factory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+	podInformer := factory.Core().V1().Pods().Informer()
+	require.NoError(t, controller.AddPodRestoreFromIndexer(podInformer))
 	for _, pod := range pods {
-		require.NoError(t, podIndexer.Add(pod))
+		require.NoError(t, podInformer.GetIndexer().Add(pod))
 	}
 	c := &Controller{
-		controllerName: "podcheckpoint-controller",
-		kubeClient:     client,
-		recorder:       testutil.NewFakeRecorder(),
-		podLister:      corelisters.NewPodLister(podIndexer),
-		queue:          workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[cache.ObjectName]()),
+		controllerName:  "podcheckpoint-controller",
+		kubeClient:      client,
+		recorder:        testutil.NewFakeRecorder(),
+		podLister:       corelisters.NewPodLister(podInformer.GetIndexer()),
+		podIndexer:      podInformer.GetIndexer(),
+		checkpointQueue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[cache.ObjectName]()),
 	}
 	c.syncHandler = c.syncCheckpoint
-	t.Cleanup(c.queue.ShutDown)
+	t.Cleanup(c.checkpointQueue.ShutDown)
 	setCachedCheckpoints(t, c, checkpoints...)
 	return c
+}
+
+// queued drains the queue and returns its keys.
+func queued(queue workqueue.TypedRateLimitingInterface[cache.ObjectName]) []string {
+	var keys []string
+	for queue.Len() > 0 {
+		key, _ := queue.Get()
+		queue.Done(key)
+		keys = append(keys, key.String())
+	}
+	return keys
+}
+
+// finalizerPatchBody decodes a strategic merge patch that adds or removes one
+// finalizer.
+type finalizerPatchBody struct {
+	Metadata struct {
+		UID             types.UID `json:"uid"`
+		ResourceVersion string    `json:"resourceVersion"`
+		Finalizers      []string  `json:"finalizers"`
+		Removed         []string  `json:"$deleteFromPrimitiveList/finalizers"`
+	} `json:"metadata"`
+}
+
+func decodeFinalizerPatch(t *testing.T, action clienttesting.Action) finalizerPatchBody {
+	t.Helper()
+	patch := action.(clienttesting.PatchActionImpl)
+	require.Equal(t, types.StrategicMergePatchType, patch.GetPatchType())
+	var body finalizerPatchBody
+	require.NoError(t, json.Unmarshal(patch.GetPatch(), &body))
+	return body
 }
 
 // statusApply decodes a server-side apply request for the status subresource.
@@ -84,6 +120,79 @@ func decodeStatusApply(t *testing.T, action clienttesting.PatchActionImpl) statu
 	var apply statusApply
 	require.NoError(t, json.Unmarshal(action.GetPatch(), &apply))
 	return apply
+}
+
+func TestSyncHandlerRestoreLock(t *testing.T) {
+	restorePod := func(name string, mutate ...func(*v1.Pod)) *v1.Pod {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "ns"},
+			Spec:       v1.PodSpec{RestoreFrom: &v1.CheckpointReference{Name: "cp"}},
+			Status:     v1.PodStatus{Phase: v1.PodRunning},
+		}
+		for _, f := range mutate {
+			f(pod)
+		}
+		return pod
+	}
+	restored := func(status v1.ConditionStatus) func(*v1.Pod) {
+		return func(pod *v1.Pod) {
+			pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodRestored, Status: status}}
+		}
+	}
+	for _, tc := range []struct {
+		name                         string
+		deleting, protected          bool
+		cached, live                 []*v1.Pod
+		wantProtection, wantLiveList bool
+		wantPatches                  int
+	}{
+		{name: "creation installs protection", wantProtection: true, wantPatches: 1},
+		{name: "unused checkpoint stays protected", protected: true, wantProtection: true},
+		{name: "deletion releases unused checkpoint", deleting: true, protected: true, wantLiveList: true, wantPatches: 1},
+		{name: "cached restore retains checkpoint", deleting: true, protected: true, cached: []*v1.Pod{restorePod("restoring")}, wantProtection: true},
+		{name: "in-progress restore retains checkpoint", deleting: true, protected: true, cached: []*v1.Pod{restorePod("restoring", restored(v1.ConditionUnknown))}, wantProtection: true},
+		{name: "uncached restore retains checkpoint", deleting: true, protected: true, live: []*v1.Pod{restorePod("restoring")}, wantProtection: true, wantLiveList: true},
+		{name: "completed restore releases checkpoint", deleting: true, protected: true, cached: []*v1.Pod{restorePod("done", restored(v1.ConditionTrue))}, wantLiveList: true, wantPatches: 1},
+		{name: "failed restore releases checkpoint", deleting: true, protected: true, cached: []*v1.Pod{restorePod("failed", restored(v1.ConditionFalse))}, wantLiveList: true, wantPatches: 1},
+		{name: "terminal Pod releases checkpoint", deleting: true, protected: true, cached: []*v1.Pod{restorePod("terminal", func(pod *v1.Pod) { pod.Status.Phase = v1.PodFailed })}, wantLiveList: true, wantPatches: 1},
+		{name: "other checkpoint does not retain", deleting: true, protected: true, cached: []*v1.Pod{restorePod("other", func(pod *v1.Pod) { pod.Spec.RestoreFrom.Name = "other" })}, wantLiveList: true, wantPatches: 1},
+		{name: "deletion already released", deleting: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pc := &nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "ns", UID: "cp-uid", ResourceVersion: "7", Finalizers: []string{"example.com/other"}}}
+			if tc.protected {
+				pc.Finalizers = append(pc.Finalizers, RestoreLockFinalizer)
+			}
+			if tc.deleting {
+				pc.DeletionTimestamp = new(metav1.Now())
+			}
+			objects := []runtime.Object{pc}
+			for _, pod := range append(slices.Clone(tc.cached), tc.live...) {
+				objects = append(objects, pod)
+			}
+			client := fake.NewClientset(objects...)
+			c := newTestController(t, client, []*nodev1alpha1.PodCheckpoint{pc}, tc.cached)
+			require.NoError(t, c.syncHandler(context.Background(), cache.NewObjectName("ns", "cp")))
+			patches, lists := 0, 0
+			for _, action := range client.Actions() {
+				switch {
+				case action.Matches("list", "pods"):
+					lists++
+				case action.GetVerb() == "patch":
+					patches++
+					body := decodeFinalizerPatch(t, action)
+					require.Equal(t, pc.UID, body.Metadata.UID)
+					require.Equal(t, pc.ResourceVersion, body.Metadata.ResourceVersion)
+				}
+			}
+			require.Equal(t, tc.wantPatches, patches)
+			require.Equal(t, tc.wantLiveList, lists == 1, "a live list confirms the cache before release")
+			stored, err := client.NodeV1alpha1().PodCheckpoints("ns").Get(context.Background(), "cp", metav1.GetOptions{})
+			require.NoError(t, err)
+			require.Equal(t, tc.wantProtection, slices.Contains(stored.Finalizers, RestoreLockFinalizer))
+			require.Contains(t, stored.Finalizers, "example.com/other")
+		})
+	}
 }
 
 // setCachedCheckpoints replaces the checkpoint cache, as the informer does when
@@ -131,16 +240,16 @@ func (noopMetric) Observe(float64) {}
 
 // Without a queue name, client-go registers no workqueue metrics.
 func TestNewControllerRegistersQueueMetrics(t *testing.T) {
-	ignoreExisting := goleak.IgnoreCurrent()
-	t.Cleanup(func() { goleak.VerifyNone(t, ignoreExisting) })
+	before := goleak.IgnoreCurrent()
+	t.Cleanup(func() { goleak.VerifyNone(t, before) })
 	provider := &queueNames{}
 	workqueue.SetProvider(provider)
 	client := fake.NewClientset()
 	factory := informers.NewSharedInformerFactory(client, 0)
 	c, err := NewController(context.Background(), "podcheckpoint-controller", factory.Node().V1alpha1().PodCheckpoints(), factory.Core().V1().Pods(), client)
 	require.NoError(t, err)
+	t.Cleanup(c.checkpointQueue.ShutDown)
 	t.Cleanup(c.eventBroadcaster.Shutdown)
-	t.Cleanup(c.queue.ShutDown)
 	provider.Lock()
 	defer provider.Unlock()
 	require.Contains(t, provider.names, "podcheckpoint-controller")
@@ -175,8 +284,8 @@ func TestRunProcessesItemsConcurrently(t *testing.T) {
 		<-done
 	}()
 
-	c.queue.Add(cache.NewObjectName("ns", "checkpoint-1"))
-	c.queue.Add(cache.NewObjectName("ns", "checkpoint-2"))
+	c.checkpointQueue.Add(cache.NewObjectName("ns", "checkpoint-1"))
+	c.checkpointQueue.Add(cache.NewObjectName("ns", "checkpoint-2"))
 	for range 2 {
 		select {
 		case <-started:
@@ -216,6 +325,18 @@ func TestUpdateCheckpointEnqueuesPendingAssignment(t *testing.T) {
 	deleting := pending.DeepCopy()
 	deleting.ResourceVersion = "2"
 	deleting.DeletionTimestamp = new(metav1.Now())
+	deletingAssigned := inProgress.DeepCopy()
+	deletingAssigned.ResourceVersion = "4"
+	deletingAssigned.DeletionTimestamp = new(metav1.Now())
+	completedWhileDeleting := deletingAssigned.DeepCopy()
+	completedWhileDeleting.ResourceVersion = "5"
+	completedWhileDeleting.Status.Conditions[0].Status = metav1.ConditionTrue
+	completedWhileDeleting.Status.Conditions[0].Reason = nodev1alpha1.PodCheckpointReasonCompleted
+	unlocked := assigned.DeepCopy()
+	unlocked.ResourceVersion = "3"
+	unlocked.Finalizers = nil
+	locked := assigned.DeepCopy()
+	locked.Finalizers = []string{RestoreLockFinalizer}
 
 	for _, tc := range []struct {
 		name       string
@@ -225,16 +346,19 @@ func TestUpdateCheckpointEnqueuesPendingAssignment(t *testing.T) {
 		{name: "kubelet status write after assignment", old: assigned, cur: inProgress},
 		{name: "own assignment", old: pending, cur: assigned},
 		{name: "own failure", old: pending, cur: failed},
-		{name: "deletion before assignment", old: pending, cur: deleting},
+		{name: "kubelet status write during deletion", old: deletingAssigned, cur: completedWhileDeleting},
 		{name: "metadata change before assignment", old: pending, cur: labeled, wantQueued: true},
+		{name: "deletion before assignment", old: pending, cur: deleting, wantQueued: true},
+		{name: "deletion after assignment", old: inProgress, cur: deletingAssigned, wantQueued: true},
+		{name: "restore lock removed", old: locked, cur: unlocked, wantQueued: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := newTestController(t, fake.NewClientset(), nil, nil)
 			c.updateCheckpoint(tc.old, tc.cur)
 			if tc.wantQueued {
-				require.Equal(t, 1, c.queue.Len())
+				require.Equal(t, []string{"ns/checkpoint"}, queued(c.checkpointQueue))
 			} else {
-				require.Zero(t, c.queue.Len())
+				require.Empty(t, queued(c.checkpointQueue))
 			}
 		})
 	}
@@ -345,7 +469,7 @@ func TestSyncHandlerAssignsCheckpoint(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			pc := &nodev1alpha1.PodCheckpoint{
-				ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns", UID: "checkpoint-uid", Generation: 3, ResourceVersion: "7"},
+				ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns", UID: "checkpoint-uid", Generation: 3, ResourceVersion: "7", Finalizers: []string{RestoreLockFinalizer}},
 				Spec:       nodev1alpha1.PodCheckpointSpec{SourcePod: nodev1alpha1.PodReference{Name: "source", UID: tc.requestedUID}},
 				Status:     tc.status,
 			}
@@ -372,6 +496,9 @@ func TestSyncHandlerAssignsCheckpoint(t *testing.T) {
 			})
 			var apply statusApply
 			client.PrependReactor("patch", "podcheckpoints", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				if action.GetSubresource() != "status" {
+					return false, nil, nil
+				}
 				applies++
 				apply = decodeStatusApply(t, action.(clienttesting.PatchActionImpl))
 				if tc.statusConflict {
@@ -456,7 +583,7 @@ func TestSyncHandlerAssignsCheckpoint(t *testing.T) {
 func TestProcessNextWorkItemRequeuesConflict(t *testing.T) {
 	ctx := context.Background()
 	pc := &nodev1alpha1.PodCheckpoint{
-		ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns", ResourceVersion: "7"},
+		ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns", ResourceVersion: "7", Finalizers: []string{RestoreLockFinalizer}},
 		Spec:       nodev1alpha1.PodCheckpointSpec{SourcePod: nodev1alpha1.PodReference{Name: "source"}},
 	}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "source", Namespace: "ns", UID: "source-uid"}, Spec: v1.PodSpec{NodeName: "node-a"}}
@@ -467,9 +594,76 @@ func TestProcessNextWorkItemRequeuesConflict(t *testing.T) {
 		return true, nil, apierrors.NewConflict(nodev1alpha1.Resource("podcheckpoints"), pc.Name, errors.New("conflict"))
 	})
 	c := newTestController(t, client, []*nodev1alpha1.PodCheckpoint{pc}, []*v1.Pod{pod})
-	key := cache.NewObjectName("ns", "checkpoint")
-	c.queue.Add(key)
+	c.checkpointQueue.Add(cache.NewObjectName("ns", "checkpoint"))
 	require.True(t, c.processNextWorkItem(ctx))
 	require.Equal(t, 1, applies)
-	require.Equal(t, 1, c.queue.NumRequeues(key))
+	require.Equal(t, 1, c.checkpointQueue.NumRequeues(cache.NewObjectName("ns", "checkpoint")))
+}
+
+func TestNewControllerSharesPodRestoreFromIndex(t *testing.T) {
+	before := goleak.IgnoreCurrent()
+	t.Cleanup(func() { goleak.VerifyNone(t, before) })
+	client := fake.NewClientset()
+	factory := informers.NewSharedInformerFactory(client, 0)
+	for range 2 {
+		c, err := NewController(context.Background(), "podcheckpoint-controller", factory.Node().V1alpha1().PodCheckpoints(), factory.Core().V1().Pods(), client)
+		require.NoError(t, err, "controllers sharing a Pod informer must reuse its index")
+		t.Cleanup(c.checkpointQueue.ShutDown)
+		t.Cleanup(c.eventBroadcaster.Shutdown)
+	}
+}
+
+func TestPodEventsEnqueueRestoreChanges(t *testing.T) {
+	restorePod := func(mutate ...func(*v1.Pod)) *v1.Pod {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "restore", ResourceVersion: "1"},
+			Spec:       v1.PodSpec{NodeName: "node-a", RestoreFrom: &v1.CheckpointReference{Name: "cp"}},
+			Status: v1.PodStatus{Phase: v1.PodPending, Conditions: []v1.PodCondition{
+				{Type: v1.PodRestored, Status: v1.ConditionUnknown},
+			}},
+		}
+		for _, f := range mutate {
+			f(pod)
+		}
+		return pod
+	}
+	restored := func(pod *v1.Pod) {
+		pod.Status.Conditions[0] = v1.PodCondition{Type: v1.PodRestored, Status: v1.ConditionTrue, Reason: nodeapi.PodRestoreReasonCompleted}
+	}
+	running := func(pod *v1.Pod) { pod.Status.Phase = v1.PodRunning }
+	ready := func(pod *v1.Pod) {
+		pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue})
+	}
+	probed := func(pod *v1.Pod) { pod.Status.Conditions[0].LastProbeTime = metav1.Now() }
+	deleting := func(pod *v1.Pod) { pod.DeletionTimestamp = new(metav1.Now()) }
+	notRestoring := func(pod *v1.Pod) { pod.Spec.RestoreFrom = nil }
+
+	for _, tc := range []struct {
+		name           string
+		old, cur       *v1.Pod
+		wantCheckpoint bool
+	}{
+		{name: "created", cur: restorePod(), wantCheckpoint: true},
+		{name: "created without restore", cur: restorePod(notRestoring)},
+		{name: "status write without restore change", old: restorePod(running), cur: restorePod(running, ready)},
+		{name: "condition probe time only", old: restorePod(), cur: restorePod(probed)},
+		{name: "update without restore", old: restorePod(notRestoring), cur: restorePod(notRestoring, running)},
+		{name: "phase change", old: restorePod(), cur: restorePod(running), wantCheckpoint: true},
+		{name: "restore outcome", old: restorePod(running), cur: restorePod(running, restored), wantCheckpoint: true},
+		{name: "deletion", old: restorePod(), cur: restorePod(deleting), wantCheckpoint: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newTestController(t, fake.NewClientset(), nil, nil)
+			if tc.old == nil {
+				c.addPod(tc.cur)
+			} else {
+				c.updatePod(tc.old, tc.cur)
+			}
+			var want []string
+			if tc.wantCheckpoint {
+				want = []string{"ns/cp"}
+			}
+			require.Equal(t, want, queued(c.checkpointQueue))
+		})
+	}
 }

@@ -81,7 +81,7 @@ func TestPodCheckpointGeneration(t *testing.T) {
 }
 
 // TestPodCheckpointControllerReconciles verifies routing to the source node
-// before execution.
+// before execution, and restore-lock removal when no Pod still needs the data.
 func TestPodCheckpointControllerReconciles(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
 
@@ -103,6 +103,7 @@ func TestPodCheckpointControllerReconciles(t *testing.T) {
 	go controller.Run(tCtx, 1)
 
 	checkpoint := newPodCheckpoint(ns.Name, "cp-1", "source-pod")
+	checkpoint.Finalizers = []string{podcheckpointcontroller.RestoreLockFinalizer}
 	if _, err := checkpoints.Create(tCtx, checkpoint, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("failed to create PodCheckpoint: %v", err)
 	}
@@ -127,6 +128,20 @@ func TestPodCheckpointControllerReconciles(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("controller did not assign the checkpoint: %v", err)
+	}
+	if err := checkpoints.Delete(tCtx, checkpoint.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	err = wait.PollUntilContextTimeout(tCtx, time.Second, 60*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, err := checkpoints.Get(ctx, "cp-1", metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		t.Fatalf("controller did not remove the inactive restore lock: %v", err)
 	}
 }
 

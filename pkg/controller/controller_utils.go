@@ -92,6 +92,9 @@ const (
 	// PodControllerIndex is the name for the Pod store's index function,
 	// which indexes by the key returned from PodControllerIndexKey.
 	PodControllerIndex = "podController"
+	// PodRestoreFromIndex is the name for the Pod store's index function,
+	// which indexes by the key returned from PodRestoreFromIndexKey.
+	PodRestoreFromIndex = "podRestoreFrom"
 )
 
 var UpdateTaintBackoff = wait.Backoff{
@@ -1149,6 +1152,32 @@ func AddPodNodeNameIndexer(podInformer cache.SharedIndexInformer) error {
 				return []string{}, nil
 			}
 			return []string{pod.Spec.NodeName}, nil
+		},
+	})
+}
+
+// PodRestoreFromIndexKey returns the index key to locate the Pods in the
+// namespace that restore from the given PodCheckpoint.
+func PodRestoreFromIndexKey(namespace, checkpointName string) string {
+	return namespace + "/" + checkpointName
+}
+
+// AddPodRestoreFromIndexer adds an indexer for the PodCheckpoint that a Pod's
+// spec.restoreFrom references to the given PodInformer. The informer is shared
+// by all controllers, so the index is added once and then reused by every
+// controller that calls this function.
+func AddPodRestoreFromIndexer(podInformer cache.SharedIndexInformer) error {
+	if _, exists := podInformer.GetIndexer().GetIndexers()[PodRestoreFromIndex]; exists {
+		// indexer already exists, do nothing
+		return nil
+	}
+	return podInformer.AddIndexers(cache.Indexers{
+		PodRestoreFromIndex: func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok || pod.Spec.RestoreFrom == nil || pod.Spec.RestoreFrom.Name == "" {
+				return nil, nil
+			}
+			return []string{PodRestoreFromIndexKey(pod.Namespace, pod.Spec.RestoreFrom.Name)}, nil
 		},
 	})
 }
