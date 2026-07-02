@@ -129,6 +129,9 @@ func IsForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim, acceptPodGroupOwner
 	}
 	if !metav1.IsControlledBy(claim, pod) {
 		if acceptPodGroupOwner {
+			if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
+				return fmt.Errorf("ResourceClaim %s/%s was not created for Pod %s/%s (Pod is not owner, and PodGroup ownership could not be checked because the Pod has no scheduling group)", claim.Namespace, claim.Name, pod.Namespace, pod.Name)
+			}
 			if !isForPodGroupByPod(pod, claim) {
 				return fmt.Errorf("ResourceClaim %s/%s was not created for Pod %s/%s (neither Pod nor PodGroup %s is the owner)", claim.Namespace, claim.Name, pod.Namespace, pod.Name, *pod.Spec.SchedulingGroup.PodGroupName)
 			}
