@@ -1401,6 +1401,11 @@ type Kubelet struct {
 	// Reference to this node.
 	nodeRef *v1.ObjectReference
 
+	// cachedNodeRef caches a copy of nodeRef with the Node's UID resolved, so the
+	// common path of recording a node event allocates nothing and does no lister
+	// lookup. It is populated lazily once the UID is known; see nodeRefWithUID.
+	cachedNodeRef atomic.Pointer[v1.ObjectReference]
+
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime
 
@@ -1709,7 +1714,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		if err := kl.containerGC.GarbageCollect(ctx); err != nil {
 			logger.Error(err, "Container garbage collection failed")
-			kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, v1.EventTypeWarning, events.ContainerGCFailed, "%s", err.Error())
+			kl.recorder.WithLogger(logger).Eventf(kl.nodeRefWithUID(), v1.EventTypeWarning, events.ContainerGCFailed, "%s", err.Error())
 			loggedContainerGCFailure = true
 		} else {
 			var vLevel klog.Level = 4
@@ -1736,7 +1741,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 			if prevImageGCFailed {
 				logger.Error(err, "Image garbage collection failed multiple times in a row")
 				// Only create an event for repeated failures
-				kl.recorder.WithLogger(logger).Event(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
+				kl.recorder.WithLogger(logger).Event(kl.nodeRefWithUID(), v1.EventTypeWarning, events.ImageGCFailed, err.Error())
 			} else {
 				logger.Error(err, "Image garbage collection failed once. Stats initialization may not have completed yet")
 			}
@@ -1909,7 +1914,7 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 	}
 
 	if err := kl.initializeModules(ctx); err != nil {
-		kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, "%s", err.Error())
+		kl.recorder.WithLogger(logger).Eventf(kl.nodeRefWithUID(), v1.EventTypeWarning, events.KubeletSetupFailed, "%s", err.Error())
 		logger.Error(err, "Failed to initialize internal modules")
 		os.Exit(1)
 	}
@@ -3328,7 +3333,7 @@ func (kl *Kubelet) GetConfiguration() kubeletconfiginternal.KubeletConfiguration
 // BirthCry sends an event that the kubelet has started up.
 func (kl *Kubelet) BirthCry() {
 	// Make an event that kubelet restarted.
-	kl.recorder.Eventf(kl.nodeRef, v1.EventTypeNormal, events.StartingKubelet, "Starting kubelet.")
+	kl.recorder.Eventf(kl.nodeRefWithUID(), v1.EventTypeNormal, events.StartingKubelet, "Starting kubelet.")
 }
 
 // ListenAndServe runs the kubelet HTTP server.
