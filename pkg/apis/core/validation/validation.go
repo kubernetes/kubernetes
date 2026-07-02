@@ -4704,13 +4704,14 @@ func validateContainerOnlyForPod(ctr *core.Container, path *field.Path) field.Er
 	return allErrs
 }
 
-// validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
-// and is called by ValidatePodCreate and ValidatePodUpdate.
-func validatePodMetadataAndSpec(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
+// validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set.
+// Update validators pass oldPod so shared Pod update checks also cover subresources.
+func validatePodMetadataAndSpec(pod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	specPath := field.NewPath("spec")
 
-	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, metaPath)
+	allErrs := validatePodCheckpointingUpdate(pod, oldPod)
+	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, metaPath)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, metaPath.Child("annotations"), opts)...)
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, specPath, opts)...)
 
@@ -5929,7 +5930,7 @@ func validateContainerImage(image string, fldPath *field.Path) field.ErrorList {
 
 // ValidatePodCreate validates a pod in the context of its initial create
 func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
-	allErrs := validatePodMetadataAndSpec(pod, opts)
+	allErrs := validatePodMetadataAndSpec(pod, nil, opts)
 
 	fldPath := field.NewPath("spec")
 	// EphemeralContainers can only be set on update using the ephemeralcontainers subresource
@@ -6032,7 +6033,7 @@ var updatablePodSpecFields = []string{
 func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, oldPod, opts)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, fldPath.Child("annotations"), opts)...)
 	allErrs = append(allErrs, validatePodSpecUpdate(newPod, oldPod, opts)...)
 	return allErrs
@@ -6674,7 +6675,7 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 	// Part 1: Validate newPod's spec and updates to metadata
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, oldPod, opts)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, fldPath.Child("annotations"), opts)...)
 
 	// static pods don't support ephemeral containers #113935
@@ -6714,7 +6715,7 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, oldPod, opts)...)
 
 	// static pods cannot be resized.
 	if _, ok := oldPod.Annotations[core.MirrorPodAnnotationKey]; ok {
@@ -6890,7 +6891,7 @@ func ValidatePodDynamicUpdate(newPod, oldPod *core.Pod, opts PodValidationOption
 	metaPath := field.NewPath("metadata")
 	specPath := field.NewPath("spec")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, metaPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, oldPod, opts)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, metaPath.Child("annotations"), opts)...)
 
 	containerErrs, containersChanged := validateDynamicContainerChanges(newPod, oldPod, specPath, opts)

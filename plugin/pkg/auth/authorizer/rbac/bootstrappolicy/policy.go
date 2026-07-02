@@ -68,6 +68,7 @@ const (
 	admissionRegistrationGroup   = "admissionregistration.k8s.io"
 	storageVersionMigrationGroup = "storagemigration.k8s.io"
 	schedulingGroup              = "scheduling.k8s.io"
+	nodeGroup                    = "node.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -146,6 +147,9 @@ func viewRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaims/status", "resourceclaimtemplates").RuleOrDie(),
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(nodeGroup).Resources("podcheckpoints", "podcheckpoints/status").RuleOrDie())
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads", "podgroups", "podgroups/status").RuleOrDie())
 	}
@@ -194,6 +198,9 @@ func editRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule(ReadWrite...).Groups(coordinationGroup).Resources("leases").RuleOrDie(),
 
 		rbacv1helpers.NewRule(Write...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaimtemplates").RuleOrDie(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(nodeGroup).Resources("podcheckpoints").RuleOrDie())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie())

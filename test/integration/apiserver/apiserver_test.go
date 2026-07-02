@@ -4078,6 +4078,9 @@ func TestDefaultStorageEncoding(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				var o unstructured.Unstructured
+				if err := etcd.CreatePrerequisites(context.TODO(), dynamicClient, NamespaceName, storageData.Prerequisites); err != nil {
+					t.Fatal(err)
+				}
 				if err := utiljson.Unmarshal([]byte(storageData.Stub), &o.Object); err != nil {
 					t.Fatal(err)
 				}
