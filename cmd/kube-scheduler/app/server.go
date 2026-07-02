@@ -217,7 +217,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	handlerSyncReadyCh := make(chan struct{})
-	handlerSyncCheck := healthz.NamedCheck("sched-handler-sync", func(_ *http.Request) error {
+	handlerSyncCheck := healthz.NamedCheck("sched-handler-sync", func(_ context.Context) error {
 		select {
 		case <-handlerSyncReadyCh:
 			return nil

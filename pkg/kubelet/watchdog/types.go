@@ -18,7 +18,6 @@ package watchdog
 
 import (
 	"context"
-	"net/http"
 
 	"k8s.io/apiserver/pkg/server/healthz"
 )
@@ -31,5 +30,5 @@ type HealthChecker interface {
 
 // syncLoopHealthChecker contains the health check method for syncLoop.
 type syncLoopHealthChecker interface {
-	SyncLoopHealthCheck(req *http.Request) error
+	SyncLoopHealthCheck(ctx context.Context) error
 }

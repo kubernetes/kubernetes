@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -159,9 +160,9 @@ func (c delayedLivezCheck) Name() string {
 	return c.check.Name()
 }
 
-func (c delayedLivezCheck) Check(req *http.Request) error {
+func (c delayedLivezCheck) Check(ctx context.Context) error {
 	if c.clock.Now().After(c.startCheck) {
-		return c.check.Check(req)
+		return c.check.Check(ctx)
 	}
 	return nil
 }
