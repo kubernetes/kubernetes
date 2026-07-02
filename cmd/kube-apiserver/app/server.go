@@ -306,8 +306,10 @@ func buildServiceResolver(enabledAggregatorRouting bool, hostname string, inform
 			endpointSliceGetter,
 		)
 	} else {
-		serviceResolver = aggregatorapiserver.NewClusterIPServiceResolver(
+		// Use readiness-aware resolver for ClusterIP routing to ensure webhooks don't target non-ready endpoints
+		serviceResolver = aggregatorapiserver.NewClusterIPServiceResolverWithReadiness(
 			informer.Core().V1().Services().Lister(),
+			endpointSliceGetter,
 		)
 	}
 

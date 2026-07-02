@@ -616,3 +616,185 @@ func TestResolveEndpointDistribution(t *testing.T) {
 		})
 	}
 }
+
+// Tests that ResolveClusterWithReadiness properly checks endpoint readiness
+func TestResolveClusterWithReadiness(t *testing.T) {
+	readyTrue := true
+	readyFalse := false
+
+	matchingEndpointSlicesReady := func(svc *v1.Service) []*discoveryv1.EndpointSlice {
+		ports := []discoveryv1.EndpointPort{}
+		for _, p := range svc.Spec.Ports {
+			if p.TargetPort.Type != intstr.Int {
+				continue
+			}
+			ports = append(ports, discoveryv1.EndpointPort{Name: &p.Name, Port: &p.TargetPort.IntVal})
+		}
+
+		return []*discoveryv1.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: svc.Namespace,
+				Name:      svc.Name + "-xxx",
+				Labels: map[string]string{
+					discoveryv1.LabelServiceName: svc.Name,
+				},
+			},
+			Endpoints: []discoveryv1.Endpoint{{
+				Hostname:  ptr.To("dummy-host"),
+				Addresses: []string{"127.0.0.1"},
+				Conditions: discoveryv1.EndpointConditions{
+					Ready: &readyTrue,
+				},
+			}},
+			Ports: ports,
+		}}
+	}
+
+	matchingEndpointSlicesNotReady := func(svc *v1.Service) []*discoveryv1.EndpointSlice {
+		ports := []discoveryv1.EndpointPort{}
+		for _, p := range svc.Spec.Ports {
+			if p.TargetPort.Type != intstr.Int {
+				continue
+			}
+			ports = append(ports, discoveryv1.EndpointPort{Name: &p.Name, Port: &p.TargetPort.IntVal})
+		}
+
+		return []*discoveryv1.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: svc.Namespace,
+				Name:      svc.Name + "-xxx",
+				Labels: map[string]string{
+					discoveryv1.LabelServiceName: svc.Name,
+				},
+			},
+			Endpoints: []discoveryv1.Endpoint{{
+				Hostname:  ptr.To("dummy-host"),
+				Addresses: []string{"127.0.0.1"},
+				Conditions: discoveryv1.EndpointConditions{
+					Ready: &readyFalse,
+				},
+			}},
+			Ports: ports,
+		}}
+	}
+
+	type expectation struct {
+		url   string
+		error bool
+	}
+
+	tests := []struct {
+		name           string
+		services       []*v1.Service
+		endpointSlices func(svc *v1.Service) []*discoveryv1.EndpointSlice
+		expectation    expectation
+	}{
+		{
+			name: "cluster ip with ready endpoint",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "ready-svc"},
+					Spec: v1.ServiceSpec{
+						Type:      v1.ServiceTypeClusterIP,
+						ClusterIP: "10.0.0.1",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt32(443)},
+						},
+					},
+				},
+			},
+			endpointSlices: matchingEndpointSlicesReady,
+			expectation:    expectation{url: "https://10.0.0.1:443", error: false},
+		},
+		{
+			name: "cluster ip with no ready endpoints",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "not-ready-svc"},
+					Spec: v1.ServiceSpec{
+						Type:      v1.ServiceTypeClusterIP,
+						ClusterIP: "10.0.0.2",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt32(443)},
+						},
+					},
+				},
+			},
+			endpointSlices: matchingEndpointSlicesNotReady,
+			expectation:    expectation{error: true},
+		},
+		{
+			name: "cluster ip with missing endpoints",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "no-endpoints-svc"},
+					Spec: v1.ServiceSpec{
+						Type:      v1.ServiceTypeClusterIP,
+						ClusterIP: "10.0.0.3",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt32(443)},
+						},
+					},
+				},
+			},
+			endpointSlices: nil,
+			expectation:    expectation{error: true}, // Should error when no endpoints found
+		},
+		{
+			name: "external name service",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "external-svc"},
+					Spec: v1.ServiceSpec{
+						Type:         v1.ServiceTypeExternalName,
+						ExternalName: "example.com",
+					},
+				},
+			},
+			endpointSlices: nil,
+			expectation:    expectation{url: "https://example.com:443", error: false},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			serviceCache := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			serviceLister := v1listers.NewServiceLister(serviceCache)
+			for i := range test.services {
+				if err := serviceCache.Add(test.services[i]); err != nil {
+					t.Fatalf("%s unexpected service add error: %v", test.name, err)
+				}
+			}
+
+			endpointSliceCache := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			endpointSliceLister := discoveryv1listers.NewEndpointSliceLister(endpointSliceCache)
+			if test.endpointSlices != nil {
+				for _, svc := range test.services {
+					for _, ep := range test.endpointSlices(svc) {
+						if err := endpointSliceCache.Add(ep); err != nil {
+							t.Fatalf("%s unexpected endpointslice add error: %v", test.name, err)
+						}
+					}
+				}
+			}
+
+			endpointSliceGetter, err := NewEndpointSliceListerGetter(endpointSliceLister)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			url, err := ResolveClusterWithReadiness(serviceLister, endpointSliceGetter, "one", test.services[0].Name, 443)
+
+			switch {
+			case err == nil && test.expectation.error:
+				t.Errorf("%s expected error, got none", test.name)
+			case err != nil && test.expectation.error:
+				// expected error
+			case err != nil:
+				t.Errorf("%s unexpected error: %v", test.name, err)
+			case url.String() != test.expectation.url:
+				t.Errorf("%s expected url %q, got %q", test.name, test.expectation.url, url.String())
+			}
+		})
+	}
+}
