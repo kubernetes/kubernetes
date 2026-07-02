@@ -298,6 +298,11 @@ func (r *FakeRuntimeService) RemovePodSandbox(_ context.Context, podSandboxID st
 
 	// Remove the pod sandbox
 	delete(r.Sandboxes, podSandboxID)
+	for containerID, container := range r.Containers {
+		if container.SandboxID == podSandboxID {
+			delete(r.Containers, containerID)
+		}
+	}
 
 	return nil
 }
@@ -768,6 +773,48 @@ func (r *FakeRuntimeService) RestorePod(ctx context.Context, options *runtimeapi
 			Name:        name,
 			ContainerId: containerID,
 		})
+	}
+
+	podSandboxID := response.GetPodSandboxId()
+	network := &runtimeapi.PodSandboxNetworkStatus{Ip: FakePodSandboxIPs[0]}
+	for _, ip := range FakePodSandboxIPs[1:] {
+		network.AdditionalIps = append(network.AdditionalIps, &runtimeapi.PodIP{Ip: ip})
+	}
+	r.Sandboxes[podSandboxID] = &FakePodSandbox{
+		PodSandboxStatus: runtimeapi.PodSandboxStatus{
+			Id:          podSandboxID,
+			Metadata:    options.GetConfig().GetMetadata(),
+			State:       runtimeapi.PodSandboxState_SANDBOX_READY,
+			CreatedAt:   time.Now().UnixNano(),
+			Network:     network,
+			Labels:      options.GetConfig().GetLabels(),
+			Annotations: options.GetConfig().GetAnnotations(),
+		},
+		RuntimeHandler: options.GetRuntimeHandler(),
+	}
+	configsByName := make(map[string]*runtimeapi.ContainerConfig, len(options.GetContainerConfigs()))
+	for _, config := range options.GetContainerConfigs() {
+		configsByName[config.GetMetadata().GetName()] = config
+	}
+	for _, restored := range response.GetRestoredContainers() {
+		config := configsByName[restored.GetName()]
+		if config == nil || restored.GetContainerId() == "" {
+			continue
+		}
+		r.Containers[restored.GetContainerId()] = &FakeContainer{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:          restored.GetContainerId(),
+				Metadata:    config.Metadata,
+				Image:       config.Image,
+				ImageRef:    config.GetImage().GetImage(),
+				CreatedAt:   time.Now().UnixNano(),
+				State:       runtimeapi.ContainerState_CONTAINER_CREATED,
+				Labels:      config.Labels,
+				Annotations: config.Annotations,
+			},
+			SandboxID:      podSandboxID,
+			LinuxResources: config.GetLinux().GetResources(),
+		}
 	}
 	return response, nil
 }

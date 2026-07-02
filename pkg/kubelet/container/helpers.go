@@ -56,6 +56,15 @@ type RuntimeHelper interface {
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
+	// GetPodCheckpointPath resolves the pod's spec.restoreFrom.name (the name of a
+	// PodCheckpoint in the pod's namespace) to the on-node checkpoint
+	// directory. It returns an error if the checkpoint cannot be found, is not
+	// ready, or was taken on a different node (cross-node restore is out of
+	// scope).
+	GetPodCheckpointPath(ctx context.Context, pod *v1.Pod) (string, error)
+	// UpdatePodRestoreHosts refreshes the kubelet-managed /etc/hosts file after
+	// RestorePod has created the sandbox and CNI has assigned its IPs.
+	UpdatePodRestoreHosts(ctx context.Context, pod *v1.Pod, podIPs []string) error
 	GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
@@ -83,6 +92,23 @@ type RuntimeHelper interface {
 
 	// ResizeEphemeralVolume directly triggers a resize of the specified volume.
 	ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
+
+	// SetPodRestoreBlocked records whether a pod's restore-from-checkpoint is
+	// currently blocked waiting for another restore of the same (namespace, name)
+	// to finish, so the kubelet can surface the Restoring=False/RestoreInProgress
+	// condition (KEP-5823).
+	SetPodRestoreBlocked(podUID types.UID, blocked bool)
+
+	// IsPodCheckpointInProgress reports whether a Pod-level checkpoint is
+	// running for podUID. The runtime manager uses it to avoid starting an
+	// ephemeral container while the runtime is capturing the pod.
+	IsPodCheckpointInProgress(podUID types.UID) bool
+
+	// TryAcquirePodCheckpointContainerStart atomically excludes a Pod checkpoint
+	// while an ephemeral container is created and started. The returned release
+	// function must be called when ok is true; ok is false when the start should
+	// be deferred because checkpoint capture owns the gate.
+	TryAcquirePodCheckpointContainerStart(podUID types.UID) (release func(), ok bool)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
