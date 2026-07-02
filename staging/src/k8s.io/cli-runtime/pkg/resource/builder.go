@@ -87,8 +87,9 @@ type Builder struct {
 	limitChunks       int64
 	requestTransforms []RequestTransform
 
-	resources   []string
-	subresource string
+	resources                 []string
+	subresource               string
+	categoryExpandedResources sets.Set[schema.GroupResource]
 
 	namespace    string
 	allNamespace bool
@@ -104,8 +105,9 @@ type Builder struct {
 
 	requireObject bool
 
-	singleResourceType bool
-	continueOnError    bool
+	singleResourceType   bool
+	continueOnError      bool
+	categoryExpanderErrs []utilerrors.Matcher
 
 	singleItemImplied bool
 
@@ -645,6 +647,7 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 // aliases found in it
 func (b *Builder) ReplaceAliases(input string) string {
 	replaced := []string{}
+	explicitlyRequestedResources := sets.New[schema.GroupResource]()
 	for _, arg := range strings.Split(input, ",") {
 		if b.categoryExpanderFn == nil {
 			continue
@@ -658,6 +661,10 @@ func (b *Builder) ReplaceAliases(input string) string {
 		if resources, ok := categoryExpander.Expand(arg); ok {
 			asStrings := []string{}
 			for _, resource := range resources {
+				if b.categoryExpandedResources == nil {
+					b.categoryExpandedResources = sets.New[schema.GroupResource]()
+				}
+				b.categoryExpandedResources.Insert(resource)
 				if len(resource.Group) == 0 {
 					asStrings = append(asStrings, resource.Resource)
 					continue
@@ -665,8 +672,14 @@ func (b *Builder) ReplaceAliases(input string) string {
 				asStrings = append(asStrings, resource.Resource+"."+resource.Group)
 			}
 			arg = strings.Join(asStrings, ",")
+		} else {
+			_, groupResource := schema.ParseResourceArg(arg)
+			explicitlyRequestedResources.Insert(groupResource)
 		}
 		replaced = append(replaced, arg)
+	}
+	if b.categoryExpandedResources != nil {
+		b.categoryExpandedResources.Delete(explicitlyRequestedResources.UnsortedList()...)
 	}
 	return strings.Join(replaced, ",")
 }
@@ -756,6 +769,14 @@ func (b *Builder) RequireObject(require bool) *Builder {
 // the first error is returned from a VisitorFunc.
 func (b *Builder) ContinueOnError() *Builder {
 	b.continueOnError = true
+	return b
+}
+
+// IgnoreErrorsForCategoryExpansion filters errors for resources reached through category expansion.
+func (b *Builder) IgnoreErrorsForCategoryExpansion(fns ...ErrMatchFunc) *Builder {
+	for _, fn := range fns {
+		b.categoryExpanderErrs = append(b.categoryExpanderErrs, utilerrors.Matcher(fn))
+	}
 	return b
 }
 
@@ -943,7 +964,14 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.limitChunks))
+		visitor := Visitor(NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.limitChunks))
+		if b.categoryExpandedResources.Has(mapping.Resource.GroupResource()) && len(b.categoryExpanderErrs) > 0 {
+			visitor = categoryExpandedResourceErrorFilter{
+				Visitor:  visitor,
+				matchers: b.categoryExpanderErrs,
+			}
+		}
+		visitors = append(visitors, visitor)
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)
@@ -974,6 +1002,15 @@ func (b *Builder) getClient(gv schema.GroupVersion) (RESTClient, error) {
 	}
 
 	return NewClientWithOptions(client, b.requestTransforms...), nil
+}
+
+type categoryExpandedResourceErrorFilter struct {
+	Visitor
+	matchers []utilerrors.Matcher
+}
+
+func (v categoryExpandedResourceErrorFilter) Visit(fn VisitorFunc) error {
+	return utilerrors.FilterOut(v.Visitor.Visit(fn), v.matchers...)
 }
 
 func (b *Builder) visitByResource() *Result {
