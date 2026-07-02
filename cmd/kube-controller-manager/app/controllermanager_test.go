@@ -265,7 +265,6 @@ func TestRunControllers(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			controllerCtx := ControllerContext{}
 
 			// testCtx is used to make sure the controller failing to shut down can exit after the test is finished.
 			testCtx, cancelTest := context.WithCancel(ctx)
@@ -276,7 +275,7 @@ func TestRunControllers(t *testing.T) {
 			ctx, cancelController := context.WithCancel(ctx)
 			cancelController()
 
-			cleanShutdown := RunControllers(ctx, controllerCtx, []Controller{tc.newController(testCtx)}, 0, tc.shutdownTimeout)
+			cleanShutdown := RunControllers(ctx, []Controller{tc.newController(testCtx)}, tc.shutdownTimeout)
 			if cleanShutdown != tc.expectedCleanTermination {
 				t.Errorf("expected clean shutdown %v, got %v", tc.expectedCleanTermination, cleanShutdown)
 			}
@@ -300,6 +299,6 @@ func runControllers(
 	if err != nil {
 		return err
 	}
-	RunControllers(ctx, controllerCtx, controllers, 0, 0)
+	RunControllers(ctx, controllers, 0)
 	return nil
 }
