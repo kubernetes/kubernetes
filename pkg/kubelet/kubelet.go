@@ -2972,7 +2972,7 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 				} else {
 					// We can hit this case if a pending resize has been reverted,
 					// so we need to clear the pending resize condition.
-					kl.statusManager.ClearPodResizePendingCondition(pod.UID)
+					kl.statusManager.ClearPodResizePendingCondition(pod.UID, "reverted")
 				}
 			}
 		}

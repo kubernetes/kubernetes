@@ -197,8 +197,9 @@ const (
 	PodResizeDurationMillisecondsKey = "pod_resize_duration_milliseconds"
 	PodPendingResizesKey             = "pod_pending_resizes"
 	PodInfeasibleResizesKey          = "pod_infeasible_resizes_total"
-	PodInProgressResizesKey          = "pod_in_progress_resizes"
-	PodDeferredAcceptedResizesKey    = "pod_deferred_accepted_resizes_total"
+	PodInProgressResizesKey             = "pod_in_progress_resizes"
+	PodDeferredAcceptedResizesKey       = "pod_deferred_accepted_resizes_total"
+	PodDeferredResizeDurationSecondsKey = "pod_deferred_resize_duration_seconds"
 
 	// Metric key for podcertificate states.
 	PodCertificateStatesKey = "podcertificate_states"
@@ -239,6 +240,9 @@ var (
 
 	// podResizeDurationBuckets is the bucket boundaries for pod_resize_duration_milliseconds metrics.
 	podResizeDurationBuckets = []float64{10, 50, 100, 500, 1000, 2000, 5000, 10000, 20000, 30000, 60000, 120000, 300000, 600000}
+
+	// podDeferredResizeDurationBuckets is the bucket boundaries for pod_deferred_resize_duration_seconds metrics.
+	podDeferredResizeDurationBuckets = []float64{5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 180, 300, 600, 1200, 1800, 3600}
 )
 
 var (
@@ -1226,7 +1230,7 @@ var (
 			Help:           "Number of pending resizes for pods.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"reason"},
+		[]string{"reason", "priority_bucket"},
 	)
 
 	// PodInfeasibleResizes tracks the number of infeasible resizes for pods.
@@ -1259,6 +1263,18 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"retry_trigger"},
+	)
+
+	// PodDeferredResizeDurationSeconds tracks the duration (in seconds) that a pod remains deferred before completion.
+	PodDeferredResizeDurationSeconds = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodDeferredResizeDurationSecondsKey,
+			Help:           "Duration in seconds that a pod resize remains deferred before completion.",
+			Buckets:        podDeferredResizeDurationBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resolution", "priority_bucket"},
 	)
 
 	// ResourceManagerAllocationsTotal counts the total number of exclusive resource
@@ -1424,6 +1440,7 @@ func Register() {
 			legacyregistry.MustRegister(PodInfeasibleResizes)
 			legacyregistry.MustRegister(PodInProgressResizes)
 			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
+			legacyregistry.MustRegister(PodDeferredResizeDurationSeconds)
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
