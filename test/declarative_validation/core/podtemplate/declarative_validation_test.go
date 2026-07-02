@@ -22,9 +22,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/core/podtemplate"
 	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -96,4 +99,53 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		updateObj := *mkPodTemplate()
 		meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 	}
+}
+
+// TestDeclarativeValidateRestoreFrom covers the declarative rules on the pod
+// template's spec.restoreFrom (KEP-5823): the referenced PodCheckpoint name is
+// required and must be a valid long name. The feature gate is enabled because a
+// present restoreFrom is only validated with the gate on (the field is dropped
+// in PrepareForCreate otherwise).
+func TestDeclarativeValidateRestoreFrom(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIPrefix:         "api",
+			APIGroup:          "",
+			APIVersion:        apiVersion,
+			IsResourceRequest: true,
+			Verb:              "create",
+		})
+		testCases := map[string]struct {
+			input        *api.PodTemplate
+			expectedErrs field.ErrorList
+		}{
+			"restoreFrom: valid name": {
+				input: mkPodTemplateRestoreFrom("valid-checkpoint"),
+			},
+			"restoreFrom: invalid name format": {
+				input: mkPodTemplateRestoreFrom("Invalid-Name"),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("template", "spec", "restoreFrom", "name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+				},
+			},
+			"restoreFrom: empty name": {
+				input: mkPodTemplateRestoreFrom(""),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("template", "spec", "restoreFrom", "name"), "").MarkAlpha(),
+				},
+			},
+		}
+		for k, tc := range testCases {
+			t.Run(k, func(t *testing.T) {
+				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
+			})
+		}
+	}
+}
+
+func mkPodTemplateRestoreFrom(name string) *api.PodTemplate {
+	pt := mkPodTemplate()
+	pt.Template.Spec.RestoreFrom = &api.CheckpointReference{Name: name}
+	return pt
 }

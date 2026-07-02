@@ -50,6 +50,7 @@ import (
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/apis/checkpoint"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -245,6 +246,95 @@ type admitTestCase struct {
 	setupFunc            func(t *testing.T)
 	err                  string
 	authz                authorizer.UnconditionalAuthorizer
+}
+
+func Test_nodePlugin_Admit_PodCheckpointStatus(t *testing.T) {
+	var (
+		mynode = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
+
+		pcResource = checkpoint.SchemeGroupVersion.WithResource("podcheckpoints")
+		pcKind     = checkpoint.SchemeGroupVersion.WithKind("PodCheckpoint")
+	)
+	mkPC := func(statusNode, sourcePodName string) *checkpoint.PodCheckpoint {
+		pc := &checkpoint.PodCheckpoint{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "cp"},
+			Spec:       checkpoint.PodCheckpointSpec{SourcePod: &checkpoint.PodReference{Name: sourcePodName}},
+		}
+		if statusNode != "" {
+			pc.Status.NodeName = &statusNode
+		}
+		return pc
+	}
+	attrs := func(old, obj *checkpoint.PodCheckpoint, subresource string, op admission.Operation) admission.Attributes {
+		var opts runtime.Object = &metav1.UpdateOptions{}
+		if op == admission.Create {
+			opts = &metav1.CreateOptions{}
+		}
+		return admission.NewAttributesRecord(obj, old, pcKind, "ns", "cp", pcResource, subresource, op, opts, false, mynode)
+	}
+
+	// Pod lister for the first-write path: a node may claim a checkpoint only if
+	// its source pod is bound to that node.
+	podsIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	if err := podsIndex.Add(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "mypod"}, Spec: corev1.PodSpec{NodeName: "mynode"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := podsIndex.Add(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "otherpod"}, Spec: corev1.PodSpec{NodeName: "othernode"}}); err != nil {
+		t.Fatal(err)
+	}
+	pods := corev1lister.NewPodLister(podsIndex)
+
+	tests := []admitTestCase{
+		{
+			name:       "node finalizes status of its own checkpoint",
+			podsGetter: pods,
+			attributes: attrs(mkPC("mynode", "mypod"), mkPC("mynode", "mypod"), "status", admission.Update),
+		},
+		{
+			name:       "node cannot finalize status of another node's checkpoint",
+			podsGetter: pods,
+			attributes: attrs(mkPC("othernode", "mypod"), mkPC("othernode", "mypod"), "status", admission.Update),
+			err:        "recorded on node \"othernode\"",
+		},
+		{
+			name:       "node claims first write when source pod is bound to it",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", "mypod"), mkPC("", "mypod"), "status", admission.Update),
+		},
+		{
+			name:       "node cannot claim first write when source pod is on another node",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", "otherpod"), mkPC("", "otherpod"), "status", admission.Update),
+			err:        "assigned to node \"othernode\"",
+		},
+		{
+			name:       "node cannot claim first write with no source pod recorded",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", ""), mkPC("", ""), "status", admission.Update),
+			err:        "no source pod recorded",
+		},
+		{
+			name:       "node cannot claim first write when source pod is missing",
+			podsGetter: pods,
+			attributes: attrs(mkPC("", "ghost"), mkPC("", "ghost"), "status", admission.Update),
+			err:        "cannot update PodCheckpoint",
+		},
+		{
+			name:       "node cannot update non-status subresource",
+			podsGetter: pods,
+			attributes: attrs(mkPC("mynode", "mypod"), mkPC("mynode", "mypod"), "", admission.Update),
+			err:        "may only update the status subresource",
+		},
+		{
+			name:       "node cannot create podcheckpoint status",
+			podsGetter: pods,
+			attributes: attrs(nil, mkPC("mynode", "mypod"), "status", admission.Create),
+			err:        "unexpected operation",
+		},
+	}
+	for i := range tests {
+		tests[i].run(t)
+	}
 }
 
 func (a *admitTestCase) run(t *testing.T) {

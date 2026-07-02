@@ -584,3 +584,49 @@ var validJobSpec = batch.JobSpec{
 	Completions:    ptr.To[int32](10),
 	Parallelism:    ptr.To[int32](10),
 }
+
+// TestDeclarativeValidateRestoreFrom covers the declarative rules on the pod
+// template's spec.restoreFrom (KEP-5823): the referenced PodCheckpoint name is
+// required and must be a valid long name. The feature gate is enabled because a
+// present restoreFrom is only validated with the gate on (the field is dropped
+// in PrepareForCreate otherwise).
+func TestDeclarativeValidateRestoreFrom(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIGroup:   "batch",
+			APIVersion: apiVersion,
+		})
+		testCases := map[string]struct {
+			input        batch.Job
+			expectedErrs field.ErrorList
+		}{
+			"restoreFrom: valid name": {
+				input: mkJob(tweakRestoreFrom("valid-checkpoint")),
+			},
+			"restoreFrom: invalid name format": {
+				input: mkJob(tweakRestoreFrom("Invalid-Name")),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "template", "spec", "restoreFrom", "name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+				},
+			},
+			"restoreFrom: empty name": {
+				input: mkJob(tweakRestoreFrom("")),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("spec", "template", "spec", "restoreFrom", "name"), "").MarkAlpha(),
+				},
+			},
+		}
+		for k, tc := range testCases {
+			t.Run(k, func(t *testing.T) {
+				apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+			})
+		}
+	}
+}
+
+func tweakRestoreFrom(name string) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.Template.Spec.RestoreFrom = &api.CheckpointReference{Name: name}
+	}
+}
