@@ -17,16 +17,231 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"maps"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 )
+
+func TestPodSpecChangedFields(t *testing.T) {
+	base := &v1.PodSpec{
+		Containers: []v1.Container{{
+			Name: "app", Image: "image:original",
+			Args: []string{"original-secret-argument"},
+			Env:  []v1.EnvVar{{Name: "PASSWORD", Value: "original-secret-value"}},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			},
+			ReadinessProbe: &v1.Probe{ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{Port: intstr.FromInt32(80)},
+			}},
+		}},
+		NodeSelector: map[string]string{"disk": "ssd", "zone": "a"},
+		Volumes:      []v1.Volume{{Name: "data", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}},
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*v1.PodSpec)
+		paths  []string
+	}{
+		{name: "equal", mutate: func(*v1.PodSpec) {}},
+		{name: "equivalent quantities and empty collections", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("1000m")
+			spec.Containers[0].Ports = []v1.ContainerPort{}
+			spec.Containers[0].Resources.Limits = v1.ResourceList{}
+		}},
+		{name: "multiple fields", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].Image = "image:changed"
+			spec.Containers[0].Args[0] = "changed-secret-argument"
+			spec.Containers[0].Env[0].Value = "changed-secret-value"
+		}, paths: []string{"spec.containers[0].args[0]", "spec.containers[0].env[0].value", "spec.containers[0].image"}},
+		{name: "changed quantity", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+		}, paths: []string{"spec.containers[0].resources.requests[cpu]"}},
+		{name: "JSON scalar", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromString("http")
+		}, paths: []string{"spec.containers[0].readinessProbe.httpGet.port"}},
+		{name: "map additions removals and changes", mutate: func(spec *v1.PodSpec) {
+			delete(spec.NodeSelector, "disk")
+			spec.NodeSelector["region"] = "private-region"
+			spec.NodeSelector["zone"] = "private-zone"
+		}, paths: []string{"spec.nodeSelector[disk]", "spec.nodeSelector[region]", "spec.nodeSelector[zone]"}},
+		{name: "added list element", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].Env = append(spec.Containers[0].Env, v1.EnvVar{Name: "TOKEN", Value: "changed-secret-value"})
+		}, paths: []string{"spec.containers[0].env[1]"}},
+		{name: "removed list element", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].Args = nil
+		}, paths: []string{"spec.containers[0].args[0]"}},
+		{name: "added pointer", mutate: func(spec *v1.PodSpec) {
+			spec.SecurityContext = &v1.PodSecurityContext{RunAsNonRoot: new(true)}
+		}, paths: []string{"spec.securityContext"}},
+		{name: "removed pointer", mutate: func(spec *v1.PodSpec) {
+			spec.Containers[0].ReadinessProbe = nil
+		}, paths: []string{"spec.containers[0].readinessProbe"}},
+		{name: "embedded fields", mutate: func(spec *v1.PodSpec) {
+			spec.Volumes[0].EmptyDir.Medium = v1.StorageMediumMemory
+		}, paths: []string{"spec.volumes[0].emptyDir.medium"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			want, got := base.DeepCopy(), base.DeepCopy()
+			tc.mutate(got)
+			wantBefore, gotBefore := want.DeepCopy(), got.DeepCopy()
+			paths := PodSpecChangedFields(want, got)
+			require.Equal(t, tc.paths, paths)
+			require.Equal(t, wantBefore, want)
+			require.Equal(t, gotBefore, got)
+			for _, value := range []string{"original-secret", "changed-secret", "private-region", "private-zone"} {
+				require.NotContains(t, strings.Join(paths, ", "), value)
+			}
+		})
+	}
+	t.Run("nil specs", func(t *testing.T) {
+		require.Empty(t, PodSpecChangedFields(nil, nil))
+		require.Equal(t, []string{"spec"}, PodSpecChangedFields(nil, base))
+		require.Equal(t, []string{"spec"}, PodSpecChangedFields(base, nil))
+	})
+}
+
+func TestPodSpecChangedFieldsHTTPProtocol(t *testing.T) {
+	containers := []struct {
+		name string
+		spec func(v1.Container) *v1.PodSpec
+	}{
+		{name: "containers", spec: func(container v1.Container) *v1.PodSpec {
+			return &v1.PodSpec{Containers: []v1.Container{container}}
+		}},
+		{name: "initContainers", spec: func(container v1.Container) *v1.PodSpec {
+			return &v1.PodSpec{InitContainers: []v1.Container{container}}
+		}},
+		{name: "ephemeralContainers", spec: func(container v1.Container) *v1.PodSpec {
+			return &v1.PodSpec{EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{
+				Name: container.Name, Image: container.Image,
+				ReadinessProbe: container.ReadinessProbe, LivenessProbe: container.LivenessProbe,
+				StartupProbe: container.StartupProbe, Lifecycle: container.Lifecycle,
+			}}}}
+		}},
+	}
+	actions := []struct {
+		name string
+		set  func(*v1.Container, *v1.HTTPGetAction)
+	}{
+		{name: "readinessProbe.httpGet", set: func(container *v1.Container, action *v1.HTTPGetAction) {
+			container.ReadinessProbe = &v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: action}}
+		}},
+		{name: "livenessProbe.httpGet", set: func(container *v1.Container, action *v1.HTTPGetAction) {
+			container.LivenessProbe = &v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: action}}
+		}},
+		{name: "startupProbe.httpGet", set: func(container *v1.Container, action *v1.HTTPGetAction) {
+			container.StartupProbe = &v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: action}}
+		}},
+		{name: "lifecycle.postStart.httpGet", set: func(container *v1.Container, action *v1.HTTPGetAction) {
+			container.Lifecycle = &v1.Lifecycle{PostStart: &v1.LifecycleHandler{HTTPGet: action}}
+		}},
+		{name: "lifecycle.preStop.httpGet", set: func(container *v1.Container, action *v1.HTTPGetAction) {
+			container.Lifecycle = &v1.Lifecycle{PreStop: &v1.LifecycleHandler{HTTPGet: action}}
+		}},
+	}
+	for _, container := range containers {
+		for _, action := range actions {
+			for _, tc := range []struct {
+				name      string
+				want, got *v1.HTTPProtocol
+				equal     bool
+			}{
+				{name: "both omitted", equal: true},
+				{name: "omitted and HTTP1", got: ptr.To(v1.HTTPProtocolHTTP1), equal: true},
+				{name: "both HTTP1", want: ptr.To(v1.HTTPProtocolHTTP1), got: ptr.To(v1.HTTPProtocolHTTP1), equal: true},
+				{name: "both HTTP2", want: ptr.To(v1.HTTPProtocolHTTP2), got: ptr.To(v1.HTTPProtocolHTTP2), equal: true},
+				{name: "omitted and HTTP2", got: ptr.To(v1.HTTPProtocolHTTP2)},
+				{name: "HTTP1 and HTTP2", want: ptr.To(v1.HTTPProtocolHTTP1), got: ptr.To(v1.HTTPProtocolHTTP2)},
+				{name: "omitted and explicit empty", got: ptr.To(v1.HTTPProtocol(""))},
+				{name: "omitted and unknown", got: ptr.To(v1.HTTPProtocol("private-protocol"))},
+				{name: "HTTP1 and explicit empty", want: ptr.To(v1.HTTPProtocolHTTP1), got: ptr.To(v1.HTTPProtocol(""))},
+				{name: "both explicit empty", want: ptr.To(v1.HTTPProtocol("")), got: ptr.To(v1.HTTPProtocol("")), equal: true},
+			} {
+				t.Run(container.name+"/"+action.name+"/"+tc.name, func(t *testing.T) {
+					wantAction := &v1.HTTPGetAction{Port: intstr.FromInt32(80), Protocol: tc.want}
+					gotAction := &v1.HTTPGetAction{Port: intstr.FromInt32(80), Protocol: tc.got}
+					wantContainer, gotContainer := v1.Container{Name: "app", Image: "image"}, v1.Container{Name: "app", Image: "image"}
+					action.set(&wantContainer, wantAction)
+					action.set(&gotContainer, gotAction)
+					want, got := container.spec(wantContainer), container.spec(gotContainer)
+					wantBefore, gotBefore := want.DeepCopy(), got.DeepCopy()
+					var expected []string
+					if !tc.equal {
+						expected = []string{fmt.Sprintf("spec.%s[0].%s.protocol", container.name, action.name)}
+					}
+					paths := PodSpecChangedFields(want, got)
+					require.Equal(t, expected, paths)
+					require.Equal(t, expected, PodSpecChangedFields(got, want))
+					require.Empty(t, PodSpecChangedFields(want, want))
+					require.Equal(t, wantBefore, want)
+					require.Equal(t, gotBefore, got)
+					require.Same(t, tc.want, wantAction.Protocol, "comparison replaced the captured protocol pointer")
+					require.Same(t, tc.got, gotAction.Protocol, "comparison replaced the destination protocol pointer")
+					require.NotContains(t, strings.Join(paths, ", "), "private-protocol")
+				})
+			}
+		}
+	}
+	// This equivalence belongs only to checkpoint comparison.
+	require.False(t, equality.Semantic.DeepEqual((*v1.HTTPProtocol)(nil), ptr.To(v1.HTTPProtocolHTTP1)))
+}
+
+func TestPodSpecChangedFieldsHTTPProtocolRetainsOtherChanges(t *testing.T) {
+	base := sourcePod().Spec.DeepCopy()
+	base.Containers[0].ReadinessProbe = &v1.Probe{ProbeHandler: v1.ProbeHandler{
+		HTTPGet: &v1.HTTPGetAction{Port: intstr.FromInt32(80)},
+	}}
+	base.Containers[0].SecurityContext = &v1.SecurityContext{RunAsUser: ptr.To[int64](1000)}
+	base.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*v1.Container)
+		paths  []string
+	}{
+		{name: "equivalent quantity", mutate: func(container *v1.Container) {
+			container.Resources.Requests[v1.ResourceCPU] = resource.MustParse("1000m")
+		}},
+		{name: "different credentials", mutate: func(container *v1.Container) {
+			container.SecurityContext.RunAsUser = ptr.To[int64](0)
+		}, paths: []string{"spec.containers[0].securityContext.runAsUser"}},
+		{name: "omitted credentials", mutate: func(container *v1.Container) {
+			container.SecurityContext.RunAsUser = nil
+		}, paths: []string{"spec.containers[0].securityContext.runAsUser"}},
+		{name: "different resources", mutate: func(container *v1.Container) {
+			container.Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+		}, paths: []string{"spec.containers[0].resources.requests[cpu]"}},
+		{name: "different port", mutate: func(container *v1.Container) {
+			container.ReadinessProbe.HTTPGet.Port = intstr.FromInt32(81)
+		}, paths: []string{"spec.containers[0].readinessProbe.httpGet.port"}},
+		{name: "different port and protocol", mutate: func(container *v1.Container) {
+			container.ReadinessProbe.HTTPGet.Port = intstr.FromInt32(81)
+			container.ReadinessProbe.HTTPGet.Protocol = ptr.To(v1.HTTPProtocol("private-protocol"))
+		}, paths: []string{"spec.containers[0].readinessProbe.httpGet.port", "spec.containers[0].readinessProbe.httpGet.protocol"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			want, got := base.DeepCopy(), base.DeepCopy()
+			got.Containers[0].ReadinessProbe.HTTPGet.Protocol = ptr.To(v1.HTTPProtocolHTTP1)
+			tc.mutate(&got.Containers[0])
+			wantBefore, gotBefore := want.DeepCopy(), got.DeepCopy()
+			require.Equal(t, tc.paths, PodSpecChangedFields(want, got))
+			require.Equal(t, tc.paths, PodSpecChangedFields(got, want))
+			require.Equal(t, wantBefore, want)
+			require.Equal(t, gotBefore, got)
+		})
+	}
+}
 
 func sourcePod() *v1.Pod {
 	return &v1.Pod{

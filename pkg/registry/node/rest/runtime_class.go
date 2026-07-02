@@ -24,6 +24,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodeinternal "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/features"
@@ -32,7 +33,9 @@ import (
 )
 
 // RESTStorageProvider is a REST storage provider for node.k8s.io
-type RESTStorageProvider struct{}
+type RESTStorageProvider struct {
+	Pods coreclient.PodsGetter
+}
 
 // NewRESTStorage returns a RESTStorageProvider
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -62,7 +65,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	}
 
 	if resource := "podcheckpoints"; apiResourceConfigSource.ResourceEnabled(nodev1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		podCheckpointStorage, podCheckpointStatusStorage, err := podcheckpointstorage.NewREST(restOptionsGetter)
+		podCheckpointStorage, podCheckpointStatusStorage, err := podcheckpointstorage.NewREST(restOptionsGetter, p.Pods)
 		if err != nil {
 			return storage, err
 		}

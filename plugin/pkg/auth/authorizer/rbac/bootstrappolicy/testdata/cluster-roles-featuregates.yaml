@@ -261,6 +261,16 @@ items:
     - patch
     - update
   - apiGroups:
+    - node.k8s.io
+    resources:
+    - podcheckpoints
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - patch
+    - update
+  - apiGroups:
     - scheduling.k8s.io
     resources:
     - podgroups
@@ -441,6 +451,15 @@ items:
     - resourceclaims
     - resourceclaims/status
     - resourceclaimtemplates
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - node.k8s.io
+    resources:
+    - podcheckpoints
+    - podcheckpoints/status
     verbs:
     - get
     - list

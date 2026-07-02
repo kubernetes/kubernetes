@@ -18,12 +18,14 @@ package storage
 
 import (
 	"context"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -43,7 +45,10 @@ type StatusREST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against PodCheckpoints.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, pods coreclient.PodsGetter) (*REST, *StatusREST, error) {
+	if pods == nil {
+		return nil, nil, fmt.Errorf("PodCheckpoint storage requires a Pod client")
+	}
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &nodeapi.PodCheckpoint{} },
 		NewListFunc:               func() runtime.Object { return &nodeapi.PodCheckpointList{} },
@@ -52,7 +57,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 		PredicateFunc: podcheckpoint.MatchPodCheckpoint,
 
-		CreateStrategy:      podcheckpoint.Strategy,
+		CreateStrategy:      podcheckpoint.NewCreateStrategy(pods),
 		UpdateStrategy:      podcheckpoint.Strategy,
 		DeleteStrategy:      podcheckpoint.Strategy,
 		ResetFieldsStrategy: podcheckpoint.Strategy,

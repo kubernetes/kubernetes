@@ -468,6 +468,9 @@ func createResource(client dynamic.Interface, gvr schema.GroupVersionResource, n
 	if err != nil {
 		return nil, err
 	}
+	if err := etcd.CreatePrerequisites(context.TODO(), client, ns, etcd.GetEtcdStorageDataForNamespace(ns)[gvr].Prerequisites); err != nil {
+		return nil, err
+	}
 	return client.Resource(gvr).Namespace(ns).Create(context.TODO(), stubObj, metav1.CreateOptions{})
 }
 

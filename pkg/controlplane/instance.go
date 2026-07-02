@@ -432,7 +432,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		discoveryrest.StorageProvider{},
 		lifecyclerest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
-		noderest.RESTStorageProvider{},
+		noderest.RESTStorageProvider{Pods: client.CoreV1()},
 		policyrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
 		schedulingrest.RESTStorageProvider{},

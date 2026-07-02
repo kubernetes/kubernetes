@@ -17,20 +17,25 @@ limitations under the License.
 package etcd
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/util/compatibility"
+	"k8s.io/client-go/dynamic"
 	basecompatibility "k8s.io/component-base/compatibility"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-
 	"k8s.io/kubernetes/test/utils/image"
 )
 
@@ -314,10 +319,14 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/node/v1alpha1
-		// The PodCheckpoint admission plugin requires a Running source pod,
-		// which these tests cannot produce, so servers using this data disable it.
+		// A checkpoint requires an existing, Running source Pod.
 		gvr("node.k8s.io", "v1alpha1", "podcheckpoints"): {
-			Stub:              `{"metadata": {"name": "pc1"}, "spec": {"sourcePod": {"name": "pod1"}}}`,
+			Stub: `{"metadata": {"name": "pc1"}, "spec": {"sourcePod": {"name": "checkpoint-source"}}}`,
+			Prerequisites: []Prerequisite{{
+				GvrData:    gvr("", "v1", "pods"),
+				Stub:       `{"metadata":{"name":"checkpoint-source"},"spec":{"nodeName":"node-1","containers":[{"name":"app","image":"pause"}]}}`,
+				StatusStub: `{"status":{"phase":"Running"}}`,
+			}},
 			ExpectedEtcdPath:  "/registry/podcheckpoints/" + namespace + "/pc1",
 			IntroducedVersion: "1.38",
 		},
@@ -1036,6 +1045,29 @@ func (s StorageData) GetMutatedStatusStub() string {
 type Prerequisite struct {
 	GvrData schema.GroupVersionResource
 	Stub    string
+	// StatusStub is applied to /status after creation, when the fixture needs observed state.
+	StatusStub string
+}
+
+// CreatePrerequisites prepares namespaced fixture dependencies for API tests.
+// The caller owns the namespace and its cleanup.
+func CreatePrerequisites(ctx context.Context, client dynamic.Interface, namespace string, prerequisites []Prerequisite) error {
+	for _, prerequisite := range prerequisites {
+		obj := &unstructured.Unstructured{}
+		if err := json.Unmarshal([]byte(prerequisite.Stub), &obj.Object); err != nil {
+			return err
+		}
+		resource := client.Resource(prerequisite.GvrData).Namespace(namespace)
+		if _, err := resource.Create(ctx, obj, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		if prerequisite.StatusStub != "" {
+			if _, err := resource.Patch(ctx, obj.GetName(), types.MergePatchType, []byte(prerequisite.StatusStub), metav1.PatchOptions{}, "status"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // GetCustomResourceDefinitionData returns the resource definitions that back the custom resources

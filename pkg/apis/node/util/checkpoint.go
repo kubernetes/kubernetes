@@ -15,15 +15,107 @@ limitations under the License.
 */
 
 // Package util provides pod-template sanitization for checkpoint capture in the
-// kubelet.
+// kubelet and Pod spec comparison for admission.
 package util
 
 import (
+	"encoding/json"
+	"reflect"
+	"slices"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
+
+// PodSpecChangedFields returns sorted API field paths without including field
+// values. The specs must already have the normalization required by the check.
+// Semantic equality preserves the comparison's quantity and nil/empty rules.
+// An omitted HTTP protocol is equivalent to HTTP1.
+func PodSpecChangedFields(want, got *v1.PodSpec) []string {
+	paths := changedFields(nil, reflect.ValueOf(want), reflect.ValueOf(got), field.NewPath("spec"))
+	slices.Sort(paths)
+	return paths
+}
+
+var podSpecSemantic = func() conversion.Equalities {
+	semantic := equality.Semantic.Copy()
+	// Captured templates can omit HTTP1, which is defaulted only on Pod objects.
+	if err := semantic.AddFunc(func(a, b *v1.HTTPProtocol) bool {
+		return ptr.Deref(a, v1.HTTPProtocolHTTP1) == ptr.Deref(b, v1.HTTPProtocolHTTP1)
+	}); err != nil {
+		panic(err)
+	}
+	return semantic
+}()
+
+var jsonMarshalerType = reflect.TypeFor[json.Marshaler]()
+
+func changedFields(paths []string, want, got reflect.Value, path *field.Path) []string {
+	if !want.IsValid() || !got.IsValid() {
+		return append(paths, path.String())
+	}
+	if podSpecSemantic.DeepEqual(want.Interface(), got.Interface()) {
+		return paths
+	}
+
+	switch want.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if !want.IsNil() && !got.IsNil() {
+			return changedFields(paths, want.Elem(), got.Elem(), path)
+		}
+	case reflect.Struct:
+		typ := want.Type()
+		// Quantities, times and IntOrString are API values, not objects whose
+		// Go representation should appear in a field path.
+		if typ.Implements(jsonMarshalerType) || reflect.PointerTo(typ).Implements(jsonMarshalerType) {
+			return append(paths, path.String())
+		}
+		start := len(paths)
+		for i := 0; i < typ.NumField(); i++ {
+			member := typ.Field(i)
+			name, _, _ := strings.Cut(member.Tag.Get("json"), ",")
+			if !member.IsExported() || name == "-" {
+				continue
+			}
+			memberPath := path
+			if name != "" {
+				memberPath = path.Child(name)
+			} else if !member.Anonymous {
+				memberPath = path.Child(member.Name)
+			}
+			paths = changedFields(paths, want.Field(i), got.Field(i), memberPath)
+		}
+		if len(paths) != start {
+			return paths
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < max(want.Len(), got.Len()); i++ {
+			if i >= want.Len() || i >= got.Len() {
+				paths = append(paths, path.Index(i).String())
+				continue
+			}
+			paths = changedFields(paths, want.Index(i), got.Index(i), path.Index(i))
+		}
+		return paths
+	case reflect.Map:
+		keys := want.MapKeys()
+		for _, key := range got.MapKeys() {
+			if !want.MapIndex(key).IsValid() {
+				keys = append(keys, key)
+			}
+		}
+		for _, key := range keys {
+			paths = changedFields(paths, want.MapIndex(key), got.MapIndex(key), path.Key(key.String()))
+		}
+		return paths
+	}
+	return append(paths, path.String())
+}
 
 // SanitizePodTemplate builds the portable PodTemplateSpec recorded in
 // PodCheckpoint.status.checkpointedPodTemplate from a pod. It captures the
