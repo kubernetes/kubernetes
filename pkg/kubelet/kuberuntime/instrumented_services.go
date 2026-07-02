@@ -353,6 +353,24 @@ func (in instrumentedRuntimeService) CheckpointContainer(ctx context.Context, op
 	return err
 }
 
+func (in instrumentedRuntimeService) CheckpointPod(ctx context.Context, options *runtimeapi.CheckpointPodRequest) error {
+	const operation = "checkpoint_pod"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.CheckpointPod(ctx, options)
+	recordError(operation, err)
+	return err
+}
+
+func (in instrumentedRuntimeService) RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (string, error) {
+	const operation = "restore_pod"
+	defer recordOperation(operation, time.Now())
+
+	podID, err := in.service.RestorePod(ctx, options)
+	recordError(operation, err)
+	return podID, err
+}
+
 func (in instrumentedRuntimeService) GetContainerEvents(ctx context.Context, containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
 	const operation = "get_container_events"
 	defer recordOperation(operation, time.Now())

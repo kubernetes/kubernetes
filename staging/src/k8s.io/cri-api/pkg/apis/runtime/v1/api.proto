@@ -163,6 +163,13 @@ service RuntimeService {
     // CheckpointContainer checkpoints a container
     rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
 
+    // CheckpointPod creates a Pod-level checkpoint. If the pod sandbox does not
+    // exist or the checkpoint operation fails, the call returns an error.
+    rpc CheckpointPod(CheckpointPodRequest) returns (CheckpointPodResponse) {}
+
+    // RestorePod restores a pod sandbox from a checkpoint
+    rpc RestorePod(RestorePodRequest) returns (RestorePodResponse) {}
+
     // GetContainerEvents gets container events from the CRI runtime
     rpc GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
 
@@ -2145,6 +2152,75 @@ message CheckpointContainerRequest {
 }
 
 message CheckpointContainerResponse {}
+
+// PostCheckpointState selects the state the Pod's processes should be left
+// in once the checkpoint image has been written.
+enum PostCheckpointState {
+    // RUNNING leaves the Pod's processes running after the snapshot has
+    // been written ("live snapshot" semantics). This is the default.
+    POST_CHECKPOINT_STATE_RUNNING = 0;
+    // STOPPED leaves the Pod stopped once the checkpoint is complete. The CRI
+    // enum reserves this value so runtimes may implement it ahead of Kubernetes,
+    // but in alpha the kubelet only ever sends RUNNING.
+    POST_CHECKPOINT_STATE_STOPPED = 1;
+}
+
+message CheckpointPodRequest {
+    // ID of the pod sandbox to be checkpointed.
+    string pod_sandbox_id = 1;
+    // Directory the runtime writes the checkpoint into. A Pod checkpoint is a
+    // collection of runtime-defined files (not a single archive object); their
+    // layout and format are opaque to Kubernetes. The runtime writes them under
+    // this directory and nowhere else (the kubelet owns it for storage accounting
+    // and path confinement).
+    string path = 2;
+    // (No timeout field: the kubelet bounds the operation with the gRPC call
+    // deadline, set from PodCheckpoint.spec.timeoutSeconds. The runtime honours
+    // the context deadline and cleans up partial artifacts when it fires.)
+    //
+    // Checkpoint options passed to the container runtime.
+    // Reserved for runtime-specific pass-through configuration; behaviour
+    // that the CRI itself must branch on belongs in dedicated fields.
+    map<string, string> options = 4;
+    // State the runtime MUST leave the Pod's processes in after the
+    // checkpoint archive has been written. Defaults to RUNNING (the Pod is
+    // left running). Runtimes that cannot honour the requested state SHOULD
+    // return an error.
+    PostCheckpointState post_checkpoint_state = 5;
+}
+
+// Empty: the checkpoint is written under the request's `path` directory, which
+// the caller (kubelet) provided and already knows, so there is no separate
+// location or object name to return.
+message CheckpointPodResponse {}
+
+message RestorePodRequest {
+    // Directory containing the checkpoint to restore from: the directory the
+    // runtime wrote during CheckpointPod (a collection of runtime-defined files).
+    string path = 1;
+    // Pod sandbox configuration supplied by the kubelet, with node-local restore-time
+    // updates (new Pod UID, cgroup parent path, log directory). Pod-spec equality between
+    // the live Pod and status.checkpointedPodTemplate of the referenced PodCheckpoint is
+    // enforced at API-server admission (and re-checked by the kubelet before this call);
+    // arbitrary user overrides are not permitted.
+    PodSandboxConfig config = 2;
+    // (No timeout field: as with CheckpointPod, the kubelet bounds the operation
+    // with the gRPC call deadline rather than a request field.)
+    //
+    // Restore options passed to the container runtime.
+    map<string, string> options = 4;
+    // Container configurations for all containers in the pod.
+    // This includes mount configurations that tell the runtime where to mount
+    // host paths (e.g., /etc/hosts, termination logs, volumes) into the containers.
+    // The runtime should match containers from the checkpoint with these configs
+    // by container name and apply the mount configurations.
+    repeated ContainerConfig container_configs = 5;
+}
+
+message RestorePodResponse {
+    // ID of the restored pod sandbox
+    string pod_sandbox_id = 1;
+}
 
 message GetEventsRequest {}
 
