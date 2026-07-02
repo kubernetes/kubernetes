@@ -1565,6 +1565,63 @@ func TestCreateMirrorPod(t *testing.T) {
 	}
 }
 
+func TestCreateMirrorPodWithRuntimePostSync(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorClient
+	testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{
+		SyncResults: []*kubecontainer.SyncResult{{
+			Action: kubecontainer.StartContainer,
+			Target: "container",
+		}},
+	}
+
+	pod := podWithUIDNameNs("12345678", "bar", "foo")
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	isTerminal, postSync, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	assert.NoError(t, err)
+	if isTerminal {
+		t.Fatalf("pod should not be terminal: %#v", pod)
+	}
+	require.NotNil(t, postSync)
+
+	postSync()
+
+	podFullName := kubecontainer.GetPodFullName(pod)
+	assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
+}
+
+func TestCreateMirrorPodWithEarlySyncPodReturn(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorClient
+	kl.volumeManager = kubeletvolume.NewFakeVolumeManager(nil, 0, nil, true /* volumeAttachLimitExceeded */)
+
+	pod := podWithUIDNameNs("12345678", "bar", "foo")
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	isTerminal, postSync, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	assert.NoError(t, err)
+	if !isTerminal {
+		t.Fatalf("pod should be terminal after admission rejection: %#v", pod)
+	}
+	require.NotNil(t, postSync)
+
+	postSync()
+
+	podFullName := kubecontainer.GetPodFullName(pod)
+	assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
+}
+
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)

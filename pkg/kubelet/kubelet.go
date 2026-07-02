@@ -2204,11 +2204,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	// Reconcile mirror pod for static pods after container sync completes.
-	// Deferred to postSync to avoid blocking container operations on API
-	// server calls. This is critical when updating infrastructure static
-	// pods (e.g. etcd) that the API server itself depends on.
-	postSync = func() {
+	reconcileMirrorPod := func() {
 		kl.tryReconcileMirrorPods(ctx, pod, mirrorPod)
 	}
 
@@ -2216,7 +2212,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	if err := kl.makePodDataDirs(pod); err != nil {
 		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "error making pod data directories: %v", err)
 		logger.Error(err, "Unable to make pod data directories for pod", "pod", klog.KObj(pod))
-		return false, nil, err
+		return false, reconcileMirrorPod, err
 	}
 
 	// Wait for volumes to attach/mount
@@ -2225,13 +2221,13 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		if errors.As(err, &volumeAttachLimitErr) {
 			kl.rejectPod(ctx, pod, volumemanager.VolumeAttachmentLimitExceededReason, volumeAttachLimitErr.Error())
 			recordAdmissionRejection(volumemanager.VolumeAttachmentLimitExceededReason)
-			return true, nil, nil
+			return true, reconcileMirrorPod, nil
 		}
 		if !wait.Interrupted(err) {
 			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to attach or mount volumes: %v", err)
 			logger.Error(err, "Unable to attach or mount volumes for pod; skipping pod", "pod", klog.KObj(pod))
 		}
-		return false, nil, err
+		return false, reconcileMirrorPod, err
 	}
 
 	// Fetch the pull secrets for the pod
@@ -2313,7 +2309,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	if len(result.SyncResults) > 0 && err == nil {
 		postSync = func() {
 			kl.RequestPodRelist(klog.FromContext(ctx), pod.UID)
+			reconcileMirrorPod()
 		}
+	} else {
+		postSync = reconcileMirrorPod
 	}
 
 	return false, postSync, err
@@ -3526,13 +3525,13 @@ func (kl *Kubelet) tryReconcileMirrorPods(ctx context.Context, staticPod, mirror
 			// indefinitely if the API server is unreachable (e.g. during
 			// etcd restarts). Reconciliation will be retried on the next sync.
 			deleteCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			defer cancel()
 			if ok, err := kl.mirrorPodClient.DeleteMirrorPod(deleteCtx, podFullName, &mirrorPod.UID); err != nil {
 				logger.Error(err, "Failed deleting mirror pod", "pod", klog.KObj(mirrorPod))
 			} else if ok {
 				deleted = ok
 				logger.Info("Deleted mirror pod as it didn't match the static Pod", "pod", klog.KObj(mirrorPod))
 			}
+			cancel()
 		}
 	}
 	if mirrorPod == nil || deleted {
