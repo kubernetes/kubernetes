@@ -161,4 +161,18 @@ type PodGroupCycleState interface {
 	//
 	// See PodGroupCycleState for notes on concurrency.
 	Delete(key StateKey)
+
+	// GetPlacementCycleStateForName returns the PlacementCycleState associated with the
+	// given placement name, or nil if none is registered. A PlacementGeneratePlugin can
+	// attach per-placement data to a placement it generates and read it back in a later
+	// phase of the same plugin (Filter, Score, etc.) for the corresponding placement.
+	GetPlacementCycleStateForName(placementName string) PlacementCycleState
+	// SetPlacementCycleStateForName registers the PlacementCycleState for the given
+	// placement name. A PlacementGeneratePlugin should call this with the name of a
+	// placement it returns to carry per-placement data into the scheduling cycle.
+	// Each plugin must use its own state keys to avoid clobbering other plugins' data.
+	SetPlacementCycleStateForName(placementName string, state PlacementCycleState)
+	// DeletePlacementCycleStateForName removes the PlacementCycleState for the given
+	// placement name. This is used by the framework during placement merging.
+	DeletePlacementCycleStateForName(placementName string)
 }
