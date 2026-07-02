@@ -88,7 +88,13 @@ func stripNodeIdentityConstraints(spec *v1.PodSpec) {
 		spec.NodeSelector = nil
 	}
 
-	if spec.Affinity == nil || spec.Affinity.NodeAffinity == nil {
+	if spec.Affinity == nil {
+		return
+	}
+	if spec.Affinity.NodeAffinity == nil {
+		if *spec.Affinity == (v1.Affinity{}) {
+			spec.Affinity = nil
+		}
 		return
 	}
 	na := spec.Affinity.NodeAffinity
@@ -124,6 +130,12 @@ func stripNodeIdentityConstraints(spec *v1.PodSpec) {
 	if na.RequiredDuringSchedulingIgnoredDuringExecution == nil &&
 		na.PreferredDuringSchedulingIgnoredDuringExecution == nil {
 		spec.Affinity.NodeAffinity = nil
+	}
+	if *spec.Affinity == (v1.Affinity{}) {
+		// Admission may have created these wrappers solely for the restore-node
+		// requirement. Drop them after pruning so equality is not sensitive to
+		// nil versus an empty struct.
+		spec.Affinity = nil
 	}
 }
 
