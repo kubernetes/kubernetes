@@ -244,6 +244,13 @@ func (cm *FakeContainerManager) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
+func (cm *FakeContainerManager) IsContainerCPUSetUpdateInProgress(pod *v1.Pod, containerName string) bool {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "IsContainerCPUSetUpdateInProgress")
+	return false
+}
+
 func (cm *FakeContainerManager) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
 	cm.Lock()
 	defer cm.Unlock()

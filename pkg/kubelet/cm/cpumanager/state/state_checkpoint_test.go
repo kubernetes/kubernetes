@@ -480,7 +480,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 	// create temp dir
 	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
 	require.NoError(t, err)
-	defer removeAll(testingDir, t)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(testingDir), "unable to remove dir %s", testingDir)
+	})
 	// create checkpoint manager for testing
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	require.NoErrorf(t, err, "could not create testing checkpoint manager: %v", err)
@@ -566,7 +568,9 @@ func TestCheckpointStateStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer removeAll(testingDir, t)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(testingDir), "unable to remove dir %s", testingDir)
+	})
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -640,7 +644,9 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer removeAll(testingDir, t)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(testingDir), "unable to remove dir %s", testingDir)
+	})
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -700,7 +706,9 @@ func TestCheckpointStateClear(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer removeAll(testingDir, t)
+			t.Cleanup(func() {
+				require.NoErrorf(t, os.RemoveAll(testingDir), "unable to remove dir %s", testingDir)
+			})
 
 			logger, _ := ktesting.NewTestContext(t)
 			state, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
@@ -744,6 +752,13 @@ func AssertStateEqual(t *testing.T, sf State, sm State) {
 	if !reflect.DeepEqual(podcpuassignmentSf, podcpuassignmentSm) {
 		t.Errorf("State CPU assignments mismatch. Have %s, want %s", podcpuassignmentSf, podcpuassignmentSm)
 	}
+
+	cpuoriginalSf := sf.GetCPUOriginals()
+	cpuoriginalSm := sm.GetCPUOriginals()
+	if !reflect.DeepEqual(cpuoriginalSf, cpuoriginalSm) {
+		t.Errorf("State CPU originals mismatch. Have %s, want %s", cpuoriginalSf, cpuoriginalSm)
+	}
+
 }
 
 func TestCPUManagerCheckpoint_MarshalCheckpoint_HashCompatibility(t *testing.T) {
@@ -927,12 +942,5 @@ func TestCPUManagerCheckpoint_RoundTrip(t *testing.T) {
 
 			tc.verify(t, tc.original, tc.restored)
 		})
-	}
-}
-
-func removeAll(dir string, t *testing.T) {
-	t.Helper()
-	if err := os.RemoveAll(dir); err != nil {
-		t.Fatalf("unable to remove dir %s: %v", dir, err)
 	}
 }

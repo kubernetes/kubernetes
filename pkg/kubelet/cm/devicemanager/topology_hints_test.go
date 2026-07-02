@@ -30,6 +30,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -100,7 +101,7 @@ func TestGetTopologyHints(t *testing.T) {
 			}
 		}
 
-		hints := m.GetTopologyHints(logger, tc.pod, &tc.pod.Spec.Containers[0])
+		hints := m.GetTopologyHints(logger, tc.pod, &tc.pod.Spec.Containers[0], lifecycle.AddOperation)
 
 		for r := range tc.expectedHints {
 			sort.SliceStable(hints[r], func(i, j int) bool {
@@ -968,7 +969,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			}
 		}
 
-		hints := m.GetPodTopologyHints(logger, tc.pod)
+		hints := m.GetPodTopologyHints(logger, tc.pod, lifecycle.AddOperation)
 
 		for r := range tc.expectedHints {
 			sort.SliceStable(hints[r], func(i, j int) bool {

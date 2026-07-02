@@ -127,7 +127,9 @@ func (sc *stateCheckpoint) restoreState() error {
 
 	var tmpDefaultCPUSet cpuset.CPUSet
 	var tmpContainerCPUSet cpuset.CPUSet
+	var tmpContainerOriginalCPUSet cpuset.CPUSet
 	tmpAssignments := ContainerCPUAssignments{}
+	tmpOriginals := ContainerCPUOriginals{}
 
 	if sc.policyName != cp.CheckpointData.PolicyName {
 		return fmt.Errorf("configured policy %q differs from state checkpoint policy %q", sc.policyName, cp.CheckpointData.PolicyName)
@@ -145,8 +147,34 @@ func (sc *stateCheckpoint) restoreState() error {
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		if len(cp.CheckpointData.Originals) > 0 {
+			// restore Originals from checkpoint data
+			for pod := range cp.CheckpointData.Originals {
+				tmpOriginals[pod] = make(map[string]ContainerCPUOriginal, len(cp.CheckpointData.Originals[pod]))
+				for container, cpuOriginals := range cp.CheckpointData.Originals[pod] {
+					if tmpContainerOriginalCPUSet, err = cpuset.Parse(cpuOriginals.Original); err != nil {
+						return fmt.Errorf("could not parse Original cpuset %q for container %q in pod %q: %w", cpuOriginals.Original, container, pod, err)
+					}
+					tmpOriginals[pod][container] = ContainerCPUOriginal{Original: tmpContainerOriginalCPUSet}
+				}
+			}
+		} else {
+			// use Entries as Originals when checkpoint does not include Originals data
+			for pod := range tmpAssignments {
+				tmpOriginals[pod] = make(map[string]ContainerCPUOriginal, len(tmpAssignments[pod]))
+				for container, entries := range tmpAssignments[pod] {
+					tmpOriginals[pod][container] = ContainerCPUOriginal{Original: entries.Clone()}
+				}
+			}
+		}
+	}
+
 	sc.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
 	sc.cache.SetCPUAssignments(tmpAssignments)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		sc.cache.SetCPUOriginals(tmpOriginals)
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
 		sc.cache.SetPodCPUAssignments(cp.CheckpointData.PodEntries)
 	}
@@ -245,12 +273,20 @@ func (sc *stateCheckpoint) storeState() error {
 	checkpoint := newCPUManagerCheckpoint()
 	checkpoint.CheckpointData.PolicyName = sc.policyName
 	checkpoint.CheckpointData.DefaultCPUSet = sc.cache.GetDefaultCPUSet().String()
-
 	assignments := sc.cache.GetCPUAssignments()
 	for pod := range assignments {
 		checkpoint.CheckpointData.Entries[pod] = make(map[string]string, len(assignments[pod]))
 		for container, cset := range assignments[pod] {
 			checkpoint.CheckpointData.Entries[pod][container] = cset.String()
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		originals := sc.cache.GetCPUOriginals()
+		for pod := range originals {
+			checkpoint.CheckpointData.Originals[pod] = make(map[string]ContainerCPUs, len(originals[pod]))
+			for container, cpuAllocation := range originals[pod] {
+				checkpoint.CheckpointData.Originals[pod][container] = ContainerCPUs{Original: cpuAllocation.Original.String()}
+			}
 		}
 	}
 
@@ -398,6 +434,35 @@ func (sc *stateCheckpoint) ClearState() {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.ClearState()
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+// GetOriginalCPUSet returns original CPU set
+func (sc *stateCheckpoint) GetOriginalCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetOriginalCPUSet(podUID, containerName)
+}
+
+// GetCPUOriginals returns CPU from pod originals
+// with InPlacePodVerticalScalingExclusiveCPUs
+func (sc *stateCheckpoint) GetCPUOriginals() ContainerCPUOriginals {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetCPUOriginals()
+}
+
+// SetCPUOriginals sets CPU to pod originals
+// with InPlacePodVerticalScalingExclusiveCPUs
+func (sc *stateCheckpoint) SetCPUOriginals(a ContainerCPUOriginals) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.SetCPUOriginals(a)
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint")

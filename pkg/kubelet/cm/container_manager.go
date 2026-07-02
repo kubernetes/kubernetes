@@ -162,6 +162,9 @@ type ContainerManager interface {
 	// ContainerHasExclusiveCPUs returns true if the provided container in the pod has exclusive cpu
 	ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool
 
+	// IsContainerCPUSetUpdateInProgress returns true if the specified container has not updated its cpuset.
+	IsContainerCPUSetUpdateInProgress(pod *v1.Pod, containerName string) bool
+
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider
 	podresources.DevicesProvider

@@ -25,33 +25,32 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	helpers "k8s.io/component-helpers/resource"
 	"k8s.io/kubectl/pkg/util/podutils"
+	"k8s.io/kubernetes/pkg/features"
 	kubeqos "k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-)
-
-const (
-	MinContainerRuntimeVersion string = "1.6.9"
 )
 
 type ResizableContainerInfo struct {
-	Name          string
-	Resources     *cgroups.ContainerResources
-	CPUPolicy     *v1.ResourceResizeRestartPolicy
-	MemPolicy     *v1.ResourceResizeRestartPolicy
-	RestartCount  int32
-	RestartPolicy v1.ContainerRestartPolicy
-	InitCtr       bool
+	Name             string
+	Resources        *cgroups.ContainerResources
+	CPUPolicy        *v1.ResourceResizeRestartPolicy
+	MemPolicy        *v1.ResourceResizeRestartPolicy
+	RestartCount     int32
+	RestartPolicy    v1.ContainerRestartPolicy
+	InitCtr          bool
+	HasExclusiveCPUs bool
 }
 
 func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.ContainerResizePolicy) {
@@ -300,7 +299,8 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 	var errs []error
 	for _, ci := range tcInfo {
 		tc := makeResizableContainer(ci)
-		errs = append(errs, cgroups.VerifyContainerCgroupValues(ctx, f, pod, &tc, onCgroupv2))
+		disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && ci.HasExclusiveCPUs
+		errs = append(errs, cgroups.VerifyContainerCgroupValues(ctx, f, pod, &tc, onCgroupv2, disableCPUQuota))
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -457,6 +457,39 @@ func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v
 		resizedPod.ManagedFields = nil // Suppress managed fields in error output.
 		framework.ExpectNoError(formatErrors(utilerrors.NewAggregate(errs)),
 			"Verifying pod resources resize state. Pod: %s", framework.PrettyPrintJSON(resizedPod))
+	}
+}
+
+func ExpectPodResizePending(ctx context.Context, f *framework.Framework, resizePendingPod *v1.Pod, expectedContainers []ResizableContainerInfo) {
+	ginkgo.GinkgoHelper()
+
+	// Verify Pod Containers Cgroup Values
+	var errs []error
+	if cgroupErrs := VerifyPodContainersCgroupValues(ctx, f, resizePendingPod, expectedContainers); cgroupErrs != nil {
+		errs = append(errs, fmt.Errorf("container cgroup values don't match expected: %w", formatErrors(cgroupErrs)))
+	}
+	if resourceErrs := VerifyPodStatusResources(resizePendingPod, expectedContainers); resourceErrs != nil {
+		errs = append(errs, fmt.Errorf("container status resources don't match expected: %w", formatErrors(resourceErrs)))
+	}
+	if restartErrs := verifyPodRestarts(ctx, f, resizePendingPod, expectedContainers); restartErrs != nil {
+		errs = append(errs, fmt.Errorf("container restart counts don't match expected: %w", formatErrors(restartErrs)))
+	}
+
+	// Verify PodResizePending condition are empty.
+	podResizePendingFound := false
+	for _, condition := range resizePendingPod.Status.Conditions {
+		if condition.Type == v1.PodResizePending {
+			podResizePendingFound = true
+		}
+	}
+	if !podResizePendingFound {
+		errs = append(errs, fmt.Errorf("resize condition type %s not found in pod status", v1.PodResizePending))
+	}
+
+	if len(errs) > 0 {
+		resizePendingPod.ManagedFields = nil // Suppress managed fields in error output.
+		framework.ExpectNoError(formatErrors(utilerrors.NewAggregate(errs)),
+			"Verifying pod resources resize state. Pod: %s", framework.PrettyPrintJSON(resizePendingPod))
 	}
 }
 

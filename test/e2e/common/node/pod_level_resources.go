@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -169,6 +170,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 		// Still, the pod-level limits field itself will not have default values set.
 		// To cover this pattern, we allow overriding the values when comparing against the PodSpec.
 		expectedPodLevelResourcesOverride *cgroups.ContainerResources
+		hasExclusiveCPUs                  bool
 	}
 
 	tests := []testCase{
@@ -440,7 +442,8 @@ func podLevelResourcesTests(f *framework.Framework) {
 			framework.ExpectNoError(err, "failed to verify pod's cgroup values: %v", err)
 
 			ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
-			err = verifyContainersCgroupLimits(ctx, f, pod)
+			disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && tc.hasExclusiveCPUs
+			err = verifyContainersCgroupLimits(ctx, f, pod, disableCPUQuota)
 			framework.ExpectNoError(err, "failed to verify containers cgroup values: %v", err)
 
 			ginkgo.By("deleting pods")
@@ -450,7 +453,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 	}
 }
 
-func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, pod *v1.Pod) error {
+func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, pod *v1.Pod, disableCPUQuota bool) error {
 	var errs []error
 	for _, container := range pod.Spec.Containers {
 		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Memory() != nil &&
@@ -463,7 +466,7 @@ func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, p
 
 		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Cpu() != nil &&
 			container.Resources.Limits.Cpu() == nil {
-			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, &container.Resources, true)
+			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, &container.Resources, true, disableCPUQuota)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
 			}

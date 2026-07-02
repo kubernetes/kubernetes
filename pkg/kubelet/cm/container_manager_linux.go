@@ -1017,6 +1017,13 @@ func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return []int64{}
 }
 
+func (cm *containerManagerImpl) IsContainerCPUSetUpdateInProgress(pod *v1.Pod, containerName string) bool {
+	if cm.cpuManager != nil {
+		return cm.cpuManager.IsContainerCPUSetUpdateInProgress(string(pod.UID), containerName)
+	}
+	return false
+}
+
 func (cm *containerManagerImpl) GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory {
 	if cm.memoryManager == nil {
 		return []*podresourcesapi.ContainerMemory{}
