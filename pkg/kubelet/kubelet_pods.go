@@ -2251,6 +2251,8 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests)
 	}
 
+	// TODO: Once we begin persisting memory Request from the PodSpec to cgroups,
+	// the code needs to persist that value if it is non-nil.
 	if _, found := resources.Requests[v1.ResourceMemory]; !found {
 		opts := resourcehelper.PodResourcesOptions{
 			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
@@ -2260,10 +2262,6 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 			resources.Requests[v1.ResourceMemory] = val
 		}
 	}
-
-	// TODO: Once we begin persisting memory Request from the PodSpec to cgroups,
-	// the code needs to persist that value if it is non-nil.
-	preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Requests, resources.Requests)
 
 	if cpuLimit != nil {
 		// If both the allocated & actual resources are at
