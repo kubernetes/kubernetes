@@ -566,7 +566,7 @@ func TestRunOp(t *testing.T) {
 				return
 			}
 
-			if err != nil {
+			if err == nil {
 				t.Fatalf("Failed to run operation: %v", err)
 			}
 
