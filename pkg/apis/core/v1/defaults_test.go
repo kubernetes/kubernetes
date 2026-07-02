@@ -19,6 +19,7 @@ package v1_test
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"testing"
@@ -40,6 +41,26 @@ import (
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
+
+// featureGatedDefaults contains defaults applied only when all feature gates are enabled.
+// These must not appear in the base expectedDefaults map used when gates are disabled.
+var featureGatedDefaults = map[string]string{
+	".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Protocol":                                           `"HTTP1"`,
+	".Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Protocol":                                             `"HTTP1"`,
+	".Spec.Containers[0].LivenessProbe.ProbeHandler.HTTPGet.Protocol":                                    `"HTTP1"`,
+	".Spec.Containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Protocol":                                   `"HTTP1"`,
+	".Spec.Containers[0].StartupProbe.ProbeHandler.HTTPGet.Protocol":                                     `"HTTP1"`,
+	".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Protocol":         `"HTTP1"`,
+	".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Protocol":           `"HTTP1"`,
+	".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Protocol":  `"HTTP1"`,
+	".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Protocol": `"HTTP1"`,
+	".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Protocol":   `"HTTP1"`,
+	".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Protocol":                                       `"HTTP1"`,
+	".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Protocol":                                         `"HTTP1"`,
+	".Spec.InitContainers[0].LivenessProbe.ProbeHandler.HTTPGet.Protocol":                                `"HTTP1"`,
+	".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.HTTPGet.Protocol":                               `"HTTP1"`,
+	".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Protocol":                                 `"HTTP1"`,
+}
 
 // TestWorkloadDefaults detects changes to defaults within PodTemplateSpec.
 // Defaulting changes within this type can cause spurious rollouts of workloads on API server update.
@@ -174,6 +195,9 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.ScaleIO.FSType":                                                `"xfs"`,
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
 		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
+	}
+	if featuresEnabled {
+		maps.Copy(expectedDefaults, featureGatedDefaults)
 	}
 	t.Run("empty PodTemplateSpec", func(t *testing.T) {
 		rc := &v1.ReplicationController{Spec: v1.ReplicationControllerSpec{Template: &v1.PodTemplateSpec{}}}
@@ -361,6 +385,9 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.ScaleIO.FSType":                                                `"xfs"`,
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
 		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
+	}
+	if featuresEnabled {
+		maps.Copy(expectedDefaults, featureGatedDefaults)
 	}
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {

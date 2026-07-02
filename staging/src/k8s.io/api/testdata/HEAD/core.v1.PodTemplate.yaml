@@ -248,6 +248,7 @@ template:
               value: valueValue
             path: pathValue
             port: portValue
+            protocol: protocolValue
             scheme: schemeValue
           sleep:
             seconds: 1
@@ -265,6 +266,7 @@ template:
               value: valueValue
             path: pathValue
             port: portValue
+            protocol: protocolValue
             scheme: schemeValue
           sleep:
             seconds: 1
@@ -287,6 +289,7 @@ template:
             value: valueValue
           path: pathValue
           port: portValue
+          protocol: protocolValue
           scheme: schemeValue
         initialDelaySeconds: 2
         periodSeconds: 4
@@ -318,6 +321,7 @@ template:
             value: valueValue
           path: pathValue
           port: portValue
+          protocol: protocolValue
           scheme: schemeValue
         initialDelaySeconds: 2
         periodSeconds: 4
@@ -389,6 +393,7 @@ template:
             value: valueValue
           path: pathValue
           port: portValue
+          protocol: protocolValue
           scheme: schemeValue
         initialDelaySeconds: 2
         periodSeconds: 4
@@ -476,6 +481,7 @@ template:
               value: valueValue
             path: pathValue
             port: portValue
+            protocol: protocolValue
             scheme: schemeValue
           sleep:
             seconds: 1
@@ -493,6 +499,7 @@ template:
               value: valueValue
             path: pathValue
             port: portValue
+            protocol: protocolValue
             scheme: schemeValue
           sleep:
             seconds: 1
@@ -515,6 +522,7 @@ template:
             value: valueValue
           path: pathValue
           port: portValue
+          protocol: protocolValue
           scheme: schemeValue
         initialDelaySeconds: 2
         periodSeconds: 4
@@ -546,6 +554,7 @@ template:
             value: valueValue
           path: pathValue
           port: portValue
+          protocol: protocolValue
           scheme: schemeValue
         initialDelaySeconds: 2
         periodSeconds: 4
@@ -617,6 +626,7 @@ template:
             value: valueValue
           path: pathValue
           port: portValue
+          protocol: protocolValue
           scheme: schemeValue
         initialDelaySeconds: 2
         periodSeconds: 4
@@ -707,6 +717,7 @@ template:
               value: valueValue
             path: pathValue
             port: portValue
+            protocol: protocolValue
             scheme: schemeValue
           sleep:
             seconds: 1
@@ -724,6 +735,7 @@ template:
               value: valueValue
             path: pathValue
             port: portValue
+            protocol: protocolValue
             scheme: schemeValue
           sleep:
             seconds: 1
@@ -746,6 +758,7 @@ template:
             value: valueValue
           path: pathValue
           port: portValue
+          protocol: protocolValue
           scheme: schemeValue
         initialDelaySeconds: 2
         periodSeconds: 4
@@ -777,6 +790,7 @@ template:
             value: valueValue
           path: pathValue
           port: portValue
+          protocol: protocolValue
           scheme: schemeValue
         initialDelaySeconds: 2
         periodSeconds: 4
@@ -848,6 +862,7 @@ template:
             value: valueValue
           path: pathValue
           port: portValue
+          protocol: protocolValue
           scheme: schemeValue
         initialDelaySeconds: 2
         periodSeconds: 4

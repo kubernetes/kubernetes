@@ -353,6 +353,10 @@ func SetDefaults_HTTPGetAction(obj *v1.HTTPGetAction) {
 	if obj.Scheme == "" {
 		obj.Scheme = v1.URISchemeHTTP
 	}
+	if obj.Protocol == nil && utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+		defaultProtocol := v1.HTTPProtocolHTTP1
+		obj.Protocol = &defaultProtocol
+	}
 }
 
 // SetDefaults_Namespace adds a default label for all namespaces
