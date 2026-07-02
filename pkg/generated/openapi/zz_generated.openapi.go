@@ -54870,7 +54870,6 @@ func schema_k8sio_api_storage_v1_CSIDriver(ref common.ReferenceCallback) common.
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -55079,7 +55078,6 @@ func schema_k8sio_api_storage_v1_CSINode(ref common.ReferenceCallback) common.Op
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -55225,7 +55223,6 @@ func schema_k8sio_api_storage_v1_CSINodeSpec(ref common.ReferenceCallback) commo
 						},
 					},
 				},
-				Required: []string{"drivers"},
 			},
 		},
 		Dependencies: []string{
@@ -55539,7 +55536,6 @@ func schema_k8sio_api_storage_v1_TokenRequest(ref common.ReferenceCallback) comm
 						},
 					},
 				},
-				Required: []string{"audience"},
 			},
 		},
 	}
@@ -55756,7 +55752,6 @@ func schema_k8sio_api_storage_v1_VolumeAttachmentStatus(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"attached"},
 			},
 		},
 		Dependencies: []string{
@@ -55816,7 +55811,7 @@ func schema_k8sio_api_storage_v1_VolumeAttributesClass(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"driverName"},
+				Required: []string{"driverName", "parameters"},
 			},
 		},
 		Dependencies: []string{
@@ -56253,7 +56248,6 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentStatus(ref common.Referen
 						},
 					},
 				},
-				Required: []string{"attached"},
 			},
 		},
 		Dependencies: []string{
@@ -56313,7 +56307,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttributesClass(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"driverName"},
+				Required: []string{"driverName", "parameters"},
 			},
 		},
 		Dependencies: []string{
@@ -56442,7 +56436,6 @@ func schema_k8sio_api_storage_v1beta1_CSIDriver(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -56651,7 +56644,6 @@ func schema_k8sio_api_storage_v1beta1_CSINode(ref common.ReferenceCallback) comm
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -56797,7 +56789,6 @@ func schema_k8sio_api_storage_v1beta1_CSINodeSpec(ref common.ReferenceCallback) 
 						},
 					},
 				},
-				Required: []string{"drivers"},
 			},
 		},
 		Dependencies: []string{
@@ -57110,7 +57101,6 @@ func schema_k8sio_api_storage_v1beta1_TokenRequest(ref common.ReferenceCallback)
 						},
 					},
 				},
-				Required: []string{"audience"},
 			},
 		},
 	}
@@ -57327,7 +57317,6 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttachmentStatus(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"attached"},
 			},
 		},
 		Dependencies: []string{
@@ -57387,7 +57376,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttributesClass(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"driverName"},
+				Required: []string{"driverName", "parameters"},
 			},
 		},
 		Dependencies: []string{
@@ -57543,6 +57532,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigration(ref commo
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
