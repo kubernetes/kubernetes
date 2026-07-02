@@ -352,7 +352,7 @@ func TestFailureHandler(t *testing.T) {
 				}
 
 				testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-				s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable), nil, time.Now())
+				s.FailureHandler(ctx, schedFramework, testPodInfo, false, fwk.NewStatus(fwk.Unschedulable), nil, time.Now())
 
 				var got *v1.Pod
 				if tt.podUpdatedDuringScheduling {
@@ -410,7 +410,7 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 			}
 
 			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-			s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
+			s.FailureHandler(ctx, schedFramework, testPodInfo, false, fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
 
 			pod := getPodFromPriorityQueue(queue, testPod)
 			if pod != nil {
