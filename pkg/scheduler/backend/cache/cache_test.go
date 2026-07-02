@@ -32,9 +32,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -2884,4 +2887,79 @@ func (cache *cacheImpl) getNodeInfo(nodeName string) (*v1.Node, error) {
 	}
 
 	return n.info.Node(), nil
+}
+
+func TestCache_HavePodsWithRequiredNonHostScopedAntiAffinity(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	nodeName := "node-1"
+	pod := st.MakePod().Name("pod-1").UID("pod-1").Node(nodeName).
+		PodAntiAffinityExists("label", "zone", st.PodAntiAffinityWithRequiredReq).Obj()
+
+	testCases := []struct {
+		name               string
+		featureGateEnabled bool
+	}{
+		{name: "feature gate enabled", featureGateEnabled: true},
+		{name: "feature gate disabled", featureGateEnabled: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, tc.featureGateEnabled)
+
+			cache := newCache(context.Background(), time.Second, nil, false)
+			node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+			cache.AddNode(logger, node)
+
+			// Add
+			if err := cache.AddPod(logger, pod); err != nil {
+				t.Fatalf("AddPod failed: %v", err)
+			}
+			snapshot := NewEmptySnapshot()
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("UpdateSnapshot failed: %v", err)
+			}
+			antiAffinityList, err := snapshot.HavePodsWithRequiredNonHostScopedAntiAffinityList()
+			if err != nil {
+				t.Fatalf("HavePodsWithRequiredNonHostScopedAntiAffinityList failed: %v", err)
+			}
+			if tc.featureGateEnabled && len(antiAffinityList) != 1 {
+				t.Errorf("expected 1 node with non-host-scoped anti-affinity, got %d", len(antiAffinityList))
+			}
+			if !tc.featureGateEnabled && len(antiAffinityList) != 0 {
+				t.Errorf("expected 0 nodes with non-host-scoped anti-affinity when feature gate is disabled, got %d", len(antiAffinityList))
+			}
+
+			// Update (to something else, e.g. change labels)
+			updatedPod := pod.DeepCopy()
+			updatedPod.Labels = map[string]string{"foo": "bar"}
+			if err := cache.UpdatePod(logger, pod, updatedPod); err != nil {
+				t.Fatalf("UpdatePod failed: %v", err)
+			}
+			snapshot = NewEmptySnapshot()
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("UpdateSnapshot failed: %v", err)
+			}
+			antiAffinityList, _ = snapshot.HavePodsWithRequiredNonHostScopedAntiAffinityList()
+			if tc.featureGateEnabled && len(antiAffinityList) != 1 {
+				t.Errorf("expected 1 node after update, got %d", len(antiAffinityList))
+			}
+			if !tc.featureGateEnabled && len(antiAffinityList) != 0 {
+				t.Errorf("expected 0 nodes after update when feature gate is disabled, got %d", len(antiAffinityList))
+			}
+
+			// Remove
+			if err := cache.RemovePod(logger, updatedPod); err != nil {
+				t.Fatalf("RemovePod failed: %v", err)
+			}
+			snapshot = NewEmptySnapshot()
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("UpdateSnapshot failed: %v", err)
+			}
+			antiAffinityList, _ = snapshot.HavePodsWithRequiredNonHostScopedAntiAffinityList()
+			if len(antiAffinityList) != 0 {
+				t.Errorf("expected 0 nodes after removal, got %d", len(antiAffinityList))
+			}
+		})
+	}
 }
