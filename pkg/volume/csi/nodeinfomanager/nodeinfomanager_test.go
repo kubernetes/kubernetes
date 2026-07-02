@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -376,7 +377,15 @@ func TestInstallCSIDriver(t *testing.T) {
 				Spec: storage.CSINodeSpec{
 					Drivers: []storage.CSINodeDriver{
 						{
-							// Only the new driver should be present because the old CSINode represented a previous node.
+							// Old driver is preserved because the CSINode OwnerReference
+							// is reconciled in-place (UID updated) rather than deleting
+							// and recreating the CSINode. The kubelet will re-register
+							// its current drivers and stale entries will be cleaned up
+							// through normal UninstallCSIDriver operations.
+							Name:   "com.example.csi.old-driver",
+							NodeID: "com.example.csi/csi-node2",
+						},
+						{
 							Name:   "com.example.csi.driver1",
 							NodeID: "com.example.csi/csi-node1",
 						},
@@ -1039,6 +1048,112 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 			t.Errorf("expected Driver to be %q and NodeID to be %q, but got: %q:%q", driverName, nodeID, driver.Name, driver.NodeID)
 		}
 	}
+}
+
+// TestCSINodeOwnerRefReconciliation verifies that when a Node is replaced with
+// the same name but a different UID (common in cloud environments), the CSINode's
+// OwnerReference is reconciled in-place to point to the new Node's UID, rather
+// than deleting and recreating the CSINode. This prevents the garbage collector
+// from deleting the CSINode while the OwnerReference is stale.
+// Regression test for https://github.com/kubernetes/kubernetes/issues/136899
+func TestCSINodeOwnerRefReconciliation(t *testing.T) {
+	const nodeName = "node1"
+	const oldUID = types.UID("old-uid-123")
+	const newUID = types.UID("new-uid-456")
+
+	existingNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+			UID:  newUID,
+		},
+	}
+
+	existingCSINode := &storage.CSINode{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: nodeKind.Version,
+					Kind:       nodeKind.Kind,
+					Name:       nodeName,
+					UID:        oldUID,
+				},
+			},
+		},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{
+				{
+					Name:   "com.example.csi/existing-driver",
+					NodeID: "com.example.csi/existing-node-id",
+				},
+			},
+		},
+	}
+
+	client := getClientSet(existingNode, existingCSINode)
+
+	tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
+	if err != nil {
+		t.Fatalf("can't create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
+		tmpDir,
+		client,
+		nil,
+		nodeName,
+		nil,
+		nil,
+	)
+	nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
+
+	// InitializeCSINodeWithAnnotation sets nim.nodeID from the Node API
+	// and then calls ensureNodeOwnsCSINode, which should reconcile the UID.
+	err = nim.InitializeCSINodeWithAnnotation()
+	require.NoError(t, err)
+
+	// Verify CSINode still exists and was NOT deleted/recreated.
+	csiNode, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	require.NoError(t, err)
+	if csiNode == nil {
+		t.Fatal("expected CSINode to exist after OwnerRef reconciliation, but it was not found")
+	}
+
+	// Verify OwnerReference UID was reconciled to the new node's UID.
+	assert.Len(t, csiNode.OwnerReferences, 1, "expected exactly one OwnerReference")
+	assert.Equal(t, newUID, csiNode.OwnerReferences[0].UID,
+		"OwnerReference UID should be reconciled to the new node's UID")
+	assert.Equal(t, nodeName, csiNode.OwnerReferences[0].Name,
+		"OwnerReference Name should remain the same")
+
+	// Verify existing drivers were preserved (not lost due to delete+recreate).
+	assert.Len(t, csiNode.Spec.Drivers, 1, "existing drivers should be preserved")
+	assert.Equal(t, "com.example.csi/existing-driver", csiNode.Spec.Drivers[0].Name)
+	assert.Equal(t, "com.example.csi/existing-node-id", csiNode.Spec.Drivers[0].NodeID)
+
+	// Verify the CSINode was NOT deleted at any point by checking client actions.
+	// With the fix, there should be no "delete" action for CSINodes.
+	for _, action := range client.Actions() {
+		if action.GetVerb() == "delete" && action.GetResource().Resource == "csinodes" {
+			t.Error("CSINode should not have been deleted during OwnerRef reconciliation")
+		}
+	}
+
+	// Now verify that InstallCSIDriver still works correctly after reconciliation.
+	err = nim.InstallCSIDriver("com.example.csi/new-driver", "com.example.csi/new-node-id", 0, nil)
+	require.NoError(t, err)
+
+	csiNode, err = client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	require.NoError(t, err)
+	if csiNode == nil {
+		t.Fatal("expected CSINode to exist after InstallCSIDriver, but it was not found")
+	}
+
+	// Should have both the preserved old driver and the newly installed driver.
+	assert.Len(t, csiNode.Spec.Drivers, 2, "should have both old and new drivers")
+	// OwnerReference should still point to the new node.
+	assert.Equal(t, newUID, csiNode.OwnerReferences[0].UID)
 }
 
 func getClientSet(existingNode *v1.Node, existingCSINode *storage.CSINode) *fake.Clientset {

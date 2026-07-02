@@ -462,9 +462,40 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 }
 
 // ensureNodeOwnsCSINode will ensure that the current CSINode object is owned by the node represented by this nodeInfoManager.
-// If not, it will delete the existing CSINode object and return an error.
+// If the CSINode has an OwnerReference with the same node name but a stale UID (e.g. after a node replacement),
+// the OwnerReference UID is reconciled to the current node's UID and persisted. This prevents the garbage collector
+// from deleting the CSINode while the UID is stale.
+// If the CSINode is owned by a completely different node, it will be deleted and an error returned.
 func (nim *nodeInfoManager) ensureNodeOwnsCSINode(nodeInfo *storagev1.CSINode) error {
 	if ok, csiNodeOwnerID := nim.nodeOwnsCSINode(nodeInfo); !ok {
+		// Before deleting, check if the CSINode has an OwnerReference with
+		// matching node name but stale UID. This happens when a Node is
+		// deleted and recreated with the same name but a different UID
+		// (common in cloud environments and automated provisioning).
+		// In that case, reconcile the UID in-place to prevent the garbage
+		// collector from deleting the CSINode before we can recreate it.
+		for i, ownerRef := range nodeInfo.OwnerReferences {
+			if ownerRef.Kind == nodeKind.Kind && ownerRef.Name == string(nim.nodeName) {
+				klog.V(2).Infof("reconciling CSINode %q OwnerReference UID from %q to %q",
+					nodeInfo.Name, ownerRef.UID, nim.nodeID)
+				nodeInfo.OwnerReferences[i].UID = nim.nodeID
+
+				csiKubeClient := nim.volumeHost.GetKubeClient()
+				if csiKubeClient == nil {
+					return goerrors.New("error getting CSI client")
+				}
+				updatedNodeInfo, err := csiKubeClient.StorageV1().CSINodes().Update(
+					context.TODO(), nodeInfo, metav1.UpdateOptions{})
+				if err != nil {
+					return fmt.Errorf("error reconciling CSINode %q OwnerReference: %w", nodeInfo.Name, err)
+				}
+				// Copy the updated object back so callers have the correct
+				// ResourceVersion for any subsequent updates.
+				*nodeInfo = *updatedNodeInfo
+				return nil
+			}
+		}
+
 		klog.V(2).Infof("existing CSINode %q is owned by different node (oldNodeID=%q, newNodeID=%q), cleaning up...", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
 		err := nim.DeleteCSINode()
 		if err != nil {
