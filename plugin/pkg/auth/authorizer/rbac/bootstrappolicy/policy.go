@@ -197,6 +197,10 @@ func editRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule(ReadWrite...).Groups(coordinationGroup).Resources("leases").RuleOrDie(),
 
 		rbacv1helpers.NewRule(Write...).Groups(checkpointGroup).Resources("podcheckpoints").RuleOrDie(),
+		// The "restore" verb gates creating a Pod with spec.restoreFrom.name set
+		// (consuming a checkpoint's captured state), separately from reading the
+		// PodCheckpoint object. Enforced by the PodRestoreAuthorization plugin.
+		rbacv1helpers.NewRule("restore").Groups(checkpointGroup).Resources("podcheckpoints").RuleOrDie(),
 
 		rbacv1helpers.NewRule(Write...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaimtemplates").RuleOrDie(),
 	}

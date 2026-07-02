@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/podcheckpoint"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	"k8s.io/kubernetes/plugin/pkg/admission/podresize"
+	"k8s.io/kubernetes/plugin/pkg/admission/podrestoreauthorization"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtopologylabels"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
@@ -106,6 +107,7 @@ var AllOrderedPlugins = []string{
 	nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator
 	podresize.PluginName,                    // PodResizeValidator
 	podcheckpoint.PluginName,                // PodCheckpoint, only active when PodLevelCheckpointRestore is enabled.
+	podrestoreauthorization.PluginName,      // PodRestoreAuthorization, only active when feature gate PodLevelCheckpointRestore is enabled.
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -163,6 +165,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	nodedeclaredfeatures.Register(plugins)
 	podresize.Register(plugins)
 	podcheckpoint.Register(plugins)
+	podrestoreauthorization.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
@@ -195,6 +198,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		podresize.PluginName,                    // PodResizeValidator, only active when feature gate InPlacePodVerticalScaling is enabled
 		conditionsenforcer.PluginName,           // AuthorizationConditionsEnforcer, only active when feature gate ConditionalAuthorization is enabled
 		podcheckpoint.PluginName,                // PodCheckpoint, only active when PodLevelCheckpointRestore is enabled.
+		podrestoreauthorization.PluginName,      // PodRestoreAuthorization, only active when feature gate PodLevelCheckpointRestore is enabled
 	)
 
 	return sets.New(AllOrderedPlugins...).Difference(defaultOnPlugins)
