@@ -29,7 +29,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
@@ -1496,7 +1495,9 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 			},
 		},
 	}}
-	require.NoError(t, cs.Tracker().Add(pd))
+	if err := cs.Tracker().Add(pd); err != nil {
+		t.Fatalf("Failed to add Pod: %v", err)
+	}
 
 	informerFactory := NewInformerFactory(cs, 0)
 	lister := informerFactory.Core().V1().Pods().Lister()
@@ -1507,6 +1508,10 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	p, err := lister.Pods("default").Get("test")
-	require.NoError(t, err)
-	require.Empty(t, p.GetManagedFields(), "expected managedFields to be trimmed by the transform")
+	if err != nil {
+		t.Fatalf("Unexpected error getting pod: %v", err)
+	}
+	if managedFields := p.GetManagedFields(); len(managedFields) != 0 {
+		t.Errorf("Expected managedFields to be empty, got: %v", managedFields)
+	}
 }
