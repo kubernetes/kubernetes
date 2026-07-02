@@ -19,6 +19,7 @@ package json
 import (
 	"encoding/json"
 	"io"
+	"os"
 	"strconv"
 
 	kjson "sigs.k8s.io/json"
@@ -327,9 +328,11 @@ func (jsonFramer) NewFrameWriter(w io.Writer) io.Writer {
 	return w
 }
 
-// NewFrameReader implements stream framing for this serializer
+// NewFrameReader implements stream framing for this serializer.
 func (jsonFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser {
-	// we need to extract the JSON chunks of data to pass to Decode()
+	if enabled, _ := strconv.ParseBool(os.Getenv("KUBE_FEATURE_LineDelimitedFrameReader")); enabled {
+		return framer.NewLineDelimitedFrameReader(r)
+	}
 	return framer.NewJSONFramedReader(r)
 }
 
