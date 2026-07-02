@@ -120,7 +120,7 @@ const (
 
 	ResourceManagerAllocationErrorsTotalKey = "resource_manager_allocation_errors_total"
 
-	ResourceManagerContainerAssignmentsKey = "resource_manager_container_assignments"
+	ResourceManagerContainerAssignmentsKey = "resource_manager_container_assignments_total"
 
 	ResourceManagerPod  = "pod"
 	ResourceManagerNode = "node"
@@ -1266,8 +1266,10 @@ var (
 	// allocations drawn from the node-level pool versus a pre-allocated pod-level pool.
 	ResourceManagerAllocationsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Name: ResourceManagerAllocationTotalKey,
-			Help: "Number of exclusive resource allocations performed by a resource manager.",
+			Subsystem:      KubeletSubsystem,
+			Name:           ResourceManagerAllocationTotalKey,
+			Help:           "Number of exclusive resource allocations performed by a resource manager.",
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"resource_name", "source"},
 	)
@@ -1276,8 +1278,10 @@ var (
 	// resource allocation, distinguished by the intended allocation source.
 	ResourceManagerAllocationErrorsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Name: ResourceManagerAllocationErrorsTotalKey,
-			Help: "Number of errors encountered during exclusive resource allocation.",
+			Subsystem:      KubeletSubsystem,
+			Name:           ResourceManagerAllocationErrorsTotalKey,
+			Help:           "Number of errors encountered during exclusive resource allocation.",
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"resource_name", "source"},
 	)
@@ -1288,8 +1292,10 @@ var (
 	// versus the pod-level shared pool.
 	ResourceManagerContainerAssignments = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Name: ResourceManagerContainerAssignmentsKey,
-			Help: "Number of containers with a specific type of resource assignment.",
+			Subsystem:      KubeletSubsystem,
+			Name:           ResourceManagerContainerAssignmentsKey,
+			Help:           "Number of containers with a specific type of resource assignment.",
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"resource_name", "assignment_type"},
 	)
