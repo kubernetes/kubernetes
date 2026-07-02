@@ -23,9 +23,39 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+// secretConfig is a minimal runtime.Object carrying a datapolicy-tagged field,
+// used to verify that MarshalJSON redacts sensitive values.
+type secretConfig struct {
+	metav1.TypeMeta `json:",inline"`
+	Public          string              `json:"public"`
+	Token           string              `json:"token" datapolicy:"token"`
+	Headers         map[string][]string `json:"headers" datapolicy:"token"`
+}
+
+func (c *secretConfig) GetObjectKind() schema.ObjectKind { return &c.TypeMeta }
+
+func (c *secretConfig) DeepCopyObject() runtime.Object {
+	cp := &secretConfig{
+		TypeMeta: c.TypeMeta,
+		Public:   c.Public,
+		Token:    c.Token,
+	}
+	if c.Headers != nil {
+		cp.Headers = make(map[string][]string, len(c.Headers))
+		for k, v := range c.Headers {
+			vals := make([]string, len(v))
+			copy(vals, v)
+			cp.Headers[k] = vals
+		}
+	}
+	return cp
+}
 
 func TestConfigz(t *testing.T) {
 	v, err := New("testing")
@@ -123,6 +153,61 @@ func TestConfigzWithAPIVersionAndKind(t *testing.T) {
 	}
 
 	Delete("testobj")
+}
+
+func TestConfigzRedactsDatapolicyFields(t *testing.T) {
+	cfg := &secretConfig{
+		TypeMeta: metav1.TypeMeta{APIVersion: "test.k8s.io/v1", Kind: "SecretConfig"},
+		Public:   "visible",
+		Token:    "super-secret-token",
+		Headers: map[string][]string{
+			"Authorization": {"Bearer abc123"},
+		},
+	}
+
+	v, err := New("secret")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	defer Delete("secret")
+
+	if err := v.Set(cfg); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	s := httptest.NewServer(http.HandlerFunc(handle))
+	defer s.Close()
+
+	resp, err := http.Get(s.URL + "/configz")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	out := string(body)
+	if strings.Contains(out, "super-secret-token") {
+		t.Errorf("expected token to be redacted, got: %s", out)
+	}
+	if strings.Contains(out, "Bearer abc123") {
+		t.Errorf("expected header value to be redacted, got: %s", out)
+	}
+	if !strings.Contains(out, "CLASSIFIED") {
+		t.Errorf("expected redacted CLASSIFIED value, got: %s", out)
+	}
+	if !strings.Contains(out, "visible") {
+		t.Errorf("expected untagged field to be preserved, got: %s", out)
+	}
+
+	// The registered config must not be mutated by serialization.
+	if cfg.Token != "super-secret-token" {
+		t.Errorf("registered config was mutated: token = %q", cfg.Token)
+	}
+	if got := cfg.Headers["Authorization"]; len(got) != 1 || got[0] != "Bearer abc123" {
+		t.Errorf("registered config was mutated: headers = %v", cfg.Headers)
+	}
 }
 
 func TestConfigzErrors(t *testing.T) {
