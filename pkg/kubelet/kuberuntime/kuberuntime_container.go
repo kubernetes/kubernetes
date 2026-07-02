@@ -309,24 +309,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	}
 	m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Container started")
 
-	// Symlink container logs to the legacy container log location for cluster logging
-	// support.
-	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
-	containerMeta := containerConfig.GetMetadata()
-	sandboxMeta := podSandboxConfig.GetMetadata()
-	legacySymlink := legacyLogSymlink(containerID, containerMeta.Name, sandboxMeta.Name,
-		sandboxMeta.Namespace)
-	containerLog := filepath.Join(podSandboxConfig.LogDirectory, containerConfig.LogPath)
-	// only create legacy symlink if containerLog path exists (or the error is not IsNotExist).
-	// Because if containerLog path does not exist, only dangling legacySymlink is created.
-	// This dangling legacySymlink is later removed by container gc, so it does not make sense
-	// to create it in the first place. it happens when journald logging driver is used with docker.
-	if _, err := m.osInterface.Stat(containerLog); !os.IsNotExist(err) {
-		if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
-			logger.Error(err, "Failed to create legacy symbolic link", "path", legacySymlink,
-				"containerID", containerID, "containerLogPath", containerLog)
-		}
-	}
+	m.createContainerLogSymlink(ctx, containerID, containerConfig, podSandboxConfig)
 
 	// Step 4: execute the post start hook.
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
@@ -349,6 +332,29 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	}
 
 	return "", nil
+}
+
+func (m *kubeGenericRuntimeManager) createContainerLogSymlink(ctx context.Context, containerID string, containerConfig *runtimeapi.ContainerConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) {
+	logger := klog.FromContext(ctx)
+
+	// Symlink container logs to the legacy container log location for cluster logging
+	// support.
+	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
+	containerMeta := containerConfig.GetMetadata()
+	sandboxMeta := podSandboxConfig.GetMetadata()
+	legacySymlink := legacyLogSymlink(containerID, containerMeta.Name, sandboxMeta.Name,
+		sandboxMeta.Namespace)
+	containerLog := filepath.Join(podSandboxConfig.LogDirectory, containerConfig.LogPath)
+	// only create legacy symlink if containerLog path exists (or the error is not IsNotExist).
+	// Because if containerLog path does not exist, only dangling legacySymlink is created.
+	// This dangling legacySymlink is later removed by container gc, so it does not make sense
+	// to create it in the first place. it happens when journald logging driver is used with docker.
+	if _, err := m.osInterface.Stat(containerLog); !os.IsNotExist(err) {
+		if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
+			logger.Error(err, "Failed to create legacy symbolic link", "path", legacySymlink,
+				"containerID", containerID, "containerLogPath", containerLog)
+		}
+	}
 }
 
 // generateContainerConfig generates container config for kubelet runtime v1.
