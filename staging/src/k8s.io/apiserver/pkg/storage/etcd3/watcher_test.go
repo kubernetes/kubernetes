@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -373,7 +374,7 @@ func TestWatchChanSyncStreamMatchesPaginated(t *testing.T) {
 	if len(stream) != len(want) {
 		t.Errorf("syncStreamRecursive queued %d events, expected %d", len(stream), len(want))
 	}
-	if diff := cmp.Diff(paginated, stream, cmp.AllowUnexported(event{})); diff != "" {
+	if diff := cmp.Diff(paginated, stream, cmp.AllowUnexported(event{}), cmpopts.IgnoreFields(event{}, "recordTime")); diff != "" {
 		t.Errorf("syncStreamRecursive and syncPaginated queued different events (-paginated +stream):\n%s", diff)
 	}
 }

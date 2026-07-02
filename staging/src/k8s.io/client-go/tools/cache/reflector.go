@@ -1036,13 +1036,23 @@ loop:
 			resourceVersion := meta.GetResourceVersion()
 			switch event.Type {
 			case watch.Added:
-				err := store.Add(event.Object)
+				var err error
+				if receiver, ok := store.(WatchEventReceiver); ok {
+					err = receiver.ProcessWatchEvent(event)
+				} else {
+					err = store.Add(event.Object)
+				}
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to add watch event object to store", "reflector", name, "object", event.Object)
 				}
 			case watch.Modified:
 				eventReceivedBesidesAdded = true
-				err := store.Update(event.Object)
+				var err error
+				if receiver, ok := store.(WatchEventReceiver); ok {
+					err = receiver.ProcessWatchEvent(event)
+				} else {
+					err = store.Update(event.Object)
+				}
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to update watch event object to store", "reflector", name, "object", event.Object)
 				}
@@ -1051,7 +1061,12 @@ loop:
 				// state", which is passed in event.Object? If so, may need
 				// to change this.
 				eventReceivedBesidesAdded = true
-				err := store.Delete(event.Object)
+				var err error
+				if receiver, ok := store.(WatchEventReceiver); ok {
+					err = receiver.ProcessWatchEvent(event)
+				} else {
+					err = store.Delete(event.Object)
+				}
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to delete watch event object from store", "reflector", name, "object", event.Object)
 				}

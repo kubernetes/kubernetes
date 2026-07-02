@@ -342,6 +342,7 @@ type Cacher struct {
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
+	watcherMetrics          *metrics.WatcherMetricsObservers
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -414,6 +415,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		clock:            config.Clock,
 		timer:            time.NewTimer(time.Duration(0)),
 		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
+		watcherMetrics:   metrics.NewWatcherMetricsObservers(config.GroupResource),
 	}
 
 	// Ensure that timer is stopped.
@@ -604,6 +606,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		deadline,
 		pred.AllowWatchBookmarks,
 		c.groupResource,
+		c.watcherMetrics,
 		identifier,
 	)
 

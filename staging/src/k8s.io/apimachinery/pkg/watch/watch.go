@@ -19,6 +19,7 @@ package watch
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -80,6 +81,10 @@ type Event struct {
 	//  * If Type is Error: *api.Status is recommended; other types may make sense
 	//    depending on context.
 	Object runtime.Object
+
+	// RecordTime is an internal timestamp used for telemetry to measure the propagation
+	// delay of the event. It is not serialized or exposed to the public API.
+	RecordTime time.Time `json:"-"`
 }
 
 type emptyWatch chan Event
@@ -165,27 +170,27 @@ func (f *FakeWatcher) ResultChan() <-chan Event {
 
 // Add sends an add event.
 func (f *FakeWatcher) Add(obj runtime.Object) {
-	f.result <- Event{Added, obj}
+	f.result <- Event{Type: Added, Object: obj}
 }
 
 // Modify sends a modify event.
 func (f *FakeWatcher) Modify(obj runtime.Object) {
-	f.result <- Event{Modified, obj}
+	f.result <- Event{Type: Modified, Object: obj}
 }
 
 // Delete sends a delete event.
 func (f *FakeWatcher) Delete(lastValue runtime.Object) {
-	f.result <- Event{Deleted, lastValue}
+	f.result <- Event{Type: Deleted, Object: lastValue}
 }
 
 // Error sends an Error event.
 func (f *FakeWatcher) Error(errValue runtime.Object) {
-	f.result <- Event{Error, errValue}
+	f.result <- Event{Type: Error, Object: errValue}
 }
 
 // Action sends an event of the requested type, for table-based testing.
 func (f *FakeWatcher) Action(action EventType, obj runtime.Object) {
-	f.result <- Event{action, obj}
+	f.result <- Event{Type: action, Object: obj}
 }
 
 // RaceFreeFakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
@@ -247,7 +252,7 @@ func (f *RaceFreeFakeWatcher) Add(obj runtime.Object) {
 	defer f.Unlock()
 	if !f.Stopped {
 		select {
-		case f.result <- Event{Added, obj}:
+		case f.result <- Event{Type: Added, Object: obj}:
 			return
 		default:
 			panic(fmt.Errorf("channel full"))
@@ -261,7 +266,7 @@ func (f *RaceFreeFakeWatcher) Modify(obj runtime.Object) {
 	defer f.Unlock()
 	if !f.Stopped {
 		select {
-		case f.result <- Event{Modified, obj}:
+		case f.result <- Event{Type: Modified, Object: obj}:
 			return
 		default:
 			panic(fmt.Errorf("channel full"))
@@ -275,7 +280,7 @@ func (f *RaceFreeFakeWatcher) Delete(lastValue runtime.Object) {
 	defer f.Unlock()
 	if !f.Stopped {
 		select {
-		case f.result <- Event{Deleted, lastValue}:
+		case f.result <- Event{Type: Deleted, Object: lastValue}:
 			return
 		default:
 			panic(fmt.Errorf("channel full"))
@@ -289,7 +294,7 @@ func (f *RaceFreeFakeWatcher) Error(errValue runtime.Object) {
 	defer f.Unlock()
 	if !f.Stopped {
 		select {
-		case f.result <- Event{Error, errValue}:
+		case f.result <- Event{Type: Error, Object: errValue}:
 			return
 		default:
 			panic(fmt.Errorf("channel full"))
@@ -303,7 +308,7 @@ func (f *RaceFreeFakeWatcher) Action(action EventType, obj runtime.Object) {
 	defer f.Unlock()
 	if !f.Stopped {
 		select {
-		case f.result <- Event{action, obj}:
+		case f.result <- Event{Type: action, Object: obj}:
 			return
 		default:
 			panic(fmt.Errorf("channel full"))
