@@ -384,7 +384,7 @@ func makePodSourceConfig(ctx context.Context, kubeCfg *kubeletconfiginternal.Kub
 	// define file config source
 	if kubeCfg.StaticPodPath != "" {
 		logger.Info("Adding static pod path", "path", kubeCfg.StaticPodPath)
-		config.NewSourceFile(logger, kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.FileSource))
+		config.NewSourceFile(ctx, kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.FileSource))
 	}
 
 	// define url config source
