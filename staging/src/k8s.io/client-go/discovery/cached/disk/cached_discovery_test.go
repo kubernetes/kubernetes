@@ -124,6 +124,8 @@ func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
 		}
 		if info.IsDir() {
 			assert.Equal(os.FileMode(0750), info.Mode().Perm())
+		} else if info.Name() == "CACHEDIR.TAG" {
+			assert.Equal(os.FileMode(0644), info.Mode().Perm())
 		} else {
 			assert.Equal(os.FileMode(0660), info.Mode().Perm())
 		}
@@ -688,6 +690,9 @@ func numFilesFound(dir string, filename string) (int, error) {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+		if info.Name() == "CACHEDIR.TAG" {
+			return nil
 		}
 		if info.Name() == filename {
 			numFound++
