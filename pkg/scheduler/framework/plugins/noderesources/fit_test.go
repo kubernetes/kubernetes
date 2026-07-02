@@ -2345,6 +2345,10 @@ func (pa *podAssignment) GetNodeName() string {
 	return pa.nodeName
 }
 
+func (pa *podAssignment) GetCycleState() fwk.CycleState {
+	return nil
+}
+
 func TestScorePlacement_Resources(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.GenericWorkload:                 true,

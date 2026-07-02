@@ -677,6 +677,8 @@ type ProposedAssignment interface {
 	GetPod() *v1.Pod
 	// GetNodeName returns the name of the proposed node for the pod.
 	GetNodeName() string
+	// GetCycleState returns the CycleState computed for this pod during pod group scheduling cycle.
+	GetCycleState() CycleState
 }
 
 // PodGroupAssignments holds the temporary assignments of pods in a pod group to nodes for a placement.

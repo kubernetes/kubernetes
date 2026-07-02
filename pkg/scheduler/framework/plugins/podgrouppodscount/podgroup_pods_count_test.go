@@ -56,6 +56,10 @@ func (pa *mockProposedAssignment) GetPod() *v1.Pod {
 	return pa.pod
 }
 
+func (pa *mockProposedAssignment) GetCycleState() fwk.CycleState {
+	return nil
+}
+
 func TestScorePlacement(t *testing.T) {
 	podGroupName := "pg1"
 
