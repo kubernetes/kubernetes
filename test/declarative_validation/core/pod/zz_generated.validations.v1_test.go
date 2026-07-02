@@ -80,6 +80,13 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.restoreFrom": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.restoreFrom.name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},
@@ -108,6 +115,13 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.nodeAllocatableResourceClaimStatuses[*].resourceClaimName": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.restoreStatus": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"status.restoreStatus.restoreState": {
+				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.volumeHealth[*]": {
