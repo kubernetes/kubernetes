@@ -36,7 +36,7 @@ func TestSliceItem(t *testing.T) {
 		name      string
 		new       []multiKeyItem
 		old       []multiKeyItem
-		match     MatchItemFn[multiKeyItem]
+		match     MatchItemFunc[multiKeyItem]
 		validator func(context.Context, operation.Operation, *field.Path, *multiKeyItem, *multiKeyItem) field.ErrorList
 		expected  field.ErrorList
 	}{
