@@ -102,6 +102,11 @@ type RuntimeClassList struct {
 }
 
 const (
+	// PodRestoreReasonCompleted reports that the one-time restore completed.
+	PodRestoreReasonCompleted = "RestoreCompleted"
+)
+
+const (
 	// PodCheckpointConditionReady is the summary condition type for a PodCheckpoint.
 	// It is True once the checkpoint data has been written and is ready to
 	// restore from, and False while the checkpoint is in progress or after a

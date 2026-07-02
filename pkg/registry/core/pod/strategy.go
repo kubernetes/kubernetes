@@ -255,6 +255,13 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if newPod.Status.ExtraNodeAllocatableResources == nil && oldPod.Status.ExtraNodeAllocatableResources != nil {
 		newPod.Status.ExtraNodeAllocatableResources = oldPod.Status.ExtraNodeAllocatableResources
 	}
+	// An older status client must not erase the durable record that prevents
+	// the kubelet from replaying a completed or interrupted restore.
+	if _, condition := podutil.GetPodCondition(&newPod.Status, api.PodRestored); condition == nil {
+		if _, oldCondition := podutil.GetPodCondition(&oldPod.Status, api.PodRestored); oldCondition != nil {
+			newPod.Status.Conditions = append(newPod.Status.Conditions, *oldCondition)
+		}
+	}
 
 	preserveOldObservedGeneration(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
