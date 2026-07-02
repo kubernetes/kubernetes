@@ -1063,7 +1063,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked)
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, 0)
 			if err != nil {
 				if tc.expErr == "" {
 					t.Errorf("unexpected error [%v]", err)
@@ -1086,4 +1086,76 @@ func mustParseCPUSet(t *testing.T, s string) cpuset.CPUSet {
 		t.Errorf("parsing %q: %v", s, err)
 	}
 	return cpus
+}
+
+func TestTakeByTopologyNUMADistributedWithMinNUMAHint(t *testing.T) {
+	// This test verifies the fix for https://github.com/kubernetes/kubernetes/issues/139430
+	// When TopologyManager selects a 4-NUMA affinity (e.g., for GPU alignment),
+	// CPUManager should not shrink the allocation to fewer NUMA nodes even if
+	// fewer nodes could satisfy the CPU count.
+	logger, _ := ktesting.NewTestContext(t)
+
+	testCases := []struct {
+		description  string
+		topo         *topology.CPUTopology
+		availableCPUs cpuset.CPUSet
+		numCPUs      int
+		cpuGroupSize int
+		minNUMAHint  int
+		expNUMAs     int // expected number of NUMA nodes in result
+	}{
+		{
+			// 4 NUMA nodes, 20 CPUs each (80 total). Request 30 CPUs.
+			// Without hint: minNUMAs=2 (30 fits in 2 NUMAs of 20 each)
+			// With hint=4: must use all 4 NUMAs
+			description:   "30 CPUs with 4-NUMA hint should distribute across all 4 NUMAs",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			numCPUs:       30,
+			cpuGroupSize:  1,
+			minNUMAHint:   4,
+			expNUMAs:      4,
+		},
+		{
+			// Same topology, no hint (0) → should use minimum NUMAs (2)
+			description:   "30 CPUs without hint should pack into minimum NUMAs",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			numCPUs:       30,
+			cpuGroupSize:  1,
+			minNUMAHint:   0,
+			expNUMAs:      2,
+		},
+		{
+			// 4 NUMA hint but only need 10 CPUs (fits in 1 NUMA)
+			// hint=4 should still force 4-NUMA distribution
+			description:   "10 CPUs with 4-NUMA hint should distribute across all 4 NUMAs",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			numCPUs:       4,
+			cpuGroupSize:  1,
+			minNUMAHint:   4,
+			expNUMAs:      4,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, tc.minNUMAHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Count how many distinct NUMA nodes are represented in the result
+			numaNodes := make(map[int]bool)
+			for _, cpuID := range result.UnsortedList() {
+				numaNodes[tc.topo.CPUDetails[cpuID].NUMANodeID] = true
+			}
+
+			if len(numaNodes) != tc.expNUMAs {
+				t.Errorf("expected CPUs distributed across %d NUMA nodes, got %d (NUMAs: %v, result: %s)",
+					tc.expNUMAs, len(numaNodes), numaNodes, result)
+			}
+		})
+	}
 }
