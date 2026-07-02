@@ -57,6 +57,16 @@ const queueMetricMetadata = `
 		# TYPE scheduler_queue_incoming_pods_total counter
 	`
 
+const queueIncomingEntitiesMetricMetadata = `
+	# HELP scheduler_queue_incoming_entities_total [ALPHA] Number of scheduling entities added to scheduling queues by event, queue type, and entity type. Entity types are either 'pod' or 'podgroup'.
+	# TYPE scheduler_queue_incoming_entities_total counter
+`
+
+const pendingEntitiesMetricMetadata = `
+	# HELP scheduler_pending_entities [ALPHA] Number of pending scheduling entities ('pod' or 'podgroup') by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
+	# TYPE scheduler_pending_entities gauge
+`
+
 var (
 	// nodeAdd is the event when a new node is added to the cluster.
 	nodeAdd = fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add}
@@ -4846,6 +4856,276 @@ func TestIncomingPodsMetrics(t *testing.T) {
 				t.Errorf("unexpected collecting result:\n%s", err)
 			}
 
+		})
+	}
+}
+
+func TestIncomingEntitiesMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	timestamp := time.Now()
+	unschedulablePlugin := "unschedulable_plugin"
+	logger := klog.Background()
+
+	pInfos := []*framework.QueuedPodInfo{
+		{
+			PodInfo: mustNewTestPodInfo(t, st.MakePod().Name("pod1").Namespace("ns-pg").UID("tp-1").Obj()),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            timestamp,
+				UnschedulablePlugins: sets.New(unschedulablePlugin),
+			},
+		},
+		{
+			PodInfo: mustNewTestPodInfo(t, st.MakePod().Name("pod2").Namespace("ns-pg").UID("tp-2").PodGroupName("pg-1").Obj()),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            timestamp,
+				UnschedulablePlugins: sets.New(unschedulablePlugin),
+			},
+		},
+		{
+			PodInfo: mustNewTestPodInfo(t, st.MakePod().Name("pod3").Namespace("ns-pg").UID("tp-3").PodGroupName("pg-1").Obj()),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            timestamp,
+				UnschedulablePlugins: sets.New(unschedulablePlugin),
+			},
+		},
+		{
+			PodInfo: mustNewTestPodInfo(t, st.MakePod().Name("pod4").Namespace("ns-pg").UID("tp-4").PodGroupName("pg-1").Obj()),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            timestamp,
+				UnschedulablePlugins: sets.New(unschedulablePlugin),
+			},
+		},
+	}
+
+	metricName := metrics.SchedulerSubsystem + "_" + metrics.SchedulerQueueIncomingEntities.Name
+
+	tests := []struct {
+		name string
+		run  func(tCtx ktesting.TContext, queue *PriorityQueue)
+		want string
+	}{
+		{
+			name: "add all pods to active queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				for _, pInfo := range pInfos {
+					queue.Add(tCtx, pInfo.Pod)
+				}
+			},
+			want: `
+				scheduler_queue_incoming_entities_total{entity="pod",event="UnscheduledPodAdd",queue="active"} 1
+				scheduler_queue_incoming_entities_total{entity="podgroup",event="UnscheduledPodAdd",queue="active"} 3
+			`,
+		},
+		{
+			name: "requeue podgroup to backoff queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[1].Pod)
+				queue.Add(tCtx, pInfos[2].Pod)
+				queue.Add(tCtx, pInfos[3].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				queue.pendingPodGroupPods.add(pInfos[2])
+				queue.pendingPodGroupPods.add(pInfos[3])
+				if err := queue.AddAttemptedPodGroupIfNeeded(logger, pgInfo, 1); err != nil {
+					tCtx.Fatalf("Unexpected error adding attempted pod group: %v", err)
+				}
+			},
+			want: `
+				scheduler_queue_incoming_entities_total{entity="podgroup",event="ScheduleAttemptFailure",queue="backoff"} 1
+				scheduler_queue_incoming_entities_total{entity="podgroup",event="UnscheduledPodAdd",queue="active"} 3
+			`,
+		},
+		{
+			name: "requeue pod to unschedulable queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[0].Pod)
+				entity, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pod := entity.(*framework.QueuedPodInfo)
+				pod.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				if err := queue.AddUnschedulablePodIfNotPresent(logger, pod, 1); err != nil {
+					tCtx.Fatalf("Unexpected error adding unschedulable pod: %v", err)
+				}
+			},
+			want: `
+				scheduler_queue_incoming_entities_total{entity="pod",event="ScheduleAttemptFailure",queue="unschedulable"} 1
+				scheduler_queue_incoming_entities_total{entity="pod",event="UnscheduledPodAdd",queue="active"} 1
+			`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			metrics.SchedulerQueueIncomingEntities.Reset()
+			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
+			test.run(tCtx, queue)
+			if err := testutil.CollectAndCompare(metrics.SchedulerQueueIncomingEntities, strings.NewReader(queueIncomingEntitiesMetricMetadata+test.want), metricName); err != nil {
+				t.Errorf("unexpected collecting result:\n%s", err)
+			}
+		})
+	}
+}
+
+func TestPendingEntitiesMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	timestamp := time.Now()
+	unschedulablePlugin := "unschedulable_plugin"
+	logger := klog.Background()
+
+	pInfos := []*framework.QueuedPodInfo{
+		{
+			PodInfo: mustNewTestPodInfo(t, st.MakePod().Name("pod1").Namespace("ns-pg").UID("tp-1").Obj()),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            timestamp,
+				UnschedulablePlugins: sets.New(unschedulablePlugin),
+			},
+		},
+		{
+			PodInfo: mustNewTestPodInfo(t, st.MakePod().Name("pod2").Namespace("ns-pg").UID("tp-2").PodGroupName("pg-1").Obj()),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            timestamp,
+				UnschedulablePlugins: sets.New(unschedulablePlugin),
+			},
+		},
+		{
+			PodInfo: mustNewTestPodInfo(t, st.MakePod().Name("pod3").Namespace("ns-pg").UID("tp-3").PodGroupName("pg-1").Obj()),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            timestamp,
+				UnschedulablePlugins: sets.New(unschedulablePlugin),
+			},
+		},
+		{
+			PodInfo: mustNewTestPodInfo(t, st.MakePod().Name("pod4").Namespace("ns-pg").UID("tp-4").PodGroupName("pg-1").Obj()),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            timestamp,
+				UnschedulablePlugins: sets.New(unschedulablePlugin),
+			},
+		},
+	}
+
+	metricName := metrics.SchedulerSubsystem + "_" + metrics.PendingEntities.Name
+
+	tests := []struct {
+		name string
+		run  func(tCtx ktesting.TContext, queue *PriorityQueue)
+		want string
+	}{
+		{
+			name: "add all pods to active queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				for _, pInfo := range pInfos {
+					queue.Add(tCtx, pInfo.Pod)
+				}
+			},
+			want: `
+				scheduler_pending_entities{entity="pod",queue="active"} 1
+				scheduler_pending_entities{entity="podgroup",queue="active"} 1
+			`,
+		},
+		{
+			name: "requeue podgroup to backoff queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[1].Pod)
+				queue.Add(tCtx, pInfos[2].Pod)
+				queue.Add(tCtx, pInfos[3].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				queue.pendingPodGroupPods.add(pInfos[2])
+				queue.pendingPodGroupPods.add(pInfos[3])
+				if err := queue.AddAttemptedPodGroupIfNeeded(logger, pgInfo, 1); err != nil {
+					tCtx.Fatalf("Unexpected error adding attempted pod group: %v", err)
+				}
+			},
+			want: `
+				scheduler_pending_entities{entity="podgroup",queue="active"} 0
+				scheduler_pending_entities{entity="podgroup",queue="backoff"} 1
+			`,
+		},
+		{
+			name: "requeue pod to unschedulable queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[0].Pod)
+				entity, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pod := entity.(*framework.QueuedPodInfo)
+				pod.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				if err := queue.AddUnschedulablePodIfNotPresent(logger, pod, 1); err != nil {
+					tCtx.Fatalf("Unexpected error adding unschedulable pod: %v", err)
+				}
+			},
+			want: `
+				scheduler_pending_entities{entity="pod",queue="active"} 0
+				scheduler_pending_entities{entity="pod",queue="unschedulable"} 1
+			`,
+		},
+		{
+			name: "move pod from unschedulable to backoff queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[0].Pod)
+				entity, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pod := entity.(*framework.QueuedPodInfo)
+				pod.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				if err := queue.AddUnschedulablePodIfNotPresent(logger, pod, 1); err != nil {
+					tCtx.Fatalf("Unexpected error adding unschedulable pod: %v", err)
+				}
+
+				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+			},
+			want: `
+				scheduler_pending_entities{entity="pod",queue="active"} 0
+				scheduler_pending_entities{entity="pod",queue="backoff"} 1
+				scheduler_pending_entities{entity="pod",queue="unschedulable"} 0
+			`,
+		},
+		{
+			name: "move pod from backoff to active queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[0].Pod)
+				entity, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pod := entity.(*framework.QueuedPodInfo)
+				pod.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				if err := queue.AddUnschedulablePodIfNotPresent(logger, pod, 1); err != nil {
+					tCtx.Fatalf("Unexpected error adding unschedulable pod: %v", err)
+				}
+
+				queue.clock.(*testingclock.FakeClock).Step(3 * time.Second)
+				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+			},
+			want: `
+				scheduler_pending_entities{entity="pod",queue="active"} 1
+				scheduler_pending_entities{entity="pod",queue="unschedulable"} 0
+			`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			metrics.PendingEntities.Reset()
+			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
+
+			test.run(tCtx, queue)
+
+			if err := testutil.CollectAndCompare(metrics.PendingEntities, strings.NewReader(pendingEntitiesMetricMetadata+test.want), metricName); err != nil {
+				t.Errorf("unexpected collecting result:\n%s", err)
+			}
 		})
 	}
 }

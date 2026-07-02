@@ -29,20 +29,33 @@ import (
 
 var _ MetricRecorder = &fakePodsRecorder{}
 
+type testEntity struct {
+	size int
+	t    string
+}
+
+func (te *testEntity) Size() int {
+	return te.size
+}
+
+func (te *testEntity) Type() string {
+	return te.t
+}
+
 type fakePodsRecorder struct {
 	counter int64
 }
 
-func (r *fakePodsRecorder) Add(val int) {
-	atomic.AddInt64(&r.counter, int64(val))
+func (r *fakePodsRecorder) Add(entity Entity) {
+	atomic.AddInt64(&r.counter, int64(entity.Size()))
 }
 
-func (r *fakePodsRecorder) Inc() {
-	atomic.AddInt64(&r.counter, 1)
+func (r *fakePodsRecorder) Remove(entity Entity) {
+	atomic.AddInt64(&r.counter, -int64(entity.Size()))
 }
 
-func (r *fakePodsRecorder) Dec() {
-	atomic.AddInt64(&r.counter, -1)
+func (r *fakePodsRecorder) Update(oldEntity, newEntity Entity) {
+	atomic.AddInt64(&r.counter, int64(newEntity.Size()-oldEntity.Size()))
 }
 
 func (r *fakePodsRecorder) Clear() {
@@ -56,7 +69,7 @@ func TestAdd(t *testing.T) {
 	wg.Add(loops)
 	for i := range loops {
 		go func() {
-			fakeRecorder.Add(i)
+			fakeRecorder.Add(&testEntity{size: i})
 			wg.Done()
 		}()
 	}
@@ -66,37 +79,20 @@ func TestAdd(t *testing.T) {
 	}
 }
 
-func TestInc(t *testing.T) {
-	fakeRecorder := fakePodsRecorder{}
-	var wg sync.WaitGroup
-	loops := 100
-	wg.Add(loops)
-	for range loops {
-		go func() {
-			fakeRecorder.Inc()
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-	if fakeRecorder.counter != int64(loops) {
-		t.Errorf("Expected %v, got %v", loops, fakeRecorder.counter)
-	}
-}
-
-func TestDec(t *testing.T) {
+func TestRemove(t *testing.T) {
 	fakeRecorder := fakePodsRecorder{counter: 100}
 	var wg sync.WaitGroup
 	loops := 100
 	wg.Add(loops)
 	for range loops {
 		go func() {
-			fakeRecorder.Dec()
+			fakeRecorder.Remove(&testEntity{size: 1})
 			wg.Done()
 		}()
 	}
 	wg.Wait()
 	if fakeRecorder.counter != int64(0) {
-		t.Errorf("Expected %v, got %v", loops, fakeRecorder.counter)
+		t.Errorf("Expected %v, got %v", 0, fakeRecorder.counter)
 	}
 }
 
@@ -107,13 +103,13 @@ func TestClear(t *testing.T) {
 	wg.Add(incLoops + decLoops)
 	for range incLoops {
 		go func() {
-			fakeRecorder.Inc()
+			fakeRecorder.Add(&testEntity{size: 1})
 			wg.Done()
 		}()
 	}
 	for range decLoops {
 		go func() {
-			fakeRecorder.Dec()
+			fakeRecorder.Remove(&testEntity{size: 1})
 			wg.Done()
 		}()
 	}
@@ -192,4 +188,97 @@ func TestInFlightEventAsync(t *testing.T) {
 	if len(r.aggregatedInflightEventMetric) != 0 {
 		t.Errorf("aggregatedInflightEventMetric should be force-flushed, but got: %v", r.aggregatedInflightEventMetric)
 	}
+}
+
+func TestPendingEntitiesRecorder(t *testing.T) {
+	Register()
+
+	recorder := NewActiveEntitiesRecorder()
+	recorder.Clear()
+
+	pInfo1 := &testEntity{size: 1, t: "pod"}
+	pInfo2 := &testEntity{size: 5, t: "podgroup"}
+	pInfo3 := &testEntity{size: 1, t: "pod"}
+	recorder.Add(pInfo1)
+	recorder.Add(pInfo2)
+	recorder.Add(pInfo3)
+
+	mfs, err := GetGather().Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkMetricValue := func(metricName string, expectedLabels map[string]string, expectedValue float64) {
+		t.Helper()
+		var found bool
+		for _, mf := range mfs {
+			if mf.GetName() != metricName {
+				continue
+			}
+			for _, m := range mf.GetMetric() {
+				labelsMatch := true
+				for k, v := range expectedLabels {
+					labelFound := false
+					for _, labelPair := range m.GetLabel() {
+						if labelPair.GetName() == k && labelPair.GetValue() == v {
+							labelFound = true
+							break
+						}
+					}
+					if !labelFound {
+						labelsMatch = false
+						break
+					}
+				}
+				if labelsMatch {
+					found = true
+					if m.GetGauge().GetValue() != expectedValue {
+						t.Errorf("expected metric %s with labels %v to have value %v, got %v", metricName, expectedLabels, expectedValue, m.GetGauge().GetValue())
+					}
+					break
+				}
+			}
+		}
+		if !found {
+			t.Errorf("metric %s with labels %v not found", metricName, expectedLabels)
+		}
+	}
+
+	checkMetricValue("scheduler_pending_pods", map[string]string{"queue": "active"}, 7)
+	checkMetricValue("scheduler_pending_entities", map[string]string{"queue": "active", "entity": "pod"}, 2)
+	checkMetricValue("scheduler_pending_entities", map[string]string{"queue": "active", "entity": "podgroup"}, 1)
+
+	recorder.Remove(pInfo1)
+
+	mfs, err = GetGather().Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkMetricValue("scheduler_pending_pods", map[string]string{"queue": "active"}, 6)
+	checkMetricValue("scheduler_pending_entities", map[string]string{"queue": "active", "entity": "pod"}, 1)
+	checkMetricValue("scheduler_pending_entities", map[string]string{"queue": "active", "entity": "podgroup"}, 1)
+
+	updatedPInfo2 := &testEntity{size: 8, t: "podgroup"}
+	recorder.Update(pInfo2, updatedPInfo2)
+
+	mfs, err = GetGather().Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkMetricValue("scheduler_pending_pods", map[string]string{"queue": "active"}, 9) // 6 - 5 + 8 = 9
+	checkMetricValue("scheduler_pending_entities", map[string]string{"queue": "active", "entity": "pod"}, 1)
+	checkMetricValue("scheduler_pending_entities", map[string]string{"queue": "active", "entity": "podgroup"}, 1)
+
+	recorder.Clear()
+
+	mfs, err = GetGather().Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkMetricValue("scheduler_pending_pods", map[string]string{"queue": "active"}, 0)
+	checkMetricValue("scheduler_pending_entities", map[string]string{"queue": "active", "entity": "pod"}, 0)
+	checkMetricValue("scheduler_pending_entities", map[string]string{"queue": "active", "entity": "podgroup"}, 0)
 }

@@ -344,7 +344,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (framework.QueuedEntityIn
 		if err != nil {
 			return nil, err
 		}
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Add(float64(entity.Size()))
+		recordIncomingEntitiesMetrics("active", entity, framework.PopFromBackoffQ)
 	}
 	err = aq.unlockedMoveEntityToInFlight(logger, entity)
 	if err != nil {
@@ -408,7 +408,7 @@ func (aq *activeQueue) add(logger klog.Logger, entity framework.QueuedEntityInfo
 	defer aq.lock.Unlock()
 
 	aq.queue.AddOrUpdate(entity)
-	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Add(float64(entity.Size()))
+	recordIncomingEntitiesMetrics("active", entity, event)
 	logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", activeQ)
 }
 
