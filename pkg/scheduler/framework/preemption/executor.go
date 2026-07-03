@@ -104,7 +104,6 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 	e.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 		logger := klog.FromContext(ctx)
 
-		skipAPICall := false
 		preemptedInMemory := false
 		eventMessage := fmt.Sprintf("Preempted by %s %v on node %v", preemptor.Type(), preemptor.UID(), c.Name())
 		// If the victim is a WaitingPod, try to preempt it without a delete call (victim will go back to backoff queue).
@@ -112,20 +111,18 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 		if waitingPod := e.fh.GetWaitingPod(victim.UID); waitingPod != nil {
 			if waitingPod.Preempt(pluginName, "preempted") {
 				logger.V(2).Info("Preemptor preempted a waiting pod", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
-				skipAPICall = true
 				preemptedInMemory = true
 			}
 		} else if podInPreBind := e.fh.GetPodInPreBind(victim.UID); podInPreBind != nil {
 			// If the victim is in the preBind cancel the binding process.
 			if podInPreBind.CancelPod(fmt.Sprintf("preempted by %s", pluginName)) {
 				logger.V(2).Info("Preemptor rejected a pod in preBind", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
-				skipAPICall = true
 				preemptedInMemory = true
 			} else {
 				logger.V(5).Info("Failed to reject a pod in preBind, falling back to deletion via api call", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
 			}
 		}
-		if !skipAPICall {
+		if !preemptedInMemory {
 			condition := &v1.PodCondition{
 				Type:               v1.DisruptionTarget,
 				ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&victim.Status, victim.Generation, v1.DisruptionTarget),

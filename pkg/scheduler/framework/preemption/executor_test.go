@@ -1551,9 +1551,8 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 
 			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 				executor.mu.RLock()
-				preempting := len(executor.preempting) != 0
-				executor.mu.RUnlock()
-				return !preempting, nil
+				defer executor.mu.RUnlock()
+				return len(executor.preempting) == 0, nil
 			}); err != nil {
 				t.Fatalf("Timed out waiting for async preemption to finish: %v", err)
 			}
