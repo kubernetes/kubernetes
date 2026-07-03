@@ -24,7 +24,7 @@ import (
 	"k8s.io/gengo/v2/codetags"
 )
 
-var kubeVersionRegex = regexp.MustCompile(`^1\.\d+$`)
+var kubeVersionRegex = regexp.MustCompile(`^\d+\.\d+$`)
 
 const (
 	alphaTagName = "k8s:alpha"
@@ -70,7 +70,7 @@ func (ltv *levelTagValidator) GetValidations(context Context, tag codetags.Tag) 
 		arg := tag.Args[0]
 		version = arg.Value
 		if !kubeVersionRegex.MatchString(version) {
-			return Validations{}, fmt.Errorf("invalid kubernetes version format, expected 1.<minor version>, got %s", version)
+			return Validations{}, fmt.Errorf("invalid kubernetes version format, expected <major>.<minor>, got %s", version)
 		}
 	}
 
