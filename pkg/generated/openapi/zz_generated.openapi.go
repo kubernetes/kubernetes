@@ -16729,7 +16729,6 @@ func schema_k8sio_api_batch_v1_JobCondition(ref common.ReferenceCallback) common
 						},
 					},
 				},
-				Required: []string{"type", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -17134,7 +17133,6 @@ func schema_k8sio_api_batch_v1_PodFailurePolicy(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"rules"},
 			},
 		},
 		Dependencies: []string{
