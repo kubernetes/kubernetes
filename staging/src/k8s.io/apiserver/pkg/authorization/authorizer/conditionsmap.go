@@ -17,6 +17,7 @@ limitations under the License.
 package authorizer
 
 import (
+	"context"
 	"fmt"
 	"iter"
 	"slices"
@@ -203,10 +204,11 @@ func validateConditions(seenIDs sets.Set[string], conditions []Condition) error 
 // with optional support for fast in-process conditions evaluation, by
 // setting EvaluateFunc non-nil.
 type GenericCondition struct {
-	ID          string
-	Condition   string
-	Type        string
-	Description string
+	ID           string
+	Condition    string
+	Type         string
+	Description  string
+	EvaluateFunc func(ctx context.Context, data ConditionsData) ConditionEvaluationResult
 }
 
 var _ Condition = GenericCondition{}
@@ -225,4 +227,10 @@ func (c GenericCondition) GetType() string {
 
 func (c GenericCondition) GetDescription() string {
 	return c.Description
+}
+func (c GenericCondition) Evaluate(ctx context.Context, data ConditionsData) ConditionEvaluationResult {
+	if c.EvaluateFunc == nil {
+		return ConditionsEvaluationResultUnevaluatable()
+	}
+	return c.EvaluateFunc(ctx, data)
 }

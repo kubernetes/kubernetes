@@ -135,6 +135,34 @@ func (d ConditionsAwareDecision) IsUnconditional() bool {
 	return d.IsAllow() || d.IsDeny() || d.IsNoOpinion()
 }
 
+// unconditionalParts turns a ConditionsAwareDecision into the
+// triple that Authorize expects. If the decision is
+// conditional, the returned condition is Deny if there were at least
+// some Deny condition, otherwise NoOpinion.
+// This function is meant to be called when IsUnconditional() == true.
+//
+// If the authorizer is conditions-aware, it can choose to only implement
+// real business logic in the ConditionsAwareAuthorize method, and implement
+// Authorize() as "return self.ConditionsAwareAuthorize(ctx, attrs).unconditionalParts()"
+//
+// Private for now, to not encourage callers to perform conditions-aware logic where not needed.
+func (d ConditionsAwareDecision) unconditionalParts() (Decision, string, error) {
+	switch {
+	case d.IsAllow():
+		return DecisionAllow, d.Reason(), d.Error()
+	case d.IsDeny():
+		return DecisionDeny, d.Reason(), d.Error()
+	case d.IsNoOpinion():
+		return DecisionNoOpinion, d.Reason(), d.Error()
+	default:
+		// An error is not returned here, as that could yield a HTTP response code of 500 instead of 403.
+		// For the use-case described above with regards to calling this function in Authorize, not returning
+		// an error is important, as it is valid to always fail closed, as if this happens, no unconditional
+		// permissions were given the requestor.
+		return d.FailureDecision(), "failed closed: tried to return conditional decision to conditions-unaware authorizer", nil
+	}
+}
+
 // IsConditionsMap returns true if the decision is a conditional response
 // with a map of conditions to evaluate.
 func (d ConditionsAwareDecision) IsConditionsMap() bool {

@@ -281,7 +281,25 @@ type Condition interface {
 	// GetDescription is an optional human-friendly description that can be shown
 	// as an error message or for debugging. Optional.
 	GetDescription() string
+
+	// Evaluate evaluates the condition to a boolean, returns an error, or returns "unevaluatable".
+	// If an authorizer already has a pre-compiled condition, this avoids one serialization roundtrip,
+	// with potentially expensive deserialization/parsing. However, if the condition underwent a
+	// serialize/deserialize roundtrip (e.g. when the caller is an aggregated API server), the authorizer
+	// might have to evaluate the condition from its serialized form using evaluateFunc in
+	// ConditionsMap.Evaluate.
+	// Evaluate must be safe to call repeatedly and concurrently.
+	//
+	// The context should only be used for timeouts/cancellation/tracing, and should not influence the
+	// evaluation outcome. Only the condition itself and data can infuence the outcome.
+	Evaluate(ctx context.Context, data ConditionsData) ConditionEvaluationResult
 }
+
+// EvaluateConditionFunc is a function that is able to concretely evaluate a condition to a boolean or error.
+type EvaluateConditionFunc func(ctx context.Context, condition Condition, data ConditionsData) (bool, error)
+
+// MaybeEvaluateConditionFunc allows potentially evaluating a condition, returning Unevaluatable if a truth value or error cannot be assigned.
+type MaybeEvaluateConditionFunc func(ctx context.Context, condition Condition, data ConditionsData) ConditionEvaluationResult
 
 // AdmissionOperation represents the admission operation,
 // for example CREATE, UPDATE, DELETE. The constants are
