@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -361,6 +362,15 @@ func TestCollectParamsHandlesCacheMiss(t *testing.T) {
 	require.NoError(t, err, "CollectParams should succeed by falling back to direct client Get")
 	require.Len(t, params, 1, "should have retrieved the param")
 	require.NotNil(t, params[0], "param should not be nil")
+
+	// Ensure fallback to get returns the same representation the informer cache would have
+	// returned for the same object.
+	cmParam, ok := params[0].(*corev1.ConfigMap)
+	require.Truef(t, ok, "expected fallback to return *corev1.ConfigMap, got %T", params[0])
+	require.Empty(t, cmParam.APIVersion, "typed param should have empty apiVersion, like informer-cached objects")
+	require.Empty(t, cmParam.Kind, "typed param should have empty kind, like informer-cached objects")
+	require.Equal(t, "test-param", cmParam.Name)
+	require.Equal(t, map[string]string{"maxReplicas": "3"}, cmParam.Data)
 
 	// Without the client fallback fix: the above would fail with NotFound error
 	// because the informer cache doesn't have the ConfigMap yet
