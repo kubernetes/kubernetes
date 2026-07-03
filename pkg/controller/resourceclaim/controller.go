@@ -974,6 +974,28 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 			}
 			logger.Error(err, "Claim that was created for the pod is no longer owned by the pod, creating a new one", "podClaim", podClaim.Name, "resourceClaim", claimName)
 		}
+
+		// When the informer lister is behind (e.g., during rapid Pod
+		// scale-out), the lister may not yet have observed the ResourceClaim
+		// create event. Normally the MutationCache covers this window, but
+		// with a large burst of claims (>100) the cache can evict the entry
+		// before the informer catches up. Directly query the API server as
+		// a final check before creating a new claim.
+		if claim == nil {
+			claim, err = ec.kubeClient.ResourceV1().ResourceClaims(pod.Namespace).Get(ctx, claimName, metav1.GetOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+			if claim != nil {
+				ec.claimCache.Mutation(claim)
+				if mustCheckOwner {
+					if err := resourceclaim.IsForPod(pod, claim, ec.features.WorkloadResourceClaims); err != nil {
+						return fmt.Errorf("claim %s is not for this pod: %w", claimName, err)
+					}
+				}
+				return nil
+			}
+		}
 	}
 
 	templateName := podClaim.ResourceClaimTemplateName
