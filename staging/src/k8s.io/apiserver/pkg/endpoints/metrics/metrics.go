@@ -285,10 +285,14 @@ var (
 
 	watchListLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Subsystem:      APIServerComponent,
-			Name:           "watch_list_duration_seconds",
-			Help:           "Response latency distribution in seconds for watch list requests broken by group, version, resource and scope.",
-			Buckets:        []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 2, 4, 6, 8, 10, 15, 20, 30, 45, 60},
+			Subsystem: APIServerComponent,
+			Name:      "watch_list_duration_seconds",
+			Help:      "Response latency distribution in seconds for watch list requests broken by group, version, resource and scope.",
+			// This metric is used for verifying api call latencies SLO,
+			// as well as tracking regressions in this aspects.
+			// Thus we customize buckets significantly, to empower both usecases.
+			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "version", "resource", "scope"},
