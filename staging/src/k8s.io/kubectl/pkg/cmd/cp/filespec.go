@@ -149,7 +149,15 @@ func stripLeadingSlash(file string) string {
 // isWindowsAbsolutePath checks if the given path is a Windows absolute path
 // such as, for example, C:\foo or c:/foo.
 func isWindowsAbsolutePath(path string) bool {
-	if runtime.GOOS != "windows" {
+	return isWindowsAbsolutePathForOS(path, runtime.GOOS)
+}
+
+// isWindowsAbsolutePathForOS is the OS-parameterized implementation of
+// isWindowsAbsolutePath. The goos argument (as reported by runtime.GOOS) is
+// taken explicitly so the detection logic can be unit tested regardless of the
+// OS running the tests.
+func isWindowsAbsolutePathForOS(path, goos string) bool {
+	if goos != "windows" {
 		return false
 	}
 
@@ -162,7 +170,14 @@ func isWindowsAbsolutePath(path string) bool {
 // does not have a drive letter, or if the runtime is not Windows, it returns
 // the path unchanged.
 func stripWindowsDriveLetter(path string) string {
-	if runtime.GOOS != "windows" || !isWindowsAbsolutePath(path) {
+	return stripWindowsDriveLetterForOS(path, runtime.GOOS)
+}
+
+// stripWindowsDriveLetterForOS is the OS-parameterized implementation of
+// stripWindowsDriveLetter, taking goos explicitly so it can be unit tested on
+// any OS.
+func stripWindowsDriveLetterForOS(path, goos string) string {
+	if goos != "windows" || !isWindowsAbsolutePathForOS(path, goos) {
 		return path
 	}
 

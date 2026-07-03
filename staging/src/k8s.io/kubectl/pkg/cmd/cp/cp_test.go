@@ -266,6 +266,61 @@ func TestIsWindowsAbsolutePath(t *testing.T) {
 	}
 }
 
+// TestIsWindowsAbsolutePathForOS exercises the drive-letter detection logic on
+// all platforms by passing goos explicitly, so the behavior is covered in CI
+// regardless of the OS running the tests.
+func TestIsWindowsAbsolutePathForOS(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		goos     string
+		expected bool
+	}{
+		{name: "windows: uppercase drive with backslash", path: `C:\foo`, goos: "windows", expected: true},
+		{name: "windows: lowercase drive with forward slash", path: "c:/foo", goos: "windows", expected: true},
+		{name: "windows: drive root", path: `D:\`, goos: "windows", expected: true},
+		{name: "windows: unix absolute path", path: "/foo/bar", goos: "windows", expected: false},
+		{name: "windows: pod spec", path: "pod:/foo", goos: "windows", expected: false},
+		{name: "windows: drive-relative without separator", path: "C:foo", goos: "windows", expected: false},
+		{name: "windows: non-letter drive", path: `1:\foo`, goos: "windows", expected: false},
+		{name: "windows: too short", path: "C:", goos: "windows", expected: false},
+		// The same drive-letter-looking paths must never be treated as absolute
+		// on non-Windows, preserving existing pod:file parsing.
+		{name: "linux: drive path is not absolute", path: `C:\foo`, goos: "linux", expected: false},
+		{name: "linux: drive path forward slash is not absolute", path: "c:/foo", goos: "linux", expected: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isWindowsAbsolutePathForOS(test.path, test.goos); got != test.expected {
+				t.Errorf("isWindowsAbsolutePathForOS(%q, %q) = %v, expected %v", test.path, test.goos, got, test.expected)
+			}
+		})
+	}
+}
+
+// TestStripWindowsDriveLetterForOS verifies drive-letter stripping on all
+// platforms via an explicit goos argument.
+func TestStripWindowsDriveLetterForOS(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		goos     string
+		expected string
+	}{
+		{name: "windows: forward slash", path: "C:/foo/bar", goos: "windows", expected: "/foo/bar"},
+		{name: "windows: backslash", path: `c:\foo\bar`, goos: "windows", expected: `\foo\bar`},
+		{name: "windows: no drive letter is unchanged", path: "/foo/bar", goos: "windows", expected: "/foo/bar"},
+		{name: "linux: drive path is left unchanged", path: "C:/foo/bar", goos: "linux", expected: "C:/foo/bar"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := stripWindowsDriveLetterForOS(test.path, test.goos); got != test.expected {
+				t.Errorf("stripWindowsDriveLetterForOS(%q, %q) = %q, expected %q", test.path, test.goos, got, test.expected)
+			}
+		})
+	}
+}
+
 func TestGetPrefix(t *testing.T) {
 	remoteSeparator := '/'
 	osSeparator := os.PathSeparator
