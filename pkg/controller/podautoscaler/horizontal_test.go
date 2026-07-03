@@ -2969,6 +2969,10 @@ func TestConfigurableTolerance(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.configurableToleranceGate {
+				// Set emulated version to 1.36 so that disabling the feature gate is allowed.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, tc.configurableToleranceGate)
 			expectedConditions := statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 				Type:   autoscalingv2.AbleToScale,
