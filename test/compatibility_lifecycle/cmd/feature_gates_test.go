@@ -108,7 +108,7 @@ func TestVerifyOrUpdateFeatureListVersioned(t *testing.T) {
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
-- name: CPUCFSQuotaPeriod
+- name: CustomCPUCFSQuotaPeriod
   versionedSpecs:
   - default: false
     lockToDefault: false
@@ -136,6 +136,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
+
+const CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
+
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	AppArmorFields: {
 		{Version: version.MajorMinor(1, 30), Default: true, PreRelease: featuregate.Beta},
@@ -166,6 +169,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
+
+const CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
+
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	AppArmorFields: {
 		{Version: version.MajorMinor(1, 30), Default: true, PreRelease: featuregate.Beta},
@@ -196,7 +202,7 @@ var otherFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
-- name: CPUCFSQuotaPeriod
+- name: CustomCPUCFSQuotaPeriod
   versionedSpecs:
   - default: false
     lockToDefault: false
@@ -276,6 +282,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
+
+const CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
+
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	AppArmorFields: {
 		{Version: version.MajorMinor(1, 30), Default: true, PreRelease: featuregate.Beta},
@@ -312,7 +321,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
-- name: CPUCFSQuotaPeriod
+- name: CustomCPUCFSQuotaPeriod
   versionedSpecs:
   - default: false
     lockToDefault: false
@@ -333,6 +342,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
+
+const CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
+
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	CPUCFSQuotaPeriod: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
@@ -373,6 +385,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
+
+const CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
+
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	AppArmorFields: {
 		{Version: version.MajorMinor(1, 30), Default: true, PreRelease: featuregate.Beta},
@@ -401,7 +416,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
-- name: CPUCFSQuotaPeriod
+- name: CustomCPUCFSQuotaPeriod
   versionedSpecs:
   - default: false
     lockToDefault: false
