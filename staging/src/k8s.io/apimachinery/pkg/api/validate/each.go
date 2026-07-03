@@ -18,6 +18,7 @@ package validate
 
 import (
 	"context"
+	"slices"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -51,7 +52,7 @@ func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *f
 
 		var old *T
 		if match != nil && len(oldSlice) > 0 {
-			old = lookupPointer(oldSlice, val, match)
+			old = lookup(oldSlice, val, match)
 		}
 		// If the operation is an update, for validation ratcheting, skip re-validating if the old
 		// value exists and either:
@@ -67,20 +68,9 @@ func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *f
 	return errs
 }
 
-// lookupValue returns a pointer to the first element in the list that matches
-// the target, according to the provided comparison function, or else nil.
-func lookupValue[T any](list []T, target T, match MatchFunc[T]) *T {
-	for i := range list {
-		if match(list[i], target) {
-			return &list[i]
-		}
-	}
-	return nil
-}
-
-// lookupPointer returns a pointer to the first element in the list that matches the
+// lookup returns a pointer to the first element in the list that matches the
 // target, according to the provided comparison function, or else nil.
-func lookupPointer[T any](list []T, target *T, match MatchFunc[*T]) *T {
+func lookup[T any](list []T, target *T, match MatchFunc[*T]) *T {
 	for i := range list {
 		if match(&list[i], target) {
 			return &list[i]
@@ -150,7 +140,7 @@ func Unique[T any](_ context.Context, _ operation.Operation, fldPath *field.Path
 				if dups == nil {
 					dups = make([]int, 0, len(newSlice))
 				}
-				if lookupValue(dups, j, func(a, b int) bool { return a == b }) == nil {
+				if !slices.Contains(dups, j) {
 					dups = append(dups, j)
 				}
 			}

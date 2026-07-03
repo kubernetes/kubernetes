@@ -198,14 +198,14 @@ func UpdateSlice[T any](_ context.Context, op operation.Operation, fldPath *fiel
 		case NoAddItem:
 			for i := range value {
 				newItem := &value[i]
-				if lookupPointer(oldValue, newItem, match) == nil {
+				if lookup(oldValue, newItem, match) == nil {
 					errs = append(errs, field.Forbidden(fldPath.Index(i), "item may not be added").WithOrigin("update"))
 				}
 			}
 		case NoRemoveItem:
 			for i := range oldValue {
 				oldItem := &oldValue[i]
-				if lookupPointer(value, oldItem, match) == nil {
+				if lookup(value, oldItem, match) == nil {
 					errs = append(errs, field.Forbidden(fldPath, "item may not be removed").WithOrigin("update"))
 				}
 			}
