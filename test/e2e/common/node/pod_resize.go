@@ -879,7 +879,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", func() {
 	doPodResizeMemoryLimitDecreaseTest(f)
 })
 
-var _ = SIGDescribe("Pod InPlace Resize Init Container", framework.WithNodeConformance(), framework.WithFeatureGate(features.InPlacePodVerticalScalingInitContainers), func() {
+var _ = SIGDescribe("Pod InPlace Resize Init Container", framework.WithSlow(), framework.WithNodeConformance(), framework.WithFeatureGate(features.InPlacePodVerticalScalingInitContainers), func() {
 	f := framework.NewDefaultFramework("pod-resize-tests")
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
