@@ -38,7 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -382,6 +382,43 @@ func genTestPod() *v1.Pod {
 				},
 			},
 		},
+	}
+}
+
+// genTestPodWithClaimTemplateNoStatus generates a pod that references its claim
+// via a ResourceClaimTemplateName but whose Status.ResourceClaimStatuses is
+// empty. This mimics https://github.com/kubernetes/kubernetes/issues/139772, where an external component overwrote
+// the pod status and dropped the generated claim name. resourceclaim.Name API
+// returns ErrClaimNotFound for such a pod, so unprepare must rely on the claim
+// info cache.
+func genTestPodWithClaimTemplateNoStatus() *v1.Pod {
+	templateName := claimName + "-template"
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			UID:       podUID,
+		},
+		Spec: v1.PodSpec{
+			ResourceClaims: []v1.PodResourceClaim{
+				{
+					Name:                      claimName,
+					ResourceClaimTemplateName: &templateName,
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{
+							{
+								Name: claimName,
+							},
+						},
+					},
+				},
+			},
+		},
+		// Status.ResourceClaimStatuses intentionally left empty.
 	}
 }
 
@@ -1202,7 +1239,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 			}
 			defer draServerInfo.teardownFn()
 			plg := manager.GetWatcherHandler()
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
+			if err := plg.RegisterPlugin(tCtx, test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 
@@ -1294,7 +1331,7 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 	defer draServerInfo.teardownFn()
 
 	plg := manager.GetWatcherHandler()
-	require.NoError(t, plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+	require.NoError(t, plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
 
 	err = manager.PrepareResources(tCtx, firstPod)
 	require.NoError(t, err)
@@ -1463,6 +1500,30 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 `,
 		},
 		{
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/139772: the pod references its
+			// claim via a template, but Status.ResourceClaimStatuses is empty
+			// (an external component overwrote the status). resourceclaim.Name
+			// returns ErrClaimNotFound, so the claim name must come from the
+			// cache instead. Previously this wedged the pod in terminating.
+			description:            "should unprepare using cache when ResourceClaimStatuses is missing",
+			driverName:             driverName,
+			pod:                    genTestPodWithClaimTemplateNoStatus(),
+			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true, nil),
+			expectedUnprepareCalls: 1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="UnprepareResources"} 1
+`,
+		},
+		{
 			description:            "should unprepare resource when driver returns nil value",
 			driverName:             driverName,
 			pod:                    genTestPod(),
@@ -1515,7 +1576,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			plg := manager.GetWatcherHandler()
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
+			if err := plg.RegisterPlugin(tCtx, test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 
@@ -1550,8 +1611,10 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			// Check cache was cleared only on successful unprepare
 			var podClaimName *string
 			if len(test.pod.Spec.ResourceClaims) > 0 {
-				podClaimName, _, err = resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
-				require.NoError(t, err)
+				// The claim name may not be derivable from the pod (e.g. when
+				// Status.ResourceClaimStatuses is missing, as in #139772). That
+				// is fine: we fall back to the known claimName constant below.
+				podClaimName, _, _ = resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
 			}
 			claimName := claimName
 			if podClaimName == nil {
@@ -1690,7 +1753,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 	plg := manager.GetWatcherHandler()
-	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
+	if err := plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
 		t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
 	}
 

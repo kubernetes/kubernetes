@@ -146,6 +146,11 @@ const (
 	// Enabled cache inconsistency detection.
 	DetectCacheInconsistency featuregate.Feature = "DetectCacheInconsistency"
 
+	// owner: @jefftree
+	//
+	// Enables the RangeStream RPC for list operations in etcd.
+	EtcdRangeStream featuregate.Feature = "EtcdRangeStream"
+
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
 	// deprecated: v1.28
@@ -271,6 +276,19 @@ const (
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
+
+	// owner: @p0lyn0mial
+	//
+	// Enables compression for WatchList responses
+	WatchListCompression featuregate.Feature = "WatchListCompression"
+
+	// owner: @aojea
+	// beta: v1.37
+	//
+	// Enables using a custom resolving RoundTripper to load-balance admission
+	// webhook requests across service endpoints instead of caching connections
+	// by service name.
+	WebhookRoundTripLoadBalancing featuregate.Feature = "WebhookRoundTripLoadBalancing"
 )
 
 func init() {
@@ -354,6 +372,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	EtcdRangeStream: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
+	},
+
 	KMSv1: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Deprecated},
@@ -433,6 +455,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	WatchCacheInitializationPostStartHook: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	WatchList: {
@@ -441,5 +464,13 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		// switch this back to false because the json and proto streaming encoders appear to work better.
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	WatchListCompression: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	WebhookRoundTripLoadBalancing: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 }

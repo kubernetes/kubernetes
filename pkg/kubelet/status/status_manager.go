@@ -124,7 +124,7 @@ type PodDeletionSafetyProvider interface {
 }
 
 type PodStartupLatencyStateHelper interface {
-	RecordStatusUpdated(pod *v1.Pod)
+	RecordStatusUpdated(logger klog.Logger, pod *v1.Pod)
 	DeletePodStartupState(podUID types.UID)
 }
 
@@ -1193,7 +1193,7 @@ func (m *manager) syncPod(ctx context.Context, uid types.UID, status versionedPo
 		logger.V(3).Info("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus)
 		pod = newPod
 		// We pass a new object (result of API call which contains updated ResourceVersion)
-		m.podStartupLatencyHelper.RecordStatusUpdated(pod)
+		m.podStartupLatencyHelper.RecordStatusUpdated(logger, pod)
 	}
 
 	// measure how long the status update took to propagate from generation to update on the server

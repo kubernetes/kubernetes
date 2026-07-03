@@ -321,9 +321,7 @@ func Convert_apiserver_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration
 }
 
 func autoConvert_v1alpha1_AdmissionPluginConfiguration_To_apiserver_AdmissionPluginConfiguration(in *AdmissionPluginConfiguration, out *apiserver.AdmissionPluginConfiguration, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Path = in.Path
-	out.Configuration = (*runtime.Unknown)(unsafe.Pointer(in.Configuration))
+	*out = *(*apiserver.AdmissionPluginConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -333,9 +331,7 @@ func Convert_v1alpha1_AdmissionPluginConfiguration_To_apiserver_AdmissionPluginC
 }
 
 func autoConvert_apiserver_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(in *apiserver.AdmissionPluginConfiguration, out *AdmissionPluginConfiguration, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Path = in.Path
-	out.Configuration = (*runtime.Unknown)(unsafe.Pointer(in.Configuration))
+	*out = *(*AdmissionPluginConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -345,7 +341,7 @@ func Convert_apiserver_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginC
 }
 
 func autoConvert_v1alpha1_AnonymousAuthCondition_To_apiserver_AnonymousAuthCondition(in *AnonymousAuthCondition, out *apiserver.AnonymousAuthCondition, s conversion.Scope) error {
-	out.Path = in.Path
+	*out = *(*apiserver.AnonymousAuthCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -355,7 +351,7 @@ func Convert_v1alpha1_AnonymousAuthCondition_To_apiserver_AnonymousAuthCondition
 }
 
 func autoConvert_apiserver_AnonymousAuthCondition_To_v1alpha1_AnonymousAuthCondition(in *apiserver.AnonymousAuthCondition, out *AnonymousAuthCondition, s conversion.Scope) error {
-	out.Path = in.Path
+	*out = *(*AnonymousAuthCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -365,8 +361,7 @@ func Convert_apiserver_AnonymousAuthCondition_To_v1alpha1_AnonymousAuthCondition
 }
 
 func autoConvert_v1alpha1_AnonymousAuthConfig_To_apiserver_AnonymousAuthConfig(in *AnonymousAuthConfig, out *apiserver.AnonymousAuthConfig, s conversion.Scope) error {
-	out.Enabled = in.Enabled
-	out.Conditions = *(*[]apiserver.AnonymousAuthCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*apiserver.AnonymousAuthConfig)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -376,8 +371,7 @@ func Convert_v1alpha1_AnonymousAuthConfig_To_apiserver_AnonymousAuthConfig(in *A
 }
 
 func autoConvert_apiserver_AnonymousAuthConfig_To_v1alpha1_AnonymousAuthConfig(in *apiserver.AnonymousAuthConfig, out *AnonymousAuthConfig, s conversion.Scope) error {
-	out.Enabled = in.Enabled
-	out.Conditions = *(*[]AnonymousAuthCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*AnonymousAuthConfig)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -509,16 +503,7 @@ func Convert_apiserver_AuthorizerConfiguration_To_v1alpha1_AuthorizerConfigurati
 }
 
 func autoConvert_v1alpha1_ClaimMappings_To_apiserver_ClaimMappings(in *ClaimMappings, out *apiserver.ClaimMappings, s conversion.Scope) error {
-	if err := Convert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpression(&in.Username, &out.Username, s); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpression(&in.Groups, &out.Groups, s); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha1_ClaimOrExpression_To_apiserver_ClaimOrExpression(&in.UID, &out.UID, s); err != nil {
-		return err
-	}
-	out.Extra = *(*[]apiserver.ExtraMapping)(unsafe.Pointer(&in.Extra))
+	*out = *(*apiserver.ClaimMappings)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -528,16 +513,7 @@ func Convert_v1alpha1_ClaimMappings_To_apiserver_ClaimMappings(in *ClaimMappings
 }
 
 func autoConvert_apiserver_ClaimMappings_To_v1alpha1_ClaimMappings(in *apiserver.ClaimMappings, out *ClaimMappings, s conversion.Scope) error {
-	if err := Convert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpression(&in.Username, &out.Username, s); err != nil {
-		return err
-	}
-	if err := Convert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpression(&in.Groups, &out.Groups, s); err != nil {
-		return err
-	}
-	if err := Convert_apiserver_ClaimOrExpression_To_v1alpha1_ClaimOrExpression(&in.UID, &out.UID, s); err != nil {
-		return err
-	}
-	out.Extra = *(*[]ExtraMapping)(unsafe.Pointer(&in.Extra))
+	*out = *(*ClaimMappings)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -547,8 +523,7 @@ func Convert_apiserver_ClaimMappings_To_v1alpha1_ClaimMappings(in *apiserver.Cla
 }
 
 func autoConvert_v1alpha1_ClaimOrExpression_To_apiserver_ClaimOrExpression(in *ClaimOrExpression, out *apiserver.ClaimOrExpression, s conversion.Scope) error {
-	out.Claim = in.Claim
-	out.Expression = in.Expression
+	*out = *(*apiserver.ClaimOrExpression)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -558,8 +533,7 @@ func Convert_v1alpha1_ClaimOrExpression_To_apiserver_ClaimOrExpression(in *Claim
 }
 
 func autoConvert_apiserver_ClaimOrExpression_To_v1alpha1_ClaimOrExpression(in *apiserver.ClaimOrExpression, out *ClaimOrExpression, s conversion.Scope) error {
-	out.Claim = in.Claim
-	out.Expression = in.Expression
+	*out = *(*ClaimOrExpression)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -569,10 +543,7 @@ func Convert_apiserver_ClaimOrExpression_To_v1alpha1_ClaimOrExpression(in *apise
 }
 
 func autoConvert_v1alpha1_ClaimValidationRule_To_apiserver_ClaimValidationRule(in *ClaimValidationRule, out *apiserver.ClaimValidationRule, s conversion.Scope) error {
-	out.Claim = in.Claim
-	out.RequiredValue = in.RequiredValue
-	out.Expression = in.Expression
-	out.Message = in.Message
+	*out = *(*apiserver.ClaimValidationRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -582,10 +553,7 @@ func Convert_v1alpha1_ClaimValidationRule_To_apiserver_ClaimValidationRule(in *C
 }
 
 func autoConvert_apiserver_ClaimValidationRule_To_v1alpha1_ClaimValidationRule(in *apiserver.ClaimValidationRule, out *ClaimValidationRule, s conversion.Scope) error {
-	out.Claim = in.Claim
-	out.RequiredValue = in.RequiredValue
-	out.Expression = in.Expression
-	out.Message = in.Message
+	*out = *(*ClaimValidationRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -595,8 +563,7 @@ func Convert_apiserver_ClaimValidationRule_To_v1alpha1_ClaimValidationRule(in *a
 }
 
 func autoConvert_v1alpha1_Connection_To_apiserver_Connection(in *Connection, out *apiserver.Connection, s conversion.Scope) error {
-	out.ProxyProtocol = apiserver.ProtocolType(in.ProxyProtocol)
-	out.Transport = (*apiserver.Transport)(unsafe.Pointer(in.Transport))
+	*out = *(*apiserver.Connection)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -606,8 +573,7 @@ func Convert_v1alpha1_Connection_To_apiserver_Connection(in *Connection, out *ap
 }
 
 func autoConvert_apiserver_Connection_To_v1alpha1_Connection(in *apiserver.Connection, out *Connection, s conversion.Scope) error {
-	out.ProxyProtocol = ProtocolType(in.ProxyProtocol)
-	out.Transport = (*Transport)(unsafe.Pointer(in.Transport))
+	*out = *(*Connection)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -678,8 +644,7 @@ func Convert_apiserver_EgressSelectorConfiguration_To_v1alpha1_EgressSelectorCon
 }
 
 func autoConvert_v1alpha1_ExtraMapping_To_apiserver_ExtraMapping(in *ExtraMapping, out *apiserver.ExtraMapping, s conversion.Scope) error {
-	out.Key = in.Key
-	out.ValueExpression = in.ValueExpression
+	*out = *(*apiserver.ExtraMapping)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -689,8 +654,7 @@ func Convert_v1alpha1_ExtraMapping_To_apiserver_ExtraMapping(in *ExtraMapping, o
 }
 
 func autoConvert_apiserver_ExtraMapping_To_v1alpha1_ExtraMapping(in *apiserver.ExtraMapping, out *ExtraMapping, s conversion.Scope) error {
-	out.Key = in.Key
-	out.ValueExpression = in.ValueExpression
+	*out = *(*ExtraMapping)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -768,9 +732,7 @@ func Convert_apiserver_JWTAuthenticator_To_v1alpha1_JWTAuthenticator(in *apiserv
 }
 
 func autoConvert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpression(in *PrefixedClaimOrExpression, out *apiserver.PrefixedClaimOrExpression, s conversion.Scope) error {
-	out.Claim = in.Claim
-	out.Prefix = (*string)(unsafe.Pointer(in.Prefix))
-	out.Expression = in.Expression
+	*out = *(*apiserver.PrefixedClaimOrExpression)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -780,9 +742,7 @@ func Convert_v1alpha1_PrefixedClaimOrExpression_To_apiserver_PrefixedClaimOrExpr
 }
 
 func autoConvert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpression(in *apiserver.PrefixedClaimOrExpression, out *PrefixedClaimOrExpression, s conversion.Scope) error {
-	out.Claim = in.Claim
-	out.Prefix = (*string)(unsafe.Pointer(in.Prefix))
-	out.Expression = in.Expression
+	*out = *(*PrefixedClaimOrExpression)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -792,8 +752,7 @@ func Convert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpr
 }
 
 func autoConvert_v1alpha1_TCPTransport_To_apiserver_TCPTransport(in *TCPTransport, out *apiserver.TCPTransport, s conversion.Scope) error {
-	out.URL = in.URL
-	out.TLSConfig = (*apiserver.TLSConfig)(unsafe.Pointer(in.TLSConfig))
+	*out = *(*apiserver.TCPTransport)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -803,8 +762,7 @@ func Convert_v1alpha1_TCPTransport_To_apiserver_TCPTransport(in *TCPTransport, o
 }
 
 func autoConvert_apiserver_TCPTransport_To_v1alpha1_TCPTransport(in *apiserver.TCPTransport, out *TCPTransport, s conversion.Scope) error {
-	out.URL = in.URL
-	out.TLSConfig = (*TLSConfig)(unsafe.Pointer(in.TLSConfig))
+	*out = *(*TCPTransport)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -814,10 +772,7 @@ func Convert_apiserver_TCPTransport_To_v1alpha1_TCPTransport(in *apiserver.TCPTr
 }
 
 func autoConvert_v1alpha1_TLSConfig_To_apiserver_TLSConfig(in *TLSConfig, out *apiserver.TLSConfig, s conversion.Scope) error {
-	out.CABundle = in.CABundle
-	out.ClientKey = in.ClientKey
-	out.ClientCert = in.ClientCert
-	out.TLSServerName = in.TLSServerName
+	*out = *(*apiserver.TLSConfig)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -827,10 +782,7 @@ func Convert_v1alpha1_TLSConfig_To_apiserver_TLSConfig(in *TLSConfig, out *apise
 }
 
 func autoConvert_apiserver_TLSConfig_To_v1alpha1_TLSConfig(in *apiserver.TLSConfig, out *TLSConfig, s conversion.Scope) error {
-	out.CABundle = in.CABundle
-	out.ClientKey = in.ClientKey
-	out.ClientCert = in.ClientCert
-	out.TLSServerName = in.TLSServerName
+	*out = *(*TLSConfig)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -860,8 +812,7 @@ func Convert_apiserver_TracingConfiguration_To_v1alpha1_TracingConfiguration(in 
 }
 
 func autoConvert_v1alpha1_Transport_To_apiserver_Transport(in *Transport, out *apiserver.Transport, s conversion.Scope) error {
-	out.TCP = (*apiserver.TCPTransport)(unsafe.Pointer(in.TCP))
-	out.UDS = (*apiserver.UDSTransport)(unsafe.Pointer(in.UDS))
+	*out = *(*apiserver.Transport)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -871,8 +822,7 @@ func Convert_v1alpha1_Transport_To_apiserver_Transport(in *Transport, out *apise
 }
 
 func autoConvert_apiserver_Transport_To_v1alpha1_Transport(in *apiserver.Transport, out *Transport, s conversion.Scope) error {
-	out.TCP = (*TCPTransport)(unsafe.Pointer(in.TCP))
-	out.UDS = (*UDSTransport)(unsafe.Pointer(in.UDS))
+	*out = *(*Transport)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -882,7 +832,7 @@ func Convert_apiserver_Transport_To_v1alpha1_Transport(in *apiserver.Transport, 
 }
 
 func autoConvert_v1alpha1_UDSTransport_To_apiserver_UDSTransport(in *UDSTransport, out *apiserver.UDSTransport, s conversion.Scope) error {
-	out.UDSName = in.UDSName
+	*out = *(*apiserver.UDSTransport)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -892,7 +842,7 @@ func Convert_v1alpha1_UDSTransport_To_apiserver_UDSTransport(in *UDSTransport, o
 }
 
 func autoConvert_apiserver_UDSTransport_To_v1alpha1_UDSTransport(in *apiserver.UDSTransport, out *UDSTransport, s conversion.Scope) error {
-	out.UDSName = in.UDSName
+	*out = *(*UDSTransport)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -902,8 +852,7 @@ func Convert_apiserver_UDSTransport_To_v1alpha1_UDSTransport(in *apiserver.UDSTr
 }
 
 func autoConvert_v1alpha1_UserValidationRule_To_apiserver_UserValidationRule(in *UserValidationRule, out *apiserver.UserValidationRule, s conversion.Scope) error {
-	out.Expression = in.Expression
-	out.Message = in.Message
+	*out = *(*apiserver.UserValidationRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -913,8 +862,7 @@ func Convert_v1alpha1_UserValidationRule_To_apiserver_UserValidationRule(in *Use
 }
 
 func autoConvert_apiserver_UserValidationRule_To_v1alpha1_UserValidationRule(in *apiserver.UserValidationRule, out *UserValidationRule, s conversion.Scope) error {
-	out.Expression = in.Expression
-	out.Message = in.Message
+	*out = *(*UserValidationRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -974,8 +922,7 @@ func Convert_apiserver_WebhookConfiguration_To_v1alpha1_WebhookConfiguration(in 
 }
 
 func autoConvert_v1alpha1_WebhookConnectionInfo_To_apiserver_WebhookConnectionInfo(in *WebhookConnectionInfo, out *apiserver.WebhookConnectionInfo, s conversion.Scope) error {
-	out.Type = in.Type
-	out.KubeConfigFile = (*string)(unsafe.Pointer(in.KubeConfigFile))
+	*out = *(*apiserver.WebhookConnectionInfo)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -985,8 +932,7 @@ func Convert_v1alpha1_WebhookConnectionInfo_To_apiserver_WebhookConnectionInfo(i
 }
 
 func autoConvert_apiserver_WebhookConnectionInfo_To_v1alpha1_WebhookConnectionInfo(in *apiserver.WebhookConnectionInfo, out *WebhookConnectionInfo, s conversion.Scope) error {
-	out.Type = in.Type
-	out.KubeConfigFile = (*string)(unsafe.Pointer(in.KubeConfigFile))
+	*out = *(*WebhookConnectionInfo)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -996,7 +942,7 @@ func Convert_apiserver_WebhookConnectionInfo_To_v1alpha1_WebhookConnectionInfo(i
 }
 
 func autoConvert_v1alpha1_WebhookMatchCondition_To_apiserver_WebhookMatchCondition(in *WebhookMatchCondition, out *apiserver.WebhookMatchCondition, s conversion.Scope) error {
-	out.Expression = in.Expression
+	*out = *(*apiserver.WebhookMatchCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1006,7 +952,7 @@ func Convert_v1alpha1_WebhookMatchCondition_To_apiserver_WebhookMatchCondition(i
 }
 
 func autoConvert_apiserver_WebhookMatchCondition_To_v1alpha1_WebhookMatchCondition(in *apiserver.WebhookMatchCondition, out *WebhookMatchCondition, s conversion.Scope) error {
-	out.Expression = in.Expression
+	*out = *(*WebhookMatchCondition)(unsafe.Pointer(in))
 	return nil
 }
 

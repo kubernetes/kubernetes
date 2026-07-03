@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -72,11 +71,11 @@ type Scheduler struct {
 
 	Extenders []fwk.Extender
 
-	// NextPod should be a function that blocks until the next pod
+	// NextEntity should be a function that blocks until the next entity (pod or pod group)
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
-	NextPod func(logger klog.Logger) (*framework.QueuedPodInfo, error)
+	NextEntity func(logger klog.Logger) (framework.QueuedEntityInfo, error)
 
 	// FailureHandler is called upon a scheduling failure.
 	FailureHandler FailureHandlerFn
@@ -114,14 +113,11 @@ type Scheduler struct {
 	// panic.
 	logger klog.Logger
 
-	podGroupLister schedulinglisters.PodGroupLister
-
 	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
 	registeredHandlers []cache.ResourceEventHandlerRegistration
 
 	nominatedNodeNameForExpectationEnabled bool
 	genericWorkloadEnabled                 bool
-	workloadAwarePreemptionEnabled         bool
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
@@ -145,6 +141,7 @@ type schedulerOptions struct {
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32
 	applyDefaultProfile        bool
+	nodeInfoSnapshot           *internalcache.Snapshot
 }
 
 // Option configures a Scheduler
@@ -259,6 +256,13 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 	}
 }
 
+// WithNodeInfoSnapshot sets the nodeInfoSnapshot for Scheduler.
+func WithNodeInfoSnapshot(snapshot *internalcache.Snapshot) Option {
+	return func(o *schedulerOptions) {
+		o.nodeInfoSnapshot = snapshot
+	}
+}
+
 var defaultSchedulerOptions = schedulerOptions{
 	clock:                             clock.RealClock{},
 	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
@@ -313,12 +317,11 @@ func New(ctx context.Context,
 
 	podLister := informerFactory.Core().V1().Pods().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	var podGroupLister schedulinglisters.PodGroupLister
-	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		podGroupLister = informerFactory.Scheduling().V1alpha2().PodGroups().Lister()
-	}
 
-	snapshot := internalcache.NewEmptySnapshot()
+	snapshot := options.nodeInfoSnapshot
+	if snapshot == nil {
+		snapshot = internalcache.NewEmptySnapshot()
+	}
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
 	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
@@ -453,11 +456,9 @@ func New(ctx context.Context,
 		logger:                                 logger,
 		APIDispatcher:                          apiDispatcher,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
-		podGroupLister:                         podGroupLister,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
-		workloadAwarePreemptionEnabled:         feature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption),
 	}
-	sched.NextPod = podQueue.Pop
+	sched.NextEntity = podQueue.Pop
 	sched.applyDefaultHandlers()
 
 	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, draManager, unionedGVKs(queueingHintsPerProfile)); err != nil {

@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+
 	// Side-effect import: registers PodGroup with legacyscheme.Scheme so
 	// the ConvertToVersion calls below resolve the type.
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -40,16 +41,17 @@ var podGroup = &scheduling.PodGroup{
 		Namespace: metav1.NamespaceDefault,
 	},
 	Spec: scheduling.PodGroupSpec{
-		PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-			Workload: &scheduling.WorkloadPodGroupTemplateReference{
-				WorkloadName:         "w",
-				PodGroupTemplateName: "t",
-			},
+		WorkloadRef: &scheduling.WorkloadReference{
+			WorkloadName: "w",
+			TemplateName: "t",
 		},
 		SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 			Gang: &scheduling.GangSchedulingPolicy{
 				MinCount: 5,
 			},
+		},
+		DisruptionMode: &scheduling.DisruptionMode{
+			Single: &scheduling.SingleDisruptionMode{},
 		},
 	},
 }
@@ -66,9 +68,26 @@ func podGroupWithSchedulingConstraints(keys ...string) *scheduling.PodGroup {
 	return pg
 }
 
-func podGroupWithDisruptionMode(mode scheduling.DisruptionMode) *scheduling.PodGroup {
+func podGroupWithDisruptionModeAll() *scheduling.PodGroup {
 	pg := podGroup.DeepCopy()
-	pg.Spec.DisruptionMode = &mode
+	pg.Spec.DisruptionMode = &scheduling.DisruptionMode{
+		All: &scheduling.AllDisruptionMode{},
+	}
+	return pg
+}
+
+func podGroupWithDisruptionModeBoth() *scheduling.PodGroup {
+	pg := podGroup.DeepCopy()
+	pg.Spec.DisruptionMode = &scheduling.DisruptionMode{
+		Single: &scheduling.SingleDisruptionMode{},
+		All:    &scheduling.AllDisruptionMode{},
+	}
+	return pg
+}
+
+func podGroupWithPreemptionPolicy(policy scheduling.PreemptionPolicy) *scheduling.PodGroup {
+	pg := podGroup.DeepCopy()
+	pg.Spec.PreemptionPolicy = &policy
 	return pg
 }
 
@@ -81,7 +100,8 @@ var (
 	maximumError           = "must be less than or equal to 1000000000"
 	subdomainNameError     = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 	forbiddenError         = "Forbidden"
-	supportedModesError    = `supported values: "Pod", "PodGroup"`
+	notAllowedToUnsetError = "field cannot be cleared once set"
+	supportedPoliciesError = `supported values: "Never", "PreemptLowerPriority"`
 )
 
 func TestStrategy(t *testing.T) {
@@ -97,7 +117,7 @@ func TestStrategy(t *testing.T) {
 func ctxWithRequestInfo() context.Context {
 	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "scheduling.k8s.io",
-		APIVersion:        "v1alpha2",
+		APIVersion:        "v1alpha3",
 		Resource:          "podgroups",
 		IsResourceRequest: true,
 	})
@@ -107,11 +127,11 @@ func TestStrategyCreate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	now := metav1.Now()
 	testCases := map[string]struct {
-		obj                           *scheduling.PodGroup
-		expectObj                     *scheduling.PodGroup
-		enableTopologyAwareScheduling bool
-		enableWorkloadAwarePreemption bool
-		expectValidationError         string
+		obj                            *scheduling.PodGroup
+		expectObj                      *scheduling.PodGroup
+		enableTopologyAwareScheduling  bool
+		enablePodGroupPreemptionPolicy bool
+		expectValidationError          string
 	}{
 		"simple": {
 			obj:       podGroup,
@@ -146,7 +166,7 @@ func TestStrategyCreate(t *testing.T) {
 				newPodGroup := podGroup.DeepCopy()
 				newPodGroup.Status.Conditions = []metav1.Condition{
 					{
-						Type:               scheduling.PodGroupScheduled,
+						Type:               scheduling.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             scheduling.PodGroupReasonUnschedulable,
 						Message:            "Test status condition message",
@@ -179,84 +199,76 @@ func TestStrategyCreate(t *testing.T) {
 			obj:       podGroupWithSchedulingConstraints("foo-"),
 			expectObj: podGroup,
 		},
-		"workload aware preemption disabled - drop disruption mode": {
-			obj:       podGroupWithDisruptionMode(scheduling.DisruptionModePod),
-			expectObj: podGroup,
+		"disruption mode all": {
+			obj:       podGroupWithDisruptionModeAll(),
+			expectObj: podGroupWithDisruptionModeAll(),
 		},
-		"workload aware preemption enabled - preserve disruption mode (pod)": {
-			obj:                           podGroupWithDisruptionMode(scheduling.DisruptionModePod),
-			expectObj:                     podGroupWithDisruptionMode(scheduling.DisruptionModePod),
-			enableWorkloadAwarePreemption: true,
+		"both disruption modes set": {
+			obj:                   podGroupWithDisruptionModeBoth(),
+			expectValidationError: "must specify exactly one of",
 		},
-		"workload aware preemption enabled - preserve disruption mode (pod group)": {
-			obj:                           podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
-			expectObj:                     podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
-			enableWorkloadAwarePreemption: true,
-		},
-		"workload aware preemption enabled - unknown disruption mode": {
-			obj:                           podGroupWithDisruptionMode(scheduling.DisruptionMode("Invalid")),
-			enableWorkloadAwarePreemption: true,
-			expectValidationError:         supportedModesError,
-		},
-		"workload aware preemption disabled - drop priorityClassName": {
+		"invalid priorityClassName": {
 			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
-				pg.Spec.PriorityClassName = "high-priority"
-				return pg
-			}(),
-			expectObj: podGroup,
-		},
-		"workload aware preemption enabled - invalid priorityClassName": {
-			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroup.DeepCopy()
 				pg.Spec.PriorityClassName = "invalid/priority/class/name"
 				return pg
 			}(),
-			enableWorkloadAwarePreemption: true,
-			expectValidationError:         subdomainNameError,
+			expectValidationError: subdomainNameError,
 		},
-		"workload aware preemption enabled - preserve priorityClassName": {
+		"priorityClassName set": {
 			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroup.DeepCopy()
 				pg.Spec.PriorityClassName = "high-priority"
 				return pg
 			}(),
 			expectObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroup.DeepCopy()
 				pg.Spec.PriorityClassName = "high-priority"
 				return pg
 			}(),
-			enableWorkloadAwarePreemption: true,
 		},
-		"workload aware preemption disabled - drop priority": {
+		"priority set": {
 			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
-				pg.Spec.Priority = new(int32(1000))
-				return pg
-			}(),
-			expectObj: podGroup,
-		},
-		"workload aware preemption enabled - preserve priority": {
-			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroup.DeepCopy()
 				pg.Spec.Priority = new(int32(1000))
 				return pg
 			}(),
 			expectObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroup.DeepCopy()
 				pg.Spec.Priority = new(int32(1000))
 				return pg
 			}(),
-			enableWorkloadAwarePreemption: true,
 		},
-		"workload aware preemption enabled - too high priority": {
+		"too high priority": {
 			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroup.DeepCopy()
 				pg.Spec.Priority = new(int32(scheduling.HighestUserDefinablePriority + 1))
 				return pg
 			}(),
-			enableWorkloadAwarePreemption: true,
-			expectValidationError:         maximumError,
+			expectValidationError: maximumError,
+		},
+		"podgroup preemptionPolicy disabled - drop preemptionPolicy": {
+			obj:       podGroupWithPreemptionPolicy(scheduling.PreemptNever),
+			expectObj: podGroup,
+		},
+		"podgroup preemptionPolicy disabled - drop invalid preemptionPolicy": {
+			obj:       podGroupWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
+			expectObj: podGroup,
+		},
+		"podgroup preemptionPolicy enabled - preserve preemptionPolicy (Never)": {
+			obj:                            podGroupWithPreemptionPolicy(scheduling.PreemptNever),
+			expectObj:                      podGroupWithPreemptionPolicy(scheduling.PreemptNever),
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"podgroup preemptionPolicy enabled - preserve preemptionPolicy (PreemptLowerPriority)": {
+			obj:                            podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			expectObj:                      podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"podgroup preemptionPolicy enabled - invalid preemptionPolicy": {
+			obj:                            podGroupWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
+			enablePodGroupPreemptionPolicy: true,
+			expectValidationError:          supportedPoliciesError,
 		},
 	}
 
@@ -265,8 +277,7 @@ func TestStrategyCreate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.GangScheduling:                  tc.enableWorkloadAwarePreemption,
-				features.WorkloadAwarePreemption:         tc.enableWorkloadAwarePreemption,
+				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			podGroup := tc.obj.DeepCopy()
 
@@ -305,11 +316,11 @@ func TestStrategyCreate(t *testing.T) {
 func TestStrategyUpdate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	testCases := map[string]struct {
-		oldObj                        *scheduling.PodGroup
-		newObj                        *scheduling.PodGroup
-		enableTopologyAwareScheduling bool
-		enableWorkloadAwarePreemption bool
-		expectValidationError         string
+		oldObj                         *scheduling.PodGroup
+		newObj                         *scheduling.PodGroup
+		enableTopologyAwareScheduling  bool
+		enablePodGroupPreemptionPolicy bool
+		expectValidationErrors         []string
 	}{
 		"no changes": {
 			oldObj: podGroup,
@@ -322,30 +333,27 @@ func TestStrategyUpdate(t *testing.T) {
 				newPodGroup.Name += "bar"
 				return newPodGroup
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"updating pod group template ref not allowed": {
 			oldObj: podGroup,
 			newObj: func() *scheduling.PodGroup {
 				newPodGroup := podGroup.DeepCopy()
-				newPodGroup.Spec.PodGroupTemplateRef = &scheduling.PodGroupTemplateReference{
-					Workload: &scheduling.WorkloadPodGroupTemplateReference{
-						WorkloadName:         "foo",
-						PodGroupTemplateName: "baz",
-					},
+				newPodGroup.Spec.WorkloadRef = &scheduling.WorkloadReference{
+					WorkloadName: "foo",
+					TemplateName: "baz",
 				}
 				return newPodGroup
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing min count in gang scheduling policy not allowed": {
+		"changing min count in gang scheduling is allowed": {
 			oldObj: podGroup,
 			newObj: func() *scheduling.PodGroup {
 				newPodGroup := podGroup.DeepCopy()
 				newPodGroup.Spec.SchedulingPolicy.Gang.MinCount = 4
 				return newPodGroup
 			}(),
-			expectValidationError: fieldImmutableError,
 		},
 		"changing scheduling policy not allowed": {
 			oldObj: podGroup,
@@ -356,97 +364,74 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 				return newPodGroup
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError, notAllowedToUnsetError},
 		},
 		"changing scheduling constraints not allowed": {
 			oldObj:                        podGroupWithSchedulingConstraints("foo"),
 			newObj:                        podGroupWithSchedulingConstraints(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         fieldImmutableError,
+			expectValidationErrors:        []string{fieldImmutableError},
 		},
 		"changing topology constraints not allowed": {
 			oldObj:                        podGroupWithSchedulingConstraints("foo"),
 			newObj:                        podGroupWithSchedulingConstraints(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         fieldImmutableError,
+			expectValidationErrors:        []string{fieldImmutableError},
 		},
 		"changing topology key not allowed": {
 			oldObj:                        podGroupWithSchedulingConstraints("foo"),
 			newObj:                        podGroupWithSchedulingConstraints("foobar"),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         fieldImmutableError,
+			expectValidationErrors:        []string{fieldImmutableError},
 		},
 		"changing scheduling constraints not allowed with TAS disabled": {
-			oldObj:                podGroupWithSchedulingConstraints("foo"),
-			newObj:                podGroupWithSchedulingConstraints(),
-			expectValidationError: forbiddenError,
+			oldObj:                 podGroupWithSchedulingConstraints("foo"),
+			newObj:                 podGroupWithSchedulingConstraints(),
+			expectValidationErrors: []string{forbiddenError},
 		},
 		"changing topology constraints not allowed with TAS disabled": {
-			oldObj:                podGroupWithSchedulingConstraints("foo"),
-			newObj:                podGroupWithSchedulingConstraints(),
-			expectValidationError: forbiddenError,
+			oldObj:                 podGroupWithSchedulingConstraints("foo"),
+			newObj:                 podGroupWithSchedulingConstraints(),
+			expectValidationErrors: []string{forbiddenError},
 		},
 		"changing topology key not allowed with TAS disabled": {
-			oldObj:                podGroupWithSchedulingConstraints("foo"),
-			newObj:                podGroupWithSchedulingConstraints("foobar"),
-			expectValidationError: forbiddenError,
+			oldObj:                 podGroupWithSchedulingConstraints("foo"),
+			newObj:                 podGroupWithSchedulingConstraints("foobar"),
+			expectValidationErrors: []string{forbiddenError},
 		},
-		"disruption mode update, workload aware preemption disabled": {
-			oldObj:                podGroupWithDisruptionMode(scheduling.DisruptionModePod),
-			newObj:                podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
-			expectValidationError: forbiddenError,
+		"changing disruption mode not allowed": {
+			oldObj:                 podGroup,
+			newObj:                 podGroupWithDisruptionModeAll(),
+			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"disruption mode update, workload aware preemption enabled": {
-			oldObj:                        podGroupWithDisruptionMode(scheduling.DisruptionModePod),
-			newObj:                        podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
-			enableWorkloadAwarePreemption: true,
-			expectValidationError:         fieldImmutableError,
-		},
-		"priority class name update, workload aware preemption disabled": {
-			oldObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
-				pg.Spec.PriorityClassName = "low-priority"
-				return pg
-			}(),
+		"changing priority class name not allowed": {
+			oldObj: podGroup,
 			newObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroup.DeepCopy()
 				pg.Spec.PriorityClassName = "high-priority"
 				return pg
 			}(),
-			expectValidationError: forbiddenError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"priority class name update, workload aware preemption enabled": {
-			oldObj: podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+		"changing priority not allowed": {
+			oldObj: podGroup,
 			newObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
-				pg.Spec.PriorityClassName = "high-priority"
-				return pg
-			}(),
-			enableWorkloadAwarePreemption: true,
-			expectValidationError:         fieldImmutableError,
-		},
-		"priority update, workload aware preemption disabled": {
-			oldObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
-				pg.Spec.Priority = new(int32(1000))
-				return pg
-			}(),
-			newObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroup.DeepCopy()
 				pg.Spec.Priority = new(int32(2000))
 				return pg
 			}(),
-			expectValidationError: forbiddenError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"priority update, workload aware preemption enabled": {
-			oldObj: podGroupWithDisruptionMode(scheduling.DisruptionModePod),
-			newObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
-				pg.Spec.Priority = new(int32(2000))
-				return pg
-			}(),
-			enableWorkloadAwarePreemption: true,
-			expectValidationError:         fieldImmutableError,
+		"changing preemptionPolicy not allowed with podgroup preemptionPolicy disabled": {
+			oldObj:                 podGroupWithPreemptionPolicy(scheduling.PreemptNever),
+			newObj:                 podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			expectValidationErrors: []string{forbiddenError, fieldImmutableError},
+		},
+		"changing preemptionPolicy not allowed with podgroup preemptionPolicy enabled": {
+			oldObj:                         podGroupWithPreemptionPolicy(scheduling.PreemptNever),
+			newObj:                         podGroupWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			enablePodGroupPreemptionPolicy: true,
+			expectValidationErrors:         []string{fieldImmutableError},
 		},
 	}
 
@@ -455,8 +440,7 @@ func TestStrategyUpdate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.GangScheduling:                  tc.enableWorkloadAwarePreemption,
-				features.WorkloadAwarePreemption:         tc.enableWorkloadAwarePreemption,
+				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			podGroup := tc.oldObj.DeepCopy()
 			newPodGroup := tc.newObj.DeepCopy()
@@ -467,18 +451,20 @@ func TestStrategyUpdate(t *testing.T) {
 			errs := strategy.ValidateUpdate(ctx, newPodGroup, podGroup)
 			errs = strategy.ValidateDeclaratively(ctx, newPodGroup, podGroup, errs, operation.Update, strategy.DeclarativeValidationConfig(ctx, newPodGroup, podGroup))
 			if len(errs) != 0 {
-				if tc.expectValidationError == "" {
+				if len(tc.expectValidationErrors) == 0 {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}
-				if len(errs) != 1 {
-					t.Fatalf("exactly one error expected")
+				if len(errs) != len(tc.expectValidationErrors) {
+					t.Fatalf("expected %d errors, got %d", len(tc.expectValidationErrors), len(errs))
 				}
-				if errMsg := errs[0].Error(); !strings.Contains(errMsg, tc.expectValidationError) {
-					t.Fatalf("error %#v does not contain the expected message %q", errMsg, tc.expectValidationError)
+				for i, err := range errs {
+					if !strings.Contains(err.Error(), tc.expectValidationErrors[i]) {
+						t.Fatalf("error %#v does not contain the expected message %q", err.Error(), tc.expectValidationErrors[i])
+					}
 				}
 				return
 			}
-			if tc.expectValidationError != "" {
+			if len(tc.expectValidationErrors) != 0 {
 				t.Fatal("expected validation error(s), got none")
 			}
 		})
@@ -488,7 +474,7 @@ func TestStrategyUpdate(t *testing.T) {
 func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:    "scheduling.k8s.io",
-		APIVersion:  "v1alpha2",
+		APIVersion:  "v1alpha3",
 		Resource:    "podgroups",
 		Subresource: "status",
 	})
@@ -509,7 +495,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			newObj: func() *scheduling.PodGroup {
 				podGroup := podGroup.DeepCopy()
 				podGroup.Status.Conditions = append(podGroup.Status.Conditions, metav1.Condition{
-					Type:               scheduling.PodGroupScheduled,
+					Type:               scheduling.PodGroupInitiallyScheduled,
 					Status:             metav1.ConditionFalse,
 					Reason:             scheduling.PodGroupReasonUnschedulable,
 					Message:            "Test status condition message",
@@ -520,7 +506,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			expectObj: func() *scheduling.PodGroup {
 				podGroup := podGroup.DeepCopy()
 				podGroup.Status.Conditions = append(podGroup.Status.Conditions, metav1.Condition{
-					Type:               scheduling.PodGroupScheduled,
+					Type:               scheduling.PodGroupInitiallyScheduled,
 					Status:             metav1.ConditionFalse,
 					Reason:             scheduling.PodGroupReasonUnschedulable,
 					Message:            "Test status condition message",

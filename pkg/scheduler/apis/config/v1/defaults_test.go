@@ -122,6 +122,10 @@ var pluginConfigs = []configv1.PluginConfig{
 				APIVersion: "kubescheduler.config.k8s.io/v1",
 			},
 			BindTimeoutSeconds: ptr.To[int64](600),
+			Shape: []configv1.UtilizationShapePoint{
+				{Utilization: 0, Score: 10},
+				{Utilization: 100, Score: 0},
+			},
 		}},
 	},
 }
@@ -345,6 +349,10 @@ func TestSchedulerDefaults(t *testing.T) {
 										APIVersion: "kubescheduler.config.k8s.io/v1",
 									},
 									BindTimeoutSeconds: ptr.To[int64](600),
+									Shape: []configv1.UtilizationShapePoint{
+										{Utilization: 0, Score: 10},
+										{Utilization: 100, Score: 0},
+									},
 								}},
 							},
 						},

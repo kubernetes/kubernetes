@@ -17,14 +17,16 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -37,6 +39,11 @@ func NewTestBitMask(sockets ...int) bitmask.BitMask {
 }
 
 func TestNewManager(t *testing.T) {
+	numaDistanceErr := "error getting NUMA distances from cadvisor"
+	if runtime.GOOS == "windows" {
+		numaDistanceErr = fmt.Sprintf("the %q policy option is not supported on Windows because NUMA node distances are not available", PreferClosestNUMANodes)
+	}
+
 	tcases := []struct {
 		description    string
 		policyName     string
@@ -96,7 +103,7 @@ func TestNewManager(t *testing.T) {
 			policyOptions: map[string]string{
 				PreferClosestNUMANodes: "true",
 			},
-			expectedError: fmt.Errorf("error getting NUMA distances from cadvisor"),
+			expectedError: fmt.Errorf("%s", numaDistanceErr),
 			topology: []cadvisorapi.Node{
 				{
 					Id: 0,
@@ -210,19 +217,19 @@ type mockHintProvider struct {
 	//allocateError error
 }
 
-func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
+func (m *mockHintProvider) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
 	return m.th
 }
 
-func (m *mockHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint {
+func (m *mockHintProvider) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod) map[string][]TopologyHint {
 	return m.th
 }
 
-func (m *mockHintProvider) AllocatePod(pod *v1.Pod) error {
+func (m *mockHintProvider) AllocatePod(logger klog.Logger, pod *v1.Pod) error {
 	return nil
 }
 
-func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
+func (m *mockHintProvider) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error {
 	//return allocateError
 	return nil
 }
@@ -265,6 +272,7 @@ func TestAddHintProvider(t *testing.T) {
 }
 
 func TestAdmit(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	numaInfo := &NUMAInfo{
 		Nodes: []int{0, 1},
 		NUMADistances: NUMADistances{
@@ -570,7 +578,7 @@ func TestAdmit(t *testing.T) {
 		}
 
 		// Container scope Admit
-		ctnActual := ctnScopeManager.Admit(&podAttr)
+		ctnActual := ctnScopeManager.Admit(tCtx, &podAttr)
 		if ctnActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, ctnActual.Admit)
 		}
@@ -579,7 +587,7 @@ func TestAdmit(t *testing.T) {
 		}
 
 		// Pod scope Admit
-		podActual := podScopeManager.Admit(&podAttr)
+		podActual := podScopeManager.Admit(tCtx, &podAttr)
 		if podActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, podActual.Admit)
 		}

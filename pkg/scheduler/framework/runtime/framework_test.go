@@ -28,7 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/scheduling/v1alpha2"
+	"k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -212,7 +212,7 @@ func (pl *TestPlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestPlugin) Less(fwk.QueuedPodInfo, fwk.QueuedPodInfo) bool {
+func (pl *TestPlugin) Less(fwk.QueuedEntityInfo, fwk.QueuedEntityInfo) bool {
 	return false
 }
 
@@ -226,6 +226,10 @@ func (pl *TestPlugin) ScoreExtensions() fwk.ScoreExtensions {
 
 func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	return pl.inj.PreFilterResult, fwk.NewStatus(fwk.Code(pl.inj.PreFilterStatus), injectReason)
+}
+
+func (pl *TestPlugin) PlacementFeasible(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Code(pl.inj.PlacementFeasibleStatus), injectReason)
 }
 
 func (pl *TestPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
@@ -274,7 +278,7 @@ func (pl *TestPlugin) GeneratePlacements(ctx context.Context, state fwk.PodGroup
 	return &fwk.GeneratePlacementsResult{Placements: pl.inj.GeneratePlacementsResult}, fwk.NewStatus(fwk.Code(pl.inj.GeneratePlacementsStatus), injectReason)
 }
 
-func (pl *TestPlugin) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *TestPlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	return 0, fwk.NewStatus(fwk.Code(pl.inj.PlacementScoreStatus), injectReason)
 }
 
@@ -282,8 +286,8 @@ func (pl *TestPlugin) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
 	return nil
 }
 
-func (pl *TestPlugin) PodGroupPostFilter(ctx context.Context, pg *v1alpha2.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) *fwk.Status {
-	return nil
+func (pl *TestPlugin) PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
+	return nil, nil
 }
 
 func newTestCloseErrorPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
@@ -413,7 +417,7 @@ func (pl *TestQueueSortPlugin) Name() string {
 	return queueSortPlugin
 }
 
-func (pl *TestQueueSortPlugin) Less(_, _ fwk.QueuedPodInfo) bool {
+func (pl *TestQueueSortPlugin) Less(_, _ fwk.QueuedEntityInfo) bool {
 	return false
 }
 
@@ -662,6 +666,126 @@ func TestNewFrameworkErrors(t *testing.T) {
 	}
 }
 
+func TestNewFramework_PlacementFeasible(t *testing.T) {
+	tests := []struct {
+		name                       string
+		genericWorkloadEnabled     bool
+		registerGangScheduling     bool
+		placementFeasibleFulfilled bool
+		wantErr                    string
+		wantPlacementFeasible      bool
+	}{
+		{
+			name:                       "GenericWorkload enabled, GangScheduling does not fulfill PlacementFeasiblePlugin interface",
+			genericWorkloadEnabled:     true,
+			registerGangScheduling:     true,
+			placementFeasibleFulfilled: false,
+			wantErr:                    "GenericWorkload is enabled, but GangScheduling plugin does not fulfill PlacementFeasiblePlugin interface",
+		},
+		{
+			name:                       "GenericWorkload disabled, GangScheduling does not fulfill PlacementFeasiblePlugin interface",
+			genericWorkloadEnabled:     false,
+			registerGangScheduling:     true,
+			placementFeasibleFulfilled: false,
+			wantPlacementFeasible:      false,
+		},
+		{
+			name:                   "GenericWorkload enabled, GangScheduling plugin not present",
+			genericWorkloadEnabled: true,
+			registerGangScheduling: false,
+			wantPlacementFeasible:  false,
+		},
+		{
+			name:                       "GenericWorkload enabled, GangScheduling fulfills PlacementFeasiblePlugin interface",
+			genericWorkloadEnabled:     true,
+			registerGangScheduling:     true,
+			placementFeasibleFulfilled: true,
+			wantPlacementFeasible:      true,
+		},
+		{
+			name:                       "GenericWorkload disabled, GangScheduling fulfills PlacementFeasiblePlugin interface",
+			genericWorkloadEnabled:     false,
+			registerGangScheduling:     true,
+			placementFeasibleFulfilled: true,
+			wantPlacementFeasible:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: tc.genericWorkloadEnabled,
+			})
+
+			_, ctx := ktesting.NewTestContext(t)
+
+			registry := Registry{}
+			profile := config.KubeSchedulerProfile{
+				Plugins: &config.Plugins{},
+			}
+
+			if tc.registerGangScheduling {
+				err := registry.Register(names.GangScheduling, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					if tc.placementFeasibleFulfilled {
+						return &mockGangSchedulingWithPlacementFeasible{}, nil
+					}
+					return &mockGangScheduling{}, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to register GangScheduling plugin: %v", err)
+				}
+				profile.Plugins.MultiPoint = config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: names.GangScheduling},
+					},
+				}
+			}
+
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+
+			if len(tc.wantErr) > 0 {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			placementFeasiblePlugins := f.(*frameworkImpl).placementFeasiblePlugins
+			if tc.wantPlacementFeasible {
+				if len(placementFeasiblePlugins) != 1 || placementFeasiblePlugins[0].Name() != names.GangScheduling {
+					t.Errorf("Expected GangScheduling plugin in placementFeasiblePlugins, got: %v", placementFeasiblePlugins)
+				}
+			} else {
+				if len(placementFeasiblePlugins) != 0 {
+					t.Errorf("Expected empty placementFeasiblePlugins, got: %v", placementFeasiblePlugins)
+				}
+			}
+		})
+	}
+}
+
+type mockGangScheduling struct{}
+
+func (m *mockGangScheduling) Name() string {
+	return names.GangScheduling
+}
+
+var _ fwk.Plugin = &mockGangScheduling{}
+
+type mockGangSchedulingWithPlacementFeasible struct {
+	mockGangScheduling
+}
+
+func (p *mockGangSchedulingWithPlacementFeasible) PlacementFeasible(_ context.Context, _ fwk.PlacementCycleState, _ fwk.PodGroupInfo) *fwk.Status {
+	return nil
+}
+
+var _ framework.PlacementFeasiblePlugin = &mockGangSchedulingWithPlacementFeasible{}
+
 func TestPodGroupPostFilterPlugins(t *testing.T) {
 	tests := []struct {
 		name                   string
@@ -741,9 +865,7 @@ func TestPodGroupPostFilterPlugins(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.featureGate {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload:         true,
-					features.GangScheduling:          true,
-					features.WorkloadAwarePreemption: true,
+					features.GenericWorkload: true,
 				})
 			}
 
@@ -781,6 +903,116 @@ func TestPodGroupPostFilterPlugins(t *testing.T) {
 		})
 	}
 
+}
+
+type mockPlacementFeasiblePlugin struct {
+	name   string
+	status *fwk.Status
+	called bool
+}
+
+func (p *mockPlacementFeasiblePlugin) Name() string { return p.name }
+
+func (p *mockPlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+	p.called = true
+	return p.status
+}
+
+func TestRunPlacementFeasiblePlugins(t *testing.T) {
+	tests := []struct {
+		name           string
+		plugins        []*mockPlacementFeasiblePlugin
+		expectedStatus *fwk.Status
+		expectedCalled []bool
+	}{
+		{
+			name: "All plugins succeed",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: nil},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: nil,
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns Wait, continues",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Wait, "wait")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Wait, "wait").WithPlugin("p1"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns Unschedulable, breaks",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable").WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+		{
+			name: "First plugin returns Wait, second returns Unschedulable, returns Unschedulable",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Wait, "wait")},
+				{name: "p2", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns Wait, second returns Wait, returns last Wait",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Wait, "wait1")},
+				{name: "p2", status: fwk.NewStatus(fwk.Wait, "wait2")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Wait, "wait2").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "Plugin returns Error, breaks",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Error, "error")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.AsStatus(fmt.Errorf("running PlacementFeasible plugin: %w", errors.New("error"))).WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+		{
+			name: "Plugin returns unexpected status, breaks",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Skip, "error")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.AsStatus(fmt.Errorf("unexpected status from PlacementFeasible plugin: Skip")).WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			f := &frameworkImpl{
+				placementFeasiblePlugins: make([]framework.PlacementFeasiblePlugin, len(tc.plugins)),
+			}
+			for i, p := range tc.plugins {
+				f.placementFeasiblePlugins[i] = p
+			}
+
+			status := f.RunPlacementFeasiblePlugins(ctx, framework.NewCycleState(), nil)
+
+			if diff := cmp.Diff(tc.expectedStatus, status, statusCmpOpts...); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+			}
+
+			for i, p := range tc.plugins {
+				if p.called != tc.expectedCalled[i] {
+					t.Errorf("Expected plugin %s called=%v, got %v", p.name, tc.expectedCalled[i], p.called)
+				}
+			}
+		})
+	}
 }
 
 func TestNewFrameworkMultiPointExpansion(t *testing.T) {
@@ -3552,9 +3784,17 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementScore - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}})
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}}, []fwk.PlacementCycleState{state})
 			},
 			wantExtensionPoint: "PlacementScore",
+			wantStatus:         fwk.Success,
+		},
+		{
+			name: "PlacementFeasible - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementFeasiblePlugins(ctx, state, nil)
+			},
+			wantExtensionPoint: "PlacementFeasible",
 			wantStatus:         fwk.Success,
 		},
 
@@ -3628,10 +3868,19 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementScore - Error",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}})
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}}, []fwk.PlacementCycleState{state})
 			},
 			inject:             injectedResult{PlacementScoreStatus: int(fwk.Error)},
 			wantExtensionPoint: "PlacementScore",
+			wantStatus:         fwk.Error,
+		},
+		{
+			name: "PlacementFeasible - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementFeasiblePlugins(ctx, state, nil)
+			},
+			inject:             injectedResult{PlacementFeasibleStatus: int(fwk.Error)},
+			wantExtensionPoint: "PlacementFeasible",
 			wantStatus:         fwk.Error,
 		},
 	}
@@ -3682,6 +3931,10 @@ func TestRecordingMetrics(t *testing.T) {
 			defer func() {
 				_ = f.Close()
 			}()
+
+			if tt.wantExtensionPoint == "PlacementFeasible" {
+				f.(*frameworkImpl).placementFeasiblePlugins = []framework.PlacementFeasiblePlugin{plugin}
+			}
 
 			tt.action(ctx, f)
 
@@ -4074,6 +4327,7 @@ type injectedResult struct {
 	GeneratePlacementsResult []*fwk.Placement     `json:"generatePlacementsResult,omitempty"`
 	GeneratePlacementsStatus int                  `json:"generatePlacementsStatus,omitempty"`
 	PlacementScoreStatus     int                  `json:"placementScoreStatus,omitempty"`
+	PlacementFeasibleStatus  int                  `json:"placementFeasibleStatus,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int64, *fwk.Status) {
@@ -4304,7 +4558,7 @@ func (pl *testPlacementScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *testPlacementScorePlugin) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *testPlacementScorePlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	r := pl.results[placement.Placement]
 	return r.score, r.status
 }
@@ -4546,11 +4800,13 @@ func TestRunPlacementScorePlugins(t *testing.T) {
 				t.Fatalf("Unexpected error during calling NewFramework, got %v", err)
 			}
 			assumedPlacements := make([]*fwk.PodGroupAssignments, len(placements))
+			placementStates := make([]fwk.PlacementCycleState, len(placements))
 			for i := range placements {
 				assumedPlacements[i] = &fwk.PodGroupAssignments{Placement: placements[i]}
+				placementStates[i] = framework.NewCycleState()
 			}
 
-			result, status := fw.RunPlacementScorePlugins(ctx, framework.NewCycleState(), nil, assumedPlacements)
+			result, status := fw.RunPlacementScorePlugins(ctx, framework.NewCycleState(), nil, assumedPlacements, placementStates)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("got status code %s, want %s", status.Code(), tt.wantStatusCode)
 			}

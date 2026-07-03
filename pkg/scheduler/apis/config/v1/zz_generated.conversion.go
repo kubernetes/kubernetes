@@ -306,18 +306,7 @@ func Convert_config_DynamicResourcesArgs_To_v1_DynamicResourcesArgs(in *config.D
 }
 
 func autoConvert_v1_Extender_To_config_Extender(in *configv1.Extender, out *config.Extender, s conversion.Scope) error {
-	out.URLPrefix = in.URLPrefix
-	out.FilterVerb = in.FilterVerb
-	out.PreemptVerb = in.PreemptVerb
-	out.PrioritizeVerb = in.PrioritizeVerb
-	out.Weight = in.Weight
-	out.BindVerb = in.BindVerb
-	out.EnableHTTPS = in.EnableHTTPS
-	out.TLSConfig = (*config.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
-	out.HTTPTimeout = in.HTTPTimeout
-	out.NodeCacheCapable = in.NodeCacheCapable
-	out.ManagedResources = *(*[]config.ExtenderManagedResource)(unsafe.Pointer(&in.ManagedResources))
-	out.Ignorable = in.Ignorable
+	*out = *(*config.Extender)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -327,18 +316,7 @@ func Convert_v1_Extender_To_config_Extender(in *configv1.Extender, out *config.E
 }
 
 func autoConvert_config_Extender_To_v1_Extender(in *config.Extender, out *configv1.Extender, s conversion.Scope) error {
-	out.URLPrefix = in.URLPrefix
-	out.FilterVerb = in.FilterVerb
-	out.PreemptVerb = in.PreemptVerb
-	out.PrioritizeVerb = in.PrioritizeVerb
-	out.Weight = in.Weight
-	out.BindVerb = in.BindVerb
-	out.EnableHTTPS = in.EnableHTTPS
-	out.TLSConfig = (*configv1.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
-	out.HTTPTimeout = in.HTTPTimeout
-	out.NodeCacheCapable = in.NodeCacheCapable
-	out.ManagedResources = *(*[]configv1.ExtenderManagedResource)(unsafe.Pointer(&in.ManagedResources))
-	out.Ignorable = in.Ignorable
+	*out = *(*configv1.Extender)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -348,8 +326,7 @@ func Convert_config_Extender_To_v1_Extender(in *config.Extender, out *configv1.E
 }
 
 func autoConvert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource(in *configv1.ExtenderManagedResource, out *config.ExtenderManagedResource, s conversion.Scope) error {
-	out.Name = in.Name
-	out.IgnoredByScheduler = in.IgnoredByScheduler
+	*out = *(*config.ExtenderManagedResource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -359,8 +336,7 @@ func Convert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource(in *co
 }
 
 func autoConvert_config_ExtenderManagedResource_To_v1_ExtenderManagedResource(in *config.ExtenderManagedResource, out *configv1.ExtenderManagedResource, s conversion.Scope) error {
-	out.Name = in.Name
-	out.IgnoredByScheduler = in.IgnoredByScheduler
+	*out = *(*configv1.ExtenderManagedResource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -876,7 +852,7 @@ func Convert_config_PodTopologySpreadArgs_To_v1_PodTopologySpreadArgs(in *config
 }
 
 func autoConvert_v1_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *configv1.RequestedToCapacityRatioParam, out *config.RequestedToCapacityRatioParam, s conversion.Scope) error {
-	out.Shape = *(*[]config.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
+	*out = *(*config.RequestedToCapacityRatioParam)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -886,7 +862,7 @@ func Convert_v1_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatio
 }
 
 func autoConvert_config_RequestedToCapacityRatioParam_To_v1_RequestedToCapacityRatioParam(in *config.RequestedToCapacityRatioParam, out *configv1.RequestedToCapacityRatioParam, s conversion.Scope) error {
-	out.Shape = *(*[]configv1.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
+	*out = *(*configv1.RequestedToCapacityRatioParam)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -896,8 +872,7 @@ func Convert_config_RequestedToCapacityRatioParam_To_v1_RequestedToCapacityRatio
 }
 
 func autoConvert_v1_ResourceSpec_To_config_ResourceSpec(in *configv1.ResourceSpec, out *config.ResourceSpec, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Weight = in.Weight
+	*out = *(*config.ResourceSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -907,8 +882,7 @@ func Convert_v1_ResourceSpec_To_config_ResourceSpec(in *configv1.ResourceSpec, o
 }
 
 func autoConvert_config_ResourceSpec_To_v1_ResourceSpec(in *config.ResourceSpec, out *configv1.ResourceSpec, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Weight = in.Weight
+	*out = *(*configv1.ResourceSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -918,9 +892,7 @@ func Convert_config_ResourceSpec_To_v1_ResourceSpec(in *config.ResourceSpec, out
 }
 
 func autoConvert_v1_ScoringStrategy_To_config_ScoringStrategy(in *configv1.ScoringStrategy, out *config.ScoringStrategy, s conversion.Scope) error {
-	out.Type = config.ScoringStrategyType(in.Type)
-	out.Resources = *(*[]config.ResourceSpec)(unsafe.Pointer(&in.Resources))
-	out.RequestedToCapacityRatio = (*config.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
+	*out = *(*config.ScoringStrategy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -930,9 +902,7 @@ func Convert_v1_ScoringStrategy_To_config_ScoringStrategy(in *configv1.ScoringSt
 }
 
 func autoConvert_config_ScoringStrategy_To_v1_ScoringStrategy(in *config.ScoringStrategy, out *configv1.ScoringStrategy, s conversion.Scope) error {
-	out.Type = configv1.ScoringStrategyType(in.Type)
-	out.Resources = *(*[]configv1.ResourceSpec)(unsafe.Pointer(&in.Resources))
-	out.RequestedToCapacityRatio = (*configv1.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
+	*out = *(*configv1.ScoringStrategy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -942,8 +912,7 @@ func Convert_config_ScoringStrategy_To_v1_ScoringStrategy(in *config.ScoringStra
 }
 
 func autoConvert_v1_UtilizationShapePoint_To_config_UtilizationShapePoint(in *configv1.UtilizationShapePoint, out *config.UtilizationShapePoint, s conversion.Scope) error {
-	out.Utilization = in.Utilization
-	out.Score = in.Score
+	*out = *(*config.UtilizationShapePoint)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -953,8 +922,7 @@ func Convert_v1_UtilizationShapePoint_To_config_UtilizationShapePoint(in *config
 }
 
 func autoConvert_config_UtilizationShapePoint_To_v1_UtilizationShapePoint(in *config.UtilizationShapePoint, out *configv1.UtilizationShapePoint, s conversion.Scope) error {
-	out.Utilization = in.Utilization
-	out.Score = in.Score
+	*out = *(*configv1.UtilizationShapePoint)(unsafe.Pointer(in))
 	return nil
 }
 

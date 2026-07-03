@@ -3252,7 +3252,10 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.featureEnabled)
+			if !tt.featureEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+			}
 			testCtx := testutils.InitTestSchedulerWithNS(t, "node-features-filter")
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name

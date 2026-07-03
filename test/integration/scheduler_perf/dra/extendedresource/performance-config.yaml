@@ -18,7 +18,11 @@
 # before/after comparisons with benchstat.
 
 # ExtendedResource uses pods with extended resources requests.
-# Each pod requests a unique extended resource.
+#
+# Class "example.com/gpu" selects one of potentially many
+# (classes parameter) device classes explicitly.
+# "deviceclass.resource.kubernetes.io/test-class" uses the implicit
+# device class instead.
 - name: ExtendedResource
   featureGates:
     DynamicResourceAllocation: true
@@ -36,14 +40,22 @@
   - opcode: createAny
     templatePath: ../templates/deviceclass-extended-resource.yaml
     countParam: $classes
+    templateParams:
+      class: $class
   - opcode: createPods
     namespace: init
     countParam: $initPods
     podTemplatePath: ../templates/pod-with-extended-resource.yaml
+    templateParams:
+      class: $class
+      classes: $classes
   - opcode: createPods
     namespace: test
     countParam: $measurePods
     podTemplatePath: ../templates/pod-with-extended-resource.yaml
+    templateParams:
+      class: $class
+      classes: $classes
     collectMetrics: true
   workloads:
   - name: fast
@@ -53,144 +65,67 @@
     params:
       # This testcase runs through all code paths without
       # taking too long overall.
+      class: example.com/gpu
       classes: 10
       nodesWithDRA: 1
       nodesWithoutDRA: 1
       initPods: 0
       measurePods: 10
       maxClaimsPerNode: 10
-
-- name: ExtendedResource_25Classes
-  featureGates:
-    DynamicResourceAllocation: true
-    DRAExtendedResource: true
-  workloadTemplate:
-  - opcode: createNodes
-    countParam: $nodesWithoutDRA
-  - opcode: createNodes
-    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
-    countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
-  - opcode: createAny
-    templatePath: ../templates/deviceclass-extended-resource.yaml
-    countParam: $classes
-  - opcode: createPods
-    namespace: init
-    countParam: $initPods
-    podTemplatePath: ../templates/pod-with-extended-resource-mod25.yaml
-  - opcode: createPods
-    namespace: test
-    countParam: $measurePods
-    podTemplatePath: ../templates/pod-with-extended-resource-mod25.yaml
-    collectMetrics: true
-  workloads:
-  - name: 2000pods_200nodes
+  - name: Explicit_25classes_2000pods_200nodes
     params:
+      class: example.com/gpu
       classes: 25
       nodesWithDRA: 200
       nodesWithoutDRA: 0
       initPods: 1000
       measurePods: 1000
       maxClaimsPerNode: 10
-  - name: 5000pods_500nodes
+  - name: Explicit_25classes_5000pods_500nodes
     labels: [performance]
     threshold: 120
     params:
+      class: example.com/gpu
       classes: 25
       nodesWithDRA: 500
       nodesWithoutDRA: 0
       initPods: 2500
       measurePods: 2500
       maxClaimsPerNode: 10
-
-- name: ExtendedResource_50Classes
-  featureGates:
-    DynamicResourceAllocation: true
-    DRAExtendedResource: true
-  workloadTemplate:
-  - opcode: createNodes
-    countParam: $nodesWithoutDRA
-  - opcode: createNodes
-    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
-    countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
-  - opcode: createAny
-    templatePath: ../templates/deviceclass-extended-resource.yaml
-    countParam: $classes
-  - opcode: createPods
-    namespace: init
-    countParam: $initPods
-    podTemplatePath: ../templates/pod-with-extended-resource-mod50.yaml
-  - opcode: createPods
-    namespace: test
-    countParam: $measurePods
-    podTemplatePath: ../templates/pod-with-extended-resource-mod50.yaml
-    collectMetrics: true
-  workloads:
-  - name: 2000pods_200nodes
+  - name: Explicit_50classes_2000pods_200nodes
     params:
+      class: example.com/gpu
       classes: 50
       nodesWithDRA: 200
       nodesWithoutDRA: 0
       initPods: 1000
       measurePods: 1000
       maxClaimsPerNode: 10
-  - name: 5000pods_500nodes
+  - name: Explicit_50classes_5000pods_500nodes
     labels: [performance]
     threshold: 130
     params:
+      class: example.com/gpu
       classes: 50
       nodesWithDRA: 500
       nodesWithoutDRA: 0
       initPods: 2500
       measurePods: 2500
       maxClaimsPerNode: 10
-
-- name: ImplicitExtendedResource_25Classes
-  featureGates:
-    DynamicResourceAllocation: true
-    DRAExtendedResource: true
-  workloadTemplate:
-  - opcode: createNodes
-    countParam: $nodesWithoutDRA
-  - opcode: createNodes
-    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
-    countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
-  - opcode: createAny
-    templatePath: ../templates/deviceclass-implicit-extended-resource.yaml
-    countParam: $classes
-  - opcode: createPods
-    namespace: init
-    countParam: $initPods
-    podTemplatePath: ../templates/pod-with-implicit-extended-resource-mod25.yaml
-  - opcode: createPods
-    namespace: test
-    countParam: $measurePods
-    podTemplatePath: ../templates/pod-with-implicit-extended-resource-mod25.yaml
-    collectMetrics: true
-  workloads:
-  - name: 2000pods_200nodes
+  - name: Implicit_25classes_2000pods_200nodes
     params:
+      class: deviceclass.resource.kubernetes.io/test-class
       classes: 25
       nodesWithDRA: 200
       nodesWithoutDRA: 0
       initPods: 1000
       measurePods: 1000
       maxClaimsPerNode: 10
-  - name: 5000pods_500nodes
+  - name: Implicit_25classes_5000pods_500nodes
     labels: [performance]
     threshold: 130
     params:
+      class: deviceclass.resource.kubernetes.io/test-class
       classes: 25
       nodesWithDRA: 500
       nodesWithoutDRA: 0

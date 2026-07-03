@@ -25,7 +25,6 @@ import (
 	unsafe "unsafe"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
@@ -192,8 +191,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1_FieldSelectorAttributes_To_authorization_FieldSelectorAttributes(in *authorizationv1.FieldSelectorAttributes, out *authorization.FieldSelectorAttributes, s conversion.Scope) error {
-	out.RawSelector = in.RawSelector
-	out.Requirements = *(*[]metav1.FieldSelectorRequirement)(unsafe.Pointer(&in.Requirements))
+	*out = *(*authorization.FieldSelectorAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -203,8 +201,7 @@ func Convert_v1_FieldSelectorAttributes_To_authorization_FieldSelectorAttributes
 }
 
 func autoConvert_authorization_FieldSelectorAttributes_To_v1_FieldSelectorAttributes(in *authorization.FieldSelectorAttributes, out *authorizationv1.FieldSelectorAttributes, s conversion.Scope) error {
-	out.RawSelector = in.RawSelector
-	out.Requirements = *(*[]metav1.FieldSelectorRequirement)(unsafe.Pointer(&in.Requirements))
+	*out = *(*authorizationv1.FieldSelectorAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -214,8 +211,7 @@ func Convert_authorization_FieldSelectorAttributes_To_v1_FieldSelectorAttributes
 }
 
 func autoConvert_v1_LabelSelectorAttributes_To_authorization_LabelSelectorAttributes(in *authorizationv1.LabelSelectorAttributes, out *authorization.LabelSelectorAttributes, s conversion.Scope) error {
-	out.RawSelector = in.RawSelector
-	out.Requirements = *(*[]metav1.LabelSelectorRequirement)(unsafe.Pointer(&in.Requirements))
+	*out = *(*authorization.LabelSelectorAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -225,8 +221,7 @@ func Convert_v1_LabelSelectorAttributes_To_authorization_LabelSelectorAttributes
 }
 
 func autoConvert_authorization_LabelSelectorAttributes_To_v1_LabelSelectorAttributes(in *authorization.LabelSelectorAttributes, out *authorizationv1.LabelSelectorAttributes, s conversion.Scope) error {
-	out.RawSelector = in.RawSelector
-	out.Requirements = *(*[]metav1.LabelSelectorRequirement)(unsafe.Pointer(&in.Requirements))
+	*out = *(*authorizationv1.LabelSelectorAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -268,8 +263,7 @@ func Convert_authorization_LocalSubjectAccessReview_To_v1_LocalSubjectAccessRevi
 }
 
 func autoConvert_v1_NonResourceAttributes_To_authorization_NonResourceAttributes(in *authorizationv1.NonResourceAttributes, out *authorization.NonResourceAttributes, s conversion.Scope) error {
-	out.Path = in.Path
-	out.Verb = in.Verb
+	*out = *(*authorization.NonResourceAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -279,8 +273,7 @@ func Convert_v1_NonResourceAttributes_To_authorization_NonResourceAttributes(in 
 }
 
 func autoConvert_authorization_NonResourceAttributes_To_v1_NonResourceAttributes(in *authorization.NonResourceAttributes, out *authorizationv1.NonResourceAttributes, s conversion.Scope) error {
-	out.Path = in.Path
-	out.Verb = in.Verb
+	*out = *(*authorizationv1.NonResourceAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -290,8 +283,7 @@ func Convert_authorization_NonResourceAttributes_To_v1_NonResourceAttributes(in 
 }
 
 func autoConvert_v1_NonResourceRule_To_authorization_NonResourceRule(in *authorizationv1.NonResourceRule, out *authorization.NonResourceRule, s conversion.Scope) error {
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
+	*out = *(*authorization.NonResourceRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -301,8 +293,7 @@ func Convert_v1_NonResourceRule_To_authorization_NonResourceRule(in *authorizati
 }
 
 func autoConvert_authorization_NonResourceRule_To_v1_NonResourceRule(in *authorization.NonResourceRule, out *authorizationv1.NonResourceRule, s conversion.Scope) error {
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
+	*out = *(*authorizationv1.NonResourceRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -312,15 +303,7 @@ func Convert_authorization_NonResourceRule_To_v1_NonResourceRule(in *authorizati
 }
 
 func autoConvert_v1_ResourceAttributes_To_authorization_ResourceAttributes(in *authorizationv1.ResourceAttributes, out *authorization.ResourceAttributes, s conversion.Scope) error {
-	out.Namespace = in.Namespace
-	out.Verb = in.Verb
-	out.Group = in.Group
-	out.Version = in.Version
-	out.Resource = in.Resource
-	out.Subresource = in.Subresource
-	out.Name = in.Name
-	out.FieldSelector = (*authorization.FieldSelectorAttributes)(unsafe.Pointer(in.FieldSelector))
-	out.LabelSelector = (*authorization.LabelSelectorAttributes)(unsafe.Pointer(in.LabelSelector))
+	*out = *(*authorization.ResourceAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -330,15 +313,7 @@ func Convert_v1_ResourceAttributes_To_authorization_ResourceAttributes(in *autho
 }
 
 func autoConvert_authorization_ResourceAttributes_To_v1_ResourceAttributes(in *authorization.ResourceAttributes, out *authorizationv1.ResourceAttributes, s conversion.Scope) error {
-	out.Namespace = in.Namespace
-	out.Verb = in.Verb
-	out.Group = in.Group
-	out.Version = in.Version
-	out.Resource = in.Resource
-	out.Subresource = in.Subresource
-	out.Name = in.Name
-	out.FieldSelector = (*authorizationv1.FieldSelectorAttributes)(unsafe.Pointer(in.FieldSelector))
-	out.LabelSelector = (*authorizationv1.LabelSelectorAttributes)(unsafe.Pointer(in.LabelSelector))
+	*out = *(*authorizationv1.ResourceAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -348,10 +323,7 @@ func Convert_authorization_ResourceAttributes_To_v1_ResourceAttributes(in *autho
 }
 
 func autoConvert_v1_ResourceRule_To_authorization_ResourceRule(in *authorizationv1.ResourceRule, out *authorization.ResourceRule, s conversion.Scope) error {
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
-	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
+	*out = *(*authorization.ResourceRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -361,10 +333,7 @@ func Convert_v1_ResourceRule_To_authorization_ResourceRule(in *authorizationv1.R
 }
 
 func autoConvert_authorization_ResourceRule_To_v1_ResourceRule(in *authorization.ResourceRule, out *authorizationv1.ResourceRule, s conversion.Scope) error {
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
-	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
+	*out = *(*authorizationv1.ResourceRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -406,8 +375,7 @@ func Convert_authorization_SelfSubjectAccessReview_To_v1_SelfSubjectAccessReview
 }
 
 func autoConvert_v1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in *authorizationv1.SelfSubjectAccessReviewSpec, out *authorization.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*authorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*authorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+	*out = *(*authorization.SelfSubjectAccessReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -417,8 +385,7 @@ func Convert_v1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessRe
 }
 
 func autoConvert_authorization_SelfSubjectAccessReviewSpec_To_v1_SelfSubjectAccessReviewSpec(in *authorization.SelfSubjectAccessReviewSpec, out *authorizationv1.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*authorizationv1.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*authorizationv1.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+	*out = *(*authorizationv1.SelfSubjectAccessReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -460,7 +427,7 @@ func Convert_authorization_SelfSubjectRulesReview_To_v1_SelfSubjectRulesReview(i
 }
 
 func autoConvert_v1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesReviewSpec(in *authorizationv1.SelfSubjectRulesReviewSpec, out *authorization.SelfSubjectRulesReviewSpec, s conversion.Scope) error {
-	out.Namespace = in.Namespace
+	*out = *(*authorization.SelfSubjectRulesReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -470,7 +437,7 @@ func Convert_v1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesRevi
 }
 
 func autoConvert_authorization_SelfSubjectRulesReviewSpec_To_v1_SelfSubjectRulesReviewSpec(in *authorization.SelfSubjectRulesReviewSpec, out *authorizationv1.SelfSubjectRulesReviewSpec, s conversion.Scope) error {
-	out.Namespace = in.Namespace
+	*out = *(*authorizationv1.SelfSubjectRulesReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -512,12 +479,7 @@ func Convert_authorization_SubjectAccessReview_To_v1_SubjectAccessReview(in *aut
 }
 
 func autoConvert_v1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(in *authorizationv1.SubjectAccessReviewSpec, out *authorization.SubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*authorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*authorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
-	out.User = in.User
-	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
-	out.Extra = *(*map[string]authorization.ExtraValue)(unsafe.Pointer(&in.Extra))
-	out.UID = in.UID
+	*out = *(*authorization.SubjectAccessReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -527,12 +489,7 @@ func Convert_v1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec
 }
 
 func autoConvert_authorization_SubjectAccessReviewSpec_To_v1_SubjectAccessReviewSpec(in *authorization.SubjectAccessReviewSpec, out *authorizationv1.SubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*authorizationv1.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*authorizationv1.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
-	out.User = in.User
-	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
-	out.Extra = *(*map[string]authorizationv1.ExtraValue)(unsafe.Pointer(&in.Extra))
-	out.UID = in.UID
+	*out = *(*authorizationv1.SubjectAccessReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -542,10 +499,7 @@ func Convert_authorization_SubjectAccessReviewSpec_To_v1_SubjectAccessReviewSpec
 }
 
 func autoConvert_v1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in *authorizationv1.SubjectAccessReviewStatus, out *authorization.SubjectAccessReviewStatus, s conversion.Scope) error {
-	out.Allowed = in.Allowed
-	out.Denied = in.Denied
-	out.Reason = in.Reason
-	out.EvaluationError = in.EvaluationError
+	*out = *(*authorization.SubjectAccessReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -555,10 +509,7 @@ func Convert_v1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewSt
 }
 
 func autoConvert_authorization_SubjectAccessReviewStatus_To_v1_SubjectAccessReviewStatus(in *authorization.SubjectAccessReviewStatus, out *authorizationv1.SubjectAccessReviewStatus, s conversion.Scope) error {
-	out.Allowed = in.Allowed
-	out.Denied = in.Denied
-	out.Reason = in.Reason
-	out.EvaluationError = in.EvaluationError
+	*out = *(*authorizationv1.SubjectAccessReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -568,10 +519,7 @@ func Convert_authorization_SubjectAccessReviewStatus_To_v1_SubjectAccessReviewSt
 }
 
 func autoConvert_v1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStatus(in *authorizationv1.SubjectRulesReviewStatus, out *authorization.SubjectRulesReviewStatus, s conversion.Scope) error {
-	out.ResourceRules = *(*[]authorization.ResourceRule)(unsafe.Pointer(&in.ResourceRules))
-	out.NonResourceRules = *(*[]authorization.NonResourceRule)(unsafe.Pointer(&in.NonResourceRules))
-	out.Incomplete = in.Incomplete
-	out.EvaluationError = in.EvaluationError
+	*out = *(*authorization.SubjectRulesReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -581,10 +529,7 @@ func Convert_v1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStat
 }
 
 func autoConvert_authorization_SubjectRulesReviewStatus_To_v1_SubjectRulesReviewStatus(in *authorization.SubjectRulesReviewStatus, out *authorizationv1.SubjectRulesReviewStatus, s conversion.Scope) error {
-	out.ResourceRules = *(*[]authorizationv1.ResourceRule)(unsafe.Pointer(&in.ResourceRules))
-	out.NonResourceRules = *(*[]authorizationv1.NonResourceRule)(unsafe.Pointer(&in.NonResourceRules))
-	out.Incomplete = in.Incomplete
-	out.EvaluationError = in.EvaluationError
+	*out = *(*authorizationv1.SubjectRulesReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 

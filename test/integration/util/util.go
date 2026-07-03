@@ -29,7 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -143,7 +143,7 @@ func StartSchedulerWithDone(tCtx ktesting.TContext, cfg *kubeschedulerconfig.Kub
 // The caller is responsible for the management of the goroutine where that method is invoked.
 func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory, features resourceclaim.Features) func() {
 	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	claimTemplateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), features, clientSet, podInformer, podGroupInformer, claimInformer, claimTemplateInformer)
@@ -824,6 +824,7 @@ func WaitForNodesInCache(ctx context.Context, sched *scheduler.Scheduler, nodeCo
 type PausePodConfig struct {
 	Name                              string
 	Namespace                         string
+	PodGroupName                      string
 	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
@@ -889,6 +890,11 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 				Image: imageutils.GetPauseImageName(),
 				Ports: conf.NonRestartableInitContainerPorts,
 			},
+		}
+	}
+	if conf.PodGroupName != "" {
+		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+			PodGroupName: &conf.PodGroupName,
 		}
 	}
 	return pod
@@ -1188,21 +1194,21 @@ func timeout(ctx context.Context, d time.Duration, f func()) error {
 	}
 }
 
-// NextPodOrDie returns the next Pod in the scheduler queue.
+// NextEntityOrDie returns the next entity (either Pod or PodGroup) in the scheduler queue.
 // The operation needs to be completed within 5 seconds; otherwise the test gets aborted.
-func NextPodOrDie(t *testing.T, testCtx *TestContext) *schedulerframework.QueuedPodInfo {
+func NextEntityOrDie(t *testing.T, testCtx *TestContext) schedulerframework.QueuedEntityInfo {
 	t.Helper()
 
-	var podInfo *schedulerframework.QueuedPodInfo
+	var entity schedulerframework.QueuedEntityInfo
 	logger := klog.FromContext(testCtx.Ctx)
-	// NextPod() is a blocking operation. Wrap it in timeout() to avoid relying on
+	// NextEntity() is a blocking operation. Wrap it in timeout() to avoid relying on
 	// default go testing timeout (10m) to abort.
 	if err := timeout(testCtx.Ctx, time.Second*5, func() {
-		podInfo, _ = testCtx.Scheduler.NextPod(logger)
+		entity, _ = testCtx.Scheduler.NextEntity(logger)
 	}); err != nil {
-		t.Fatalf("Timed out waiting for the Pod to be popped: %v", err)
+		t.Fatalf("Timed out waiting for the entity to be popped: %v", err)
 	}
-	return podInfo
+	return entity
 }
 
 func WaitForNominatedNodeNameWithTimeout(ctx context.Context, cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {

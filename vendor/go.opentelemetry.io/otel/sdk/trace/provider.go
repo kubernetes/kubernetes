@@ -82,6 +82,10 @@ type TracerProvider struct {
 
 var _ trace.TracerProvider = &TracerProvider{}
 
+type experimentalOption interface {
+	Experimental()
+}
+
 // NewTracerProvider returns a new and configured TracerProvider.
 //
 // By default the returned TracerProvider is configured with:
@@ -99,6 +103,9 @@ func NewTracerProvider(opts ...TracerProviderOption) *TracerProvider {
 	o = applyTracerProviderEnvConfigs(o)
 
 	for _, opt := range opts {
+		if _, ok := opt.(experimentalOption); ok {
+			continue
+		}
 		o = opt.apply(o)
 	}
 
@@ -310,7 +317,7 @@ func (p *TracerProvider) Shutdown(ctx context.Context) error {
 }
 
 func (p *TracerProvider) getSpanProcessors() spanProcessorStates {
-	return *(p.spanProcessors.Load())
+	return *p.spanProcessors.Load()
 }
 
 // TracerProviderOption configures a TracerProvider.

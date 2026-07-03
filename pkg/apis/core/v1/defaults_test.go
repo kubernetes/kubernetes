@@ -1777,6 +1777,39 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	return obj3
 }
 
+func TestSetDefaultServiceAccountAlias(t *testing.T) {
+	tests := []struct {
+		name                     string
+		serviceAccountName       string
+		deprecatedServiceAccount string
+		expected                 string
+	}{
+		{name: "neither set", serviceAccountName: "", deprecatedServiceAccount: "", expected: ""},
+		{name: "both set to the same value", serviceAccountName: "a", deprecatedServiceAccount: "a", expected: "a"},
+		{name: "both set, serviceAccountName wins", serviceAccountName: "a", deprecatedServiceAccount: "b", expected: "a"},
+		{name: "only serviceAccountName set", serviceAccountName: "a", deprecatedServiceAccount: "", expected: "a"},
+		{name: "only deprecated alias set", serviceAccountName: "", deprecatedServiceAccount: "a", expected: "a"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					ServiceAccountName:       tc.serviceAccountName,
+					DeprecatedServiceAccount: tc.deprecatedServiceAccount,
+				},
+			}
+			obj2 := roundTrip(t, runtime.Object(pod))
+			pod2 := obj2.(*v1.Pod)
+			if pod2.Spec.ServiceAccountName != tc.expected {
+				t.Errorf("expected serviceAccountName %q, got %q", tc.expected, pod2.Spec.ServiceAccountName)
+			}
+			if pod2.Spec.DeprecatedServiceAccount != tc.expected {
+				t.Errorf("expected deprecatedServiceAccount %q, got %q", tc.expected, pod2.Spec.DeprecatedServiceAccount)
+			}
+		})
+	}
+}
+
 func TestSetDefaultReplicationController(t *testing.T) {
 	tests := []struct {
 		rc             *v1.ReplicationController
@@ -3367,4 +3400,55 @@ func setAllFeatures(t *testing.T, featuresEnabled bool) {
 		}
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, features)
+}
+
+func TestSetDefaultPodStatusPodIPs(t *testing.T) {
+	tests := []struct {
+		name      string
+		podIP     string
+		podIPs    []v1.PodIP
+		expectIP  string
+		expectIPs []v1.PodIP
+	}{
+		{name: "only podIP, podIPs synthesized", podIP: "10.0.0.1", expectIP: "10.0.0.1", expectIPs: []v1.PodIP{{IP: "10.0.0.1"}}},
+		{name: "mismatched, podIP authoritative", podIP: "10.0.0.2", podIPs: []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000::"}}, expectIP: "10.0.0.2", expectIPs: []v1.PodIP{{IP: "10.0.0.2"}}},
+		{name: "only podIPs, podIP filled", podIPs: []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000::"}}, expectIP: "10.0.0.1", expectIPs: []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000::"}}},
+		{name: "consistent dual-stack preserved", podIP: "10.0.0.1", podIPs: []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000::"}}, expectIP: "10.0.0.1", expectIPs: []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000::"}}},
+		{name: "neither set", expectIP: "", expectIPs: nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Status: v1.PodStatus{PodIP: tc.podIP, PodIPs: tc.podIPs}}
+			obj2 := roundTrip(t, runtime.Object(pod))
+			pod2 := obj2.(*v1.Pod)
+			if pod2.Status.PodIP != tc.expectIP {
+				t.Errorf("expected podIP %q, got %q", tc.expectIP, pod2.Status.PodIP)
+			}
+			if !reflect.DeepEqual(pod2.Status.PodIPs, tc.expectIPs) {
+				t.Errorf("expected podIPs %#v, got %#v", tc.expectIPs, pod2.Status.PodIPs)
+			}
+		})
+	}
+}
+
+func TestSetDefaultPodTerminationGracePeriodSeconds(t *testing.T) {
+	tests := []struct {
+		name     string
+		grace    *int64
+		expected *int64
+	}{
+		{name: "negative clamped to 1", grace: ptr.To[int64](-1), expected: ptr.To[int64](1)},
+		{name: "zero preserved", grace: ptr.To[int64](0), expected: ptr.To[int64](0)},
+		{name: "positive preserved", grace: ptr.To[int64](42), expected: ptr.To[int64](42)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Spec: v1.PodSpec{TerminationGracePeriodSeconds: tc.grace}}
+			obj2 := roundTrip(t, runtime.Object(pod))
+			pod2 := obj2.(*v1.Pod)
+			if !reflect.DeepEqual(pod2.Spec.TerminationGracePeriodSeconds, tc.expected) {
+				t.Errorf("expected %v, got %v", *tc.expected, *pod2.Spec.TerminationGracePeriodSeconds)
+			}
+		})
+	}
 }

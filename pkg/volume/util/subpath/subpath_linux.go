@@ -20,7 +20,6 @@ package subpath
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -94,24 +93,33 @@ func safeOpenSubPath(mounter mount.Interface, subpath Subpath) (int, error) {
 func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, string, error) {
 	// Early check for already bind-mounted subpath.
 	bindPathTarget := getSubpathBindTarget(subpath)
-	notMount, err := mount.IsNotMountPoint(mounter, bindPathTarget)
+	isMount, err := mounter.IsMountPoint(bindPathTarget)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
+		if os.IsNotExist(err) {
+			// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
+			isMount = false
+		} else if mount.IsCorruptedMnt(err) {
+			// The mount point is corrupted, attempt to recover by re-creating it.
+			klog.Warningf("Detected corrupted mount at %s (error: %v), unmounting", bindPathTarget, err)
+			if unmountErr := mounter.Unmount(bindPathTarget); unmountErr != nil {
+				return false, "", fmt.Errorf("error unmounting corrupted mount %s: %w", bindPathTarget, unmountErr)
+			}
+			isMount = false
+		} else {
+			return false, "", fmt.Errorf("error checking path %s for mount: %w", bindPathTarget, err)
 		}
-		// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
-		notMount = true
 	}
-	if !notMount {
+	if isMount {
 		// It's already mounted, so check if it's bind-mounted to the same path
 		samePath, err := checkSubPathFileEqual(subpath, bindPathTarget)
 		if err != nil {
 			return false, "", fmt.Errorf("error checking subpath mount info for %s: %s", bindPathTarget, err)
 		}
 		if !samePath {
-			// It's already mounted but not what we want, unmount it
-			if err = mounter.Unmount(bindPathTarget); err != nil {
-				return false, "", fmt.Errorf("error unmounting %s: %w", bindPathTarget, err)
+			// Use lazy unmount so a hung FUSE/GlusterFS flush cannot block pod recovery.
+			klog.V(4).Infof("Subpath bind mount at %s points to a different inode/device than source, will lazy-unmount and recreate", bindPathTarget)
+			if err = lazyUnmountFn(bindPathTarget); err != nil {
+				return false, "", fmt.Errorf("error lazy-unmounting stale subpath mount %s: %w", bindPathTarget, err)
 			}
 		} else {
 			// It's already mounted
@@ -142,11 +150,17 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		// A file is enough for all possible targets (symlink, device, pipe,
 		// socket, ...), bind-mounting them into a file correctly changes type
 		// of the target file.
-		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
+		if err = os.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
 			return false, "", fmt.Errorf("error creating file %s: %s", bindPathTarget, err)
 		}
 	}
 	return false, bindPathTarget, nil
+}
+
+// lazyUnmountFn is a package-level variable so tests can replace it without
+// forking the binary.
+var lazyUnmountFn = func(path string) error {
+	return syscall.Unmount(path, syscall.MNT_DETACH)
 }
 
 func checkSubPathFileEqual(subpath Subpath, bindMountTarget string) (bool, error) {
@@ -237,7 +251,7 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 	subPathDir := filepath.Join(podDir, containerSubPathDirectoryName, volumeName)
 	klog.V(4).Infof("Cleaning up subpath mounts for %s", subPathDir)
 
-	containerDirs, err := ioutil.ReadDir(subPathDir)
+	containerDirs, err := os.ReadDir(subPathDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -428,7 +442,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		klog.V(4).Infof("Creating %s", dir)
 		err = syscall.Mkdirat(parentFD, currentPath, uint32(perm))
 		if err != nil {
-			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
+			return fmt.Errorf("cannot create directory %s: %w", currentPath, err)
 		}
 		// Dive into the created directory
 		childFD, err = syscall.Openat(parentFD, dir, nofollowFlags|unix.O_CLOEXEC, 0)

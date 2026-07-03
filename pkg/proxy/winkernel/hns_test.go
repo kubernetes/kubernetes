@@ -20,6 +20,7 @@ package winkernel
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -723,4 +724,310 @@ func createTestNetwork() (*hcn.HostComputeNetwork, error) {
 	network.Ipams[0].Subnets[0].Policies = append(network.Ipams[0].Subnets[0].Policies, spJson)
 
 	return network.Create()
+}
+
+func TestIsHnsNotRunningError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "HNS not running error during enumerate endpoints",
+			err:      fmt.Errorf("hcnEnumerateEndpoints failed in Win32: The interface is unknown. (0x6b5)"),
+			expected: true,
+		},
+		{
+			name:     "HNS not running error during enumerate networks",
+			err:      fmt.Errorf("hcnEnumerateNetworks failed in Win32: The interface is unknown. (0x6b5)"),
+			expected: true,
+		},
+		{
+			name:     "unrelated error",
+			err:      fmt.Errorf("some other error"),
+			expected: false,
+		},
+		{
+			name:     "error containing 0xb7 but not 0x6b5",
+			err:      fmt.Errorf("file already exists: 0xb7"),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsHnsNotRunningError(tt.err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIsPolicyAlreadyExists(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "file already exists error",
+			err:      fmt.Errorf("HNS error: 0xb7 - The specified port already exists."),
+			expected: true,
+		},
+		{
+			name:     "unrelated error",
+			err:      fmt.Errorf("some other error"),
+			expected: false,
+		},
+		{
+			name:     "HNS not running error (not file exists)",
+			err:      fmt.Errorf("HNS call failed: 0x6b5"),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsPolicyAlreadyExists(tt.err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFindExistingLBIdByFrontend(t *testing.T) {
+	tests := []struct {
+		name        string
+		proposedLB  *hcn.HostComputeLoadBalancer
+		existingLBs map[loadBalancerIdentifier]*loadBalancerInfo
+		expectedID  string
+	}{
+		{
+			name: "single matching LB found",
+			proposedLB: &hcn.HostComputeLoadBalancer{
+				FrontendVIPs: []string{serviceVip},
+				PortMappings: []hcn.LoadBalancerPortMapping{
+					{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+				},
+				Flags: hcn.LoadBalancerFlagsNone,
+			},
+			existingLBs: map[loadBalancerIdentifier]*loadBalancerInfo{
+				{vip: serviceVip, protocol: protocol, internalPort: internalPort, externalPort: externalPort, isIPv6: false}: {hnsID: "lb-123"},
+			},
+			expectedID: "lb-123",
+		},
+		{
+			name: "no matching LB",
+			proposedLB: &hcn.HostComputeLoadBalancer{
+				FrontendVIPs: []string{serviceVip},
+				PortMappings: []hcn.LoadBalancerPortMapping{
+					{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+				},
+				Flags: hcn.LoadBalancerFlagsNone,
+			},
+			existingLBs: map[loadBalancerIdentifier]*loadBalancerInfo{
+				{vip: "10.0.0.99", protocol: protocol, internalPort: internalPort, externalPort: externalPort, isIPv6: false}: {hnsID: "lb-999"},
+			},
+			expectedID: "",
+		},
+		{
+			name: "multiple matching LBs returns empty (ambiguous)",
+			proposedLB: &hcn.HostComputeLoadBalancer{
+				FrontendVIPs: []string{serviceVip},
+				PortMappings: []hcn.LoadBalancerPortMapping{
+					{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+				},
+				Flags: hcn.LoadBalancerFlagsNone,
+			},
+			existingLBs: map[loadBalancerIdentifier]*loadBalancerInfo{
+				{vip: serviceVip, protocol: protocol, internalPort: internalPort, externalPort: externalPort, isIPv6: false}:                             {hnsID: "lb-1"},
+				{vip: serviceVip, protocol: protocol, internalPort: internalPort, externalPort: externalPort, isIPv6: false, endpointsHash: [20]byte{1}}: {hnsID: "lb-2"},
+			},
+			expectedID: "",
+		},
+		{
+			name: "empty existing LBs map",
+			proposedLB: &hcn.HostComputeLoadBalancer{
+				FrontendVIPs: []string{serviceVip},
+				PortMappings: []hcn.LoadBalancerPortMapping{
+					{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+				},
+				Flags: hcn.LoadBalancerFlagsNone,
+			},
+			existingLBs: map[loadBalancerIdentifier]*loadBalancerInfo{},
+			expectedID:  "",
+		},
+		{
+			name: "IPv6 LB matches only IPv6 entry",
+			proposedLB: &hcn.HostComputeLoadBalancer{
+				FrontendVIPs: []string{"fd00::1"},
+				PortMappings: []hcn.LoadBalancerPortMapping{
+					{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+				},
+				Flags: LoadBalancerFlagsIPv6,
+			},
+			existingLBs: map[loadBalancerIdentifier]*loadBalancerInfo{
+				{vip: "fd00::1", protocol: protocol, internalPort: internalPort, externalPort: externalPort, isIPv6: true}:  {hnsID: "lb-v6"},
+				{vip: "fd00::1", protocol: protocol, internalPort: internalPort, externalPort: externalPort, isIPv6: false}: {hnsID: "lb-v4"},
+			},
+			expectedID: "lb-v6",
+		},
+		{
+			name: "proposed LB with empty FrontendVIPs matches empty vip entry",
+			proposedLB: &hcn.HostComputeLoadBalancer{
+				FrontendVIPs: []string{},
+				PortMappings: []hcn.LoadBalancerPortMapping{
+					{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+				},
+				Flags: hcn.LoadBalancerFlagsNone,
+			},
+			existingLBs: map[loadBalancerIdentifier]*loadBalancerInfo{
+				{vip: "", protocol: protocol, internalPort: internalPort, externalPort: externalPort, isIPv6: false}: {hnsID: "lb-nodeport"},
+			},
+			expectedID: "lb-nodeport",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := findExistingLBIdByFrontend(tt.proposedLB, tt.existingLBs)
+			assert.Equal(t, tt.expectedID, result)
+		})
+	}
+}
+
+func TestCreateOrReplaceLoadbalancer_Success(t *testing.T) {
+	hcnMock := getHcnMock("L2Bridge")
+	hns := hns{hcn: hcnMock}
+
+	proposedLB := &hcn.HostComputeLoadBalancer{
+		FrontendVIPs: []string{serviceVip},
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+		},
+		Flags: hcn.LoadBalancerFlagsNone,
+	}
+	existingLBs := map[loadBalancerIdentifier]*loadBalancerInfo{}
+
+	lb, err := hns.createOrReplaceLoadbalancer(proposedLB, existingLBs)
+	assert.NoError(t, err)
+	assert.NotNil(t, lb)
+	assert.NotEmpty(t, lb.Id)
+}
+
+func TestCreateOrReplaceLoadbalancer_FileAlreadyExistsAndRetrySucceeds(t *testing.T) {
+	hcnMock := getHcnMock("L2Bridge")
+	hns := hns{hcn: hcnMock}
+
+	// Create an existing LB that will conflict
+	existingLB := &hcn.HostComputeLoadBalancer{
+		FrontendVIPs: []string{serviceVip},
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+		},
+		Flags: hcn.LoadBalancerFlagsNone,
+	}
+	createdLB, err := hcnMock.CreateLoadBalancer(existingLB)
+	assert.NoError(t, err)
+
+	// Build the existingLBs map that the retry logic uses to find the conflicting LB
+	existingLBs := map[loadBalancerIdentifier]*loadBalancerInfo{
+		{vip: serviceVip, protocol: protocol, internalPort: internalPort, externalPort: externalPort, isIPv6: false}: {hnsID: createdLB.Id},
+	}
+
+	// Now attempt to create a duplicate — should get 0xb7, find existing, delete it, and retry
+	proposedLB := &hcn.HostComputeLoadBalancer{
+		FrontendVIPs: []string{serviceVip},
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+		},
+		Flags: hcn.LoadBalancerFlagsNone,
+	}
+
+	lb, err := hns.createOrReplaceLoadbalancer(proposedLB, existingLBs)
+	assert.NoError(t, err)
+	assert.NotNil(t, lb)
+	assert.NotEqual(t, createdLB.Id, lb.Id, "should have created a new LB after deleting the old one")
+}
+
+func TestCreateOrReplaceLoadbalancer_FileAlreadyExistsNoMatchingLB(t *testing.T) {
+	hcnMock := getHcnMock("L2Bridge")
+	hns := hns{hcn: hcnMock}
+
+	// Create an existing LB that will conflict at HCN level
+	existingLB := &hcn.HostComputeLoadBalancer{
+		FrontendVIPs: []string{serviceVip},
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+		},
+		Flags: hcn.LoadBalancerFlagsNone,
+	}
+	_, err := hcnMock.CreateLoadBalancer(existingLB)
+	assert.NoError(t, err)
+
+	// existingLBs doesn't contain the conflicting LB — can't find it by frontend
+	existingLBs := map[loadBalancerIdentifier]*loadBalancerInfo{}
+
+	proposedLB := &hcn.HostComputeLoadBalancer{
+		FrontendVIPs: []string{serviceVip},
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+		},
+		Flags: hcn.LoadBalancerFlagsNone,
+	}
+
+	lb, err := hns.createOrReplaceLoadbalancer(proposedLB, existingLBs)
+	assert.Error(t, err, "should return the original 0xb7 error since no matching LB was found to delete")
+	assert.Nil(t, lb)
+}
+
+func TestDeleteLoadBalancer_NotFound(t *testing.T) {
+	hcnMock := getHcnMock("L2Bridge")
+	hns := hns{hcn: hcnMock}
+
+	// Deleting a non-existent LB should return nil (silently)
+	err := hns.deleteLoadBalancer("non-existent-lb-id")
+	assert.NoError(t, err, "deleteLoadBalancer should return nil for not-found errors")
+}
+
+func TestDeleteLoadBalancer_HnsNotRunning(t *testing.T) {
+	hcnMock := getHcnMock("L2Bridge")
+	hcnMock.ShouldReturnHnsNotRunning = true
+	hns := hns{hcn: hcnMock}
+
+	err := hns.deleteLoadBalancer("any-lb-id")
+	assert.Error(t, err, "deleteLoadBalancer should return error when HNS is not running")
+	assert.True(t, IsHnsNotRunningError(err))
+}
+
+func TestDeleteLoadBalancer_Success(t *testing.T) {
+	hcnMock := getHcnMock("L2Bridge")
+	hns := hns{hcn: hcnMock}
+
+	// Create a LB first
+	lb := &hcn.HostComputeLoadBalancer{
+		FrontendVIPs: []string{serviceVip},
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{Protocol: protocol, InternalPort: internalPort, ExternalPort: externalPort},
+		},
+		Flags: hcn.LoadBalancerFlagsNone,
+	}
+	createdLB, err := hcnMock.CreateLoadBalancer(lb)
+	assert.NoError(t, err)
+
+	// Delete it
+	err = hns.deleteLoadBalancer(createdLB.Id)
+	assert.NoError(t, err)
+
+	// Verify it's gone
+	_, err = hcnMock.GetLoadBalancerByID(createdLB.Id)
+	assert.Error(t, err, "LB should have been deleted")
 }

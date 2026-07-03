@@ -20,6 +20,7 @@ package winkernel
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -35,10 +36,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	basemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	fakehcn "k8s.io/kubernetes/pkg/proxy/winkernel/testing"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -2673,4 +2677,217 @@ func TestEndpointTransitionWithLBFailures(t *testing.T) {
 	epANew := findRemoteEp(svcPortName1, localIP)
 	assert.NotNil(t, epANew, "Local endpoint A should still exist")
 	assert.True(t, epANew.IsLocal(), "A should be local")
+}
+
+func TestClassifyLBError(t *testing.T) {
+	// Note: classifyLBError uses hcn.Is*Error functions which check for *hcn.HcnError
+	// with specific error codes. Since HcnError can only be created internally by the
+	// hcn package, we can only test nil and generic error cases here. The actual HCN
+	// error classification is tested through the hcn package's own tests.
+	tests := []struct {
+		name     string
+		err      error
+		expected lbErrorType
+	}{
+		{
+			name:     "nil error returns none",
+			err:      nil,
+			expected: lbErrNone,
+		},
+		{
+			name:     "generic error returns other",
+			err:      errors.New("something went wrong"),
+			expected: lbErrOther,
+		},
+		{
+			// hcn.NetworkNotFoundError is a shim error type, not an HCN system error.
+			// hcn.IsNetworkNotFoundError checks for HcnError with HCN_E_NETWORK_NOT_FOUND code,
+			// so this returns lbErrOther.
+			name:     "hcn NetworkNotFoundError shim type returns other",
+			err:      hcn.NetworkNotFoundError{NetworkName: "testnet"},
+			expected: lbErrOther,
+		},
+		{
+			name:     "hcn LoadBalancerNotFoundError shim type returns other",
+			err:      hcn.LoadBalancerNotFoundError{LoadBalancerId: "lb-123"},
+			expected: lbErrOther,
+		},
+		{
+			name:     "hcn EndpointNotFoundError shim type returns other",
+			err:      hcn.EndpointNotFoundError{EndpointID: "ep-123"},
+			expected: lbErrOther,
+		},
+		{
+			name:     "wrapped generic error returns other",
+			err:      fmt.Errorf("wrapped: %w", errors.New("inner error")),
+			expected: lbErrOther,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := classifyLBError(tc.err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestLoadBalancerTypeConstants(t *testing.T) {
+	// Verify all loadBalancerType constants have non-empty string values.
+	lbTypes := []loadBalancerType{
+		lbTypeClusterIP,
+		lbTypeNodePort,
+		lbTypeExternalIP,
+		lbTypeIngressIP,
+		lbTypeHealthCheck,
+	}
+	seen := make(map[loadBalancerType]bool)
+	for _, lbt := range lbTypes {
+		assert.NotEmpty(t, string(lbt), "loadBalancerType constant should not be empty")
+		assert.False(t, seen[lbt], "duplicate loadBalancerType constant: %s", lbt)
+		seen[lbt] = true
+	}
+}
+
+func TestLBErrorTypeConstants(t *testing.T) {
+	// Verify all lbErrorType constants have non-empty, unique string values.
+	errTypes := []lbErrorType{
+		lbErrNetworkNotFound,
+		lbErrPortAlreadyExists,
+		lbErrNotImplemented,
+		lbErrInvalidIP,
+		lbErrOther,
+		lbErrNone,
+	}
+	seen := make(map[lbErrorType]bool)
+	for _, et := range errTypes {
+		assert.NotEmpty(t, string(et), "lbErrorType constant should not be empty")
+		assert.False(t, seen[et], "duplicate lbErrorType constant: %s", et)
+		seen[et] = true
+	}
+}
+
+func TestLBMetricEmission(t *testing.T) {
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeKernelspace)
+
+	tests := []struct {
+		name      string
+		metricVec *basemetrics.CounterVec
+		ipFamily  string
+		lbType    loadBalancerType
+		errType   lbErrorType
+	}{
+		{
+			name:      "create failure with clusterip and network_not_found",
+			metricVec: metrics.WinKernelLBCreateFailure,
+			ipFamily:  "IPv4",
+			lbType:    lbTypeClusterIP,
+			errType:   lbErrNetworkNotFound,
+		},
+		{
+			name:      "update failure with nodeport and port_already_exists",
+			metricVec: metrics.WinKernelLBUpdateFailure,
+			ipFamily:  "IPv4",
+			lbType:    lbTypeNodePort,
+			errType:   lbErrPortAlreadyExists,
+		},
+		{
+			name:      "delete failure with ingressip and other",
+			metricVec: metrics.WinKernelLBDeleteFailure,
+			ipFamily:  "IPv6",
+			lbType:    lbTypeIngressIP,
+			errType:   lbErrOther,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.metricVec.Reset()
+
+			tc.metricVec.WithLabelValues(tc.ipFamily, string(tc.lbType), string(tc.errType)).Inc()
+
+			val, err := testutil.GetCounterMetricValue(tc.metricVec.WithLabelValues(tc.ipFamily, string(tc.lbType), string(tc.errType)))
+			assert.NoError(t, err)
+			assert.Equal(t, float64(1), val)
+
+			// Verify a different label combination was not incremented.
+			val, err = testutil.GetCounterMetricValue(tc.metricVec.WithLabelValues(tc.ipFamily, string(lbTypeHealthCheck), string(lbErrInvalidIP)))
+			assert.NoError(t, err)
+			assert.Equal(t, float64(0), val)
+		})
+	}
+}
+
+// TestCreateServiceWhereFrontEndSameAsExistingLB validates service creation scenarios
+// where the frontend IP and port match those of an existing load balancer.
+// When a match is detected, the existing load balancer is expected to be deleted
+// and recreated with new configuration to ensure it is correctly associated with the new service.
+func TestCreateServiceWhereFrontEndSameAsExistingLB(t *testing.T) {
+	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_L2BRIDGE, true)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	svcIP := "10.20.30.41"
+	lbIP := "14.0.0.14"
+	svcPort := 80
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeLoadBalancer
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.LoadBalancerIP = lbIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{
+					Addresses: []string{epIpAddressLocal1}, // Local Endpoint 1
+				},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	hcn := (proxier.hcn).(*fakehcn.HcnMock)
+	// Populating the endpoint to the cache, since it's a local endpoint and local endpoints are managed by CNI and not KubeProxy
+	// Populating here marks the endpoint to local
+	hcn.PopulateQueriedEndpoints(endpointLocal1, networkId, epIpAddressLocal1, macAddressLocal1, prefixLen)
+	hcn.PopulateQueriedLoadbalancers(loadbalancerGuid2, svcIP, 6, uint16(svcPort), uint16(svcPort), false, endpointLocal2)
+
+	proxier.setInitialized(true)
+
+	// Test 1: When a local endpoint is added to the service, the service should continue to use the local endpoints and existing loadbalancer.
+	// If no existing loadbalancer is present, a new loadbalancer should be created.
+	proxier.syncProxyRules()
+
+	ep := proxier.endpointsMap[svcPortName][0]
+	epInfo, ok := ep.(*endpointInfo)
+	assert.True(t, ok, fmt.Sprintf("Failed to cast endpointInfo %q", svcPortName.String()))
+	assert.NotEmpty(t, epInfo.hnsID, fmt.Sprintf("Expected HNS ID to be set for endpoint %s, but got empty value", epIpAddressRemote))
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo %q", svcPortName.String())
+	assert.Equal(t, svcInfo.hnsID, loadbalancerGuid1, fmt.Sprintf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1))
+	lb, err := proxier.hcn.GetLoadBalancerByID(loadbalancerGuid1)
+	assert.Equal(t, nil, err, fmt.Sprintf("Failed to fetch loadbalancer: %s. Error: %v", loadbalancerGuid1, err))
+	assert.NotNil(t, lb, "Loadbalancer object should not be nil")
 }

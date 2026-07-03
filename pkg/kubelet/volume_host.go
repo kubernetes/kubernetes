@@ -52,6 +52,7 @@ import (
 // kubelet - used by VolumeHost methods to expose kubelet specific parameters
 // plugins - used to initialize volumePluginMgr
 func NewInitializedVolumePluginMgr(
+	logger klog.Logger,
 	kubelet *Kubelet,
 	secretManager secret.Manager,
 	configMapManager configmap.Manager,
@@ -59,10 +60,6 @@ func NewInitializedVolumePluginMgr(
 	clusterTrustBundleManager clustertrustbundle.Manager,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
-
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
 
 	// Initialize csiDriverLister before calling InitPlugins
 	var informerFactory informers.SharedInformerFactory

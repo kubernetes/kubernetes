@@ -31,9 +31,9 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs/testing"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig/testing"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
 )
 
 func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, error) {
@@ -81,7 +81,7 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 	tmpdir := t.TempDir()
 
 	// Adds a pki folder with a ca cert to the temp folder
-	pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
+	pkidir := certstestutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
 
 	// Retrieves ca cert for assertions
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)
@@ -162,7 +162,7 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 			}
 
 			// checks that CLI flags are properly propagated
-			kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
+			kubeconfigutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
 
 			if test.withClientCert {
 				if test.expectedValidityPeriod == 0 {
@@ -171,17 +171,17 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 				// checks that kubeconfig files have expected client cert
 				startTime := kubeadmutil.StartTimeUTC()
 				notAfter := startTime.Add(test.expectedValidityPeriod)
-				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, notAfter, "myUser")
+				kubeconfigutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, notAfter, "myUser")
 			}
 
 			if test.withToken {
 				// checks that kubeconfig files have expected token
-				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithToken(t, config, "myUser", "123456")
+				kubeconfigutil.AssertKubeConfigCurrentAuthInfoWithToken(t, config, "myUser", "123456")
 			}
 
 			if len(test.clusterName) > 0 {
 				// checks that kubeconfig files have expected cluster name
-				kubeconfigtestutil.AssertKubeConfigCurrentContextWithClusterName(t, config, test.clusterName)
+				kubeconfigutil.AssertKubeConfigCurrentContextWithClusterName(t, config, test.clusterName)
 			}
 		})
 	}

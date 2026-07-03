@@ -36,7 +36,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *scheduling.PodGroup, c randfill.Continue) {
 			c.FillNoCustom(s)
 			if s.Spec.DisruptionMode == nil {
-				s.Spec.DisruptionMode = new(scheduling.DisruptionModePod)
+				s.Spec.DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
+			}
+			if s.Spec.PreemptionPolicy == nil {
+				preemptLowerPriority := scheduling.PreemptLowerPriority
+				s.Spec.PreemptionPolicy = &preemptLowerPriority
 			}
 		},
 	}

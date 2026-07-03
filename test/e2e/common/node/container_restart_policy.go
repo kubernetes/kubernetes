@@ -34,7 +34,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFeatureGate(features.ContainerRestartRules), func() {
+var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithNodeConformance(), framework.WithFeatureGate(features.ContainerRestartRules), func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -173,7 +173,7 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 	})
 })
 
-var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeatureGate(features.ContainerRestartRules), framework.WithFeatureGate(features.RestartAllContainersOnContainerExits), func() {
+var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithNodeConformance(), framework.WithFeatureGate(features.ContainerRestartRules), framework.WithFeatureGate(features.RestartAllContainersOnContainerExits), func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

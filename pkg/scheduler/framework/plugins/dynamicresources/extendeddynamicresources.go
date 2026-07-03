@@ -579,7 +579,7 @@ func (pl *DynamicResources) patchPodExtendedResourceClaimStatus(
 		RequestMappings:   cer,
 		ResourceClaimName: claim.Name,
 	}
-	err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+	err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, "", &pod.Status, podStatusCopy)
 	if err != nil {
 		return fmt.Errorf("update pod %s/%s ExtendedResourceClaimStatus: %w", pod.Namespace, pod.Name, err)
 	}

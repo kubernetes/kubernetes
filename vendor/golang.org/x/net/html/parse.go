@@ -5,9 +5,11 @@
 package html
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	a "golang.org/x/net/html/atom"
@@ -328,6 +330,14 @@ func (p *parser) addText(text string) {
 	})
 }
 
+func attrCompare(a, b Attribute) int {
+	return cmp.Or(
+		cmp.Compare(a.Namespace, b.Namespace),
+		cmp.Compare(a.Key, b.Key),
+		cmp.Compare(a.Val, b.Val),
+	)
+}
+
 // addElement adds a child element based on the current token.
 func (p *parser) addElement() {
 	p.addChild(&Node{
@@ -342,6 +352,10 @@ func (p *parser) addElement() {
 func (p *parser) addFormattingElement() {
 	tagAtom, attr := p.tok.DataAtom, p.tok.Attr
 	p.addElement()
+
+	// In order to optimize the search, we need the attributes to be sorted, so we
+	// can just use slices.Equal.
+	slices.SortFunc(attr, attrCompare)
 
 	// Implement the Noah's Ark clause, but with three per family instead of two.
 	identicalElements := 0
@@ -360,19 +374,7 @@ findIdenticalElements:
 		if n.DataAtom != tagAtom {
 			continue
 		}
-		if len(n.Attr) != len(attr) {
-			continue
-		}
-	compareAttributes:
-		for _, t0 := range n.Attr {
-			for _, t1 := range attr {
-				if t0.Key == t1.Key && t0.Namespace == t1.Namespace && t0.Val == t1.Val {
-					// Found a match for this attribute, continue with the next attribute.
-					continue compareAttributes
-				}
-			}
-			// If we get here, there is no attribute that matches a.
-			// Therefore the element is not identical to the new one.
+		if !slices.Equal(n.Attr, attr) {
 			continue findIdenticalElements
 		}
 
@@ -382,7 +384,11 @@ findIdenticalElements:
 		}
 	}
 
-	p.afe = append(p.afe, p.top())
+	// Sort the attributes to optimize future identical-element searches.
+	top := p.top()
+	slices.SortFunc(top.Attr, attrCompare)
+
+	p.afe = append(p.afe, top)
 }
 
 // Section 12.2.4.3.
@@ -1372,8 +1378,6 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom, tagName string) {
 }
 
 // inBodyEndTagOther performs the "any other end tag" algorithm for inBodyIM.
-// "Any other end tag" handling from 12.2.6.5 The rules for parsing tokens in foreign content
-// https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inforeign
 func (p *parser) inBodyEndTagOther(tagAtom a.Atom, tagName string) {
 	for i := len(p.oe) - 1; i >= 0; i-- {
 		// Two element nodes have the same tag if they have the same Data (a
@@ -1383,7 +1387,7 @@ func (p *parser) inBodyEndTagOther(tagAtom a.Atom, tagName string) {
 		// Uncommon (custom) tags get a zero DataAtom.
 		//
 		// The if condition here is equivalent to (p.oe[i].Data == tagName).
-		if (p.oe[i].DataAtom == tagAtom) &&
+		if p.oe[i].Namespace == "" && (p.oe[i].DataAtom == tagAtom) &&
 			((tagAtom != 0) || (p.oe[i].Data == tagName)) {
 			p.oe = p.oe[:i]
 			break

@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/testdeviceplugin"
 )
 
-var _ = SIGDescribe("Device Plugin Failures Pod Status", framework.WithFeatureGate(features.ResourceHealthStatus), func() {
+var _ = SIGDescribe("Device Plugin Failures Pod Status", framework.WithNodeConformance(), framework.WithFeatureGate(features.ResourceHealthStatus), func() {
 	f := framework.NewDefaultFramework("device-plugin-failures")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

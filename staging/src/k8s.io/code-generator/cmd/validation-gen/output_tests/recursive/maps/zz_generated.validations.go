@@ -98,6 +98,36 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type T5
+	scheme.AddValidationFunc(
+		(*T5)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_T5(
+					ctx, op, nil, /* fldPath */
+					obj.(*T5),
+					safe.Cast[*T5](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
+	// type T6
+	scheme.AddValidationFunc(
+		(*T6)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_T6(
+					ctx, op, nil, /* fldPath */
+					obj.(*T6),
+					safe.Cast[*T6](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
@@ -149,6 +179,54 @@ func Validate_T1(
 				return &oldObj.T3
 			})
 		errs = append(errs, fn(fldPath.Child("t3"), &obj.T3, oldVal, oldObj != nil)...)
+	}
+
+	{ // field T1.T5
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]T5,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// iterate the map and call the value type's validation function
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T5); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T1) map[string]T5 {
+				return oldObj.T5
+			})
+		errs = append(errs, fn(fldPath.Child("t5"), obj.T5, oldVal, oldObj != nil)...)
+	}
+
+	{ // field T1.T6
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]T6,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// iterate the map and call the value type's validation function
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T6); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T1) map[string]T6 {
+				return oldObj.T6
+			})
+		errs = append(errs, fn(fldPath.Child("t6"), obj.T6, oldVal, oldObj != nil)...)
 	}
 
 	return errs
@@ -250,6 +328,100 @@ func Validate_T4(
 				return oldObj.MT3
 			})
 		errs = append(errs, fn(fldPath.Child("mt3"), obj.MT3, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_T5 validates an instance of T5 according
+// to declarative validation rules in the API schema.
+func Validate_T5(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *T5) (errs field.ErrorList) {
+
+	{ // field T5.T5
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]T5,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T5.T5"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the map and call the value type's validation function
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T5); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T5) map[string]T5 {
+				return oldObj.T5
+			})
+		errs = append(errs, fn(fldPath.Child("t5"), obj.T5, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_T6 validates an instance of T6 according
+// to declarative validation rules in the API schema.
+func Validate_T6(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *T6) (errs field.ErrorList) {
+
+	{ // field T6.S
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T6.S"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T6) *string {
+				return &oldObj.S
+			})
+		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
+	}
+
+	{ // field T6.T6
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]T6,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// iterate the map and call the value type's validation function
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T6); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T6) map[string]T6 {
+				return oldObj.T6
+			})
+		errs = append(errs, fn(fldPath.Child("t6"), obj.T6, oldVal, oldObj != nil)...)
 	}
 
 	return errs

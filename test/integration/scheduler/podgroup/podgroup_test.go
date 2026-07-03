@@ -24,7 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -49,18 +49,26 @@ func TestPodGroupScheduling(t *testing.T) {
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t2").BasicPolicy().Obj()).
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t-mid").MinCount(2).Obj()).
+		PodGroupTemplate(st.MakePodGroupTemplate().Name("t-mutable").MinCount(5).Obj()).
 		Obj()
 	otherWorkload := st.MakeWorkload().Name("other-workload").
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(3).Obj()).
 		Obj()
 
-	gangPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t1", "workload").
+	gangPodGroup := st.MakePodGroup().Name("pg1").WorkloadRef("t1", "workload").
 		Priority(100).MinCount(3).Obj()
 
-	otherGangPodGroup := st.MakePodGroup().Name("pg2").TemplateRef("t", "other-workload").
+	otherGangPodGroup := st.MakePodGroup().Name("pg2").WorkloadRef("t", "other-workload").
 		Priority(100).MinCount(3).Obj()
 
-	basicPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t2", "workload").Priority(100).BasicPolicy().Obj()
+	basicPodGroup := st.MakePodGroup().Name("pg1").WorkloadRef("t2", "workload").Priority(100).BasicPolicy().Obj()
+	podGroupWithMinCount5 := st.MakePodGroup().Name("pg-mutable").WorkloadRef("t-mutable", "workload").Priority(100).MinCount(5).Obj()
+
+	mutP1 := st.MakePod().Name("mut-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
+	mutP2 := st.MakePod().Name("mut-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
+	mutP3 := st.MakePod().Name("mut-p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
+	mutP4 := st.MakePod().Name("mut-p4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
+	mutP5 := st.MakePod().Name("mut-p5").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
 
 	p1 := st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
 		PodGroupName("pg1").Priority(100).Obj()
@@ -96,9 +104,9 @@ func TestPodGroupScheduling(t *testing.T) {
 	midP2 := st.MakePod().Name("mid-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
 		PodGroupName("mid-pg").Priority(50).Obj()
 
-	midPodGroup := st.MakePodGroup().Name("mid-pg").TemplateRef("t-mid", "workload").
+	midPodGroup := st.MakePodGroup().Name("mid-pg").WorkloadRef("t-mid", "workload").
 		Priority(50).MinCount(2).Obj()
-	midPodGroupWithConstraint := st.MakePodGroup().Name("mid-pg").TemplateRef("t-mid", "workload").
+	midPodGroupWithConstraint := st.MakePodGroup().Name("mid-pg").WorkloadRef("t-mid", "workload").
 		Priority(50).MinCount(2).TopologyKey("topology.kubernetes.io/zone").Obj()
 
 	otherP1 := st.MakePod().Name("other-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
@@ -110,7 +118,6 @@ func TestPodGroupScheduling(t *testing.T) {
 
 	tests := []struct {
 		name                                  string
-		enableWorkloadAwarePreemption         bool
 		enableTopologyAwareWorkloadScheduling []bool
 		steps                                 []stepsframework.Step
 	}{
@@ -151,8 +158,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2},
 				},
 				{
-					Name:                         "Verify pods are gated at PreEnqueue (no quorum)",
-					WaitForPodsGatedOnPreEnqueue: []string{"p1", "p2"},
+					Name:                               "Verify pods are gated at PreEnqueue (no quorum)",
+					WaitForPodsInUnschedulableEntities: []string{"p1", "p2"},
 				},
 				{
 					Name:       "Create the last pod belonging to the gang to unblock PreEnqueue",
@@ -180,15 +187,15 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2, p3},
 				},
 				{
-					Name:                         "Verify pods are gated at PreEnqueue (no PodGroup object)",
-					WaitForPodsGatedOnPreEnqueue: []string{"p1", "p2", "p3"},
+					Name:                                "Verify pods are waiting in incompletePodGroupPods (no PodGroup object)",
+					WaitForPodsInIncompletePodGroupPods: []string{"p1", "p2", "p3"},
 				},
 				{
-					Name:           "Create the PodGroup to unblock PreEnqueue",
+					Name:           "Create the PodGroup to unblock the pods",
 					CreatePodGroup: gangPodGroup,
 				},
 				{
-					Name:                     "Verify pods become unschedulable (Permit timeout due to resource blocker)",
+					Name:                     "Verify pods become unschedulable due to resource blocker pod",
 					WaitForPodsUnschedulable: []string{"p1", "p2", "p3"},
 				},
 				{
@@ -233,7 +240,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2, p3, p4},
 				},
 				{
-					Name:           "Create the PodGroup to unblock PreEnqueue",
+					Name:           "Create the PodGroup to unblock pods",
 					CreatePodGroup: gangPodGroup,
 				},
 				{
@@ -305,43 +312,6 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name: "gang schedules with preemption",
-			steps: []stepsframework.Step{
-				{
-					Name:       "Create a low priority pod taking all resources",
-					CreatePods: []*v1.Pod{lowPriorityBlockerPod},
-				},
-				{
-					Name:                 "Schedule the low priority resource-blocking pod",
-					WaitForPodsScheduled: []string{"low-priority-blocker"},
-				},
-				{
-					Name:           "Create the PodGroup object",
-					CreatePodGroup: gangPodGroup,
-				},
-				{
-					Name:       "Create high priority gang pods",
-					CreatePods: []*v1.Pod{p1, p2, p3, p4},
-				},
-				{
-					Name:                 "Verify all gang pods are scheduled successfully (after preemption)",
-					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
-				},
-				{
-					Name: "Verify PodGroup condition is set to Scheduled after preemption completes",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg1",
-						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
-					},
-				},
-				{
-					Name:               "Verify preemption victims were removed",
-					WaitForPodsRemoved: []string{"low-priority-blocker"},
-				},
-			},
-		},
-		{
 			name: "basic group schedules when pod group and resources are available, without gang enforcement",
 			steps: []stepsframework.Step{
 				{
@@ -382,11 +352,11 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2, p3},
 				},
 				{
-					Name:                         "Verify pods are gated at PreEnqueue (no PodGroup object)",
-					WaitForPodsGatedOnPreEnqueue: []string{"p1", "p2", "p3"},
+					Name:                                "Verify pods are waiting in incompletePodGroupPods (no PodGroup object)",
+					WaitForPodsInIncompletePodGroupPods: []string{"p1", "p2", "p3"},
 				},
 				{
-					Name:           "Create the PodGroup to unblock PreEnqueue",
+					Name:           "Create the PodGroup to unblock pods",
 					CreatePodGroup: basicPodGroup,
 				},
 				{
@@ -408,38 +378,8 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name: "basic group schedules with preemption",
-			steps: []stepsframework.Step{
-				{
-					Name:       "Create a low priority pod taking all resources",
-					CreatePods: []*v1.Pod{lowPriorityBlockerPod},
-				},
-				{
-					Name:                 "Schedule the low priority resource-blocking pod",
-					WaitForPodsScheduled: []string{"low-priority-blocker"},
-				},
-				{
-					Name:           "Create the PodGroup object",
-					CreatePodGroup: basicPodGroup,
-				},
-				{
-					Name:       "Create high priority group's pods",
-					CreatePods: []*v1.Pod{p1, p2, p3, p4},
-				},
-				{
-					Name:                 "Verify all group's pods are scheduled successfully (after preemption)",
-					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
-				},
-				{
-					Name:               "Verify preemption victims were removed",
-					WaitForPodsRemoved: []string{"low-priority-blocker"},
-				},
-			},
-		},
-		{
 			name:                                  "basic group schedules with workload-aware preemption",
 			enableTopologyAwareWorkloadScheduling: []bool{false},
-			enableWorkloadAwarePreemption:         true,
 			steps: []stepsframework.Step{
 				{
 					Name:       "Create a low priority pod taking all resources",
@@ -468,8 +408,7 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name:                          "gang schedules with workload-aware preemption",
-			enableWorkloadAwarePreemption: true,
+			name: "gang schedules with workload-aware preemption",
 			steps: []stepsframework.Step{
 				{
 					Name:       "Create low priority pods that take up all node resources",
@@ -480,7 +419,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					WaitForPodsScheduled: []string{"low-p1", "low-p2", "low-p3", "low-p4"},
 				},
 				{
-					Name:           "Create the Workload object",
+					Name:           "Create the PodGroup object",
 					CreatePodGroup: gangPodGroup,
 				},
 				{
@@ -492,14 +431,21 @@ func TestPodGroupScheduling(t *testing.T) {
 					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
 				},
 				{
+					Name: "Verify PodGroup condition is set to Scheduled after preemption completes",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          "Scheduled",
+					},
+				},
+				{
 					Name:               "Verify preemption victims were removed",
 					WaitForPodsRemoved: []string{"low-p1", "low-p2", "low-p3", "low-p4"},
 				},
 			},
 		},
 		{
-			name:                          "gang schedules with partial workload-aware preemption",
-			enableWorkloadAwarePreemption: true,
+			name: "gang schedules with partial workload-aware preemption",
 			steps: []stepsframework.Step{
 				{
 					Name:       "Create very low and low priority pods that take up all node resources",
@@ -555,7 +501,6 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name:                                  "tas gang with constraint does not use workload preemption",
-			enableWorkloadAwarePreemption:         true,
 			enableTopologyAwareWorkloadScheduling: []bool{true},
 			steps: []stepsframework.Step{
 				{
@@ -580,6 +525,97 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "gang pods are unschedulable due to lack of quorum, then scheduled when minCount is decreased",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object with minCount=5",
+					CreatePodGroup: podGroupWithMinCount5,
+				},
+				{
+					Name:              "Create 4 pods belonging to the gang (quorum is 5)",
+					CreatePodsInOrder: []*v1.Pod{mutP1, mutP2, mutP3, mutP4},
+				},
+				{
+					Name:                               "Verify gang pods are gated at PreEnqueue",
+					WaitForPodsInUnschedulableEntities: []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+				},
+				{
+					Name:           "Update the PodGroup with decreased minCount=4",
+					UpdatePodGroup: (&st.PodGroupWrapper{PodGroup: *podGroupWithMinCount5.DeepCopy()}).MinCount(4).Obj(),
+				},
+				{
+					Name:                 "Verify all gang pods are immediately re-queued and scheduled successfully",
+					WaitForPodsScheduled: []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+				},
+			},
+		},
+		{
+			name: "gang pods are unschedulable due to lack of space, then scheduled when minCount is decreased",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object with minCount=5",
+					CreatePodGroup: podGroupWithMinCount5,
+				},
+				{
+					Name:              "Create 5 pods belonging to the gang",
+					CreatePodsInOrder: []*v1.Pod{mutP1, mutP2, mutP3, mutP4, mutP5},
+				},
+				{
+					Name:                     "Verify gang pods are unschedulable",
+					WaitForPodsUnschedulable: []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4", "mut-p5"},
+				},
+				{
+					Name:           "Update the PodGroup with decreased minCount=4",
+					UpdatePodGroup: (&st.PodGroupWrapper{PodGroup: *podGroupWithMinCount5.DeepCopy()}).MinCount(4).Obj(),
+				},
+				{
+					Name:                 "Verify 4 gang pods are immediately re-queued and scheduled successfully",
+					WaitForPodsScheduled: []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+				},
+				{
+					Name:                     "Verify the last gang pod is unschedulable",
+					WaitForPodsUnschedulable: []string{"mut-p5"},
+				},
+			},
+		},
+		{
+			name: "gang pods are unschedulable due to lack of quorum, and remain unschedulable without triggering reschedule when minCount is increased",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object with minCount=5",
+					CreatePodGroup: podGroupWithMinCount5,
+				},
+				{
+					Name:              "Create 4 pods belonging to the gang (quorum is 5)",
+					CreatePodsInOrder: []*v1.Pod{mutP1, mutP2, mutP3, mutP4},
+				},
+				{
+					Name:                               "Verify gang pods are gated at PreEnqueue",
+					WaitForPodsInUnschedulableEntities: []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+				},
+				{
+					Name: "Verify scheduling attempts of all gang pods is 0",
+					VerifyPodSchedulingAttempts: &stepsframework.VerifyPodsSchedulingAttempts{
+						PodNames:     []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+						PodGroupName: "pg-mutable",
+						Attempts:     0,
+					},
+				},
+				{
+					Name:           "Update the PodGroup with increased minCount=6",
+					UpdatePodGroup: (&st.PodGroupWrapper{PodGroup: *podGroupWithMinCount5.DeepCopy()}).MinCount(6).Obj(),
+				},
+				{
+					Name: "Verify scheduling attempts of all gang pods is still 0 (did not trigger reschedule/requeue)",
+					VerifyPodSchedulingAttempts: &stepsframework.VerifyPodsSchedulingAttempts{
+						PodNames:     []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+						PodGroupName: "pg-mutable",
+						Attempts:     0,
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -591,9 +627,7 @@ func TestPodGroupScheduling(t *testing.T) {
 			t.Run(fmt.Sprintf("%s (TopologyAwareWorkloadScheduling enabled: %v)", tt.name, tasEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 					features.GenericWorkload:                 true,
-					features.GangScheduling:                  true,
 					features.TopologyAwareWorkloadScheduling: tasEnabled,
-					features.WorkloadAwarePreemption:         tt.enableWorkloadAwarePreemption,
 				})
 
 				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-scheduling",
@@ -624,16 +658,14 @@ func TestPodGroupScheduling(t *testing.T) {
 
 func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:         true,
-		features.GangScheduling:          true,
-		features.WorkloadAwarePreemption: true,
+		features.GenericWorkload: true,
 	})
 
 	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
 
 	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
-	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
-		DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(100).MinCount(3).Obj()
+	pg := st.MakePodGroup().Namespace("default").Name("pg1").WorkloadRef("t1", "workload").
+		DisruptionModeAll().Priority(100).MinCount(3).Obj()
 
 	// Low priority pods taking up all resources
 	lowPods := []*v1.Pod{
@@ -677,13 +709,13 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 	}
 
 	// 2. Create workload
-	if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1alpha3().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create workload: %v", err)
 	}
 
 	// 3. Create PodGroup
 	pg.Namespace = ns
-	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create PodGroup: %v", err)
 	}
 
@@ -735,16 +767,14 @@ func (m *mockPostFilterPlugin) PostFilter(ctx context.Context, state framework.C
 
 func TestPostFilterInvocationCount(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:         true,
-		features.GangScheduling:          true,
-		features.WorkloadAwarePreemption: true,
+		features.GenericWorkload: true,
 	})
 
 	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
 
 	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
-	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
-		DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(100).MinCount(3).Obj()
+	pg := st.MakePodGroup().Namespace("default").Name("pg1").WorkloadRef("t1", "workload").
+		DisruptionModeAll().Priority(100).MinCount(3).Obj()
 
 	// Low priority pods taking up all resources
 	lowPods := []*v1.Pod{
@@ -783,8 +813,9 @@ func TestPostFilterInvocationCount(t *testing.T) {
 	})
 
 	testCtx := testutils.InitTestSchedulerWithNS(t, "post-filter-count",
-		scheduler.WithPodMaxBackoffSeconds(0),
-		scheduler.WithPodInitialBackoffSeconds(0),
+		// Set high backoff times so that the scheduler does not retry scheduling before checking the count.
+		scheduler.WithPodMaxBackoffSeconds(100),
+		scheduler.WithPodInitialBackoffSeconds(100),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
@@ -812,13 +843,13 @@ func TestPostFilterInvocationCount(t *testing.T) {
 	}
 
 	// 2. Create workload
-	if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1alpha3().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create workload: %v", err)
 	}
 
 	// 3. Create PodGroup
 	pg.Namespace = ns
-	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create PodGroup: %v", err)
 	}
 
@@ -830,11 +861,12 @@ func TestPostFilterInvocationCount(t *testing.T) {
 		}
 	}
 
-	// 5. Verify that MockPostFilter was called exactly 3 times
-	// It should be called for each pod from pod group in pod group cycle
+	// 5. Verify that MockPostFilter was called exactly once
+	// It should be called for each evaluated pod from pod group in pod group cycle
 	// but should not be called in WAP.
+	// Only one pod is evaluated for pod group because minCount=3 can't be satisfied with the remaining 2 pods.
 	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-		if mockPlugin.count == 3 {
+		if mockPlugin.count == 1 {
 			return true, nil
 		}
 		return false, nil

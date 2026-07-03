@@ -81,6 +81,7 @@ func NewConfig(opts options.CompletedOptions) (*Config, error) {
 		[]*runtime.Scheme{legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme},
 		controlplane.DefaultAPIResourceConfigSource(),
 		generatedopenapi.GetOpenAPIDefinitions,
+		opts.InformerName,
 	)
 	if err != nil {
 		return nil, err

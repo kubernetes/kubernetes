@@ -29,6 +29,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
@@ -40,9 +41,12 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "autoscaling",
-		APIVersion: apiVersion,
-		Resource:   "horizontalpodautoscalers",
+		APIPrefix:         "apis",
+		APIGroup:          "autoscaling",
+		APIVersion:        apiVersion,
+		Resource:          "horizontalpodautoscalers",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	testCases := map[string]struct {
 		input             api.HorizontalPodAutoscaler
@@ -58,6 +62,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"valid: minReplicas not set (nil)": {
 			input: makeValidHPA(), // Default, no minReplicas set
+		},
+		"invalid: scaleTargetRef.kind empty (required)": {
+			input: makeValidHPA(tweakScaleTargetRefKind("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), "").MarkAlpha(),
+			},
+		},
+		"invalid: scaleTargetRef.name empty (required)": {
+			input: makeValidHPA(tweakScaleTargetRefName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), "").MarkAlpha(),
+			},
 		},
 		"invalid: maxReplicas = 0 (required)": {
 			input: makeValidHPA(tweakMaxReplicas(0)),
@@ -84,6 +100,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := makeValidHPA(tweakMinReplicas(5))
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -95,6 +114,15 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "autoscaling",
+		APIVersion:        apiVersion,
+		Resource:          "horizontalpodautoscalers",
+		Name:              "valid-obj",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
 	testCases := map[string]struct {
 		oldObj            api.HorizontalPodAutoscaler
 		updateObj         api.HorizontalPodAutoscaler
@@ -113,6 +141,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:            makeValidHPA(tweakMinReplicas(1), tweakMetrics(validScaleToZeroMetrics...)),
 			updateObj:         makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...)),
 			enableScaleToZero: true,
+		},
+		"invalid update: scaleTargetRef.kind empty (required)": {
+			oldObj:    makeValidHPA(),
+			updateObj: makeValidHPA(tweakScaleTargetRefKind("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), "").MarkAlpha(),
+			},
+		},
+		"invalid update: scaleTargetRef.name empty (required)": {
+			oldObj:    makeValidHPA(),
+			updateObj: makeValidHPA(tweakScaleTargetRefName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), "").MarkAlpha(),
+			},
 		},
 		"invalid update: maxReplicas = 0 (required)": {
 			oldObj:    makeValidHPA(),
@@ -144,20 +186,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, tc.enableScaleToZero)
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:          "autoscaling",
-				APIVersion:        apiVersion,
-				Resource:          "horizontalpodautoscalers",
-				Name:              "test-hpa",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := makeValidHPA(tweakMinReplicas(5))
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
-func makeValidHPA(mutators ...func(*api.HorizontalPodAutoscaler)) api.HorizontalPodAutoscaler {
+func makeValidHPA(tweaks ...func(*api.HorizontalPodAutoscaler)) api.HorizontalPodAutoscaler {
 	hpa := api.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test-hpa",
@@ -173,10 +209,22 @@ func makeValidHPA(mutators ...func(*api.HorizontalPodAutoscaler)) api.Horizontal
 			MaxReplicas: 10,
 		},
 	}
-	for _, mutate := range mutators {
-		mutate(&hpa)
+	for _, tweak := range tweaks {
+		tweak(&hpa)
 	}
 	return hpa
+}
+
+func tweakScaleTargetRefKind(kind string) func(*api.HorizontalPodAutoscaler) {
+	return func(hpa *api.HorizontalPodAutoscaler) {
+		hpa.Spec.ScaleTargetRef.Kind = kind
+	}
+}
+
+func tweakScaleTargetRefName(name string) func(*api.HorizontalPodAutoscaler) {
+	return func(hpa *api.HorizontalPodAutoscaler) {
+		hpa.Spec.ScaleTargetRef.Name = name
+	}
 }
 
 func tweakMinReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {

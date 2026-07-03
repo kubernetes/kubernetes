@@ -36,7 +36,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
 
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
@@ -292,7 +291,7 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 
 func TestResourceVersionAfterInitEvents(t *testing.T) {
 	const numObjects = 10
-	store := cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))
+	store := store.NewIndexer(nil)
 
 	for i := 0; i < numObjects; i++ {
 		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod-%d", i), uint64(i)))

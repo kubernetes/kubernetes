@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -98,7 +99,7 @@ func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) 
 func TestNewManagerImpl(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	socketDir, socketName, _, err := tmpSocketDir()
-	topologyStore := topologymanager.NewFakeManager()
+	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 	_, err = newManagerImpl(logger, socketName, nil, topologyStore)
@@ -159,7 +160,7 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			case <-time.After(5 * time.Second):
 				t.Fatalf("timeout while waiting for manager update")
 			}
-			capacity, allocatable, _ := m.GetCapacity()
+			capacity, allocatable, _ := m.GetCapacity(logger)
 			resourceCapacity := capacity[v1.ResourceName(testResourceName)]
 			resourceAllocatable := allocatable[v1.ResourceName(testResourceName)]
 			require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
@@ -176,7 +177,7 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			case <-time.After(5 * time.Second):
 				t.Fatalf("timeout while waiting for manager update")
 			}
-			capacity, allocatable, _ = m.GetCapacity()
+			capacity, allocatable, _ = m.GetCapacity(logger)
 			resourceCapacity = capacity[v1.ResourceName(testResourceName)]
 			resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
 			require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
@@ -194,7 +195,7 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			case <-time.After(5 * time.Second):
 				t.Fatalf("timeout while waiting for manager update")
 			}
-			capacity, allocatable, _ = m.GetCapacity()
+			capacity, allocatable, _ = m.GetCapacity(logger)
 			resourceCapacity = capacity[v1.ResourceName(testResourceName)]
 			resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
 			require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
@@ -239,7 +240,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.FailNow()
 	}
-	capacity, allocatable, _ := m.GetCapacity()
+	capacity, allocatable, _ := m.GetCapacity(logger)
 	resourceCapacity := capacity[v1.ResourceName(testResourceName)]
 	resourceAllocatable := allocatable[v1.ResourceName(testResourceName)]
 	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
@@ -255,7 +256,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 		t.FailNow()
 	}
 
-	capacity, allocatable, _ = m.GetCapacity()
+	capacity, allocatable, _ = m.GetCapacity(logger)
 	resourceCapacity = capacity[v1.ResourceName(testResourceName)]
 	resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
 	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
@@ -272,7 +273,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 		t.FailNow()
 	}
 
-	capacity, allocatable, _ = m.GetCapacity()
+	capacity, allocatable, _ = m.GetCapacity(logger)
 	resourceCapacity = capacity[v1.ResourceName(testResourceName)]
 	resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
 	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
@@ -287,7 +288,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 
 func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string,
 	topology []cadvisorapi.Node, logger klog.Logger) (Manager, <-chan interface{}) {
-	topologyStore := topologymanager.NewFakeManager()
+	topologyStore := topologymanager.NewFakeManager(logger)
 	m, err := newManagerImpl(logger, socketName, topology, topologyStore)
 	require.NoError(t, err)
 	updateChan := make(chan interface{})
@@ -364,7 +365,7 @@ func cleanup(logger klog.Logger, m Manager, p *plugin.Stub) error {
 func TestUpdateCapacityAllocatable(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	socketDir, socketName, _, err := tmpSocketDir()
-	topologyStore := topologymanager.NewFakeManager()
+	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
@@ -385,7 +386,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	e1 := &endpointImpl{}
 	testManager.endpoints[resourceName1] = endpointInfo{e: e1, opts: nil}
 	callback(logger, resourceName1, devs)
-	capacity, allocatable, removedResources := testManager.GetCapacity()
+	capacity, allocatable, removedResources := testManager.GetCapacity(logger)
 	resource1Capacity, ok := capacity[v1.ResourceName(resourceName1)]
 	as.True(ok)
 	resource1Allocatable, ok := allocatable[v1.ResourceName(resourceName1)]
@@ -397,7 +398,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	// Deletes an unhealthy device should NOT change allocatable but change capacity.
 	devs1 := devs[:len(devs)-1]
 	callback(logger, resourceName1, devs1)
-	capacity, allocatable, removedResources = testManager.GetCapacity()
+	capacity, allocatable, removedResources = testManager.GetCapacity(logger)
 	resource1Capacity, ok = capacity[v1.ResourceName(resourceName1)]
 	as.True(ok)
 	resource1Allocatable, ok = allocatable[v1.ResourceName(resourceName1)]
@@ -409,7 +410,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	// Updates a healthy device to unhealthy should reduce allocatable by 1.
 	devs[1].Health = pluginapi.Unhealthy
 	callback(logger, resourceName1, devs)
-	capacity, allocatable, removedResources = testManager.GetCapacity()
+	capacity, allocatable, removedResources = testManager.GetCapacity(logger)
 	resource1Capacity, ok = capacity[v1.ResourceName(resourceName1)]
 	as.True(ok)
 	resource1Allocatable, ok = allocatable[v1.ResourceName(resourceName1)]
@@ -421,7 +422,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	// Deletes a healthy device should reduce capacity and allocatable by 1.
 	devs2 := devs[1:]
 	callback(logger, resourceName1, devs2)
-	capacity, allocatable, removedResources = testManager.GetCapacity()
+	capacity, allocatable, removedResources = testManager.GetCapacity(logger)
 	resource1Capacity, ok = capacity[v1.ResourceName(resourceName1)]
 	as.True(ok)
 	resource1Allocatable, ok = allocatable[v1.ResourceName(resourceName1)]
@@ -438,7 +439,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	testManager.endpoints[resourceName2] = eInfo
 	testManager.endpointStore[resourceName2] = map[string]*endpointInfo{socketName: &eInfo}
 	callback(logger, resourceName2, devs)
-	capacity, allocatable, removedResources = testManager.GetCapacity()
+	capacity, allocatable, removedResources = testManager.GetCapacity(logger)
 	as.Len(capacity, 2)
 	resource2Capacity, ok := capacity[v1.ResourceName(resourceName2)]
 	as.True(ok)
@@ -451,7 +452,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	// Expires resourceName1 endpoint. Verifies testManager.GetCapacity() reports that resourceName1
 	// is removed from capacity and it no longer exists in healthyDevices after the call.
 	e1.setStopTime(time.Now().Add(-1*endpointStopGracePeriod - time.Duration(10)*time.Second))
-	capacity, allocatable, removed := testManager.GetCapacity()
+	capacity, allocatable, removed := testManager.GetCapacity(logger)
 	as.Equal([]string{resourceName1}, removed)
 	as.NotContains(capacity, v1.ResourceName(resourceName1))
 	as.NotContains(allocatable, v1.ResourceName(resourceName1))
@@ -475,7 +476,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	// Marks resourceName2 unhealthy and verifies its capacity/allocatable are
 	// correctly updated.
 	testManager.markResourceUnhealthy(logger, resourceName2)
-	capacity, allocatable, removed = testManager.GetCapacity()
+	capacity, allocatable, removed = testManager.GetCapacity(logger)
 	val, ok = capacity[v1.ResourceName(resourceName2)]
 	as.True(ok)
 	as.Equal(int64(3), val.Value())
@@ -496,7 +497,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	as.NoError(err)
 	as.Len(testManager.endpoints, 1)
 	as.Contains(testManager.endpoints, resourceName2)
-	capacity, allocatable, removed = testManager.GetCapacity()
+	capacity, allocatable, removed = testManager.GetCapacity(logger)
 	val, ok = capacity[v1.ResourceName(resourceName2)]
 	as.True(ok)
 	as.Equal(int64(0), val.Value())
@@ -510,7 +511,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	socketDir, socketName, _, err := tmpSocketDir()
-	topologyStore := topologymanager.NewFakeManager()
+	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
@@ -552,7 +553,7 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	socketDir, socketName, _, err := tmpSocketDir()
-	topologyStore := topologymanager.NewFakeManager()
+	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
@@ -859,7 +860,7 @@ func makePod(limits v1.ResourceList) *v1.Pod {
 	}
 }
 
-func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestResource) (*wrappedManagerImpl, error) {
+func getTestManager(logger klog.Logger, tmpDir string, activePods ActivePodsFunc, testRes []TestResource) (*wrappedManagerImpl, error) {
 	monitorCallback := func(logger klog.Logger, resourceName string, devices []*pluginapi.Device) {}
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	if err != nil {
@@ -872,7 +873,7 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		endpoints:             make(map[string]endpointInfo),
 		podDevices:            newPodDevices(),
 		devicesToReuse:        make(PodReusableDevices),
-		topologyAffinityStore: topologymanager.NewFakeManager(),
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
 		activePods:            activePods,
 		sourcesReady:          &sourcesReadyStub{},
 		checkpointManager:     ckm,
@@ -929,6 +930,7 @@ type TestResource struct {
 }
 
 func TestFilterByAffinity(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	as := require.New(t)
 	allDevices := ResourceDeviceInstances{
 		"res1": map[string]*pluginapi.Device{
@@ -987,7 +989,7 @@ func TestFilterByAffinity(t *testing.T) {
 		Preferred:        true,
 	}
 	testManager := ManagerImpl{
-		topologyAffinityStore: topologymanager.NewFakeManagerWithHint(&fakeHint),
+		topologyAffinityStore: topologymanager.NewFakeManagerWithHint(logger, &fakeHint),
 		allDevices:            allDevices,
 	}
 
@@ -1012,7 +1014,7 @@ func TestFilterByAffinity(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		fromAffinity, notFromAffinity, withoutTopology := testManager.filterByAffinity("", "", "res1", testCase.available)
+		fromAffinity, notFromAffinity, withoutTopology := testManager.filterByAffinity(logger, "", "", "res1", testCase.available)
 		as.Truef(fromAffinity.Equal(testCase.fromAffinityExpected), "expect devices from affinity to be %v but got %v", testCase.fromAffinityExpected, fromAffinity)
 		as.Truef(notFromAffinity.Equal(testCase.notFromAffinityExpected), "expect devices not from affinity to be %v but got %v", testCase.notFromAffinityExpected, notFromAffinity)
 		as.Truef(withoutTopology.Equal(testCase.withoutTopologyExpected), "expect devices without topology to be %v but got %v", testCase.notFromAffinityExpected, notFromAffinity)
@@ -1020,7 +1022,7 @@ func TestFilterByAffinity(t *testing.T) {
 }
 
 func TestPodContainerDeviceAllocation(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	res1 := TestResource{
 		resourceName:     "domain1.com/resource1",
 		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
@@ -1043,7 +1045,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
 	defer os.RemoveAll(tmpDir)
-	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
 	as.NoError(err)
 
 	testPods := []*v1.Pod{
@@ -1094,7 +1096,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		pod := testCase.testPod
 		activePods = append(activePods, pod)
 		podsStub.updateActivePods(activePods)
-		err := testManager.Allocate(pod, &pod.Spec.Containers[0])
+		err := testManager.Allocate(tCtx, pod, &pod.Spec.Containers[0])
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("DevicePluginManager error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -1225,7 +1227,7 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 }
 
 func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podToAllocate := "podToAllocate"
 	containerToAllocate := "containerToAllocate"
 	podToRemove := "podToRemove"
@@ -1262,7 +1264,7 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 		podDevices:            newPodDevices(),
 		activePods:            func() []*v1.Pod { return []*v1.Pod{} },
 		sourcesReady:          &sourcesReadyStub{},
-		topologyAffinityStore: topologymanager.NewFakeManager(),
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
 	}
 
 	testManager.endpoints[resourceName] = endpointInfo{
@@ -1286,7 +1288,7 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 }
 
 func TestGetDeviceRunContainerOptions(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	res1 := TestResource{
 		resourceName:     "domain1.com/resource1",
 		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
@@ -1313,7 +1315,7 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 	as.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
 	as.NoError(err)
 
 	pod1 := makePod(v1.ResourceList{
@@ -1327,9 +1329,9 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 	activePods := []*v1.Pod{pod1, pod2}
 	podsStub.updateActivePods(activePods)
 
-	err = testManager.Allocate(pod1, &pod1.Spec.Containers[0])
+	err = testManager.Allocate(tCtx, pod1, &pod1.Spec.Containers[0])
 	as.NoError(err)
-	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	err = testManager.Allocate(tCtx, pod2, &pod2.Spec.Containers[0])
 	as.NoError(err)
 
 	// when pod is in activePods, GetDeviceRunContainerOptions should return
@@ -1350,6 +1352,7 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 }
 
 func TestInitContainerDeviceAllocation(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	// Requesting to create a pod that requests resourceName1 in init containers and normal containers
 	// should succeed with devices allocated to init containers reallocated to normal containers.
 	res1 := TestResource{
@@ -1375,7 +1378,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	as.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
 	as.NoError(err)
 
 	podWithPluginResourcesInInitContainers := &v1.Pod{
@@ -1425,10 +1428,10 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	}
 	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInInitContainers})
 	for _, container := range podWithPluginResourcesInInitContainers.Spec.InitContainers {
-		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
+		err = testManager.Allocate(tCtx, podWithPluginResourcesInInitContainers, &container)
 	}
 	for _, container := range podWithPluginResourcesInInitContainers.Spec.Containers {
-		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
+		err = testManager.Allocate(tCtx, podWithPluginResourcesInInitContainers, &container)
 	}
 	as.NoError(err)
 	podUID := string(podWithPluginResourcesInInitContainers.UID)
@@ -1451,6 +1454,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 }
 
 func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	// Requesting to create a pod that requests resourceName1 in restartable
 	// init containers and normal containers should succeed with devices
 	// allocated to init containers not reallocated to normal containers.
@@ -1476,7 +1480,7 @@ func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
 	as.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
 	as.NoError(err)
 
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
@@ -1535,10 +1539,10 @@ func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
 	}
 	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInRestartableInitContainers})
 	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers {
-		err = testManager.Allocate(podWithPluginResourcesInRestartableInitContainers, &container)
+		err = testManager.Allocate(tCtx, podWithPluginResourcesInRestartableInitContainers, &container)
 	}
 	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.Containers {
-		err = testManager.Allocate(podWithPluginResourcesInRestartableInitContainers, &container)
+		err = testManager.Allocate(tCtx, podWithPluginResourcesInRestartableInitContainers, &container)
 	}
 	as.NoError(err)
 	podUID := string(podWithPluginResourcesInRestartableInitContainers.UID)
@@ -1634,7 +1638,7 @@ func TestUpdatePluginResources(t *testing.T) {
 }
 
 func TestDevicePreStartContainer(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	// Ensures that if device manager is indicated to invoke `PreStartContainer` RPC
 	// by device plugin, then device manager invokes PreStartContainer at endpoint interface.
 	// Also verifies that final allocation of mounts, envs etc is same as expected.
@@ -1652,7 +1656,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 	as.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, []TestResource{res1})
+	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, []TestResource{res1})
 	as.NoError(err)
 
 	ch := make(chan []string, 1)
@@ -1668,7 +1672,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 	activePods := []*v1.Pod{}
 	activePods = append(activePods, pod)
 	podsStub.updateActivePods(activePods)
-	err = testManager.Allocate(pod, &pod.Spec.Containers[0])
+	err = testManager.Allocate(tCtx, pod, &pod.Spec.Containers[0])
 	as.NoError(err)
 	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(tCtx, pod, &pod.Spec.Containers[0])
 	as.NoError(err)
@@ -1696,7 +1700,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI)})
 	activePods = append(activePods, pod2)
 	podsStub.updateActivePods(activePods)
-	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	err = testManager.Allocate(tCtx, pod2, &pod2.Spec.Containers[0])
 	as.NoError(err)
 	_, err = testManager.GetDeviceRunContainerOptions(tCtx, pod2, &pod2.Spec.Containers[0])
 	as.NoError(err)
@@ -1849,7 +1853,7 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 			count:       10,
 			devices:     devs,
 			testfunc: func(manager *wrappedManagerImpl) {
-				manager.GetTopologyHints(testPod, &testPod.Spec.Containers[0])
+				manager.GetTopologyHints(logger, testPod, &testPod.Spec.Containers[0])
 			},
 		},
 		{
@@ -1857,7 +1861,7 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 			count:       10,
 			devices:     devs,
 			testfunc: func(manager *wrappedManagerImpl) {
-				manager.GetPodTopologyHints(testPod)
+				manager.GetPodTopologyHints(logger, testPod)
 			},
 		},
 	}
@@ -2078,6 +2082,7 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 // of the pods referring DRA extended resources depending on whether
 // the DRAExtendedResource feature gate is enabled or disabled.
 func TestAdmitPodWithDRAResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := map[string]struct {
 		enableFeatureGate bool
 		checkError        func(t require.TestingT, err error, msgAndArgs ...interface{})
@@ -2097,6 +2102,9 @@ func TestAdmitPodWithDRAResources(t *testing.T) {
 
 	for description, test := range testCases {
 		t.Run(description, func(t *testing.T) {
+			if !test.enableFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableFeatureGate)
 
 			pod := &v1.Pod{
@@ -2139,7 +2147,7 @@ func TestAdmitPodWithDRAResources(t *testing.T) {
 				sourcesReady: &sourcesReadyStub{},
 			}
 
-			err := testManager.Allocate(pod, &pod.Spec.Containers[0])
+			err := testManager.Allocate(tCtx, pod, &pod.Spec.Containers[0])
 			test.checkError(t, err)
 		})
 	}
@@ -2195,7 +2203,7 @@ func TestEndpointSyncOnDisconnect(t *testing.T) {
 	// Expire endpoint to shorten the test
 	ep.stopTime = time.Now().Add(-endpointStopGracePeriod * 2)
 	// Call GetCapacity to trigger https://github.com/kubernetes/kubernetes/issues/133702
-	manager.GetCapacity()
+	manager.GetCapacity(logger)
 
 	require.Empty(t, manager.endpoints)
 	require.Empty(t, manager.healthyDevices)

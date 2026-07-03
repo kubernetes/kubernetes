@@ -22,7 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -114,19 +114,19 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 		{
 			name:         "add a pod group which matches the pod's pod group name",
 			pod:          st.MakePod().Name("p").PodGroupName("pg").Obj(),
-			newPodGroup:  st.MakePodGroup().Name("pg").MinCount(1).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Name("pg").MinCount(1).WorkloadRef("t", "w").Obj(),
 			expectedHint: fwk.Queue,
 		},
 		{
 			name:         "add a pod group which doesn't match the pod's scheduling group name",
 			pod:          st.MakePod().Name("p").PodGroupName("pg1").Obj(),
-			newPodGroup:  st.MakePodGroup().Name("pg2").MinCount(1).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Name("pg2").MinCount(1).WorkloadRef("t", "w").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "add a pod group which doesn't match the pod's scheduling group namespace",
 			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
-			newPodGroup:  st.MakePodGroup().Namespace("ns2").Name("pg").MinCount(1).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns2").Name("pg").MinCount(1).WorkloadRef("t", "w").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 	}
@@ -157,6 +157,98 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 	}
 }
 
+func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		oldPodGroup  *schedulingapi.PodGroup
+		newPodGroup  *schedulingapi.PodGroup
+		expectedHint fwk.QueueingHint
+		expectErr    bool
+	}{
+		{
+			name:         "minCount decreased matches target pod",
+			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name:         "update Basic policy",
+			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().WorkloadRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name:         "minCount increased matches target pod",
+			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("t", "w").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "minCount unchanged matches target pod",
+			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "minCount decreased but pod group name doesn't match target pod",
+			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg-other").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "minCount decreased but pod group namespace doesn't match target pod",
+			pod:          st.MakePod().Namespace("ns-other").Name("p").PodGroupName("pg").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "pod without a scheduling group is skipped",
+			pod:          st.MakePod().Namespace("ns1").Name("p").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).WorkloadRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).WorkloadRef("t", "w").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+
+			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
+				frameworkruntime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			p, err := New(ctx, nil, fh, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualHint, err := p.(*GangScheduling).isSchedulableAfterPodGroupUpdated(logger, tc.pod, tc.oldPodGroup, tc.newPodGroup)
+			if tc.expectErr {
+				if err == nil {
+					t.Errorf("Expected error but got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("Expected QueuingHint doesn't match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 type podActivatorMock struct {
 	activatedPods []*v1.Pod
 }
@@ -167,10 +259,35 @@ func (pam *podActivatorMock) Activate(_ klog.Logger, pods map[string]*v1.Pod) {
 	}
 }
 
+type mockPodGroupState struct {
+	fwk.PodGroupState
+	scheduledPodsCount int
+}
+
+func (m *mockPodGroupState) ScheduledPodsCount() int { return m.scheduledPodsCount }
+
+type mockPodGroupStateLister struct {
+	state *mockPodGroupState
+	err   error
+}
+
+func (m *mockPodGroupStateLister) Get(namespace, podGroupName string) (fwk.PodGroupState, error) {
+	return m.state, m.err
+}
+
+type mockSharedLister struct {
+	fwk.SharedLister
+	podGroupStateLister *mockPodGroupStateLister
+}
+
+func (m *mockSharedLister) PodGroupStates() fwk.PodGroupStateLister {
+	return m.podGroupStateLister
+}
+
 func TestGangSchedulingFlow(t *testing.T) {
-	gangPodGroup1 := st.MakePodGroup().Namespace("ns1").Name("pg1").TemplateRef("t1", "gang-wl").MinCount(3).Obj()
-	gangPodGroup2 := st.MakePodGroup().Namespace("ns1").Name("pg2").TemplateRef("t2", "gang-wl").MinCount(4).Obj()
-	basicPodGroup := st.MakePodGroup().Namespace("ns1").Name("pg3").TemplateRef("1", "basic-wl").BasicPolicy().Obj()
+	gangPodGroup1 := st.MakePodGroup().Namespace("ns1").Name("pg1").WorkloadRef("t1", "gang-wl").MinCount(3).Obj()
+	gangPodGroup2 := st.MakePodGroup().Namespace("ns1").Name("pg2").WorkloadRef("t2", "gang-wl").MinCount(4).Obj()
+	basicPodGroup := st.MakePodGroup().Namespace("ns1").Name("pg3").WorkloadRef("1", "basic-wl").BasicPolicy().Obj()
 
 	p1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").PodGroupName("pg1").Obj()
 	p2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").PodGroupName("pg1").Obj()
@@ -244,17 +361,6 @@ func TestGangSchedulingFlow(t *testing.T) {
 			wantPermitStatus:     nil,
 			wantAllowedPods:      []types.UID{"p1", "p2", "p3"},
 		},
-		{
-			name:                            "final gang pod arrives at Permit during pod group scheduling cycle",
-			pod:                             p1,
-			initialPods:                     []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:                []*schedulingapi.PodGroup{gangPodGroup1, gangPodGroup2},
-			podsWaitingOnPermit:             []*v1.Pod{p2, p3, p4, p5},
-			isDuringPodGroupSchedulingCycle: true,
-			wantPreEnqueueStatus:            nil,
-			wantPermitStatus:                nil,
-			wantAllowedPods:                 []types.UID{"p1", "p2", "p3"},
-		},
 	}
 
 	for _, tt := range tests {
@@ -264,7 +370,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			cache := internalcache.New(ctx, nil, true)
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
-			podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 			fakeActivator := &podActivatorMock{}
 			snapshot := internalcache.NewEmptySnapshot()
 			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
@@ -279,11 +385,12 @@ func TestGangSchedulingFlow(t *testing.T) {
 			}
 
 			// Populate informers and manager state for the test case.
-			for _, wl := range tt.initialPodGroups {
-				err := podGroupInformer.Informer().GetStore().Add(wl)
+			for _, pg := range tt.initialPodGroups {
+				err := podGroupInformer.Informer().GetStore().Add(pg)
 				if err != nil {
-					t.Fatalf("Failed to add podGroup %s to store: %v", wl.Name, err)
+					t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
 				}
+				cache.AddPodGroup(pg)
 			}
 
 			for _, p := range tt.initialPods {
@@ -291,7 +398,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			}
 			cache.AddPodGroupMember(tt.pod)
 
-			p, err := New(ctx, nil, fh, feature.Features{EnableGangScheduling: true})
+			p, err := New(ctx, nil, fh, feature.Features{EnableGenericWorkload: true})
 			if err != nil {
 				t.Fatalf("Failed to create plugin: %v", err)
 			}
@@ -304,6 +411,10 @@ func TestGangSchedulingFlow(t *testing.T) {
 			if !gotPreEnqueueStatus.IsSuccess() {
 				// Pod is rejected.
 				return
+			}
+
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
 			}
 
 			// Simulate that other pods have already hit Permit and are now waiting.
@@ -349,6 +460,9 @@ func TestGangSchedulingFlow(t *testing.T) {
 				if err := cache.AssumePod(logger, pod); err != nil {
 					t.Fatalf("Failed to assume pod %q in cache: %v", pod.Name, err)
 				}
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("Failed to update snapshot: %v", err)
+				}
 			}
 
 			gotPermitStatus, _ := pl.Permit(ctx, cycleState, pod, "some-node")
@@ -380,3 +494,265 @@ func TestGangSchedulingFlow(t *testing.T) {
 		})
 	}
 }
+
+func TestPlacementFeasible(t *testing.T) {
+	tests := []struct {
+		name                  string
+		minCount              int32
+		unscheduledPods       []*v1.Pod
+		podStatuses           []fwk.Code
+		expectedStatuses      []fwk.Code
+		initialScheduledCount int
+	}{
+		{
+			name:     "All pods succeed, minCount met at end",
+			minCount: 2,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Success,
+				fwk.Success,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Wait,
+				fwk.Success,
+			},
+		},
+		{
+			name:     "First pod fails, minCount not satisfiable",
+			minCount: 3,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+				st.MakePod().Name("p3").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Unschedulable,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Unschedulable,
+			},
+		},
+		{
+			name:     "Second pod fails, minCount not satisfiable",
+			minCount: 2,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Success,
+				fwk.Unschedulable,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Wait,
+				fwk.Unschedulable,
+			},
+		},
+		{
+			name:            "Non-gang pod group ignored",
+			minCount:        0, // No gang policy
+			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj()},
+			podStatuses: []fwk.Code{
+				fwk.Unschedulable,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Success,
+			},
+		},
+		{
+			name:     "More than minCount pods, all succeed",
+			minCount: 2,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+				st.MakePod().Name("p3").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Success,
+				fwk.Success,
+				fwk.Success,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Wait,
+				fwk.Success,
+				fwk.Success,
+			},
+		},
+		{
+			name:     "More than minCount pods, first fails",
+			minCount: 2,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+				st.MakePod().Name("p3").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Unschedulable,
+				fwk.Success,
+				fwk.Success,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Success,
+			},
+		},
+		{
+			name:     "More than minCount pods, minCount not satisfiable",
+			minCount: 2,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+				st.MakePod().Name("p3").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Unschedulable,
+				fwk.Unschedulable,
+				fwk.Success,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Wait,
+				fwk.Unschedulable,
+				fwk.Unschedulable,
+			},
+		},
+		{
+			name:     "1 pod scheduled, 2 unscheduled pods succeed, minCount 3 met",
+			minCount: 3,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Success,
+				fwk.Success,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Wait,
+				fwk.Success,
+			},
+			initialScheduledCount: 1,
+		},
+		{
+			name:     "minCount already met by scheduled pods",
+			minCount: 2,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Unschedulable,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Success,
+			},
+			initialScheduledCount: 2,
+		},
+		{
+			name:     "1 pod scheduled, minCount 3, first unscheduled fails, not enough remaining",
+			minCount: 3,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Unschedulable,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Unschedulable,
+			},
+			initialScheduledCount: 1,
+		},
+		{
+			name:     "1 pod scheduled, minCount 4, first unscheduled succeeds, not enough remaining",
+			minCount: 4,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Success,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Unschedulable,
+			},
+			initialScheduledCount: 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			pgName := "test-pg"
+			namespace := "default"
+			pg := st.MakePodGroup().Namespace(namespace).Name(pgName).Obj()
+			if tc.minCount > 0 {
+				pg.Spec.SchedulingPolicy.Gang = &schedulingapi.GangSchedulingPolicy{MinCount: tc.minCount}
+			} else {
+				pg.Spec.SchedulingPolicy.Basic = &schedulingapi.BasicSchedulingPolicy{}
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(pg), 0)
+			informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
+
+			mockState := &mockPodGroupState{scheduledPodsCount: tc.initialScheduledCount}
+			mockLister := &mockSharedLister{
+				podGroupStateLister: &mockPodGroupStateLister{state: mockState},
+			}
+
+			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
+				frameworkruntime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			p, err := New(ctx, nil, fh, feature.Features{EnableGenericWorkload: true})
+			if err != nil {
+				t.Fatalf("Failed to create plugin: %v", err)
+			}
+			pl := p.(*GangScheduling)
+
+			// Inject the mock lister
+			pl.snapshotLister = mockLister
+
+			pgInfo := &testPodGroupInfo{
+				namespace:       namespace,
+				name:            pgName,
+				unscheduledPods: tc.unscheduledPods,
+				podGroup:        pg,
+			}
+
+			cycleState := schedulerframework.NewCycleState()
+
+			for i, code := range tc.podStatuses {
+				if code == fwk.Success {
+					mockState.scheduledPodsCount++
+				}
+
+				gotStatus := pl.PlacementFeasible(ctx, cycleState, pgInfo)
+
+				if gotCode := gotStatus.Code(); gotCode != tc.expectedStatuses[i] {
+					t.Errorf("Step %d: expected status %v, got %v", i, tc.expectedStatuses[i], gotCode)
+				}
+			}
+		})
+	}
+}
+
+type testPodGroupInfo struct {
+	namespace       string
+	name            string
+	unscheduledPods []*v1.Pod
+	podGroup        *schedulingapi.PodGroup
+}
+
+func (t *testPodGroupInfo) GetNamespace() string                 { return t.namespace }
+func (t *testPodGroupInfo) GetName() string                      { return t.name }
+func (t *testPodGroupInfo) GetUnscheduledPods() []*v1.Pod        { return t.unscheduledPods }
+func (t *testPodGroupInfo) GetPodGroup() *schedulingapi.PodGroup { return t.podGroup }

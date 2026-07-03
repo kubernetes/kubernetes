@@ -552,7 +552,9 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 					defer testCtx.Scheduler.SchedulingQueue.Close()
 
 					createdPods := []*v1.Pod{}
-					defer testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+					defer func() {
+						testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+					}()
 
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
@@ -773,9 +775,9 @@ func (p *mockQueueSortPlugin) Name() string {
 	return "mockQueueSortPlugin"
 }
 
-func (p *mockQueueSortPlugin) Less(pInfo1, pInfo2 fwk.QueuedPodInfo) bool {
-	name1 := pInfo1.GetPodInfo().GetPod().Name
-	name2 := pInfo2.GetPodInfo().GetPod().Name
+func (p *mockQueueSortPlugin) Less(entity1, entity2 fwk.QueuedEntityInfo) bool {
+	name1 := entity1.(interface{ GetName() string }).GetName()
+	name2 := entity2.(interface{ GetName() string }).GetName()
 	o1, ok1 := p.order[name1]
 	if !ok1 {
 		p.t.Errorf("order doesn't contain pod with the specified name: %s", name1)

@@ -6850,14 +6850,25 @@ func TestDescribeStatefulSet(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{},
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			Replicas:            &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "mytest"},
+			},
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Image: "mytest-image:latest"},
+						{
+							Name:  "mytest",
+							Image: "mytest-image:latest",
+						},
 					},
 				},
+			},
+			ServiceName: "test-service",
+			PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
 			},
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -6874,7 +6885,18 @@ func TestDescribeStatefulSet(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	expectedOutputs := []string{
-		"bar", "foo", "Containers:", "mytest-image:latest", "Update Strategy", "RollingUpdate", "Partition", "2672",
+		"Name:                   bar",
+		"Namespace:              foo",
+		"CreationTimestamp:      Mon, 01 Jan 0001 00:00:00 +0000",
+		"Selector:               app=mytest",
+		"Service Name:           test-service",
+		"Pod Management Policy:  Parallel",
+		"Replicas:               1 desired | 0 total",
+		"Update Strategy:        RollingUpdate",
+		"  Partition:            2672",
+		"Persistent Volume Claim Retention Policy:",
+		"  WhenDeleted:  Delete",
+		"  WhenScaled:   Retain",
 	}
 	for _, o := range expectedOutputs {
 		if !strings.Contains(out, o) {

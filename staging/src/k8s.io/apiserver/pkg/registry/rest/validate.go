@@ -409,49 +409,56 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, mismatchCandidateErrs, validationIdentifier, betaEnabled, *cfg)
 	}
 
-	// Filter HV errors
-	errs = filterHandwrittenErrors(errs, allDeclarativeEnforced, betaEnabled)
-
-	// Append Enforced DV errors
+	// Collect the declarative errors that are enforced (i.e. surfaced to the user) in the
+	// current mode. A declarative error is enforced when any of the following holds:
+	//   - allDeclarativeEnforced is set (testing): every declarative error is enforced.
+	//   - It is an internal error: always enforced, regardless of lifecycle.
+	//   - It is a beta error and the beta gate is enabled.
+	//   - It is a standard (unprefixed) error: always enforced.
+	// Alpha errors are never enforced; they remain shadowed by handwritten validation.
+	enforcedDeclarativeErrs := make(field.ErrorList, 0, len(declarativeErrs))
 	for _, dvErr := range declarativeErrs {
-		if allDeclarativeEnforced {
-			errs = append(errs, dvErr)
-			continue
-		}
 		switch {
+		case allDeclarativeEnforced:
+			enforcedDeclarativeErrs = append(enforcedDeclarativeErrs, dvErr)
 		case dvErr.Type == field.ErrorTypeInternal:
-			errs = append(errs, dvErr)
+			enforcedDeclarativeErrs = append(enforcedDeclarativeErrs, dvErr)
 		case dvErr.IsBeta():
 			if betaEnabled {
-				errs = append(errs, dvErr)
+				enforcedDeclarativeErrs = append(enforcedDeclarativeErrs, dvErr)
 			}
 		case !dvErr.IsAlpha():
-			errs = append(errs, dvErr) // Standard
+			enforcedDeclarativeErrs = append(enforcedDeclarativeErrs, dvErr) // Standard
 		}
 	}
+
+	// Remove handwritten errors that are superseded by an enforced declarative counterpart.
+	errs = filterHandwrittenErrors(errs, enforcedDeclarativeErrs, allDeclarativeEnforced, cfg)
+
+	// Append the enforced declarative errors.
+	errs = append(errs, enforcedDeclarativeErrs...)
 
 	return errs
 }
 
-func filterHandwrittenErrors(errs field.ErrorList, allDeclarativeEnforced, betaEnabled bool) field.ErrorList {
-	// We remove HV errors that are covered by declarative validation AND are enforced.
+// filterHandwrittenErrors removes a CoveredByDeclarative handwritten error when a matching enforced
+// beta declarative error exists (matched by type, field, and origin). In allDeclarativeEnforced
+// (testing-only) mode every covered handwritten error is removed.
+func filterHandwrittenErrors(errs, enforcedDeclarativeErrs field.ErrorList, allDeclarativeEnforced bool, opts *ValidationConfigOption) field.ErrorList {
+	matcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(opts.NormalizationRules)
 	return errs.Filter(func(e error) bool {
 		var fe *field.Error
 		if !errors.As(e, &fe) || !fe.CoveredByDeclarative {
 			return false
 		}
-
 		if allDeclarativeEnforced {
 			return true
 		}
-
-		// Explicit Strategy
-		if fe.IsBeta() {
-			// Beta validations are enforced only if the Beta feature gate is enabled.
-			return betaEnabled
+		for _, dErr := range enforcedDeclarativeErrs {
+			if dErr.IsBeta() && matcher.Matches(fe, dErr) {
+				return true
+			}
 		}
-		// For Standard validations, we keep the handwritten error for now to avoid losing coverage
-		// before it is deleted from source. Alpha validations are always shadowed (kept).
 		return false
 	})
 }

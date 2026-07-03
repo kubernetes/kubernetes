@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -52,10 +53,10 @@ type Snapshot struct {
 	// havePodsWithRequiredAntiAffinityNodeInfoList is the list of nodes with at least one pod declaring
 	// required anti-affinity terms.
 	havePodsWithRequiredAntiAffinityNodeInfoList []fwk.NodeInfo
-	// usedPVCSet contains a set of PVC names that have one or more scheduled pods using them,
+	// usedPVCRefCounts contains the number of nodes using each PVC across the cluster,
 	// keyed in the format "namespace/name".
-	usedPVCSet sets.Set[string]
-	generation int64
+	usedPVCRefCounts map[string]int
+	generation       int64
 	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
 	// This map should be emptied before the next cycle starts.
 	assumedPods map[string]*v1.Pod
@@ -79,7 +80,7 @@ var _ fwk.SharedLister = &Snapshot{}
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
 		nodeInfoMap:            make(map[string]*framework.NodeInfo),
-		usedPVCSet:             sets.New[string](),
+		usedPVCRefCounts:       make(map[string]int),
 		assumedPods:            make(map[string]*v1.Pod),
 		podGroupStates:         make(map[podGroupKey]*podGroupStateSnapshot),
 		genericWorkloadEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
@@ -87,6 +88,7 @@ func NewEmptySnapshot() *Snapshot {
 }
 
 // NewSnapshot initializes a Snapshot struct and returns it.
+// It should be used only in the tests.
 func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	nodeInfoMap := createNodeInfoMap(pods, nodes)
 	nodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
@@ -107,11 +109,27 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	s.nodeInfoList = nodeInfoList
 	s.havePodsWithAffinityNodeInfoList = havePodsWithAffinityNodeInfoList
 	s.havePodsWithRequiredAntiAffinityNodeInfoList = havePodsWithRequiredAntiAffinityNodeInfoList
-	s.usedPVCSet = createUsedPVCSet(pods)
+	s.usedPVCRefCounts = createUsedPVCRefCounts(nodeInfoMap)
 	if s.genericWorkloadEnabled {
 		s.podGroupStates = createPodGroupStates(pods)
 	}
 
+	return s
+}
+
+// NewTestSnapshotWithPodGroups initializes a Snapshot struct with pod groups and returns it.
+// It should be used only in the tests.
+func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1alpha3.PodGroup) *Snapshot {
+	s := NewSnapshot(pods, nodes)
+	for _, podGroup := range podGroups {
+		key := newPodGroupKey(podGroup.Namespace, podGroup.Name)
+		pgs, ok := s.podGroupStates[key]
+		if !ok {
+			pgs = &podGroupStateSnapshot{podGroupStateData: newPodGroupStateData()}
+			s.podGroupStates[key] = pgs
+		}
+		pgs.podGroup = podGroup
+	}
 	return s
 }
 
@@ -213,23 +231,14 @@ func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.N
 	return nodeNameToInfo
 }
 
-func createUsedPVCSet(pods []*v1.Pod) sets.Set[string] {
-	usedPVCSet := sets.New[string]()
-	for _, pod := range pods {
-		if pod.Spec.NodeName == "" {
-			continue
-		}
-
-		for _, v := range pod.Spec.Volumes {
-			if v.PersistentVolumeClaim == nil {
-				continue
-			}
-
-			key := framework.GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
-			usedPVCSet.Insert(key)
+func createUsedPVCRefCounts(nodeInfoMap map[string]*framework.NodeInfo) map[string]int {
+	usedPVCRefCounts := make(map[string]int)
+	for _, nodeInfo := range nodeInfoMap {
+		for pvcKey, count := range nodeInfo.PVCRefCounts {
+			usedPVCRefCounts[pvcKey] += count
 		}
 	}
-	return usedPVCSet
+	return usedPVCRefCounts
 }
 
 // getNodeImageStates returns the given node's image states based on the given imageExistence map.
@@ -277,6 +286,31 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 // PodGroupStates returns a PodGroupStateLister.
 func (s *Snapshot) PodGroupStates() fwk.PodGroupStateLister {
 	return &podGroupStateSnapshotLister{podGroupStates: s.podGroupStates}
+}
+
+// PodGroups returns a PodGroupLister.
+func (s *Snapshot) PodGroups() fwk.PodGroupLister {
+	return &podGroupSnapshotListerImpl{snapshot: s}
+}
+
+type podGroupSnapshotListerImpl struct {
+	snapshot *Snapshot
+}
+
+func (l *podGroupSnapshotListerImpl) Get(namespace, name string) (*schedulingv1alpha3.PodGroup, error) {
+	if !l.snapshot.genericWorkloadEnabled {
+		return nil, fmt.Errorf("generic workload feature gate is disabled")
+	}
+	key := newPodGroupKey(namespace, name)
+	pgs, exists := l.snapshot.podGroupStates[key]
+	if !exists {
+		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
+	}
+	pg := pgs.podGroup
+	if pg == nil {
+		return nil, fmt.Errorf("pod group object not found for pod group %s", key)
+	}
+	return pg, nil
 }
 
 var _ fwk.PodGroupStateLister = &podGroupStateSnapshotLister{}
@@ -330,7 +364,7 @@ func (s *Snapshot) Get(nodeName string) (fwk.NodeInfo, error) {
 }
 
 func (s *Snapshot) IsPVCUsedByPods(key string) bool {
-	return s.usedPVCSet.Has(key)
+	return s.usedPVCRefCounts[key] > 0
 }
 
 // AssumePod assumes a given pod in the snapshot.

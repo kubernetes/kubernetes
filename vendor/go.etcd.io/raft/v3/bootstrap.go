@@ -17,6 +17,8 @@ package raft
 import (
 	"errors"
 
+	"google.golang.org/protobuf/proto"
+
 	pb "go.etcd.io/raft/v3/raftpb"
 )
 
@@ -48,15 +50,15 @@ func (rn *RawNode) Bootstrap(peers []Peer) error {
 	// TODO(tbg): remove StartNode and give the application the right tools to
 	// bootstrap the initial membership in a cleaner way.
 	rn.raft.becomeFollower(1, None)
-	ents := make([]pb.Entry, len(peers))
+	ents := make([]*pb.Entry, len(peers))
 	for i, peer := range peers {
-		cc := pb.ConfChange{Type: pb.ConfChangeAddNode, NodeID: peer.ID, Context: peer.Context}
-		data, err := cc.Marshal()
+		cc := &pb.ConfChange{Type: pb.ConfChangeAddNode.Enum(), NodeId: new(peer.ID), Context: peer.Context}
+		data, err := proto.Marshal(cc)
 		if err != nil {
 			return err
 		}
 
-		ents[i] = pb.Entry{Type: pb.EntryConfChange, Term: 1, Index: uint64(i + 1), Data: data}
+		ents[i] = &pb.Entry{Type: pb.EntryConfChange.Enum(), Term: new(uint64(1)), Index: new(uint64(i + 1)), Data: data}
 	}
 	rn.raft.raftLog.append(ents...)
 
@@ -74,7 +76,7 @@ func (rn *RawNode) Bootstrap(peers []Peer) error {
 	// the invariant that committed < unstable?
 	rn.raft.raftLog.committed = uint64(len(ents))
 	for _, peer := range peers {
-		rn.raft.applyConfChange(pb.ConfChange{NodeID: peer.ID, Type: pb.ConfChangeAddNode}.AsV2())
+		rn.raft.applyConfChange((&pb.ConfChange{NodeId: new(peer.ID), Type: pb.ConfChangeAddNode.Enum()}).AsV2())
 	}
 	return nil
 }

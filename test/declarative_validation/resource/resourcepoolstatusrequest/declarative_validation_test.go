@@ -26,6 +26,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	registry "k8s.io/kubernetes/pkg/registry/resource/resourcepoolstatusrequest"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 
 	// Ensure all API groups are registered with the scheme
@@ -103,6 +104,9 @@ func TestDeclarativeValidate(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidRPSR()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -140,6 +144,9 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	updateObj := mkValidRPSRForUpdate()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateStatusUpdate(t *testing.T) {
@@ -370,6 +377,13 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.StatusStrategy, tc.expectedErrs)
 		})
 	}
+
+	meta.RunConditionTestCases(t, ctx, field.NewPath("status", "conditions"), &resource.ResourcePoolStatusRequest{}, registry.StatusStrategy, func(obj *resource.ResourcePoolStatusRequest, c []metav1.Condition) {
+		*obj = mkValidRPSRForUpdate()
+		if c != nil {
+			withStatus(func(s *resource.ResourcePoolStatusRequestStatus) { s.Conditions = c })(obj)
+		}
+	})
 }
 
 // mkValidRPSR creates a valid ResourcePoolStatusRequest with optional tweaks.

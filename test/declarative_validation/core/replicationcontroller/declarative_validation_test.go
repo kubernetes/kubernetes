@@ -28,13 +28,18 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "",
-		APIVersion: "v1",
+		APIPrefix:         "api",
+		APIGroup:          "",
+		APIVersion:        "v1",
+		Resource:          "replicationcontrollers",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	testCases := map[string]struct {
 		input        api.ReplicationController
@@ -187,18 +192,38 @@ func TestDeclarativeValidate(t *testing.T) {
 				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
+		// spec.template.spec.tolerations[*].key
+		"tolerations: valid key": {
+			input: mkValidReplicationController(setSpecTolerations(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists})),
+		},
+		"tolerations: valid key without prefix": {
+			input: mkValidReplicationController(setSpecTolerations(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists})),
+		},
+		"tolerations: invalid key format": {
+			input: mkValidReplicationController(setSpecTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.spec.tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkValidReplicationController()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "",
-		APIVersion: "v1",
+		APIPrefix:         "api",
+		APIGroup:          "",
+		APIVersion:        "v1",
+		Resource:          "replicationcontrollers",
+		Name:              "valid-obj",
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 	testCases := map[string]struct {
 		old          api.ReplicationController
@@ -278,6 +303,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidReplicationController()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 // mkValidReplicationController produces a ReplicationController which passes
@@ -311,5 +338,11 @@ func setSpecReplicas(val int32) func(rc *api.ReplicationController) {
 func setSpecMinReadySeconds(val int32) func(rc *api.ReplicationController) {
 	return func(rc *api.ReplicationController) {
 		rc.Spec.MinReadySeconds = val
+	}
+}
+
+func setSpecTolerations(tolerations ...api.Toleration) func(rc *api.ReplicationController) {
+	return func(rc *api.ReplicationController) {
+		rc.Spec.Template.Spec.Tolerations = tolerations
 	}
 }

@@ -17,11 +17,10 @@ limitations under the License.
 package stats
 
 import (
-	"context"
 	"runtime"
 	"testing"
 
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -63,7 +62,7 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		cName22   = "c2"
 		cName222  = "c222"
 	)
-	infos := map[string]cadvisorapiv2.ContainerInfo{
+	infos := map[string]cadvisorapi.ContainerInfo{
 		// ContainerInfo with past creation time and no CPU/memory usage for
 		// simulating uncleaned cgroups of already terminated containers, which
 		// should not be shown in the results.
@@ -90,7 +89,7 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		"/pod2-c2-terminated-1": getTerminatedContainerInfo(seedPastPod0Container0, pName2, namespace, cName22),
 
 		//ContainerInfo with no CPU/memory usage but has network usage for uncleaned cgroups, should not be filtered out
-		"/pod2-c222-zerocpumem-1": getContainerInfoWithZeroCpuMem(seedPastPod0Container0, pName2, namespace, cName222),
+		"/pod2-c222-zerocpumem-1": getContainerInfoWithZeroCPUMem(seedPastPod0Container0, pName2, namespace, cName222),
 	}
 	logger, _ := ktesting.NewTestContext(t)
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
@@ -118,8 +117,8 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 }
 
 func TestCadvisorListPodStats(t *testing.T) {
+	ctx := ktesting.Init(t).Context
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
-	ctx := context.Background()
 	const (
 		namespace0 = "test0"
 		namespace2 = "test2"
@@ -173,7 +172,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	prf1 := statsapi.PodReference{Name: pName1, Namespace: namespace0, UID: "UID" + pName1}
 	prf2 := statsapi.PodReference{Name: pName2, Namespace: namespace2, UID: "UID" + pName2}
 	prf3 := statsapi.PodReference{Name: pName3, Namespace: namespace0, UID: "UID" + pName3}
-	infos := map[string]cadvisorapiv2.ContainerInfo{
+	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":              getTestContainerInfo(seedRoot, "", "", ""),
 		"/docker-daemon": getTestContainerInfo(seedRuntime, "", "", ""),
 		"/kubelet":       getTestContainerInfo(seedKubelet, "", "", ""),
@@ -198,7 +197,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 
 	freeRootfsInodes := rootfsInodesFree
 	totalRootfsInodes := rootfsInodes
-	rootfs := cadvisorapiv2.FsInfo{
+	rootfs := cadvisorapi.FsInfo{
 		Capacity:   rootfsCapacity,
 		Available:  rootfsAvailable,
 		InodesFree: &freeRootfsInodes,
@@ -207,7 +206,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 
 	freeImagefsInodes := imagefsInodesFree
 	totalImagefsInodes := imagefsInodes
-	imagefs := cadvisorapiv2.FsInfo{
+	imagefs := cadvisorapi.FsInfo{
 		Capacity:   imagefsCapacity,
 		Available:  imagefsAvailable,
 		InodesFree: &freeImagefsInodes,
@@ -236,16 +235,16 @@ func TestCadvisorListPodStats(t *testing.T) {
 		if !found {
 			t.Errorf("No container defined with name %v", name)
 		}
-		info.Spec.Memory = cadvisorapiv2.MemorySpec{}
-		info.Spec.Cpu = cadvisorapiv2.CpuSpec{}
+		info.Spec.Memory = cadvisorapi.MemorySpec{}
+		info.Spec.Cpu = cadvisorapi.CpuSpec{}
 		info.Spec.HasMemory = false
 		info.Spec.HasCpu = false
 		info.Spec.HasNetwork = false
 		infos[name] = info
 	}
 
-	options := cadvisorapiv2.RequestOptions{
-		IdType:    cadvisorapiv2.TypeName,
+	options := cadvisorapi.RequestOptions{
+		IdType:    cadvisorapi.TypeName,
 		Count:     2,
 		Recursive: true,
 	}
@@ -392,7 +391,7 @@ func TestCadvisorPodCPUAndMemoryStats(t *testing.T) {
 			UID:       podUID,
 		},
 	}
-	infos := map[string]cadvisorapiv2.ContainerInfo{
+	infos := map[string]cadvisorapi.ContainerInfo{
 		"/pods/pod0":    getTestContainerInfo(seedPod0, podName, namespace, ""),
 		"/pods/pod0-i":  getTestContainerInfo(seedPod0Infra, podName, namespace, ""),
 		"/pods/pod0-c0": getTestContainerInfo(seedPod0Container0, podName, namespace, cName0),
@@ -503,7 +502,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	prf0 := statsapi.PodReference{Name: pName0, Namespace: namespace0, UID: "UID" + pName0}
 	prf1 := statsapi.PodReference{Name: pName1, Namespace: namespace0, UID: "UID" + pName1}
 	prf2 := statsapi.PodReference{Name: pName2, Namespace: namespace2, UID: "UID" + pName2}
-	infos := map[string]cadvisorapiv2.ContainerInfo{
+	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":              getTestContainerInfo(seedRoot, "", "", ""),
 		"/docker-daemon": getTestContainerInfo(seedRuntime, "", "", ""),
 		"/kubelet":       getTestContainerInfo(seedKubelet, "", "", ""),
@@ -536,8 +535,8 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 		infos[name] = info
 	}
 
-	options := cadvisorapiv2.RequestOptions{
-		IdType:    cadvisorapiv2.TypeName,
+	options := cadvisorapi.RequestOptions{
+		IdType:    cadvisorapi.TypeName,
 		Count:     2,
 		Recursive: true,
 	}
@@ -644,7 +643,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 }
 
 func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t).Context
 	var (
 		assert       = assert.New(t)
 		mockCadvisor = cadvisortest.NewMockInterface(t)
@@ -730,7 +729,7 @@ func TestImageFsStatsCustomResponse(t *testing.T) {
 			shouldErr:           false,
 		},
 	} {
-		ctx := context.Background()
+		ctx := ktesting.Init(t).Context
 		mockCadvisor := cadvisortest.NewMockInterface(t)
 		mockRuntime := containertest.NewMockRuntime(t)
 
@@ -754,7 +753,7 @@ func TestImageFsStatsCustomResponse(t *testing.T) {
 }
 
 func TestCadvisorImagesFsStats(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t).Context
 	var (
 		assert       = assert.New(t)
 		mockCadvisor = cadvisortest.NewMockInterface(t)
@@ -799,7 +798,7 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 }
 
 func TestCadvisorSplitImagesFsStats(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t).Context
 	var (
 		assert       = assert.New(t)
 		mockCadvisor = cadvisortest.NewMockInterface(t)
@@ -852,7 +851,7 @@ func TestCadvisorSplitImagesFsStats(t *testing.T) {
 }
 
 func TestCadvisorSameDiskDifferentLocations(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t).Context
 	var (
 		assert       = assert.New(t)
 		mockCadvisor = cadvisortest.NewMockInterface(t)
@@ -905,7 +904,7 @@ func TestCadvisorSameDiskDifferentLocations(t *testing.T) {
 }
 
 func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t).Context
 	const (
 		namespace0 = "test0"
 	)
@@ -937,7 +936,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	)
 
 	prf0 := statsapi.PodReference{Name: pName0, Namespace: namespace0, UID: "UID" + pName0}
-	infos := map[string]cadvisorapiv2.ContainerInfo{
+	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":              getTestContainerInfo(seedRoot, "", "", ""),
 		"/docker-daemon": getTestContainerInfo(seedRuntime, "", "", ""),
 		"/kubelet":       getTestContainerInfo(seedKubelet, "", "", ""),
@@ -959,7 +958,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 
 	freeRootfsInodes := rootfsInodesFree
 	totalRootfsInodes := rootfsInodes
-	rootfs := cadvisorapiv2.FsInfo{
+	rootfs := cadvisorapi.FsInfo{
 		Capacity:   rootfsCapacity,
 		Available:  rootfsAvailable,
 		InodesFree: &freeRootfsInodes,
@@ -968,15 +967,15 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 
 	freeImagefsInodes := imagefsInodesFree
 	totalImagefsInodes := imagefsInodes
-	imagefs := cadvisorapiv2.FsInfo{
+	imagefs := cadvisorapi.FsInfo{
 		Capacity:   imagefsCapacity,
 		Available:  imagefsAvailable,
 		InodesFree: &freeImagefsInodes,
 		Inodes:     &totalImagefsInodes,
 	}
 
-	options := cadvisorapiv2.RequestOptions{
-		IdType:    cadvisorapiv2.TypeName,
+	options := cadvisorapi.RequestOptions{
+		IdType:    cadvisorapi.TypeName,
 		Count:     2,
 		Recursive: true,
 	}
@@ -1003,4 +1002,19 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	assert.Len(t, pods, 1)
 	// Validate Pod0 Results
 	checkEphemeralStats(t, "Pod0", []int{seedPod0Container0, seedPod0Container1}, nil, fakeStatsSlice, pods[0].EphemeralStorage)
+}
+
+func TestHasMemoryAndCPUInstUsageNilMemory(t *testing.T) {
+	// With lib/model pointer sub-stats, Spec.HasMemory no longer guarantees a
+	// non-nil Memory sample. hasMemoryAndCPUInstUsage must return false instead
+	// of panicking when the memory sample is absent for a container that the
+	// spec says has memory.
+	info := getTestContainerInfo(4000, "pod0", "ns0", "c0")
+	if !hasMemoryAndCPUInstUsage(&info) {
+		t.Fatalf("precondition failed: baseline fixture should report memory and cpuinst usage")
+	}
+	info.Stats[0].Memory = nil
+	if hasMemoryAndCPUInstUsage(&info) {
+		t.Errorf("hasMemoryAndCPUInstUsage with nil Memory and HasMemory=true = true; want false")
+	}
 }

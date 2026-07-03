@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	cadvisorv1 "github.com/google/cadvisor/info/v1"
+	cadvisorv1 "github.com/google/cadvisor/lib/model"
 	libcontainercgroups "github.com/opencontainers/cgroups"
 
 	v1 "k8s.io/api/core/v1"
@@ -138,7 +138,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 
 	// If pod has exclusive cpu and the container in question has integer cpu requests
 	// the cfs quota will not be enforced
-	disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.ContainerHasExclusiveCPUs(pod, container)
+	disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.ContainerHasExclusiveCPUs(logger, pod, container)
 	logger.V(5).Info("Enforcing CFS quota", "pod", klog.KObj(pod), "unlimited", disableCPUQuota)
 	lcr := m.calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit, disableCPUQuota)
 
@@ -168,9 +168,9 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			unified[cm.Cgroup2MemoryLow] = "0"
 		}
 
-		// Guaranteed pods by their QoS definition requires that memory request equals memory limit and cpu request must equal cpu limit.
-		// Here, we only check from memory perspective. Hence MemoryQoS feature is disabled on those QoS pods by not setting memory.high.
-		if memoryRequest != memoryLimit {
+		// Skip memory.high only for equal, positive memory request/limit (container guaranteed memory).
+		// For Burstable pods, memory.high uses the memory limit, for BestEffort pods (request=limit=0), node allocatable is used.
+		if memoryRequest != memoryLimit || memoryRequest == 0 {
 			// The formula for memory.high for container cgroup is modified in Alpha stage of the feature in K8s v1.27.
 			// It will be set based on formula:
 			// `memory.high=floor[(requests.memory + memory throttling factor * (limits.memory or node allocatable memory - requests.memory))/pageSize] * pageSize`
@@ -204,6 +204,14 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			}
 			logger.V(4).Info("MemoryQoS config for container", "pod", klog.KObj(pod), "containerName", container.Name, "unified", unified)
 		}
+	} else if isCgroup2UnifiedMode() {
+		// When MemoryQoS is off, explicitly reset memory.high to "max" so
+		// that InPlacePodResize clears the stale throttle limit on containers
+		// that were created while MemoryQoS was enabled.
+		if lcr.Unified == nil {
+			lcr.Unified = map[string]string{}
+		}
+		lcr.Unified[cm.Cgroup2MemoryHigh] = "max"
 	}
 
 	return lcr

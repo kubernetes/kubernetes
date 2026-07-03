@@ -212,7 +212,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	if spec.MaxFailedIndexes != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.MaxFailedIndexes), fldPath.Child("maxFailedIndexes"))...)
 		if spec.BackoffLimitPerIndex == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("backoffLimitPerIndex"), fmt.Sprintf("when maxFailedIndexes is specified")))
+			allErrs = append(allErrs, field.Required(fldPath.Child("backoffLimitPerIndex"), "when maxFailedIndexes is specified").WithOrigin("dependentRequired").MarkCoveredByDeclarative())
 		}
 	}
 	if spec.ManagedBy != nil {
@@ -777,7 +777,7 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 	allErrs := field.ErrorList{}
 
 	if len(spec.Schedule) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), "").MarkCoveredByDeclarative())
 	} else {
 		allowTZInSchedule := false
 		if oldSpec != nil {

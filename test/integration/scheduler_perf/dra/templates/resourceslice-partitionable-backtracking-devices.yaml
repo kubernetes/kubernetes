@@ -8,13 +8,7 @@ spec:
     generation: 1
     resourceSliceCount: 2
   driver: test-driver.cdi.k8s.io
-  nodeSelector:
-    nodeSelectorTerms:
-    - matchExpressions:
-      - key: node-with-dra
-        operator: In
-        values:
-        - "true"
+  nodeName: scheduler-perf-dra-{{.Index}}
   devices:
   - name: device-1
     consumesCounters:

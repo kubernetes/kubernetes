@@ -15,11 +15,11 @@
 package mvcc
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/client/pkg/v3/verify"
@@ -414,7 +414,7 @@ func (s *watchableStore) syncWatchers() int {
 }
 
 // rangeEvents returns events in range [minRev, maxRev).
-func rangeEvents(lg *zap.Logger, b backend.Backend, minRev, maxRev int64, c contains) []mvccpb.Event {
+func rangeEvents(lg *zap.Logger, b backend.Backend, minRev, maxRev int64, c contains) []*mvccpb.Event {
 	if minRev < 0 {
 		lg.Warn("Unexpected negative revision range start", zap.Int64("minRev", minRev))
 		minRev = 0
@@ -441,10 +441,10 @@ type contains interface {
 }
 
 // kvsToEvents gets all events for the watchers from all key-value pairs
-func kvsToEvents(lg *zap.Logger, c contains, revs, vals [][]byte) (evs []mvccpb.Event) {
+func kvsToEvents(lg *zap.Logger, c contains, revs, vals [][]byte) (evs []*mvccpb.Event) {
 	for i, v := range vals {
-		var kv mvccpb.KeyValue
-		if err := kv.Unmarshal(v); err != nil {
+		kv := &mvccpb.KeyValue{}
+		if err := proto.Unmarshal(v, kv); err != nil {
 			lg.Panic("failed to unmarshal mvccpb.KeyValue", zap.Error(err))
 		}
 
@@ -452,20 +452,20 @@ func kvsToEvents(lg *zap.Logger, c contains, revs, vals [][]byte) (evs []mvccpb.
 			continue
 		}
 
-		ty := mvccpb.PUT
+		ty := mvccpb.Event_PUT
 		if isTombstone(revs[i]) {
-			ty = mvccpb.DELETE
+			ty = mvccpb.Event_DELETE
 			// patch in mod revision so watchers won't skip
 			kv.ModRevision = BytesToRev(revs[i]).Main
 		}
-		evs = append(evs, mvccpb.Event{Kv: &kv, Type: ty})
+		evs = append(evs, &mvccpb.Event{Kv: kv, Type: ty})
 	}
 	return evs
 }
 
 // notify notifies the fact that given event at the given rev just happened to
 // watchers that watch on the key of the event.
-func (s *watchableStore) notify(rev int64, evs []mvccpb.Event) {
+func (s *watchableStore) notify(rev int64, evs []*mvccpb.Event) {
 	victim := make(watcherBatch)
 	for w, eb := range newWatcherBatch(&s.synced, evs) {
 		if eb.revs != 1 {
@@ -575,7 +575,7 @@ func (w *watcher) send(wr WatchResponse) bool {
 	progressEvent := len(wr.Events) == 0
 
 	if len(w.fcs) != 0 {
-		ne := make([]mvccpb.Event, 0, len(wr.Events))
+		ne := make([]*mvccpb.Event, 0, len(wr.Events))
 		for i := range wr.Events {
 			filtered := false
 			for _, filter := range w.fcs {
@@ -591,14 +591,19 @@ func (w *watcher) send(wr WatchResponse) bool {
 		wr.Events = ne
 	}
 
-	verify.Verify(func() {
+	verify.Verify("Event.ModRevision is less than the w.startRev for watchID", func() (bool, map[string]any) {
 		if w.startRev > 0 {
 			for _, ev := range wr.Events {
 				if ev.Kv.ModRevision < w.startRev {
-					panic(fmt.Sprintf("Event.ModRevision(%d) is less than the w.startRev(%d) for watchID: %d", ev.Kv.ModRevision, w.startRev, w.id))
+					return false, map[string]any{
+						"Event.ModRevision": ev.Kv.ModRevision,
+						"w.startRev":        w.startRev,
+						"watchID":           w.id,
+					}
 				}
 			}
 		}
+		return true, nil
 	})
 
 	// if all events are filtered out, we should send nothing.

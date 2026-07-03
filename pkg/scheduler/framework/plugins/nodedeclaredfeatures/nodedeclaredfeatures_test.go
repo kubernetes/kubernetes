@@ -249,8 +249,10 @@ func TestFilter(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Setting feature gate is still needed as we check for it in SetNode()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.pluginEnabled)
+			if !tc.pluginEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.pluginEnabled)
+			}
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(tc.node)
 
@@ -445,6 +447,42 @@ func TestIsSchedulableAfterTargetPodUpdate(t *testing.T) {
 
 			if tc.expectedHint != hint {
 				t.Errorf("unexpected hint: want %v, got %v", tc.expectedHint, hint)
+			}
+		})
+	}
+}
+
+func TestEventsToRegister(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	tests := []struct {
+		name           string
+		enabled        bool
+		expectedLength int
+	}{
+		{
+			name:           "plugin disabled",
+			enabled:        false,
+			expectedLength: 0,
+		},
+		{
+			name:           "plugin enabled",
+			enabled:        true,
+			expectedLength: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plugin := &NodeDeclaredFeatures{
+				enabled: tt.enabled,
+			}
+			events, err := plugin.EventsToRegister(ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(events) != tt.expectedLength {
+				t.Errorf("expected %d events, got %d", tt.expectedLength, len(events))
 			}
 		})
 	}

@@ -390,10 +390,7 @@ func Convert_storage_CSINode_To_v1beta1_CSINode(in *storage.CSINode, out *storag
 }
 
 func autoConvert_v1beta1_CSINodeDriver_To_storage_CSINodeDriver(in *storagev1beta1.CSINodeDriver, out *storage.CSINodeDriver, s conversion.Scope) error {
-	out.Name = in.Name
-	out.NodeID = in.NodeID
-	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
-	out.Allocatable = (*storage.VolumeNodeResources)(unsafe.Pointer(in.Allocatable))
+	*out = *(*storage.CSINodeDriver)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -403,10 +400,7 @@ func Convert_v1beta1_CSINodeDriver_To_storage_CSINodeDriver(in *storagev1beta1.C
 }
 
 func autoConvert_storage_CSINodeDriver_To_v1beta1_CSINodeDriver(in *storage.CSINodeDriver, out *storagev1beta1.CSINodeDriver, s conversion.Scope) error {
-	out.Name = in.Name
-	out.NodeID = in.NodeID
-	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
-	out.Allocatable = (*storagev1beta1.VolumeNodeResources)(unsafe.Pointer(in.Allocatable))
+	*out = *(*storagev1beta1.CSINodeDriver)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -438,7 +432,7 @@ func Convert_storage_CSINodeList_To_v1beta1_CSINodeList(in *storage.CSINodeList,
 }
 
 func autoConvert_v1beta1_CSINodeSpec_To_storage_CSINodeSpec(in *storagev1beta1.CSINodeSpec, out *storage.CSINodeSpec, s conversion.Scope) error {
-	out.Drivers = *(*[]storage.CSINodeDriver)(unsafe.Pointer(&in.Drivers))
+	*out = *(*storage.CSINodeSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -448,7 +442,7 @@ func Convert_v1beta1_CSINodeSpec_To_storage_CSINodeSpec(in *storagev1beta1.CSINo
 }
 
 func autoConvert_storage_CSINodeSpec_To_v1beta1_CSINodeSpec(in *storage.CSINodeSpec, out *storagev1beta1.CSINodeSpec, s conversion.Scope) error {
-	out.Drivers = *(*[]storagev1beta1.CSINodeDriver)(unsafe.Pointer(&in.Drivers))
+	*out = *(*storagev1beta1.CSINodeSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -564,8 +558,7 @@ func Convert_storage_StorageClassList_To_v1beta1_StorageClassList(in *storage.St
 }
 
 func autoConvert_v1beta1_TokenRequest_To_storage_TokenRequest(in *storagev1beta1.TokenRequest, out *storage.TokenRequest, s conversion.Scope) error {
-	out.Audience = in.Audience
-	out.ExpirationSeconds = (*int64)(unsafe.Pointer(in.ExpirationSeconds))
+	*out = *(*storage.TokenRequest)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -575,8 +568,7 @@ func Convert_v1beta1_TokenRequest_To_storage_TokenRequest(in *storagev1beta1.Tok
 }
 
 func autoConvert_storage_TokenRequest_To_v1beta1_TokenRequest(in *storage.TokenRequest, out *storagev1beta1.TokenRequest, s conversion.Scope) error {
-	out.Audience = in.Audience
-	out.ExpirationSeconds = (*int64)(unsafe.Pointer(in.ExpirationSeconds))
+	*out = *(*storagev1beta1.TokenRequest)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -726,10 +718,7 @@ func Convert_storage_VolumeAttachmentSpec_To_v1beta1_VolumeAttachmentSpec(in *st
 }
 
 func autoConvert_v1beta1_VolumeAttachmentStatus_To_storage_VolumeAttachmentStatus(in *storagev1beta1.VolumeAttachmentStatus, out *storage.VolumeAttachmentStatus, s conversion.Scope) error {
-	out.Attached = in.Attached
-	out.AttachmentMetadata = *(*map[string]string)(unsafe.Pointer(&in.AttachmentMetadata))
-	out.AttachError = (*storage.VolumeError)(unsafe.Pointer(in.AttachError))
-	out.DetachError = (*storage.VolumeError)(unsafe.Pointer(in.DetachError))
+	*out = *(*storage.VolumeAttachmentStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -739,10 +728,7 @@ func Convert_v1beta1_VolumeAttachmentStatus_To_storage_VolumeAttachmentStatus(in
 }
 
 func autoConvert_storage_VolumeAttachmentStatus_To_v1beta1_VolumeAttachmentStatus(in *storage.VolumeAttachmentStatus, out *storagev1beta1.VolumeAttachmentStatus, s conversion.Scope) error {
-	out.Attached = in.Attached
-	out.AttachmentMetadata = *(*map[string]string)(unsafe.Pointer(&in.AttachmentMetadata))
-	out.AttachError = (*storagev1beta1.VolumeError)(unsafe.Pointer(in.AttachError))
-	out.DetachError = (*storagev1beta1.VolumeError)(unsafe.Pointer(in.DetachError))
+	*out = *(*storagev1beta1.VolumeAttachmentStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -798,9 +784,7 @@ func Convert_storage_VolumeAttributesClassList_To_v1beta1_VolumeAttributesClassL
 }
 
 func autoConvert_v1beta1_VolumeError_To_storage_VolumeError(in *storagev1beta1.VolumeError, out *storage.VolumeError, s conversion.Scope) error {
-	out.Time = in.Time
-	out.Message = in.Message
-	out.ErrorCode = (*int32)(unsafe.Pointer(in.ErrorCode))
+	*out = *(*storage.VolumeError)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -810,9 +794,7 @@ func Convert_v1beta1_VolumeError_To_storage_VolumeError(in *storagev1beta1.Volum
 }
 
 func autoConvert_storage_VolumeError_To_v1beta1_VolumeError(in *storage.VolumeError, out *storagev1beta1.VolumeError, s conversion.Scope) error {
-	out.Time = in.Time
-	out.Message = in.Message
-	out.ErrorCode = (*int32)(unsafe.Pointer(in.ErrorCode))
+	*out = *(*storagev1beta1.VolumeError)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -822,7 +804,7 @@ func Convert_storage_VolumeError_To_v1beta1_VolumeError(in *storage.VolumeError,
 }
 
 func autoConvert_v1beta1_VolumeNodeResources_To_storage_VolumeNodeResources(in *storagev1beta1.VolumeNodeResources, out *storage.VolumeNodeResources, s conversion.Scope) error {
-	out.Count = (*int32)(unsafe.Pointer(in.Count))
+	*out = *(*storage.VolumeNodeResources)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -832,7 +814,7 @@ func Convert_v1beta1_VolumeNodeResources_To_storage_VolumeNodeResources(in *stor
 }
 
 func autoConvert_storage_VolumeNodeResources_To_v1beta1_VolumeNodeResources(in *storage.VolumeNodeResources, out *storagev1beta1.VolumeNodeResources, s conversion.Scope) error {
-	out.Count = (*int32)(unsafe.Pointer(in.Count))
+	*out = *(*storagev1beta1.VolumeNodeResources)(unsafe.Pointer(in))
 	return nil
 }
 

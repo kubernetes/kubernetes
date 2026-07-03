@@ -140,11 +140,12 @@ A common use case would be integrating with different 3rd party signature
 providers, like key management services from various cloud providers or Hardware
 Security Modules (HSMs) or to implement additional standards.
 
-| Extension | Purpose                                                                                                  | Repo                                       |
-| --------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| GCP       | Integrates with multiple Google Cloud Platform signing tools (AppEngine, IAM API, Cloud KMS)             | https://github.com/someone1/gcp-jwt-go     |
-| AWS       | Integrates with AWS Key Management Service, KMS                                                          | https://github.com/matelang/jwt-go-aws-kms |
-| JWKS      | Provides support for JWKS ([RFC 7517](https://datatracker.ietf.org/doc/html/rfc7517)) as a `jwt.Keyfunc` | https://github.com/MicahParks/keyfunc      |
+| Extension | Purpose                                                                                                  | Repo                                              |
+| --------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| GCP       | Integrates with multiple Google Cloud Platform signing tools (AppEngine, IAM API, Cloud KMS)             | https://github.com/someone1/gcp-jwt-go            |
+| AWS       | Integrates with AWS Key Management Service, KMS                                                          | https://github.com/matelang/jwt-go-aws-kms        |
+| JWKS      | Provides support for JWKS ([RFC 7517](https://datatracker.ietf.org/doc/html/rfc7517)) as a `jwt.Keyfunc` | https://github.com/MicahParks/keyfunc             |
+| TPM       | Integrates with Trusted Platform Module (TPM)                                                            | https://github.com/salrashid123/golang-jwt-tpm    |
 
 *Disclaimer*: Unless otherwise specified, these integrations are maintained by
 third parties and should not be considered as a primary offer by any of the

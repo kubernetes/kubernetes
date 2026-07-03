@@ -46,6 +46,8 @@ import (
 
 const MigrationRunnerControllerName string = "migration-runner-controller"
 
+const migrationRunningReason = "MigrationRunning"
+
 // MigrationRunnerController is responsible for managing the lifecycle of
 // StorageVersionMigration resources. It will ensure that only a single StorageVersionMigration
 // will be active at a time for a given GroupResource, by adding the MigrationRunning condition
@@ -80,7 +82,7 @@ func NewCustomResourceController(
 		),
 	}
 
-	_, _ = svmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := svmInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			crController.addSVM(logger, obj)
 		},
@@ -90,7 +92,8 @@ func NewCustomResourceController(
 		DeleteFunc: func(obj interface{}) {
 			crController.deleteSVM(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	return crController
 }
@@ -272,7 +275,7 @@ func (crc *MigrationRunnerController) markAsActive(ctx context.Context, svm *svm
 		}
 	}
 
-	svm = setStatusConditions(svm, svmv1beta1.MigrationRunning, "MigrationRunning", "The migration is running")
+	svm = setStatusConditions(svm, svmv1beta1.MigrationRunning, migrationRunningReason, migrationRunningMessage(nil, nil, nil))
 	_, err = crc.kubeClient.StoragemigrationV1beta1().
 		StorageVersionMigrations().
 		UpdateStatus(

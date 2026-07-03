@@ -457,7 +457,7 @@ func TestValidateConditions(t *testing.T) {
 			Type: "First",
 		}},
 		validateErrs: func(t *testing.T, errs field.ErrorList) {
-			needle := `status.conditions[2].type: Duplicate value: "First"`
+			needle := `status.conditions[2]: Duplicate value: "First"`
 			if !hasError(errs, needle) {
 				t.Errorf("missing %q in\n%v", needle, errorsAsString(errs))
 			}

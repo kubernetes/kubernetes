@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 	registry "k8s.io/kubernetes/pkg/registry/networking/ipaddress"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidateIPAddress(t *testing.T) {
@@ -33,6 +34,7 @@ func TestDeclarativeValidateIPAddress(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
 				genericapirequest.NewDefaultContext(),
 				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
 					APIGroup:          "networking.k8s.io",
 					APIVersion:        apiVersion,
 					Resource:          "ipaddresses",
@@ -78,6 +80,9 @@ func TestDeclarativeValidateIPAddress(t *testing.T) {
 					)
 				})
 			}
+
+			obj := mkValidIPAddress()
+			meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
@@ -147,21 +152,20 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 				},
 			}
 
+			ctx := genericapirequest.WithRequestInfo(
+				genericapirequest.NewDefaultContext(),
+				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
+					APIGroup:          "networking.k8s.io",
+					APIVersion:        apiVersion,
+					Resource:          "ipaddresses",
+					Name:              "192.168.1.1",
+					IsResourceRequest: true,
+					Verb:              "update",
+				},
+			)
 			for name, tc := range testCases {
 				t.Run(name, func(t *testing.T) {
-					ctx := genericapirequest.WithRequestInfo(
-						genericapirequest.NewDefaultContext(),
-						&genericapirequest.RequestInfo{
-							APIPrefix:         "apis",
-							APIGroup:          "networking.k8s.io",
-							APIVersion:        apiVersion,
-							Resource:          "ipaddresses",
-							Name:              "192.168.1.1",
-							IsResourceRequest: true,
-							Verb:              "update",
-						},
-					)
-
 					apitesting.VerifyUpdateValidationEquivalence(
 						t,
 						ctx,
@@ -172,6 +176,8 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 					)
 				})
 			}
+			obj := mkValidIPAddress()
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }

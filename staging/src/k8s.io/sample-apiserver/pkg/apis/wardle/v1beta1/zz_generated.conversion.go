@@ -134,9 +134,7 @@ func Convert_wardle_FlunderList_To_v1beta1_FlunderList(in *wardle.FlunderList, o
 }
 
 func autoConvert_v1beta1_FlunderSpec_To_wardle_FlunderSpec(in *FlunderSpec, out *wardle.FlunderSpec, s conversion.Scope) error {
-	out.FlunderReference = in.FlunderReference
-	out.FischerReference = in.FischerReference
-	out.ReferenceType = wardle.ReferenceType(in.ReferenceType)
+	*out = *(*wardle.FlunderSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -146,9 +144,7 @@ func Convert_v1beta1_FlunderSpec_To_wardle_FlunderSpec(in *FlunderSpec, out *war
 }
 
 func autoConvert_wardle_FlunderSpec_To_v1beta1_FlunderSpec(in *wardle.FlunderSpec, out *FlunderSpec, s conversion.Scope) error {
-	out.FlunderReference = in.FlunderReference
-	out.FischerReference = in.FischerReference
-	out.ReferenceType = ReferenceType(in.ReferenceType)
+	*out = *(*FlunderSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -158,6 +154,7 @@ func Convert_wardle_FlunderSpec_To_v1beta1_FlunderSpec(in *wardle.FlunderSpec, o
 }
 
 func autoConvert_v1beta1_FlunderStatus_To_wardle_FlunderStatus(in *FlunderStatus, out *wardle.FlunderStatus, s conversion.Scope) error {
+	*out = *(*wardle.FlunderStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -167,6 +164,7 @@ func Convert_v1beta1_FlunderStatus_To_wardle_FlunderStatus(in *FlunderStatus, ou
 }
 
 func autoConvert_wardle_FlunderStatus_To_v1beta1_FlunderStatus(in *wardle.FlunderStatus, out *FlunderStatus, s conversion.Scope) error {
+	*out = *(*FlunderStatus)(unsafe.Pointer(in))
 	return nil
 }
 

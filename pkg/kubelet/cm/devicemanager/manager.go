@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -392,10 +392,7 @@ func (m *ManagerImpl) Stop(logger klog.Logger) error {
 
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
-func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	ctx := context.TODO()
+func (m *ManagerImpl) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error {
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
 		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.Set[string])
 	}
@@ -470,10 +467,7 @@ func (m *ManagerImpl) markResourceUnhealthy(logger klog.Logger, resourceName str
 // cm.UpdatePluginResource() run during predicate Admit guarantees we adjust nodeinfo
 // capacity for already allocated pods so that they can continue to run. However, new pods
 // requiring device plugin resources will not be scheduled till device plugin re-registers.
-func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string) {
-	// Use logger.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *ManagerImpl) GetCapacity(logger klog.Logger) (v1.ResourceList, v1.ResourceList, []string) {
 	var capacity = v1.ResourceList{}
 	var allocatable = v1.ResourceList{}
 	deletedResources := sets.New[string]()
@@ -712,7 +706,7 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 	}
 
 	// Filters available Devices based on NUMA affinity.
-	aligned, unaligned, noAffinity := m.filterByAffinity(podUID, contName, resource, available)
+	aligned, unaligned, noAffinity := m.filterByAffinity(logger, podUID, contName, resource, available)
 
 	// If we can allocate all remaining devices from the set of aligned ones, then
 	// give the plugin the chance to influence which ones to allocate from that set.
@@ -764,9 +758,9 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 	return nil, fmt.Errorf("unexpectedly allocated less resources than required. Requested: %d, Got: %d", required, required-needed)
 }
 
-func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, available sets.Set[string]) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+func (m *ManagerImpl) filterByAffinity(logger klog.Logger, podUID, contName, resource string, available sets.Set[string]) (sets.Set[string], sets.Set[string], sets.Set[string]) {
 	// If alignment information is not available, just pass the available list back.
-	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
+	hint := m.topologyAffinityStore.GetAffinity(logger, podUID, contName)
 	if !m.deviceHasTopologyAlignment(resource) || hint.NUMANodeAffinity == nil {
 		return sets.New[string](), sets.New[string](), available
 	}
@@ -1013,7 +1007,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(ctx context.Context, pod *v1.
 	}
 	if needsReAllocate {
 		logger.V(2).Info("Needs to re-allocate device plugin resources for pod", "pod", klog.KObj(pod), "containerName", container.Name)
-		if err := m.Allocate(pod, container); err != nil {
+		if err := m.Allocate(ctx, pod, container); err != nil {
 			return nil, err
 		}
 	}
@@ -1152,7 +1146,7 @@ func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 }
 
 // AllocatePod is called to trigger the allocation of resources to a pod.
-func (m *ManagerImpl) AllocatePod(pod *v1.Pod) error {
+func (m *ManagerImpl) AllocatePod(logger klog.Logger, pod *v1.Pod) error {
 	// Device Manager does not support pod level resource allocation.
 	return nil
 }

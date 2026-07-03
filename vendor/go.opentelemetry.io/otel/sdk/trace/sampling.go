@@ -297,8 +297,9 @@ func (pb parentBased) ShouldSample(p SamplingParameters) SamplingResult {
 }
 
 func (pb parentBased) Description() string {
-	return fmt.Sprintf("ParentBased{root:%s,remoteParentSampled:%s,"+
-		"remoteParentNotSampled:%s,localParentSampled:%s,localParentNotSampled:%s}",
+	return fmt.Sprintf(
+		"ParentBased{root:%s,remoteParentSampled:%s,"+
+			"remoteParentNotSampled:%s,localParentSampled:%s,localParentNotSampled:%s}",
 		pb.root.Description(),
 		pb.config.remoteParentSampled.Description(),
 		pb.config.remoteParentNotSampled.Description(),

@@ -906,6 +906,44 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 		})
 
+		// Regression test for https://github.com/kubernetes/kubernetes/issues/139166:
+		// rolling-update registration sockets must stay within AF_UNIX path limits
+		// even when the driver name is longer than 28 characters.
+		f.It("rolling update with long driver name", f.WithKubeletMinVersion("1.33"), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			nodes := drautils.NewNodesNow(tCtx, 1, 1)
+
+			oldDriver := drautils.NewDriverInstance(tCtx)
+			oldDriver.Name = drautils.LongRollingUpdateDriverName
+			oldDriver.InstanceSuffix = "-old"
+			oldDriver.RollingUpdate = true
+			oldDriver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesNow(nodes, 1))
+
+			getSlices := oldDriver.NewGetSlices()
+			tCtx.Eventually(getSlices).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
+			initialSlices := getSlices(tCtx)
+
+			newDriver := drautils.NewDriverInstance(tCtx)
+			newDriver.Name = drautils.LongRollingUpdateDriverName
+			newDriver.InstanceSuffix = "-new"
+			newDriver.RollingUpdate = true
+			newDriver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesNow(nodes, 1))
+
+			oldDriver.TearDown(tCtx)
+
+			b := drautils.NewBuilderNow(tCtx, oldDriver)
+			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			b.TestPod(tCtx, pod)
+
+			finalSlices := getSlices(tCtx)
+			gomega.Expect(finalSlices.Items).Should(gomega.Equal(initialSlices.Items))
+
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
+		})
+
 		// Seamless upgrade support was added in Kubernetes 1.33.
 		f.It("failed update", f.WithKubeletMinVersion("1.33"), func(ctx context.Context) {
 			tCtx := f.TContext(ctx)

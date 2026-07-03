@@ -890,13 +890,19 @@ Here are a few things to note when evaluating and using Bolt:
   to grow. However, it's important to note that deleting large chunks of data
   will not allow you to reclaim that space on disk.
 
+  For more information on page allocation, [see this comment][page-allocation].
+
 * Removing key/values pairs in a bucket during iteration on the bucket using
   cursor may not work properly. Each time when removing a key/value pair, the
   cursor may automatically move to the next position if present. When users
   call `c.Next()` after removing a key, it may skip one key/value pair.
   Refer to https://github.com/etcd-io/bbolt/pull/611 for more detailed info.
 
-  For more information on page allocation, [see this comment][page-allocation].
+* Bolt db can be corrupted during the initialization phase due to abrupt power failure.
+  - Please note: This issue can only be reproduced during the very first initialization phase, when there is
+  no existing data in bolt database.
+  - In normal production environment, it is difficult to reproduce this. Once the database file has been initialized, it can no longer occur.
+  - Please refer to this issue for more details: https://github.com/etcd-io/etcd/issues/16596.
 
 [page-allocation]: https://github.com/boltdb/bolt/issues/308#issuecomment-74811638
 
@@ -954,11 +960,16 @@ them via pull request.
 
 - bbolt might run into data corruption issue on Linux when the feature
   [ext4: fast commit](https://lwn.net/Articles/842385/), which was introduced in
-  linux kernel version v5.10, is enabled. The fixes to the issue were included in
-  linux kernel version v5.17, please refer to links below,
+  linux kernel version v5.10, is enabled. The fixes to the issue are included in
+  stable LTS patchlevels 5.10.94+ and 5.15.17+ (ftruncate tracking), plus
+  5.15.27+ (ineligible-commit fallback). Linux 5.17 includes these fixes as
+  well, but 5.17 is not an LTS release. Please refer to links below,
 
   * [ext4: fast commit may miss tracking unwritten range during ftruncate](https://lore.kernel.org/linux-ext4/20211223032337.5198-3-yinxin.x@bytedance.com/)
+    * [5.10.94 stable backport](https://lore.kernel.org/stable/20220124184041.063143682@linuxfoundation.org/)
+    * [5.15.17 stable backport](https://lore.kernel.org/stable/20220124184125.887304707@linuxfoundation.org/)
   * [ext4: fast commit may not fallback for ineligible commit](https://lore.kernel.org/lkml/202201091544.W5HHEXAp-lkp@intel.com/T/#ma0768815e4b5f671e9e451d578256ef9a76fe30e)
+    * [5.15.27 stable backport](https://lore.kernel.org/stable/20220307091703.544901888@linuxfoundation.org/)
   * [ext4 updates for 5.17](https://lore.kernel.org/lkml/YdyxjTFaLWif6BCM@mit.edu/)
 
   Please also refer to the discussion in https://github.com/etcd-io/bbolt/issues/562.
@@ -1000,6 +1011,7 @@ Below is a list of public, open source projects that use Bolt:
 * [GoShort](https://github.com/pankajkhairnar/goShort) - GoShort is a URL shortener written in Golang and BoltDB for persistent key/value storage and for routing it's using high performent HTTPRouter.
 * [gopherpit](https://github.com/gopherpit/gopherpit) - A web service to manage Go remote import paths with custom domains
 * [gokv](https://github.com/philippgille/gokv) - Simple key-value store abstraction and implementations for Go (Redis, Consul, etcd, bbolt, BadgerDB, LevelDB, Memcached, DynamoDB, S3, PostgreSQL, MongoDB, CockroachDB and many more)
+* [goraphdb](https://github.com/mstrYoda/goraphdb) - A graph database provides Cypher query, fluent builder and management UI.
 * [Gitchain](https://github.com/gitchain/gitchain) - Decentralized, peer-to-peer Git repositories aka "Git meets Bitcoin".
 * [InfluxDB](https://influxdata.com) - Scalable datastore for metrics, events, and real-time analytics.
 * [ipLocator](https://github.com/AndreasBriese/ipLocator) - A fast ip-geo-location-server using bolt with bloom filters.

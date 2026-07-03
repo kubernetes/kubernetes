@@ -55,7 +55,7 @@ func (*podGroupStrategy) NamespaceScoped() bool {
 // should not be modified by the user. For a new PodGroup that is the status.
 func (*podGroupStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"scheduling.k8s.io/v1alpha2": fieldpath.NewSet(
+		"scheduling.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -83,8 +83,8 @@ func (*podGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, o
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
 		opts = append(opts, string(features.DRAWorkloadResourceClaims))
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
-		opts = append(opts, string(features.WorkloadAwarePreemption))
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
+		opts = append(opts, string(features.PodGroupPreemptionPolicy))
 	}
 	return rest.DeclarativeValidationConfig{Options: opts}
 }
@@ -133,7 +133,7 @@ func NewStatusStrategy(podGroupStrategy *podGroupStrategy) *podGroupStatusStrate
 // should not be modified by the user. For a status update that is the spec.
 func (*podGroupStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"scheduling.k8s.io/v1alpha2": fieldpath.NewSet(
+		"scheduling.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),
@@ -176,9 +176,7 @@ func dropDisabledPodGroupFields(podGroup, oldPodGroup *scheduling.PodGroup) {
 func dropDisabledPodGroupSpecFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
 	dropDisabledSchedulingConstraintsFields(podGroupSpec, oldPodGroupSpec)
 	dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec)
-	dropDisabledDisruptionModeField(podGroupSpec, oldPodGroupSpec)
-	dropDisabledPriorityClassNameField(podGroupSpec, oldPodGroupSpec)
-	dropDisabledPriorityField(podGroupSpec, oldPodGroupSpec)
+	dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec)
 }
 
 func dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
@@ -214,34 +212,14 @@ func dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec *
 	podGroupSpec.ResourceClaims = nil
 }
 
-// dropDisabledDisruptionModeField removes the DisruptionMode field unless it is
+// dropDisabledPreemptionPolicyField removes the PreemptionPolicy field unless it is
 // already used in the old PodGroup spec.
-func dropDisabledDisruptionModeField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || disruptionModeInUse(oldPodGroupSpec) {
+func dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldPodGroupSpec) {
 		// No need to drop anything.
 		return
 	}
-	podGroupSpec.DisruptionMode = nil
-}
-
-// dropDisabledPriorityClassNameField removes the PriorityClassName field unless
-// it is already used in the old PodGroup spec.
-func dropDisabledPriorityClassNameField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || priorityClassNameInUse(oldPodGroupSpec) {
-		// No need to drop anything.
-		return
-	}
-	podGroupSpec.PriorityClassName = ""
-}
-
-// dropDisabledPriorityField removes the Priority field unless it is already used
-// in the old PodGroup spec.
-func dropDisabledPriorityField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || priorityInUse(oldPodGroupSpec) {
-		// No need to drop anything.
-		return
-	}
-	podGroupSpec.Priority = nil
+	podGroupSpec.PreemptionPolicy = nil
 }
 
 func schedulingConstraintsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
@@ -252,14 +230,6 @@ func draWorkloadResourceClaimsInUse(podGroupSpec *scheduling.PodGroupSpec) bool 
 	return podGroupSpec != nil && len(podGroupSpec.ResourceClaims) > 0
 }
 
-func disruptionModeInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
-	return podGroupSpec != nil && podGroupSpec.DisruptionMode != nil
-}
-
-func priorityClassNameInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
-	return podGroupSpec != nil && podGroupSpec.PriorityClassName != ""
-}
-
-func priorityInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
-	return podGroupSpec != nil && podGroupSpec.Priority != nil
+func preemptionPolicyInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.PreemptionPolicy != nil
 }

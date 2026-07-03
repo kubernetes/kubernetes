@@ -22,6 +22,8 @@ limitations under the License.
 package v1
 
 import (
+	unsafe "unsafe"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -115,7 +117,7 @@ func autoConvert_example_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *example.Replica
 }
 
 func autoConvert_v1_ReplicaSetStatus_To_example_ReplicaSetStatus(in *ReplicaSetStatus, out *example.ReplicaSetStatus, s conversion.Scope) error {
-	out.Replicas = in.Replicas
+	*out = *(*example.ReplicaSetStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -125,7 +127,7 @@ func Convert_v1_ReplicaSetStatus_To_example_ReplicaSetStatus(in *ReplicaSetStatu
 }
 
 func autoConvert_example_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *example.ReplicaSetStatus, out *ReplicaSetStatus, s conversion.Scope) error {
-	out.Replicas = in.Replicas
+	*out = *(*ReplicaSetStatus)(unsafe.Pointer(in))
 	return nil
 }
 

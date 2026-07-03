@@ -547,6 +547,8 @@ message ConfigMap {
   // the Data field, this is enforced during validation process.
   // Using this field will require 1.10+ apiserver and
   // kubelet.
+  // Note: BinaryData keys are not currently propagated to container env vars
+  // via ConfigMapKeyRef or ConfigMapRef env sources; only Data keys are used.
   // +optional
   map<string, bytes> binaryData = 3;
 }
@@ -556,6 +558,7 @@ message ConfigMap {
 //
 // The contents of the target ConfigMap's Data field will represent the
 // key-value pairs as environment variables.
+// Keys in the BinaryData field are not currently propagated to container env vars.
 message ConfigMapEnvSource {
   // The ConfigMap to select from.
   optional LocalObjectReference localObjectReference = 1;
@@ -571,7 +574,8 @@ message ConfigMapKeySelector {
   // The ConfigMap to select from.
   optional LocalObjectReference localObjectReference = 1;
 
-  // The key to select.
+  // The key to select from the ConfigMap's Data field.
+  // Keys in the BinaryData field are not currently propagated to container env vars.
   optional string key = 2;
 
   // Specify whether the ConfigMap or its key must be defined
@@ -2906,6 +2910,9 @@ message NodeSpec {
 
   // ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
   // +optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:update=NoModify
+  // +k8s:alpha(since: "1.36")=+k8s:update=NoUnset
   optional string providerID = 3;
 
   // Unschedulable controls node schedulability of new pods. By default, node is schedulable.
@@ -3682,6 +3689,8 @@ message PhotonPersistentDiskVolumeSource {
 // by clients and scheduled onto hosts.
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/ephemeralcontainers"
+// +k8s:supportsSubresource="/resize"
+// +k8s:supportsSubresource="/eviction"
 message Pod {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -4396,11 +4405,8 @@ message PodSecurityContext {
   // Eligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes
   // whose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their
   // CSIDriver instance. Other volumes are always re-labelled recursively.
-  // "MountOption" value is allowed only when SELinuxMount feature gate is enabled.
   //
-  // If not specified and SELinuxMount feature gate is enabled, "MountOption" is used.
-  // If not specified and SELinuxMount feature gate is disabled, "MountOption" is used for ReadWriteOncePod volumes
-  // and "Recursive" for all other volumes.
+  // If not specified, "MountOption" is used.
   //
   // This field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.
   //
@@ -4517,7 +4523,6 @@ message PodSpec {
 
   // DeprecatedServiceAccount is a deprecated alias for ServiceAccountName.
   // Deprecated: Use serviceAccountName instead.
-  // +k8s:conversion-gen=false
   // +optional
   optional string serviceAccount = 9;
 
@@ -4538,19 +4543,16 @@ message PodSpec {
   // When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
   // and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
   // Default to false.
-  // +k8s:conversion-gen=false
   // +optional
   optional bool hostNetwork = 11;
 
   // Use the host's pid namespace.
   // Optional: Default to false.
-  // +k8s:conversion-gen=false
   // +optional
   optional bool hostPID = 12;
 
   // Use the host's ipc namespace.
   // Optional: Default to false.
-  // +k8s:conversion-gen=false
   // +optional
   optional bool hostIPC = 13;
 
@@ -4559,7 +4561,6 @@ message PodSpec {
   // in the same pod, and the first process in each container will not be assigned PID 1.
   // HostPID and ShareProcessNamespace cannot both be set.
   // Optional: Default to false.
-  // +k8s:conversion-gen=false
   // +optional
   optional bool shareProcessNamespace = 27;
 
@@ -4600,6 +4601,7 @@ message PodSpec {
   // If specified, the pod's tolerations.
   // +optional
   // +listType=atomic
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   repeated Toleration tolerations = 22;
 
   // HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
@@ -4658,6 +4660,8 @@ message PodSpec {
 
   // PreemptionPolicy is the Policy for preempting pods with lower priority.
   // One of Never, PreemptLowerPriority.
+  // When Priority Admission Controller is enabled, it prevents users from setting
+  // this field. The admission controller populates this field from PriorityClassName.
   // Defaults to PreemptLowerPriority if unset.
   // +optional
   optional string preemptionPolicy = 31;
@@ -4734,7 +4738,6 @@ message PodSpec {
   // When set to false, a new userns is created for the pod. Setting false is useful for
   // mitigating container breakout vulnerabilities even allowing users to run their
   // containers as root without actually having root privileges on the host.
-  // +k8s:conversion-gen=false
   // +optional
   optional bool hostUsers = 37;
 
@@ -5448,6 +5451,7 @@ message ReplicationControllerSpec {
   // The only allowed template.spec.restartPolicy value is "Always".
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   optional PodTemplateSpec template = 3;
 }
 
@@ -5845,6 +5849,8 @@ message Secret {
   // Used to facilitate programmatic handling of secret data.
   // More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional string type = 3;
 }
 
@@ -6504,6 +6510,7 @@ message ServiceStatus {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=type
+  // +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 2;
 }
 
@@ -6631,6 +6638,8 @@ message Toleration {
   // Key is the taint key that the toleration applies to. Empty means match all taint keys.
   // If the key is empty, operator must be Exists; this combination means to match all values and all keys.
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:format=k8s-label-key
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.

@@ -1094,6 +1094,32 @@ func TestJobStrategy_ValidateUpdate_MutablePodResources(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "spec.template.spec"},
 			},
 		},
+		"feature gate enabled - pod resource update allowed for suspended Job without Suspended condition but never started": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active:    0,
+					StartTime: nil,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{
+					api.ResourceCPU: resource.MustParse("200m"),
+				}
+			},
+		},
 		"feature gate enabled - job resuming (suspend=false) but JobSuspended condition still true - resource updates rejected": {
 			enableFeatureGate: true,
 			job: &batch.Job{
@@ -3833,6 +3859,32 @@ func TestJobStrategy_ValidateUpdate_MutableSchedulingDirectives(t *testing.T) {
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+		"feature gate enabled - scheduling directives update allowed for suspended Job without Suspended condition but never started": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active:    0,
+					StartTime: nil,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{
+					"key": "value",
+				}
 			},
 		},
 	}

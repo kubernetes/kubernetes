@@ -162,6 +162,11 @@ func SetDefaults_Service(obj *v1.Service) {
 
 }
 func SetDefaults_Pod(obj *v1.Pod) {
+	// Enforced on Pod but not on PodSpec. For historical reasons, PodTemplate is not defaulted this way.
+	if obj.Spec.TerminationGracePeriodSeconds != nil && *obj.Spec.TerminationGracePeriodSeconds < 0 {
+		obj.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
+	}
+
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements
 	// because we only want this defaulting semantic to take place on a v1.Pod and not a v1.PodTemplate
@@ -208,17 +213,45 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		defaultHostNetworkPorts(&obj.Spec.InitContainers)
 	}
 }
+func SetDefaults_PodStatus(obj *v1.PodStatus) {
+	// Keep the singular PodIP and the PodIPs list in sync.
+	hasIP := len(obj.PodIP) > 0
+	hasIPs := len(obj.PodIPs) > 0
+	switch {
+	case hasIP && !hasIPs:
+		// default the list from the singular field
+		obj.PodIPs = []v1.PodIP{{IP: obj.PodIP}}
+	case !hasIP && hasIPs:
+		// default the singular field from the list
+		obj.PodIP = obj.PodIPs[0].IP
+	case hasIP && hasIPs && obj.PodIPs[0].IP != obj.PodIP:
+		// when both are specified and mismatch, PodIP is authoritative for
+		// compatibility with older kubelets
+		obj.PodIPs = []v1.PodIP{{IP: obj.PodIP}}
+	}
+}
+
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// New fields added here will break upgrade tests:
 	// https://github.com/kubernetes/kubernetes/issues/69445
 	// In most cases the new defaulted field can added to SetDefaults_Pod instead of here, so
 	// that it only materializes in the Pod object and not all objects with a PodSpec field.
+
+	// DeprecatedServiceAccount is an alias for ServiceAccountName; keep the two
+	// in sync, with ServiceAccountName winning when both are set. This was
+	// historically applied during conversion and produces identical
+	// serializations, so it is exempt from the new-field caution above.
+	if len(obj.ServiceAccountName) == 0 {
+		obj.ServiceAccountName = obj.DeprecatedServiceAccount
+	}
+	obj.DeprecatedServiceAccount = obj.ServiceAccountName
 	if obj.DNSPolicy == "" {
 		obj.DNSPolicy = v1.DNSClusterFirst
 	}
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
 	}
+	// Always default an empty securityContext to preserve historical behavior.
 	if obj.SecurityContext == nil {
 		obj.SecurityContext = &v1.PodSecurityContext{}
 	}

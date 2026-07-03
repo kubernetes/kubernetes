@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
-	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -106,19 +105,43 @@ func (c *createAny) run(tCtx ktesting.TContext) {
 	if c.Count != nil {
 		count = *c.Count
 	}
+	var items []string
 	for index := 0; index < count; index++ {
 		env := make(map[string]any)
 		maps.Copy(env, c.TemplateParams)
 		env["Index"] = index
 		env["Count"] = count
-		c.create(tCtx, env)
+		item := c.create(tCtx, env)
+		// Keep first and last item for reporting.
+		if index == 0 {
+			items = []string{strings.TrimSpace(item)}
+			continue
+		}
+		if index == count-1 {
+			if index > 1 {
+				// We skipped some intermediate item(s).
+				items = append(items, "\n\n...\n\n")
+			}
+			items = append(items, strings.TrimSpace(item))
+		}
 	}
+
+	params := ""
+	if len(c.TemplateParams) > 0 {
+		params = fmt.Sprintf(" with params %v", c.TemplateParams)
+	}
+	namespace := " in cluster scope"
+	if c.Namespace != "" {
+		namespace = fmt.Sprintf(" in namespace %q", c.Namespace)
+	}
+	tCtx.Logf("Created %d item(s) from %s%s%s:\n%s", count, c.TemplatePath, params, namespace, strings.Join(items, ""))
 }
 
-func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) {
+func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) string {
 	var obj *unstructured.Unstructured
-	if err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj); err != nil {
-		tCtx.Fatalf("%s: parsing failed: %v", c.TemplatePath, err)
+	objData, err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj)
+	if err != nil {
+		tCtx.Fatalf("%s: parsing failed: %v\n%s", c.TemplatePath, err, objData)
 	}
 
 	// Not caching the discovery result isn't very efficient, but good enough when
@@ -156,31 +179,31 @@ func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) {
 	for {
 		err := create()
 		if err == nil {
-			return
+			return objData
 		}
 		select {
 		case <-ctx.Done():
-			tCtx.Fatalf("%s: timed out (%q) while creating %q, last error was: %v", c.TemplatePath, context.Cause(ctx), klog.KObj(obj), err)
+			tCtx.Fatalf("%s: timed out (%q) while creating %q, last error was: %v\n\n%s", c.TemplatePath, context.Cause(ctx), klog.KObj(obj), err, objData)
 		case <-time.After(time.Second):
 		}
 	}
 }
 
-func getSpecFromTextTemplateFile(path string, env map[string]any, spec interface{}) error {
+func getSpecFromTextTemplateFile(path string, env map[string]any, spec interface{}) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return "", err
 	}
 	tmpl, err := template.New("object").Funcs(getTemplateFuncs()).Parse(string(content))
 	if err != nil {
-		return err
+		return "", err
 	}
 	var buffer bytes.Buffer
 	if err := tmpl.Execute(&buffer, env); err != nil {
-		return err
+		return "", err
 	}
 
-	return yaml.UnmarshalStrict(buffer.Bytes(), spec)
+	return buffer.String(), yaml.UnmarshalStrict(buffer.Bytes(), spec)
 }
 
 func restMappingFromUnstructuredObj(tCtx ktesting.TContext, obj *unstructured.Unstructured) (*meta.RESTMapping, error) {
@@ -215,9 +238,9 @@ type createNodesOp struct {
 	// At most one of the following strategies can be defined. Defaults
 	// to TrivialNodePrepareStrategy if unspecified.
 	// Optional
-	NodeAllocatableStrategy  *testutils.NodeAllocatableStrategy
-	LabelNodePrepareStrategy *testutils.LabelNodePrepareStrategy
-	UniqueNodeLabelStrategy  *testutils.UniqueNodeLabelStrategy
+	NodeAllocatableStrategy  *NodeAllocatableStrategy
+	LabelNodePrepareStrategy *LabelNodePrepareStrategy
+	UniqueNodeLabelStrategy  *UniqueNodeLabelStrategy
 	// Params to be passed to the template.
 	// Values with `$` prefix will be resolved to the workload parameters.
 	TemplateParams map[string]any
@@ -637,38 +660,59 @@ func (so sleepOp) patchParams(w *Workload) (realOp, error) {
 	return &so, nil
 }
 
-// waitForPodGroups defines an op that waits for a specific number of PodGroup objects to be visible in the scheduler's cache.
-type waitForPodGroups struct {
-	// Must be waitForPodGroupsOpcode.
+// createPodGroups defines an op where PodGroups get created from a YAML template
+// then waits for them to be visible in the scheduler's informer cache.
+type createPodGroups struct {
+	// Must match createPodGroupsOpcode.
 	Opcode operationCode
-	// Namespace the objects should be in.
+	// Namespace the objects should be created in.
 	Namespace string
-	// Count determines how many objects to wait for.
+	// Path to spec file describing the PodGroup to create.
+	TemplatePath string
+	// Params to be passed to the template.
+	TemplateParams map[string]any
+	// Count determines how many PodGroups get created.
 	Count int
 	// CountParam is the name of the parameter that determines the count.
 	CountParam string
 }
 
-func (w *waitForPodGroups) isValid(allowParameterization bool) error {
-	if !isValidCount(allowParameterization, w.Count, w.CountParam) {
-		return fmt.Errorf("invalid Count=%d / CountParam=%q", w.Count, w.CountParam)
+func (cpg *createPodGroups) isValid(allowParameterization bool) error {
+	if cpg.TemplatePath == "" {
+		return fmt.Errorf("templatePath must be set")
+	}
+	if cpg.Namespace == "" {
+		return fmt.Errorf("namespace must be set")
+	}
+	if !isValidCount(allowParameterization, cpg.Count, cpg.CountParam) {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpg.Count, cpg.CountParam)
+	}
+	if !allowParameterization && cpg.Count < 1 {
+		return fmt.Errorf("count must be greater than 0, got %d", cpg.Count)
 	}
 	return nil
 }
 
-func (w *waitForPodGroups) collectsMetrics() bool {
+func (cpg *createPodGroups) collectsMetrics() bool {
 	return false
 }
 
-func (w waitForPodGroups) patchParams(workload *Workload) (realOp, error) {
-	if w.CountParam != "" {
+func (cpg createPodGroups) patchParams(w *Workload) (realOp, error) {
+	if cpg.CountParam != "" {
+		count, err := w.Params.get(cpg.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		cpg.Count = count
+	}
+	if len(cpg.TemplateParams) > 0 {
 		var err error
-		w.Count, err = workload.Params.get(w.CountParam[1:])
+		cpg.TemplateParams, err = resolveTemplateParams(cpg.TemplateParams, w)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return &w, (&w).isValid(false)
+	return &cpg, cpg.isValid(false)
 }
 
 // startCollectingMetricsOp defines an op that starts metrics collectors.

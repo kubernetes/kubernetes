@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -51,7 +52,7 @@ type mockTopologyManager struct {
 	topologymanager.Manager
 }
 
-func (topologyManager *mockTopologyManager) AddContainer(*v1.Pod, *v1.Container, string) {
+func (topologyManager *mockTopologyManager) AddContainer(klog.Logger, *v1.Pod, *v1.Container, string) {
 	topologyManager.called = true
 }
 

@@ -330,211 +330,211 @@ func (PodSandboxState) EnumDescriptor() ([]byte, []int) {
 type Signal int32
 
 const (
-	Signal_RUNTIME_DEFAULT Signal = 0
-	Signal_SIGABRT         Signal = 1
-	Signal_SIGALRM         Signal = 2
-	Signal_SIGBUS          Signal = 3
-	Signal_SIGCHLD         Signal = 4
-	Signal_SIGCLD          Signal = 5
-	Signal_SIGCONT         Signal = 6
-	Signal_SIGFPE          Signal = 7
-	Signal_SIGHUP          Signal = 8
-	Signal_SIGILL          Signal = 9
-	Signal_SIGINT          Signal = 10
-	Signal_SIGIO           Signal = 11
-	Signal_SIGIOT          Signal = 12
-	Signal_SIGKILL         Signal = 13
-	Signal_SIGPIPE         Signal = 14
-	Signal_SIGPOLL         Signal = 15
-	Signal_SIGPROF         Signal = 16
-	Signal_SIGPWR          Signal = 17
-	Signal_SIGQUIT         Signal = 18
-	Signal_SIGSEGV         Signal = 19
-	Signal_SIGSTKFLT       Signal = 20
-	Signal_SIGSTOP         Signal = 21
-	Signal_SIGSYS          Signal = 22
-	Signal_SIGTERM         Signal = 23
-	Signal_SIGTRAP         Signal = 24
-	Signal_SIGTSTP         Signal = 25
-	Signal_SIGTTIN         Signal = 26
-	Signal_SIGTTOU         Signal = 27
-	Signal_SIGURG          Signal = 28
-	Signal_SIGUSR1         Signal = 29
-	Signal_SIGUSR2         Signal = 30
-	Signal_SIGVTALRM       Signal = 31
-	Signal_SIGWINCH        Signal = 32
-	Signal_SIGXCPU         Signal = 33
-	Signal_SIGXFSZ         Signal = 34
-	Signal_SIGRTMIN        Signal = 35
-	Signal_SIGRTMINPLUS1   Signal = 36
-	Signal_SIGRTMINPLUS2   Signal = 37
-	Signal_SIGRTMINPLUS3   Signal = 38
-	Signal_SIGRTMINPLUS4   Signal = 39
-	Signal_SIGRTMINPLUS5   Signal = 40
-	Signal_SIGRTMINPLUS6   Signal = 41
-	Signal_SIGRTMINPLUS7   Signal = 42
-	Signal_SIGRTMINPLUS8   Signal = 43
-	Signal_SIGRTMINPLUS9   Signal = 44
-	Signal_SIGRTMINPLUS10  Signal = 45
-	Signal_SIGRTMINPLUS11  Signal = 46
-	Signal_SIGRTMINPLUS12  Signal = 47
-	Signal_SIGRTMINPLUS13  Signal = 48
-	Signal_SIGRTMINPLUS14  Signal = 49
-	Signal_SIGRTMINPLUS15  Signal = 50
-	Signal_SIGRTMAXMINUS14 Signal = 51
-	Signal_SIGRTMAXMINUS13 Signal = 52
-	Signal_SIGRTMAXMINUS12 Signal = 53
-	Signal_SIGRTMAXMINUS11 Signal = 54
-	Signal_SIGRTMAXMINUS10 Signal = 55
-	Signal_SIGRTMAXMINUS9  Signal = 56
-	Signal_SIGRTMAXMINUS8  Signal = 57
-	Signal_SIGRTMAXMINUS7  Signal = 58
-	Signal_SIGRTMAXMINUS6  Signal = 59
-	Signal_SIGRTMAXMINUS5  Signal = 60
-	Signal_SIGRTMAXMINUS4  Signal = 61
-	Signal_SIGRTMAXMINUS3  Signal = 62
-	Signal_SIGRTMAXMINUS2  Signal = 63
-	Signal_SIGRTMAXMINUS1  Signal = 64
-	Signal_SIGRTMAX        Signal = 65
+	Signal_SIGNAL_RUNTIME_DEFAULT Signal = 0
+	Signal_SIGNAL_SIGABRT         Signal = 1
+	Signal_SIGNAL_SIGALRM         Signal = 2
+	Signal_SIGNAL_SIGBUS          Signal = 3
+	Signal_SIGNAL_SIGCHLD         Signal = 4
+	Signal_SIGNAL_SIGCLD          Signal = 5
+	Signal_SIGNAL_SIGCONT         Signal = 6
+	Signal_SIGNAL_SIGFPE          Signal = 7
+	Signal_SIGNAL_SIGHUP          Signal = 8
+	Signal_SIGNAL_SIGILL          Signal = 9
+	Signal_SIGNAL_SIGINT          Signal = 10
+	Signal_SIGNAL_SIGIO           Signal = 11
+	Signal_SIGNAL_SIGIOT          Signal = 12
+	Signal_SIGNAL_SIGKILL         Signal = 13
+	Signal_SIGNAL_SIGPIPE         Signal = 14
+	Signal_SIGNAL_SIGPOLL         Signal = 15
+	Signal_SIGNAL_SIGPROF         Signal = 16
+	Signal_SIGNAL_SIGPWR          Signal = 17
+	Signal_SIGNAL_SIGQUIT         Signal = 18
+	Signal_SIGNAL_SIGSEGV         Signal = 19
+	Signal_SIGNAL_SIGSTKFLT       Signal = 20
+	Signal_SIGNAL_SIGSTOP         Signal = 21
+	Signal_SIGNAL_SIGSYS          Signal = 22
+	Signal_SIGNAL_SIGTERM         Signal = 23
+	Signal_SIGNAL_SIGTRAP         Signal = 24
+	Signal_SIGNAL_SIGTSTP         Signal = 25
+	Signal_SIGNAL_SIGTTIN         Signal = 26
+	Signal_SIGNAL_SIGTTOU         Signal = 27
+	Signal_SIGNAL_SIGURG          Signal = 28
+	Signal_SIGNAL_SIGUSR1         Signal = 29
+	Signal_SIGNAL_SIGUSR2         Signal = 30
+	Signal_SIGNAL_SIGVTALRM       Signal = 31
+	Signal_SIGNAL_SIGWINCH        Signal = 32
+	Signal_SIGNAL_SIGXCPU         Signal = 33
+	Signal_SIGNAL_SIGXFSZ         Signal = 34
+	Signal_SIGNAL_SIGRTMIN        Signal = 35
+	Signal_SIGNAL_SIGRTMINPLUS1   Signal = 36
+	Signal_SIGNAL_SIGRTMINPLUS2   Signal = 37
+	Signal_SIGNAL_SIGRTMINPLUS3   Signal = 38
+	Signal_SIGNAL_SIGRTMINPLUS4   Signal = 39
+	Signal_SIGNAL_SIGRTMINPLUS5   Signal = 40
+	Signal_SIGNAL_SIGRTMINPLUS6   Signal = 41
+	Signal_SIGNAL_SIGRTMINPLUS7   Signal = 42
+	Signal_SIGNAL_SIGRTMINPLUS8   Signal = 43
+	Signal_SIGNAL_SIGRTMINPLUS9   Signal = 44
+	Signal_SIGNAL_SIGRTMINPLUS10  Signal = 45
+	Signal_SIGNAL_SIGRTMINPLUS11  Signal = 46
+	Signal_SIGNAL_SIGRTMINPLUS12  Signal = 47
+	Signal_SIGNAL_SIGRTMINPLUS13  Signal = 48
+	Signal_SIGNAL_SIGRTMINPLUS14  Signal = 49
+	Signal_SIGNAL_SIGRTMINPLUS15  Signal = 50
+	Signal_SIGNAL_SIGRTMAXMINUS14 Signal = 51
+	Signal_SIGNAL_SIGRTMAXMINUS13 Signal = 52
+	Signal_SIGNAL_SIGRTMAXMINUS12 Signal = 53
+	Signal_SIGNAL_SIGRTMAXMINUS11 Signal = 54
+	Signal_SIGNAL_SIGRTMAXMINUS10 Signal = 55
+	Signal_SIGNAL_SIGRTMAXMINUS9  Signal = 56
+	Signal_SIGNAL_SIGRTMAXMINUS8  Signal = 57
+	Signal_SIGNAL_SIGRTMAXMINUS7  Signal = 58
+	Signal_SIGNAL_SIGRTMAXMINUS6  Signal = 59
+	Signal_SIGNAL_SIGRTMAXMINUS5  Signal = 60
+	Signal_SIGNAL_SIGRTMAXMINUS4  Signal = 61
+	Signal_SIGNAL_SIGRTMAXMINUS3  Signal = 62
+	Signal_SIGNAL_SIGRTMAXMINUS2  Signal = 63
+	Signal_SIGNAL_SIGRTMAXMINUS1  Signal = 64
+	Signal_SIGNAL_SIGRTMAX        Signal = 65
 )
 
 // Enum value maps for Signal.
 var (
 	Signal_name = map[int32]string{
-		0:  "RUNTIME_DEFAULT",
-		1:  "SIGABRT",
-		2:  "SIGALRM",
-		3:  "SIGBUS",
-		4:  "SIGCHLD",
-		5:  "SIGCLD",
-		6:  "SIGCONT",
-		7:  "SIGFPE",
-		8:  "SIGHUP",
-		9:  "SIGILL",
-		10: "SIGINT",
-		11: "SIGIO",
-		12: "SIGIOT",
-		13: "SIGKILL",
-		14: "SIGPIPE",
-		15: "SIGPOLL",
-		16: "SIGPROF",
-		17: "SIGPWR",
-		18: "SIGQUIT",
-		19: "SIGSEGV",
-		20: "SIGSTKFLT",
-		21: "SIGSTOP",
-		22: "SIGSYS",
-		23: "SIGTERM",
-		24: "SIGTRAP",
-		25: "SIGTSTP",
-		26: "SIGTTIN",
-		27: "SIGTTOU",
-		28: "SIGURG",
-		29: "SIGUSR1",
-		30: "SIGUSR2",
-		31: "SIGVTALRM",
-		32: "SIGWINCH",
-		33: "SIGXCPU",
-		34: "SIGXFSZ",
-		35: "SIGRTMIN",
-		36: "SIGRTMINPLUS1",
-		37: "SIGRTMINPLUS2",
-		38: "SIGRTMINPLUS3",
-		39: "SIGRTMINPLUS4",
-		40: "SIGRTMINPLUS5",
-		41: "SIGRTMINPLUS6",
-		42: "SIGRTMINPLUS7",
-		43: "SIGRTMINPLUS8",
-		44: "SIGRTMINPLUS9",
-		45: "SIGRTMINPLUS10",
-		46: "SIGRTMINPLUS11",
-		47: "SIGRTMINPLUS12",
-		48: "SIGRTMINPLUS13",
-		49: "SIGRTMINPLUS14",
-		50: "SIGRTMINPLUS15",
-		51: "SIGRTMAXMINUS14",
-		52: "SIGRTMAXMINUS13",
-		53: "SIGRTMAXMINUS12",
-		54: "SIGRTMAXMINUS11",
-		55: "SIGRTMAXMINUS10",
-		56: "SIGRTMAXMINUS9",
-		57: "SIGRTMAXMINUS8",
-		58: "SIGRTMAXMINUS7",
-		59: "SIGRTMAXMINUS6",
-		60: "SIGRTMAXMINUS5",
-		61: "SIGRTMAXMINUS4",
-		62: "SIGRTMAXMINUS3",
-		63: "SIGRTMAXMINUS2",
-		64: "SIGRTMAXMINUS1",
-		65: "SIGRTMAX",
+		0:  "SIGNAL_RUNTIME_DEFAULT",
+		1:  "SIGNAL_SIGABRT",
+		2:  "SIGNAL_SIGALRM",
+		3:  "SIGNAL_SIGBUS",
+		4:  "SIGNAL_SIGCHLD",
+		5:  "SIGNAL_SIGCLD",
+		6:  "SIGNAL_SIGCONT",
+		7:  "SIGNAL_SIGFPE",
+		8:  "SIGNAL_SIGHUP",
+		9:  "SIGNAL_SIGILL",
+		10: "SIGNAL_SIGINT",
+		11: "SIGNAL_SIGIO",
+		12: "SIGNAL_SIGIOT",
+		13: "SIGNAL_SIGKILL",
+		14: "SIGNAL_SIGPIPE",
+		15: "SIGNAL_SIGPOLL",
+		16: "SIGNAL_SIGPROF",
+		17: "SIGNAL_SIGPWR",
+		18: "SIGNAL_SIGQUIT",
+		19: "SIGNAL_SIGSEGV",
+		20: "SIGNAL_SIGSTKFLT",
+		21: "SIGNAL_SIGSTOP",
+		22: "SIGNAL_SIGSYS",
+		23: "SIGNAL_SIGTERM",
+		24: "SIGNAL_SIGTRAP",
+		25: "SIGNAL_SIGTSTP",
+		26: "SIGNAL_SIGTTIN",
+		27: "SIGNAL_SIGTTOU",
+		28: "SIGNAL_SIGURG",
+		29: "SIGNAL_SIGUSR1",
+		30: "SIGNAL_SIGUSR2",
+		31: "SIGNAL_SIGVTALRM",
+		32: "SIGNAL_SIGWINCH",
+		33: "SIGNAL_SIGXCPU",
+		34: "SIGNAL_SIGXFSZ",
+		35: "SIGNAL_SIGRTMIN",
+		36: "SIGNAL_SIGRTMINPLUS1",
+		37: "SIGNAL_SIGRTMINPLUS2",
+		38: "SIGNAL_SIGRTMINPLUS3",
+		39: "SIGNAL_SIGRTMINPLUS4",
+		40: "SIGNAL_SIGRTMINPLUS5",
+		41: "SIGNAL_SIGRTMINPLUS6",
+		42: "SIGNAL_SIGRTMINPLUS7",
+		43: "SIGNAL_SIGRTMINPLUS8",
+		44: "SIGNAL_SIGRTMINPLUS9",
+		45: "SIGNAL_SIGRTMINPLUS10",
+		46: "SIGNAL_SIGRTMINPLUS11",
+		47: "SIGNAL_SIGRTMINPLUS12",
+		48: "SIGNAL_SIGRTMINPLUS13",
+		49: "SIGNAL_SIGRTMINPLUS14",
+		50: "SIGNAL_SIGRTMINPLUS15",
+		51: "SIGNAL_SIGRTMAXMINUS14",
+		52: "SIGNAL_SIGRTMAXMINUS13",
+		53: "SIGNAL_SIGRTMAXMINUS12",
+		54: "SIGNAL_SIGRTMAXMINUS11",
+		55: "SIGNAL_SIGRTMAXMINUS10",
+		56: "SIGNAL_SIGRTMAXMINUS9",
+		57: "SIGNAL_SIGRTMAXMINUS8",
+		58: "SIGNAL_SIGRTMAXMINUS7",
+		59: "SIGNAL_SIGRTMAXMINUS6",
+		60: "SIGNAL_SIGRTMAXMINUS5",
+		61: "SIGNAL_SIGRTMAXMINUS4",
+		62: "SIGNAL_SIGRTMAXMINUS3",
+		63: "SIGNAL_SIGRTMAXMINUS2",
+		64: "SIGNAL_SIGRTMAXMINUS1",
+		65: "SIGNAL_SIGRTMAX",
 	}
 	Signal_value = map[string]int32{
-		"RUNTIME_DEFAULT": 0,
-		"SIGABRT":         1,
-		"SIGALRM":         2,
-		"SIGBUS":          3,
-		"SIGCHLD":         4,
-		"SIGCLD":          5,
-		"SIGCONT":         6,
-		"SIGFPE":          7,
-		"SIGHUP":          8,
-		"SIGILL":          9,
-		"SIGINT":          10,
-		"SIGIO":           11,
-		"SIGIOT":          12,
-		"SIGKILL":         13,
-		"SIGPIPE":         14,
-		"SIGPOLL":         15,
-		"SIGPROF":         16,
-		"SIGPWR":          17,
-		"SIGQUIT":         18,
-		"SIGSEGV":         19,
-		"SIGSTKFLT":       20,
-		"SIGSTOP":         21,
-		"SIGSYS":          22,
-		"SIGTERM":         23,
-		"SIGTRAP":         24,
-		"SIGTSTP":         25,
-		"SIGTTIN":         26,
-		"SIGTTOU":         27,
-		"SIGURG":          28,
-		"SIGUSR1":         29,
-		"SIGUSR2":         30,
-		"SIGVTALRM":       31,
-		"SIGWINCH":        32,
-		"SIGXCPU":         33,
-		"SIGXFSZ":         34,
-		"SIGRTMIN":        35,
-		"SIGRTMINPLUS1":   36,
-		"SIGRTMINPLUS2":   37,
-		"SIGRTMINPLUS3":   38,
-		"SIGRTMINPLUS4":   39,
-		"SIGRTMINPLUS5":   40,
-		"SIGRTMINPLUS6":   41,
-		"SIGRTMINPLUS7":   42,
-		"SIGRTMINPLUS8":   43,
-		"SIGRTMINPLUS9":   44,
-		"SIGRTMINPLUS10":  45,
-		"SIGRTMINPLUS11":  46,
-		"SIGRTMINPLUS12":  47,
-		"SIGRTMINPLUS13":  48,
-		"SIGRTMINPLUS14":  49,
-		"SIGRTMINPLUS15":  50,
-		"SIGRTMAXMINUS14": 51,
-		"SIGRTMAXMINUS13": 52,
-		"SIGRTMAXMINUS12": 53,
-		"SIGRTMAXMINUS11": 54,
-		"SIGRTMAXMINUS10": 55,
-		"SIGRTMAXMINUS9":  56,
-		"SIGRTMAXMINUS8":  57,
-		"SIGRTMAXMINUS7":  58,
-		"SIGRTMAXMINUS6":  59,
-		"SIGRTMAXMINUS5":  60,
-		"SIGRTMAXMINUS4":  61,
-		"SIGRTMAXMINUS3":  62,
-		"SIGRTMAXMINUS2":  63,
-		"SIGRTMAXMINUS1":  64,
-		"SIGRTMAX":        65,
+		"SIGNAL_RUNTIME_DEFAULT": 0,
+		"SIGNAL_SIGABRT":         1,
+		"SIGNAL_SIGALRM":         2,
+		"SIGNAL_SIGBUS":          3,
+		"SIGNAL_SIGCHLD":         4,
+		"SIGNAL_SIGCLD":          5,
+		"SIGNAL_SIGCONT":         6,
+		"SIGNAL_SIGFPE":          7,
+		"SIGNAL_SIGHUP":          8,
+		"SIGNAL_SIGILL":          9,
+		"SIGNAL_SIGINT":          10,
+		"SIGNAL_SIGIO":           11,
+		"SIGNAL_SIGIOT":          12,
+		"SIGNAL_SIGKILL":         13,
+		"SIGNAL_SIGPIPE":         14,
+		"SIGNAL_SIGPOLL":         15,
+		"SIGNAL_SIGPROF":         16,
+		"SIGNAL_SIGPWR":          17,
+		"SIGNAL_SIGQUIT":         18,
+		"SIGNAL_SIGSEGV":         19,
+		"SIGNAL_SIGSTKFLT":       20,
+		"SIGNAL_SIGSTOP":         21,
+		"SIGNAL_SIGSYS":          22,
+		"SIGNAL_SIGTERM":         23,
+		"SIGNAL_SIGTRAP":         24,
+		"SIGNAL_SIGTSTP":         25,
+		"SIGNAL_SIGTTIN":         26,
+		"SIGNAL_SIGTTOU":         27,
+		"SIGNAL_SIGURG":          28,
+		"SIGNAL_SIGUSR1":         29,
+		"SIGNAL_SIGUSR2":         30,
+		"SIGNAL_SIGVTALRM":       31,
+		"SIGNAL_SIGWINCH":        32,
+		"SIGNAL_SIGXCPU":         33,
+		"SIGNAL_SIGXFSZ":         34,
+		"SIGNAL_SIGRTMIN":        35,
+		"SIGNAL_SIGRTMINPLUS1":   36,
+		"SIGNAL_SIGRTMINPLUS2":   37,
+		"SIGNAL_SIGRTMINPLUS3":   38,
+		"SIGNAL_SIGRTMINPLUS4":   39,
+		"SIGNAL_SIGRTMINPLUS5":   40,
+		"SIGNAL_SIGRTMINPLUS6":   41,
+		"SIGNAL_SIGRTMINPLUS7":   42,
+		"SIGNAL_SIGRTMINPLUS8":   43,
+		"SIGNAL_SIGRTMINPLUS9":   44,
+		"SIGNAL_SIGRTMINPLUS10":  45,
+		"SIGNAL_SIGRTMINPLUS11":  46,
+		"SIGNAL_SIGRTMINPLUS12":  47,
+		"SIGNAL_SIGRTMINPLUS13":  48,
+		"SIGNAL_SIGRTMINPLUS14":  49,
+		"SIGNAL_SIGRTMINPLUS15":  50,
+		"SIGNAL_SIGRTMAXMINUS14": 51,
+		"SIGNAL_SIGRTMAXMINUS13": 52,
+		"SIGNAL_SIGRTMAXMINUS12": 53,
+		"SIGNAL_SIGRTMAXMINUS11": 54,
+		"SIGNAL_SIGRTMAXMINUS10": 55,
+		"SIGNAL_SIGRTMAXMINUS9":  56,
+		"SIGNAL_SIGRTMAXMINUS8":  57,
+		"SIGNAL_SIGRTMAXMINUS7":  58,
+		"SIGNAL_SIGRTMAXMINUS6":  59,
+		"SIGNAL_SIGRTMAXMINUS5":  60,
+		"SIGNAL_SIGRTMAXMINUS4":  61,
+		"SIGNAL_SIGRTMAXMINUS3":  62,
+		"SIGNAL_SIGRTMAXMINUS2":  63,
+		"SIGNAL_SIGRTMAXMINUS1":  64,
+		"SIGNAL_SIGRTMAX":        65,
 	}
 )
 
@@ -5837,7 +5837,7 @@ func (x *ContainerConfig) GetStopSignal() Signal {
 	if x != nil {
 		return x.StopSignal
 	}
-	return Signal_RUNTIME_DEFAULT
+	return Signal_SIGNAL_RUNTIME_DEFAULT
 }
 
 type CreateContainerRequest struct {
@@ -6909,7 +6909,7 @@ func (x *ContainerStatus) GetStopSignal() Signal {
 	if x != nil {
 		return x.StopSignal
 	}
-	return Signal_RUNTIME_DEFAULT
+	return Signal_SIGNAL_RUNTIME_DEFAULT
 }
 
 type ContainerStatusResponse struct {
@@ -12359,85 +12359,75 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x06Strict\x10\x01*:\n" +
 	"\x0fPodSandboxState\x12\x11\n" +
 	"\rSANDBOX_READY\x10\x00\x12\x14\n" +
-	"\x10SANDBOX_NOTREADY\x10\x01*\xac\b\n" +
-	"\x06Signal\x12\x13\n" +
-	"\x0fRUNTIME_DEFAULT\x10\x00\x12\v\n" +
-	"\aSIGABRT\x10\x01\x12\v\n" +
-	"\aSIGALRM\x10\x02\x12\n" +
-	"\n" +
-	"\x06SIGBUS\x10\x03\x12\v\n" +
-	"\aSIGCHLD\x10\x04\x12\n" +
-	"\n" +
-	"\x06SIGCLD\x10\x05\x12\v\n" +
-	"\aSIGCONT\x10\x06\x12\n" +
-	"\n" +
-	"\x06SIGFPE\x10\a\x12\n" +
-	"\n" +
-	"\x06SIGHUP\x10\b\x12\n" +
-	"\n" +
-	"\x06SIGILL\x10\t\x12\n" +
-	"\n" +
-	"\x06SIGINT\x10\n" +
-	"\x12\t\n" +
-	"\x05SIGIO\x10\v\x12\n" +
-	"\n" +
-	"\x06SIGIOT\x10\f\x12\v\n" +
-	"\aSIGKILL\x10\r\x12\v\n" +
-	"\aSIGPIPE\x10\x0e\x12\v\n" +
-	"\aSIGPOLL\x10\x0f\x12\v\n" +
-	"\aSIGPROF\x10\x10\x12\n" +
-	"\n" +
-	"\x06SIGPWR\x10\x11\x12\v\n" +
-	"\aSIGQUIT\x10\x12\x12\v\n" +
-	"\aSIGSEGV\x10\x13\x12\r\n" +
-	"\tSIGSTKFLT\x10\x14\x12\v\n" +
-	"\aSIGSTOP\x10\x15\x12\n" +
-	"\n" +
-	"\x06SIGSYS\x10\x16\x12\v\n" +
-	"\aSIGTERM\x10\x17\x12\v\n" +
-	"\aSIGTRAP\x10\x18\x12\v\n" +
-	"\aSIGTSTP\x10\x19\x12\v\n" +
-	"\aSIGTTIN\x10\x1a\x12\v\n" +
-	"\aSIGTTOU\x10\x1b\x12\n" +
-	"\n" +
-	"\x06SIGURG\x10\x1c\x12\v\n" +
-	"\aSIGUSR1\x10\x1d\x12\v\n" +
-	"\aSIGUSR2\x10\x1e\x12\r\n" +
-	"\tSIGVTALRM\x10\x1f\x12\f\n" +
-	"\bSIGWINCH\x10 \x12\v\n" +
-	"\aSIGXCPU\x10!\x12\v\n" +
-	"\aSIGXFSZ\x10\"\x12\f\n" +
-	"\bSIGRTMIN\x10#\x12\x11\n" +
-	"\rSIGRTMINPLUS1\x10$\x12\x11\n" +
-	"\rSIGRTMINPLUS2\x10%\x12\x11\n" +
-	"\rSIGRTMINPLUS3\x10&\x12\x11\n" +
-	"\rSIGRTMINPLUS4\x10'\x12\x11\n" +
-	"\rSIGRTMINPLUS5\x10(\x12\x11\n" +
-	"\rSIGRTMINPLUS6\x10)\x12\x11\n" +
-	"\rSIGRTMINPLUS7\x10*\x12\x11\n" +
-	"\rSIGRTMINPLUS8\x10+\x12\x11\n" +
-	"\rSIGRTMINPLUS9\x10,\x12\x12\n" +
-	"\x0eSIGRTMINPLUS10\x10-\x12\x12\n" +
-	"\x0eSIGRTMINPLUS11\x10.\x12\x12\n" +
-	"\x0eSIGRTMINPLUS12\x10/\x12\x12\n" +
-	"\x0eSIGRTMINPLUS13\x100\x12\x12\n" +
-	"\x0eSIGRTMINPLUS14\x101\x12\x12\n" +
-	"\x0eSIGRTMINPLUS15\x102\x12\x13\n" +
-	"\x0fSIGRTMAXMINUS14\x103\x12\x13\n" +
-	"\x0fSIGRTMAXMINUS13\x104\x12\x13\n" +
-	"\x0fSIGRTMAXMINUS12\x105\x12\x13\n" +
-	"\x0fSIGRTMAXMINUS11\x106\x12\x13\n" +
-	"\x0fSIGRTMAXMINUS10\x107\x12\x12\n" +
-	"\x0eSIGRTMAXMINUS9\x108\x12\x12\n" +
-	"\x0eSIGRTMAXMINUS8\x109\x12\x12\n" +
-	"\x0eSIGRTMAXMINUS7\x10:\x12\x12\n" +
-	"\x0eSIGRTMAXMINUS6\x10;\x12\x12\n" +
-	"\x0eSIGRTMAXMINUS5\x10<\x12\x12\n" +
-	"\x0eSIGRTMAXMINUS4\x10=\x12\x12\n" +
-	"\x0eSIGRTMAXMINUS3\x10>\x12\x12\n" +
-	"\x0eSIGRTMAXMINUS2\x10?\x12\x12\n" +
-	"\x0eSIGRTMAXMINUS1\x10@\x12\f\n" +
-	"\bSIGRTMAX\x10A*k\n" +
+	"\x10SANDBOX_NOTREADY\x10\x01*\xfa\v\n" +
+	"\x06Signal\x12\x1a\n" +
+	"\x16SIGNAL_RUNTIME_DEFAULT\x10\x00\x12\x12\n" +
+	"\x0eSIGNAL_SIGABRT\x10\x01\x12\x12\n" +
+	"\x0eSIGNAL_SIGALRM\x10\x02\x12\x11\n" +
+	"\rSIGNAL_SIGBUS\x10\x03\x12\x12\n" +
+	"\x0eSIGNAL_SIGCHLD\x10\x04\x12\x11\n" +
+	"\rSIGNAL_SIGCLD\x10\x05\x12\x12\n" +
+	"\x0eSIGNAL_SIGCONT\x10\x06\x12\x11\n" +
+	"\rSIGNAL_SIGFPE\x10\a\x12\x11\n" +
+	"\rSIGNAL_SIGHUP\x10\b\x12\x11\n" +
+	"\rSIGNAL_SIGILL\x10\t\x12\x11\n" +
+	"\rSIGNAL_SIGINT\x10\n" +
+	"\x12\x10\n" +
+	"\fSIGNAL_SIGIO\x10\v\x12\x11\n" +
+	"\rSIGNAL_SIGIOT\x10\f\x12\x12\n" +
+	"\x0eSIGNAL_SIGKILL\x10\r\x12\x12\n" +
+	"\x0eSIGNAL_SIGPIPE\x10\x0e\x12\x12\n" +
+	"\x0eSIGNAL_SIGPOLL\x10\x0f\x12\x12\n" +
+	"\x0eSIGNAL_SIGPROF\x10\x10\x12\x11\n" +
+	"\rSIGNAL_SIGPWR\x10\x11\x12\x12\n" +
+	"\x0eSIGNAL_SIGQUIT\x10\x12\x12\x12\n" +
+	"\x0eSIGNAL_SIGSEGV\x10\x13\x12\x14\n" +
+	"\x10SIGNAL_SIGSTKFLT\x10\x14\x12\x12\n" +
+	"\x0eSIGNAL_SIGSTOP\x10\x15\x12\x11\n" +
+	"\rSIGNAL_SIGSYS\x10\x16\x12\x12\n" +
+	"\x0eSIGNAL_SIGTERM\x10\x17\x12\x12\n" +
+	"\x0eSIGNAL_SIGTRAP\x10\x18\x12\x12\n" +
+	"\x0eSIGNAL_SIGTSTP\x10\x19\x12\x12\n" +
+	"\x0eSIGNAL_SIGTTIN\x10\x1a\x12\x12\n" +
+	"\x0eSIGNAL_SIGTTOU\x10\x1b\x12\x11\n" +
+	"\rSIGNAL_SIGURG\x10\x1c\x12\x12\n" +
+	"\x0eSIGNAL_SIGUSR1\x10\x1d\x12\x12\n" +
+	"\x0eSIGNAL_SIGUSR2\x10\x1e\x12\x14\n" +
+	"\x10SIGNAL_SIGVTALRM\x10\x1f\x12\x13\n" +
+	"\x0fSIGNAL_SIGWINCH\x10 \x12\x12\n" +
+	"\x0eSIGNAL_SIGXCPU\x10!\x12\x12\n" +
+	"\x0eSIGNAL_SIGXFSZ\x10\"\x12\x13\n" +
+	"\x0fSIGNAL_SIGRTMIN\x10#\x12\x18\n" +
+	"\x14SIGNAL_SIGRTMINPLUS1\x10$\x12\x18\n" +
+	"\x14SIGNAL_SIGRTMINPLUS2\x10%\x12\x18\n" +
+	"\x14SIGNAL_SIGRTMINPLUS3\x10&\x12\x18\n" +
+	"\x14SIGNAL_SIGRTMINPLUS4\x10'\x12\x18\n" +
+	"\x14SIGNAL_SIGRTMINPLUS5\x10(\x12\x18\n" +
+	"\x14SIGNAL_SIGRTMINPLUS6\x10)\x12\x18\n" +
+	"\x14SIGNAL_SIGRTMINPLUS7\x10*\x12\x18\n" +
+	"\x14SIGNAL_SIGRTMINPLUS8\x10+\x12\x18\n" +
+	"\x14SIGNAL_SIGRTMINPLUS9\x10,\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMINPLUS10\x10-\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMINPLUS11\x10.\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMINPLUS12\x10/\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMINPLUS13\x100\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMINPLUS14\x101\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMINPLUS15\x102\x12\x1a\n" +
+	"\x16SIGNAL_SIGRTMAXMINUS14\x103\x12\x1a\n" +
+	"\x16SIGNAL_SIGRTMAXMINUS13\x104\x12\x1a\n" +
+	"\x16SIGNAL_SIGRTMAXMINUS12\x105\x12\x1a\n" +
+	"\x16SIGNAL_SIGRTMAXMINUS11\x106\x12\x1a\n" +
+	"\x16SIGNAL_SIGRTMAXMINUS10\x107\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMAXMINUS9\x108\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMAXMINUS8\x109\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMAXMINUS7\x10:\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMAXMINUS6\x10;\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMAXMINUS5\x10<\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMAXMINUS4\x10=\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMAXMINUS3\x10>\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMAXMINUS2\x10?\x12\x19\n" +
+	"\x15SIGNAL_SIGRTMAXMINUS1\x10@\x12\x13\n" +
+	"\x0fSIGNAL_SIGRTMAX\x10A*k\n" +
 	"\x0eContainerState\x12\x15\n" +
 	"\x11CONTAINER_CREATED\x10\x00\x12\x15\n" +
 	"\x11CONTAINER_RUNNING\x10\x01\x12\x14\n" +

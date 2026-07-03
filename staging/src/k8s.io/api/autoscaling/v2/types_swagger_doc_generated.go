@@ -131,6 +131,7 @@ var map_HorizontalPodAutoscalerCondition = map[string]string{
 	"lastTransitionTime": "lastTransitionTime is the last time the condition transitioned from one status to another",
 	"reason":             "reason is the reason for the condition's last transition.",
 	"message":            "message is a human-readable explanation containing details about the transition",
+	"observedGeneration": "observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.",
 }
 
 func (HorizontalPodAutoscalerCondition) SwaggerDoc() map[string]string {

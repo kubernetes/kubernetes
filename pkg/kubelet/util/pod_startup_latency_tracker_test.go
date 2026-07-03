@@ -25,9 +25,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -61,6 +61,8 @@ func TestNoEvents(t *testing.T) {
 }
 
 func TestPodsRunningBeforeKubeletStarted(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	t.Run("pod was running for 10m before kubelet started", func(t *testing.T) {
 
 		// expects no metrics in the output
@@ -82,7 +84,7 @@ func TestPodsRunningBeforeKubeletStarted(t *testing.T) {
 				StartTime: &metav1.Time{Time: frozenTime.Add(-10 * time.Minute)},
 			},
 		}
-		tracker.ObservedPodOnWatch(podStarted, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime)
 
 		assert.Empty(t, tracker.pods)
 		metrics.PodStartSLIDuration.Reset()
@@ -90,6 +92,7 @@ func TestPodsRunningBeforeKubeletStarted(t *testing.T) {
 }
 
 func TestSinglePodOneImageDownloadRecorded(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 
 	t.Run("single pod; started in 3s, image pulling 100ms", func(t *testing.T) {
 
@@ -136,7 +139,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		}
 
 		podInit := buildInitializingPod()
-		tracker.ObservedPodOnWatch(podInit, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podInit, frozenTime)
 
 		// image pulling took 100ms
 		tracker.RecordImageStartedPulling(podInit.UID)
@@ -153,10 +156,10 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		}
 
 		podStarted := buildRunningPod()
-		tracker.RecordStatusUpdated(podStarted)
+		tracker.RecordStatusUpdated(logger, podStarted)
 
 		// 3s later, observe the same pod on watch
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*3))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*3))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
 			t.Fatal(err)
@@ -171,6 +174,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 }
 
 func TestSinglePodMultipleDownloadsAndRestartsRecorded(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 
 	t.Run("single pod; started in 30s, overlapping image pulling between 10th and 20th seconds", func(t *testing.T) {
 
@@ -217,7 +221,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		}
 
 		podInitializing := buildInitializingPod()
-		tracker.ObservedPodOnWatch(podInitializing, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podInitializing, frozenTime)
 		// Image 1: 10-16s
 		fakeClock.SetTime(frozenTime.Add(time.Second * 10))
 		tracker.RecordImageStartedPulling(podInitializing.UID)
@@ -249,19 +253,19 @@ kubelet_pod_start_sli_duration_seconds_count 1
 
 		// pod started
 		podStarted := buildRunningPod()
-		tracker.RecordStatusUpdated(podStarted)
+		tracker.RecordStatusUpdated(logger, podStarted)
 
 		// at 30s observe the same pod on watch
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*30))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*30))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
 			t.Fatal(err)
 		}
 
 		// any new pod observations should not impact the metrics, as the pod should be recorder only once
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*150))
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*200))
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*250))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*150))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*200))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*250))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
 			t.Fatal(err)
@@ -276,6 +280,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 }
 
 func TestPodWithInitContainersAndMainContainers(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 
 	t.Run("single pod with multiple init containers and main containers", func(t *testing.T) {
 
@@ -322,7 +327,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		}
 
 		podInit := buildInitializingPod("init-1", "init-2")
-		tracker.ObservedPodOnWatch(podInit, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podInit, frozenTime)
 
 		// Init container 1 image pull: 0.5s-1.5s
 		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 500))
@@ -359,8 +364,8 @@ kubelet_pod_start_sli_duration_seconds_count 1
 
 		// Pod becomes running at 11s
 		podStarted := buildRunningPod()
-		tracker.RecordStatusUpdated(podStarted)
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*11))
+		tracker.RecordStatusUpdated(logger, podStarted)
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*11))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
 			t.Fatal(err)
@@ -389,6 +394,8 @@ kubelet_pod_start_sli_duration_seconds_count 1
 }
 
 func TestImmediatelySchedulablePods(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	t.Run("pods not immediately schedulable should be excluded from tracking", func(t *testing.T) {
 		wants := ""
 
@@ -411,7 +418,7 @@ func TestImmediatelySchedulablePods(t *testing.T) {
 				Reason: "Unschedulable",
 			},
 		}
-		tracker.ObservedPodOnWatch(podNotSchedulable, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podNotSchedulable, frozenTime)
 		assert.Empty(t, tracker.pods, "Pod with PodScheduled=False should not be tracked")
 
 		// pod that is immediately schedulable (PodScheduled=True)
@@ -424,13 +431,13 @@ func TestImmediatelySchedulablePods(t *testing.T) {
 				Reason: "Scheduled",
 			},
 		}
-		tracker.ObservedPodOnWatch(podSchedulable, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podSchedulable, frozenTime)
 		assert.Len(t, tracker.pods, 1, "Pod with PodScheduled=True should be tracked")
 
 		// pod without PodScheduled condition
 		podNoCondition := buildInitializingPod()
 		podNoCondition.UID = "no-condition-pod"
-		tracker.ObservedPodOnWatch(podNoCondition, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podNoCondition, frozenTime)
 		assert.Len(t, tracker.pods, 2, "Pod without PodScheduled condition should be tracked by default")
 
 		// Verify metrics are empty
@@ -459,7 +466,7 @@ func TestImmediatelySchedulablePods(t *testing.T) {
 		// First observe pod as schedulable
 		podSchedulable := buildInitializingPod()
 		podSchedulable.UID = "becomes-unschedulable"
-		tracker.ObservedPodOnWatch(podSchedulable, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podSchedulable, frozenTime)
 		assert.Len(t, tracker.pods, 1, "Pod should be tracked initially")
 
 		// Later observe the same pod as unschedulable
@@ -473,7 +480,7 @@ func TestImmediatelySchedulablePods(t *testing.T) {
 			},
 		}
 
-		tracker.ObservedPodOnWatch(podUnschedulable, frozenTime.Add(time.Second))
+		tracker.ObservedPodOnWatch(logger, podUnschedulable, frozenTime.Add(time.Second))
 		assert.Empty(t, tracker.pods, "Pod should be removed when it becomes unschedulable")
 
 		// Verify no metrics
@@ -507,7 +514,7 @@ func TestImmediatelySchedulablePods(t *testing.T) {
 			},
 		}
 
-		tracker.ObservedPodOnWatch(podUnschedulable, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podUnschedulable, frozenTime)
 		assert.Empty(t, tracker.pods, "Pod should not be tracked when first observed as unschedulable")
 		assert.True(t, tracker.excludedPods[podUnschedulable.UID], "Pod should be in excludedPods map")
 
@@ -522,15 +529,15 @@ func TestImmediatelySchedulablePods(t *testing.T) {
 			},
 		}
 
-		tracker.ObservedPodOnWatch(podSchedulable, frozenTime.Add(time.Second*5))
+		tracker.ObservedPodOnWatch(logger, podSchedulable, frozenTime.Add(time.Second*5))
 		assert.Empty(t, tracker.pods, "Pod should remain excluded even after becoming schedulable")
 		assert.True(t, tracker.excludedPods[podSchedulable.UID], "Pod should remain in excludedPods map")
 
 		// Complete the startup process - should not record metrics
 		podRunning := buildRunningPod()
 		podRunning.UID = "unschedulable-first"
-		tracker.RecordStatusUpdated(podRunning)
-		tracker.ObservedPodOnWatch(podRunning, frozenTime.Add(time.Second*10))
+		tracker.RecordStatusUpdated(logger, podRunning)
+		tracker.ObservedPodOnWatch(logger, podRunning, frozenTime.Add(time.Second*10))
 
 		// Verify no SLI metrics recorded
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
@@ -546,6 +553,8 @@ func TestImmediatelySchedulablePods(t *testing.T) {
 }
 
 func TestStatefulPodExclusion(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	t.Run("stateful pods should be excluded from SLI metrics", func(t *testing.T) {
 		wantsSLI := ""
 
@@ -571,15 +580,15 @@ func TestStatefulPodExclusion(t *testing.T) {
 			},
 		}
 
-		tracker.ObservedPodOnWatch(statefulPod, frozenTime)
+		tracker.ObservedPodOnWatch(logger, statefulPod, frozenTime)
 
 		statefulPodRunning := buildRunningPod()
 		statefulPodRunning.UID = "stateful-pod"
 		statefulPodRunning.Spec.Volumes = statefulPod.Spec.Volumes
-		tracker.RecordStatusUpdated(statefulPodRunning)
+		tracker.RecordStatusUpdated(logger, statefulPodRunning)
 
 		// Observe pod as running after 3 seconds
-		tracker.ObservedPodOnWatch(statefulPodRunning, frozenTime.Add(time.Second*3))
+		tracker.ObservedPodOnWatch(logger, statefulPodRunning, frozenTime.Add(time.Second*3))
 
 		// Verify no SLI metrics for stateful pod (
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wantsSLI), metricsName); err != nil {
@@ -726,6 +735,7 @@ func TestIsStatefulPod(t *testing.T) {
 }
 
 func TestFirstNetworkPodMetrics(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 
 	t.Run("first network pod; started in 30s, image pulling between 10th and 20th seconds", func(t *testing.T) {
 
@@ -748,32 +758,32 @@ kubelet_first_network_pod_start_sli_duration_seconds 30
 		hostNetworkPodInitializing := buildInitializingPod()
 		hostNetworkPodInitializing.UID = "11111-22222"
 		hostNetworkPodInitializing.Spec.HostNetwork = true
-		tracker.ObservedPodOnWatch(hostNetworkPodInitializing, frozenTime)
+		tracker.ObservedPodOnWatch(logger, hostNetworkPodInitializing, frozenTime)
 
 		hostNetworkPodStarted := buildRunningPod()
 		hostNetworkPodStarted.UID = "11111-22222"
 		hostNetworkPodStarted.Spec.HostNetwork = true
-		tracker.RecordStatusUpdated(hostNetworkPodStarted)
+		tracker.RecordStatusUpdated(logger, hostNetworkPodStarted)
 
 		// track only the first pod with network
 		podInitializing := buildInitializingPod()
-		tracker.ObservedPodOnWatch(podInitializing, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podInitializing, frozenTime)
 
 		// pod started
 		podStarted := buildRunningPod()
-		tracker.RecordStatusUpdated(podStarted)
+		tracker.RecordStatusUpdated(logger, podStarted)
 
 		// at 30s observe the same pod on watch
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*30))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*30))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_first_network_pod_start_sli_duration_seconds", "kubelet_first_network_pod_start_total_duration_seconds"); err != nil {
 			t.Fatal(err)
 		}
 
 		// any new pod observations should not impact the metrics, as the pod should be recorder only once
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*150))
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*200))
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*250))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*150))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*200))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*250))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_first_network_pod_start_sli_duration_seconds", "kubelet_first_network_pod_start_total_duration_seconds"); err != nil {
 			t.Fatal(err)

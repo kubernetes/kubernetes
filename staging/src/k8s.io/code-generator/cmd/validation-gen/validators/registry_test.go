@@ -57,3 +57,36 @@ func TestGetStability(t *testing.T) {
 		})
 	}
 }
+
+func TestIsKnownTag(t *testing.T) {
+	tests := []struct {
+		tagName  string
+		expected bool
+	}{
+		{
+			tagName:  "k8s:validateTrueAlpha",
+			expected: true,
+		},
+		{
+			tagName:  "k8s:validateTrueBeta",
+			expected: true,
+		},
+		{
+			tagName:  "k8s:required",
+			expected: true,
+		},
+		{
+			tagName:  "k8s:unknownTag",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.tagName, func(t *testing.T) {
+			got := IsKnownTag(tt.tagName)
+			if got != tt.expected {
+				t.Errorf("IsKnownTag(%q) = %v, want %v", tt.tagName, got, tt.expected)
+			}
+		})
+	}
+}

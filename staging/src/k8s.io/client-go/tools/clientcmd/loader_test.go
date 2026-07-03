@@ -656,6 +656,19 @@ func TestMigratingFile(t *testing.T) {
 	if !reflect.DeepEqual(sourceContent, destinationContent) {
 		t.Errorf("source and destination do not match")
 	}
+
+	// destination file permissions should be the same as the source file permissions
+	sourceInfo, err := os.Stat(sourceFile.Name())
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	destinationInfo, err := os.Stat(destinationFile.Name())
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if destinationInfo.Mode().Perm() != sourceInfo.Mode().Perm() {
+		t.Errorf("expected permissions %v, got %v", sourceInfo.Mode().Perm(), destinationInfo.Mode().Perm())
+	}
 }
 
 func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {

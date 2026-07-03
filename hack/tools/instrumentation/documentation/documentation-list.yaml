@@ -465,6 +465,7 @@
   namespace: apiserver
   help: Number of objects read from watch cache in the course of serving a LIST request
   type: Counter
+  deprecatedVersion: 1.37.0
   stabilityLevel: ALPHA
   labels:
   - group
@@ -477,6 +478,7 @@
   namespace: apiserver
   help: Number of objects returned for a LIST request from watch cache
   type: Counter
+  deprecatedVersion: 1.37.0
   stabilityLevel: ALPHA
   labels:
   - group
@@ -488,6 +490,7 @@
   namespace: apiserver
   help: Number of LIST requests served from watch cache
   type: Counter
+  deprecatedVersion: 1.37.0
   stabilityLevel: ALPHA
   labels:
   - group
@@ -2279,39 +2282,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: watch_events_sizes
-  subsystem: apiserver
-  help: Watch event size distribution in bytes
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  - version
-  buckets:
-  - 1024
-  - 2048
-  - 4096
-  - 8192
-  - 16384
-  - 32768
-  - 65536
-  - 131072
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: watch_events_total
-  subsystem: apiserver
-  help: Number of events sent in watch clients
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  - version
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: watch_filtered_events_total
   namespace: apiserver
   help: Counter of events filtered out by shard selector during watch dispatch, broken
@@ -2332,28 +2302,6 @@
   labels:
   - group
   - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: x509_insecure_sha1_total
-  subsystem: webhooks
-  namespace: apiserver
-  help: Counts the number of requests to servers with insecure SHA1 signatures in
-    their serving certificate OR the number of connection failures due to the insecure
-    SHA1 signatures (either/or, based on the runtime environment)
-  type: Counter
-  stabilityLevel: ALPHA
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: x509_missing_san_total
-  subsystem: webhooks
-  namespace: apiserver
-  help: Counts the number of requests to servers missing SAN extension in their serving
-    certificate OR the number of connection failures due to the lack of x509 certificate
-    SAN extension missing (either/or, based on the runtime environment)
-  type: Counter
-  stabilityLevel: ALPHA
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -2507,6 +2455,41 @@
   - 16.384
   componentEndpoints:
   - component: kube-apiserver
+    endpoint: /metrics
+- name: cloud_provider_calls_total
+  subsystem: cloud_node_lifecycle_controller
+  help: The total number of cloud provider API calls, labeled by operation and result.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  - result
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+- name: monitor_nodes_duration_seconds
+  subsystem: cloud_node_lifecycle_controller
+  help: A metric measuring the duration in seconds of a single MonitorNodes loop execution.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  componentEndpoints:
+  - component: cloud-controller-manager
     endpoint: /metrics
 - name: request_duration_seconds
   subsystem: cloud_provider_webhook
@@ -5286,6 +5269,42 @@
   componentEndpoints:
   - component: kube-proxy
     endpoint: /metrics
+- name: sync_proxy_rules_winkernel_lb_create_failures_total
+  subsystem: kubeproxy
+  help: Cumulative proxy winkernel lb create failures
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - error
+  - ip_family
+  - lb_type
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: sync_proxy_rules_winkernel_lb_delete_failures_total
+  subsystem: kubeproxy
+  help: Cumulative proxy winkernel lb delete failures
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - error
+  - ip_family
+  - lb_type
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: sync_proxy_rules_winkernel_lb_update_failures_total
+  subsystem: kubeproxy
+  help: Cumulative proxy winkernel lb update failures
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - error
+  - ip_family
+  - lb_type
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
 - name: leader_election_master_status
   help: Gauge of if the reporting system is master of the relevant lease, 0 indicates
     backup, 1 indicates master. 'name' is the string used to identify the lease. Please
@@ -6448,7 +6467,7 @@
     endpoint: /metrics
 - name: pod_scheduled_after_flush_total
   subsystem: scheduler
-  help: Number of pods that were successfully scheduled after being flushed from unschedulablePods
+  help: Number of pods that were successfully scheduled after being flushed from unschedulableEntities
     due to timeout. This metric helps detect potential queueing hint misconfigurations
     or event handling issues.
   type: Counter
@@ -6495,7 +6514,7 @@
     endpoint: /metrics
 - name: podgroup_scheduling_attempt_duration_seconds
   subsystem: scheduler
-  help: Pod group scheduling attempt latency in seconds (scheduling algorithm + binding)
+  help: Pod group scheduling attempt latency in seconds
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -7280,6 +7299,39 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: watch_events_sizes
+  subsystem: apiserver
+  help: Watch event size distribution in bytes
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - version
+  buckets:
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+  - 65536
+  - 131072
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_events_total
+  subsystem: apiserver
+  help: Number of events sent in watch clients
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - version
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: watch_list_duration_seconds
   subsystem: apiserver
   help: Response latency distribution in seconds for watch list requests broken by
@@ -7309,6 +7361,28 @@
   - 30
   - 45
   - 60
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: x509_insecure_sha1_total
+  subsystem: webhooks
+  namespace: apiserver
+  help: Counts the number of requests to servers with insecure SHA1 signatures in
+    their serving certificate OR the number of connection failures due to the insecure
+    SHA1 signatures (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: BETA
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: x509_missing_san_total
+  subsystem: webhooks
+  namespace: apiserver
+  help: Counts the number of requests to servers missing SAN extension in their serving
+    certificate OR the number of connection failures due to the lack of x509 certificate
+    SAN extension missing (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: BETA
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -8499,8 +8573,8 @@
   subsystem: scheduler
   help: Number of pending pods, by the queue type. 'active' means number of pods in
     activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
-    of pods in unschedulablePods that the scheduler attempted to schedule and failed;
-    'gated' is the number of unschedulable pods that the scheduler never attempted
+    of pods in unschedulableEntities that the scheduler attempted to schedule and
+    failed; 'gated' is the number of unschedulable pods that the scheduler never attempted
     to schedule because they are gated.
   type: Gauge
   stabilityLevel: STABLE

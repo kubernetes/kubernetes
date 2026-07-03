@@ -366,7 +366,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 						Requests:            config.Requests,
 						DeviceConfiguration: config.DeviceConfiguration,
 					})
-					continue
+					break // We can stop checking after the first match as all requests in the config should be added.
 				}
 
 				requestKey := requestIndices{claimIndex: claimIndex, requestIndex: i}
@@ -383,7 +383,37 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 						Requests:            config.Requests,
 						DeviceConfiguration: config.DeviceConfiguration,
 					})
+					break // We can stop checking after the first match as all requests in the config should be added.
 				}
+			}
+		}
+
+		// If a config applies to all requests, clear its Requests
+		// field to take advantage of the "empty means all" semantic.
+		for i := range allocationResult.Devices.Config {
+			requests := allocationResult.Devices.Config[i].Requests
+			if len(requests) == 0 {
+				continue
+			}
+			appliesToAll := true
+			for requestIndex, request := range claim.Spec.Devices.Requests {
+				if slices.Contains(requests, request.Name) {
+					continue
+				}
+				requestKey := requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}
+				requestData := alloc.requestData[requestKey]
+				if requestData.parentRequest != nil {
+					subRequest := request.FirstAvailable[requestData.selectedSubRequestIndex]
+					subRequestName := fmt.Sprintf("%s/%s", request.Name, subRequest.Name)
+					if slices.Contains(requests, subRequestName) {
+						continue
+					}
+				}
+				appliesToAll = false
+				break
+			}
+			if appliesToAll {
+				allocationResult.Devices.Config[i].Requests = nil
 			}
 		}
 

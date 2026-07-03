@@ -32,7 +32,7 @@ type entryID struct {
 
 // pbEntryID returns the ID of the given pb.Entry.
 func pbEntryID(entry *pb.Entry) entryID {
-	return entryID{term: entry.Term, index: entry.Index}
+	return entryID{term: entry.GetTerm(), index: entry.GetIndex()}
 }
 
 // logSlice describes a correct slice of a raft log.
@@ -70,7 +70,7 @@ type logSlice struct {
 	// prev is the ID of the entry immediately preceding the entries.
 	prev entryID
 	// entries contains the consecutive entries representing this slice.
-	entries []pb.Entry
+	entries []*pb.Entry
 }
 
 // lastIndex returns the index of the last entry in this log slice. Returns
@@ -83,7 +83,7 @@ func (s logSlice) lastIndex() uint64 {
 // there are no entries.
 func (s logSlice) lastEntryID() entryID {
 	if ln := len(s.entries); ln != 0 {
-		return pbEntryID(&s.entries[ln-1])
+		return pbEntryID(s.entries[ln-1])
 	}
 	return s.prev
 }
@@ -93,7 +93,7 @@ func (s logSlice) lastEntryID() entryID {
 func (s logSlice) valid() error {
 	prev := s.prev
 	for i := range s.entries {
-		id := pbEntryID(&s.entries[i])
+		id := pbEntryID(s.entries[i])
 		if id.term < prev.term || id.index != prev.index+1 {
 			return fmt.Errorf("leader term %d: entries %+v and %+v not consistent", s.term, prev, id)
 		}

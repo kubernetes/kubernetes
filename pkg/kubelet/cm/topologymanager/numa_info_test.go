@@ -19,14 +19,20 @@ package topologymanager
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
 func TestNUMAInfo(t *testing.T) {
+	numaDistanceErr := "error getting NUMA distances from cadvisor"
+	if runtime.GOOS == "windows" {
+		numaDistanceErr = fmt.Sprintf("the %q policy option is not supported on Windows because NUMA node distances are not available", PreferClosestNUMANodes)
+	}
+
 	tcases := []struct {
 		name             string
 		topology         []cadvisorapi.Node
@@ -325,7 +331,7 @@ func TestNUMAInfo(t *testing.T) {
 				},
 			},
 			expectedNUMAInfo: nil,
-			expectedErr:      fmt.Errorf("error getting NUMA distances from cadvisor"),
+			expectedErr:      fmt.Errorf("%s", numaDistanceErr),
 			opts: PolicyOptions{
 				PreferClosestNUMA: true,
 			},

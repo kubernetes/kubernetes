@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 )
 
@@ -184,10 +183,7 @@ func Convert_policy_PodDisruptionBudgetList_To_v1_PodDisruptionBudgetList(in *po
 }
 
 func autoConvert_v1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *policyv1.PodDisruptionBudgetSpec, out *policy.PodDisruptionBudgetSpec, s conversion.Scope) error {
-	out.MinAvailable = (*intstr.IntOrString)(unsafe.Pointer(in.MinAvailable))
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
-	out.UnhealthyPodEvictionPolicy = (*policy.UnhealthyPodEvictionPolicyType)(unsafe.Pointer(in.UnhealthyPodEvictionPolicy))
+	*out = *(*policy.PodDisruptionBudgetSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -197,10 +193,7 @@ func Convert_v1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *po
 }
 
 func autoConvert_policy_PodDisruptionBudgetSpec_To_v1_PodDisruptionBudgetSpec(in *policy.PodDisruptionBudgetSpec, out *policyv1.PodDisruptionBudgetSpec, s conversion.Scope) error {
-	out.MinAvailable = (*intstr.IntOrString)(unsafe.Pointer(in.MinAvailable))
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
-	out.UnhealthyPodEvictionPolicy = (*policyv1.UnhealthyPodEvictionPolicyType)(unsafe.Pointer(in.UnhealthyPodEvictionPolicy))
+	*out = *(*policyv1.PodDisruptionBudgetSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -210,13 +203,7 @@ func Convert_policy_PodDisruptionBudgetSpec_To_v1_PodDisruptionBudgetSpec(in *po
 }
 
 func autoConvert_v1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *policyv1.PodDisruptionBudgetStatus, out *policy.PodDisruptionBudgetStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
-	out.DisruptedPods = *(*map[string]metav1.Time)(unsafe.Pointer(&in.DisruptedPods))
-	out.DisruptionsAllowed = in.DisruptionsAllowed
-	out.CurrentHealthy = in.CurrentHealthy
-	out.DesiredHealthy = in.DesiredHealthy
-	out.ExpectedPods = in.ExpectedPods
-	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*policy.PodDisruptionBudgetStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -226,13 +213,7 @@ func Convert_v1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in
 }
 
 func autoConvert_policy_PodDisruptionBudgetStatus_To_v1_PodDisruptionBudgetStatus(in *policy.PodDisruptionBudgetStatus, out *policyv1.PodDisruptionBudgetStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
-	out.DisruptedPods = *(*map[string]metav1.Time)(unsafe.Pointer(&in.DisruptedPods))
-	out.DisruptionsAllowed = in.DisruptionsAllowed
-	out.CurrentHealthy = in.CurrentHealthy
-	out.DesiredHealthy = in.DesiredHealthy
-	out.ExpectedPods = in.ExpectedPods
-	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*policyv1.PodDisruptionBudgetStatus)(unsafe.Pointer(in))
 	return nil
 }
 

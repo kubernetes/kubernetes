@@ -29,12 +29,14 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	clientgofeaturegate "k8s.io/client-go/features"
+	"k8s.io/client-go/tools/metrics"
 	"k8s.io/klog/v2"
 )
 
 // New returns an http.RoundTripper that will provide the authentication
 // or transport level security defined by the provided Config.
 func New(config *Config) (http.RoundTripper, error) {
+	metrics.EnsureRegistered()
 	// Set transport level security
 	if config.Transport != nil && (config.HasCA() || config.HasCertAuth() || config.HasCertCallback() || config.TLS.Insecure) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")

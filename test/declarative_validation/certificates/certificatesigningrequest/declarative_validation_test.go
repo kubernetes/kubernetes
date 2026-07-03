@@ -33,6 +33,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
@@ -44,8 +45,12 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "certificates.k8s.io",
-		APIVersion: apiVersion,
+		APIPrefix:         "apis",
+		APIGroup:          "certificates.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "certificatesigningrequests",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	testCases := map[string]struct {
 		input        api.CertificateSigningRequest
@@ -87,6 +92,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := makeValidCSR()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -197,13 +205,22 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs)
 			})
 		}
+
+		ctx := createContextForSubresource(apiVersion, "/")
+		updateObj := makeValidCSR()
+		meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 	}
 }
 
 func createContextForSubresource(apiVersion, subresource string) context.Context {
 	requestInfo := &genericapirequest.RequestInfo{
-		APIGroup:   "certificates.k8s.io",
-		APIVersion: apiVersion,
+		APIPrefix:         "apis",
+		APIGroup:          "certificates.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "certificatesigningrequests",
+		Name:              "valid-obj",
+		IsResourceRequest: true,
+		Verb:              "update",
 	}
 
 	if subresource != "/" {
@@ -213,7 +230,7 @@ func createContextForSubresource(apiVersion, subresource string) context.Context
 	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), requestInfo)
 }
 
-func makeValidCSR(mutators ...func(*api.CertificateSigningRequest)) api.CertificateSigningRequest {
+func makeValidCSR(tweaks ...func(*api.CertificateSigningRequest)) api.CertificateSigningRequest {
 	csr := api.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-csr",
@@ -224,8 +241,8 @@ func makeValidCSR(mutators ...func(*api.CertificateSigningRequest)) api.Certific
 			Usages:     []api.KeyUsage{api.UsageDigitalSignature, api.UsageKeyEncipherment},
 		},
 	}
-	for _, mutate := range mutators {
-		mutate(&csr)
+	for _, tweak := range tweaks {
+		tweak(&csr)
 	}
 	return csr
 }

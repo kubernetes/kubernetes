@@ -44,7 +44,7 @@ type Manager interface {
 	// owning device plugin to allow setup procedures to take place, and for
 	// the device plugin to provide runtime settings to use the device
 	// (environment variables, mount points and device files).
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error
 
 	// UpdatePluginResources updates node resources based on devices already
 	// allocated to pods. The node object is provided for the device manager to
@@ -61,7 +61,7 @@ type Manager interface {
 
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.
-	GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
+	GetCapacity(logger klog.Logger) (v1.ResourceList, v1.ResourceList, []string)
 
 	// GetWatcherHandler returns the plugin handler for the device manager.
 	GetWatcherHandler() cache.PluginHandler
@@ -83,14 +83,14 @@ type Manager interface {
 
 	// TopologyManager HintProvider provider indicates the Device Manager implements the Topology Manager Interface
 	// and is consulted to make Topology aware resource alignments
-	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
 
 	// TopologyManager HintProvider provider indicates the Device Manager implements the Topology Manager Interface
 	// and is consulted to make Topology aware resource alignments per Pod
-	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(logger klog.Logger, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
 	// AllocatePod is called to trigger the allocation of resources to a pod.
-	AllocatePod(pod *v1.Pod) error
+	AllocatePod(logger klog.Logger, pod *v1.Pod) error
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()

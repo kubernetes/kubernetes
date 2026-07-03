@@ -37,7 +37,7 @@ func (c MajorityConfig) String() string {
 		if i > 0 {
 			buf.WriteByte(' ')
 		}
-		fmt.Fprint(&buf, sl[i])
+		fmt.Fprintf(&buf, "%x", sl[i])
 	}
 	buf.WriteByte(')')
 	return buf.String()
@@ -76,9 +76,11 @@ func (c MajorityConfig) Describe(l AckedIndexer) string {
 	})
 
 	// Populate .bar.
-	for i := range info {
-		if i > 0 && info[i-1].idx < info[i].idx {
+	for i := 1; i < len(info); i++ {
+		if info[i-1].idx < info[i].idx {
 			info[i].bar = i
+		} else {
+			info[i].bar = info[i-1].bar
 		}
 	}
 
@@ -98,7 +100,7 @@ func (c MajorityConfig) Describe(l AckedIndexer) string {
 		} else {
 			fmt.Fprint(&buf, strings.Repeat("x", bar)+">"+strings.Repeat(" ", n-bar))
 		}
-		fmt.Fprintf(&buf, " %5d    (id=%d)\n", info[i].idx, info[i].id)
+		fmt.Fprintf(&buf, " %5d    (id=%x)\n", info[i].idx, info[i].id)
 	}
 	return buf.String()
 }

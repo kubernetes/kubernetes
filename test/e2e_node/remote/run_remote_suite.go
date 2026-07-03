@@ -84,7 +84,7 @@ func RunRemoteTestSuite(testSuite TestSuite) {
 
 	// Append some default ginkgo flags. We use similar defaults here as hack/ginkgo-e2e.sh
 	allGinkgoFlags := fmt.Sprintf("%s --no-color -v", *ginkgoFlags)
-	fmt.Printf("Will use ginkgo flags as: %s", allGinkgoFlags)
+	klog.Infof("Will use ginkgo flags as: %s", allGinkgoFlags)
 
 	var runner Runner
 	cfg := Config{

@@ -39,7 +39,6 @@ type ClusterVersionBackend interface {
 type MemberBackend interface {
 	MustReadMembersFromBackend() (map[types.ID]*Member, map[types.ID]bool)
 	MustSaveMemberToBackend(*Member)
-	MustHackySaveMemberToBackend(*Member)
 	TrimMembershipFromBackend() error
 	MustDeleteMemberFromBackend(types.ID)
 }

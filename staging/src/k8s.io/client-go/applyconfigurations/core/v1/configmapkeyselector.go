@@ -25,7 +25,8 @@ package v1
 type ConfigMapKeySelectorApplyConfiguration struct {
 	// The ConfigMap to select from.
 	LocalObjectReferenceApplyConfiguration `json:""`
-	// The key to select.
+	// The key to select from the ConfigMap's Data field.
+	// Keys in the BinaryData field are not currently propagated to container env vars.
 	Key *string `json:"key,omitempty"`
 	// Specify whether the ConfigMap or its key must be defined
 	Optional *bool `json:"optional,omitempty"`

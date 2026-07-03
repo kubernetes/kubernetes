@@ -29,6 +29,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	registry "k8s.io/kubernetes/pkg/registry/resource/resourceslice"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
@@ -36,9 +37,11 @@ func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:   "resource.k8s.io",
-				APIVersion: apiVersion,
-				Resource:   "ResourceSlice",
+				APIGroup:          "resource.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "ResourceSlice",
+				IsResourceRequest: true,
+				Verb:              "create",
 			})
 
 			strategy := registry.Strategy
@@ -275,6 +278,9 @@ func TestDeclarativeValidate(t *testing.T) {
 					)
 				})
 			}
+
+			obj := mkResourceSliceWithDevices()
+			meta.RunObjectMetaTestCases(t, ctx, &obj, strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
@@ -283,9 +289,11 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:   "resource.k8s.io",
-				APIVersion: apiVersion,
-				Resource:   "ResourceSlice",
+				APIGroup:          "resource.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "ResourceSlice",
+				IsResourceRequest: true,
+				Verb:              "update",
 			})
 
 			strategy := registry.Strategy
@@ -510,6 +518,9 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 				})
 			}
+
+			updateObj := mkResourceSliceWithDevices()
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }

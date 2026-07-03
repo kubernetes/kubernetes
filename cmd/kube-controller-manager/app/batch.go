@@ -23,7 +23,7 @@ import (
 	"context"
 	"fmt"
 
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha3"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -49,8 +49,8 @@ func newJobController(ctx context.Context, controllerContext ControllerContext, 
 	var workloadInformer schedulinginformers.WorkloadInformer
 	var podGroupInformer schedulinginformers.PodGroupInformer
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
-		workloadInformer = controllerContext.InformerFactory.Scheduling().V1alpha2().Workloads()
-		podGroupInformer = controllerContext.InformerFactory.Scheduling().V1alpha2().PodGroups()
+		workloadInformer = controllerContext.InformerFactory.Scheduling().V1alpha3().Workloads()
+		podGroupInformer = controllerContext.InformerFactory.Scheduling().V1alpha3().PodGroups()
 	}
 
 	jc, err := job.NewController(

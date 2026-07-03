@@ -30,13 +30,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -772,7 +773,7 @@ func TestSyncHandler(t *testing.T) {
 			})
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
@@ -847,7 +848,7 @@ func TestSyncHandler(t *testing.T) {
 			}
 			assert.Equal(t, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
 
-			podGroups, err := fakeKubeClient.SchedulingV1alpha2().PodGroups("").List(tCtx, metav1.ListOptions{})
+			podGroups, err := fakeKubeClient.SchedulingV1alpha3().PodGroups("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing podgroups: %v", err)
 			}
@@ -874,7 +875,7 @@ func TestResourceClaimTemplateEventHandler(t *testing.T) {
 	fakeKubeClient := createTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	claimTemplateClient := fakeKubeClient.ResourceV1().ResourceClaimTemplates(testNamespace)
@@ -1007,7 +1008,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	fakeKubeClient := createTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	setupMetrics()
@@ -1310,7 +1311,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			fakeKubeClient := createTestClient(test.initialObjects...)
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
@@ -2041,6 +2042,9 @@ func TestEnqueuePodExtendedResourceClaims(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if !test.featureGateEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.featureGateEnabled)
 
 			tCtx := ktesting.Init(t)
@@ -2048,7 +2052,7 @@ func TestEnqueuePodExtendedResourceClaims(t *testing.T) {
 			fakeKubeClient := createTestClient()
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 

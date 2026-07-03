@@ -43,28 +43,31 @@ const (
 var (
 	listCacheCount = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Name:           "cache_list_total",
-			Help:           "Number of LIST requests served from watch cache",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Namespace:         namespace,
+			Name:              "cache_list_total",
+			Help:              "Number of LIST requests served from watch cache",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource", "index"},
 	)
 	listCacheNumFetched = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Name:           "cache_list_fetched_objects_total",
-			Help:           "Number of objects read from watch cache in the course of serving a LIST request",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Namespace:         namespace,
+			Name:              "cache_list_fetched_objects_total",
+			Help:              "Number of objects read from watch cache in the course of serving a LIST request",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource", "index"},
 	)
 	listCacheNumReturned = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Name:           "cache_list_returned_objects_total",
-			Help:           "Number of objects returned for a LIST request from watch cache",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Namespace:         namespace,
+			Name:              "cache_list_returned_objects_total",
+			Help:              "Number of objects returned for a LIST request from watch cache",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource"},
 	)

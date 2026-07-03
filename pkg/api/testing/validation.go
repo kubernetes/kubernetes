@@ -24,11 +24,11 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/test/coverage"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -41,6 +41,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"sigs.k8s.io/randfill"
 )
+
+// skippedEquivalenceGroupVersions opt out of declarative validation
+// (+k8s:validation-gen=false) but share an internal type with versions that do
+// not. Only intentional opt-outs belong here; any other version missing
+// declarative validation should fail the sweep, not be skipped.
+var skippedEquivalenceGroupVersions = sets.New("extensions/v1beta1")
 
 // VerifyVersionedValidationEquivalence tests that all versions of an API return equivalent validation errors.
 // It accepts optional configuration to handle path normalization across API versions where structures differ.
@@ -55,6 +61,11 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 	// Accumulate errors from all versioned validation, per version.
 	all := map[string]field.ErrorList{}
 	accumulate := func(t *testing.T, gv string, errs field.ErrorList) {
+		// Skip group/versions excluded from the equivalence sweep
+		// (see skippedEquivalenceGroupVersions).
+		if skippedEquivalenceGroupVersions.Has(gv) {
+			return
+		}
 		// If normalization rules are provided, apply them to the field paths of generated errors.
 		// This allows comparing errors between API versions that have structural differences
 		// (e.g. flattened vs nested fields).
@@ -271,11 +282,7 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 	}
 
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
-		errs := strategy.Validate(c, obj)
-		if dv, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
-			errs = dv.ValidateDeclaratively(c, obj, nil, errs, operation.Create, dv.DeclarativeValidationConfig(c, obj, nil))
-		}
-		return errs
+		return rest.ValidateCreate(c, obj, strategy)
 	}, ctx, opts, obj)
 	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
 }
@@ -303,13 +310,26 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 	}
 
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
-		errs := strategy.ValidateUpdate(c, obj, old)
-		if dv, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
-			errs = dv.ValidateDeclaratively(c, obj, old, errs, operation.Update, dv.DeclarativeValidationConfig(c, obj, old))
-		}
-		return errs
+		return rest.ValidateUpdate(c, obj, old, strategy)
 	}, ctx, opts, obj)
 	VerifyVersionedValidationEquivalence(t, obj, old, testConfigs...)
+}
+
+// VerifyValidationEquivalenceFunc is a variant of VerifyValidationEquivalence
+// for callers that produce handwritten and declarative validation errors directly, rather
+// than through a RESTCreateStrategy. The validate closure should return the combined
+// ErrorList for (ctx, obj).
+func VerifyValidationEquivalenceFunc(t *testing.T, ctx context.Context, obj runtime.Object, validate func(ctx context.Context, obj runtime.Object) field.ErrorList, expectedErrs field.ErrorList, testConfigs ...ValidationTestConfig) {
+	t.Helper()
+	opts := &validationOption{}
+	for _, testcfg := range testConfigs {
+		testcfg(opts)
+	}
+
+	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
+		return validate(c, obj)
+	}, ctx, opts, obj)
+	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
 }
 
 // VerifyUpdateValidationEquivalenceFunc is a variant of VerifyUpdateValidationEquivalence
@@ -344,7 +364,6 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	t.Run("with declarative validation (Beta enabled)", func(t *testing.T) {
 		validationmetrics.ResetValidationMetricsInstance()
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.DeclarativeValidation:     true,
 			features.DeclarativeValidationBeta: true,
 		})
 		errs := runValidations(ctx)
@@ -363,7 +382,6 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	t.Run("with declarative validation (Beta disabled)", func(t *testing.T) {
 		validationmetrics.ResetValidationMetricsInstance()
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.DeclarativeValidation:     true,
 			features.DeclarativeValidationBeta: false,
 		})
 		errs := runValidations(ctx)
@@ -387,7 +405,6 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		// We don't strictly need to set feature gates here as the context override should force enforcement,
 		// but setting them ensures a consistent environment.
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.DeclarativeValidation:     true,
 			features.DeclarativeValidationBeta: true,
 		})
 		testCtx := rest.WithAllDeclarativeEnforcedForTest(ctx)

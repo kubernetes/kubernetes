@@ -19,6 +19,7 @@ package pod
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1145,6 +1146,8 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			if !tc.enabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			} else if !tc.extendedEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
 			overrides := featuregatetesting.FeatureOverrides{
 				features.DynamicResourceAllocation: tc.enabled,
@@ -2619,25 +2622,20 @@ func TestDropHostUsers(t *testing.T) {
 
 	podWithoutHostUsers := func() *api.Pod {
 		return &api.Pod{
-			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{}},
+			Spec: api.PodSpec{},
 		}
 	}
 	podWithHostUsersFalse := func() *api.Pod {
 		return &api.Pod{
 			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &falseVar,
-				},
+				HostUsers: &falseVar,
 			},
 		}
 	}
 	podWithHostUsersTrue := func() *api.Pod {
 		return &api.Pod{
 			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &trueVar,
-				},
+				HostUsers: &trueVar,
 			},
 		}
 	}
@@ -3584,240 +3582,6 @@ func TestDropPodCertificateProjectedVolumes(t *testing.T) {
 	}
 }
 
-func TestDropPodLifecycleSleepAction(t *testing.T) {
-	makeSleepHandler := func() *api.LifecycleHandler {
-		return &api.LifecycleHandler{
-			Sleep: &api.SleepAction{Seconds: 1},
-		}
-	}
-
-	makeExecHandler := func() *api.LifecycleHandler {
-		return &api.LifecycleHandler{
-			Exec: &api.ExecAction{Command: []string{"foo"}},
-		}
-	}
-
-	makeHTTPGetHandler := func() *api.LifecycleHandler {
-		return &api.LifecycleHandler{
-			HTTPGet: &api.HTTPGetAction{Host: "foo"},
-		}
-	}
-
-	makeContainer := func(preStop, postStart *api.LifecycleHandler) api.Container {
-		container := api.Container{Name: "foo"}
-		if preStop != nil || postStart != nil {
-			container.Lifecycle = &api.Lifecycle{
-				PostStart: postStart,
-				PreStop:   preStop,
-			}
-		}
-		return container
-	}
-
-	makeEphemeralContainer := func(preStop, postStart *api.LifecycleHandler) api.EphemeralContainer {
-		container := api.EphemeralContainer{
-			EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "foo"},
-		}
-		if preStop != nil || postStart != nil {
-			container.Lifecycle = &api.Lifecycle{
-				PostStart: postStart,
-				PreStop:   preStop,
-			}
-		}
-		return container
-	}
-
-	makePod := func(containers []api.Container, initContainers []api.Container, ephemeralContainers []api.EphemeralContainer) *api.PodSpec {
-		return &api.PodSpec{
-			Containers:          containers,
-			InitContainers:      initContainers,
-			EphemeralContainers: ephemeralContainers,
-		}
-	}
-
-	testCases := []struct {
-		gateEnabled            bool
-		oldLifecycleHandler    *api.LifecycleHandler
-		newLifecycleHandler    *api.LifecycleHandler
-		expectLifecycleHandler *api.LifecycleHandler
-	}{
-		// nil -> nil
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    nil,
-			newLifecycleHandler:    nil,
-			expectLifecycleHandler: nil,
-		},
-		{
-			gateEnabled:            true,
-			oldLifecycleHandler:    nil,
-			newLifecycleHandler:    nil,
-			expectLifecycleHandler: nil,
-		},
-		// nil -> exec
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    nil,
-			newLifecycleHandler:    makeExecHandler(),
-			expectLifecycleHandler: makeExecHandler(),
-		},
-		{
-			gateEnabled:            true,
-			oldLifecycleHandler:    nil,
-			newLifecycleHandler:    makeExecHandler(),
-			expectLifecycleHandler: makeExecHandler(),
-		},
-		// nil -> sleep
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    nil,
-			newLifecycleHandler:    makeSleepHandler(),
-			expectLifecycleHandler: nil,
-		},
-		{
-			gateEnabled:            true,
-			oldLifecycleHandler:    nil,
-			newLifecycleHandler:    makeSleepHandler(),
-			expectLifecycleHandler: makeSleepHandler(),
-		},
-		// exec -> exec
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    makeExecHandler(),
-			newLifecycleHandler:    makeExecHandler(),
-			expectLifecycleHandler: makeExecHandler(),
-		},
-		{
-			gateEnabled:            true,
-			oldLifecycleHandler:    makeExecHandler(),
-			newLifecycleHandler:    makeExecHandler(),
-			expectLifecycleHandler: makeExecHandler(),
-		},
-		// exec -> http
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    makeExecHandler(),
-			newLifecycleHandler:    makeHTTPGetHandler(),
-			expectLifecycleHandler: makeHTTPGetHandler(),
-		},
-		{
-			gateEnabled:            true,
-			oldLifecycleHandler:    makeExecHandler(),
-			newLifecycleHandler:    makeHTTPGetHandler(),
-			expectLifecycleHandler: makeHTTPGetHandler(),
-		},
-		// exec -> sleep
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    makeExecHandler(),
-			newLifecycleHandler:    makeSleepHandler(),
-			expectLifecycleHandler: nil,
-		},
-		{
-			gateEnabled:            true,
-			oldLifecycleHandler:    makeExecHandler(),
-			newLifecycleHandler:    makeSleepHandler(),
-			expectLifecycleHandler: makeSleepHandler(),
-		},
-		// sleep -> exec
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    makeSleepHandler(),
-			newLifecycleHandler:    makeExecHandler(),
-			expectLifecycleHandler: makeExecHandler(),
-		},
-		{
-			gateEnabled:            true,
-			oldLifecycleHandler:    makeSleepHandler(),
-			newLifecycleHandler:    makeExecHandler(),
-			expectLifecycleHandler: makeExecHandler(),
-		},
-		// sleep -> sleep
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    makeSleepHandler(),
-			newLifecycleHandler:    makeSleepHandler(),
-			expectLifecycleHandler: makeSleepHandler(),
-		},
-		{
-			gateEnabled:            true,
-			oldLifecycleHandler:    makeSleepHandler(),
-			newLifecycleHandler:    makeSleepHandler(),
-			expectLifecycleHandler: makeSleepHandler(),
-		},
-	}
-
-	for i, tc := range testCases {
-		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, tc.gateEnabled)
-
-			// preStop
-			// container
-			{
-				oldPod := makePod([]api.Container{makeContainer(tc.oldLifecycleHandler.DeepCopy(), nil)}, nil, nil)
-				newPod := makePod([]api.Container{makeContainer(tc.newLifecycleHandler.DeepCopy(), nil)}, nil, nil)
-				expectPod := makePod([]api.Container{makeContainer(tc.expectLifecycleHandler.DeepCopy(), nil)}, nil, nil)
-				dropDisabledFields(newPod, nil, oldPod, nil)
-				if diff := cmp.Diff(expectPod, newPod); diff != "" {
-					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
-				}
-			}
-			// InitContainer
-			{
-				oldPod := makePod(nil, []api.Container{makeContainer(tc.oldLifecycleHandler.DeepCopy(), nil)}, nil)
-				newPod := makePod(nil, []api.Container{makeContainer(tc.newLifecycleHandler.DeepCopy(), nil)}, nil)
-				expectPod := makePod(nil, []api.Container{makeContainer(tc.expectLifecycleHandler.DeepCopy(), nil)}, nil)
-				dropDisabledFields(newPod, nil, oldPod, nil)
-				if diff := cmp.Diff(expectPod, newPod); diff != "" {
-					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
-				}
-			}
-			// EphemeralContainer
-			{
-				oldPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.oldLifecycleHandler.DeepCopy(), nil)})
-				newPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.newLifecycleHandler.DeepCopy(), nil)})
-				expectPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.expectLifecycleHandler.DeepCopy(), nil)})
-				dropDisabledFields(newPod, nil, oldPod, nil)
-				if diff := cmp.Diff(expectPod, newPod); diff != "" {
-					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
-				}
-			}
-			// postStart
-			// container
-			{
-				oldPod := makePod([]api.Container{makeContainer(nil, tc.oldLifecycleHandler.DeepCopy())}, nil, nil)
-				newPod := makePod([]api.Container{makeContainer(nil, tc.newLifecycleHandler.DeepCopy())}, nil, nil)
-				expectPod := makePod([]api.Container{makeContainer(nil, tc.expectLifecycleHandler.DeepCopy())}, nil, nil)
-				dropDisabledFields(newPod, nil, oldPod, nil)
-				if diff := cmp.Diff(expectPod, newPod); diff != "" {
-					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
-				}
-			}
-			// InitContainer
-			{
-				oldPod := makePod(nil, []api.Container{makeContainer(nil, tc.oldLifecycleHandler.DeepCopy())}, nil)
-				newPod := makePod(nil, []api.Container{makeContainer(nil, tc.newLifecycleHandler.DeepCopy())}, nil)
-				expectPod := makePod(nil, []api.Container{makeContainer(nil, tc.expectLifecycleHandler.DeepCopy())}, nil)
-				dropDisabledFields(newPod, nil, oldPod, nil)
-				if diff := cmp.Diff(expectPod, newPod); diff != "" {
-					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
-				}
-			}
-			// EphemeralContainer
-			{
-				oldPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.oldLifecycleHandler.DeepCopy())})
-				newPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.newLifecycleHandler.DeepCopy())})
-				expectPod := makePod(nil, nil, []api.EphemeralContainer{makeEphemeralContainer(nil, tc.expectLifecycleHandler.DeepCopy())})
-				dropDisabledFields(newPod, nil, oldPod, nil)
-				if diff := cmp.Diff(expectPod, newPod); diff != "" {
-					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
-				}
-			}
-		})
-	}
-}
-
 func TestDropContainerStopSignals(t *testing.T) {
 	makeContainer := func(lifecycle *api.Lifecycle) api.Container {
 		container := api.Container{Name: "foo"}
@@ -4371,7 +4135,7 @@ func TestDropSELinuxChangePolicy(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// un-lock locked feature gates, if necessary
-			if !sets.New(tc.gates...).Has(features.SELinuxChangePolicy) {
+			if !slices.Contains(tc.gates, features.SELinuxChangePolicy) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
 			// Set feature gates for the test. *Disable* those that are not in tc.gates.
@@ -4640,182 +4404,6 @@ func TestValidateInvalidLabelValueInNodeSelectorOption(t *testing.T) {
 			if tc.wantOption != gotOptions.AllowInvalidLabelValueInRequiredNodeAffinity {
 				t.Errorf("Got AllowInvalidLabelValueInRequiredNodeAffinity=%t, want %t", gotOptions.AllowInvalidLabelValueInRequiredNodeAffinity, tc.wantOption)
 			}
-		})
-	}
-}
-
-func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
-	testCases := []struct {
-		name                                        string
-		podSpec                                     *api.PodSpec
-		featureEnabled                              bool
-		expectAllowPodLifecycleSleepActionZeroValue bool
-	}{
-		{
-			name:           "no lifecycle hooks",
-			podSpec:        &api.PodSpec{},
-			featureEnabled: true,
-			expectAllowPodLifecycleSleepActionZeroValue: true,
-		},
-		{
-			name: "Prestop with non-zero second duration",
-			podSpec: &api.PodSpec{
-				Containers: []api.Container{
-					{
-						Lifecycle: &api.Lifecycle{
-							PreStop: &api.LifecycleHandler{
-								Sleep: &api.SleepAction{
-									Seconds: 1,
-								},
-							},
-						},
-					},
-				},
-			},
-			featureEnabled: true,
-			expectAllowPodLifecycleSleepActionZeroValue: true,
-		},
-		{
-			name: "PostStart with non-zero second duration",
-			podSpec: &api.PodSpec{
-				Containers: []api.Container{
-					{
-						Lifecycle: &api.Lifecycle{
-							PostStart: &api.LifecycleHandler{
-								Sleep: &api.SleepAction{
-									Seconds: 1,
-								},
-							},
-						},
-					},
-				},
-			},
-			featureEnabled: true,
-			expectAllowPodLifecycleSleepActionZeroValue: true,
-		},
-		{
-			name: "PreStop with zero seconds",
-			podSpec: &api.PodSpec{
-				Containers: []api.Container{
-					{
-						Lifecycle: &api.Lifecycle{
-							PreStop: &api.LifecycleHandler{
-								Sleep: &api.SleepAction{
-									Seconds: 0,
-								},
-							},
-						},
-					},
-				},
-			},
-			featureEnabled: true,
-			expectAllowPodLifecycleSleepActionZeroValue: true,
-		},
-		{
-			name: "PostStart with zero seconds",
-			podSpec: &api.PodSpec{
-				Containers: []api.Container{
-					{
-						Lifecycle: &api.Lifecycle{
-							PostStart: &api.LifecycleHandler{
-								Sleep: &api.SleepAction{
-									Seconds: 0,
-								},
-							},
-						},
-					},
-				},
-			},
-			featureEnabled: true,
-			expectAllowPodLifecycleSleepActionZeroValue: true,
-		},
-		{
-			name:           "no lifecycle hooks with feature gate disabled",
-			podSpec:        &api.PodSpec{},
-			featureEnabled: false,
-			expectAllowPodLifecycleSleepActionZeroValue: false,
-		},
-		{
-			name: "Prestop with non-zero second duration with feature gate disabled",
-			podSpec: &api.PodSpec{
-				Containers: []api.Container{
-					{
-						Lifecycle: &api.Lifecycle{
-							PreStop: &api.LifecycleHandler{
-								Sleep: &api.SleepAction{
-									Seconds: 1,
-								},
-							},
-						},
-					},
-				},
-			},
-			featureEnabled: false,
-			expectAllowPodLifecycleSleepActionZeroValue: false,
-		},
-		{
-			name: "PostStart with non-zero second duration with feature gate disabled",
-			podSpec: &api.PodSpec{
-				Containers: []api.Container{
-					{
-						Lifecycle: &api.Lifecycle{
-							PostStart: &api.LifecycleHandler{
-								Sleep: &api.SleepAction{
-									Seconds: 1,
-								},
-							},
-						},
-					},
-				},
-			},
-			featureEnabled: false,
-			expectAllowPodLifecycleSleepActionZeroValue: false,
-		},
-		{
-			name: "PreStop with zero seconds with feature gate disabled",
-			podSpec: &api.PodSpec{
-				Containers: []api.Container{
-					{
-						Lifecycle: &api.Lifecycle{
-							PreStop: &api.LifecycleHandler{
-								Sleep: &api.SleepAction{
-									Seconds: 0,
-								},
-							},
-						},
-					},
-				},
-			},
-			featureEnabled: false,
-			expectAllowPodLifecycleSleepActionZeroValue: true,
-		},
-		{
-			name: "PostStart with zero seconds with feature gate disabled",
-			podSpec: &api.PodSpec{
-				Containers: []api.Container{
-					{
-						Lifecycle: &api.Lifecycle{
-							PostStart: &api.LifecycleHandler{
-								Sleep: &api.SleepAction{
-									Seconds: 0,
-								},
-							},
-						},
-					},
-				},
-			},
-			featureEnabled: false,
-			expectAllowPodLifecycleSleepActionZeroValue: true,
-		},
-	}
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepActionAllowZero, tc.featureEnabled)
-
-			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.podSpec, nil, nil)
-			assert.Equal(t, tc.expectAllowPodLifecycleSleepActionZeroValue, gotOptions.AllowPodLifecycleSleepActionZeroValue, "AllowPodLifecycleSleepActionZeroValue")
 		})
 	}
 }
@@ -6134,16 +5722,12 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 		}, {
 			name: "hostUsers=false & no volume devices",
 			spec: &api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &falseVar,
-				},
+				HostUsers: &falseVar,
 			},
 		}, {
 			name: "hostUsers=true & container volumeDevice",
 			spec: &api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &trueVar,
-				},
+				HostUsers: &trueVar,
 				Containers: []api.Container{{
 					Name: "test-container",
 					VolumeDevices: []api.VolumeDevice{{
@@ -6156,9 +5740,7 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 			name:     "hostUsers=false & container volumeDevice",
 			expected: true,
 			spec: &api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &falseVar,
-				},
+				HostUsers: &falseVar,
 				Containers: []api.Container{{
 					Name: "test-container",
 					VolumeDevices: []api.VolumeDevice{{
@@ -6172,9 +5754,7 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 			name:     "hostUsers=false & initContainer volumeDevice",
 			expected: true,
 			spec: &api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &falseVar,
-				},
+				HostUsers: &falseVar,
 				InitContainers: []api.Container{{
 					Name: "test-container",
 					VolumeDevices: []api.VolumeDevice{{
@@ -6187,9 +5767,7 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 			name:     "hostUsers=false & ephemeralContainer volumeDevice",
 			expected: true,
 			spec: &api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &falseVar,
-				},
+				HostUsers: &falseVar,
 				EphemeralContainers: []api.EphemeralContainer{{
 					EphemeralContainerCommon: api.EphemeralContainerCommon{
 						Name: "test-container",
@@ -6572,7 +6150,6 @@ func TestValidateRestartAllContainersOption(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.ContainerRestartRules:                tc.featureEnabled,
-				features.NodeDeclaredFeatures:                 tc.featureEnabled,
 				features.RestartAllContainersOnContainerExits: tc.featureEnabled,
 			})
 			// The new pod doesn't impact the outcome.

@@ -19,6 +19,8 @@ package localupcluster
 import (
 	"reflect"
 	"testing"
+
+	"k8s.io/component-base/featuregate"
 )
 
 func TestMergeFeatureGatesFlags(t *testing.T) {
@@ -128,6 +130,34 @@ func TestMergeFeatureGatesFlags(t *testing.T) {
 			}
 			if !reflect.DeepEqual(tc.cmdLine, cmdLineCopy) {
 				t.Errorf("input slice was mutated:\n got:  %q\n want: %q", tc.cmdLine, cmdLineCopy)
+			}
+		})
+	}
+}
+
+func TestFilterLockedFeatureGates(t *testing.T) {
+	allGates := map[featuregate.Feature]featuregate.FeatureSpec{
+		"Unlocked":      {Default: true, LockToDefault: false},
+		"LockedToTrue":  {Default: true, LockToDefault: true},
+		"LockedToFalse": {Default: false, LockToDefault: true},
+	}
+	for name, tc := range map[string]struct {
+		featureGates string
+		want         string
+	}{
+		"no-locked-gates":                   {featureGates: "Unlocked=false", want: "Unlocked=false"},
+		"locked-to-true-set-false-removed":  {featureGates: "LockedToTrue=false", want: ""},
+		"locked-to-true-set-true-removed":   {featureGates: "LockedToTrue=true", want: ""},
+		"locked-to-false-set-true-removed":  {featureGates: "LockedToFalse=true", want: ""},
+		"locked-to-false-set-false-removed": {featureGates: "LockedToFalse=false", want: ""},
+		"locked-gate-mixed":                 {featureGates: "Unlocked=false,LockedToTrue=false", want: "Unlocked=false"},
+		"unknown-gate-kept":                 {featureGates: "Unknown=true", want: "Unknown=true"},
+		"multiple-unlocked":                 {featureGates: "Unlocked=false,Unknown=true", want: "Unlocked=false,Unknown=true"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := filterLockedFeatureGates(tc.featureGates, allGates)
+			if got != tc.want {
+				t.Errorf("filterLockedFeatureGates(%q) = %q, want %q", tc.featureGates, got, tc.want)
 			}
 		})
 	}

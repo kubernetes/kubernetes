@@ -127,12 +127,52 @@ func SetActiveDeadlineSeconds(deadline int64) Tweak {
 func SetServiceAccountName(name string) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.ServiceAccountName = name
+		pod.Spec.DeprecatedServiceAccount = name //nolint:staticcheck // SA1019 to match defaulting
+	}
+}
+
+// SetDeprecatedServiceAccount should only be used to test that validation ensures
+// defaulting works correctly. SetServiceAccountName sets it correctly for other
+// test cases.
+func SetDeprecatedServiceAccount(name string) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.DeprecatedServiceAccount = name //nolint:staticcheck // SA1019 for testing
 	}
 }
 
 func SetSecurityContext(ctx *api.PodSecurityContext) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.SecurityContext = ctx
+	}
+}
+
+func SetHostNetwork(b bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.HostNetwork = b
+	}
+}
+
+func SetHostPID(b bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.HostPID = b
+	}
+}
+
+func SetHostIPC(b bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.HostIPC = b
+	}
+}
+
+func SetShareProcessNamespace(b *bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.ShareProcessNamespace = b
+	}
+}
+
+func SetHostUsers(b *bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.HostUsers = b
 	}
 }
 

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -68,12 +67,12 @@ func (s *staticNodeTemplate) GetNodeTemplate(index, count int) (*v1.Node, error)
 // IntegrationTestNodePreparer holds configuration information for the test node preparer.
 type IntegrationTestNodePreparer struct {
 	client          clientset.Interface
-	countToStrategy []testutils.CountToStrategy
+	countToStrategy []CountToStrategy
 	nodeTemplate    NodeTemplate
 }
 
 // NewIntegrationTestNodePreparer creates an IntegrationTestNodePreparer with a given nodeTemplate.
-func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeTemplate NodeTemplate) testutils.TestNodePreparer {
+func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy []CountToStrategy, nodeTemplate NodeTemplate) TestNodePreparer {
 	return &IntegrationTestNodePreparer{
 		client:          client,
 		countToStrategy: countToStrategy,
@@ -126,7 +125,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 	index := nextNodeIndex
 	for _, v := range p.countToStrategy {
 		for i := 0; i < v.Count; i, index = i+1, index+1 {
-			if err := testutils.DoPrepareNode(ctx, p.client, &nodes.Items[index], v.Strategy); err != nil {
+			if err := DoPrepareNode(ctx, p.client, &nodes.Items[index], v.Strategy); err != nil {
 				return fmt.Errorf("aborting node preparation: %w", err)
 			}
 		}

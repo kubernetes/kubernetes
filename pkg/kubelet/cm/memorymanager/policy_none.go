@@ -17,6 +17,8 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
@@ -46,7 +48,7 @@ func (p *none) Start(logger klog.Logger, s state.State) error {
 }
 
 // Allocate call is idempotent
-func (p *none) Allocate(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *none) Allocate(_ context.Context, s state.State, pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 

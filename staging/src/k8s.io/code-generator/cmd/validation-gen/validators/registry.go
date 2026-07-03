@@ -67,7 +67,7 @@ func (reg *registry) addTagValidator(tv TagValidator) {
 	globalRegistry.tagValidators[name] = tv
 }
 
-func (reg *registry) init(c *generator.Context) {
+func (reg *registry) init(c *generator.Context, inputToPkg map[string]string) {
 	if reg.initialized.Load() {
 		panic("registry.init() was called twice")
 	}
@@ -78,6 +78,7 @@ func (reg *registry) init(c *generator.Context) {
 	cfg := Config{
 		GengoContext: c,
 		TagValidator: reg,
+		InputToPkg:   inputToPkg,
 	}
 
 	for _, tv := range globalRegistry.tagValidators {
@@ -224,6 +225,9 @@ type ValidationExtractor interface {
 
 	// Stability returns the stability level for a given tag.
 	Stability(tag string) (TagStabilityLevel, error)
+
+	// IsKnownTag returns true if the tag is a registered validation tag.
+	IsKnownTag(tag string) bool
 }
 
 // Stability returns the stability level for a given tag.
@@ -245,10 +249,21 @@ func GetStability(tag string) (TagStabilityLevel, error) {
 	return globalRegistry.Stability(tag)
 }
 
+// IsKnownTag returns true if the tag has been registered as a validation tag.
+func (reg *registry) IsKnownTag(tag string) bool {
+	_, err := reg.Stability(tag)
+	return err == nil
+}
+
+// IsKnownTag returns true if the given tag is a registered validation tag.
+func IsKnownTag(tag string) bool {
+	return globalRegistry.IsKnownTag(tag)
+}
+
 // InitGlobalValidator must be called exactly once by the main application to
 // initialize and safely access the global tag registry.  Once this is called,
 // no more validators may be registered.
-func InitGlobalValidator(c *generator.Context) ValidationExtractor {
-	globalRegistry.init(c)
+func InitGlobalValidator(c *generator.Context, inputToPkg map[string]string) ValidationExtractor {
+	globalRegistry.init(c, inputToPkg)
 	return globalRegistry
 }

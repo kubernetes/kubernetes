@@ -17,6 +17,8 @@ limitations under the License.
 package storageversionmigrator
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
@@ -43,4 +45,19 @@ func setStatusConditions(
 	})
 
 	return toBeUpdatedSVM
+}
+
+func migrationRunningMessage(objectsToPatch, totalObjects *int, transientError error) string {
+	msg := "The migration is running"
+	if objectsToPatch != nil && totalObjects != nil && *totalObjects > 0 {
+		if *objectsToPatch > 0 {
+			msg += fmt.Sprintf(", %d/%d objects not yet migrated", *objectsToPatch, *totalObjects)
+		} else {
+			msg += fmt.Sprintf(", %d objects verified migrated", *totalObjects)
+		}
+	}
+	if transientError != nil {
+		msg += fmt.Sprintf("; transient error: %s", transientError.Error())
+	}
+	return msg
 }

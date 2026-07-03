@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -702,6 +703,9 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 
 	for _, test := range enoughPodsTests {
 		tCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
+			if !test.draExtendedResourceEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draExtendedResourceEnabled)
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5), Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
@@ -1249,6 +1253,9 @@ func testFitScore(tCtx ktesting.TContext) {
 
 	for _, test := range tests {
 		tCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
+			if test.draObjects == nil {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draObjects != nil)
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
@@ -2190,6 +2197,9 @@ func testHaveAnyRequestedResourcesIncreased(tCtx ktesting.TContext) {
 	for name, tc := range testCases {
 		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			var draManager *dynamicresources.DefaultDRAManager
+			if !tc.draExtendedResourceEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResourceEnabled)
 			if tc.draExtendedResourceEnabled {
 				draManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)

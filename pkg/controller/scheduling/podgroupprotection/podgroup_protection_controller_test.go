@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,8 +46,8 @@ const (
 	defaultPGUID  = "pg-uid-1"
 )
 
-func podGroup() *schedulingv1alpha2.PodGroup {
-	return &schedulingv1alpha2.PodGroup{
+func podGroup() *schedulingv1alpha3.PodGroup {
+	return &schedulingv1alpha3.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      defaultPGName,
 			Namespace: defaultNS,
@@ -56,12 +56,12 @@ func podGroup() *schedulingv1alpha2.PodGroup {
 	}
 }
 
-func withFinalizer(pg *schedulingv1alpha2.PodGroup) *schedulingv1alpha2.PodGroup {
+func withFinalizer(pg *schedulingv1alpha3.PodGroup) *schedulingv1alpha3.PodGroup {
 	pg.Finalizers = append(pg.Finalizers, scheduling.PodGroupProtectionFinalizer)
 	return pg
 }
 
-func deletedPodGroup(pg *schedulingv1alpha2.PodGroup) *schedulingv1alpha2.PodGroup {
+func deletedPodGroup(pg *schedulingv1alpha3.PodGroup) *schedulingv1alpha3.PodGroup {
 	pg.DeletionTimestamp = &metav1.Time{}
 	return pg
 }
@@ -373,7 +373,7 @@ func TestPodGroupProtectionController(t *testing.T) {
 
 			client := fake.NewClientset(test.initialObjects...)
 			informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-			pgInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+			pgInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 			podInformer := informerFactory.Core().V1().Pods()
 
 			ctrl, err := NewPodGroupProtectionController(klog.FromContext(ctx), pgInformer, podInformer, client)
@@ -408,7 +408,7 @@ func TestPodGroupProtectionController(t *testing.T) {
 			}
 
 			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-				pg, err := client.SchedulingV1alpha2().PodGroups(defaultNS).Get(ctx, defaultPGName, metav1.GetOptions{})
+				pg, err := client.SchedulingV1alpha3().PodGroups(defaultNS).Get(ctx, defaultPGName, metav1.GetOptions{})
 				if apierrors.IsNotFound(err) {
 					return !test.expectFinalizer, nil
 				}
@@ -535,7 +535,7 @@ func TestHandlePodGroupUpdate(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 
 	tests := map[string]struct {
-		pg       *schedulingv1alpha2.PodGroup
+		pg       *schedulingv1alpha3.PodGroup
 		wantSize int
 	}{
 		"PodGroup without finalizer, not deleting/not enqueued": {

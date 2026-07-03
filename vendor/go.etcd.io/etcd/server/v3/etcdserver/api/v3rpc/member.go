@@ -29,6 +29,8 @@ import (
 type ClusterServer struct {
 	cluster api.Cluster
 	server  *etcdserver.EtcdServer
+	// we want compile errors if new methods are added
+	pb.UnsafeClusterServer
 }
 
 func NewClusterServer(s *etcdserver.EtcdServer) *ClusterServer {

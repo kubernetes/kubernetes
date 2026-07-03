@@ -177,6 +177,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+- name: CompositePodGroup
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: ConcurrentWatchObjectDecode
   versionedSpecs:
   - default: false
@@ -427,6 +433,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.36"
+  - default: true
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.37"
 - name: DisableNodeKubeProxyVersion
   versionedSpecs:
   - default: false
@@ -509,6 +519,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.37"
 - name: DRAListTypeAttributes
   versionedSpecs:
   - default: false
@@ -607,6 +621,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+- name: EtcdRangeStream
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: EventedPLEG
   versionedSpecs:
   - default: false
@@ -643,12 +663,6 @@
     lockToDefault: true
     preRelease: GA
     version: "1.36"
-- name: GangScheduling
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.35"
 - name: GenericWorkload
   versionedSpecs:
   - default: false
@@ -721,6 +735,16 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.16"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
+- name: HugepageAwareEviction
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: ImageMaximumGCAge
   versionedSpecs:
   - default: false
@@ -979,6 +1003,16 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
+- name: KubeProxyIPVS
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
+  - default: true
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.37"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false
@@ -1057,6 +1091,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: MemoryQoS
   versionedSpecs:
   - default: false
@@ -1175,6 +1213,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.37"
 - name: NodeInclusionPolicyInPodTopologySpread
   versionedSpecs:
   - default: false
@@ -1285,6 +1327,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.22"
+- name: PodGroupPreemptionPolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: PodLevelResourceManagers
   versionedSpecs:
   - default: false
@@ -1300,34 +1348,6 @@
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: "1.34"
-- name: PodLifecycleSleepAction
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.29"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.30"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
-- name: PodLifecycleSleepActionAllowZero
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.32"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.33"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
     version: "1.34"
 - name: PodLogsQuerySplitStreams
   versionedSpecs:
@@ -1477,20 +1497,6 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
-- name: RelaxedDNSSearchValidation
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.32"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.33"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: RelaxedEnvironmentVariableValidation
   versionedSpecs:
   - default: false
@@ -1515,6 +1521,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.37"
 - name: ReloadKubeletClientCAFile
   versionedSpecs:
   - default: true
@@ -1625,6 +1635,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.37"
 - name: SELinuxMountReadWriteOncePod
   versionedSpecs:
   - default: false
@@ -1797,6 +1811,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: StorageNamespaceIndex
   versionedSpecs:
   - default: true
@@ -2015,6 +2033,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.37"
 - name: WatchList
   versionedSpecs:
   - default: false
@@ -2033,6 +2055,18 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: WatchListCompression
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
+- name: WebhookRoundTripLoadBalancing
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: WindowsCPUAndMemoryAffinity
   versionedSpecs:
   - default: false
@@ -2087,12 +2121,6 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
-- name: WorkloadAwarePreemption
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.36"
 - name: WorkloadWithJob
   versionedSpecs:
   - default: false

@@ -16,6 +16,7 @@ package schema
 
 import (
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/api/v3/authpb"
 	"go.etcd.io/etcd/server/v3/storage/backend"
@@ -37,7 +38,7 @@ func (atx *authBatchTx) UnsafeGetAllUsers() []*authpb.User {
 }
 
 func (atx *authBatchTx) UnsafePutUser(user *authpb.User) {
-	b, err := user.Marshal()
+	b, err := proto.Marshal(user)
 	if err != nil {
 		atx.lg.Panic("failed to unmarshal 'authpb.User'", zap.Error(err))
 	}
@@ -59,7 +60,7 @@ func unsafeGetUser(lg *zap.Logger, tx backend.UnsafeReader, username string) *au
 	}
 
 	user := &authpb.User{}
-	err := user.Unmarshal(vs[0])
+	err := proto.Unmarshal(vs[0], user)
 	if err != nil {
 		lg.Panic(
 			"failed to unmarshal 'authpb.User'",
@@ -98,7 +99,7 @@ func unsafeGetAllUsers(lg *zap.Logger, tx backend.UnsafeReader) []*authpb.User {
 	users := make([]*authpb.User, len(vs))
 	for i := range vs {
 		user := &authpb.User{}
-		err := user.Unmarshal(vs[i])
+		err := proto.Unmarshal(vs[i], user)
 		if err != nil {
 			lg.Panic("failed to unmarshal 'authpb.User'", zap.Error(err))
 		}

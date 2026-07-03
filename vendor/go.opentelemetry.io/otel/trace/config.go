@@ -34,10 +34,17 @@ func (t *TracerConfig) SchemaURL() string {
 	return t.schemaURL
 }
 
+type experimentalOption interface {
+	Experimental()
+}
+
 // NewTracerConfig applies all the options to a returned TracerConfig.
 func NewTracerConfig(options ...TracerOption) TracerConfig {
 	var config TracerConfig
 	for _, option := range options {
+		if _, ok := option.(experimentalOption); ok {
+			continue
+		}
 		config = option.apply(config)
 	}
 	return config
@@ -103,6 +110,9 @@ func (cfg *SpanConfig) SpanKind() SpanKind {
 func NewSpanStartConfig(options ...SpanStartOption) SpanConfig {
 	var c SpanConfig
 	for _, option := range options {
+		if _, ok := option.(experimentalOption); ok {
+			continue
+		}
 		c = option.applySpanStart(c)
 	}
 	return c
@@ -115,6 +125,9 @@ func NewSpanStartConfig(options ...SpanStartOption) SpanConfig {
 func NewSpanEndConfig(options ...SpanEndOption) SpanConfig {
 	var c SpanConfig
 	for _, option := range options {
+		if _, ok := option.(experimentalOption); ok {
+			continue
+		}
 		c = option.applySpanEnd(c)
 	}
 	return c
@@ -167,6 +180,9 @@ func (cfg *EventConfig) StackTrace() bool {
 func NewEventConfig(options ...EventOption) EventConfig {
 	var c EventConfig
 	for _, option := range options {
+		if _, ok := option.(experimentalOption); ok {
+			continue
+		}
 		c = option.applyEvent(c)
 	}
 	if c.timestamp.IsZero() {

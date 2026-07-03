@@ -257,7 +257,7 @@ func (prober *flexVolumeProber) initWatcher() error {
 		klog.Errorf("Received an error from watcher: %s", err)
 	})
 	if err != nil {
-		return fmt.Errorf("error initializing watcher: %s", err)
+		return fmt.Errorf("flex volume: %w", err)
 	}
 
 	if err := prober.addWatchRecursive(prober.pluginDir); err != nil {

@@ -174,8 +174,8 @@ func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.AuthorizationInfo) er
 	return err
 }
 
-func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interface) (authorizer.UnconditionalAuthorizer, error) {
-	var authorizers []authorizer.UnconditionalAuthorizer
+func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interface) (authorizer.Authorizer, error) {
+	var authorizers []authorizer.Authorizer
 
 	if len(s.AlwaysAllowGroups) > 0 {
 		authorizers = append(authorizers, authorizerfactory.NewPrivilegedGroups(s.AlwaysAllowGroups...))

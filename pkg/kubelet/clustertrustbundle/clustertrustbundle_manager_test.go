@@ -114,8 +114,8 @@ func TestGetTrustAnchorsByName(t *testing.T) {
 }
 
 func testGetTrustAnchorsByName[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithTimeout(tCtx, 5*time.Second)
 	defer cancel()
 
 	ctb1Bundle := mustMakeRoot(t, "root1")
@@ -251,8 +251,8 @@ func TestGetTrustAnchorsBySignerName(t *testing.T) {
 }
 
 func testGetTrustAnchorsBySignerName[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithTimeout(tCtx, 5*time.Second)
 	defer cancel()
 
 	ctb1 := b.ctbConstructor("signer-a-label-a-1", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "0"))
@@ -654,12 +654,16 @@ func (d fakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*met
 	return d.gvResources[groupVersion], d.err
 }
 
+func (d fakeDiscovery) ServerResourcesForGroupVersionWithContext(ctx context.Context, groupVersion string) (*metav1.APIResourceList, error) {
+	return d.gvResources[groupVersion], d.err
+}
+
 type fakeDiscoveryClientSet struct {
 	*fake.Clientset
 	DiscoveryObj *fakeDiscovery
 }
 
-func (c *fakeDiscoveryClientSet) Discovery() discovery.DiscoveryInterface {
+func (c *fakeDiscoveryClientSet) Discovery() discovery.DiscoveryInterfaces {
 	return c.DiscoveryObj
 }
 

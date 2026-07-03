@@ -331,16 +331,6 @@ export DNS_MEMORY_LIMIT=${KUBE_DNS_MEMORY_LIMIT:-170Mi}
 # Optional: Enable DNS horizontal autoscaler
 export ENABLE_DNS_HORIZONTAL_AUTOSCALER=${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-true}
 
-# Optional: Install node problem detector.
-#   none           - Not run node problem detector.
-#   daemonset      - Run node problem detector as daemonset.
-#   standalone     - Run node problem detector as standalone system daemon.
-export ENABLE_NODE_PROBLEM_DETECTOR=${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-daemonset}
-NODE_PROBLEM_DETECTOR_VERSION=${NODE_PROBLEM_DETECTOR_VERSION:-}
-NODE_PROBLEM_DETECTOR_TAR_HASH=${NODE_PROBLEM_DETECTOR_TAR_HASH:-}
-NODE_PROBLEM_DETECTOR_RELEASE_PATH=${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}
-NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS=${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}
-
 CNI_HASH=${CNI_HASH:-}
 CNI_TAR_PREFIX=${CNI_TAR_PREFIX:-cni-plugins-linux-amd64-}
 CNI_STORAGE_URL_BASE=${CNI_STORAGE_URL_BASE:-https://github.com/containernetworking/plugins/releases/download}
@@ -577,11 +567,6 @@ export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
 
 # Enable Windows DSR (Direct Server Return)
 export WINDOWS_ENABLE_DSR="${WINDOWS_ENABLE_DSR:-false}"
-
-# Install Node Problem Detector (NPD) on Windows nodes.
-# NPD analyzes the host for problems that can disrupt workloads.
-export WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR="${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR:-none}"
-export WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
 
 # TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver.
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.

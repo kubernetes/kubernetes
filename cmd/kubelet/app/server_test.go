@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	yaml "go.yaml.in/yaml/v2"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -70,6 +71,37 @@ func TestValueOfAllocatableResources(t *testing.T) {
 				t.Errorf("%s: unexpected error: %v, %v", test.name, err1, err2)
 			}
 		}
+	}
+}
+
+func TestParseResourceList(t *testing.T) {
+	testCases := []struct {
+		input    map[string]string
+		expected string
+		name     string
+	}{
+		{
+			input:    map[string]string{"cpu": "200m"},
+			expected: "200m",
+			name:     "whole millicores",
+		},
+		{
+			input:    map[string]string{"cpu": "200.5m"},
+			expected: "201m",
+			name:     "decimal millicores rounded up",
+		},
+		{
+			input:    map[string]string{"cpu": "200.4m"},
+			expected: "200m",
+			name:     "decimal millicores rounded down",
+		},
+	}
+
+	for _, test := range testCases {
+		rl, err := parseResourceList(test.input)
+		require.NoError(t, err, test.name)
+		q := rl[v1.ResourceCPU]
+		require.Equal(t, test.expected, q.String(), test.name)
 	}
 }
 
@@ -520,4 +552,38 @@ readOnlyPort: 9999
 			}
 		})
 	}
+}
+
+func TestMarshalKubeletConfigForLog(t *testing.T) {
+	kc := &kubeletconfiginternal.KubeletConfiguration{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "KubeletConfiguration",
+			APIVersion: "kubelet.config.k8s.io/v1beta1",
+		},
+		// Non-default values that must round-trip into the marshaled output.
+		FailSwapOn:   false,
+		EvictionHard: map[string]string{"memory.available": "200Mi"},
+		// Sensitive field that must be masked.
+		StaticPodURLHeader: map[string][]string{
+			"Authorization": {"Bearer super-secret-token"},
+		},
+	}
+
+	out, err := marshalKubeletConfigForLog(kc)
+	require.NoError(t, err)
+
+	// (2) The output carries the external GroupVersionKind, mirroring /configz.
+	require.Contains(t, out, "apiVersion: kubelet.config.k8s.io/v1beta1")
+	require.Contains(t, out, "kind: KubeletConfiguration")
+
+	// (1) Non-default effective values are present.
+	require.Contains(t, out, "failSwapOn: false")
+	require.Contains(t, out, "memory.available: 200Mi")
+
+	// (3) Sensitive StaticPodURLHeader values are masked, never leaked.
+	require.Contains(t, out, "<masked>")
+	require.NotContains(t, out, "super-secret-token")
+
+	// The helper must not mutate the caller's config when masking.
+	require.Equal(t, []string{"Bearer super-secret-token"}, kc.StaticPodURLHeader["Authorization"])
 }

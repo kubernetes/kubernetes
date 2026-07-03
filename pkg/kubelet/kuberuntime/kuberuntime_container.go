@@ -262,7 +262,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	}
 
 	// When creating a container, mark the resources as actuated.
-	if err := m.setActuatedContainerResources(pod, container); err != nil {
+	if err := m.setActuatedContainerResources(logger, pod, container); err != nil {
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
 		return err.Error(), ErrCreateContainerConfig
 	}
@@ -408,23 +408,24 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 }
 
 func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) error {
+	logger := klog.FromContext(ctx)
 	containerResources := m.generateContainerResources(ctx, pod, container)
 	if containerResources == nil {
 		return fmt.Errorf("container %q updateContainerResources failed: cannot generate resources config", containerID.String())
 	}
 	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
 	if err == nil {
-		err = m.setActuatedContainerResources(pod, container)
+		err = m.setActuatedContainerResources(logger, pod, container)
 	}
 	return err
 }
 
-func (m *kubeGenericRuntimeManager) setActuatedContainerResources(pod *v1.Pod, container *v1.Container) error {
+func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) error {
 	containerResources := container.Resources
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 		containerResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
 	}
-	return m.actuatedState.SetContainerResources(pod.UID, container.Name, containerResources)
+	return m.actuatedState.SetContainerResources(logger, pod.UID, container.Name, containerResources)
 }
 
 func (m *kubeGenericRuntimeManager) updatePodSandboxResources(ctx context.Context, sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) error {
@@ -724,9 +725,9 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 	var cStatusStopSignal *v1.Signal
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
 		signal := status.GetStopSignal().String()
-		// Here Signal_RUNTIME_DEFAULT means that the runtime is not returning any StopSignal
+		// Here Signal_SIGNAL_RUNTIME_DEFAULT means that the runtime is not returning any StopSignal
 		// This happens only when the container runtime version doesn't support StopSignal yet
-		if signal != "" && signal != "RUNTIME_DEFAULT" {
+		if signal != "" && signal != runtimeapi.Signal_SIGNAL_RUNTIME_DEFAULT.String() {
 			cStatusStopSignal = runtimeSignalToString(status.GetStopSignal())
 		}
 	}

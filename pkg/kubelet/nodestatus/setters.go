@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -195,9 +195,9 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 func MachineInfo(nodeName string,
 	maxPods int,
 	podsPerCore int,
-	machineInfoFunc func() (*cadvisorapiv1.MachineInfo, error), // typically Kubelet.GetCachedMachineInfo
-	capacityFunc func(localStorageCapacityIsolation bool) v1.ResourceList, // typically Kubelet.containerManager.GetCapacity
-	devicePluginResourceCapacityFunc func() (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
+	machineInfoFunc func() (*cadvisorapi.MachineInfo, error), // typically Kubelet.GetCachedMachineInfo
+	capacityFunc func(logger klog.Logger, localStorageCapacityIsolation bool) v1.ResourceList, // typically Kubelet.containerManager.GetCapacity
+	devicePluginResourceCapacityFunc func(logger klog.Logger) (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
 	nodeAllocatableReservationFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetNodeAllocatableReservation
 	recordEventFunc func(eventType, event, message string), // typically Kubelet.recordEvent
 	localStorageCapacityIsolation bool,
@@ -255,14 +255,14 @@ func MachineInfo(nodeName string,
 
 			// TODO: all the node resources should use ContainerManager.GetCapacity instead of deriving the
 			// capacity for every node status request
-			initialCapacity := capacityFunc(localStorageCapacityIsolation)
+			initialCapacity := capacityFunc(logger, localStorageCapacityIsolation)
 			if initialCapacity != nil {
 				if v, exists := initialCapacity[v1.ResourceEphemeralStorage]; exists {
 					node.Status.Capacity[v1.ResourceEphemeralStorage] = v
 				}
 			}
 
-			devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = devicePluginResourceCapacityFunc()
+			devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = devicePluginResourceCapacityFunc(logger)
 			for k, v := range devicePluginCapacity {
 				if old, ok := node.Status.Capacity[k]; !ok || old.Value() != v.Value() {
 					logger.V(2).Info("Updated capacity for device plugin", "plugin", k, "capacity", v.Value())
@@ -339,7 +339,7 @@ func MachineInfo(nodeName string,
 }
 
 // VersionInfo returns a Setter that updates version-related information on the node.
-func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // typically Kubelet.cadvisor.VersionInfo
+func VersionInfo(versionInfoFunc func() (*cadvisorapi.VersionInfo, error), // typically Kubelet.cadvisor.VersionInfo
 	runtimeTypeFunc func() string, // typically Kubelet.containerRuntime.Type
 	runtimeVersionFunc func(ctx context.Context) (kubecontainer.Version, error), // typically Kubelet.containerRuntime.Version
 ) Setter {

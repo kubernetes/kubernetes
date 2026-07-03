@@ -938,6 +938,16 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 }
 
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {
+	ok, err := g.canUseMemoryCopyConversion(inType, outType)
+	if err != nil {
+		klog.Errorf("Type %v: error checking for direct-copy conversion: %v", inType, err)
+	}
+	if ok {
+		args := argsFromType(inType, outType).
+			With("Pointer", types.Ref("unsafe", "Pointer"))
+		sw.Do("*out = *(*$.outType|raw$)($.Pointer|raw$(in))\n", args)
+		return
+	}
 	for _, inMember := range inType.Members {
 		tagvals, err := extractTag(inMember.CommentLines)
 		if err != nil {
@@ -1112,6 +1122,44 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			}
 		}
 	}
+}
+
+// canUseMemoryCopyConversion reports whether two struct types can be converted
+// with a single unsafe memory copy rather than field-by-field conversion. This
+// returns true only for structs that are both memory-identical and do not have any
+// manual conversions (except copy-only conversions, which are allowed).
+func (g *genConversion) canUseMemoryCopyConversion(inType, outType *types.Type) (bool, error) {
+	if !g.useUnsafe.Equal(inType, outType) {
+		return false, nil
+	}
+	for _, inMember := range inType.Members {
+		tagvals, err := extractTag(inMember.CommentLines)
+		if err != nil {
+			return false, err
+		}
+		if len(tagvals) > 0 && tagvals[0] == "false" {
+			return false, nil // opted out of conversion-gen
+		}
+		outMember, found := findMember(outType, inMember.Name)
+		if !found {
+			return false, nil
+		}
+
+		if namer.IsPrivateGoName(inMember.Name) && g.outputPackage != inType.Name.Package {
+			return false, nil
+		}
+		if namer.IsPrivateGoName(outMember.Name) && g.outputPackage != outType.Name.Package {
+			return false, nil
+		}
+		// Bail out if there is a manual conversion other than 'copy-only'.
+		if function, ok := g.preexists(inMember.Type, outMember.Type); ok {
+			copyOnly, err := isCopyOnly(function.CommentLines)
+			if err != nil || !copyOnly {
+				return false, err
+			}
+		}
+	}
+	return true, nil
 }
 
 func (g *genConversion) isFastConversion(inType, outType *types.Type) bool {

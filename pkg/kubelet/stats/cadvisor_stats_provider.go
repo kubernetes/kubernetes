@@ -23,7 +23,7 @@ import (
 	"sort"
 	"strings"
 
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -188,8 +188,8 @@ func (p *cadvisorStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx contex
 
 func (p *cadvisorStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
 	_, podName := p.containerManager.NewPodContainerManager().GetPodContainerName(pod)
-	infos, err := p.cadvisor.ContainerInfoV2(podName, cadvisorapiv2.RequestOptions{
-		IdType:    cadvisorapiv2.TypeName,
+	infos, err := p.cadvisor.ContainerInfoV2(podName, cadvisorapi.RequestOptions{
+		IdType:    cadvisorapi.TypeName,
 		Count:     2,
 		Recursive: true,
 	})
@@ -408,7 +408,7 @@ func buildPodRef(containerLabels map[string]string) statsapi.PodReference {
 }
 
 // isPodManagedContainer returns true if the cinfo container is managed by a Pod
-func isPodManagedContainer(logger klog.Logger, cinfo *cadvisorapiv2.ContainerInfo) bool {
+func isPodManagedContainer(logger klog.Logger, cinfo *cadvisorapi.ContainerInfo) bool {
 	podName := kubetypes.GetPodName(cinfo.Spec.Labels)
 	podNamespace := kubetypes.GetPodNamespace(cinfo.Spec.Labels)
 	managed := podName != "" && podNamespace != ""
@@ -421,7 +421,7 @@ func isPodManagedContainer(logger klog.Logger, cinfo *cadvisorapiv2.ContainerInf
 }
 
 // getCadvisorPodInfoFromPodUID returns a pod cgroup information by matching the podUID with its CgroupName identifier base name
-func getCadvisorPodInfoFromPodUID(podUID types.UID, infos map[string]cadvisorapiv2.ContainerInfo) *cadvisorapiv2.ContainerInfo {
+func getCadvisorPodInfoFromPodUID(podUID types.UID, infos map[string]cadvisorapi.ContainerInfo) *cadvisorapi.ContainerInfo {
 	if info, found := infos[cm.GetPodCgroupNameSuffix(podUID)]; found {
 		return &info
 	}
@@ -434,9 +434,9 @@ func getCadvisorPodInfoFromPodUID(podUID types.UID, infos map[string]cadvisorapi
 // the second return map is pod cgroup key <-> ContainerInfo.
 // A ContainerInfo is considered to be of a terminated container if it has an
 // older CreationTime and zero CPU instantaneous and memory RSS usage.
-func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger klog.Logger, containerInfo map[string]cadvisorapiv2.ContainerInfo) (map[string]cadvisorapiv2.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo) {
+func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger klog.Logger, containerInfo map[string]cadvisorapi.ContainerInfo) (map[string]cadvisorapi.ContainerInfo, map[string]cadvisorapi.ContainerInfo) {
 	cinfoMap := make(map[containerID][]containerInfoWithCgroup)
-	cinfosByPodCgroupKey := make(map[string]cadvisorapiv2.ContainerInfo)
+	cinfosByPodCgroupKey := make(map[string]cadvisorapi.ContainerInfo)
 	for key, cinfo := range containerInfo {
 		var podCgroupKey string
 		if cm.IsSystemdStyleName(key) {
@@ -460,7 +460,7 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger klog.Logger, 
 			cgroup: key,
 		})
 	}
-	result := make(map[string]cadvisorapiv2.ContainerInfo)
+	result := make(map[string]cadvisorapi.ContainerInfo)
 	for _, refs := range cinfoMap {
 		if len(refs) == 1 {
 			// ContainerInfo with no CPU/memory/network usage for uncleaned cgroups of
@@ -506,14 +506,14 @@ type containerID struct {
 
 // containerInfoWithCgroup contains the ContainerInfo and its cgroup name.
 type containerInfoWithCgroup struct {
-	cinfo  cadvisorapiv2.ContainerInfo
+	cinfo  cadvisorapi.ContainerInfo
 	cgroup string
 }
 
 // hasMemoryAndCPUInstUsage returns true if the specified container info has
 // both non-zero CPU instantaneous usage and non-zero memory RSS usage, and
 // false otherwise.
-func hasMemoryAndCPUInstUsage(info *cadvisorapiv2.ContainerInfo) bool {
+func hasMemoryAndCPUInstUsage(info *cadvisorapi.ContainerInfo) bool {
 	if !info.Spec.HasCpu || !info.Spec.HasMemory {
 		return false
 	}
@@ -521,7 +521,10 @@ func hasMemoryAndCPUInstUsage(info *cadvisorapiv2.ContainerInfo) bool {
 	if !found {
 		return false
 	}
-	if cstat.CpuInst == nil {
+	// Spec.HasMemory does not guarantee a memory sample is present: lib/model
+	// exposes Memory as a pointer that is nil when no memory stats were
+	// collected for this sample, so guard the deref.
+	if cstat.CpuInst == nil || cstat.Memory == nil {
 		return false
 	}
 	return cstat.CpuInst.Usage.Total != 0 && cstat.Memory.RSS != 0
@@ -532,7 +535,7 @@ func hasMemoryAndCPUInstUsage(info *cadvisorapiv2.ContainerInfo) bool {
 // 2. info.Stats both network and cpu or memory are nil
 // 3. both zero CPU instantaneous usage zero memory RSS usage and zero network usage,
 // and false otherwise.
-func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
+func isContainerTerminated(info *cadvisorapi.ContainerInfo) bool {
 	if !info.Spec.HasCpu && !info.Spec.HasMemory && !info.Spec.HasNetwork {
 		return true
 	}
@@ -556,9 +559,9 @@ func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
 	return cstat.CpuInst.Usage.Total == 0 && cstat.Memory.RSS == 0
 }
 
-func getCadvisorContainerInfo(logger klog.Logger, ca cadvisor.Interface) (map[string]cadvisorapiv2.ContainerInfo, error) {
-	infos, err := ca.ContainerInfoV2("/", cadvisorapiv2.RequestOptions{
-		IdType:    cadvisorapiv2.TypeName,
+func getCadvisorContainerInfo(logger klog.Logger, ca cadvisor.Interface) (map[string]cadvisorapi.ContainerInfo, error) {
+	infos, err := ca.ContainerInfoV2("/", cadvisorapi.RequestOptions{
+		IdType:    cadvisorapi.TypeName,
 		Count:     2, // 2 samples are needed to compute "instantaneous" CPU
 		Recursive: true,
 	})

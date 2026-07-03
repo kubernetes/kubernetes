@@ -73,10 +73,7 @@ var (
 )
 
 var (
-	horizontalGroupResource = schema.GroupResource{
-		Group:    "autoscaling",
-		Resource: "horizontalpodautoscalers",
-	}
+	horizontalGroupResource = autoscalingv2.Resource("horizontalpodautoscalers")
 )
 
 type timestampedRecommendation struct {
@@ -589,8 +586,7 @@ func (a *HorizontalController) reconcileKey(ctx context.Context, key string) (de
 		Name:      name,
 	}
 	if err := a.consistencyStore.EnsureReady(hpaNamespacedName); err != nil {
-		var consistencyErr *consistencyutil.ConsistencyError
-		if errors.As(err, &consistencyErr) {
+		if consistencyErr, ok := errors.AsType[*consistencyutil.ConsistencyError](err); ok {
 			a.monitor.ObserveHPARequeueSkips(
 				consistencyErr.GroupResource.Group,
 				consistencyErr.GroupResource.Resource,

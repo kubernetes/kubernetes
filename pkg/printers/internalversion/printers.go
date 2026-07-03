@@ -40,7 +40,7 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -762,7 +762,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	podGroupColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Policy", Type: "string", Description: schedulingv1alpha2.PodGroupSpec{}.SwaggerDoc()["schedulingPolicy"]},
+		{Name: "Policy", Type: "string", Description: schedulingv1alpha3.PodGroupSpec{}.SwaggerDoc()["schedulingPolicy"]},
 		{Name: "Workload", Type: "string", Description: "Name of the referenced Workload object"},
 		{Name: "Status", Type: "string", Description: "Status of the PodGroup"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
@@ -3500,7 +3500,7 @@ func printPodGroup(obj *scheduling.PodGroup, options printers.GenerateOptions) (
 		cond := obj.Status.Conditions[i]
 		conditionMap[cond.Type] = &cond
 	}
-	if cond, ok := conditionMap[scheduling.PodGroupScheduled]; ok {
+	if cond, ok := conditionMap[scheduling.PodGroupInitiallyScheduled]; ok {
 		status = "Unschedulable"
 		if cond.Status == metav1.ConditionTrue {
 			status = "Scheduled"
@@ -3511,8 +3511,8 @@ func printPodGroup(obj *scheduling.PodGroup, options printers.GenerateOptions) (
 	}
 
 	workload := "<none>"
-	if ref := obj.Spec.PodGroupTemplateRef; ref != nil {
-		workload = ref.Workload.WorkloadName
+	if ref := obj.Spec.WorkloadRef; ref != nil {
+		workload = ref.WorkloadName
 	}
 
 	row.Cells = append(row.Cells, obj.Name, policy, workload, status, translateTimestampSince(obj.CreationTimestamp))

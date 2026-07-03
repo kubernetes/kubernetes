@@ -68,12 +68,14 @@ type Indexer interface {
 	GetByKey(key string) (item interface{}, exists bool, err error)
 	Replace([]interface{}, string) error
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
+	Count(prefix, continueKey string) (count int)
+	Clone() Snapshot
+	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
 
-type OrderedLister interface {
-	ListPrefix(prefix, continueKey string) []interface{}
-	Count(prefix, continueKey string) (count int)
-	Clone() OrderedLister
+type Snapshot interface {
+	GetByKey(key string) (item interface{}, exists bool, err error)
+	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
 
 func NewIndexer(indexers *cache.Indexers) Indexer {

@@ -59,7 +59,7 @@ func RecordAuthorizationDecision(authorizerType, authorizerName, decision string
 	authorizationDecisionsTotal.WithLabelValues(authorizerType, authorizerName, decision).Inc()
 }
 
-func InstrumentedAuthorizer(authorizerType string, authorizerName string, delegate authorizer.UnconditionalAuthorizer) authorizer.UnconditionalAuthorizer {
+func InstrumentedAuthorizer(authorizerType string, authorizerName string, delegate authorizer.Authorizer) authorizer.Authorizer {
 	RegisterMetrics()
 	return &instrumentedAuthorizer{
 		authorizerType: string(authorizerType),
@@ -73,11 +73,50 @@ var _ = authorizer.Authorizer(&instrumentedAuthorizer{})
 type instrumentedAuthorizer struct {
 	authorizerType string
 	authorizerName string
-	delegate       authorizer.UnconditionalAuthorizer
+	delegate       authorizer.Authorizer
 }
 
 func (a *instrumentedAuthorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	decision, reason, err := a.delegate.Authorize(ctx, attributes)
+	switch decision {
+	case authorizer.DecisionNoOpinion:
+		// non-terminal, not reported
+	case authorizer.DecisionAllow:
+		// matches SubjectAccessReview status.allowed field name
+		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "allowed")
+	case authorizer.DecisionDeny:
+		// matches SubjectAccessReview status.denied field name
+		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "denied")
+	default:
+		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "unknown")
+	}
+	return decision, reason, err
+}
+
+// ConditionsAwareAuthorize delegates to the wrapped authorizer.
+func (a *instrumentedAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attributes authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	decision := a.delegate.ConditionsAwareAuthorize(ctx, attributes)
+	switch {
+	case decision.IsNoOpinion():
+		// non-terminal, not reported
+	case decision.IsAllow():
+		// matches SubjectAccessReview status.allowed field name
+		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "allowed")
+	case decision.IsDeny():
+		// matches SubjectAccessReview status.denied field name
+		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "denied")
+	default:
+		// the ConditionsAwareDecision enforces that there are no other possible states
+		// than Allow/Deny/NoOpinion/ConditionsMap/Union. The latter two are conditional
+		// decisions.
+		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "conditional")
+	}
+	return decision
+}
+
+// EvaluateConditions delegates to the wrapped authorizer, and registers the metric just like Authorize.
+func (a *instrumentedAuthorizer) EvaluateConditions(ctx context.Context, unevaluatedDecision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	decision, reason, err := a.delegate.EvaluateConditions(ctx, unevaluatedDecision, data)
 	switch decision {
 	case authorizer.DecisionNoOpinion:
 		// non-terminal, not reported

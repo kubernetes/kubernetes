@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1619,13 +1619,11 @@ func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
 	return wrapper
 }
 
-// TemplateRef sets appropriate PodGroupTemplateRef field of the inner PodGroup.
-func (wrapper *PodGroupWrapper) TemplateRef(templateName, workloadName string) *PodGroupWrapper {
-	wrapper.PodGroup.Spec.PodGroupTemplateRef = &schedulingapi.PodGroupTemplateReference{
-		Workload: &schedulingapi.WorkloadPodGroupTemplateReference{
-			PodGroupTemplateName: templateName,
-			WorkloadName:         workloadName,
-		},
+// WorkloadRef sets appropriate WorkloadRef field of the inner PodGroup.
+func (wrapper *PodGroupWrapper) WorkloadRef(templateName, workloadName string) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.WorkloadRef = &schedulingapi.WorkloadReference{
+		TemplateName: templateName,
+		WorkloadName: workloadName,
 	}
 	return wrapper
 }
@@ -1654,15 +1652,27 @@ func (wrapper *PodGroupWrapper) ResourceClaimStatuses(statuses ...schedulingapi.
 	return wrapper
 }
 
-// DisruptionMode sets the disruption mode of the inner PodGroup.
-func (wrapper *PodGroupWrapper) DisruptionMode(mode schedulingapi.DisruptionMode) *PodGroupWrapper {
-	wrapper.PodGroup.Spec.DisruptionMode = &mode
+// DisruptionModeAll sets the disruption mode of the inner PodGroup to All.
+func (wrapper *PodGroupWrapper) DisruptionModeAll() *PodGroupWrapper {
+	wrapper.PodGroup.Spec.DisruptionMode = &schedulingapi.DisruptionMode{All: &schedulingapi.AllDisruptionMode{}}
+	return wrapper
+}
+
+// DisruptionModeSingle sets the disruption mode of the inner PodGroup to Single.
+func (wrapper *PodGroupWrapper) DisruptionModeSingle() *PodGroupWrapper {
+	wrapper.PodGroup.Spec.DisruptionMode = &schedulingapi.DisruptionMode{Single: &schedulingapi.SingleDisruptionMode{}}
 	return wrapper
 }
 
 // Priority sets the priority of the inner PodGroup.
 func (wrapper *PodGroupWrapper) Priority(priority int32) *PodGroupWrapper {
 	wrapper.PodGroup.Spec.Priority = &priority
+	return wrapper
+}
+
+// PreemptionPolicy sets the preemption policy of the inner PodGroup.
+func (wrapper *PodGroupWrapper) PreemptionPolicy(policy schedulingapi.PreemptionPolicy) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.PreemptionPolicy = &policy
 	return wrapper
 }
 
@@ -1728,5 +1738,17 @@ func (wrapper *PodGroupTemplateWrapper) MinCount(count int32) *PodGroupTemplateW
 // BasicPolicy sets the PodGroup policy to Basic.
 func (wrapper *PodGroupTemplateWrapper) BasicPolicy() *PodGroupTemplateWrapper {
 	wrapper.SchedulingPolicy.Basic = &schedulingapi.BasicSchedulingPolicy{}
+	return wrapper
+}
+
+// DisruptionModeAll sets the disruption mode of the inner PodGroupTemplate to All.
+func (wrapper *PodGroupTemplateWrapper) DisruptionModeAll() *PodGroupTemplateWrapper {
+	wrapper.PodGroupTemplate.DisruptionMode = &schedulingapi.DisruptionMode{All: &schedulingapi.AllDisruptionMode{}}
+	return wrapper
+}
+
+// DisruptionModeSingle sets the disruption mode of the inner PodGroupTemplate to Single.
+func (wrapper *PodGroupTemplateWrapper) DisruptionModeSingle() *PodGroupTemplateWrapper {
+	wrapper.PodGroupTemplate.DisruptionMode = &schedulingapi.DisruptionMode{Single: &schedulingapi.SingleDisruptionMode{}}
 	return wrapper
 }

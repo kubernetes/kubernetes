@@ -21,8 +21,7 @@ package cadvisor
 import (
 	"context"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
@@ -35,8 +34,8 @@ type cadvisorClient struct {
 var _ Interface = new(cadvisorClient)
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(_ klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
-	client, err := winstats.NewPerfCounterClient(klog.TODO())
+func New(logger klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
+	client, err := winstats.NewPerfCounterClient(logger)
 	return &cadvisorClient{
 		rootPath:       rootPath,
 		winStatsClient: client,
@@ -48,35 +47,35 @@ func (cu *cadvisorClient) Start() error {
 }
 
 // ContainerInfoV2 is only expected to be used for the root container. Returns info for all containers in the node.
-func (cu *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
+func (cu *cadvisorClient) ContainerInfoV2(name string, options cadvisorapi.RequestOptions) (map[string]cadvisorapi.ContainerInfo, error) {
 	return cu.winStatsClient.WinContainerInfos()
 }
 
-func (cu *cadvisorClient) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+func (cu *cadvisorClient) GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return nil, nil
 }
 
-func (cu *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
-	return cu.winStatsClient.WinMachineInfo(klog.TODO())
+func (cu *cadvisorClient) MachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
+	return cu.winStatsClient.WinMachineInfo(logger)
 }
 
 func (cu *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return cu.winStatsClient.WinVersionInfo()
 }
 
-func (cu *cadvisorClient) ImagesFsInfo(context.Context) (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, nil
+func (cu *cadvisorClient) ImagesFsInfo(context.Context) (cadvisorapi.FsInfo, error) {
+	return cadvisorapi.FsInfo{}, nil
 }
 
-func (cu *cadvisorClient) ContainerFsInfo(context.Context) (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, nil
+func (cu *cadvisorClient) ContainerFsInfo(context.Context) (cadvisorapi.FsInfo, error) {
+	return cadvisorapi.FsInfo{}, nil
 }
 
-func (cu *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (cu *cadvisorClient) RootFsInfo() (cadvisorapi.FsInfo, error) {
 	return cu.GetDirFsInfo(cu.rootPath)
 }
 
-func (cu *cadvisorClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
+func (cu *cadvisorClient) GetDirFsInfo(path string) (cadvisorapi.FsInfo, error) {
 	return cu.winStatsClient.GetDirFsInfo(path)
 }
 

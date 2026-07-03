@@ -13,6 +13,13 @@
 - **Staging is source of truth** for `k8s.io/*` (`staging/src/k8s.io/`). Never import `k8s.io/kubernetes` from staging.
 - **Boilerplate required.** Every `.go` file needs the license header from `hack/boilerplate/boilerplate.go.txt`.
 
+## Contributor Guidelines
+
+- Keep changes focused and reviewable
+- Add or update relevant tests
+- Do not put `@mentions` or `fixes #...` keywords in commit messages
+- Do not add `Co-authored-by:`  in commit messages
+
 ## Commands
 
 Run `make help` for all available targets. Common workflows:

@@ -95,7 +95,7 @@ func TestValidateSARSpec(t *testing.T) {
 			NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
 			User:                  "me",
 		},
-		msg: "cannot be specified in combination with resourceAttributes",
+		msg: "exactly one of nonResourceAttributes or resourceAttributes must be specified",
 	}, {
 		name: "no subject",
 		obj: authorizationapi.SubjectAccessReviewSpec{
@@ -380,7 +380,7 @@ func TestValidateSelfSAR(t *testing.T) {
 			ResourceAttributes:    &authorizationapi.ResourceAttributes{},
 			NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
 		},
-		msg: "cannot be specified in combination with resourceAttributes",
+		msg: "exactly one of nonResourceAttributes or resourceAttributes must be specified",
 	}, {
 		// here we only test one to be sure the function is called.  The more exhaustive suite is tested above.
 		name: "resource attributes: label selector specify both",

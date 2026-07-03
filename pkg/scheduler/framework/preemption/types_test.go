@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -68,38 +68,90 @@ func TestGetPodGroup(t *testing.T) {
 	}
 }
 
-func TestIsDisruptionModePodGroup(t *testing.T) {
+func TestNewPodGroupPreemptorResolvesPreemptionPolicy(t *testing.T) {
+	preemptNeverPod := st.MakePod().Name("p-never").PreemptionPolicy(v1.PreemptNever).Obj()
+	preemptLowerPriorityPod := st.MakePod().Name("p-lower").PreemptionPolicy(v1.PreemptLowerPriority).Obj()
+	noPolicyPod := st.MakePod().Name("p-nil").Obj()
+
 	tests := []struct {
-		name       string
-		pg         *schedulingapi.PodGroup
-		wantModePG bool
+		name                           string
+		pg                             *schedulingapi.PodGroup
+		pods                           []*v1.Pod
+		enablePodGroupPreemptionPolicy bool
+		wantPolicy                     schedulingapi.PreemptionPolicy
 	}{
 		{
-			name:       "nil pod group",
-			pg:         nil,
-			wantModePG: false,
+			name:                           "PreemptionPolicy PreemptNever is resolved from PodGroup, ignoring policy in pod, with PodGroupPreemptionPolicy enabled",
+			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingapi.PreemptNever).Obj(),
+			pods:                           []*v1.Pod{preemptLowerPriorityPod},
+			enablePodGroupPreemptionPolicy: true,
+			wantPolicy:                     schedulingapi.PreemptNever,
 		},
 		{
-			name:       "pod group with nil disruption mode",
-			pg:         st.MakePodGroup().Name("pg1").Namespace("default").Obj(),
-			wantModePG: false,
+			name:                           "PreemptionPolicy PreemptLowerPriority is resolved from PodGroup, ignoring different policies in pods, with PodGroupPreemptionPolicy enabled",
+			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingapi.PreemptLowerPriority).Obj(),
+			pods:                           []*v1.Pod{preemptLowerPriorityPod, noPolicyPod},
+			enablePodGroupPreemptionPolicy: true,
+			wantPolicy:                     schedulingapi.PreemptLowerPriority,
 		},
 		{
-			name:       "pod group with DisruptionModePod",
-			pg:         st.MakePodGroup().Name("pg1").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePod).Obj(),
-			wantModePG: false,
+			name:                           "PreemptionPolicy is resolved from pods with PodGroupPreemptionPolicy disabled",
+			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingapi.PreemptNever).Obj(),
+			pods:                           []*v1.Pod{preemptLowerPriorityPod},
+			enablePodGroupPreemptionPolicy: false,
+			wantPolicy:                     schedulingapi.PreemptLowerPriority,
 		},
 		{
-			name:       "pod group with DisruptionModePodGroup",
-			pg:         st.MakePodGroup().Name("pg1").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePodGroup).Obj(),
-			wantModePG: true,
+			name:                           "PreemptionPolicy is resolved from pods when multiple pods have different policies, with PodGroupPreemptionPolicy disabled",
+			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingapi.PreemptLowerPriority).Obj(),
+			pods:                           []*v1.Pod{preemptNeverPod, preemptLowerPriorityPod, noPolicyPod},
+			enablePodGroupPreemptionPolicy: false,
+			wantPolicy:                     schedulingapi.PreemptNever,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if gotModePG := isDisruptionModePodGroup(tt.pg); gotModePG != tt.wantModePG {
-				t.Errorf("isDisruptionModePodGroup() = %v, want %v", gotModePG, tt.wantModePG)
+			preemptor := newPodGroupPreemptor(tt.pg, tt.pods, tt.enablePodGroupPreemptionPolicy)
+			if preemptor.preemptionPolicy != tt.wantPolicy {
+				t.Errorf("expected preemption policy %q, got %q", tt.wantPolicy, preemptor.preemptionPolicy)
+			}
+		})
+	}
+}
+
+func TestIsDisruptionModeAll(t *testing.T) {
+	tests := []struct {
+		name        string
+		pg          *schedulingapi.PodGroup
+		wantModeAll bool
+	}{
+		{
+			name:        "nil pod group",
+			pg:          nil,
+			wantModeAll: false,
+		},
+		{
+			name:        "pod group with nil disruption mode",
+			pg:          st.MakePodGroup().Name("pg1").Namespace("default").Obj(),
+			wantModeAll: false,
+		},
+		{
+			name:        "pod group with DisruptionModeSingle",
+			pg:          st.MakePodGroup().Name("pg1").Namespace("default").DisruptionModeSingle().Obj(),
+			wantModeAll: false,
+		},
+		{
+			name:        "pod group with DisruptionModeAll",
+			pg:          st.MakePodGroup().Name("pg1").Namespace("default").DisruptionModeAll().Obj(),
+			wantModeAll: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotModeAll := isDisruptionModeAll(tt.pg); gotModeAll != tt.wantModeAll {
+				t.Errorf("isDisruptionModeAll() = %v, want %v", gotModeAll, tt.wantModeAll)
 			}
 		})
 	}
@@ -148,7 +200,7 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 			},
 		},
 		{
-			name: "pods with pod group (DisruptionModePodGroup)",
+			name: "pods with pod group (DisruptionModeAll)",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
 				st.MakeNode().Name("node2").Obj(),
@@ -158,7 +210,7 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(10).Obj(),
 			},
 			podGroups: map[string]*schedulingapi.PodGroup{
-				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(50).Obj(),
+				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().Priority(50).Obj(),
 			},
 			domainName: "test-domain",
 			wantVictims: []expectedVictim{
@@ -166,7 +218,7 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 			},
 		},
 		{
-			name: "pods with pod group (DisruptionModePod)",
+			name: "pods with pod group (DisruptionModeSingle)",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
 				st.MakeNode().Name("node2").Obj(),
@@ -176,7 +228,7 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(20).Obj(),
 			},
 			podGroups: map[string]*schedulingapi.PodGroup{
-				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePod).Priority(50).Obj(),
+				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().Priority(50).Obj(),
 			},
 			domainName: "test-domain",
 			wantVictims: []expectedVictim{
@@ -197,8 +249,8 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				st.MakePod().Name("p4").UID("p4").Node("node2").Priority(30).Obj(),
 			},
 			podGroups: map[string]*schedulingapi.PodGroup{
-				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(50).Obj(),
-				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionMode(schedulingapi.DisruptionModePod).Priority(60).Obj(),
+				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().Priority(50).Obj(),
+				"pg2": st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeSingle().Priority(60).Obj(),
 			},
 			domainName: "test-domain",
 			wantVictims: []expectedVictim{

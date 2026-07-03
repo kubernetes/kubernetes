@@ -133,11 +133,7 @@ func Convert_apiregistration_APIService_To_v1beta1_APIService(in *apiregistratio
 }
 
 func autoConvert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondition(in *APIServiceCondition, out *apiregistration.APIServiceCondition, s conversion.Scope) error {
-	out.Type = apiregistration.APIServiceConditionType(in.Type)
-	out.Status = apiregistration.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*apiregistration.APIServiceCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -147,11 +143,7 @@ func Convert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondition(
 }
 
 func autoConvert_apiregistration_APIServiceCondition_To_v1beta1_APIServiceCondition(in *apiregistration.APIServiceCondition, out *APIServiceCondition, s conversion.Scope) error {
-	out.Type = APIServiceConditionType(in.Type)
-	out.Status = ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*APIServiceCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -251,7 +243,7 @@ func Convert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(in *apireg
 }
 
 func autoConvert_v1beta1_APIServiceStatus_To_apiregistration_APIServiceStatus(in *APIServiceStatus, out *apiregistration.APIServiceStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]apiregistration.APIServiceCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*apiregistration.APIServiceStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -261,7 +253,7 @@ func Convert_v1beta1_APIServiceStatus_To_apiregistration_APIServiceStatus(in *AP
 }
 
 func autoConvert_apiregistration_APIServiceStatus_To_v1beta1_APIServiceStatus(in *apiregistration.APIServiceStatus, out *APIServiceStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]APIServiceCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*APIServiceStatus)(unsafe.Pointer(in))
 	return nil
 }
 

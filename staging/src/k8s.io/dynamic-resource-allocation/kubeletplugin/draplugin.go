@@ -18,6 +18,8 @@ package kubeletplugin
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -49,7 +51,51 @@ const (
 	KubeletPluginsDir = "/var/lib/kubelet/plugins"
 	// KubeletRegistryDir is the default for [RegistrarDirectoryPath]
 	KubeletRegistryDir = "/var/lib/kubelet/plugins_registry"
+
+	// unixPathMax is the maximum length of an AF_UNIX socket path on Linux.
+	unixPathMax = 108
+
+	// rollingUpdateUIDHashBytes is how much of the SHA-256 digest of a pod UID
+	// is base64-encoded when the full UID does not fit in the registration socket
+	// path. 8 bytes (64 bits) is ample for node-local uniqueness during rolling
+	// updates.
+	rollingUpdateUIDHashBytes = 8
+
+	// rollingUpdateRegistrarSocketHashBytes is how much of the SHA-256 digest
+	// of (driver name, pod UID) is base64-encoded into the shortest rolling-update
+	// registration socket basename. 16 bytes (128 bits) is ample for
+	// node-local uniqueness while keeping AF_UNIX paths under typical limits.
+	rollingUpdateRegistrarSocketHashBytes = 16
 )
+
+// RollingUpdateRegistrarSocketFile returns a kubelet plugin registration socket
+// basename for rolling updates. The full path path.Join(registryDir, basename)
+// must fit within unixPathMax bytes.
+//
+// The basename is chosen in order of preference:
+//  1. <driver name>-<pod UID>-reg.sock
+//  2. <driver name>-<base64(SHA-256(pod UID)[:8])>-reg.sock
+//  3. dra-<base64(SHA-256(driver name, NUL, pod UID)[:16])>-reg.sock
+func RollingUpdateRegistrarSocketFile(registryDir, driverName string, podUID types.UID) string {
+	uid := string(podUID)
+	uidHash := sha256Sum(uid)
+	driverUIDHash := sha256Sum(driverName + "\x00" + uid)
+	candidates := []string{
+		driverName + "-" + uid + "-reg.sock",
+		driverName + "-" + base64.RawURLEncoding.EncodeToString(uidHash[:rollingUpdateUIDHashBytes]) + "-reg.sock",
+		"dra-" + base64.RawURLEncoding.EncodeToString(driverUIDHash[:rollingUpdateRegistrarSocketHashBytes]) + "-reg.sock",
+	}
+	for _, basename := range candidates {
+		if len(path.Join(registryDir, basename)) <= unixPathMax {
+			return basename
+		}
+	}
+	return candidates[len(candidates)-1]
+}
+
+func sha256Sum(data string) [32]byte {
+	return sha256.Sum256([]byte(data))
+}
 
 // DRAPlugin is the interface that needs to be implemented by a DRA driver to
 // use this helper package. The helper package then implements the gRPC
@@ -290,7 +336,9 @@ func RegistrarDirectoryPath(path string) Option {
 // of the helper code.
 //
 // The default is <driver name>-reg.sock. When rolling updates are enabled,
-// it is <driver name>-<uid>-reg.sock.
+// the basename is chosen so the full path under [RegistrarDirectoryPath]
+// fits within AF_UNIX length limits, preferring names that keep the driver
+// name visible (see [RollingUpdateRegistrarSocketFile]).
 //
 // This option and [RollingUpdate] are mutually exclusive.
 func RegistrarSocketFilename(name string) Option {
@@ -360,8 +408,10 @@ func PluginListener(listen func(ctx context.Context, path string) (net.Listener,
 // RollingUpdate can be used to enable support for running two plugin instances
 // in parallel while a newer instance replaces the older. When enabled, both
 // instances must share the same plugin data directory and driver name.
-// They create different sockets to allow the kubelet to connect to both at
-// the same time.
+// They create different registration sockets (and DRA gRPC sockets) so the
+// kubelet can connect to both at the same time. The default registration socket
+// basename is chosen to fit within AF_UNIX path limits (see
+// [RollingUpdateRegistrarSocketFile]).
 //
 // There is no guarantee which of the two instances are used by kubelet.
 // For example, it can happen that a claim gets prepared by one instance
@@ -688,7 +738,11 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		uidPart = "-" + string(o.rollingUpdateUID)
 	}
 	if o.pluginRegistrationEndpoint.file == "" {
-		o.pluginRegistrationEndpoint.file = o.driverName + uidPart + "-reg.sock"
+		if o.rollingUpdateUID != "" {
+			o.pluginRegistrationEndpoint.file = RollingUpdateRegistrarSocketFile(o.pluginRegistrationEndpoint.dir, o.driverName, o.rollingUpdateUID)
+		} else {
+			o.pluginRegistrationEndpoint.file = o.driverName + "-reg.sock"
+		}
 	}
 	if o.pluginDataDirectoryPath == "" {
 		o.pluginDataDirectoryPath = path.Join(KubeletPluginsDir, o.driverName)

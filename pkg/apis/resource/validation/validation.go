@@ -803,7 +803,7 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 	if counterSet.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, validateCounterName(counterSet.Name, fldPath.Child("name"))...).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, validateCounterName(counterSet.Name, fldPath.Child("name")).MarkCoveredByDeclarative()...)
 	}
 	if len(counterSet.Counters) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
@@ -960,7 +960,7 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 	if len(deviceCounterConsumption.CounterSet) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counterSet"), "").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, validateCounterName(deviceCounterConsumption.CounterSet, fldPath.Child("counterSet"))...).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, validateCounterName(deviceCounterConsumption.CounterSet, fldPath.Child("counterSet")).MarkCoveredByDeclarative()...)
 	}
 	if len(deviceCounterConsumption.Counters) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
@@ -1175,14 +1175,18 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 		}
 	}
 	if valueRange.Step != nil {
-		added := valueRange.Min.DeepCopy()
-		added.Add(*valueRange.Step)
-		if added.Cmp(maxCapacity) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("step"), valueRange.Step.String(), fmt.Sprintf("one step %s is larger than capacity value: %s", added.String(), maxCapacity.String())))
-		}
-		allErrs = append(allErrs, validateRequestPolicyRangeStep(defaultValue, *valueRange.Min, *valueRange.Step, fldPath.Child("step"))...)
-		if valueRange.Max != nil {
-			allErrs = append(allErrs, validateRequestPolicyRangeStep(*valueRange.Max, *valueRange.Min, *valueRange.Step, fldPath.Child("step"))...)
+		if valueRange.Step.Sign() <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("step"), valueRange.Step.String(), "must be greater than zero"))
+		} else {
+			added := valueRange.Min.DeepCopy()
+			added.Add(*valueRange.Step)
+			if added.Cmp(maxCapacity) > 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("step"), valueRange.Step.String(), fmt.Sprintf("one step %s is larger than capacity value: %s", added.String(), maxCapacity.String())))
+			}
+			allErrs = append(allErrs, validateRequestPolicyRangeStep(defaultValue, *valueRange.Min, *valueRange.Step, fldPath.Child("step"))...)
+			if valueRange.Max != nil {
+				allErrs = append(allErrs, validateRequestPolicyRangeStep(*valueRange.Max, *valueRange.Min, *valueRange.Step, fldPath.Child("step"))...)
+			}
 		}
 	}
 	return allErrs

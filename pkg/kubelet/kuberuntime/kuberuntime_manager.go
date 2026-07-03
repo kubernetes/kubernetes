@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"go.opentelemetry.io/otel/trace"
 	grpcstatus "google.golang.org/grpc/status"
 
@@ -273,7 +273,7 @@ func NewKubeGenericRuntimeManager(
 		runtimeService:               runtimeService,
 		imageService:                 imageService,
 		containerManager:             containerManager,
-		internalLifecycle:            containerManager.InternalContainerLifecycle(),
+		internalLifecycle:            containerManager.InternalContainerLifecycle(logger),
 		logManager:                   logManager,
 		runtimeClassManager:          runtimeClassManager,
 		logReduction:                 logreduction.NewLogReduction(identicalErrorDelay),
@@ -372,7 +372,7 @@ func NewKubeGenericRuntimeManager(
 		versionCacheTTL,
 	)
 
-	kubeRuntimeManager.actuatedState, err = state.NewStateCheckpoint(rootDirectory, actuatedPodsStateFile)
+	kubeRuntimeManager.actuatedState, err = state.NewStateCheckpoint(logger, rootDirectory, actuatedPodsStateFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
 	}
@@ -829,7 +829,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	pcm := m.containerManager.NewPodContainerManager()
 	//TODO(vinaykul,InPlacePodVerticalScaling): Figure out best way to get enforceMemoryQoS value (parameter #4 below) in platform-agnostic way
 	enforceCPULimits := m.cpuCFSQuota
-	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(logger, pod) {
 		enforceCPULimits = false
 		logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
 	}
@@ -907,7 +907,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			}
 
 		}
-		if err = m.actuatedState.SetPodLevelResources(pod.UID, actuatedPodResources); err != nil {
+		if err = m.actuatedState.SetPodLevelResources(logger, pod.UID, actuatedPodResources); err != nil {
 			logger.Error(err, "SetPodLevelResources failed", "pod", pod.Name, "UID", pod.UID,
 				"pod", format.Pod(pod), "resourceName", resourceName)
 			return err
@@ -1176,7 +1176,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Syncing Pod", "pod", klog.KObj(pod))
 
-	createPodSandbox, attempt, sandboxID := runtimeutil.PodSandboxChanged(pod, podStatus)
+	createPodSandbox, attempt, sandboxID, _ := runtimeutil.PodSandboxChanged(pod, podStatus)
 	changes := podActions{
 		KillPod:           createPodSandbox,
 		CreateSandbox:     createPodSandbox,
@@ -2161,7 +2161,7 @@ func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy
 	// Remove terminated pods from the actuated state.
 	for uid := range m.actuatedState.GetPodResourceInfoMap() {
 		if m.podStateProvider.ShouldPodContentBeRemoved(uid) {
-			if err := m.actuatedState.RemovePod(uid); err != nil {
+			if err := m.actuatedState.RemovePod(logger, uid); err != nil {
 				// No need to act on the error beyond logging it here.
 				logger.Error(err, "Failed to remove pod from actuated state", "podUID", uid)
 			}
@@ -2198,7 +2198,7 @@ func (m *kubeGenericRuntimeManager) ListPodSandboxMetrics(ctx context.Context) (
 	return m.runtimeService.ListPodSandboxMetrics(ctx)
 }
 
-func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error {
+func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return nil
 	}
@@ -2211,7 +2211,7 @@ func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(actuatedPod 
 		return nil
 	}
 
-	return m.actuatedState.SetPodLevelResources(actuatedPod.UID, actuatedPod.Spec.Resources)
+	return m.actuatedState.SetPodLevelResources(logger, actuatedPod.UID, actuatedPod.Spec.Resources)
 }
 
 // isPodResizeInProgress checks whether the actuated resizable resources differ from

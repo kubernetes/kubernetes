@@ -31,6 +31,7 @@ import (
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
@@ -164,7 +165,28 @@ func Validate_DeviceTaintRule(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field resourcev1alpha3.DeviceTaintRule.Status has no validation
+	{ // field resourcev1alpha3.DeviceTaintRule.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1alpha3.DeviceTaintRuleStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceTaintRuleStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1alpha3.DeviceTaintRule) *resourcev1alpha3.DeviceTaintRuleStatus {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -196,6 +218,53 @@ func Validate_DeviceTaintRuleSpec(
 				return &oldObj.Taint
 			})
 		errs = append(errs, fn(fldPath.Child("taint"), &obj.Taint, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_DeviceTaintRuleStatus validates an instance of DeviceTaintRuleStatus according
+// to declarative validation rules in the API schema.
+func Validate_DeviceTaintRuleStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1alpha3.DeviceTaintRuleStatus) (errs field.ErrorList) {
+
+	{ // field resourcev1alpha3.DeviceTaintRuleStatus.Conditions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []v1.Condition,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1alpha3.DeviceTaintRuleStatus) []v1.Condition {
+				return oldObj.Conditions
+			})
+		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
 	}
 
 	return errs
@@ -800,6 +869,16 @@ func Validate_ResourcePoolStatusRequestStatus(
 			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
+				errs = append(errs, e...)
 			}
 			return
 		}

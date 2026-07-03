@@ -25,7 +25,6 @@ import (
 	unsafe "unsafe"
 
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
@@ -162,7 +161,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_AggregationRule_To_rbac_AggregationRule(in *rbacv1beta1.AggregationRule, out *rbac.AggregationRule, s conversion.Scope) error {
-	out.ClusterRoleSelectors = *(*[]v1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
+	*out = *(*rbac.AggregationRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -172,7 +171,7 @@ func Convert_v1beta1_AggregationRule_To_rbac_AggregationRule(in *rbacv1beta1.Agg
 }
 
 func autoConvert_rbac_AggregationRule_To_v1beta1_AggregationRule(in *rbac.AggregationRule, out *rbacv1beta1.AggregationRule, s conversion.Scope) error {
-	out.ClusterRoleSelectors = *(*[]v1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
+	*out = *(*rbacv1beta1.AggregationRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -278,11 +277,7 @@ func Convert_rbac_ClusterRoleList_To_v1beta1_ClusterRoleList(in *rbac.ClusterRol
 }
 
 func autoConvert_v1beta1_PolicyRule_To_rbac_PolicyRule(in *rbacv1beta1.PolicyRule, out *rbac.PolicyRule, s conversion.Scope) error {
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
-	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
-	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
+	*out = *(*rbac.PolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -292,11 +287,7 @@ func Convert_v1beta1_PolicyRule_To_rbac_PolicyRule(in *rbacv1beta1.PolicyRule, o
 }
 
 func autoConvert_rbac_PolicyRule_To_v1beta1_PolicyRule(in *rbac.PolicyRule, out *rbacv1beta1.PolicyRule, s conversion.Scope) error {
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
-	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
-	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
+	*out = *(*rbacv1beta1.PolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -400,9 +391,7 @@ func Convert_rbac_RoleList_To_v1beta1_RoleList(in *rbac.RoleList, out *rbacv1bet
 }
 
 func autoConvert_v1beta1_RoleRef_To_rbac_RoleRef(in *rbacv1beta1.RoleRef, out *rbac.RoleRef, s conversion.Scope) error {
-	out.APIGroup = in.APIGroup
-	out.Kind = in.Kind
-	out.Name = in.Name
+	*out = *(*rbac.RoleRef)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -412,9 +401,7 @@ func Convert_v1beta1_RoleRef_To_rbac_RoleRef(in *rbacv1beta1.RoleRef, out *rbac.
 }
 
 func autoConvert_rbac_RoleRef_To_v1beta1_RoleRef(in *rbac.RoleRef, out *rbacv1beta1.RoleRef, s conversion.Scope) error {
-	out.APIGroup = in.APIGroup
-	out.Kind = in.Kind
-	out.Name = in.Name
+	*out = *(*rbacv1beta1.RoleRef)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -424,10 +411,7 @@ func Convert_rbac_RoleRef_To_v1beta1_RoleRef(in *rbac.RoleRef, out *rbacv1beta1.
 }
 
 func autoConvert_v1beta1_Subject_To_rbac_Subject(in *rbacv1beta1.Subject, out *rbac.Subject, s conversion.Scope) error {
-	out.Kind = in.Kind
-	out.APIGroup = in.APIGroup
-	out.Name = in.Name
-	out.Namespace = in.Namespace
+	*out = *(*rbac.Subject)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -437,10 +421,7 @@ func Convert_v1beta1_Subject_To_rbac_Subject(in *rbacv1beta1.Subject, out *rbac.
 }
 
 func autoConvert_rbac_Subject_To_v1beta1_Subject(in *rbac.Subject, out *rbacv1beta1.Subject, s conversion.Scope) error {
-	out.Kind = in.Kind
-	out.APIGroup = in.APIGroup
-	out.Name = in.Name
-	out.Namespace = in.Namespace
+	*out = *(*rbacv1beta1.Subject)(unsafe.Pointer(in))
 	return nil
 }
 

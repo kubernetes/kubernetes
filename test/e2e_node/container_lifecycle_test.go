@@ -25,6 +25,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -5220,7 +5221,13 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &grace})
 				framework.ExpectNoError(err)
 				ginkgo.By("waiting for the pod to disappear")
-				err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, 120*time.Second)
+				err = framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*v1.Pod, error) {
+					pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+					if apierrors.IsNotFound(err) {
+						return nil, nil
+					}
+					return pod, err
+				})).WithTimeout(120 * time.Second).WithPolling(100 * time.Millisecond).Should(gomega.BeNil())
 				framework.ExpectNoError(err)
 
 				buffer := int64(2)

@@ -17,7 +17,9 @@ limitations under the License.
 package v1_test
 
 import (
+	_ "embed"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/url"
 	"reflect"
@@ -33,19 +35,27 @@ import (
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	// ensure types are installed corereplicationcontroller<->replicaset conversions
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 )
+
+//go:embed testdata/exemplar_pod.yaml
+var benchmarkExemplarPodYAML []byte
+
+const benchmarkSeed = 100
 
 func TestPodLogOptions(t *testing.T) {
 	sinceSeconds := int64(1)
@@ -138,15 +148,15 @@ func TestPodLogOptions(t *testing.T) {
 	}
 }
 
-// TestPodSpecConversion tests that v1.ServiceAccount is an alias for
-// ServiceAccountName.
+// TestPodSpecConversion tests that ServiceAccountName and its deprecated alias
+// are preserved verbatim by conversion in both directions (keeping them in
+// sync is handled by defaulting and the pod registry strategy, not conversion).
 func TestPodSpecConversion(t *testing.T) {
 	name, other := "foo", "bar"
 
-	// Test internal -> v1. Should have both alias (DeprecatedServiceAccount)
-	// and new field (ServiceAccountName).
 	i := &core.PodSpec{
-		ServiceAccountName: name,
+		ServiceAccountName:       name,
+		DeprecatedServiceAccount: other,
 	}
 	v := v1.PodSpec{}
 	if err := legacyscheme.Scheme.Convert(i, &v, nil); err != nil {
@@ -155,33 +165,184 @@ func TestPodSpecConversion(t *testing.T) {
 	if v.ServiceAccountName != name {
 		t.Fatalf("want v1.ServiceAccountName %q, got %q", name, v.ServiceAccountName)
 	}
-	if v.DeprecatedServiceAccount != name {
-		t.Fatalf("want v1.DeprecatedServiceAccount %q, got %q", name, v.DeprecatedServiceAccount)
+	if v.DeprecatedServiceAccount != other {
+		t.Fatalf("want v1.DeprecatedServiceAccount %q, got %q", other, v.DeprecatedServiceAccount)
 	}
 
-	// Test v1 -> internal. Either DeprecatedServiceAccount, ServiceAccountName,
-	// or both should translate to ServiceAccountName. ServiceAccountName wins
-	// if both are set.
-	testCases := []*v1.PodSpec{
-		// New
-		{ServiceAccountName: name},
-		// Alias
-		{DeprecatedServiceAccount: name},
-		// Both: same
-		{ServiceAccountName: name, DeprecatedServiceAccount: name},
-		// Both: different
-		{ServiceAccountName: name, DeprecatedServiceAccount: other},
+	got := core.PodSpec{}
+	if err := legacyscheme.Scheme.Convert(&v, &got, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	for k, v := range testCases {
-		got := core.PodSpec{}
-		err := legacyscheme.Scheme.Convert(v, &got, nil)
-		if err != nil {
-			t.Fatalf("unexpected error for case %d: %v", k, err)
-		}
-		if got.ServiceAccountName != name {
-			t.Fatalf("want core.ServiceAccountName %q, got %q", name, got.ServiceAccountName)
-		}
+	if got.ServiceAccountName != name {
+		t.Fatalf("want core.ServiceAccountName %q, got %q", name, got.ServiceAccountName)
 	}
+	if got.DeprecatedServiceAccount != other { //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be tested for backward compatibility
+		t.Fatalf("want core.DeprecatedServiceAccount %q, got %q", other, got.DeprecatedServiceAccount) //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be tested for backward compatibility
+	}
+}
+
+func TestPodSpecHostNamespaceSecurityContextRoundTrip(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(spec *v1.PodSpec)
+	}{
+		{"none", func(spec *v1.PodSpec) {}},
+		{"hostNetwork", func(spec *v1.PodSpec) { spec.HostNetwork = true }},
+		{"hostPID", func(spec *v1.PodSpec) { spec.HostPID = true }},
+		{"hostIPC", func(spec *v1.PodSpec) { spec.HostIPC = true }},
+		{"hostUsers", func(spec *v1.PodSpec) { spec.HostUsers = new(true) }},
+		{"hostUsersFalse", func(spec *v1.PodSpec) { spec.HostUsers = new(false) }},
+		{"shareProcessNamespace", func(spec *v1.PodSpec) { spec.ShareProcessNamespace = new(true) }},
+		{"shareProcessNamespaceFalse", func(spec *v1.PodSpec) { spec.ShareProcessNamespace = new(false) }},
+		{"all", func(spec *v1.PodSpec) {
+			spec.HostNetwork = true
+			spec.HostIPC = true
+			spec.HostUsers = new(true)
+			spec.ShareProcessNamespace = new(true)
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := &v1.Pod{}
+			tc.mutate(&in.Spec)
+			if in.Spec.SecurityContext != nil {
+				t.Fatalf("securityContext must start nil")
+			}
+			legacyscheme.Scheme.Default(in)
+			if in.Spec.SecurityContext == nil {
+				t.Errorf("securityContext must default to non-nil")
+			}
+
+			// v1 -> internal
+			internal := &core.Pod{}
+			if err := legacyscheme.Scheme.Convert(in, internal, nil); err != nil {
+				t.Fatal(err)
+			}
+			// compare across types
+			if internal.Spec.HostNetwork != in.Spec.HostNetwork ||
+				internal.Spec.HostPID != in.Spec.HostPID ||
+				internal.Spec.HostIPC != in.Spec.HostIPC ||
+				!reflect.DeepEqual(internal.Spec.HostUsers, in.Spec.HostUsers) ||
+				!reflect.DeepEqual(internal.Spec.ShareProcessNamespace, in.Spec.ShareProcessNamespace) {
+				t.Errorf("v1 -> internal:\n%s", cmp.Diff(in.Spec, internal.Spec))
+			}
+
+			// internal -> v1
+			out := &v1.Pod{}
+			if err := legacyscheme.Scheme.Convert(internal, out, nil); err != nil {
+				t.Fatal(err)
+			}
+			if out.Spec.SecurityContext == nil {
+				t.Errorf("securityContext must be an non-nil")
+			}
+			// compare round-tripped
+			if !reflect.DeepEqual(in.Spec, out.Spec) {
+				t.Errorf("internal -> v1:\n%s", cmp.Diff(in.Spec, out.Spec))
+			}
+		})
+	}
+}
+
+func BenchmarkPodListConversion(b *testing.B) {
+	versionedPod := loadExemplarPod()
+
+	for _, tc := range []struct {
+		name      string
+		benchmark func(*testing.B, int, *v1.Pod)
+	}{
+		{name: "core-to-v1", benchmark: benchmarkConvertCorePodListToV1},
+		{name: "v1-to-core", benchmark: benchmarkConvertV1PodListToCore},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			for _, size := range []int{1, 100, 1000, 5000, 10000} {
+				b.Run(fmt.Sprintf("pods=%d", size), func(b *testing.B) {
+					tc.benchmark(b, size, versionedPod)
+				})
+			}
+		})
+	}
+}
+
+func benchmarkConvertCorePodListToV1(b *testing.B, size int, exemplar *v1.Pod) {
+	in := benchmarkCorePodList(b, benchmarkVersionedPodList(exemplar, size))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			out := &v1.PodList{}
+			if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+				panic(fmt.Sprintf("unexpected conversion error: %v", err))
+			}
+			if len(out.Items) != size {
+				panic(fmt.Sprintf("unexpected converted item count: got %d, want %d", len(out.Items), size))
+			}
+		}
+	})
+}
+
+func benchmarkConvertV1PodListToCore(b *testing.B, size int, exemplar *v1.Pod) {
+	in := benchmarkVersionedPodList(exemplar, size)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			out := &core.PodList{}
+			if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+				panic(fmt.Sprintf("unexpected conversion error: %v", err))
+			}
+			if len(out.Items) != size {
+				panic(fmt.Sprintf("unexpected converted item count: got %d, want %d", len(out.Items), size))
+			}
+		}
+	})
+}
+
+func benchmarkCorePodList(b *testing.B, in *v1.PodList) *core.PodList {
+	b.Helper()
+	out := &core.PodList{}
+	if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+		b.Fatalf("unexpected setup conversion error: %v", err)
+	}
+	return out
+}
+
+func benchmarkVersionedPodList(exemplar *v1.Pod, size int) *v1.PodList {
+	utilrand.Seed(benchmarkSeed)
+	nodeNames := make([]string, 25)
+	for i := range nodeNames {
+		nodeNames[i] = utilrand.String(10)
+	}
+	items := make([]v1.Pod, size)
+	for i := range items {
+		pod := exemplar.DeepCopy()
+		randomizePod(pod, utilrand.String(10), nodeNames[utilrand.Intn(len(nodeNames))])
+		items[i] = *pod
+	}
+	return &v1.PodList{
+		ListMeta: metav1.ListMeta{ResourceVersion: "1000"},
+		Items:    items,
+	}
+}
+
+func randomizePod(pod *v1.Pod, ns string, nodeName string) {
+	pod.Namespace = ns
+	pod.Name = pod.GenerateName + utilrand.String(10)
+	pod.UID = types.UID(utilrand.String(36))
+	pod.ResourceVersion = ""
+	pod.Spec.NodeName = nodeName
+}
+
+func loadExemplarPod() *v1.Pod {
+	if len(benchmarkExemplarPodYAML) == 0 {
+		panic("exemplar pod empty")
+	}
+	pod := &v1.Pod{}
+	if err := yaml.Unmarshal(benchmarkExemplarPodYAML, pod); err != nil {
+		panic(fmt.Sprintf("decode exemplar pod: %v", err))
+	}
+	return pod
 }
 
 func TestResourceListConversion(t *testing.T) {
@@ -448,202 +609,31 @@ func roundTripRS(t *testing.T, rs *apps.ReplicaSet) *apps.ReplicaSet {
 	return obj2.(*apps.ReplicaSet)
 }
 
-func Test_core_PodStatus_to_v1_PodStatus(t *testing.T) {
-	// core to v1
-	testInputs := []core.PodStatus{
-		{
-			// one IP
-			PodIPs: []core.PodIP{
-				{
-					IP: "1.1.1.1",
-				},
-			},
-		},
-		{
-			// no ips
-			PodIPs: nil,
-		},
-		{
-			// list of ips
-			PodIPs: []core.PodIP{
-				{
-					IP: "1.1.1.1",
-				},
-				{
-					IP: "2000::",
-				},
-			},
+func TestPodStatusConversion(t *testing.T) {
+	in := core.PodStatus{
+		PodIP: "1.1.2.1",
+		PodIPs: []core.PodIP{
+			{IP: "1.1.1.1"},
+			{IP: "2000::"},
 		},
 	}
-	for i, input := range testInputs {
-		v1PodStatus := v1.PodStatus{}
-		if err := corev1.Convert_core_PodStatus_To_v1_PodStatus(&input, &v1PodStatus, nil); nil != err {
-			t.Errorf("%v: Convert core.PodStatus to v1.PodStatus failed with error %v", i, err.Error())
-		}
-
-		if len(input.PodIPs) == 0 {
-			// no more work needed
-			continue
-		}
-		// Primary IP was not set..
-		if len(v1PodStatus.PodIP) == 0 {
-			t.Errorf("%v: Convert core.PodStatus to v1.PodStatus failed out.PodIP is empty, should be %v", i, v1PodStatus.PodIP)
-		}
-
-		// Primary should always == in.PodIPs[0].IP
-		if len(input.PodIPs) > 0 && v1PodStatus.PodIP != input.PodIPs[0].IP {
-			t.Errorf("%v: Convert core.PodStatus to v1.PodStatus failed out.PodIP != in.PodIP[0].IP expected %v found %v", i, input.PodIPs[0].IP, v1PodStatus.PodIP)
-		}
-		// match v1.PodIPs to core.PodIPs
-		for idx := range input.PodIPs {
-			if v1PodStatus.PodIPs[idx].IP != input.PodIPs[idx].IP {
-				t.Errorf("%v: Convert core.PodStatus to v1.PodStatus failed. Expected v1.PodStatus[%v]=%v but found %v", i, idx, input.PodIPs[idx].IP, v1PodStatus.PodIPs[idx].IP)
-			}
-		}
+	v1Status := v1.PodStatus{}
+	if err := corev1.Convert_core_PodStatus_To_v1_PodStatus(&in, &v1Status, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-}
-func Test_v1_PodStatus_to_core_PodStatus(t *testing.T) {
-	asymmetricInputs := []struct {
-		name string
-		in   v1.PodStatus
-		out  core.PodStatus
-	}{
-		{
-			name: "mismatched podIP",
-			in: v1.PodStatus{
-				PodIP: "1.1.2.1", // Older field takes precedence for compatibility with patch by older clients
-				PodIPs: []v1.PodIP{
-					{IP: "1.1.1.1"},
-					{IP: "2.2.2.2"},
-				},
-			},
-			out: core.PodStatus{
-				PodIPs: []core.PodIP{
-					{IP: "1.1.2.1"},
-				},
-			},
-		},
-		{
-			name: "matching podIP",
-			in: v1.PodStatus{
-				PodIP: "1.1.1.1",
-				PodIPs: []v1.PodIP{
-					{IP: "1.1.1.1"},
-					{IP: "2.2.2.2"},
-				},
-			},
-			out: core.PodStatus{
-				PodIPs: []core.PodIP{
-					{IP: "1.1.1.1"},
-					{IP: "2.2.2.2"},
-				},
-			},
-		},
-		{
-			name: "empty podIP",
-			in: v1.PodStatus{
-				PodIP: "",
-				PodIPs: []v1.PodIP{
-					{IP: "1.1.1.1"},
-					{IP: "2.2.2.2"},
-				},
-			},
-			out: core.PodStatus{
-				PodIPs: []core.PodIP{
-					{IP: "1.1.1.1"},
-					{IP: "2.2.2.2"},
-				},
-			},
-		},
+	if v1Status.PodIP != in.PodIP {
+		t.Errorf("expected v1 podIP %q, got %q", in.PodIP, v1Status.PodIP)
+	}
+	if len(v1Status.PodIPs) != len(in.PodIPs) || v1Status.PodIPs[0].IP != in.PodIPs[0].IP {
+		t.Errorf("expected v1 podIPs to match, got %#v", v1Status.PodIPs)
 	}
 
-	// success
-	v1TestInputs := []v1.PodStatus{
-		// only Primary IP Provided
-		{
-			PodIP: "1.1.1.1",
-		},
-		{
-			// both are not provided
-			PodIP:  "",
-			PodIPs: nil,
-		},
-		// only list of IPs
-		{
-			PodIPs: []v1.PodIP{
-				{IP: "1.1.1.1"},
-				{IP: "2.2.2.2"},
-			},
-		},
-		// Both
-		{
-			PodIP: "1.1.1.1",
-			PodIPs: []v1.PodIP{
-				{IP: "1.1.1.1"},
-				{IP: "2.2.2.2"},
-			},
-		},
-		// v4 and v6
-		{
-			PodIP: "1.1.1.1",
-			PodIPs: []v1.PodIP{
-				{IP: "1.1.1.1"},
-				{IP: "::1"},
-			},
-		},
-		// v6 and v4
-		{
-			PodIP: "::1",
-			PodIPs: []v1.PodIP{
-				{IP: "::1"},
-				{IP: "1.1.1.1"},
-			},
-		},
+	roundTripped := core.PodStatus{}
+	if err := corev1.Convert_v1_PodStatus_To_core_PodStatus(&v1Status, &roundTripped, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-
-	// run asymmetric cases
-	for _, tc := range asymmetricInputs {
-		testInput := tc.in
-
-		corePodStatus := core.PodStatus{}
-		// convert..
-		if err := corev1.Convert_v1_PodStatus_To_core_PodStatus(&testInput, &corePodStatus, nil); err != nil {
-			t.Errorf("%s: Convert v1.PodStatus to core.PodStatus failed with error:%v for input %+v", tc.name, err.Error(), testInput)
-		}
-		if !reflect.DeepEqual(corePodStatus, tc.out) {
-			t.Errorf("%s: expected %#v, got %#v", tc.name, tc.out.PodIPs, corePodStatus.PodIPs)
-		}
-	}
-
-	// run ok cases
-	for i, testInput := range v1TestInputs {
-		corePodStatus := core.PodStatus{}
-		// convert..
-		if err := corev1.Convert_v1_PodStatus_To_core_PodStatus(&testInput, &corePodStatus, nil); err != nil {
-			t.Errorf("%v: Convert v1.PodStatus to core.PodStatus failed with error:%v for input %+v", i, err.Error(), testInput)
-		}
-
-		if len(testInput.PodIP) == 0 && len(testInput.PodIPs) == 0 {
-			continue //no more work needed
-		}
-
-		// List should have at least 1 IP == v1.PodIP || v1.PodIPs[0] (whichever provided)
-		if len(testInput.PodIP) > 0 && corePodStatus.PodIPs[0].IP != testInput.PodIP {
-			t.Errorf("%v: Convert v1.PodStatus to core.PodStatus failed. expected corePodStatus.PodIPs[0].ip=%v found %v", i, corePodStatus.PodIPs[0].IP, corePodStatus.PodIPs[0].IP)
-		}
-
-		// walk the list
-		for idx := range testInput.PodIPs {
-			if corePodStatus.PodIPs[idx].IP != testInput.PodIPs[idx].IP {
-				t.Errorf("%v: Convert v1.PodStatus to core.PodStatus failed core.PodIPs[%v]=%v expected %v", i, idx, corePodStatus.PodIPs[idx].IP, testInput.PodIPs[idx].IP)
-			}
-		}
-
-		// if input has a list of IPs
-		// then out put should have the same length
-		if len(testInput.PodIPs) > 0 && len(testInput.PodIPs) != len(corePodStatus.PodIPs) {
-			t.Errorf("%v: Convert v1.PodStatus to core.PodStatus failed len(core.PodIPs) != len(v1.PodStatus.PodIPs) [%v]=[%v]", i, len(corePodStatus.PodIPs), len(testInput.PodIPs))
-		}
+	if roundTripped.PodIP != in.PodIP || len(roundTripped.PodIPs) != len(in.PodIPs) {
+		t.Errorf("expected round-tripped to match, got %#v", roundTripped)
 	}
 }
 
@@ -832,8 +822,9 @@ func TestConvert_v1_Pod_To_core_Pod(t *testing.T) {
 			},
 			wantOut: &core.Pod{
 				Spec: core.PodSpec{
-					TerminationGracePeriodSeconds: ptr.To[int64](1),
-					SecurityContext:               &core.PodSecurityContext{},
+					// This is impossible in practice because defaulting will coherce a negative value to 1.
+					// We test it here to ensure faithful conversion.
+					TerminationGracePeriodSeconds: ptr.To[int64](-1),
 				},
 			},
 		},
@@ -872,7 +863,9 @@ func TestConvert_core_Pod_To_v1_Pod(t *testing.T) {
 			},
 			wantOut: &v1.Pod{
 				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: ptr.To[int64](1),
+					// This is impossible in practice because defaulting will coherce a negative value to 1.
+					// We test it here to ensure faithful conversion.
+					TerminationGracePeriodSeconds: ptr.To[int64](-1),
 				},
 			},
 		},
@@ -886,5 +879,73 @@ func TestConvert_core_Pod_To_v1_Pod(t *testing.T) {
 				t.Errorf("Convert_core_Pod_To_v1_Pod() mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// TestPodMemoryIdenticalConversion ensures the internal and v1 Pod types
+// remain memory-identical. These types must be kept memory-identical
+// for performance reasons.
+func TestPodMemoryIdenticalConversion(t *testing.T) {
+	f := fuzzer.FuzzerFor(fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, corefuzzer.Funcs), rand.NewSource(1), legacyscheme.Codecs).NilChance(0).NumElements(1, 1)
+	t.Run("v1 to internal", func(t *testing.T) {
+		in := &v1.Pod{}
+		f.Fill(in)
+		out := &core.Pod{}
+		if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+			t.Fatalf("conversion failed: %v", err)
+		}
+		assertMemoryIdentical(t, "Pod", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
+	})
+	t.Run("internal to v1", func(t *testing.T) {
+		in := &core.Pod{}
+		f.Fill(in)
+		out := &v1.Pod{}
+		if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+			t.Fatalf("conversion failed: %v", err)
+		}
+		assertMemoryIdentical(t, "Pod", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
+	})
+}
+
+func assertMemoryIdentical(t *testing.T, path string, a, b reflect.Value) {
+	t.Helper()
+	if a.Kind() != b.Kind() {
+		t.Errorf("%s: unexpected kind mismatch: %s, %s", path, a.Kind(), b.Kind())
+		return
+	}
+	switch a.Kind() {
+	case reflect.Struct: // allow for copied structs since conversion copies status/spec today
+		if a.Type().Size() != b.Type().Size() {
+			t.Errorf("%s: unexpected struct size mismatch: %d, %d", path, a.Type().Size(), b.Type().Size())
+			return
+		}
+		if a.NumField() != b.NumField() {
+			t.Errorf("%s: unexpected field count mismatch: %d, %d", path, a.NumField(), b.NumField())
+			return
+		}
+		for i := 0; i < a.NumField(); i++ {
+			aTypeField := a.Type().Field(i)
+			bTypeField := b.Type().Field(i)
+			if aTypeField.Name != bTypeField.Name {
+				t.Errorf("%s: unexpected field name mismatch: %s, %s", path, aTypeField.Name, bTypeField.Name)
+			}
+			if aTypeField.Offset != bTypeField.Offset {
+				t.Errorf("%s.%s: unexpected field offset mismatch: %d, %d", path, aTypeField.Name, aTypeField.Offset, bTypeField.Offset)
+			}
+			assertMemoryIdentical(t, path+"."+aTypeField.Name, a.Field(i), b.Field(i))
+		}
+	case reflect.Pointer, reflect.Map, reflect.Slice:
+		if a.IsNil() != b.IsNil() {
+			t.Errorf("%s: nilable pointer mismatch: %v, %v", path, !a.IsNil(), !b.IsNil())
+			return
+		}
+		if !a.IsNil() && a.UnsafePointer() != b.UnsafePointer() {
+			t.Errorf("%s: nilable type was unexpectedly copied", path)
+		}
+	case reflect.Bool, reflect.Int, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64, reflect.String:
+		// Assume scalars are copied by value
+	default:
+		t.Errorf("%s: unexpected kind: %v", path, a.Kind())
 	}
 }

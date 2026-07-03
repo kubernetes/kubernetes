@@ -32,7 +32,7 @@ Packet flow through netfilter looks something like:
 where the `[*]` represents a routing decision, and all of the boxes except in the top row
 represent netfilter hooks. More detailed versions of this diagram can be seen at
 https://en.wikipedia.org/wiki/Netfilter#/media/File:Netfilter-packet-flow.svg and
-https://wiki.nftables.org/wiki-nftables/index.php/Netfilter_hooks but note that in the the
+https://wiki.nftables.org/wiki-nftables/index.php/Netfilter_hooks but note that in the
 standard version of this diagram, the top two boxes are squished together into "local
 process" which (a) fails to make a few important distinctions, and (b) makes it look like
 a single packet can go `input` -> "local process" -> `output`, which it cannot. Note also
@@ -110,7 +110,7 @@ This is implemented as follows:
 
 ## Integrating with kube-proxy's nftables mode
 
-Implementations of pod networking, NetworkPolicy, service meshes, etc, may need to be
+Implementations of pod networking, NetworkPolicy, service meshes, etc., may need to be
 aware of some slightly lower-level details of kube-proxy's implementation.
 
 Components other than kube-proxy should *never* make any modifications to the

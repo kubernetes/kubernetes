@@ -247,9 +247,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostNetwork: true,
-				},
+				HostNetwork:   true,
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 				Containers: []api.Container{{
@@ -557,7 +555,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		name: "empty selector",
 		set:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(nil)),
 		errs: field.ErrorList{
-			field.Required(field.NewPath("spec", "selector"), ""),
+			field.Required(field.NewPath("spec", "selector"), "").MarkCoveredByDeclarative(),
 			field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""), // selector is empty, labels are not, so select doesn't match labels
 		},
 	}, {
@@ -1261,21 +1259,28 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			tweakSelectorLabels(validLabels2),
 		),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "selector"), nil, "").MarkCoveredByDeclarative(),
+		},
+	}, {
+		name:   "update service name",
+		old:    mkStatefulSet(&validPodTemplate, tweakServiceName("valid-service")),
+		update: mkStatefulSet(&validPodTemplate, tweakServiceName("other-service")),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "serviceName"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "update pod management policy 1",
 		old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy("")),
 		update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "update pod management policy 2",
 		old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.ParallelPodManagement)),
 		update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "update to negative replicas",
@@ -1289,21 +1294,21 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedSize)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "update pvc template storage class",
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedClass)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "add new pvc template",
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate, validPVCTemplate2)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "valid old spec but invalid new spec",
@@ -2355,9 +2360,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: podtest.MakePodSpec(
-				podtest.SetSecurityContext(&api.PodSecurityContext{
-					HostNetwork: true,
-				}),
+				podtest.SetHostNetwork(true),
 				podtest.SetContainers(podtest.MakeContainer("abc",
 					podtest.SetContainerPorts(api.ContainerPort{
 						ContainerPort: 12345,
@@ -2596,9 +2599,7 @@ func TestValidateDeployment(t *testing.T) {
 	successCases := []*apps.Deployment{
 		validDeployment(),
 		validDeployment(func(d *apps.Deployment) {
-			d.Spec.Template.Spec.SecurityContext = &api.PodSecurityContext{
-				HostNetwork: true,
-			}
+			d.Spec.Template.Spec.HostNetwork = true
 			d.Spec.Template.Spec.Containers[0].Ports = []api.ContainerPort{{
 				ContainerPort: 12345,
 				Protocol:      api.ProtocolTCP,
@@ -3531,9 +3532,7 @@ func TestValidateReplicaSet(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: podtest.MakePodSpec(
-				podtest.SetSecurityContext(&api.PodSecurityContext{
-					HostNetwork: true,
-				}),
+				podtest.SetHostNetwork(true),
 				podtest.SetContainers(podtest.MakeContainer("abc", podtest.SetContainerPorts(api.ContainerPort{
 					ContainerPort: 12345,
 					Protocol:      api.ProtocolTCP,

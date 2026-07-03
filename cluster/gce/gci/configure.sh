@@ -27,9 +27,7 @@ set -o pipefail
 DEFAULT_CNI_VERSION='v1.9.1'
 # CNI HASH for amd64 sha512
 DEFAULT_CNI_HASH='3ea8a76852b7ddc62c087a34cccca2cb29822ca24214928cd172b28bf9d1486000ba3eb71a156445af31ff6a92c1dc3e01e702546c6ee016ef13fae06ccfb8fc'
-DEFAULT_NPD_VERSION='v1.34.0'
-DEFAULT_NPD_HASH_AMD64='3c55ff6ffadd77dbc3df3774d13164587103ca87c8b6914f5c71c87d8f498b78621e0c96538bb3c69f8f1b4194a6da553aa56b1b52001a7d9a67776ac24e80bd'
-DEFAULT_NPD_HASH_ARM64='ca1d34e64b80f6b2bdf86cfde95154122d6e14c707a748ea6fc414a55f391b1bb572a96b6b2c285996af0232917fa87e14e037125aa03a62247383af3e48c095'
+
 DEFAULT_CRICTL_VERSION='v1.36.0'
 DEFAULT_CRICTL_AMD64_SHA512='43ac5425d264547bc9d9c9e31c74624d9c2a63bf7de4e77fe79517e0c927ea77ee3951a2f662920bc771599a0dc4f2859b6225c3621c7cafff952e63c83d686d'
 DEFAULT_CRICTL_ARM64_SHA512='485aa86f327c23cb0508e814e568bda793d291865c5cec3337ae5467a51898e9ab21a6bd38b73a6b219058bb34c9b4e7128e57360a2552b74a552e7ea1936f32'
@@ -291,56 +289,6 @@ function install-gci-mounter-tools {
   tar xf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
   rm /tmp/mounter.tar
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs/var/lib/kubelet"
-}
-
-# Install node problem detector binary.
-function install-node-problem-detector {
-  if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
-      local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
-      local -r npd_hash="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
-  else
-      local -r npd_version="${DEFAULT_NPD_VERSION}"
-      case "${HOST_PLATFORM}/${HOST_ARCH}" in
-        linux/amd64)
-          local -r npd_hash="${DEFAULT_NPD_HASH_AMD64}"
-          ;;
-        linux/arm64)
-          local -r npd_hash="${DEFAULT_NPD_HASH_ARM64}"
-          ;;
-        # no other architectures are supported currently.
-        # Assumption is that this script only runs on linux,
-        # see cluster/gce/windows/k8s-node-setup.psm1 for windows
-        # https://github.com/kubernetes/node-problem-detector/releases/
-        *)
-          echo "Unrecognized version and platform/arch combination:"
-          echo "$DEFAULT_NPD_VERSION $HOST_PLATFORM/$HOST_ARCH"
-          echo "Set NODE_PROBLEM_DETECTOR_VERSION and NODE_PROBLEM_DETECTOR_TAR_HASH to overwrite"
-          exit 1
-          ;;
-      esac
-  fi
-  local -r npd_tar="node-problem-detector-${npd_version}-${HOST_PLATFORM}_${HOST_ARCH}.tar.gz"
-
-  if is-preloaded "${npd_tar}" "${npd_hash}"; then
-    echo "${npd_tar} is preloaded."
-    return
-  fi
-
-  if [[ -n "${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}" ]]; then
-    echo "Downloading ${npd_tar} from ${NODE_PROBLEM_DETECTOR_RELEASE_PATH}."
-    local -r download_path="${NODE_PROBLEM_DETECTOR_RELEASE_PATH}/node-problem-detector/${npd_tar}"
-  else
-    echo "Downloading ${npd_tar} from github."
-    local -r download_path="https://github.com/kubernetes/node-problem-detector/releases/download/${npd_version}/${npd_tar}"
-  fi
-  download-or-bust "${npd_hash}" "${download_path}"
-  local -r npd_dir="${KUBE_HOME}/node-problem-detector"
-  mkdir -p "${npd_dir}"
-  tar xzf "${KUBE_HOME}/${npd_tar}" -C "${npd_dir}" --overwrite
-  mv "${npd_dir}/bin"/* "${KUBE_BIN}"
-  chmod a+x "${KUBE_BIN}/node-problem-detector"
-  rmdir "${npd_dir}/bin"
-  rm -f "${KUBE_HOME}/${npd_tar}"
 }
 
 function install-cni-binaries {
@@ -793,11 +741,6 @@ function install-kube-binary-config {
     rm -rf "${KUBE_HOME}"/LICENSES
     mv "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
     mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
-  fi
-
-  if [[ "${KUBERNETES_MASTER:-}" == "false" ]] && \
-     [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    log-wrap "InstallNodeProblemDetector" install-node-problem-detector
   fi
 
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \

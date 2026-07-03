@@ -34,6 +34,7 @@ import (
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/component-base/featuregate"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -75,7 +77,7 @@ const (
 	sleepOpcode                  operationCode = "sleep"
 	startCollectingMetricsOpcode operationCode = "startCollectingMetrics"
 	stopCollectingMetricsOpcode  operationCode = "stopCollectingMetrics"
-	waitForPodGroupsOpcode       operationCode = "waitForPodGroups"
+	createPodGroupsOpcode        operationCode = "createPodGroups"
 	startCollectingProfileOpcode operationCode = "startCollectingProfile"
 	stopCollectingProfileOpcode  operationCode = "stopCollectingProfile"
 )
@@ -164,9 +166,10 @@ var (
 			"scheduler_podgroup_scheduling_attempt_duration_seconds": {
 				{
 					Label:  resultLabelName,
-					Values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
+					Values: []string{metrics.WaitingOnPreemptionResult, metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
 				},
 			},
+			"scheduler_podgroup_scheduling_algorithm_duration_seconds": nil,
 		},
 	}
 
@@ -515,7 +518,7 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		sleepOpcode:                  &sleepOp{},
 		startCollectingMetricsOpcode: &startCollectingMetricsOp{},
 		stopCollectingMetricsOpcode:  &stopCollectingMetricsOp{},
-		waitForPodGroupsOpcode:       &waitForPodGroups{},
+		createPodGroupsOpcode:        &createPodGroups{},
 		startCollectingProfileOpcode: &startCollectingProfileOp{},
 		stopCollectingProfileOpcode:  &stopCollectingProfileOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
@@ -687,6 +690,11 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// quit *before* restoring klog settings.
 	framework.GoleakCheck(t)
 
+	// We need to set emulation version for NodeDeclaredFeatures feature gate, which is locked at 1.37.
+	// Only emulate v1.36 when NodeDeclaredFeatures is explicitly disabled.
+	if ndfEnabled, exists := featureGates[features.NodeDeclaredFeatures]; exists && !ndfEnabled {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureGates)
 
 	if opts.preRunFn != nil {
@@ -799,6 +807,13 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					scheduler, informerFactory, schedulerDone, tCtx := setupTestCase(b, tc, featureGates, w, opts)
+					tCtx.TB().Cleanup(func() {
+						tCtx.Cancel("workload is done")
+						<-schedulerDone
+						// Reset metrics to prevent metrics generated in current workload gets
+						// carried over to the next workload.
+						legacyregistry.Reset()
+					})
 
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
@@ -845,14 +860,6 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					if err = checkEmptyInFlightEvents(); err != nil {
 						tCtx.Errorf("%s: %s", w.Name, err)
 					}
-
-					tCtx.Cancel("workload is done")
-					// Wait for the scheduler to stop to avoid data races when resetting metrics.
-					<-schedulerDone
-
-					// Reset metrics to prevent metrics generated in current workload gets
-					// carried over to the next workload.
-					legacyregistry.Reset()
 
 					// Exactly one result is expected to contain the progress information.
 					for _, item := range results {
@@ -923,6 +930,13 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 					}
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					scheduler, informerFactory, schedulerDone, tCtx := setupTestCase(t, tc, featureGates, w, opts)
+					tCtx.TB().Cleanup(func() {
+						tCtx.Cancel("workload is done")
+						<-schedulerDone
+						// Reset metrics to prevent metrics generated in current workload gets
+						// carried over to the next workload.
+						legacyregistry.Reset()
+					})
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						t.Fatalf("workload %s is not valid: %v", w.Name, err)
@@ -937,14 +951,6 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 					if err = checkEmptyInFlightEvents(); err != nil {
 						tCtx.Errorf("%s: %s", w.Name, err)
 					}
-
-					tCtx.Cancel("workload is done")
-					// Wait for the scheduler to stop to avoid data races when resetting metrics.
-					<-schedulerDone
-
-					// Reset metrics to prevent metrics generated in current workload gets
-					// carried over to the next workload.
-					legacyregistry.Reset()
 				})
 			}
 		})
@@ -1102,7 +1108,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *Workload, topicName st
 		scheduler:                    scheduler,
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
-		podGroupInformer:             informerFactory.Scheduling().V1alpha2().PodGroups(),
+		podGroupInformer:             informerFactory.Scheduling().V1alpha3().PodGroups(),
 		throughputErrorMargin:        throughputErrorMargin,
 		testCase:                     tc,
 		workload:                     w,

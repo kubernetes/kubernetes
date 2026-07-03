@@ -72,6 +72,74 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Validate_CrossVersionObjectReference validates an instance of CrossVersionObjectReference according
+// to declarative validation rules in the API schema.
+func Validate_CrossVersionObjectReference(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *autoscalingv1.CrossVersionObjectReference) (errs field.ErrorList) {
+
+	{ // field autoscalingv1.CrossVersionObjectReference.Kind
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.CrossVersionObjectReference) *string {
+				return &oldObj.Kind
+			})
+		errs = append(errs, fn(fldPath.Child("kind"), &obj.Kind, oldVal, oldObj != nil)...)
+	}
+
+	{ // field autoscalingv1.CrossVersionObjectReference.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.CrossVersionObjectReference) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	// field autoscalingv1.CrossVersionObjectReference.APIVersion has no validation
+	return errs
+}
+
 // Validate_HorizontalPodAutoscaler validates an instance of HorizontalPodAutoscaler according
 // to declarative validation rules in the API schema.
 func Validate_HorizontalPodAutoscaler(
@@ -113,7 +181,27 @@ func Validate_HorizontalPodAutoscalerSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) (errs field.ErrorList) {
 
-	// field autoscalingv1.HorizontalPodAutoscalerSpec.ScaleTargetRef has no validation
+	{ // field autoscalingv1.HorizontalPodAutoscalerSpec.ScaleTargetRef
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *autoscalingv1.CrossVersionObjectReference,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CrossVersionObjectReference(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *autoscalingv1.CrossVersionObjectReference {
+				return &oldObj.ScaleTargetRef
+			})
+		errs = append(errs, fn(fldPath.Child("scaleTargetRef"), &obj.ScaleTargetRef, oldVal, oldObj != nil)...)
+	}
 
 	{ // field autoscalingv1.HorizontalPodAutoscalerSpec.MinReplicas
 		fn := func(

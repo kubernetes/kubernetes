@@ -183,7 +183,7 @@ func newNodeLifecycleController(ctx context.Context, controllerContext Controlle
 		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
 		// node lifecycle controller uses existing cluster role from node-controller
 		client,
-		controllerContext.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
+		controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorPeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorGracePeriod.Duration,
 		controllerContext.ComponentConfig.NodeLifecycleController.NodeEvictionRate,

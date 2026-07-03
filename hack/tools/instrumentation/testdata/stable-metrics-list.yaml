@@ -183,6 +183,33 @@
   help: Number of times declarative validation has panicked during validation.
   type: Counter
   stabilityLevel: BETA
+- name: watch_events_sizes
+  subsystem: apiserver
+  help: Watch event size distribution in bytes
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - version
+  buckets:
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+  - 65536
+  - 131072
+- name: watch_events_total
+  subsystem: apiserver
+  help: Number of events sent in watch clients
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - version
 - name: watch_list_duration_seconds
   subsystem: apiserver
   help: Response latency distribution in seconds for watch list requests broken by
@@ -212,6 +239,22 @@
   - 30
   - 45
   - 60
+- name: x509_insecure_sha1_total
+  subsystem: webhooks
+  namespace: apiserver
+  help: Counts the number of requests to servers with insecure SHA1 signatures in
+    their serving certificate OR the number of connection failures due to the insecure
+    SHA1 signatures (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: BETA
+- name: x509_missing_san_total
+  subsystem: webhooks
+  namespace: apiserver
+  help: Counts the number of requests to servers missing SAN extension in their serving
+    certificate OR the number of connection failures due to the lack of x509 certificate
+    SAN extension missing (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: BETA
 - name: disabled_metrics_total
   help: The count of disabled metrics.
   type: Counter
@@ -1042,8 +1085,8 @@
   subsystem: scheduler
   help: Number of pending pods, by the queue type. 'active' means number of pods in
     activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
-    of pods in unschedulablePods that the scheduler attempted to schedule and failed;
-    'gated' is the number of unschedulable pods that the scheduler never attempted
+    of pods in unschedulableEntities that the scheduler attempted to schedule and
+    failed; 'gated' is the number of unschedulable pods that the scheduler never attempted
     to schedule because they are gated.
   type: Gauge
   stabilityLevel: STABLE

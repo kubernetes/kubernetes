@@ -245,5 +245,45 @@ func convertField(value ref.Val) (any, error) {
 		}
 		return result, nil
 	}
+	if lister, ok := value.(traits.Lister); ok {
+		var result []any
+		it := lister.Iterator()
+		for it.HasNext() == types.True {
+			val := it.Next()
+			conv, err := convertField(val)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, conv)
+		}
+		return result, nil
+	}
+	if mapper, ok := value.(traits.Mapper); ok {
+		// ObjectVal handles its own fast path and returns map[string]any directly via ConvertToNative
+		if objVal, isObj := value.(*ObjectVal); isObj {
+			native, err := objVal.ConvertToNative(reflect.TypeFor[map[string]any]())
+			if err != nil {
+				return nil, err
+			}
+			return native, nil
+		}
+
+		result := make(map[string]any)
+		it := mapper.Iterator()
+		for it.HasNext() == types.True {
+			k := it.Next()
+			stringKey, ok := k.Value().(string)
+			if !ok {
+				return nil, fmt.Errorf("map key %q is of type %T, not string", k, k)
+			}
+			v := mapper.Get(k)
+			conv, err := convertField(v)
+			if err != nil {
+				return nil, err
+			}
+			result[stringKey] = conv
+		}
+		return result, nil
+	}
 	return value.Value(), nil
 }

@@ -17,6 +17,8 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
@@ -31,7 +33,7 @@ type Policy interface {
 	Name() string
 	Start(logger klog.Logger, s state.State) error
 	// Allocate call is idempotent
-	Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) error
+	Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) error
 	// RemoveContainer call is idempotent
 	RemoveContainer(logger klog.Logger, s state.State, podUID string, containerName string)
 	// GetTopologyHints implements the topologymanager.HintProvider Interface

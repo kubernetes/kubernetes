@@ -189,6 +189,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		[]*runtime.Scheme{legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme},
 		controlplane.DefaultAPIResourceConfigSource(),
 		generatedopenapi.GetOpenAPIDefinitions,
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

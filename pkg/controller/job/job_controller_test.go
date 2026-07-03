@@ -32,7 +32,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -139,8 +139,8 @@ func newControllerFromClientWithClock(ctx context.Context, t *testing.T, kubeCli
 	jm, err := newControllerWithClock(ctx, kubeClient, clock,
 		sharedInformers.Core().V1().Pods(),
 		sharedInformers.Batch().V1().Jobs(),
-		sharedInformers.Scheduling().V1alpha2().Workloads(),
-		sharedInformers.Scheduling().V1alpha2().PodGroups(),
+		sharedInformers.Scheduling().V1alpha3().Workloads(),
+		sharedInformers.Scheduling().V1alpha3().PodGroups(),
 	)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
@@ -417,18 +417,19 @@ func TestControllerSyncJob(t *testing.T) {
 		},
 		"more terminating pods than parallelism; PodFailurePolicy used": {
 			// Repro for https://github.com/kubernetes/kubernetes/issues/122235
-			parallelism:         1,
-			completions:         1,
-			backoffLimit:        6,
-			activePods:          2,
-			failedPods:          0,
-			terminatingPods:     4,
-			podFailurePolicy:    &batch.PodFailurePolicy{},
-			expectedTerminating: ptr.To[int32](5),
-			expectedReady:       ptr.To[int32](0),
-			expectedActive:      1,
-			expectedDeletions:   1,
-			expectedPodPatches:  1,
+			parallelism:          1,
+			completions:          1,
+			backoffLimit:         6,
+			activePods:           2,
+			failedPods:           0,
+			terminatingPods:      4,
+			podFailurePolicy:     &batch.PodFailurePolicy{},
+			podReplacementPolicy: podReplacementPolicy(batch.Failed),
+			expectedTerminating:  ptr.To[int32](5),
+			expectedReady:        ptr.To[int32](0),
+			expectedActive:       1,
+			expectedDeletions:    1,
+			expectedPodPatches:   1,
 		},
 		"too few active pods and active back-off": {
 			parallelism:  1,
@@ -451,6 +452,37 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded:   0,
 			expectedPodPatches:  0,
 			expectedReady:       ptr.To[int32](0),
+			expectedTerminating: ptr.To[int32](0),
+			controllerTime:      &referenceTime,
+		},
+		// Regression test for https://github.com/kubernetes/kubernetes/issues/139428.
+		// When replacement pods are needed but pod creation is deferred due to an
+		// active backoff, manageJob must report the actual active count rather than
+		// 0. Reporting 0 while Ready still reflects the running pods makes the status
+		// update fail apiserver validation ("cannot set more ready pods than active"),
+		// blocking finalizer removal and status flushing.
+		"too few active pods and active back-off with running pods": {
+			parallelism:  2,
+			completions:  2,
+			backoffLimit: 6,
+			backoffRecord: &backoffRecord{
+				failuresAfterLastSuccess: 1,
+				lastFailureTime:          &referenceTime,
+			},
+			initialStatus: &jobInitialStatus{
+				startTime: func() *time.Time {
+					now := time.Now()
+					return &now
+				}(),
+			},
+			activePods:          1,
+			readyPods:           1,
+			succeededPods:       0,
+			expectedCreations:   0,
+			expectedActive:      1,
+			expectedSucceeded:   0,
+			expectedPodPatches:  0,
+			expectedReady:       ptr.To[int32](1),
 			expectedTerminating: ptr.To[int32](0),
 			controllerTime:      &referenceTime,
 		},
@@ -5220,6 +5252,50 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				FailedIndexes:           ptr.To(""),
 			},
 		},
+		// Regression test for https://github.com/kubernetes/kubernetes/issues/139428.
+		// One index has a running pod while another index's replacement pod
+		// creation is deferred because its per-index backoff is still active.
+		// manageJob must report the actual active count (1) rather than 0; a
+		// status with active=0 while pods are still running is rejected by the
+		// apiserver ("cannot set more ready pods than active"), blocking
+		// finalizer removal and status flushing.
+		"replacement pod creation delayed by per-index backoff while another index runs": {
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validTemplate,
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
+					BackoffLimitPerIndex: ptr.To[int32](1),
+				},
+			},
+			pods: []v1.Pod{
+				*buildPod().uid("a").index("0").phase(v1.PodRunning).indexFailureCount("0").trackingFinalizer().Pod,
+				*buildPod().uid("b").index("1").status(v1.PodStatus{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "x",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									FinishedAt: metav1.NewTime(now),
+								},
+							},
+						},
+					},
+				}).indexFailureCount("0").trackingFinalizer().Pod,
+			},
+			wantStatus: batch.JobStatus{
+				Active:                  1,
+				Terminating:             ptr.To[int32](0),
+				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+				FailedIndexes:           new(string),
+			},
+		},
 		"single failed index due to exceeding the backoff limit per index, the job continues": {
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
@@ -6498,7 +6574,7 @@ func TestWatchOrphanPods(t *testing.T) {
 	t.Cleanup(cancel)
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha2().Workloads(), sharedInformers.Scheduling().V1alpha2().PodGroups())
+	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha3().Workloads(), sharedInformers.Scheduling().V1alpha3().PodGroups())
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -6569,7 +6645,7 @@ func TestSyncOrphanPod(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha2().Workloads(), sharedInformers.Scheduling().V1alpha2().PodGroups())
+	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha3().Workloads(), sharedInformers.Scheduling().V1alpha3().PodGroups())
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -7444,7 +7520,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha2().Workloads(), sharedInformers.Scheduling().V1alpha2().PodGroups())
+	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha3().Workloads(), sharedInformers.Scheduling().V1alpha3().PodGroups())
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -7548,7 +7624,7 @@ func TestFinalizerCleanup(t *testing.T) {
 
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha2().Workloads(), sharedInformers.Scheduling().V1alpha2().PodGroups())
+	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha3().Workloads(), sharedInformers.Scheduling().V1alpha3().PodGroups())
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -7805,31 +7881,31 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 	gangJob.Spec.BackoffLimit = ptr.To[int32](6)
 	templateName := fmt.Sprintf("%s-pgt-%d", gangJob.Name, 0)
 
-	makeWorkload := func(job *batch.Job) *schedulingv1alpha2.Workload {
-		return &schedulingv1alpha2.Workload{
+	makeWorkload := func(job *batch.Job) *schedulingv1alpha3.Workload {
+		return &schedulingv1alpha3.Workload{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            computeWorkloadName(job),
 				Namespace:       metav1.NamespaceDefault,
 				UID:             types.UID("wl-uid"),
 				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 			},
-			Spec: schedulingv1alpha2.WorkloadSpec{
-				ControllerRef: &schedulingv1alpha2.TypedLocalObjectReference{
+			Spec: schedulingv1alpha3.WorkloadSpec{
+				ControllerRef: &schedulingv1alpha3.TypedLocalObjectReference{
 					APIGroup: "batch",
 					Kind:     "Job",
 					Name:     job.Name,
 				},
-				PodGroupTemplates: []schedulingv1alpha2.PodGroupTemplate{
+				PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
 					{Name: templateName},
 				},
 			},
 		}
 	}
 
-	makePodGroup := func(job *batch.Job, wl *schedulingv1alpha2.Workload) *schedulingv1alpha2.PodGroup {
-		return &schedulingv1alpha2.PodGroup{
+	makePodGroup := func(job *batch.Job, wl *schedulingv1alpha3.Workload) *schedulingv1alpha3.PodGroup {
+		return &schedulingv1alpha3.PodGroup{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "scheduling.k8s.io/v1alpha2",
+				APIVersion: "scheduling.k8s.io/v1alpha3",
 				Kind:       "PodGroup",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -7838,12 +7914,10 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				UID:             types.UID("pg-uid"),
 				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 			},
-			Spec: schedulingv1alpha2.PodGroupSpec{
-				PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
-					Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
-						WorkloadName:         wl.Name,
-						PodGroupTemplateName: templateName,
-					},
+			Spec: schedulingv1alpha3.PodGroupSpec{
+				WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+					WorkloadName: wl.Name,
+					TemplateName: templateName,
 				},
 			},
 		}
@@ -7854,8 +7928,8 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 
 	testCases := map[string]struct {
 		job              *batch.Job
-		existingWorkload *schedulingv1alpha2.Workload
-		existingPodGroup *schedulingv1alpha2.PodGroup
+		existingWorkload *schedulingv1alpha3.Workload
+		existingPodGroup *schedulingv1alpha3.PodGroup
 
 		workloadWithJob bool
 
@@ -7899,11 +7973,11 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				return j
 			}(),
 			workloadWithJob: true,
-			existingWorkload: func() *schedulingv1alpha2.Workload {
+			existingWorkload: func() *schedulingv1alpha3.Workload {
 				j := newGangSchedulingJob("suspended-job", 4)
 				return makeWorkload(j)
 			}(),
-			existingPodGroup: func() *schedulingv1alpha2.PodGroup {
+			existingPodGroup: func() *schedulingv1alpha3.PodGroup {
 				j := newGangSchedulingJob("suspended-job", 4)
 				wl := makeWorkload(j)
 				return makePodGroup(j, wl)

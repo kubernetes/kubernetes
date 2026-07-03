@@ -20,7 +20,7 @@ import (
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
 )
@@ -346,10 +346,12 @@ func (s *recordingSpan) addOverCapAttrs(limit int, attrs []attribute.KeyValue) {
 	}
 }
 
-// truncateAttr returns a truncated version of attr. Only string and string
-// slice attribute values are truncated. String values are truncated to at
-// most a length of limit. Each string slice value is truncated in this fashion
-// (the slice length itself is unaffected).
+// truncateAttr returns a truncated version of attr. Only string, string
+// slice, byte slice, and slice attribute values are truncated. String values are truncated
+// to at most a length of limit. Each string slice value is truncated in this
+// fashion (the slice length itself is unaffected), and byte slice values are truncated to at most
+// limit bytes. For slice attribute values, the limit is applied to each
+// element recursively.
 //
 // No truncation is performed for a negative limit.
 func truncateAttr(limit int, attr attribute.KeyValue) attribute.KeyValue {
@@ -366,8 +368,93 @@ func truncateAttr(limit int, attr attribute.KeyValue) attribute.KeyValue {
 			v[i] = truncate(limit, v[i])
 		}
 		return attr.Key.StringSlice(v)
+	case attribute.BYTESLICE:
+		v := attr.Value.AsString()
+		if len(v) > limit {
+			return attr.Key.ByteSlice([]byte(v[:limit]))
+		}
+		return attr
+	case attribute.SLICE:
+		v := attr.Value.AsSlice()
+		if !slices.ContainsFunc(v, func(e attribute.Value) bool { return needsTruncation(limit, e) }) {
+			return attr
+		}
+		newV := make([]attribute.Value, len(v))
+		for i, elem := range v {
+			newV[i] = truncateValue(limit, elem)
+		}
+		return attr.Key.Slice(newV...)
 	}
 	return attr
+}
+
+// truncateValue returns a truncated version of v. Only string, string slice,
+// byte slice, and (recursively) slice values are modified.
+//
+// No truncation is performed for a negative limit.
+func truncateValue(limit int, v attribute.Value) attribute.Value {
+	switch v.Type() {
+	case attribute.STRING:
+		return attribute.StringValue(truncate(limit, v.AsString()))
+	case attribute.STRINGSLICE:
+		ss := v.AsStringSlice()
+		for i := range ss {
+			ss[i] = truncate(limit, ss[i])
+		}
+		return attribute.StringSliceValue(ss)
+
+	case attribute.BYTESLICE:
+		// len(v.AsString()) is identical to len(v.AsByteSlice()) but
+		// avoids allocating the full slice before truncation.
+		s := v.AsString()
+		if limit >= 0 && len(s) > limit {
+			return attribute.ByteSliceValue([]byte(s[:limit]))
+		}
+	case attribute.SLICE:
+		sl := v.AsSlice()
+		if !slices.ContainsFunc(sl, func(e attribute.Value) bool { return needsTruncation(limit, e) }) {
+			return v
+		}
+		newSl := make([]attribute.Value, len(sl))
+		for i, elem := range sl {
+			newSl[i] = truncateValue(limit, elem)
+		}
+		return attribute.SliceValue(newSl...)
+	}
+	return v
+}
+
+// stringNeedsTruncation reports whether s would be modified by truncate for the
+// given limit.
+func stringNeedsTruncation(limit int, s string) bool {
+	if limit < 0 || len(s) <= limit {
+		return false
+	}
+	return utf8.RuneCountInString(s) > limit || !utf8.ValidString(s)
+}
+
+// needsTruncation reports whether v would be modified by truncateValue for the
+// given limit.
+func needsTruncation(limit int, v attribute.Value) bool {
+	switch v.Type() {
+	case attribute.STRING:
+		return stringNeedsTruncation(limit, v.AsString())
+	case attribute.BYTESLICE:
+		// len(v.AsString()) is identical to len(v.AsByteSlice()) but
+		// avoids memory allocation.
+		if limit >= 0 && len(v.AsString()) > limit {
+			return true
+		}
+	case attribute.STRINGSLICE:
+		for _, s := range v.AsStringSlice() {
+			if stringNeedsTruncation(limit, s) {
+				return true
+			}
+		}
+	case attribute.SLICE:
+		return slices.ContainsFunc(v.AsSlice(), func(e attribute.Value) bool { return needsTruncation(limit, e) })
+	}
+	return false
 }
 
 // truncate returns a truncated version of s such that it contains less than

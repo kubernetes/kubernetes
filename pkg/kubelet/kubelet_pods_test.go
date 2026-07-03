@@ -4769,8 +4769,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   v1.PodReadyToStartContainers,
-				Status: v1.ConditionFalse,
+				Type:    v1.PodReadyToStartContainers,
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgNoPodSandbox,
 			},
 		},
 		{
@@ -4815,8 +4817,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Message: "test",
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   v1.PodReadyToStartContainers,
-				Status: v1.ConditionFalse,
+				Type:    v1.PodReadyToStartContainers,
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgNoPodSandbox,
 			},
 		},
 		{
@@ -4868,8 +4872,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Message: "test",
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   v1.PodReadyToStartContainers,
-				Status: v1.ConditionFalse,
+				Type:    v1.PodReadyToStartContainers,
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgNoPodSandbox,
 			},
 		},
 		{
@@ -5747,8 +5753,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 }
 
 func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	if goruntime.GOOS != "linux" {
+		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	testContainerName := "ctr0"
@@ -6569,9 +6575,9 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 }
 
 func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	if goruntime.GOOS == "windows" {
-		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	logger, tCtx := ktesting.NewTestContext(t)
+	if goruntime.GOOS != "linux" {
+		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
@@ -7017,7 +7023,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			} else {
 				tPod.Spec.Containers[0].Resources = tc.Resources
 			}
-			err := kubelet.allocationManager.SetAllocatedResources(tPod)
+			err := kubelet.allocationManager.SetAllocatedResources(logger, tPod)
 			require.NoError(t, err)
 			resources := tc.ActualResources
 			if resources == nil {
@@ -8383,13 +8389,9 @@ func testMetric(t *testing.T, metricName string, expectedMetric string) {
 func TestGetNonExistentImagePullSecret(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	secrets := make([]*v1.Secret, 0)
-	fakeRecorder := record.NewFakeRecorder(1)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	testKubelet.kubelet.recorder = fakeRecorder
 	testKubelet.kubelet.secretManager = secret.NewFakeManagerWithSecrets(secrets)
 	defer testKubelet.Cleanup()
-
-	expectedEvent := "Warning FailedToRetrieveImagePullSecret Unable to retrieve some image pull secrets (secretFoo); attempting to pull the image may not succeed."
 
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -8404,12 +8406,9 @@ func TestGetNonExistentImagePullSecret(t *testing.T) {
 		},
 	}
 
-	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(logger, testPod)
+	pullSecrets, missingPullSecrets := testKubelet.kubelet.getPullSecretsForPod(logger, testPod)
 	assert.Empty(t, pullSecrets)
-
-	assert.Len(t, fakeRecorder.Events, 1)
-	event := <-fakeRecorder.Events
-	assert.Equal(t, expectedEvent, event)
+	assert.Equal(t, []string{"secretFoo"}, missingPullSecrets)
 }
 
 func TestParseGetSubIdsOutput(t *testing.T) {

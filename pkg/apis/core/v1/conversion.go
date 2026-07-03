@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/utils/ptr"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -232,90 +230,6 @@ func Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(in *
 	return nil
 }
 
-func Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in *core.PodTemplateSpec, out *v1.PodTemplateSpec, s conversion.Scope) error {
-	if err := autoConvert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in, out, s); err != nil {
-		return err
-	}
-
-	// drop init container annotations so they don't take effect on legacy kubelets.
-	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
-	out.Annotations = dropInitContainerAnnotations(out.Annotations)
-
-	return nil
-}
-
-func Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in *v1.PodTemplateSpec, out *core.PodTemplateSpec, s conversion.Scope) error {
-	if err := autoConvert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in, out, s); err != nil {
-		return err
-	}
-
-	// drop init container annotations so they don't show up as differences when receiving requests from old clients
-	out.Annotations = dropInitContainerAnnotations(out.Annotations)
-
-	return nil
-}
-
-func Convert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodStatus, s conversion.Scope) error {
-	if err := autoConvert_v1_PodStatus_To_core_PodStatus(in, out, s); err != nil {
-		return err
-	}
-
-	// If both fields (v1.PodIPs and v1.PodIP) are provided and differ, then PodIP is authoritative for compatibility with older kubelets
-	if (len(in.PodIP) > 0 && len(in.PodIPs) > 0) && (in.PodIP != in.PodIPs[0].IP) {
-		out.PodIPs = []core.PodIP{
-			{
-				IP: in.PodIP,
-			},
-		}
-	}
-	// at the this point, autoConvert copied v1.PodIPs -> core.PodIPs
-	// if v1.PodIPs was empty but v1.PodIP is not, then set core.PodIPs[0] with v1.PodIP
-	if len(in.PodIP) > 0 && len(in.PodIPs) == 0 {
-		out.PodIPs = []core.PodIP{
-			{
-				IP: in.PodIP,
-			},
-		}
-	}
-	return nil
-}
-
-func Convert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodStatus, s conversion.Scope) error {
-	if err := autoConvert_core_PodStatus_To_v1_PodStatus(in, out, s); err != nil {
-		return err
-	}
-	// at the this point autoConvert copied core.PodIPs -> v1.PodIPs
-	//  v1.PodIP (singular value field, which does not exist in core) needs to
-	// be set with core.PodIPs[0]
-	if len(in.PodIPs) > 0 {
-		out.PodIP = in.PodIPs[0].IP
-	}
-	return nil
-}
-
-// The following two v1.PodSpec conversions are done here to support v1.ServiceAccount
-// as an alias for ServiceAccountName.
-func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
-	if err := autoConvert_core_PodSpec_To_v1_PodSpec(in, out, s); err != nil {
-		return err
-	}
-
-	// DeprecatedServiceAccount is an alias for ServiceAccountName.
-	out.DeprecatedServiceAccount = in.ServiceAccountName
-
-	if in.SecurityContext != nil {
-		// the host namespace fields have to be handled here for backward compatibility
-		// with v1.0.0
-		out.HostPID = in.SecurityContext.HostPID
-		out.HostNetwork = in.SecurityContext.HostNetwork
-		out.HostIPC = in.SecurityContext.HostIPC
-		out.ShareProcessNamespace = in.SecurityContext.ShareProcessNamespace
-		out.HostUsers = in.SecurityContext.HostUsers
-	}
-
-	return nil
-}
-
 func Convert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *v1.NodeSpec, s conversion.Scope) error {
 	if err := autoConvert_core_NodeSpec_To_v1_NodeSpec(in, out, s); err != nil {
 		return err
@@ -342,64 +256,6 @@ func Convert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpec, s
 	// if v1.PodCIDRs was empty but v1.PodCIDR is not, then set core.PodCIDRs[0] with v1.PodCIDR
 	if len(in.PodCIDR) > 0 && len(in.PodCIDRs) == 0 {
 		out.PodCIDRs = []string{in.PodCIDR}
-	}
-	return nil
-}
-
-func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s conversion.Scope) error {
-	if err := autoConvert_v1_PodSpec_To_core_PodSpec(in, out, s); err != nil {
-		return err
-	}
-
-	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
-	// If both are specified, ServiceAccountName (the new field) wins.
-	if in.ServiceAccountName == "" {
-		out.ServiceAccountName = in.DeprecatedServiceAccount
-	}
-
-	// the host namespace fields have to be handled specially for backward compatibility
-	// with v1.0.0
-	if out.SecurityContext == nil {
-		out.SecurityContext = new(core.PodSecurityContext)
-	}
-	out.SecurityContext.HostNetwork = in.HostNetwork
-	out.SecurityContext.HostPID = in.HostPID
-	out.SecurityContext.HostIPC = in.HostIPC
-	out.SecurityContext.ShareProcessNamespace = in.ShareProcessNamespace
-	out.SecurityContext.HostUsers = in.HostUsers
-
-	return nil
-}
-
-func Convert_v1_Pod_To_core_Pod(in *v1.Pod, out *core.Pod, s conversion.Scope) error {
-	if err := autoConvert_v1_Pod_To_core_Pod(in, out, s); err != nil {
-		return err
-	}
-
-	// drop init container annotations so they don't show up as differences when receiving requests from old clients
-	out.Annotations = dropInitContainerAnnotations(out.Annotations)
-
-	// Forcing the value of TerminationGracePeriodSeconds to 1 if it is negative.
-	// Just for Pod, not for PodSpec, because we don't want to change the behavior of the PodTemplate.
-	if in.Spec.TerminationGracePeriodSeconds != nil && *in.Spec.TerminationGracePeriodSeconds < 0 {
-		out.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
-	}
-	return nil
-}
-
-func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) error {
-	if err := autoConvert_core_Pod_To_v1_Pod(in, out, s); err != nil {
-		return err
-	}
-
-	// drop init container annotations so they don't take effect on legacy kubelets.
-	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
-	out.Annotations = dropInitContainerAnnotations(out.Annotations)
-
-	// Forcing the value of TerminationGracePeriodSeconds to 1 if it is negative.
-	// Just for Pod, not for PodSpec, because we don't want to change the behavior of the PodTemplate.
-	if in.Spec.TerminationGracePeriodSeconds != nil && *in.Spec.TerminationGracePeriodSeconds < 0 {
-		out.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
 	}
 	return nil
 }
@@ -508,41 +364,16 @@ func AddFieldLabelConversionsForService(scheme *runtime.Scheme) error {
 		})
 }
 
-var initContainerAnnotations = map[string]bool{
-	"pod.beta.kubernetes.io/init-containers":          true,
-	"pod.alpha.kubernetes.io/init-containers":         true,
-	"pod.beta.kubernetes.io/init-container-statuses":  true,
-	"pod.alpha.kubernetes.io/init-container-statuses": true,
+// Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec is defined outside the autogenerated file
+// so that generated conversions in other API packages that embed PodTemplateSpec can find it.
+func Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in *core.PodTemplateSpec, out *v1.PodTemplateSpec, s conversion.Scope) error {
+	return autoConvert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in, out, s)
 }
 
-// dropInitContainerAnnotations returns a copy of the annotations with init container annotations removed,
-// or the original annotations if no init container annotations were present.
-//
-// this can be removed once no clients prior to 1.8 are supported, and no kubelets prior to 1.8 can be run
-// (we don't support kubelets older than 2 versions skewed from the apiserver, but we don't prevent them, either)
-func dropInitContainerAnnotations(oldAnnotations map[string]string) map[string]string {
-	if len(oldAnnotations) == 0 {
-		return oldAnnotations
-	}
-
-	found := false
-	for k := range initContainerAnnotations {
-		if _, ok := oldAnnotations[k]; ok {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return oldAnnotations
-	}
-
-	newAnnotations := make(map[string]string, len(oldAnnotations))
-	for k, v := range oldAnnotations {
-		if !initContainerAnnotations[k] {
-			newAnnotations[k] = v
-		}
-	}
-	return newAnnotations
+// Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec is defined outside the autogenerated file
+// so that generated conversions in other API packages that embed PodTemplateSpec can find it.
+func Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in *v1.PodTemplateSpec, out *core.PodTemplateSpec, s conversion.Scope) error {
+	return autoConvert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in, out, s)
 }
 
 // Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec is defined outside the autogenerated file for use by other API packages

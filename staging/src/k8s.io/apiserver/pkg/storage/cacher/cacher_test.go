@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -310,9 +311,6 @@ func TestMarkConsistent(t *testing.T) {
 	if len(etcdRequests) != 0 {
 		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
 	}
-	if cacher.cacher.watchCache.snapshots.Len() != 2 {
-		t.Errorf("Expected cache %d snapshots, got: %d", 2, cacher.cacher.watchCache.snapshots.Len())
-	}
 
 	t.Log("Inconsistent cache clears old snapshots, list hits etcd")
 	cacher.cacher.MarkConsistent(false)
@@ -324,9 +322,6 @@ func TestMarkConsistent(t *testing.T) {
 	})
 	if len(etcdRequests) != 1 {
 		t.Errorf("Expected request to etcd, got: %+v", etcdRequests)
-	}
-	if cacher.cacher.watchCache.snapshots.Len() != 0 {
-		t.Errorf("Expected cache %d snapshots, got: %d", 0, cacher.cacher.watchCache.snapshots.Len())
 	}
 
 	t.Log("Inconsistent cache doesn't collect new snapshot, list hits etcd")
@@ -340,9 +335,6 @@ func TestMarkConsistent(t *testing.T) {
 	if len(etcdRequests) != 1 {
 		t.Errorf("Expected request to etcd, got: %+v", etcdRequests)
 	}
-	if cacher.cacher.watchCache.snapshots.Len() != 0 {
-		t.Errorf("Expected cache %d snapshots, got: %d", 0, cacher.cacher.watchCache.snapshots.Len())
-	}
 
 	t.Log("Marking cache consistent allows it to collect new snapshots, list skips etcd")
 	cacher.cacher.MarkConsistent(true)
@@ -355,9 +347,6 @@ func TestMarkConsistent(t *testing.T) {
 	})
 	if len(etcdRequests) != 0 {
 		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
-	}
-	if cacher.cacher.watchCache.snapshots.Len() != 1 {
-		t.Errorf("Expected cache %d snapshots, got: %d", 1, cacher.cacher.watchCache.snapshots.Len())
 	}
 }
 
@@ -724,22 +713,37 @@ func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime
 		return true, nil
 	})
 }
-
-func BenchmarkStoreCreateList(b *testing.B) {
+func BenchmarkStoreWriteThroughput(b *testing.B) {
 	klog.SetLogger(logr.Discard())
-	for _, rvm := range []metav1.ResourceVersionMatch{metav1.ResourceVersionMatchNotOlderThan, metav1.ResourceVersionMatchExact} {
-		b.Run(fmt.Sprintf("RV=%s", rvm), func(b *testing.B) {
-			for _, useIndex := range []bool{true, false} {
-				b.Run(fmt.Sprintf("Indexed=%v", useIndex), func(b *testing.B) {
-					opts := []setupOption{}
-					if useIndex {
-						opts = append(opts, withNodeNameAndNamespaceIndex)
-					}
-					ctx, cacher, _, terminate := testSetupWithEtcdServer(b, opts...)
-					b.Cleanup(terminate)
-					storagetesting.RunBenchmarkStoreListCreate(ctx, b, cacher, rvm)
-				})
+	dimensions := []struct {
+		namespaceCount       int
+		podPerNamespaceCount int
+		nodeCount            int
+	}{
+		{
+			namespaceCount:       50,
+			podPerNamespaceCount: 3_000,
+			nodeCount:            5_000,
+		},
+	}
+	for _, dims := range dimensions {
+		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+			opts := []setupOption{withNodeNameAndNamespaceIndex}
+			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, opts...)
+			b.Cleanup(terminate)
+			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+			tracker := storagetesting.NewWatchLatencyTracker(clock.RealClock{})
+			originalHandler := cacher.cacher.watchCache.config.eventHandler
+			cacher.cacher.watchCache.config.eventHandler = func(event *watchCacheEvent) {
+				if originalHandler != nil {
+					originalHandler(event)
+				}
+				tracker.HandleEvent(event.Object)
 			}
+			b.Cleanup(func() {
+				cacher.cacher.watchCache.config.eventHandler = originalHandler
+			})
+			storagetesting.RunBenchmarkWriteThroughput(ctx, b, cacher, data, true, tracker)
 		})
 	}
 }
@@ -770,16 +774,10 @@ func BenchmarkStoreList(b *testing.B) {
 	}
 	for _, dims := range dimensions {
 		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
-			data := storagetesting.PrepareBenchchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
 			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withNodeNameAndNamespaceIndex)
 			b.Cleanup(terminate)
-			var out example.Pod
-			for _, pod := range data.Pods {
-				err := cacher.Create(ctx, computePodKey(pod), pod, &out, 0)
-				if err != nil {
-					b.Fatal(err)
-				}
-			}
+			require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, cacher, data))
 			for _, useIndex := range []bool{true, false} {
 				b.Run(fmt.Sprintf("Indexed=%v", useIndex), func(b *testing.B) {
 					storagetesting.RunBenchmarkStoreList(ctx, b, cacher, data, useIndex)
@@ -791,7 +789,7 @@ func BenchmarkStoreList(b *testing.B) {
 
 func BenchmarkStoreStats(b *testing.B) {
 	klog.SetLogger(logr.Discard())
-	data := storagetesting.PrepareBenchchmarkData(50, 3_000, 5_000)
+	data := storagetesting.PrepareBenchmarkData(50, 3_000, 5_000)
 	ctx, cacher, _, terminate := testSetupWithEtcdServer(b)
 	b.Cleanup(terminate)
 	var out example.Pod

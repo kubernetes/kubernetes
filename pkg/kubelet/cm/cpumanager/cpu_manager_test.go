@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/go-logr/logr"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -349,7 +349,7 @@ func TestCPUManagerAdd(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	testPolicy, _ := NewStaticPolicy(
 		logger,
@@ -366,7 +366,7 @@ func TestCPUManagerAdd(t *testing.T) {
 		},
 		0,
 		cpuset.New(),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(logger),
 		nil)
 	testCases := []struct {
 		description        string
@@ -416,7 +416,7 @@ func TestCPUManagerAdd(t *testing.T) {
 		container := &pod.Spec.Containers[0]
 		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
 
-		err := mgr.Allocate(pod, container)
+		err := mgr.Allocate(tCtx, pod, container)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
 			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAllocateErr, err)
@@ -621,8 +621,8 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
-		policy, _ := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		logger, ctx := ktesting.NewTestContext(t)
+		policy, _ := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 
 		mockState := &mockState{
 			assignments:   testCase.stAssignments,
@@ -657,7 +657,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 		cumCSet := cpuset.New()
 
 		for i := range containers {
-			err := mgr.Allocate(testCase.pod, &containers[i])
+			err := mgr.Allocate(ctx, testCase.pod, &containers[i])
 			if err != nil {
 				t.Errorf("StaticPolicy Allocate() error (%v). unexpected error for container id: %v: %v",
 					testCase.description, containerIDs[i], err)
@@ -786,7 +786,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			defer os.RemoveAll(sDir)
 
 			logger, _ := ktesting.NewTestContext(t)
-			mgr, err := NewManager(logger, testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			mgr, err := NewManager(logger, testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger))
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -858,7 +858,7 @@ func TestReconcileState(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	testPolicy, _ := NewStaticPolicy(
 		logger,
@@ -879,7 +879,7 @@ func TestReconcileState(t *testing.T) {
 		},
 		0,
 		cpuset.New(),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(logger),
 		nil)
 
 	testCases := []struct {
@@ -1315,7 +1315,6 @@ func TestReconcileState(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
 		mgr := &manager{
 			policy: testCase.policy,
 			state: &mockState{
@@ -1336,7 +1335,7 @@ func TestReconcileState(t *testing.T) {
 			},
 		}
 		mgr.sourcesReady = &sourcesReadyStub{}
-		success, failure := mgr.reconcileState(context.Background())
+		success, failure := mgr.reconcileState(tCtx)
 
 		if !reflect.DeepEqual(testCase.expectStAssignments, mgr.state.GetCPUAssignments()) {
 			t.Errorf("%v", testCase.description)
@@ -1389,7 +1388,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	testPolicy, _ := NewStaticPolicy(
 		logger,
 		&topology.CPUTopology{
@@ -1405,7 +1404,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		},
 		1,
 		cpuset.New(0),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(logger),
 		nil)
 	testCases := []struct {
 		description        string
@@ -1445,7 +1444,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		container := &pod.Spec.Containers[0]
 		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
 
-		err := mgr.Allocate(pod, container)
+		err := mgr.Allocate(tCtx, pod, container)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
 			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAllocateErr, err)
@@ -1523,7 +1522,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			defer os.RemoveAll(sDir)
 
 			logger, _ := ktesting.NewTestContext(t)
-			_, err = NewManager(logger, testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			_, err = NewManager(logger, testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger))
 			if err == nil {
 				t.Errorf("Expected error, but NewManager succeeded")
 			}
@@ -1536,7 +1535,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 }
 
 func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
@@ -1557,7 +1556,7 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 		},
 		1,
 		cpuset.New(0),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(logger),
 		nil)
 
 	testCases := []struct {
@@ -1595,7 +1594,7 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
 
-		_ = mgr.Allocate(pod, container)
+		_ = mgr.Allocate(tCtx, pod, container)
 
 		if !mgr.GetAllocatableCPUs().Equals(testCase.expAllocatableCPUs) {
 			t.Errorf("Policy GetAllocatableCPUs() error (%v). expected cpuset %v for container %v but got %v",

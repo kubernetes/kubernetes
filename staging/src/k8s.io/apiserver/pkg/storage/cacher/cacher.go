@@ -44,6 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
+	"k8s.io/apiserver/pkg/storage/cacher/key"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
@@ -1170,12 +1171,12 @@ func (c *Cacher) Compact(resourceVersion string) error {
 	if err != nil {
 		return err
 	}
-	c.watchCache.Compact(rv)
+	c.watchCache.storage.Compact(rv)
 	return nil
 }
 
 func (c *Cacher) MarkConsistent(consistent bool) {
-	c.watchCache.MarkConsistent(consistent)
+	c.watchCache.storage.MarkConsistent(consistent)
 }
 
 // Stop implements the graceful termination.
@@ -1212,10 +1213,10 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 	}
 }
 
-func filterWithAttrsAndPrefixFunction(key string, p storage.SelectionPredicate, groupResource schema.GroupResource) filterWithAttrsFunc {
+func filterWithAttrsAndPrefixFunction(prefix string, p storage.SelectionPredicate, groupResource schema.GroupResource) filterWithAttrsFunc {
 	isSharded := utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && p.ShardSelector != nil && !p.ShardSelector.Empty()
 	filterFunc := func(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
-		if !hasPathPrefix(objKey, key) {
+		if !key.HasPathPrefix(objKey, prefix) {
 			return false
 		}
 		if isSharded {
@@ -1305,13 +1306,10 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 		//
 		// In this very rare scenario, the worst case will be that this
 		// request will wait for 3 seconds before it fails.
-		if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) && c.watchCache.notFresh(requestedWatchRV) {
-			c.watchCache.waitingUntilFresh.Add()
-			defer c.watchCache.waitingUntilFresh.Remove()
-		}
-		err := c.watchCache.waitUntilFreshAndBlock(ctx, requestedWatchRV)
+		consistentReadSupported := delegator.ConsistentReadSupported()
+		c.watchCache.RLock()
 		defer c.watchCache.RUnlock()
-		return err
+		return c.watchCache.waitUntilFreshLocked(ctx, consistentReadSupported, requestedWatchRV)
 	}
 	return nil
 }
@@ -1386,7 +1384,7 @@ func newErrWatcher(err error) *errWatcher {
 
 func (c *Cacher) ShouldDelegateExactRV(resourceVersion string, recursive bool) (delegator.Result, error) {
 	// Not Recursive is not supported unitl exact RV is implemented for WaitUntilFreshAndGet.
-	if !recursive || c.watchCache.snapshots == nil {
+	if !recursive || !c.watchCache.storage.SnapshottingEnabled() {
 		return delegator.Result{ShouldDelegate: true}, nil
 	}
 	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
@@ -1398,7 +1396,7 @@ func (c *Cacher) ShouldDelegateExactRV(resourceVersion string, recursive bool) (
 
 func (c *Cacher) ShouldDelegateContinue(continueToken string, recursive bool) (delegator.Result, error) {
 	// Not Recursive is not supported unitl exact RV is implemented for WaitUntilFreshAndGet.
-	if !recursive || c.watchCache.snapshots == nil {
+	if !recursive || !c.watchCache.storage.SnapshottingEnabled() {
 		return delegator.Result{ShouldDelegate: true}, nil
 	}
 	_, continueRV, err := storage.DecodeContinue(continueToken, c.resourcePrefix)
@@ -1420,7 +1418,7 @@ func (c *Cacher) shouldDelegateExactRV(rv uint64) (delegator.Result, error) {
 			ShouldDelegate: !delegator.ConsistentReadSupported(),
 		}, nil
 	}
-	_, canServe := c.watchCache.snapshots.GetLessOrEqual(rv)
+	canServe := c.watchCache.storage.CanServeExactRV(rv)
 	return delegator.Result{
 		ShouldDelegate: !canServe,
 	}, nil

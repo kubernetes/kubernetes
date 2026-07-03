@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
@@ -46,10 +47,7 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 
 	var paramsVal, authorizerVal, requestResourceAuthorizerVal any
 	if inputs.VersionedParams != nil {
-		paramsVal, err = objectToResolveVal(inputs.VersionedParams)
-		if err != nil {
-			return nil, fmt.Errorf("failed to prepare params variable for evaluation: %w", err)
-		}
+		paramsVal = common.SchemalessTypedToVal(inputs.VersionedParams)
 	}
 
 	if inputs.Authorizer != nil {
@@ -57,19 +55,13 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 		requestResourceAuthorizerVal = library.NewResourceAuthorizerVal(versionedAttr.GetUserInfo(), inputs.Authorizer, versionedAttr)
 	}
 
-	requestVal, err := admission.ConvertObjectToUnstructured(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare request variable for evaluation: %w", err)
-	}
-	namespaceVal, err := objectToResolveVal(namespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare namespace variable for evaluation: %w", err)
-	}
+	requestVal := common.SchemalessTypedToVal(request)
+	namespaceVal := common.SchemalessTypedToVal(namespace)
 	va := &evaluationActivation{
 		object:                    celObjVal,
 		oldObject:                 celOldObjVal,
 		params:                    paramsVal,
-		request:                   requestVal.Object,
+		request:                   requestVal,
 		namespace:                 namespaceVal,
 		authorizer:                authorizerVal,
 		requestResourceAuthorizer: requestResourceAuthorizerVal,

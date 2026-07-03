@@ -17,6 +17,7 @@ limitations under the License.
 package json
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -35,14 +36,14 @@ import (
 func streamEncodeCollections(obj runtime.Object, w io.Writer) (bool, error) {
 	list, ok := obj.(*unstructured.UnstructuredList)
 	if ok {
-		return true, streamingEncodeUnstructuredList(w, list)
+		return true, newStreamEncoder(w).encodeUnstructuredList(list)
 	}
 	if _, ok := obj.(json.Marshaler); ok {
 		return false, nil
 	}
 	typeMeta, listMeta, items, err := getListMeta(obj)
 	if err == nil {
-		return true, streamingEncodeList(w, typeMeta, listMeta, items)
+		return true, newStreamEncoder(w).encodeList(typeMeta, listMeta, items)
 	}
 	return false, nil
 }
@@ -94,45 +95,59 @@ func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []runti
 	return typeMeta, listMeta, items, nil
 }
 
-func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.ListMeta, items []runtime.Object) error {
+// streamEncoder encodes JSON values to w, reusing an internal buffer across
+// values to avoid the fresh output allocation json.Marshal makes per call.
+type streamEncoder struct {
+	w    io.Writer
+	buf  bytes.Buffer
+	json *json.Encoder
+}
+
+func newStreamEncoder(w io.Writer) *streamEncoder {
+	e := &streamEncoder{w: w}
+	e.json = json.NewEncoder(&e.buf)
+	return e
+}
+
+func (e *streamEncoder) encodeList(typeMeta metav1.TypeMeta, listMeta metav1.ListMeta, items []runtime.Object) error {
 	// Start
-	if _, err := w.Write([]byte(`{`)); err != nil {
+	if _, err := e.w.Write([]byte(`{`)); err != nil {
 		return err
 	}
 
 	// TypeMeta
 	if typeMeta.Kind != "" {
-		if err := encodeKeyValuePair(w, "kind", typeMeta.Kind, []byte(",")); err != nil {
+		if err := e.encodeKeyValuePair("kind", typeMeta.Kind, []byte(",")); err != nil {
 			return err
 		}
 	}
 	if typeMeta.APIVersion != "" {
-		if err := encodeKeyValuePair(w, "apiVersion", typeMeta.APIVersion, []byte(",")); err != nil {
+		if err := e.encodeKeyValuePair("apiVersion", typeMeta.APIVersion, []byte(",")); err != nil {
 			return err
 		}
 	}
 
 	// ListMeta
-	if err := encodeKeyValuePair(w, "metadata", listMeta, []byte(",")); err != nil {
+	if err := e.encodeKeyValuePair("metadata", listMeta, []byte(",")); err != nil {
 		return err
 	}
 
 	// Items
-	if err := encodeItemsObjectSlice(w, items); err != nil {
+	if err := e.encodeItemsObjectSlice(items); err != nil {
 		return err
 	}
 
 	// End
-	_, err := w.Write([]byte("}\n"))
+	_, err := e.w.Write([]byte("}\n"))
 	return err
 }
 
-func encodeItemsObjectSlice(w io.Writer, items []runtime.Object) (err error) {
+func (e *streamEncoder) encodeItemsObjectSlice(items []runtime.Object) (err error) {
 	if items == nil {
-		err := encodeKeyValuePair(w, "items", nil, nil)
+		err := e.encodeKeyValuePair("items", nil, nil)
 		return err
 	}
-	_, err = w.Write([]byte(`"items":[`))
+	_, err = e.w.Write([]byte(`"items":[`))
 	if err != nil {
 		return err
 	}
@@ -141,20 +156,20 @@ func encodeItemsObjectSlice(w io.Writer, items []runtime.Object) (err error) {
 		if i == len(items)-1 {
 			suffix = nil
 		}
-		err := encodeValue(w, item, suffix)
+		err := e.encodeValue(item, suffix)
 		if err != nil {
 			return err
 		}
 	}
-	_, err = w.Write([]byte("]"))
+	_, err = e.w.Write([]byte("]"))
 	if err != nil {
 		return err
 	}
 	return err
 }
 
-func streamingEncodeUnstructuredList(w io.Writer, list *unstructured.UnstructuredList) error {
-	_, err := w.Write([]byte(`{`))
+func (e *streamEncoder) encodeUnstructuredList(list *unstructured.UnstructuredList) error {
+	_, err := e.w.Write([]byte(`{`))
 	if err != nil {
 		return err
 	}
@@ -170,20 +185,20 @@ func streamingEncodeUnstructuredList(w io.Writer, list *unstructured.Unstructure
 			suffix = nil
 		}
 		if key == "items" {
-			err = encodeItemsUnstructuredSlice(w, list.Items, suffix)
+			err = e.encodeItemsUnstructuredSlice(list.Items, suffix)
 		} else {
-			err = encodeKeyValuePair(w, key, list.Object[key], suffix)
+			err = e.encodeKeyValuePair(key, list.Object[key], suffix)
 		}
 		if err != nil {
 			return err
 		}
 	}
-	_, err = w.Write([]byte("}\n"))
+	_, err = e.w.Write([]byte("}\n"))
 	return err
 }
 
-func encodeItemsUnstructuredSlice(w io.Writer, items []unstructured.Unstructured, suffix []byte) (err error) {
-	_, err = w.Write([]byte(`"items":[`))
+func (e *streamEncoder) encodeItemsUnstructuredSlice(items []unstructured.Unstructured, suffix []byte) (err error) {
+	_, err = e.w.Write([]byte(`"items":[`))
 	if err != nil {
 		return err
 	}
@@ -192,44 +207,42 @@ func encodeItemsUnstructuredSlice(w io.Writer, items []unstructured.Unstructured
 		if i == len(items)-1 {
 			comma = nil
 		}
-		err := encodeValue(w, item.Object, comma)
+		err := e.encodeValue(item.Object, comma)
 		if err != nil {
 			return err
 		}
 	}
-	_, err = w.Write([]byte("]"))
+	_, err = e.w.Write([]byte("]"))
 	if err != nil {
 		return err
 	}
 	if len(suffix) > 0 {
-		_, err = w.Write(suffix)
+		_, err = e.w.Write(suffix)
 	}
 	return err
 }
 
-func encodeKeyValuePair(w io.Writer, key string, value any, suffix []byte) (err error) {
-	err = encodeValue(w, key, []byte(":"))
+func (e *streamEncoder) encodeKeyValuePair(key string, value any, suffix []byte) (err error) {
+	err = e.encodeValue(key, []byte(":"))
 	if err != nil {
 		return err
 	}
-	err = encodeValue(w, value, suffix)
+	err = e.encodeValue(value, suffix)
 	if err != nil {
 		return err
 	}
 	return err
 }
 
-func encodeValue(w io.Writer, value any, suffix []byte) error {
-	data, err := json.Marshal(value)
-	if err != nil {
+func (e *streamEncoder) encodeValue(value any, suffix []byte) error {
+	e.buf.Reset()
+	if err := e.json.Encode(value); err != nil {
 		return err
 	}
-	_, err = w.Write(data)
-	if err != nil {
-		return err
-	}
-	if len(suffix) > 0 {
-		_, err = w.Write(suffix)
-	}
+	// Encode appends a newline after the value; replace it with the suffix to
+	// keep the output identical to json.Marshal's.
+	e.buf.Truncate(e.buf.Len() - 1)
+	e.buf.Write(suffix)
+	_, err := e.w.Write(e.buf.Bytes())
 	return err
 }

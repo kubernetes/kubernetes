@@ -418,7 +418,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidTopologySpreadConstraintLabelSelector:   false,
 		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
 		AllowNonLocalProjectedTokenPath:                     false,
-		AllowPodLifecycleSleepActionZeroValue:               utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepActionAllowZero),
 		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
 		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
@@ -438,7 +437,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
 	// we must allow it
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
-	opts.AllowRelaxedDNSSearchValidation = useRelaxedDNSSearchValidation(oldPodSpec)
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
 	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
 
@@ -468,7 +466,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// if old spec has invalid sysctl with hostNet or hostIPC, we must allow it when update
 		if oldPodSpec.SecurityContext != nil && len(oldPodSpec.SecurityContext.Sysctls) != 0 {
 			for _, s := range oldPodSpec.SecurityContext.Sysctls {
-				err := apivalidation.ValidateHostSysctl(s.Name, oldPodSpec.SecurityContext, nil)
+				err := apivalidation.ValidateHostSysctl(s.Name, oldPodSpec, nil)
 				if err != nil {
 					opts.AllowNamespacedSysctlsForHostNetAndHostIPC = true
 					break
@@ -476,7 +474,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 			}
 		}
 
-		opts.AllowPodLifecycleSleepActionZeroValue = opts.AllowPodLifecycleSleepActionZeroValue || podLifecycleSleepActionZeroValueInUse(oldPodSpec)
 		// If oldPod has resize policy set on the restartable init container, we must allow it
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
 
@@ -522,45 +519,21 @@ func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *api.PodSpec) b
 	return false
 }
 
-func useRelaxedDNSSearchValidation(oldPodSpec *api.PodSpec) bool {
-	// Return true early if feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedDNSSearchValidation) {
-		return true
-	}
-
-	// Return false early if there is no DNSConfig or Searches.
-	if oldPodSpec == nil || oldPodSpec.DNSConfig == nil || oldPodSpec.DNSConfig.Searches == nil {
-		return false
-	}
-
-	return hasDotOrUnderscore(oldPodSpec.DNSConfig.Searches)
-}
-
-// Helper function to check if any domain is a dot or contains an underscore.
-func hasDotOrUnderscore(searches []string) bool {
-	for _, domain := range searches {
-		if domain == "." || strings.Contains(domain, "_") {
-			return true
-		}
-	}
-	return false
-}
-
 func useAllowUserNamespacesHostNetworkSupport(oldPodSpec *api.PodSpec) bool {
 	// Return true early if feature gate is enabled
 	if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesHostNetworkSupport) {
 		return true
 	}
 
-	if oldPodSpec == nil || oldPodSpec.SecurityContext == nil || oldPodSpec.SecurityContext.HostUsers == nil {
+	if oldPodSpec == nil || oldPodSpec.HostUsers == nil {
 		return false
 	}
 
 	// If a pod with user namespaces and hostNetwork already exists in the cluster,
 	// this allows it to continue using the UserNamespacesHostNetworkSupport
 	// validation logic even after the feature gate is disabled.
-	userNamespaces := !*oldPodSpec.SecurityContext.HostUsers
-	return oldPodSpec.SecurityContext.HostNetwork && userNamespaces
+	userNamespaces := !*oldPodSpec.HostUsers
+	return oldPodSpec.HostNetwork && userNamespaces
 }
 
 func useAllowEnvFilesValidation(oldPodSpec *api.PodSpec) bool {
@@ -734,11 +707,7 @@ func dropDisabledFields(
 
 	// If the feature is disabled and not in use, drop the hostUsers field.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && !hostUsersInUse(oldPodSpec) {
-		// Drop the field in podSpec only if SecurityContext is not nil.
-		// If it is nil, there is no need to set hostUsers=nil (it will be nil too).
-		if podSpec.SecurityContext != nil {
-			podSpec.SecurityContext.HostUsers = nil
-		}
+		podSpec.HostUsers = nil
 	}
 
 	// If the feature is disabled and not in use, drop the SupplementalGroupsPolicy field.
@@ -803,10 +772,10 @@ func dropDisabledFields(
 	}
 
 	dropFileKeyRefInUse(podSpec, oldPodSpec)
-	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
 	dropContainerStopSignals(podSpec, oldPodSpec)
+	DropInitContainerAnnotations(podAnnotations)
 }
 
 // setHostnameOverrideInUse returns true if any pod's spec defines HostnameOverride field.
@@ -900,101 +869,6 @@ func dropDisabledPodLevelResources(podSpec, oldPodSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && !podLevelResourcesInUse(oldPodSpec) {
 		podSpec.Resources = nil
 	}
-}
-
-func dropPodLifecycleSleepAction(podSpec, oldPodSpec *api.PodSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) || podLifecycleSleepActionInUse(oldPodSpec) {
-		return
-	}
-
-	adjustLifecycle := func(lifecycle *api.Lifecycle) {
-		if lifecycle.PreStop != nil && lifecycle.PreStop.Sleep != nil {
-			lifecycle.PreStop.Sleep = nil
-			if lifecycle.PreStop.Exec == nil && lifecycle.PreStop.HTTPGet == nil && lifecycle.PreStop.TCPSocket == nil {
-				lifecycle.PreStop = nil
-			}
-		}
-		if lifecycle.PostStart != nil && lifecycle.PostStart.Sleep != nil {
-			lifecycle.PostStart.Sleep = nil
-			if lifecycle.PostStart.Exec == nil && lifecycle.PostStart.HTTPGet == nil && lifecycle.PostStart.TCPSocket == nil {
-				lifecycle.PostStart = nil
-			}
-		}
-	}
-
-	for i := range podSpec.Containers {
-		if podSpec.Containers[i].Lifecycle == nil {
-			continue
-		}
-		adjustLifecycle(podSpec.Containers[i].Lifecycle)
-		if podSpec.Containers[i].Lifecycle.PreStop == nil && podSpec.Containers[i].Lifecycle.PostStart == nil && podSpec.Containers[i].Lifecycle.StopSignal == nil {
-			podSpec.Containers[i].Lifecycle = nil
-		}
-	}
-
-	for i := range podSpec.InitContainers {
-		if podSpec.InitContainers[i].Lifecycle == nil {
-			continue
-		}
-		adjustLifecycle(podSpec.InitContainers[i].Lifecycle)
-		if podSpec.InitContainers[i].Lifecycle.PreStop == nil && podSpec.InitContainers[i].Lifecycle.PostStart == nil && podSpec.InitContainers[i].Lifecycle.StopSignal == nil {
-			podSpec.InitContainers[i].Lifecycle = nil
-		}
-	}
-
-	for i := range podSpec.EphemeralContainers {
-		if podSpec.EphemeralContainers[i].Lifecycle == nil {
-			continue
-		}
-		adjustLifecycle(podSpec.EphemeralContainers[i].Lifecycle)
-		if podSpec.EphemeralContainers[i].Lifecycle.PreStop == nil && podSpec.EphemeralContainers[i].Lifecycle.PostStart == nil && podSpec.EphemeralContainers[i].Lifecycle.StopSignal == nil {
-			podSpec.EphemeralContainers[i].Lifecycle = nil
-		}
-	}
-}
-
-func podLifecycleSleepActionInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		if c.Lifecycle == nil {
-			return true
-		}
-		if c.Lifecycle.PreStop != nil && c.Lifecycle.PreStop.Sleep != nil {
-			inUse = true
-			return false
-		}
-		if c.Lifecycle.PostStart != nil && c.Lifecycle.PostStart.Sleep != nil {
-			inUse = true
-			return false
-		}
-		return true
-	})
-	return inUse
-}
-
-func podLifecycleSleepActionZeroValueInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		if c.Lifecycle == nil {
-			return true
-		}
-		if c.Lifecycle.PreStop != nil && c.Lifecycle.PreStop.Sleep != nil && c.Lifecycle.PreStop.Sleep.Seconds == 0 {
-			inUse = true
-			return false
-		}
-		if c.Lifecycle.PostStart != nil && c.Lifecycle.PostStart.Sleep != nil && c.Lifecycle.PostStart.Sleep.Seconds == 0 {
-			inUse = true
-			return false
-		}
-		return true
-	})
-	return inUse
 }
 
 // dropDisabledPodStatusFields removes disabled fields from the pod status
@@ -1377,7 +1251,7 @@ func nodeTaintsPolicyInUse(podSpec *api.PodSpec) bool {
 
 // hostUsersInUse returns true if the pod spec has spec.hostUsers field set.
 func hostUsersInUse(podSpec *api.PodSpec) bool {
-	return podSpec != nil && podSpec.SecurityContext != nil && podSpec.SecurityContext.HostUsers != nil
+	return podSpec != nil && podSpec.HostUsers != nil
 }
 
 func supplementalGroupsPolicyInUse(podSpec *api.PodSpec) bool {
@@ -1736,7 +1610,7 @@ func allowTaintTolerationComparisonOperators(oldPodSpec *api.PodSpec) bool {
 }
 
 func hasUserNamespacesWithVolumeDevices(podSpec *api.PodSpec) bool {
-	if podSpec.SecurityContext == nil || podSpec.SecurityContext.HostUsers == nil || *podSpec.SecurityContext.HostUsers {
+	if podSpec.HostUsers == nil || *podSpec.HostUsers {
 		return false
 	}
 
@@ -2031,4 +1905,20 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+var initContainerAnnotations = map[string]struct{}{
+	"pod.beta.kubernetes.io/init-containers":          {},
+	"pod.alpha.kubernetes.io/init-containers":         {},
+	"pod.beta.kubernetes.io/init-container-statuses":  {},
+	"pod.alpha.kubernetes.io/init-container-statuses": {},
+}
+
+// DropInitContainerAnnotations deletes the legacy alpha/beta init container
+// annotations from the provided map in place. Support for these annotations was
+// removed in v1.8 in favor of the Spec.InitContainers field.
+func DropInitContainerAnnotations(annotations map[string]string) {
+	for k := range initContainerAnnotations {
+		delete(annotations, k)
+	}
 }
