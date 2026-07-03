@@ -1851,6 +1851,11 @@ func TestPreemptionRespectsWaitingPod(t *testing.T) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("Timed out waiting for victim to reach WaitOnPermit")
 	}
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		return testCtx.Scheduler.Profiles[v1.DefaultSchedulerName].GetWaitingPod(victim.UID) != nil, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for victim to be recorded as a waiting pod: %v", err)
+	}
 
 	smallNodeRes := map[v1.ResourceName]string{
 		v1.ResourceCPU:    "1",
