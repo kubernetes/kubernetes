@@ -17,6 +17,7 @@ limitations under the License.
 package selinuxwarning
 
 import (
+	"context"
 	"fmt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -83,14 +84,14 @@ func (c *Controller) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
-func (c *Controller) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
+func (c *Controller) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(_ context.Context, _, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in SELinux controller")
 	}
 }
 
-func (c *Controller) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
+func (c *Controller) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(_ context.Context, _, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in SELinux controller")
 	}
 }

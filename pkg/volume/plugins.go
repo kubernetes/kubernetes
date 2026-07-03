@@ -394,10 +394,10 @@ type VolumeHost interface {
 	GetNodeAllocatable() (v1.ResourceList, error)
 
 	// Returns a function that returns a secret.
-	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
+	GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error)
 
 	// Returns a function that returns a configmap.
-	GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error)
+	GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 
 	GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 

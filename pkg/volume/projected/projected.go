@@ -48,8 +48,8 @@ const (
 type projectedPlugin struct {
 	host                      volume.VolumeHost
 	kvHost                    volume.KubeletVolumeHost
-	getSecret                 func(namespace, name string) (*v1.Secret, error)
-	getConfigMap              func(namespace, name string) (*v1.ConfigMap, error)
+	getSecret                 func(ctx context.Context, namespace, name string) (*v1.Secret, error)
+	getConfigMap              func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 	getServiceAccountToken    func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 	deleteServiceAccountToken func(podUID types.UID)
 }
@@ -191,7 +191,8 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 		return err
 	}
 
-	data, err := s.collectData(mounterArgs)
+	// TODO: pass actual context to collectData once contextual migration is complete
+	data, err := s.collectData(context.TODO(), mounterArgs)
 	if err != nil {
 		klog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
 		return err
@@ -244,7 +245,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 	return nil
 }
 
-func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (map[string]volumeutil.FileProjection, error) {
+func (s *projectedVolumeMounter) collectData(ctx context.Context, mounterArgs volume.MounterArgs) (map[string]volumeutil.FileProjection, error) {
 	if s.source.DefaultMode == nil {
 		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
@@ -260,7 +261,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 		switch {
 		case source.Secret != nil:
 			optional := source.Secret.Optional != nil && *source.Secret.Optional
-			secretapi, err := s.plugin.getSecret(s.pod.Namespace, source.Secret.Name)
+			secretapi, err := s.plugin.getSecret(ctx, s.pod.Namespace, source.Secret.Name)
 			if err != nil {
 				if !(errors.IsNotFound(err) && optional) {
 					klog.Errorf("Couldn't get secret %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
@@ -285,7 +286,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			}
 		case source.ConfigMap != nil:
 			optional := source.ConfigMap.Optional != nil && *source.ConfigMap.Optional
-			configMap, err := s.plugin.getConfigMap(s.pod.Namespace, source.ConfigMap.Name)
+			configMap, err := s.plugin.getConfigMap(ctx, s.pod.Namespace, source.ConfigMap.Name)
 			if err != nil {
 				if !(errors.IsNotFound(err) && optional) {
 					klog.Errorf("Couldn't get configMap %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
@@ -389,7 +390,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				FsUser: mounterArgs.FsUser,
 			}
 		case source.PodCertificate != nil:
-			key, certificates, err := s.plugin.kvHost.GetPodCertificateCredentialBundle(context.TODO(), s.pod.ObjectMeta.Namespace, s.pod.ObjectMeta.Name, string(s.pod.ObjectMeta.UID), s.volName, sourceIndex)
+			key, certificates, err := s.plugin.kvHost.GetPodCertificateCredentialBundle(ctx, s.pod.ObjectMeta.Namespace, s.pod.ObjectMeta.Name, string(s.pod.ObjectMeta.UID), s.volName, sourceIndex)
 			if err != nil {
 				errlist = append(errlist, err)
 				continue

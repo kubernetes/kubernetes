@@ -798,7 +798,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := cm.Optional != nil && *cm.Optional
-				configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
+				configMap, err = kl.configMapManager.GetConfigMap(ctx, pod.Namespace, name)
 				if err != nil {
 					if errors.IsNotFound(err) && optional {
 						// ignore error when marked optional
@@ -826,7 +826,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					return result, fmt.Errorf("couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := s.Optional != nil && *s.Optional
-				secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
+				secret, err = kl.secretManager.GetSecret(ctx, pod.Namespace, name)
 				if err != nil {
 					if errors.IsNotFound(err) && optional {
 						// ignore error when marked optional
@@ -892,7 +892,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					if kl.kubeClient == nil {
 						return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
-					configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
+					configMap, err = kl.configMapManager.GetConfigMap(ctx, pod.Namespace, name)
 					if err != nil {
 						if errors.IsNotFound(err) && optional {
 							// ignore error when marked optional
@@ -919,7 +919,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					if kl.kubeClient == nil {
 						return result, fmt.Errorf("couldn't get secret %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
-					secret, err = kl.secretManager.GetSecret(pod.Namespace, name)
+					secret, err = kl.secretManager.GetSecret(ctx, pod.Namespace, name)
 					if err != nil {
 						if errors.IsNotFound(err) && optional {
 							// ignore error when marked optional
@@ -1084,7 +1084,8 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets. The names of secrets that cannot be found are returned so we can
 // emit an event later if the image pull fails too.
-func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) ([]v1.Secret, []string) {
+func (kl *Kubelet) getPullSecretsForPod(ctx context.Context, pod *v1.Pod) ([]v1.Secret, []string) {
+	logger := klog.FromContext(ctx)
 	pullSecrets := []v1.Secret{}
 	missingPullSecretNames := []string{}
 
@@ -1094,7 +1095,7 @@ func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) ([]v1.S
 			// Ignore to avoid unnecessary warnings.
 			continue
 		}
-		secret, err := kl.secretManager.GetSecret(pod.Namespace, secretRef.Name)
+		secret, err := kl.secretManager.GetSecret(ctx, pod.Namespace, secretRef.Name)
 		if err != nil {
 			logger.Info("Unable to retrieve pull secret, the image pull may not succeed.", "pod", klog.KObj(pod), "secret", klog.KRef(pod.Namespace, secretRef.Name), "err", err)
 			missingPullSecretNames = append(missingPullSecretNames, secretRef.Name)

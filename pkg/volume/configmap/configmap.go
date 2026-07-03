@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -43,7 +44,7 @@ const (
 // configMapPlugin implements the VolumePlugin interface.
 type configMapPlugin struct {
 	host         volume.VolumeHost
-	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
+	getConfigMap func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.VolumePlugin = &configMapPlugin{}
@@ -150,7 +151,7 @@ type configMapVolumeMounter struct {
 
 	source       v1.ConfigMapVolumeSource
 	pod          v1.Pod
-	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
+	getConfigMap func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.Mounter = &configMapVolumeMounter{}
@@ -187,7 +188,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 	}
 
 	optional := b.source.Optional != nil && *b.source.Optional
-	configMap, err := b.getConfigMap(b.pod.Namespace, b.source.Name)
+	configMap, err := b.getConfigMap(context.TODO(), b.pod.Namespace, b.source.Name)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
 			klog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
