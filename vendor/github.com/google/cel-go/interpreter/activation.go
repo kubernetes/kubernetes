@@ -110,8 +110,9 @@ func (a *mapActivation) ResolveName(name string) (any, bool) {
 // hierarchicalActivation which implements Activation and contains a parent and
 // child activation.
 type hierarchicalActivation struct {
-	parent Activation
-	child  Activation
+	parent        Activation
+	child         Activation
+	poolAllocated bool
 }
 
 // Parent implements the Activation interface method.
@@ -127,10 +128,28 @@ func (a *hierarchicalActivation) ResolveName(name string) (any, bool) {
 	return a.parent.ResolveName(name)
 }
 
+// Unwrap returns the parent activation, stripping the local child scope.
+// This allows global disambiguation to skip past locally introduced variables.
+func (a *hierarchicalActivation) Unwrap() Activation {
+	return a.parent
+}
+
+// AsPartialActivation checks the child first via direct type assertion (to
+// avoid recursion through the folder → frame → hierarchicalActivation cycle),
+// then walks the parent hierarchy via the free function.
+func (a *hierarchicalActivation) AsPartialActivation() (PartialActivation, bool) {
+	if pv, ok := a.child.(partialActivationConverter); ok {
+		if p, ok := pv.AsPartialActivation(); ok {
+			return p, true
+		}
+	}
+	return AsPartialActivation(a.parent)
+}
+
 // NewHierarchicalActivation takes two activations and produces a new one which prioritizes
 // resolution in the child first and parent(s) second.
 func NewHierarchicalActivation(parent Activation, child Activation) Activation {
-	return &hierarchicalActivation{parent, child}
+	return &hierarchicalActivation{parent: parent, child: child, poolAllocated: false}
 }
 
 // NewPartialActivation returns an Activation which contains a list of AttributePattern values

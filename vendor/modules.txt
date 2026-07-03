@@ -301,7 +301,7 @@ github.com/google/cadvisor/lib/utils/sysfs
 github.com/google/cadvisor/lib/utils/sysinfo
 github.com/google/cadvisor/lib/version
 github.com/google/cadvisor/lib/watcher
-# github.com/google/cel-go v0.27.0
+# github.com/google/cel-go v0.29.2
 ## explicit; go 1.23.0
 github.com/google/cel-go/cel
 github.com/google/cel-go/checker
