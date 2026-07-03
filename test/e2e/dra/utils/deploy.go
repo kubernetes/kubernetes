@@ -791,8 +791,8 @@ func (d *Driver) removeFile(tCtx ktesting.TContext, pod *v1.Pod, name string) er
 
 func (d *Driver) createFromYAML(tCtx ktesting.TContext, content []byte, namespace string) {
 	// Not caching the discovery result isn't very efficient, but good enough.
-	discoveryCache := memory.NewMemCacheClient(tCtx.Client().Discovery())
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryCache)
+	discoveryCache := memory.NewMemCacheClientWithContext(tCtx.Client().Discovery())
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapperWithContext(discoveryCache)
 
 	for _, content := range bytes.Split(content, []byte("---\n")) {
 		if len(content) == 0 {
@@ -806,7 +806,7 @@ func (d *Driver) createFromYAML(tCtx ktesting.TContext, content []byte, namespac
 		tCtx.ExpectNoError(err, fmt.Sprintf("extract group+version from object %q", klog.KObj(obj)))
 		gk := schema.GroupKind{Group: gv.Group, Kind: obj.GetKind()}
 
-		mapping, err := restMapper.RESTMapping(gk, gv.Version)
+		mapping, err := restMapper.RESTMappingWithContext(tCtx, gk, gv.Version)
 		tCtx.ExpectNoError(err, fmt.Sprintf("map %q to resource", gk))
 
 		resourceClient := tCtx.Dynamic().Resource(mapping.Resource)
