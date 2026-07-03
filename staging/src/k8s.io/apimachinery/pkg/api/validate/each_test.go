@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 type TestStruct struct {
@@ -310,12 +309,12 @@ func TestEachMapValRatcheting(t *testing.T) {
 	)
 	testEachMapValRatcheting(t, "struct with pointer field, same value different pointer",
 		map[string]NonComparableStructWithPtr{
-			"one": {I: 11, P: ptr.To(1)},
-			"two": {I: 12, P: ptr.To(2)},
+			"one": {I: 11, P: new(1)},
+			"two": {I: 12, P: new(2)},
 		},
 		map[string]NonComparableStructWithPtr{
-			"one": {I: 11, P: ptr.To(1)},
-			"two": {I: 12, P: ptr.To(2)},
+			"one": {I: 11, P: new(1)},
+			"two": {I: 12, P: new(2)},
 		},
 		SemanticDeepEqual,
 		0,
@@ -492,16 +491,16 @@ func testValSliceUniqueByReflect[T any](t *testing.T, name string, input []T, wa
 }
 
 func TestEachPtrSliceVal(t *testing.T) {
-	testEachPtrSliceVal(t, "valid", []*int{ptr.To(11), ptr.To(12), ptr.To(13)})
-	testEachPtrSliceVal(t, "valid", []*string{ptr.To("a"), ptr.To("b"), ptr.To("c")})
-	testEachPtrSliceVal(t, "valid", []*TestStruct{ptr.To(TestStruct{11, "a"}), ptr.To(TestStruct{12, "b"}), ptr.To(TestStruct{13, "c"})})
+	testEachPtrSliceVal(t, "valid", []*int{new(11), new(12), new(13)})
+	testEachPtrSliceVal(t, "valid", []*string{new("a"), new("b"), new("c")})
+	testEachPtrSliceVal(t, "valid", []*TestStruct{{11, "a"}, {12, "b"}, {13, "c"}})
 
 	testEachPtrSliceVal(t, "empty", []*int{})
 	testEachPtrSliceVal[int](t, "nil", nil)
 
 	// Test nil elements
 	t.Run("nil elements", func(t *testing.T) {
-		input := []*int{ptr.To(11), nil, ptr.To(13)}
+		input := []*int{new(11), nil, new(13)}
 		calls := 0
 		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *int) field.ErrorList {
 			calls++
@@ -516,7 +515,7 @@ func TestEachPtrSliceVal(t *testing.T) {
 		}
 	})
 
-	testEachPtrSliceValUpdate(t, "valid", []*int{ptr.To(11), ptr.To(12), ptr.To(13)})
+	testEachPtrSliceValUpdate(t, "valid", []*int{new(11), new(12), new(13)})
 }
 
 func testEachPtrSliceVal[T any](t *testing.T, name string, input []*T) {
@@ -572,12 +571,8 @@ func testEachPtrSliceValUpdate[T any](t *testing.T, name string, input []*T) {
 
 func TestEachPtrSliceValRatcheting(t *testing.T) {
 	testEachPtrSliceValRatcheting(t, "ComparableStruct same data different order",
-		[]*TestStruct{
-			ptr.To(TestStruct{11, "a"}), ptr.To(TestStruct{12, "b"}), ptr.To(TestStruct{13, "c"}),
-		},
-		[]*TestStruct{
-			ptr.To(TestStruct{11, "a"}), ptr.To(TestStruct{13, "c"}), ptr.To(TestStruct{12, "b"}),
-		},
+		[]*TestStruct{{11, "a"}, {12, "b"}, {13, "c"}},
+		[]*TestStruct{{11, "a"}, {13, "c"}, {12, "b"}},
 		SemanticDeepEqual,
 		nil,
 	)
@@ -600,10 +595,10 @@ func testEachPtrSliceValRatcheting[T any](t *testing.T, name string, old, new []
 func TestPtrSliceUnique(t *testing.T) {
 	testPtrSliceUnique(t, "int_nil", []*int(nil), 0, 0)
 	testPtrSliceUnique(t, "int_empty", []*int{}, 0, 0)
-	testPtrSliceUnique(t, "int_uniq", []*int{ptr.To(1), ptr.To(2), ptr.To(3)}, 0, 0)
-	testPtrSliceUnique(t, "int_dup", []*int{ptr.To(1), ptr.To(2), ptr.To(3), ptr.To(2), ptr.To(1)}, 2, 0)
-	testPtrSliceUnique(t, "int_nil_element", []*int{ptr.To(1), nil, ptr.To(3), nil}, 0, 0)
-	testPtrSliceUnique(t, "int_dup_and_nil", []*int{ptr.To(1), nil, ptr.To(1), nil}, 1, 0)
+	testPtrSliceUnique(t, "int_uniq", []*int{new(1), new(2), new(3)}, 0, 0)
+	testPtrSliceUnique(t, "int_dup", []*int{new(1), new(2), new(3), new(2), new(1)}, 2, 0)
+	testPtrSliceUnique(t, "int_nil_element", []*int{new(1), nil, new(3), nil}, 0, 0)
+	testPtrSliceUnique(t, "int_dup_and_nil", []*int{new(1), nil, new(1), nil}, 1, 0)
 }
 
 func testPtrSliceUnique[T comparable](t *testing.T, name string, input []*T, wantDupErrs, wantReqErrs int) {
@@ -637,8 +632,8 @@ func TestPtrSliceNoNils(t *testing.T) {
 	}{
 		{"nil", nil, 0},
 		{"empty", []*int{}, 0},
-		{"no_nil", []*int{ptr.To(1), ptr.To(2)}, 0},
-		{"has_nil", []*int{ptr.To(1), nil, ptr.To(3), nil}, 2},
+		{"no_nil", []*int{new(1), new(2)}, 0},
+		{"has_nil", []*int{new(1), nil, new(3), nil}, 2},
 	}
 
 	for _, tt := range tests {

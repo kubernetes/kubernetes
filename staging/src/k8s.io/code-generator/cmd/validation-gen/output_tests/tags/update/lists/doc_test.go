@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestUpdateListTags(t *testing.T) {
@@ -304,7 +303,7 @@ func TestUpdateListTags(t *testing.T) {
 		old := base
 		old.PointerSliceNoSet = nil
 		cur := base
-		cur.PointerSliceNoSet = []*string{ptr.To("a")}
+		cur.PointerSliceNoSet = []*string{new("a")}
 
 		st.Value(&cur).OldValue(&old).ExpectMatches(matcher, field.ErrorList{
 			field.Invalid(field.NewPath("pointerSliceNoSet"), nil, "field cannot be set once created").WithOrigin("update"),
@@ -317,9 +316,9 @@ func TestUpdateListTags(t *testing.T) {
 	// Pointer listType=set + NoAddItem
 	{
 		old := base
-		old.PointerSetNoAdd = []*string{ptr.To("a"), ptr.To("b")}
+		old.PointerSetNoAdd = []*string{new("a"), new("b")}
 		cur := base
-		cur.PointerSetNoAdd = []*string{ptr.To("a"), ptr.To("b"), ptr.To("c")}
+		cur.PointerSetNoAdd = []*string{new("a"), new("b"), new("c")}
 
 		st.Value(&cur).OldValue(&old).ExpectMatches(matcher, field.ErrorList{
 			field.Forbidden(field.NewPath("pointerSetNoAdd").Index(2), "item may not be added").WithOrigin("update"),
@@ -346,7 +345,7 @@ func TestUpdateListTags(t *testing.T) {
 	// Nil element in pointer slice on update should trigger Required error from PtrSliceUpdate
 	{
 		old := base
-		old.PointerSetNoAdd = []*string{ptr.To("a")}
+		old.PointerSetNoAdd = []*string{new("a")}
 		cur := base
 		cur.PointerSetNoAdd = []*string{nil}
 

@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 type multiKeyItem struct {
@@ -179,7 +178,7 @@ func TestPtrSliceItem(t *testing.T) {
 		{
 			name: "no match",
 			new: []*multiKeyItem{
-				ptr.To(multiKeyItem{K1: "a", K2: "1", V: 1}),
+				{K1: "a", K2: "1", V: 1},
 			},
 			match: func(i *multiKeyItem) bool {
 				return i.K1 == "target"
@@ -192,8 +191,8 @@ func TestPtrSliceItem(t *testing.T) {
 		{
 			name: "new item with matching keys",
 			new: []*multiKeyItem{
-				ptr.To(multiKeyItem{K1: "a", K2: "1", V: 1}),
-				ptr.To(multiKeyItem{K1: "target", K2: "target2", V: 2}),
+				{K1: "a", K2: "1", V: 1},
+				{K1: "target", K2: "target2", V: 2},
 			},
 			match: func(i *multiKeyItem) bool {
 				return i.K1 == "target" && i.K2 == "target2"
@@ -210,7 +209,7 @@ func TestPtrSliceItem(t *testing.T) {
 			name: "nil element in new list (ignored)",
 			new: []*multiKeyItem{
 				nil,
-				ptr.To(multiKeyItem{K1: "target", V: 1}),
+				{K1: "target", V: 1},
 			},
 			match: func(i *multiKeyItem) bool {
 				return i.K1 == "target"

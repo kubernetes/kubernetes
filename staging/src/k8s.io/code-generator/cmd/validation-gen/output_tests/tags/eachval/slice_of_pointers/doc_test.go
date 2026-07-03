@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -34,7 +33,7 @@ func Test(t *testing.T) {
 	// 2. Non-nil elements trigger validation errors
 	st.Value(&Struct{
 		ListField:          []*OtherStruct{{}, {}},
-		ListPrimitiveField: []*string{ptr.To("a"), ptr.To("b")},
+		ListPrimitiveField: []*string{new("a"), new("b")},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"listField[0]":          {"field Struct.ListField[*]", "type OtherStruct"},
 		"listField[1]":          {"field Struct.ListField[*]", "type OtherStruct"},
