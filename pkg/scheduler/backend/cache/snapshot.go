@@ -385,8 +385,16 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	// Since this operation only affects the snapshot,
 	// we should keep the old number to remain consistent with the cached value.
 	oldGeneration := nodeInfo.Generation
+	hadPodsWithAffinity := len(nodeInfo.PodsWithAffinity) > 0
+	hadPodsWithRequiredAntiAffinity := len(nodeInfo.PodsWithRequiredAntiAffinity) > 0
 	nodeInfo.AddPodInfo(podInfo)
 	nodeInfo.Generation = oldGeneration
+	if !hadPodsWithAffinity && len(nodeInfo.PodsWithAffinity) > 0 {
+		s.havePodsWithAffinityNodeInfoList = addNodeInfoToList(s.havePodsWithAffinityNodeInfoList, nodeInfo)
+	}
+	if !hadPodsWithRequiredAntiAffinity && len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
+		s.havePodsWithRequiredAntiAffinityNodeInfoList = addNodeInfoToList(s.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
+	}
 	s.assumedPods[key] = pod
 	// Update the pod group state in the snapshot if the pod belongs to a pod group.
 	if !s.genericWorkloadEnabled || pod.Spec.SchedulingGroup == nil {
@@ -417,11 +425,19 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 		// Since this operation only affects the snapshot,
 		// we should keep the old number to remain consistent with the cached value.
 		oldGeneration := nodeInfo.Generation
+		hadPodsWithAffinity := len(nodeInfo.PodsWithAffinity) > 0
+		hadPodsWithRequiredAntiAffinity := len(nodeInfo.PodsWithRequiredAntiAffinity) > 0
 		err := nodeInfo.RemovePod(logger, pod)
 		if err != nil {
 			return err
 		}
 		nodeInfo.Generation = oldGeneration
+		if hadPodsWithAffinity && len(nodeInfo.PodsWithAffinity) == 0 {
+			s.havePodsWithAffinityNodeInfoList = removeNodeInfoFromList(s.havePodsWithAffinityNodeInfoList, nodeInfo)
+		}
+		if hadPodsWithRequiredAntiAffinity && len(nodeInfo.PodsWithRequiredAntiAffinity) == 0 {
+			s.havePodsWithRequiredAntiAffinityNodeInfoList = removeNodeInfoFromList(s.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
+		}
 		if len(nodeInfo.Pods) == 0 && nodeInfo.Node() == nil {
 			delete(s.nodeInfoMap, nodeName)
 		}
@@ -435,6 +451,30 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 		pgs.forgetPod(assumedPod.UID)
 	}
 	return nil
+}
+
+func addNodeInfoToList(list []fwk.NodeInfo, nodeInfo *framework.NodeInfo) []fwk.NodeInfo {
+	if nodeInfo.Node() == nil {
+		return list
+	}
+	for _, existing := range list {
+		if existing.Node() != nil && existing.Node().Name == nodeInfo.Node().Name {
+			return list
+		}
+	}
+	return append(list, nodeInfo)
+}
+
+func removeNodeInfoFromList(list []fwk.NodeInfo, nodeInfo *framework.NodeInfo) []fwk.NodeInfo {
+	if nodeInfo.Node() == nil {
+		return list
+	}
+	for i, existing := range list {
+		if existing.Node() != nil && existing.Node().Name == nodeInfo.Node().Name {
+			return append(list[:i], list[i+1:]...)
+		}
+	}
+	return list
 }
 
 // forgetAllAssumedPods forgets all assumed pods from the snapshot.

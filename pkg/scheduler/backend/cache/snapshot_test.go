@@ -545,6 +545,81 @@ func TestSnapshot_AssumeForget(t *testing.T) {
 	}
 }
 
+func TestSnapshotAssumeForgetUpdatesAffinityNodeInfoLists(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	node1 := st.MakeNode().Name("node-1").Label("node", "node-1").Obj()
+	node2 := st.MakeNode().Name("node-2").Label("node", "node-2").Obj()
+	podWithRequiredAntiAffinity1 := st.MakePod().Name("pod-anti-1").Namespace("ns").UID("pod-anti-1").
+		Label("anti", "anti").
+		PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).
+		Node("node-1").
+		Obj()
+	podWithRequiredAntiAffinity2 := st.MakePod().Name("pod-anti-2").Namespace("ns").UID("pod-anti-2").
+		Label("anti", "anti").
+		PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).
+		Node("node-1").
+		Obj()
+	podWithAffinity := st.MakePod().Name("pod-affinity").Namespace("ns").UID("pod-affinity").
+		PodAffinityExists("affinity", "node", st.PodAffinityWithRequiredReq).
+		Node("node-2").
+		Obj()
+
+	snapshot := NewSnapshot(nil, []*v1.Node{node1, node2})
+	assumePod := func(pod *v1.Pod) {
+		t.Helper()
+		podInfo, err := framework.NewPodInfo(pod)
+		if err != nil {
+			t.Fatalf("NewPodInfo failed: %v", err)
+		}
+		if err := snapshot.AssumePod(podInfo); err != nil {
+			t.Fatalf("AssumePod failed: %v", err)
+		}
+	}
+	forgetPod := func(pod *v1.Pod) {
+		t.Helper()
+		if err := snapshot.ForgetPod(logger, pod); err != nil {
+			t.Fatalf("ForgetPod failed: %v", err)
+		}
+	}
+	checkNodeNames := func(name string, got []fwk.NodeInfo, want sets.Set[string]) {
+		t.Helper()
+		gotNames := sets.New[string]()
+		for _, nodeInfo := range got {
+			gotNames.Insert(nodeInfo.Node().Name)
+		}
+		if !gotNames.Equal(want) {
+			t.Fatalf("unexpected %s node names: got %v, want %v", name, sets.List(gotNames), sets.List(want))
+		}
+	}
+	checkAffinityLists := func(wantAffinity, wantRequiredAntiAffinity sets.Set[string]) {
+		t.Helper()
+		affinityNodes, err := snapshot.HavePodsWithAffinityList()
+		if err != nil {
+			t.Fatalf("HavePodsWithAffinityList failed: %v", err)
+		}
+		checkNodeNames("affinity", affinityNodes, wantAffinity)
+		requiredAntiAffinityNodes, err := snapshot.HavePodsWithRequiredAntiAffinityList()
+		if err != nil {
+			t.Fatalf("HavePodsWithRequiredAntiAffinityList failed: %v", err)
+		}
+		checkNodeNames("required anti-affinity", requiredAntiAffinityNodes, wantRequiredAntiAffinity)
+	}
+
+	checkAffinityLists(nil, nil)
+	assumePod(podWithRequiredAntiAffinity1)
+	checkAffinityLists(sets.New("node-1"), sets.New("node-1"))
+	assumePod(podWithRequiredAntiAffinity2)
+	checkAffinityLists(sets.New("node-1"), sets.New("node-1"))
+	assumePod(podWithAffinity)
+	checkAffinityLists(sets.New("node-1", "node-2"), sets.New("node-1"))
+	forgetPod(podWithRequiredAntiAffinity1)
+	checkAffinityLists(sets.New("node-1", "node-2"), sets.New("node-1"))
+	forgetPod(podWithRequiredAntiAffinity2)
+	checkAffinityLists(sets.New("node-2"), nil)
+	forgetPod(podWithAffinity)
+	checkAffinityLists(nil, nil)
+}
+
 func TestSnapshot_Placement(t *testing.T) {
 	tt := []struct {
 		name           string
