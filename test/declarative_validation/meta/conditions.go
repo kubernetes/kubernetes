@@ -124,6 +124,15 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 			},
 			ExpectedErrs: nil,
 		},
+		{
+			Name: "invalid missing reason",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakReason("")),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Required(fldPath.Index(0).Child("reason"), "").MarkAlpha(),
+			},
+		},
 	}
 }
 
@@ -178,5 +187,11 @@ func TweakObservedGeneration(gen int64) func(*metav1.Condition) {
 func TweakLastTransitionTime(t metav1.Time) func(*metav1.Condition) {
 	return func(c *metav1.Condition) {
 		c.LastTransitionTime = t
+	}
+}
+
+func TweakReason(reason string) func(*metav1.Condition) {
+	return func(c *metav1.Condition) {
+		c.Reason = reason
 	}
 }
