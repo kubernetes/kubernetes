@@ -143,7 +143,7 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-slice")
 				}); len(e) != 0 {
@@ -285,7 +285,7 @@ func Validate_ValidatedStringSlice(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj ValidatedStringSlice) (errs field.ErrorList) {
 
-	if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+	if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-typedef")
 		}); len(e) != 0 {

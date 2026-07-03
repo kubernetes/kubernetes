@@ -440,7 +440,7 @@ func collectRules(node *typeNode) fieldRules {
 // PathFragments into suffix, and records (basePath+suffix, Rule) at each
 // emitting leaf. A FunctionGen may declare multiple Emissions when the
 // runtime emits errors of different types or at different path fragments
-// from the same call (e.g. UpdateSlice with NoAddItem and NoRemoveItem).
+// from the same call (e.g. ValSliceUpdate with NoAddItem and NoRemoveItem).
 func recordRules(rules fieldRules, basePath string, fg validators.FunctionGen, suffix string) {
 	if len(fg.Emits) > 0 {
 		for _, e := range fg.Emits {

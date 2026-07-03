@@ -166,7 +166,7 @@ func Test(t *testing.T) {
 		},
 	}).ExpectValid()
 
-	// Test pointer items (SliceItemPointer)
+	// Test pointer items (PtrSliceItem)
 	st.Value(&Struct{
 		PointerItems: []*Item{
 			{Key: "a", Data: "d1"},

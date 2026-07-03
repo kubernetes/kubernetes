@@ -59,33 +59,33 @@ type NonComparableStructWithPtr struct {
 	P *int
 }
 
-func TestEachSliceVal(t *testing.T) {
-	testEachSliceVal(t, "valid", []int{11, 12, 13})
-	testEachSliceVal(t, "valid", []string{"a", "b", "c"})
-	testEachSliceVal(t, "valid", []TestStruct{{11, "a"}, {12, "b"}, {13, "c"}})
+func TestEachValSliceVal(t *testing.T) {
+	testEachValSliceVal(t, "valid", []int{11, 12, 13})
+	testEachValSliceVal(t, "valid", []string{"a", "b", "c"})
+	testEachValSliceVal(t, "valid", []TestStruct{{11, "a"}, {12, "b"}, {13, "c"}})
 
-	testEachSliceVal(t, "empty", []int{})
-	testEachSliceVal(t, "empty", []string{})
-	testEachSliceVal(t, "empty", []TestStruct{})
+	testEachValSliceVal(t, "empty", []int{})
+	testEachValSliceVal(t, "empty", []string{})
+	testEachValSliceVal(t, "empty", []TestStruct{})
 
-	testEachSliceVal[int](t, "nil", nil)
-	testEachSliceVal[string](t, "nil", nil)
-	testEachSliceVal[TestStruct](t, "nil", nil)
+	testEachValSliceVal[int](t, "nil", nil)
+	testEachValSliceVal[string](t, "nil", nil)
+	testEachValSliceVal[TestStruct](t, "nil", nil)
 
-	testEachSliceValUpdate(t, "valid", []int{11, 12, 13})
-	testEachSliceValUpdate(t, "valid", []string{"a", "b", "c"})
-	testEachSliceValUpdate(t, "valid", []TestStruct{{11, "a"}, {12, "b"}, {13, "c"}})
+	testEachValSliceValUpdate(t, "valid", []int{11, 12, 13})
+	testEachValSliceValUpdate(t, "valid", []string{"a", "b", "c"})
+	testEachValSliceValUpdate(t, "valid", []TestStruct{{11, "a"}, {12, "b"}, {13, "c"}})
 
-	testEachSliceValUpdate(t, "empty", []int{})
-	testEachSliceValUpdate(t, "empty", []string{})
-	testEachSliceValUpdate(t, "empty", []TestStruct{})
+	testEachValSliceValUpdate(t, "empty", []int{})
+	testEachValSliceValUpdate(t, "empty", []string{})
+	testEachValSliceValUpdate(t, "empty", []TestStruct{})
 
-	testEachSliceValUpdate[int](t, "nil", nil)
-	testEachSliceValUpdate[string](t, "nil", nil)
-	testEachSliceValUpdate[TestStruct](t, "nil", nil)
+	testEachValSliceValUpdate[int](t, "nil", nil)
+	testEachValSliceValUpdate[string](t, "nil", nil)
+	testEachValSliceValUpdate[TestStruct](t, "nil", nil)
 }
 
-func testEachSliceVal[T any](t *testing.T, name string, input []T) {
+func testEachValSliceVal[T any](t *testing.T, name string, input []T) {
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
@@ -97,14 +97,14 @@ func testEachSliceVal[T any](t *testing.T, name string, input []T) {
 			calls++
 			return nil
 		}
-		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, nil, vfn)
+		_ = EachValSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, nil, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}
 	})
 }
 
-func testEachSliceValUpdate[T any](t *testing.T, name string, input []T) {
+func testEachValSliceValUpdate[T any](t *testing.T, name string, input []T) {
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
@@ -123,15 +123,15 @@ func testEachSliceValUpdate[T any](t *testing.T, name string, input []T) {
 		copy(old, input)
 		slices.Reverse(old)
 		match := func(a, b *T) bool { return reflect.DeepEqual(*a, *b) }
-		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, match, match, vfn)
+		_ = EachValSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, match, match, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}
 	})
 }
 
-func TestEachSliceValRatcheting(t *testing.T) {
-	testEachSliceValRatcheting(t, "ComparableStruct same data different order",
+func TestEachValSliceValRatcheting(t *testing.T) {
+	testEachValSliceValRatcheting(t, "ComparableStruct same data different order",
 		[]TestStruct{
 			{11, "a"}, {12, "b"}, {13, "c"},
 		},
@@ -141,7 +141,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		SemanticDeepEqual,
 		nil,
 	)
-	testEachSliceValRatcheting(t, "ComparableStruct less data in new, exist in old",
+	testEachValSliceValRatcheting(t, "ComparableStruct less data in new, exist in old",
 		[]TestStruct{
 			{11, "a"}, {12, "b"}, {13, "c"},
 		},
@@ -151,7 +151,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		DirectEqual,
 		nil,
 	)
-	testEachSliceValRatcheting(t, "Comparable struct with key same data different order",
+	testEachValSliceValRatcheting(t, "Comparable struct with key same data different order",
 		[]TestStructWithKey{
 			{Key: "a", I: 11, D: "a"}, {Key: "b", I: 12, D: "b"}, {Key: "c", I: 13, D: "c"},
 		},
@@ -163,7 +163,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		}),
 		DirectEqual,
 	)
-	testEachSliceValRatcheting(t, "Comparable struct with key less data in new, exist in old",
+	testEachValSliceValRatcheting(t, "Comparable struct with key less data in new, exist in old",
 		[]TestStructWithKey{
 			{Key: "a", I: 11, D: "a"}, {Key: "b", I: 12, D: "b"}, {Key: "c", I: 13, D: "c"},
 		},
@@ -175,7 +175,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		}),
 		DirectEqual,
 	)
-	testEachSliceValRatcheting(t, "NonComparableStruct same data different order",
+	testEachValSliceValRatcheting(t, "NonComparableStruct same data different order",
 		[]NonComparableStruct{
 			{I: 11, S: []string{"a"}}, {I: 12, S: []string{"b"}}, {I: 13, S: []string{"c"}},
 		},
@@ -185,7 +185,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		SemanticDeepEqual,
 		nil,
 	)
-	testEachSliceValRatcheting(t, "NonComparableStructWithKey same data different order",
+	testEachValSliceValRatcheting(t, "NonComparableStructWithKey same data different order",
 		[]NonComparableStructWithKey{
 			{Key: "a", I: 11, S: []string{"a"}}, {Key: "b", I: 12, S: []string{"b"}}, {Key: "c", I: 13, S: []string{"c"}},
 		},
@@ -200,14 +200,14 @@ func TestEachSliceValRatcheting(t *testing.T) {
 
 }
 
-func testEachSliceValRatcheting[T any](t *testing.T, name string, old, new []T, match, equiv MatchFunc[*T]) {
+func testEachValSliceValRatcheting[T any](t *testing.T, name string, old, new []T, match, equiv MatchFunc[*T]) {
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
 			return field.ErrorList{field.Invalid(fldPath, *newVal, "expected no calls")}
 		}
-		errs := EachSliceVal(context.Background(), operation.Operation{Type: operation.Update}, field.NewPath("test"), new, old, match, equiv, vfn)
+		errs := EachValSliceVal(context.Background(), operation.Operation{Type: operation.Update}, field.NewPath("test"), new, old, match, equiv, vfn)
 		if len(errs) > 0 {
 			t.Errorf("expected no errors, got %d: %s", len(errs), fmtErrs(errs))
 		}
@@ -425,54 +425,54 @@ func testEachMapKeyRatcheting[K ~string, V any](t *testing.T, name string, old, 
 	})
 }
 
-func TestUniqueComparableValues(t *testing.T) {
-	testUnique(t, "int_nil", []int(nil), 0)
-	testUnique(t, "int_empty", []int{}, 0)
-	testUnique(t, "int_uniq", []int{1, 2, 3}, 0)
-	testUnique(t, "int_dup", []int{1, 2, 3, 2, 1}, 2)
+func TestValSliceUniqueComparableValues(t *testing.T) {
+	testValSliceUnique(t, "int_nil", []int(nil), 0)
+	testValSliceUnique(t, "int_empty", []int{}, 0)
+	testValSliceUnique(t, "int_uniq", []int{1, 2, 3}, 0)
+	testValSliceUnique(t, "int_dup", []int{1, 2, 3, 2, 1}, 2)
 
-	testUnique(t, "string_nil", []string(nil), 0)
-	testUnique(t, "string_empty", []string{}, 0)
-	testUnique(t, "string_uniq", []string{"a", "b", "c"}, 0)
-	testUnique(t, "string_dup", []string{"a", "a", "c", "b", "a"}, 2)
+	testValSliceUnique(t, "string_nil", []string(nil), 0)
+	testValSliceUnique(t, "string_empty", []string{}, 0)
+	testValSliceUnique(t, "string_uniq", []string{"a", "b", "c"}, 0)
+	testValSliceUnique(t, "string_dup", []string{"a", "a", "c", "b", "a"}, 2)
 
 	type isComparable struct {
 		I int
 		S string
 	}
 
-	testUnique(t, "struct_nil", []isComparable(nil), 0)
-	testUnique(t, "struct_empty", []isComparable{}, 0)
-	testUnique(t, "struct_uniq", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}}, 0)
-	testUnique(t, "struct_dup", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}, {2, "b"}, {1, "a"}}, 2)
+	testValSliceUnique(t, "struct_nil", []isComparable(nil), 0)
+	testValSliceUnique(t, "struct_empty", []isComparable{}, 0)
+	testValSliceUnique(t, "struct_uniq", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}}, 0)
+	testValSliceUnique(t, "struct_dup", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}, {2, "b"}, {1, "a"}}, 2)
 }
 
-func testUnique[T comparable](t *testing.T, name string, input []T, wantErrs int) {
+func testValSliceUnique[T comparable](t *testing.T, name string, input []T, wantErrs int) {
 	t.Helper()
 	t.Run(fmt.Sprintf("%s(direct)", name), func(t *testing.T) {
-		errs := Unique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, DirectEqual)
+		errs := ValSliceUnique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, DirectEqual)
 		if len(errs) != wantErrs {
 			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
 		}
 	})
 	t.Run(fmt.Sprintf("%s(reflect)", name), func(t *testing.T) {
-		errs := Unique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, SemanticDeepEqual)
+		errs := ValSliceUnique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, SemanticDeepEqual)
 		if len(errs) != wantErrs {
 			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
 		}
 	})
 }
 
-func TestUniqueNonComparableValues(t *testing.T) {
+func TestValSliceUniqueNonComparableValues(t *testing.T) {
 	type nonComparable struct {
 		I int
 		S []string
 	}
 
-	testUniqueByReflect(t, "noncomp_nil", []nonComparable(nil), 0)
-	testUniqueByReflect(t, "noncomp_empty", []nonComparable{}, 0)
-	testUniqueByReflect(t, "noncomp_uniq", []nonComparable{{1, []string{"a"}}, {2, []string{"b"}}, {3, []string{"c"}}}, 0)
-	testUniqueByReflect(t, "noncomp_dup", []nonComparable{
+	testValSliceUniqueByReflect(t, "noncomp_nil", []nonComparable(nil), 0)
+	testValSliceUniqueByReflect(t, "noncomp_empty", []nonComparable{}, 0)
+	testValSliceUniqueByReflect(t, "noncomp_uniq", []nonComparable{{1, []string{"a"}}, {2, []string{"b"}}, {3, []string{"c"}}}, 0)
+	testValSliceUniqueByReflect(t, "noncomp_dup", []nonComparable{
 		{1, []string{"a"}},
 		{2, []string{"b"}},
 		{3, []string{"c"}},
@@ -480,24 +480,24 @@ func TestUniqueNonComparableValues(t *testing.T) {
 		{1, []string{"a"}}}, 2)
 }
 
-func testUniqueByReflect[T any](t *testing.T, name string, input []T, wantErrs int) {
+func testValSliceUniqueByReflect[T any](t *testing.T, name string, input []T, wantErrs int) {
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
-		errs := Unique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, SemanticDeepEqual)
+		errs := ValSliceUnique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, SemanticDeepEqual)
 		if len(errs) != wantErrs {
 			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
 		}
 	})
 }
 
-func TestEachSlicePointer(t *testing.T) {
-	testEachSlicePointer(t, "valid", []*int{ptr.To(11), ptr.To(12), ptr.To(13)})
-	testEachSlicePointer(t, "valid", []*string{ptr.To("a"), ptr.To("b"), ptr.To("c")})
-	testEachSlicePointer(t, "valid", []*TestStruct{ptr.To(TestStruct{11, "a"}), ptr.To(TestStruct{12, "b"}), ptr.To(TestStruct{13, "c"})})
+func TestEachPtrSliceVal(t *testing.T) {
+	testEachPtrSliceVal(t, "valid", []*int{ptr.To(11), ptr.To(12), ptr.To(13)})
+	testEachPtrSliceVal(t, "valid", []*string{ptr.To("a"), ptr.To("b"), ptr.To("c")})
+	testEachPtrSliceVal(t, "valid", []*TestStruct{ptr.To(TestStruct{11, "a"}), ptr.To(TestStruct{12, "b"}), ptr.To(TestStruct{13, "c"})})
 
-	testEachSlicePointer(t, "empty", []*int{})
-	testEachSlicePointer[int](t, "nil", nil)
+	testEachPtrSliceVal(t, "empty", []*int{})
+	testEachPtrSliceVal[int](t, "nil", nil)
 
 	// Test nil elements
 	t.Run("nil elements", func(t *testing.T) {
@@ -507,7 +507,7 @@ func TestEachSlicePointer(t *testing.T) {
 			calls++
 			return nil
 		}
-		errs := EachSlicePointer(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, nil, vfn)
+		errs := EachPtrSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, nil, vfn)
 		if len(errs) != 0 {
 			t.Errorf("expected 0 errors, got %d", len(errs))
 		}
@@ -516,10 +516,10 @@ func TestEachSlicePointer(t *testing.T) {
 		}
 	})
 
-	testEachSlicePointerUpdate(t, "valid", []*int{ptr.To(11), ptr.To(12), ptr.To(13)})
+	testEachPtrSliceValUpdate(t, "valid", []*int{ptr.To(11), ptr.To(12), ptr.To(13)})
 }
 
-func testEachSlicePointer[T any](t *testing.T, name string, input []*T) {
+func testEachPtrSliceVal[T any](t *testing.T, name string, input []*T) {
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(*%T)", name, zero), func(t *testing.T) {
@@ -531,7 +531,7 @@ func testEachSlicePointer[T any](t *testing.T, name string, input []*T) {
 			calls++
 			return nil
 		}
-		errs := EachSlicePointer(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, nil, vfn)
+		errs := EachPtrSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, nil, vfn)
 		if len(errs) != 0 {
 			t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
 		}
@@ -541,7 +541,7 @@ func testEachSlicePointer[T any](t *testing.T, name string, input []*T) {
 	})
 }
 
-func testEachSlicePointerUpdate[T any](t *testing.T, name string, input []*T) {
+func testEachPtrSliceValUpdate[T any](t *testing.T, name string, input []*T) {
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(*%T) update", name, zero), func(t *testing.T) {
@@ -560,7 +560,7 @@ func testEachSlicePointerUpdate[T any](t *testing.T, name string, input []*T) {
 		copy(old, input)
 		slices.Reverse(old)
 		match := func(a, b *T) bool { return reflect.DeepEqual(*a, *b) }
-		errs := EachSlicePointer(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, match, match, vfn)
+		errs := EachPtrSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, match, match, vfn)
 		if len(errs) != 0 {
 			t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
 		}
@@ -570,8 +570,8 @@ func testEachSlicePointerUpdate[T any](t *testing.T, name string, input []*T) {
 	})
 }
 
-func TestEachSlicePointerRatcheting(t *testing.T) {
-	testEachSlicePointerRatcheting(t, "ComparableStruct same data different order",
+func TestEachPtrSliceValRatcheting(t *testing.T) {
+	testEachPtrSliceValRatcheting(t, "ComparableStruct same data different order",
 		[]*TestStruct{
 			ptr.To(TestStruct{11, "a"}), ptr.To(TestStruct{12, "b"}), ptr.To(TestStruct{13, "c"}),
 		},
@@ -583,33 +583,33 @@ func TestEachSlicePointerRatcheting(t *testing.T) {
 	)
 }
 
-func testEachSlicePointerRatcheting[T any](t *testing.T, name string, old, new []*T, match, equiv MatchFunc[*T]) {
+func testEachPtrSliceValRatcheting[T any](t *testing.T, name string, old, new []*T, match, equiv MatchFunc[*T]) {
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(*%T)", name, zero), func(t *testing.T) {
 		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
 			return field.ErrorList{field.Invalid(fldPath, *newVal, "expected no calls")}
 		}
-		errs := EachSlicePointer(context.Background(), operation.Operation{Type: operation.Update}, field.NewPath("test"), new, old, match, equiv, vfn)
+		errs := EachPtrSliceVal(context.Background(), operation.Operation{Type: operation.Update}, field.NewPath("test"), new, old, match, equiv, vfn)
 		if len(errs) != 0 {
 			t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
 		}
 	})
 }
 
-func TestUniquePointers(t *testing.T) {
-	testUniquePointers(t, "int_nil", []*int(nil), 0, 0)
-	testUniquePointers(t, "int_empty", []*int{}, 0, 0)
-	testUniquePointers(t, "int_uniq", []*int{ptr.To(1), ptr.To(2), ptr.To(3)}, 0, 0)
-	testUniquePointers(t, "int_dup", []*int{ptr.To(1), ptr.To(2), ptr.To(3), ptr.To(2), ptr.To(1)}, 2, 0)
-	testUniquePointers(t, "int_nil_element", []*int{ptr.To(1), nil, ptr.To(3), nil}, 0, 0)
-	testUniquePointers(t, "int_dup_and_nil", []*int{ptr.To(1), nil, ptr.To(1), nil}, 1, 0)
+func TestPtrSliceUnique(t *testing.T) {
+	testPtrSliceUnique(t, "int_nil", []*int(nil), 0, 0)
+	testPtrSliceUnique(t, "int_empty", []*int{}, 0, 0)
+	testPtrSliceUnique(t, "int_uniq", []*int{ptr.To(1), ptr.To(2), ptr.To(3)}, 0, 0)
+	testPtrSliceUnique(t, "int_dup", []*int{ptr.To(1), ptr.To(2), ptr.To(3), ptr.To(2), ptr.To(1)}, 2, 0)
+	testPtrSliceUnique(t, "int_nil_element", []*int{ptr.To(1), nil, ptr.To(3), nil}, 0, 0)
+	testPtrSliceUnique(t, "int_dup_and_nil", []*int{ptr.To(1), nil, ptr.To(1), nil}, 1, 0)
 }
 
-func testUniquePointers[T comparable](t *testing.T, name string, input []*T, wantDupErrs, wantReqErrs int) {
+func testPtrSliceUnique[T comparable](t *testing.T, name string, input []*T, wantDupErrs, wantReqErrs int) {
 	t.Helper()
 	t.Run(fmt.Sprintf("%s(direct)", name), func(t *testing.T) {
-		errs := UniquePointers(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, DirectEqual)
+		errs := PtrSliceUnique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, DirectEqual)
 		gotDup, gotReq := countErrors(errs)
 		if gotDup != wantDupErrs || gotReq != wantReqErrs {
 			t.Errorf("expected %d dup, %d req errors; got %d dup, %d req: %s", wantDupErrs, wantReqErrs, gotDup, gotReq, fmtErrs(errs))
@@ -629,7 +629,7 @@ func countErrors(errs field.ErrorList) (dup, req int) {
 	return
 }
 
-func TestSliceNilCheck(t *testing.T) {
+func TestPtrSliceNoNils(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []*int
@@ -643,7 +643,7 @@ func TestSliceNilCheck(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			errs := SliceNilCheck(context.Background(), operation.Operation{}, field.NewPath("test"), tt.input, nil)
+			errs := PtrSliceNoNils(context.Background(), operation.Operation{}, field.NewPath("test"), tt.input, nil)
 			if len(errs) != tt.wantErrs {
 				t.Errorf("expected %d errors, got %d: %v", tt.wantErrs, len(errs), errs)
 			}

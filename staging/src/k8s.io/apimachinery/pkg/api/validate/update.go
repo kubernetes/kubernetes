@@ -168,19 +168,19 @@ func UpdateStruct[T any](_ context.Context, op operation.Operation, fldPath *fie
 	return errs
 }
 
-// UpdateSlice verifies update constraints for slice types.
+// ValSliceUpdate verifies update constraints for slices of values.
 // NoAddItem and NoRemoveItem use the match function to find corresponding
 // elements between value and oldValue. NoSet and NoUnset treat len == 0 as
 // "unset".
 //
 // The match function will never be called with nil arguments.
-func UpdateSlice[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue []T, match MatchFunc[*T], constraints ...UpdateConstraint) field.ErrorList {
+func ValSliceUpdate[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue []T, match MatchFunc[*T], constraints ...UpdateConstraint) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}
 
 	if match == nil && (slices.Contains(constraints, NoAddItem) || slices.Contains(constraints, NoRemoveItem)) {
-		return field.ErrorList{field.InternalError(fldPath, fmt.Errorf("UpdateSlice: NoAddItem/NoRemoveItem require a non-nil match function"))}
+		return field.ErrorList{field.InternalError(fldPath, fmt.Errorf("ValSliceUpdate: NoAddItem/NoRemoveItem require a non-nil match function"))}
 	}
 
 	var errs field.ErrorList
@@ -253,14 +253,19 @@ func UpdateMap[K comparable, V any](_ context.Context, op operation.Operation, f
 	return errs
 }
 
-// UpdateSlicePointer verifies update constraints for slice of pointers.
-func UpdateSlicePointer[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue []*T, match MatchFunc[*T], constraints ...UpdateConstraint) field.ErrorList {
+// PtrSliceUpdate verifies update constraints for slices of pointers.
+// NoAddItem and NoRemoveItem use the match function to find corresponding
+// elements between value and oldValue. NoSet and NoUnset treat len == 0 as
+// "unset".
+//
+// The match function will never be called with nil arguments.
+func PtrSliceUpdate[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue []*T, match MatchFunc[*T], constraints ...UpdateConstraint) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}
 
 	if match == nil && (slices.Contains(constraints, NoAddItem) || slices.Contains(constraints, NoRemoveItem)) {
-		return field.ErrorList{field.InternalError(fldPath, fmt.Errorf("UpdateSlicePointer: NoAddItem/NoRemoveItem require a non-nil match function"))}
+		return field.ErrorList{field.InternalError(fldPath, fmt.Errorf("PtrSliceUpdate: NoAddItem/NoRemoveItem require a non-nil match function"))}
 	}
 
 	var errs field.ErrorList
@@ -279,7 +284,7 @@ func UpdateSlicePointer[T any](ctx context.Context, op operation.Operation, fldP
 			for i := range value {
 				newItem := value[i]
 				if newItem == nil {
-					// Ignore nil items; they are supposed to have been checked by SliceNilCheck.
+					// Ignore nil items; they are supposed to have been checked by PtrSliceNoNils.
 					continue
 				}
 				if lookupPointer(oldValue, newItem, match) == nil {

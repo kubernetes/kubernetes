@@ -203,8 +203,8 @@ var (
 	updatePointerValidator        = types.Name{Package: libValidationPkg, Name: "UpdatePointer"}
 	updateValueByReflectValidator = types.Name{Package: libValidationPkg, Name: "UpdateValueByReflect"}
 	updateStructValidator         = types.Name{Package: libValidationPkg, Name: "UpdateStruct"}
-	updateSliceValidator          = types.Name{Package: libValidationPkg, Name: "UpdateSlice"}
-	updateSlicePointerValidator   = types.Name{Package: libValidationPkg, Name: "UpdateSlicePointer"}
+	valSliceUpdateValidator       = types.Name{Package: libValidationPkg, Name: "ValSliceUpdate"}
+	ptrSliceUpdateValidator       = types.Name{Package: libValidationPkg, Name: "PtrSliceUpdate"}
 	updateMapValidator            = types.Name{Package: libValidationPkg, Name: "UpdateMap"}
 
 	// Constraint constants that will be used as arguments
@@ -254,7 +254,7 @@ func generateUpdateValidation(listByPath map[string]*listMetadata, context Conte
 	return emitScalarUpdate(context, constraints), nil
 }
 
-// generateSliceValidation emits validate.UpdateSlice. NoAddItem/NoRemoveItem
+// generateSliceValidation emits validate.ValSliceUpdate. NoAddItem/NoRemoveItem
 // need a match function to pair old and new items, which function we emit is
 // determined by the list's semantic (set/map) as set by
 // +k8s:listType/+k8s:listMapKey/+k8s:unique. For NoSet/NoUnset alone, a nil match is fine.
@@ -293,10 +293,10 @@ func generateSliceValidation(listByPath map[string]*listMetadata, context Contex
 
 	args := append([]any{matchArg}, constraintIdentifierArgs(constraints)...)
 
-	validator := updateSliceValidator
+	validator := valSliceUpdateValidator
 	nt := util.NativeType(context.Type)
 	if nt.Elem.Kind == types.Pointer {
-		validator = updateSlicePointerValidator
+		validator = ptrSliceUpdateValidator
 	}
 
 	// Use ShortCircuit flag so these run in the same group as +k8s:optional
@@ -346,7 +346,7 @@ func emitScalarUpdate(context Context, constraints []validate.UpdateConstraint) 
 	return Validations{Functions: []FunctionGen{fn}}
 }
 
-// compoundUpdateEmissions returns the (deduplicated) Emissions UpdateSlice or
+// compoundUpdateEmissions returns the (deduplicated) Emissions ValSliceUpdate or
 // UpdateMap produces for the given constraints. Order is stable for
 // reproducible codegen. NoModify is rejected for compound types upstream, so
 // only NoSet/NoUnset/NoAddItem/NoRemoveItem are handled here.

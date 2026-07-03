@@ -122,7 +122,7 @@ func Validate_T1(
 				}
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_M1); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_M1); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

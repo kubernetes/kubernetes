@@ -343,7 +343,7 @@ func TestUpdateListTags(t *testing.T) {
 		})
 	}
 
-	// Nil element in pointer slice on update should trigger Required error from UpdateSlicePointer
+	// Nil element in pointer slice on update should trigger Required error from PtrSliceUpdate
 	{
 		old := base
 		old.PointerSetNoAdd = []*string{ptr.To("a")}

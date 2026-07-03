@@ -182,12 +182,12 @@ func Validate_AllocatedDeviceStatus(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *metav1.Condition, b *metav1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *metav1.Condition, b *metav1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -422,14 +422,14 @@ func Validate_Device(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.DeviceCounterConsumption, b *resourcev1.DeviceCounterConsumption) bool {
 					return a.CounterSet == b.CounterSet
 				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.DeviceCounterConsumption, b *resourcev1.DeviceCounterConsumption) bool {
 					return a.CounterSet == b.CounterSet
 				}, validate.SemanticDeepEqual, Validate_DeviceCounterConsumption); len(e) != 0 {
@@ -468,7 +468,7 @@ func Validate_Device(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceTaint); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceTaint); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -612,7 +612,7 @@ func Validate_DeviceAllocationConfiguration(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkBeta(); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -694,7 +694,7 @@ func Validate_DeviceAllocationResult(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceRequestAllocationResult); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceRequestAllocationResult); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -730,7 +730,7 @@ func Validate_DeviceAllocationResult(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceAllocationConfiguration); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceAllocationConfiguration); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -992,7 +992,7 @@ func Validate_DeviceAttribute(
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					return validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 64)
 				}).MarkAlpha(); len(e) != 0 {
@@ -1068,12 +1068,12 @@ func Validate_DeviceClaim(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.DeviceRequest, b *resourcev1.DeviceRequest) bool { return a.Name == b.Name }).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.DeviceRequest, b *resourcev1.DeviceRequest) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_DeviceRequest); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -1110,7 +1110,7 @@ func Validate_DeviceClaim(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceConstraint); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceConstraint); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1146,7 +1146,7 @@ func Validate_DeviceClaim(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClaimConfiguration); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClaimConfiguration); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1191,7 +1191,7 @@ func Validate_DeviceClaimConfiguration(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkBeta(); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1389,7 +1389,7 @@ func Validate_DeviceClassSpec(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClassConfiguration); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClassConfiguration); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1504,7 +1504,7 @@ func Validate_DeviceConstraint(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkBeta(); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1686,12 +1686,12 @@ func Validate_DeviceRequest(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.DeviceSubRequest, b *resourcev1.DeviceSubRequest) bool { return a.Name == b.Name }).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.DeviceSubRequest, b *resourcev1.DeviceSubRequest) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_DeviceSubRequest); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -1805,7 +1805,7 @@ func Validate_DeviceRequestAllocationResult(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -2040,7 +2040,7 @@ func Validate_DeviceSubRequest(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -2230,12 +2230,12 @@ func Validate_DeviceTaintRuleStatus(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *metav1.Condition, b *metav1.Condition) bool { return a.Type == b.Type }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *metav1.Condition, b *metav1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -2464,7 +2464,7 @@ func Validate_ExactDeviceRequest(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -2541,7 +2541,7 @@ func Validate_NetworkDeviceData(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkBeta(); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -2792,7 +2792,7 @@ func Validate_ResourceClaimStatus(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.ResourceClaimConsumerReference, b *resourcev1.ResourceClaimConsumerReference) bool {
 					return a.UID == b.UID
 				}).MarkBeta(); len(e) != 0 {
@@ -2827,14 +2827,14 @@ func Validate_ResourceClaimStatus(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.AllocatedDeviceStatus, b *resourcev1.AllocatedDeviceStatus) bool {
 					return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
 				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.AllocatedDeviceStatus, b *resourcev1.AllocatedDeviceStatus) bool {
 					return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
 				}, validate.SemanticDeepEqual, Validate_AllocatedDeviceStatus); len(e) != 0 {
@@ -2985,7 +2985,7 @@ func Validate_ResourceSliceSpec(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Device); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Device); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -3023,12 +3023,12 @@ func Validate_ResourceSliceSpec(
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.CounterSet, b *resourcev1.CounterSet) bool { return a.Name == b.Name }).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.CounterSet, b *resourcev1.CounterSet) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_CounterSet); len(e) != 0 {
 				errs = append(errs, e...)
 			}

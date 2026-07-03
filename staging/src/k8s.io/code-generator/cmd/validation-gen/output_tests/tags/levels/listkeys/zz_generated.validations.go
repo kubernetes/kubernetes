@@ -77,7 +77,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -103,7 +103,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -129,7 +129,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -155,7 +155,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MultiKeyItem, b *MultiKeyItem) bool { return a.Key1 == b.Key1 && a.Key2 == b.Key2 }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -181,7 +181,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MultiKeyItem, b *MultiKeyItem) bool { return a.Key2 == b.Key2 && a.Key1 == b.Key1 }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -207,7 +207,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MultiKeyItem, b *MultiKeyItem) bool { return a.Key1 == b.Key1 && a.Key2 == b.Key2 }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -233,7 +233,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MultiKeyItem, b *MultiKeyItem) bool { return a.Key2 == b.Key2 && a.Key1 == b.Key1 }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -259,7 +259,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MultiKeyItem, b *MultiKeyItem) bool { return a.Key1 == b.Key1 && a.Key2 == b.Key2 }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -285,7 +285,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MultiKeyItem, b *MultiKeyItem) bool { return a.Key2 == b.Key2 && a.Key1 == b.Key1 }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -311,7 +311,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MultiKeyItem, b *MultiKeyItem) bool { return a.Key1 == b.Key1 && a.Key2 == b.Key2 }).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -337,7 +337,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MultiKeyItem, b *MultiKeyItem) bool { return a.Key2 == b.Key2 && a.Key1 == b.Key1 }).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -363,7 +363,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -389,7 +389,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -415,7 +415,7 @@ func Validate_ListKeyStruct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}

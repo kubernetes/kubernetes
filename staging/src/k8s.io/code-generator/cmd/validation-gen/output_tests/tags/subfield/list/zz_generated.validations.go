@@ -93,7 +93,7 @@ func Validate_Struct(
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ownerReferences",
 					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []v1.OwnerReference) field.ErrorList {
-						return validate.Unique(ctx, op, fldPath, obj, oldObj,
+						return validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 							func(a *v1.OwnerReference, b *v1.OwnerReference) bool { return a.UID == b.UID })
 					}); len(e) != 0 {
 					errs = append(errs, e...)
@@ -101,7 +101,7 @@ func Validate_Struct(
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ownerReferences",
 					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []v1.OwnerReference) field.ErrorList {
-						return validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+						return validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 							func(a *v1.OwnerReference, b *v1.OwnerReference) bool { return a.UID == b.UID }, validate.SemanticDeepEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *v1.OwnerReference) field.ErrorList {
 								return validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
@@ -118,7 +118,7 @@ func Validate_Struct(
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "finalizers",
 					func(o *v1.ObjectMeta) []string { return o.Finalizers }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
-						return validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)
+						return validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)
 					}); len(e) != 0 {
 					errs = append(errs, e...)
 				}

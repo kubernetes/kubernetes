@@ -61,8 +61,8 @@ func (itemTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	validateSliceItem        = types.Name{Package: libValidationPkg, Name: "SliceItem"}
-	validateSliceItemPointer = types.Name{Package: libValidationPkg, Name: "SliceItemPointer"}
+	validateValSliceItem = types.Name{Package: libValidationPkg, Name: "ValSliceItem"}
+	validatePtrSliceItem = types.Name{Package: libValidationPkg, Name: "PtrSliceItem"}
 )
 
 func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -77,9 +77,9 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	}
 	elemT := util.NonPointer(util.NativeType(nt.Elem))
 
-	validateFunc := validateSliceItem
+	validateFunc := validateValSliceItem
 	if nt.Elem.Kind == types.Pointer {
-		validateFunc = validateSliceItemPointer
+		validateFunc = validatePtrSliceItem
 	}
 	if elemT.Kind != types.Struct {
 		return Validations{}, fmt.Errorf("can only be used on lists of structs")
@@ -169,7 +169,7 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 					// We reach here if the original deferred scope was ParentContext.
 					// Because the parent of a list element is the list itself, the generated
 					// function `fn` (e.g. a union validation) already expects the full list
-					// as its argument. If we didn't skip wrapping, validateSliceItem would
+					// as its argument. If we didn't skip wrapping, validateValSliceItem would
 					// mistakenly attempt to pass individual list elements to it.
 					return fn
 				}

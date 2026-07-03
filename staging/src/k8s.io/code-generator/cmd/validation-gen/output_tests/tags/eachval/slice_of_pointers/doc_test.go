@@ -42,7 +42,7 @@ func Test(t *testing.T) {
 		"listPrimitiveField[1]": {"field Struct.ListPrimitiveField[*]"},
 	})
 
-	// 3. Nil elements trigger Required errors from EachSlicePointer
+	// 3. Nil elements trigger Required errors from EachPtrSliceVal
 	st.Value(&Struct{
 		ListField:          []*OtherStruct{nil},
 		ListPrimitiveField: []*string{nil},

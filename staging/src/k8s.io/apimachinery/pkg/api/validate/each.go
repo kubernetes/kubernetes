@@ -30,21 +30,24 @@ import (
 // according to some criteria, and returns true if they match.
 type MatchFunc[T any] func(T, T) bool
 
-// EachSliceVal performs validation on each element of newSlice using the provided validation function.
+// EachValSliceVal performs validation on each element of a slice of values
+// using the provided validation function.
 //
-// For update operations, the match function finds corresponding values in oldSlice for each
-// value in newSlice. This comparison can be either full or partial (e.g., matching only
-// specific struct fields that serve as a unique identifier). If match is nil, validation
-// proceeds without considering old values, and the equiv function is not used.
+// For update operations, the match function finds corresponding values in
+// oldSlice for each value in newSlice. This comparison can be either full or
+// partial (e.g., matching only specific struct fields that serve as a unique
+// identifier). If match is nil, validation proceeds without considering old
+// values, and the equiv function is not used.
 //
-// For update operations, the equiv function checks if a new value is equivalent to its
-// corresponding old value, enabling validation ratcheting. If equiv is nil but match is
-// provided, the match function is assumed to perform full value comparison.
+// For update operations, the equiv function checks if a new value is
+// equivalent to its corresponding old value, enabling validation ratcheting.
+// If equiv is nil but match is provided, the match function is assumed to
+// perform full value comparison.
 //
 // The match and equiv functions will never be called with nil arguments.
 //
 // Note: The slice element type must be non-nilable.
-func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []T,
+func EachValSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []T,
 	match, equiv MatchFunc[*T], validator ValidateFunc[*T]) field.ErrorList {
 	var errs field.ErrorList
 	for i := range newSlice {
@@ -144,12 +147,12 @@ func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, f
 	return errs
 }
 
-// Unique verifies that each element of newSlice is unique, according to the
-// match function. It compares every element of the slice with every other
-// element and returns errors for non-unique items.
+// ValSliceUnique verifies that each element of a slice of values is unique,
+// according to the match function. It compares every element of the slice with
+// every other element and returns errors for non-unique items.
 //
 // The match function will never be called with nil arguments.
-func Unique[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []T, match MatchFunc[*T]) field.ErrorList {
+func ValSliceUnique[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []T, match MatchFunc[*T]) field.ErrorList {
 	var dups []int
 	for i := range newSlice {
 		for j := i + 1; j < len(newSlice); j++ {
@@ -204,16 +207,28 @@ func DirectEqual[T comparable](a, b *T) bool {
 	return *a == *b
 }
 
-// EachSlicePointer performs validation on each element of newSlice (which is a slice of pointers)
+// EachPtrSliceVal performs validation on each element of a slice of pointers
 // using the provided validation function.
-// For update operations, it matches elements using the match function and performs ratcheting.
-func EachSlicePointer[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []*T,
+//
+// For update operations, the match function finds corresponding values in
+// oldSlice for each value in newSlice. This comparison can be either full or
+// partial (e.g., matching only specific struct fields that serve as a unique
+// identifier). If match is nil, validation proceeds without considering old
+// values, and the equiv function is not used.
+//
+// For update operations, the equiv function checks if a new value is
+// equivalent to its corresponding old value, enabling validation ratcheting.
+// If equiv is nil but match is provided, the match function is assumed to
+// perform full value comparison.
+//
+// The match and equiv functions will never be called with nil arguments.
+func EachPtrSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []*T,
 	match, equiv MatchFunc[*T], validator ValidateFunc[*T]) field.ErrorList {
 	var errs field.ErrorList
 	for i := range newSlice {
 		val := newSlice[i]
 		if val == nil {
-			// Ignore nil items; they are supposed to have been checked by SliceNilCheck.
+			// Ignore nil items; they are supposed to have been checked by PtrSliceNoNils.
 			continue
 		}
 
@@ -229,14 +244,17 @@ func EachSlicePointer[T any](ctx context.Context, op operation.Operation, fldPat
 	return errs
 }
 
-// UniquePointers verifies that each element of newSlice (which is a slice of pointers)
-// is unique, according to the match function.
-func UniquePointers[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []*T, match MatchFunc[*T]) field.ErrorList {
+// PtrSliceUnique verifies that each element of a slice of pointers is unique,
+// according to the match function. It compares every element of the slice with
+// every other element and returns errors for non-unique items.
+//
+// The match function will never be called with nil arguments.
+func PtrSliceUnique[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []*T, match MatchFunc[*T]) field.ErrorList {
 	var errs field.ErrorList
 	var dups []int
 	for i := range newSlice {
 		if newSlice[i] == nil {
-			// Ignore nil items; they are supposed to have been checked by SliceNilCheck.
+			// Ignore nil items; they are supposed to have been checked by PtrSliceNoNils.
 			continue
 		}
 		for j := i + 1; j < len(newSlice); j++ {
@@ -262,8 +280,9 @@ func UniquePointers[T any](_ context.Context, _ operation.Operation, fldPath *fi
 	return errs
 }
 
-// SliceNilCheck returns a Required error for each nil element in the slice.
-func SliceNilCheck[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []*T) (errs field.ErrorList) {
+// PtrSliceNoNils returns a Required error for each nil element in a slice of
+// pointers.
+func PtrSliceNoNils[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []*T) (errs field.ErrorList) {
 	for i := range newSlice {
 		if newSlice[i] == nil {
 			errs = append(errs, field.Required(fldPath.Index(i), ""))

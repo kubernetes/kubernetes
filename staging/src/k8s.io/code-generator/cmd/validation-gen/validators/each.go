@@ -67,9 +67,9 @@ func (eachValTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	validateEachSliceVal     = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
-	validateEachSlicePointer = types.Name{Package: libValidationPkg, Name: "EachSlicePointer"}
-	validateEachMapVal       = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
+	validateEachValSliceVal = types.Name{Package: libValidationPkg, Name: "EachValSliceVal"}
+	validateEachPtrSliceVal = types.Name{Package: libValidationPkg, Name: "EachPtrSliceVal"}
+	validateEachMapVal      = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
 )
 
 func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -214,9 +214,9 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		}
 	}
 
-	validateFunc := validateEachSliceVal
+	validateFunc := validateEachValSliceVal
 	if nt.Elem.Kind == types.Pointer {
-		validateFunc = validateEachSlicePointer
+		validateFunc = validateEachPtrSliceVal
 	}
 
 	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {

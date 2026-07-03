@@ -406,8 +406,8 @@ func (cutv customUniqueTagValidator) Docs() TagDoc {
 }
 
 var (
-	validateUnique            = types.Name{Package: libValidationPkg, Name: "Unique"}
-	validateUniquePointers    = types.Name{Package: libValidationPkg, Name: "UniquePointers"}
+	validateValSliceUnique    = types.Name{Package: libValidationPkg, Name: "ValSliceUnique"}
+	validatePtrSliceUnique    = types.Name{Package: libValidationPkg, Name: "PtrSliceUnique"}
 	validateSemanticDeepEqual = types.Name{Package: libValidationPkg, Name: "SemanticDeepEqual"}
 	validateDirectEqual       = types.Name{Package: libValidationPkg, Name: "DirectEqual"}
 )
@@ -491,9 +491,9 @@ func getListValidations(byPath map[string]*listMetadata, context Context) (Valid
 		if util.IsDirectComparable(util.NonPointer(util.NativeType(nt.Elem))) {
 			matchArg = validateDirectEqual
 		}
-		validateFunc := validateUnique
+		validateFunc := validateValSliceUnique
 		if nt.Elem.Kind == types.Pointer {
-			validateFunc = validateUniquePointers
+			validateFunc = validatePtrSliceUnique
 		}
 		comment := "lists with set semantics require unique values"
 		f := Function("listValidator", DefaultFlags, validateFunc, Identifier(matchArg)).
@@ -510,9 +510,9 @@ func getListValidations(byPath map[string]*listMetadata, context Context) (Valid
 		// maps or we need to allow types to opt-out from this validation.  SSA
 		// is also not able to handle these well.
 		matchArg := lm.makeListMapMatchFunc(nt.Elem)
-		validateFunc := validateUnique
+		validateFunc := validateValSliceUnique
 		if nt.Elem.Kind == types.Pointer {
-			validateFunc = validateUniquePointers
+			validateFunc = validatePtrSliceUnique
 		}
 		comment := "lists with map semantics require unique keys"
 

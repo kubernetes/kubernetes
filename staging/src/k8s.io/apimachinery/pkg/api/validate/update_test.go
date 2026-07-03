@@ -430,7 +430,7 @@ func TestUpdateStruct(t *testing.T) {
 	}
 }
 
-func TestUpdateSlice(t *testing.T) {
+func TestValSliceUpdate(t *testing.T) {
 	type keyed struct {
 		Name  string
 		Value string
@@ -556,16 +556,16 @@ func TestUpdateSlice(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			op := operation.Operation{Type: tt.op}
-			errs := UpdateSlice(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue, tt.match, tt.constraints...)
+			errs := ValSliceUpdate(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue, tt.match, tt.constraints...)
 			if len(errs) != len(tt.wantDetails) {
-				t.Fatalf("UpdateSlice() returned %d errors, want %d: %v", len(errs), len(tt.wantDetails), errs)
+				t.Fatalf("ValSliceUpdate() returned %d errors, want %d: %v", len(errs), len(tt.wantDetails), errs)
 			}
 			for i, want := range tt.wantDetails {
 				if errs[i].Detail != want {
-					t.Errorf("UpdateSlice() error[%d] = %q, want %q", i, errs[i].Detail, want)
+					t.Errorf("ValSliceUpdate() error[%d] = %q, want %q", i, errs[i].Detail, want)
 				}
 				if errs[i].Origin != "update" {
-					t.Errorf("UpdateSlice() error[%d] origin = %q, want %q", i, errs[i].Origin, "update")
+					t.Errorf("ValSliceUpdate() error[%d] origin = %q, want %q", i, errs[i].Origin, "update")
 				}
 			}
 		})
@@ -578,7 +578,7 @@ func TestUpdateSlice(t *testing.T) {
 		op := operation.Operation{Type: operation.Update}
 		newList := []keyed{{Name: "alpha", Value: "v2"}, {Name: "beta", Value: "v1"}}
 		oldList := []keyed{{Name: "alpha", Value: "v1"}, {Name: "beta", Value: "v1"}}
-		errs := UpdateSlice(context.TODO(), op, field.NewPath("test"), newList, oldList, keyMatch, NoAddItem, NoRemoveItem)
+		errs := ValSliceUpdate(context.TODO(), op, field.NewPath("test"), newList, oldList, keyMatch, NoAddItem, NoRemoveItem)
 		if len(errs) != 0 {
 			t.Errorf("expected no errors for keyed-match item modification, got %v", errs)
 		}
@@ -588,7 +588,7 @@ func TestUpdateSlice(t *testing.T) {
 		op := operation.Operation{Type: operation.Update}
 		newList := []keyed{{Name: "alpha"}, {Name: "gamma"}}
 		oldList := []keyed{{Name: "alpha"}, {Name: "beta"}}
-		errs := UpdateSlice(context.TODO(), op, field.NewPath("test"), newList, oldList, keyMatch, NoAddItem, NoRemoveItem)
+		errs := ValSliceUpdate(context.TODO(), op, field.NewPath("test"), newList, oldList, keyMatch, NoAddItem, NoRemoveItem)
 		if len(errs) != 2 {
 			t.Fatalf("expected 2 errors, got %d: %v", len(errs), errs)
 		}
@@ -596,7 +596,7 @@ func TestUpdateSlice(t *testing.T) {
 
 	t.Run("NoAddItem without match returns internal error", func(t *testing.T) {
 		op := operation.Operation{Type: operation.Update}
-		errs := UpdateSlice[string](context.TODO(), op, field.NewPath("test"), []string{"a"}, nil, nil, NoAddItem)
+		errs := ValSliceUpdate[string](context.TODO(), op, field.NewPath("test"), []string{"a"}, nil, nil, NoAddItem)
 		if len(errs) != 1 || errs[0].Type != field.ErrorTypeInternal {
 			t.Errorf("expected single InternalError, got %v", errs)
 		}
@@ -686,7 +686,7 @@ func TestUpdateMap(t *testing.T) {
 	}
 }
 
-func TestUpdateSlicePointer(t *testing.T) {
+func TestPtrSliceUpdate(t *testing.T) {
 	type keyed struct {
 		Name  string
 		Value string
@@ -750,16 +750,17 @@ func TestUpdateSlicePointer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			op := operation.Operation{Type: tt.op}
-			errs := UpdateSlicePointer(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue, tt.match, tt.constraints...)
+			errs := PtrSliceUpdate(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue, tt.match, tt.constraints...)
+
 			if len(errs) != len(tt.wantDetails) {
-				t.Fatalf("UpdateSlicePointer() returned %d errors, want %d: %v", len(errs), len(tt.wantDetails), errs)
+				t.Fatalf("PtrSliceUpdate() returned %d errors, want %d: %v", len(errs), len(tt.wantDetails), errs)
 			}
 			for i, want := range tt.wantDetails {
 				if errs[i].Detail != want {
-					t.Errorf("UpdateSlicePointer() error[%d] = %q, want %q", i, errs[i].Detail, want)
+					t.Errorf("PtrSliceUpdate() error[%d] = %q, want %q", i, errs[i].Detail, want)
 				}
 				if errs[i].Origin != "update" {
-					t.Errorf("UpdateSlicePointer() error[%d] origin = %q, want %q", i, errs[i].Origin, "update")
+					t.Errorf("PtrSliceUpdate() error[%d] origin = %q, want %q", i, errs[i].Origin, "update")
 				}
 			}
 		})
@@ -769,7 +770,7 @@ func TestUpdateSlicePointer(t *testing.T) {
 		op := operation.Operation{Type: operation.Update}
 		newList := []*keyed{ptr.To(keyed{Name: "alpha", Value: "v2"}), ptr.To(keyed{Name: "beta", Value: "v1"})}
 		oldList := []*keyed{ptr.To(keyed{Name: "alpha", Value: "v1"}), ptr.To(keyed{Name: "beta", Value: "v1"})}
-		errs := UpdateSlicePointer(context.TODO(), op, field.NewPath("test"), newList, oldList, keyMatch, NoAddItem, NoRemoveItem)
+		errs := PtrSliceUpdate(context.TODO(), op, field.NewPath("test"), newList, oldList, keyMatch, NoAddItem, NoRemoveItem)
 		if len(errs) != 0 {
 			t.Errorf("expected no errors for keyed-match item modification, got %v", errs)
 		}
@@ -777,7 +778,7 @@ func TestUpdateSlicePointer(t *testing.T) {
 
 	t.Run("NoAddItem without match returns internal error", func(t *testing.T) {
 		op := operation.Operation{Type: operation.Update}
-		errs := UpdateSlicePointer[string](context.TODO(), op, field.NewPath("test"), []*string{ptr.To("a")}, nil, nil, NoAddItem)
+		errs := PtrSliceUpdate[string](context.TODO(), op, field.NewPath("test"), []*string{ptr.To("a")}, nil, nil, NoAddItem)
 		if len(errs) != 1 || errs[0].Type != field.ErrorTypeInternal {
 			t.Errorf("expected single InternalError, got %v", errs)
 		}

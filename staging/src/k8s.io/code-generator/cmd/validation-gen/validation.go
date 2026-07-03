@@ -1271,11 +1271,11 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 
 				if hasFieldValidations || hasPropagation || hasKeyIterations || hasValIterations {
 					nilCheckFunc := validators.FunctionGen{
-						TagName: "SliceNilCheck",
+						TagName: "PtrSliceNoNils",
 						Flags:   validators.ShortCircuit,
 						Function: types.Name{
 							Package: "k8s.io/apimachinery/pkg/api/validate",
-							Name:    "SliceNilCheck",
+							Name:    "PtrSliceNoNils",
 						},
 						TypeArgs: []types.Name{nt.Elem.Elem.Name},
 					}

@@ -32,7 +32,7 @@ type multiKeyItem struct {
 	V  int    `json:"v"`
 }
 
-func TestSliceItem(t *testing.T) {
+func TestValSliceItem(t *testing.T) {
 	testCases := []struct {
 		name      string
 		new       []multiKeyItem
@@ -158,7 +158,7 @@ func TestSliceItem(t *testing.T) {
 			op := operation.Operation{Type: operation.Update}
 			fp := field.NewPath("")
 
-			got := SliceItem(ctx, op, fp, tc.new, tc.old, tc.match, SemanticDeepEqual, tc.validator)
+			got := ValSliceItem(ctx, op, fp, tc.new, tc.old, tc.match, SemanticDeepEqual, tc.validator)
 
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got, tc.expected)
@@ -167,7 +167,7 @@ func TestSliceItem(t *testing.T) {
 	}
 }
 
-func TestSliceItemPointer(t *testing.T) {
+func TestPtrSliceItem(t *testing.T) {
 	testCases := []struct {
 		name      string
 		new       []*multiKeyItem
@@ -228,7 +228,7 @@ func TestSliceItemPointer(t *testing.T) {
 			op := operation.Operation{Type: operation.Update}
 			fp := field.NewPath("")
 
-			got := SliceItemPointer(ctx, op, fp, tc.new, tc.old, tc.match, SemanticDeepEqual, tc.validator)
+			got := PtrSliceItem(ctx, op, fp, tc.new, tc.old, tc.match, SemanticDeepEqual, tc.validator)
 
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got, tc.expected)
