@@ -71,6 +71,43 @@ func EachValSliceVal[T any](ctx context.Context, op operation.Operation, fldPath
 	return errs
 }
 
+// EachPtrSliceVal performs validation on each element of a slice of pointers
+// using the provided validation function.
+//
+// For update operations, the match function finds corresponding values in
+// oldSlice for each value in newSlice. This comparison can be either full or
+// partial (e.g., matching only specific struct fields that serve as a unique
+// identifier). If match is nil, validation proceeds without considering old
+// values, and the equiv function is not used.
+//
+// For update operations, the equiv function checks if a new value is
+// equivalent to its corresponding old value, enabling validation ratcheting.
+// If equiv is nil but match is provided, the match function is assumed to
+// perform full value comparison.
+//
+// The match and equiv functions will never be called with nil arguments.
+func EachPtrSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []*T,
+	match, equiv MatchFunc[*T], validator ValidateFunc[*T]) field.ErrorList {
+	var errs field.ErrorList
+	for i := range newSlice {
+		val := newSlice[i]
+		if val == nil {
+			// Ignore nil items; they are supposed to have been checked by PtrSliceNoNils.
+			continue
+		}
+
+		var old *T
+		if match != nil && len(oldSlice) > 0 {
+			old = lookupPointer(oldSlice, val, match)
+		}
+		if op.Type == operation.Update && old != nil && (equiv == nil || equiv(val, old)) {
+			continue
+		}
+		errs = append(errs, validator(ctx, op, fldPath.Index(i), val, old)...)
+	}
+	return errs
+}
+
 // lookup returns a pointer to the first element in the list that matches the
 // target, according to the provided comparison function, or else nil.
 func lookup[T any](list []T, target *T, match MatchFunc[*T]) *T {
@@ -181,69 +218,6 @@ func ValSliceUnique[T any](_ context.Context, _ operation.Operation, fldPath *fi
 	return errs
 }
 
-// SemanticDeepEqual is a MatchFunc that uses equality.Semantic.DeepEqual to
-// compare two values.
-// This wrapper is needed because MatchFunc requires a function that takes two
-// arguments of specific type T, while equality.Semantic.DeepEqual takes
-// arguments of type interface{}/any. The wrapper satisfies the type
-// constraints of MatchFunc while leveraging the underlying semantic equality
-// logic. It can be used by any other function that needs to call DeepEqual.
-func SemanticDeepEqual[T any](a, b T) bool {
-	return equality.Semantic.DeepEqual(a, b)
-}
-
-// DirectEqual is a MatchFunc that dereferences two pointers and uses the ==
-// operator to compare the values. If both pointers are nil, it returns true.
-// If one pointer is nil and the other is not, it returns false.
-// It can be used by any other function that needs to compare two pointees
-// directly.
-func DirectEqual[T comparable](a, b *T) bool {
-	if a == b {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return *a == *b
-}
-
-// EachPtrSliceVal performs validation on each element of a slice of pointers
-// using the provided validation function.
-//
-// For update operations, the match function finds corresponding values in
-// oldSlice for each value in newSlice. This comparison can be either full or
-// partial (e.g., matching only specific struct fields that serve as a unique
-// identifier). If match is nil, validation proceeds without considering old
-// values, and the equiv function is not used.
-//
-// For update operations, the equiv function checks if a new value is
-// equivalent to its corresponding old value, enabling validation ratcheting.
-// If equiv is nil but match is provided, the match function is assumed to
-// perform full value comparison.
-//
-// The match and equiv functions will never be called with nil arguments.
-func EachPtrSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []*T,
-	match, equiv MatchFunc[*T], validator ValidateFunc[*T]) field.ErrorList {
-	var errs field.ErrorList
-	for i := range newSlice {
-		val := newSlice[i]
-		if val == nil {
-			// Ignore nil items; they are supposed to have been checked by PtrSliceNoNils.
-			continue
-		}
-
-		var old *T
-		if match != nil && len(oldSlice) > 0 {
-			old = lookupPointer(oldSlice, val, match)
-		}
-		if op.Type == operation.Update && old != nil && (equiv == nil || equiv(val, old)) {
-			continue
-		}
-		errs = append(errs, validator(ctx, op, fldPath.Index(i), val, old)...)
-	}
-	return errs
-}
-
 // PtrSliceUnique verifies that each element of a slice of pointers is unique,
 // according to the match function. It compares every element of the slice with
 // every other element and returns errors for non-unique items.
@@ -278,6 +252,32 @@ func PtrSliceUnique[T any](_ context.Context, _ operation.Operation, fldPath *fi
 		errs = append(errs, field.Duplicate(fldPath.Index(i), val))
 	}
 	return errs
+}
+
+// SemanticDeepEqual is a MatchFunc that uses equality.Semantic.DeepEqual to
+// compare two values.
+// This wrapper is needed because MatchFunc requires a function that takes two
+// arguments of specific type T, while equality.Semantic.DeepEqual takes
+// arguments of type interface{}/any. The wrapper satisfies the type
+// constraints of MatchFunc while leveraging the underlying semantic equality
+// logic. It can be used by any other function that needs to call DeepEqual.
+func SemanticDeepEqual[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
+}
+
+// DirectEqual is a MatchFunc that dereferences two pointers and uses the ==
+// operator to compare the values. If both pointers are nil, it returns true.
+// If one pointer is nil and the other is not, it returns false.
+// It can be used by any other function that needs to compare two pointees
+// directly.
+func DirectEqual[T comparable](a, b *T) bool {
+	if a == b {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 // PtrSliceNoNils returns a Required error for each nil element in a slice of

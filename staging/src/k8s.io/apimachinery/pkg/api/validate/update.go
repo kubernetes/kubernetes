@@ -215,44 +215,6 @@ func ValSliceUpdate[T any](_ context.Context, op operation.Operation, fldPath *f
 	return errs
 }
 
-// UpdateMap verifies update constraints for map types.
-// NoAddItem and NoRemoveItem compare keys between value and oldValue. NoSet
-// and NoUnset treat len == 0 as "unset".
-func UpdateMap[K comparable, V any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue map[K]V, constraints ...UpdateConstraint) field.ErrorList {
-	if op.Type != operation.Update {
-		return nil
-	}
-
-	var errs field.ErrorList
-
-	for _, constraint := range constraints {
-		switch constraint {
-		case NoSet:
-			if len(oldValue) == 0 && len(value) > 0 {
-				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be set once created").WithOrigin("update"))
-			}
-		case NoUnset:
-			if len(oldValue) > 0 && len(value) == 0 {
-				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
-			}
-		case NoAddItem:
-			for k := range value {
-				if _, ok := oldValue[k]; !ok {
-					errs = append(errs, field.Forbidden(fldPath.Key(fmt.Sprintf("%v", k)), "item may not be added").WithOrigin("update"))
-				}
-			}
-		case NoRemoveItem:
-			for k := range oldValue {
-				if _, ok := value[k]; !ok {
-					errs = append(errs, field.Forbidden(fldPath.Key(fmt.Sprintf("%v", k)), "item may not be removed").WithOrigin("update"))
-				}
-			}
-		}
-	}
-
-	return errs
-}
-
 // PtrSliceUpdate verifies update constraints for slices of pointers.
 // NoAddItem and NoRemoveItem use the match function to find corresponding
 // elements between value and oldValue. NoSet and NoUnset treat len == 0 as
@@ -299,6 +261,44 @@ func PtrSliceUpdate[T any](ctx context.Context, op operation.Operation, fldPath 
 				}
 				if lookupPointer(value, oldItem, match) == nil {
 					errs = append(errs, field.Forbidden(fldPath, "item may not be removed").WithOrigin("update"))
+				}
+			}
+		}
+	}
+
+	return errs
+}
+
+// UpdateMap verifies update constraints for map types.
+// NoAddItem and NoRemoveItem compare keys between value and oldValue. NoSet
+// and NoUnset treat len == 0 as "unset".
+func UpdateMap[K comparable, V any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue map[K]V, constraints ...UpdateConstraint) field.ErrorList {
+	if op.Type != operation.Update {
+		return nil
+	}
+
+	var errs field.ErrorList
+
+	for _, constraint := range constraints {
+		switch constraint {
+		case NoSet:
+			if len(oldValue) == 0 && len(value) > 0 {
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be set once created").WithOrigin("update"))
+			}
+		case NoUnset:
+			if len(oldValue) > 0 && len(value) == 0 {
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
+			}
+		case NoAddItem:
+			for k := range value {
+				if _, ok := oldValue[k]; !ok {
+					errs = append(errs, field.Forbidden(fldPath.Key(fmt.Sprintf("%v", k)), "item may not be added").WithOrigin("update"))
+				}
+			}
+		case NoRemoveItem:
+			for k := range oldValue {
+				if _, ok := value[k]; !ok {
+					errs = append(errs, field.Forbidden(fldPath.Key(fmt.Sprintf("%v", k)), "item may not be removed").WithOrigin("update"))
 				}
 			}
 		}
