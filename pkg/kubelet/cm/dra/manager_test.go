@@ -1524,6 +1524,24 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 `,
 		},
 		{
+			// Regression test for the pod reference guard in unprepareResources:
+			// if the claimInfo does not reference this pod, NodeUnprepareResources
+			// must not be called.
+			description:            "should skip unprepare for pod that never prepared the claim",
+			driverName:             driverName,
+			pod:                    genTestPod(), // pod UID = podUID
+			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
+			claimInfo:              genTestClaimInfo(claimUID, []string{"another-pod-uid"}, true, nil),
+			wantResourceSkipped:    true,
+			expectedUnprepareCalls: 0,
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="UnprepareResources"} 1
+`,
+		},
+		{
 			description:            "should unprepare resource when driver returns nil value",
 			driverName:             driverName,
 			pod:                    genTestPod(),
@@ -1600,10 +1618,19 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			require.NoError(t, err)
 
 			if test.wantResourceSkipped {
-				if test.claimInfo != nil && len(test.claimInfo.PodUIDs) > 1 {
+				if test.claimInfo != nil && len(test.claimInfo.PodUIDs) > 0 {
 					cachedClaim, exists := manager.cache.get(test.claimInfo.ClaimName, test.claimInfo.Namespace)
 					require.True(t, exists, "ClaimInfo should still exist if skipped")
-					assert.False(t, cachedClaim.PodUIDs.Has(string(test.pod.UID)), "Pod UID should be removed from skipped claim")
+					assert.False(t, cachedClaim.PodUIDs.Has(string(test.pod.UID)), "Pod UID should not remain in skipped claim")
+					// Any pod UIDs that belonged to other pods must survive the
+					// no-op unprepare — this guards against wrongly tearing
+					// down a claim owned by another pod.
+					for uid := range test.claimInfo.PodUIDs {
+						if uid == string(test.pod.UID) {
+							continue
+						}
+						assert.True(t, cachedClaim.PodUIDs.Has(uid), "other pod UID %q must still reference the claim", uid)
+					}
 				}
 				return // resource skipped so no need to continue
 			}
