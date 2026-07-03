@@ -18,6 +18,7 @@ package meta
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -132,6 +133,22 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 			ExpectedErrs: field.ErrorList{
 				field.Required(fldPath.Index(0).Child("reason"), "").MarkAlpha(),
 			},
+		},
+		{
+			Name: "invalid too long reason",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakReason(strings.Repeat("A", 1025))),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.TooLong(fldPath.Index(0).Child("reason"), "", 1024).WithOrigin("maxLength").MarkAlpha(),
+			},
+		},
+		{
+			Name: "valid reason at max length",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakReason(strings.Repeat("A", 1024))),
+			},
+			ExpectedErrs: nil,
 		},
 	}
 }

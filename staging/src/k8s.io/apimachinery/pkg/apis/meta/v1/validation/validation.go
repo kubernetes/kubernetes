@@ -371,7 +371,7 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, currErr))
 		}
 		if len(condition.Reason) > maxReasonLen {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), "" /*unused*/, maxReasonLen))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), "" /*unused*/, maxReasonLen).WithOrigin("maxLength").MarkCoveredByDeclarative())
 		}
 	}
 

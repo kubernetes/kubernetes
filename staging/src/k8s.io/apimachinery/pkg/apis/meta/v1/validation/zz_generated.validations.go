@@ -176,6 +176,9 @@ func Validate_Condition(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 1024).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
