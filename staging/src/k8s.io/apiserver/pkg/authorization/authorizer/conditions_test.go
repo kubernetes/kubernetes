@@ -20,8 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
@@ -33,16 +36,17 @@ func TestConditionsAwareDecision(t *testing.T) {
 	sampleAttrs := authorizer.AttributesRecord{}
 
 	tests := []struct {
-		name                string
-		testDecisions       []authorizer.ConditionsAwareDecision
-		wantIsAllowed       bool
-		wantIsNoOpinion     bool
-		wantIsDenied        bool
-		wantIsUnconditional bool
-		wantReason          string
-		wantAnyError        bool
-		wantErrorIs         error
-		wantString          string
+		name                                 string
+		testDecisions                        []authorizer.ConditionsAwareDecision
+		wantIsAllow                          bool
+		wantIsNoOpinion                      bool
+		wantIsDeny                           bool
+		wantContainsUnconditionalAllowOrDeny bool
+		wantPossibleDecisions                sets.Set[authorizer.Decision]
+		wantReason                           string
+		wantAnyError                         bool
+		wantErrorIs                          error
+		wantString                           string
 	}{
 		{
 			name: "zero value",
@@ -53,11 +57,10 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:        true,
-			wantIsUnconditional: true,
-			wantReason:          "",
-			wantErrorIs:         nil,
-			wantString:          `Deny`,
+			wantIsDeny:  true,
+			wantReason:  "",
+			wantErrorIs: nil,
+			wantString:  `Deny`,
 		},
 		{
 			name: "deny constructor",
@@ -68,11 +71,10 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return authorizer.DecisionDeny, "foo", unexpectedErr
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:        true,
-			wantIsUnconditional: true,
-			wantReason:          "foo",
-			wantErrorIs:         unexpectedErr,
-			wantString:          `Deny(reason="foo", err="unexpected things happened")`,
+			wantIsDeny:  true,
+			wantReason:  "foo",
+			wantErrorIs: unexpectedErr,
+			wantString:  `Deny(reason="foo", err="unexpected things happened")`,
 		},
 		{
 			name: "allow constructor",
@@ -83,11 +85,10 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return authorizer.DecisionAllow, "ok", nil
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsAllowed:       true,
-			wantIsUnconditional: true,
-			wantReason:          "ok",
-			wantErrorIs:         nil,
-			wantString:          `Allow(reason="ok")`,
+			wantIsAllow: true,
+			wantReason:  "ok",
+			wantErrorIs: nil,
+			wantString:  `Allow(reason="ok")`,
 		},
 		{
 			name: "noopinion constructor",
@@ -98,11 +99,10 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return authorizer.DecisionNoOpinion, "", nil
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsNoOpinion:     true,
-			wantIsUnconditional: true,
-			wantReason:          "",
-			wantErrorIs:         nil,
-			wantString:          `NoOpinion`,
+			wantIsNoOpinion: true,
+			wantReason:      "",
+			wantErrorIs:     nil,
+			wantString:      `NoOpinion`,
 		},
 		{
 			name: "from parts: unsupported mode",
@@ -112,11 +112,10 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return 42, "", nil
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:        true,
-			wantIsUnconditional: true,
-			wantReason:          "",
-			wantAnyError:        true,
-			wantString:          `Deny(err="unknown unconditional decision type: 42")`,
+			wantIsDeny:   true,
+			wantReason:   "",
+			wantAnyError: true,
+			wantString:   `Deny(err="unknown unconditional decision type: 42")`,
 		},
 		{
 			name: "from parts: unsupported mode with other error",
@@ -126,11 +125,10 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return 42, "foo", otherErr
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:        true,
-			wantIsUnconditional: true,
-			wantReason:          "foo",
-			wantErrorIs:         otherErr,
-			wantString:          `Deny(reason="foo", err="[other error, unknown unconditional decision type: 42]")`,
+			wantIsDeny:  true,
+			wantReason:  "foo",
+			wantErrorIs: otherErr,
+			wantString:  `Deny(reason="foo", err="[other error, unknown unconditional decision type: 42]")`,
 		},
 	}
 	for _, tt := range tests {
@@ -138,20 +136,57 @@ func TestConditionsAwareDecision(t *testing.T) {
 			for i, d := range tt.testDecisions {
 				t.Run(fmt.Sprint(i), func(t *testing.T) {
 					isAllowed := d.IsAllow()
-					if isAllowed != tt.wantIsAllowed {
-						t.Errorf("IsAllowed() = %v, want %v", isAllowed, tt.wantIsAllowed)
+					if isAllowed != tt.wantIsAllow {
+						t.Errorf("IsAllowed() = %v, want %v", isAllowed, tt.wantIsAllow)
 					}
 					isNoOpinion := d.IsNoOpinion()
 					if isNoOpinion != tt.wantIsNoOpinion {
 						t.Errorf("IsNoOpinion() = %v, want %v", isNoOpinion, tt.wantIsNoOpinion)
 					}
 					isDenied := d.IsDeny()
-					if isDenied != tt.wantIsDenied {
-						t.Errorf("IsDenied() = %v, want %v", isDenied, tt.wantIsDenied)
+					if isDenied != tt.wantIsDeny {
+						t.Errorf("IsDenied() = %v, want %v", isDenied, tt.wantIsDeny)
 					}
 					isUnconditional := d.IsUnconditional()
-					if isUnconditional != tt.wantIsUnconditional {
-						t.Errorf("IsUnconditional() = %v, want %v", isUnconditional, tt.wantIsUnconditional)
+					wantIsUnconditional := tt.wantIsAllow || tt.wantIsDeny || tt.wantIsNoOpinion
+					if isUnconditional != wantIsUnconditional {
+						t.Errorf("IsUnconditional() = %v, want %v", isUnconditional, wantIsUnconditional)
+					}
+					containsUnconditionalAllowOrDeny := d.ContainsUnconditionalAllowOrDeny()
+					// default assertion value for the plain Allow/Deny cases to avoid stutter
+					if tt.wantIsDeny || tt.wantIsAllow {
+						tt.wantContainsUnconditionalAllowOrDeny = true
+					}
+					if containsUnconditionalAllowOrDeny != tt.wantContainsUnconditionalAllowOrDeny {
+						t.Errorf("ContainsUnconditionalAllowOrDeny() = %v, want %v", containsUnconditionalAllowOrDeny, tt.wantContainsUnconditionalAllowOrDeny)
+					}
+					gotPossibleDecisions := d.PossibleDecisions()
+					// default assertion value for the plain Allow/Deny/NoOpinion cases to avoid stutter
+					if tt.wantPossibleDecisions == nil {
+						tt.wantPossibleDecisions = make(sets.Set[authorizer.Decision])
+					}
+					if tt.wantIsAllow {
+						tt.wantPossibleDecisions.Insert(authorizer.DecisionAllow)
+					}
+					if tt.wantIsDeny {
+						tt.wantPossibleDecisions.Insert(authorizer.DecisionDeny)
+					}
+					if tt.wantIsNoOpinion {
+						tt.wantPossibleDecisions.Insert(authorizer.DecisionNoOpinion)
+					}
+					if !gotPossibleDecisions.Equal(tt.wantPossibleDecisions) {
+						t.Errorf("PossibleDecisions() = %v, want %v",
+							slices.Sorted(maps.Keys(gotPossibleDecisions)),
+							slices.Sorted(maps.Keys(tt.wantPossibleDecisions)))
+					}
+					// dynamic property-based assertion, ordered after dynamic defaults to tt.wantPossibleDecisions
+					wantFailureDecision := authorizer.DecisionNoOpinion
+					if tt.wantPossibleDecisions.Has(authorizer.DecisionDeny) {
+						wantFailureDecision = authorizer.DecisionDeny
+					}
+					failureDecision := d.FailureDecision()
+					if failureDecision != wantFailureDecision {
+						t.Errorf("FailureDecision() = %v, want %v", failureDecision, wantFailureDecision)
 					}
 					gotReason := d.Reason()
 					if gotReason != tt.wantReason {

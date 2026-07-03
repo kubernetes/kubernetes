@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // conditionsAwareDecisionType is a small enum-like type for keeping track of what type a ConditionsAwareDecision is.
@@ -130,6 +131,42 @@ func (d ConditionsAwareDecision) IsDeny() bool {
 // IsUnconditional is true if d is Allow, Deny or NoOpinion.
 func (d ConditionsAwareDecision) IsUnconditional() bool {
 	return d.IsAllow() || d.IsDeny() || d.IsNoOpinion()
+}
+
+// PossibleDecisions details what are the possible decision outcomes of this
+// ConditionsAwareDecision. The return value is a subset of {Allow, Deny, NoOpinion},
+// but never the empty set. If the set only contains a single value, it means the
+// decision is unconditional.
+func (d ConditionsAwareDecision) PossibleDecisions() sets.Set[Decision] {
+	switch {
+	case d.IsAllow():
+		return sets.New(DecisionAllow)
+	case d.IsNoOpinion():
+		return sets.New(DecisionNoOpinion)
+	default: // default case Deny
+		return sets.New(DecisionDeny)
+	}
+}
+
+// FailureDecision returns either a Deny or NoOpinion decision that the caller can
+// use if the caller encounters an unrecoverable error while processing a
+// ConditionsAwareDecision. If this decision is or could evaluate to Deny
+// this function returns DecisionDeny to the caller, in order to fail closed
+// as a conservative approximation. Otherwise, NoOpinion is returned.
+func (d ConditionsAwareDecision) FailureDecision() Decision {
+	if d.PossibleDecisions().Has(DecisionDeny) {
+		return DecisionDeny
+	}
+	return DecisionNoOpinion
+}
+
+// ContainsUnconditionalAllowOrDeny returns true whether there union contains at least one
+// Allow or Deny decision within the tree of decisions.
+func (d ConditionsAwareDecision) ContainsUnconditionalAllowOrDeny() bool {
+	if d.IsAllow() || d.IsDeny() {
+		return true
+	}
+	return false // NoOpinion
 }
 
 // Reason returns the reason supplied when constructing
