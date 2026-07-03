@@ -4772,10 +4772,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "status"
-      ],
       "type": "object"
     },
     "io.k8s.api.batch.v1.JobList": {
@@ -5018,9 +5014,6 @@
           "x-kubernetes-list-type": "atomic"
         }
       },
-      "required": [
-        "rules"
-      ],
       "type": "object"
     },
     "io.k8s.api.batch.v1.PodFailurePolicyOnExitCodesRequirement": {
