@@ -63,6 +63,11 @@ type Struct struct {
 	// +k8s:listMapKey=key
 	// +k8s:item(key: "target-ptr")=+k8s:validateFalse="item PtrKeyItems[key=target-ptr]"
 	PtrKeyItems []PtrKeyItem `json:"ptrKeyItems"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=key
+	// +k8s:item(key: "target")=+k8s:validateFalse="item PointerItems[key=target]"
+	PointerItems []*Item `json:"pointerItems"`
 }
 
 type StructWithNestedTypedef struct {

@@ -319,6 +319,49 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("ptrKeyItems"), obj.PtrKeyItems, oldVal, oldObj != nil)...)
 	}
 
+	{ // field Struct.PointerItems
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []*Item,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.SliceNilCheck[Item](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.UniquePointers(ctx, op, fldPath, obj, oldObj,
+				func(a *Item, b *Item) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "target"}"
+				if e := validate.SliceItemPointer(ctx, op, fldPath, obj, oldObj,
+					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item PointerItems[key=target]")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []*Item {
+				return oldObj.PointerItems
+			})
+		errs = append(errs, fn(fldPath.Child("pointerItems"), obj.PointerItems, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 

@@ -39,6 +39,16 @@ type Struct struct {
 	ListTypedefField []StringType `json:"listTypedefField"`
 
 	UnvalidatedListField []string `json:"UnvalidatedListField"`
+
+	// +k8s:validateFalse="field Struct.ListPtrField"
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrField[*]"
+	ListPtrField []*string `json:"listPtrField"`
+
+	// +k8s:validateFalse="field Struct.ListPtrTypedefField"
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrTypedefField[*]"
+	ListPtrTypedefField []*StringType `json:"listPtrTypedefField"`
+
+	UnvalidatedListPtrField []*string `json:"UnvalidatedListPtrField"`
 }
 
 // +k8s:validateFalse="type StringType"

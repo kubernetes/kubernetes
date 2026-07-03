@@ -79,6 +79,23 @@ func lookup[T any](list []T, target *T, match MatchFunc[*T]) *T {
 	return nil
 }
 
+// lookupPointer returns the first non-nil element in the list that matches the
+// target, according to the provided comparison function, or else nil.
+// Nil elements in the list are skipped.
+func lookupPointer[T any](list []*T, target *T, match MatchFunc[*T]) *T {
+	for i := range list {
+		if list[i] == nil {
+			// We can't really do anything about nil entries in the old list,
+			// just skip them.
+			continue
+		}
+		if match(list[i], target) {
+			return list[i]
+		}
+	}
+	return nil
+}
+
 // EachMapVal validates each value in newMap using the specified validation
 // function, passing the corresponding old value from oldMap if the key exists in oldMap.
 // For update operations, it implements validation ratcheting by skipping validation
@@ -185,4 +202,72 @@ func DirectEqual[T comparable](a, b *T) bool {
 		return false
 	}
 	return *a == *b
+}
+
+// EachSlicePointer performs validation on each element of newSlice (which is a slice of pointers)
+// using the provided validation function.
+// For update operations, it matches elements using the match function and performs ratcheting.
+func EachSlicePointer[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []*T,
+	match, equiv MatchFunc[*T], validator ValidateFunc[*T]) field.ErrorList {
+	var errs field.ErrorList
+	for i := range newSlice {
+		val := newSlice[i]
+		if val == nil {
+			// Ignore nil items; they are supposed to have been checked by SliceNilCheck.
+			continue
+		}
+
+		var old *T
+		if match != nil && len(oldSlice) > 0 {
+			old = lookupPointer(oldSlice, val, match)
+		}
+		if op.Type == operation.Update && old != nil && (equiv == nil || equiv(val, old)) {
+			continue
+		}
+		errs = append(errs, validator(ctx, op, fldPath.Index(i), val, old)...)
+	}
+	return errs
+}
+
+// UniquePointers verifies that each element of newSlice (which is a slice of pointers)
+// is unique, according to the match function.
+func UniquePointers[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []*T, match MatchFunc[*T]) field.ErrorList {
+	var errs field.ErrorList
+	var dups []int
+	for i := range newSlice {
+		if newSlice[i] == nil {
+			// Ignore nil items; they are supposed to have been checked by SliceNilCheck.
+			continue
+		}
+		for j := i + 1; j < len(newSlice); j++ {
+			if newSlice[j] == nil {
+				continue
+			}
+			if match(newSlice[i], newSlice[j]) {
+				if dups == nil {
+					dups = make([]int, 0, len(newSlice))
+				}
+				if !slices.Contains(dups, j) {
+					dups = append(dups, j)
+				}
+			}
+		}
+	}
+
+	sort.Ints(dups)
+	for _, i := range dups {
+		var val any = newSlice[i]
+		errs = append(errs, field.Duplicate(fldPath.Index(i), val))
+	}
+	return errs
+}
+
+// SliceNilCheck returns a Required error for each nil element in the slice.
+func SliceNilCheck[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []*T) (errs field.ErrorList) {
+	for i := range newSlice {
+		if newSlice[i] == nil {
+			errs = append(errs, field.Required(fldPath.Index(i), ""))
+		}
+	}
+	return
 }

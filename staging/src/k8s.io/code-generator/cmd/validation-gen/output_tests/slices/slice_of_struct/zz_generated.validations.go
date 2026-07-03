@@ -162,10 +162,12 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listTypedefField"), obj.ListTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UnvalidatedListField
+	// field Struct.UnvalidatedListField has no validation
+
+	{ // field Struct.ListPtrField
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj []OtherStruct,
+			obj, oldObj []*OtherStruct,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -173,18 +175,79 @@ func Validate_Struct(
 					return nil
 				}
 			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.SliceNilCheck[OtherStruct](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachSlicePointer(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrField[*]")
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
+			if e := validate.EachSlicePointer(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *Struct) []OtherStruct {
-				return oldObj.UnvalidatedListField
+			func(oldObj *Struct) []*OtherStruct {
+				return oldObj.ListPtrField
 			})
-		errs = append(errs, fn(fldPath.Child("UnvalidatedListField"), obj.UnvalidatedListField, oldVal, oldObj != nil)...)
+		errs = append(errs, fn(fldPath.Child("listPtrField"), obj.ListPtrField, oldVal, oldObj != nil)...)
 	}
 
+	{ // field Struct.ListPtrTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []*OtherTypedefStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.SliceNilCheck[OtherTypedefStruct](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrTypedefField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachSlicePointer(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherTypedefStruct) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrTypedefField[*]")
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachSlicePointer(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherTypedefStruct); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []*OtherTypedefStruct {
+				return oldObj.ListPtrTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("listPtrTypedefField"), obj.ListPtrTypedefField, oldVal, oldObj != nil)...)
+	}
+
+	// field Struct.UnvalidatedListPtrField has no validation
 	return errs
 }

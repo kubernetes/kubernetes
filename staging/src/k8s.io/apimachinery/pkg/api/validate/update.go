@@ -252,3 +252,52 @@ func UpdateMap[K comparable, V any](_ context.Context, op operation.Operation, f
 
 	return errs
 }
+
+// UpdateSlicePointer verifies update constraints for slice of pointers.
+func UpdateSlicePointer[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue []*T, match MatchFunc[*T], constraints ...UpdateConstraint) field.ErrorList {
+	if op.Type != operation.Update {
+		return nil
+	}
+
+	if match == nil && (slices.Contains(constraints, NoAddItem) || slices.Contains(constraints, NoRemoveItem)) {
+		return field.ErrorList{field.InternalError(fldPath, fmt.Errorf("UpdateSlicePointer: NoAddItem/NoRemoveItem require a non-nil match function"))}
+	}
+
+	var errs field.ErrorList
+
+	for _, constraint := range constraints {
+		switch constraint {
+		case NoSet:
+			if len(oldValue) == 0 && len(value) > 0 {
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be set once created").WithOrigin("update"))
+			}
+		case NoUnset:
+			if len(oldValue) > 0 && len(value) == 0 {
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
+			}
+		case NoAddItem:
+			for i := range value {
+				newItem := value[i]
+				if newItem == nil {
+					// Ignore nil items; they are supposed to have been checked by SliceNilCheck.
+					continue
+				}
+				if lookupPointer(oldValue, newItem, match) == nil {
+					errs = append(errs, field.Forbidden(fldPath.Index(i), "item may not be added").WithOrigin("update"))
+				}
+			}
+		case NoRemoveItem:
+			for i := range oldValue {
+				oldItem := oldValue[i]
+				if oldItem == nil {
+					continue
+				}
+				if lookupPointer(value, oldItem, match) == nil {
+					errs = append(errs, field.Forbidden(fldPath, "item may not be removed").WithOrigin("update"))
+				}
+			}
+		}
+	}
+
+	return errs
+}

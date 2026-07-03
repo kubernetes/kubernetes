@@ -58,6 +58,11 @@ func TestUnique(t *testing.T) {
 			{Key1: ptr.To("a"), Key2: ptr.To("x"), Data: "first"},
 			{Key1: ptr.To("a"), Key2: ptr.To("y"), Data: "second"},
 		},
+		PrimitivePointerListUniqueSet: []*string{ptr.To("aaa"), ptr.To("bbb")},
+		PointerListUniqueMap: []*Item{
+			{Key: "key1", Data: "one"},
+			{Key: "key2", Data: "two"},
+		},
 	}).ExpectValid()
 
 	// Test empty lists
@@ -70,6 +75,8 @@ func TestUnique(t *testing.T) {
 		CustomUniqueListWithTypeMap:      []Item{},
 		SliceMapFieldWithMixedKeys:       []ItemWithMixedKeys{},
 		SliceMapFieldWithMultiplePtrKeys: []ItemWithMultiplePtrKeys{},
+		PrimitivePointerListUniqueSet:    []*string{},
+		PointerListUniqueMap:             []*Item{},
 	}).ExpectValid()
 
 	// Test single element lists
@@ -82,6 +89,8 @@ func TestUnique(t *testing.T) {
 		CustomUniqueListWithTypeMap:      []Item{{Key: "single"}},
 		SliceMapFieldWithMixedKeys:       []ItemWithMixedKeys{{Key1: ptr.To("a"), Key2: "b", Data: "one"}},
 		SliceMapFieldWithMultiplePtrKeys: []ItemWithMultiplePtrKeys{{Key1: ptr.To("a"), Key2: ptr.To("b"), Data: "one"}},
+		PrimitivePointerListUniqueSet:    []*string{ptr.To("single")},
+		PointerListUniqueMap:             []*Item{{Key: "single", Data: "one"}},
 	}).ExpectValid()
 
 	// Test duplicate values (should fail validation)
@@ -119,6 +128,12 @@ func TestUnique(t *testing.T) {
 			{Key1: ptr.To("a"), Key2: ptr.To("y"), Data: "second"},
 			{Key1: ptr.To("a"), Key2: ptr.To("x"), Data: "third"},
 		},
+		PrimitivePointerListUniqueSet: []*string{ptr.To("aaa"), ptr.To("bbb"), ptr.To("aaa")},
+		PointerListUniqueMap: []*Item{
+			{Key: "key1", Data: "one"},
+			{Key: "key2", Data: "two"},
+			{Key: "key1", Data: "three"},
+		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Duplicate(field.NewPath("primitiveListUniqueSet").Index(3), nil),
 		field.Duplicate(field.NewPath("primitiveListUniqueSet").Index(4), nil),
@@ -129,6 +144,8 @@ func TestUnique(t *testing.T) {
 		field.Duplicate(field.NewPath("sliceMapFieldWithPtrKey").Index(2), nil),
 		field.Duplicate(field.NewPath("sliceMapFieldWithMixedKeys").Index(2), nil),
 		field.Duplicate(field.NewPath("sliceMapFieldWithMultiplePtrKeys").Index(2), nil),
+		field.Duplicate(field.NewPath("primitivePointerListUniqueSet").Index(2), nil),
+		field.Duplicate(field.NewPath("pointerListUniqueMap").Index(2), nil),
 	})
 
 	// Test with zero values and empty strings
@@ -144,6 +161,15 @@ func TestUnique(t *testing.T) {
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Duplicate(field.NewPath("primitiveListUniqueSet").Index(2), nil),
 		field.Duplicate(field.NewPath("atomicListUniqueMap").Index(2), nil),
+	})
+
+	// Test nil elements in pointer lists (should trigger Required errors)
+	st.Value(&Struct{
+		PrimitivePointerListUniqueSet: []*string{ptr.To("a"), nil, ptr.To("b")},
+		PointerListUniqueMap:          []*Item{{Key: "key1"}, nil},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Required(field.NewPath("primitivePointerListUniqueSet").Index(1), ""),
+		field.Required(field.NewPath("pointerListUniqueMap").Index(1), ""),
 	})
 }
 
@@ -178,6 +204,11 @@ func TestRatcheting(t *testing.T) {
 			{Key1: ptr.To("a"), Key2: ptr.To("x"), Data: "first"},
 			{Key1: ptr.To("a"), Key2: ptr.To("y"), Data: "second"},
 		},
+		PrimitivePointerListUniqueSet: []*string{ptr.To("aaa"), ptr.To("bbb")},
+		PointerListUniqueMap: []*Item{
+			{Key: "key1", Data: "one"},
+			{Key: "key2", Data: "two"},
+		},
 	}
 
 	// Same data, different order.
@@ -208,6 +239,11 @@ func TestRatcheting(t *testing.T) {
 		SliceMapFieldWithMultiplePtrKeys: []ItemWithMultiplePtrKeys{
 			{Key1: ptr.To("a"), Key2: ptr.To("y"), Data: "second"},
 			{Key1: ptr.To("a"), Key2: ptr.To("x"), Data: "first"},
+		},
+		PrimitivePointerListUniqueSet: []*string{ptr.To("bbb"), ptr.To("aaa")},
+		PointerListUniqueMap: []*Item{
+			{Key: "key2", Data: "two"},
+			{Key: "key1", Data: "one"},
 		},
 	}
 

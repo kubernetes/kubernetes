@@ -77,3 +77,45 @@ func SliceItem[TList ~[]TItem, TItem any](
 
 	return itemValidator(ctx, op, fldPath.Index(newIndex), matchedNew, matchedOld)
 }
+
+func SliceItemPointer[TList ~[]*TItem, TItem any](
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	newList, oldList TList,
+	match MatchItemFunc[*TItem],
+	equiv MatchFunc[*TItem],
+	itemValidator func(ctx context.Context, op operation.Operation, fldPath *field.Path, newObj, oldObj *TItem) field.ErrorList,
+) field.ErrorList {
+	var matchedNew, matchedOld *TItem
+	var newIndex int
+
+	for i := range newList {
+		if newList[i] == nil {
+			// Ignore nil items; they are supposed to have been checked by SliceNilCheck.
+			continue
+		}
+		if match(newList[i]) {
+			matchedNew = newList[i]
+			newIndex = i
+			break
+		}
+	}
+	if matchedNew == nil {
+		return nil
+	}
+
+	for i := range oldList {
+		if oldList[i] == nil {
+			continue
+		}
+		if match(oldList[i]) {
+			matchedOld = oldList[i]
+			break
+		}
+	}
+
+	if op.Type == operation.Update && matchedOld != nil && equiv(matchedNew, matchedOld) {
+		return nil
+	}
+
+	return itemValidator(ctx, op, fldPath.Index(newIndex), matchedNew, matchedOld)
+}

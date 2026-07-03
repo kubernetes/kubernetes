@@ -204,6 +204,7 @@ var (
 	updateValueByReflectValidator = types.Name{Package: libValidationPkg, Name: "UpdateValueByReflect"}
 	updateStructValidator         = types.Name{Package: libValidationPkg, Name: "UpdateStruct"}
 	updateSliceValidator          = types.Name{Package: libValidationPkg, Name: "UpdateSlice"}
+	updateSlicePointerValidator   = types.Name{Package: libValidationPkg, Name: "UpdateSlicePointer"}
 	updateMapValidator            = types.Name{Package: libValidationPkg, Name: "UpdateMap"}
 
 	// Constraint constants that will be used as arguments
@@ -292,8 +293,14 @@ func generateSliceValidation(listByPath map[string]*listMetadata, context Contex
 
 	args := append([]any{matchArg}, constraintIdentifierArgs(constraints)...)
 
+	validator := updateSliceValidator
+	nt := util.NativeType(context.Type)
+	if nt.Elem.Kind == types.Pointer {
+		validator = updateSlicePointerValidator
+	}
+
 	// Use ShortCircuit flag so these run in the same group as +k8s:optional
-	fn := Function(updateTagName, ShortCircuit, updateSliceValidator, args...).
+	fn := Function(updateTagName, ShortCircuit, validator, args...).
 		WithEmits(compoundUpdateEmissions(constraints, false)...)
 	return Validations{Functions: []FunctionGen{fn}}, nil
 }

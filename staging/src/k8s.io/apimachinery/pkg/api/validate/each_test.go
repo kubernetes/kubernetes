@@ -490,3 +490,168 @@ func testUniqueByReflect[T any](t *testing.T, name string, input []T, wantErrs i
 		}
 	})
 }
+
+func TestEachSlicePointer(t *testing.T) {
+	testEachSlicePointer(t, "valid", []*int{ptr.To(11), ptr.To(12), ptr.To(13)})
+	testEachSlicePointer(t, "valid", []*string{ptr.To("a"), ptr.To("b"), ptr.To("c")})
+	testEachSlicePointer(t, "valid", []*TestStruct{ptr.To(TestStruct{11, "a"}), ptr.To(TestStruct{12, "b"}), ptr.To(TestStruct{13, "c"})})
+
+	testEachSlicePointer(t, "empty", []*int{})
+	testEachSlicePointer[int](t, "nil", nil)
+
+	// Test nil elements
+	t.Run("nil elements", func(t *testing.T) {
+		input := []*int{ptr.To(11), nil, ptr.To(13)}
+		calls := 0
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *int) field.ErrorList {
+			calls++
+			return nil
+		}
+		errs := EachSlicePointer(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, nil, vfn)
+		if len(errs) != 0 {
+			t.Errorf("expected 0 errors, got %d", len(errs))
+		}
+		if calls != 2 {
+			t.Errorf("expected 2 calls, got %d", calls)
+		}
+	})
+
+	testEachSlicePointerUpdate(t, "valid", []*int{ptr.To(11), ptr.To(12), ptr.To(13)})
+}
+
+func testEachSlicePointer[T any](t *testing.T, name string, input []*T) {
+	t.Helper()
+	var zero T
+	t.Run(fmt.Sprintf("%s(*%T)", name, zero), func(t *testing.T) {
+		calls := 0
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
+			if oldVal != nil {
+				t.Errorf("expected nil oldVal, got %v", *oldVal)
+			}
+			calls++
+			return nil
+		}
+		errs := EachSlicePointer(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, nil, vfn)
+		if len(errs) != 0 {
+			t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
+		}
+		if calls != len(input) {
+			t.Errorf("expected %d calls, got %d", len(input), calls)
+		}
+	})
+}
+
+func testEachSlicePointerUpdate[T any](t *testing.T, name string, input []*T) {
+	t.Helper()
+	var zero T
+	t.Run(fmt.Sprintf("%s(*%T) update", name, zero), func(t *testing.T) {
+		calls := 0
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
+			if oldVal == nil {
+				t.Fatalf("expected non-nil oldVal")
+			}
+			if !reflect.DeepEqual(*newVal, *oldVal) {
+				t.Errorf("expected oldVal == newVal, got %v, %v", *oldVal, *newVal)
+			}
+			calls++
+			return nil
+		}
+		old := make([]*T, len(input))
+		copy(old, input)
+		slices.Reverse(old)
+		match := func(a, b *T) bool { return reflect.DeepEqual(*a, *b) }
+		errs := EachSlicePointer(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, match, match, vfn)
+		if len(errs) != 0 {
+			t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
+		}
+		if calls != len(input) {
+			t.Errorf("expected %d calls, got %d", len(input), calls)
+		}
+	})
+}
+
+func TestEachSlicePointerRatcheting(t *testing.T) {
+	testEachSlicePointerRatcheting(t, "ComparableStruct same data different order",
+		[]*TestStruct{
+			ptr.To(TestStruct{11, "a"}), ptr.To(TestStruct{12, "b"}), ptr.To(TestStruct{13, "c"}),
+		},
+		[]*TestStruct{
+			ptr.To(TestStruct{11, "a"}), ptr.To(TestStruct{13, "c"}), ptr.To(TestStruct{12, "b"}),
+		},
+		SemanticDeepEqual,
+		nil,
+	)
+}
+
+func testEachSlicePointerRatcheting[T any](t *testing.T, name string, old, new []*T, match, equiv MatchFunc[*T]) {
+	t.Helper()
+	var zero T
+	t.Run(fmt.Sprintf("%s(*%T)", name, zero), func(t *testing.T) {
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
+			return field.ErrorList{field.Invalid(fldPath, *newVal, "expected no calls")}
+		}
+		errs := EachSlicePointer(context.Background(), operation.Operation{Type: operation.Update}, field.NewPath("test"), new, old, match, equiv, vfn)
+		if len(errs) != 0 {
+			t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
+		}
+	})
+}
+
+func TestUniquePointers(t *testing.T) {
+	testUniquePointers(t, "int_nil", []*int(nil), 0, 0)
+	testUniquePointers(t, "int_empty", []*int{}, 0, 0)
+	testUniquePointers(t, "int_uniq", []*int{ptr.To(1), ptr.To(2), ptr.To(3)}, 0, 0)
+	testUniquePointers(t, "int_dup", []*int{ptr.To(1), ptr.To(2), ptr.To(3), ptr.To(2), ptr.To(1)}, 2, 0)
+	testUniquePointers(t, "int_nil_element", []*int{ptr.To(1), nil, ptr.To(3), nil}, 0, 0)
+	testUniquePointers(t, "int_dup_and_nil", []*int{ptr.To(1), nil, ptr.To(1), nil}, 1, 0)
+}
+
+func testUniquePointers[T comparable](t *testing.T, name string, input []*T, wantDupErrs, wantReqErrs int) {
+	t.Helper()
+	t.Run(fmt.Sprintf("%s(direct)", name), func(t *testing.T) {
+		errs := UniquePointers(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, DirectEqual)
+		gotDup, gotReq := countErrors(errs)
+		if gotDup != wantDupErrs || gotReq != wantReqErrs {
+			t.Errorf("expected %d dup, %d req errors; got %d dup, %d req: %s", wantDupErrs, wantReqErrs, gotDup, gotReq, fmtErrs(errs))
+		}
+	})
+}
+
+func countErrors(errs field.ErrorList) (dup, req int) {
+	for _, err := range errs {
+		switch err.Type {
+		case field.ErrorTypeDuplicate:
+			dup++
+		case field.ErrorTypeRequired:
+			req++
+		}
+	}
+	return
+}
+
+func TestSliceNilCheck(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []*int
+		wantErrs int
+	}{
+		{"nil", nil, 0},
+		{"empty", []*int{}, 0},
+		{"no_nil", []*int{ptr.To(1), ptr.To(2)}, 0},
+		{"has_nil", []*int{ptr.To(1), nil, ptr.To(3), nil}, 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := SliceNilCheck(context.Background(), operation.Operation{}, field.NewPath("test"), tt.input, nil)
+			if len(errs) != tt.wantErrs {
+				t.Errorf("expected %d errors, got %d: %v", tt.wantErrs, len(errs), errs)
+			}
+			for _, err := range errs {
+				if err.Type != field.ErrorTypeRequired {
+					t.Errorf("expected Required error, got %v", err.Type)
+				}
+			}
+		})
+	}
+}

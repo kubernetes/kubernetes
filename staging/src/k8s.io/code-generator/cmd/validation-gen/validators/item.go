@@ -61,7 +61,8 @@ func (itemTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	validateSliceItem = types.Name{Package: libValidationPkg, Name: "SliceItem"}
+	validateSliceItem        = types.Name{Package: libValidationPkg, Name: "SliceItem"}
+	validateSliceItemPointer = types.Name{Package: libValidationPkg, Name: "SliceItemPointer"}
 )
 
 func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -75,6 +76,11 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
 	elemT := util.NonPointer(util.NativeType(nt.Elem))
+
+	validateFunc := validateSliceItem
+	if nt.Elem.Kind == types.Pointer {
+		validateFunc = validateSliceItemPointer
+	}
 	if elemT.Kind != types.Struct {
 		return Validations{}, fmt.Errorf("can only be used on lists of structs")
 	}
@@ -123,7 +129,7 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 			}
 			deferredResult := Validations{}
 			for _, vfn := range validations.Functions {
-				f := Function(itemTagName, vfn.Flags, validateSliceItem, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: elemT})
+				f := Function(itemTagName, vfn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: elemT})
 				f.Cohort = itemKey
 				vfn = f
 				deferredResult.AddFunction(vfn)
@@ -167,7 +173,7 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 					// mistakenly attempt to pass individual list elements to it.
 					return fn
 				}
-				f := Function(itemTagName, fn.Flags, validateSliceItem, matchArg, equivArg, WrapperFunction{Function: fn, ObjType: elemT})
+				f := Function(itemTagName, fn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: fn, ObjType: elemT})
 				f.Cohort = itemKey
 				return f
 			}, d.Scope), nil

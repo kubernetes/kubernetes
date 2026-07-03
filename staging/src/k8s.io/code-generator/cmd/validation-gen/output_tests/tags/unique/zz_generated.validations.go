@@ -282,5 +282,72 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceMapFieldWithMultiplePtrKeys"), obj.SliceMapFieldWithMultiplePtrKeys, oldVal, oldObj != nil)...)
 	}
 
+	{ // field Struct.PrimitivePointerListUniqueSet
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []*string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.SliceNilCheck[string](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with set semantics require unique values
+			if e := validate.UniquePointers(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []*string {
+				return oldObj.PrimitivePointerListUniqueSet
+			})
+		errs = append(errs, fn(fldPath.Child("primitivePointerListUniqueSet"), obj.PrimitivePointerListUniqueSet, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.PointerListUniqueMap
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []*Item,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.SliceNilCheck[Item](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.UniquePointers(ctx, op, fldPath, obj, oldObj,
+				func(a *Item, b *Item) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []*Item {
+				return oldObj.PointerListUniqueMap
+			})
+		errs = append(errs, fn(fldPath.Child("pointerListUniqueMap"), obj.PointerListUniqueMap, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }

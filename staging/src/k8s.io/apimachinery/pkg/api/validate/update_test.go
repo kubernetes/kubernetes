@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
 
 func TestUpdateValue(t *testing.T) {
@@ -683,4 +684,102 @@ func TestUpdateMap(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateSlicePointer(t *testing.T) {
+	type keyed struct {
+		Name  string
+		Value string
+	}
+	keyMatch := func(a, b *keyed) bool { return a.Name == b.Name }
+
+	tests := []struct {
+		name        string
+		op          operation.Type
+		value       []*string
+		oldValue    []*string
+		match       MatchFunc[*string]
+		constraints []UpdateConstraint
+		wantDetails []string
+	}{
+		{
+			name:        "create operation - no validation",
+			op:          operation.Create,
+			value:       []*string{ptr.To("a")},
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoSet, NoUnset, NoAddItem, NoRemoveItem},
+			match:       DirectEqual[string],
+		},
+		{
+			name:        "NoSet nil to non-empty (forbidden)",
+			op:          operation.Update,
+			value:       []*string{ptr.To("a")},
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoSet},
+			wantDetails: []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoAddItem direct-equal item added",
+			op:          operation.Update,
+			value:       []*string{ptr.To("a"), ptr.To("b"), ptr.To("c")},
+			oldValue:    []*string{ptr.To("a"), ptr.To("c")},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoAddItem},
+			wantDetails: []string{"item may not be added"},
+		},
+		{
+			name:        "NoRemoveItem direct-equal item removed",
+			op:          operation.Update,
+			value:       []*string{ptr.To("a")},
+			oldValue:    []*string{ptr.To("a"), ptr.To("b")},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoRemoveItem},
+			wantDetails: []string{"item may not be removed"},
+		},
+		{
+			name:        "nil element in value (ignored)",
+			op:          operation.Update,
+			value:       []*string{ptr.To("a"), nil, ptr.To("c")},
+			oldValue:    []*string{ptr.To("a"), ptr.To("c")},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoAddItem},
+			// Expect 0 errors because nil is ignored and non-nil elements match old values.
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := operation.Operation{Type: tt.op}
+			errs := UpdateSlicePointer(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue, tt.match, tt.constraints...)
+			if len(errs) != len(tt.wantDetails) {
+				t.Fatalf("UpdateSlicePointer() returned %d errors, want %d: %v", len(errs), len(tt.wantDetails), errs)
+			}
+			for i, want := range tt.wantDetails {
+				if errs[i].Detail != want {
+					t.Errorf("UpdateSlicePointer() error[%d] = %q, want %q", i, errs[i].Detail, want)
+				}
+				if errs[i].Origin != "update" {
+					t.Errorf("UpdateSlicePointer() error[%d] origin = %q, want %q", i, errs[i].Origin, "update")
+				}
+			}
+		})
+	}
+
+	t.Run("NoAddItem+NoRemoveItem keyed match allows item modification", func(t *testing.T) {
+		op := operation.Operation{Type: operation.Update}
+		newList := []*keyed{ptr.To(keyed{Name: "alpha", Value: "v2"}), ptr.To(keyed{Name: "beta", Value: "v1"})}
+		oldList := []*keyed{ptr.To(keyed{Name: "alpha", Value: "v1"}), ptr.To(keyed{Name: "beta", Value: "v1"})}
+		errs := UpdateSlicePointer(context.TODO(), op, field.NewPath("test"), newList, oldList, keyMatch, NoAddItem, NoRemoveItem)
+		if len(errs) != 0 {
+			t.Errorf("expected no errors for keyed-match item modification, got %v", errs)
+		}
+	})
+
+	t.Run("NoAddItem without match returns internal error", func(t *testing.T) {
+		op := operation.Operation{Type: operation.Update}
+		errs := UpdateSlicePointer[string](context.TODO(), op, field.NewPath("test"), []*string{ptr.To("a")}, nil, nil, NoAddItem)
+		if len(errs) != 1 || errs[0].Type != field.ErrorTypeInternal {
+			t.Errorf("expected single InternalError, got %v", errs)
+		}
+	})
 }

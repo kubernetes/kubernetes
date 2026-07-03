@@ -625,8 +625,6 @@ func (td *typeDiscoverer) verifySupportedType(t *types.Type) error {
 	case types.Slice:
 		elem := util.NativeType(t.Elem)
 		switch elem.Kind {
-		case types.Pointer:
-			return fmt.Errorf("lists of pointers are not supported")
 		case types.Slice:
 			if util.NativeType(elem.Elem) != types.Byte {
 				return fmt.Errorf("lists of lists are not supported")
@@ -1259,6 +1257,34 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			//      in a struct changes, the struct's type-attached validations
 			//      need to be executed, but if no fields changed they can be
 			//      skipped).
+			//
+			// For the same reasons, in the specific case of lists of pointers,
+			// we do not emit nil-checks inside type-specific validation
+			// functions.  If we solve for the duplicative ratcheting, then we
+			// should also solve for nil-checks.
+
+			if nt := util.NativeType(fld.childType); nt.Kind == types.Slice && nt.Elem.Kind == types.Pointer {
+				hasFieldValidations := len(fld.fieldValidations.Functions) > 0
+				hasPropagation := fld.node != nil && g.hasValidations(fld.node)
+				hasKeyIterations := len(fld.fieldKeyIterations.Functions) > 0 && hasPropagation
+				hasValIterations := len(fld.fieldValIterations.Functions) > 0 && hasPropagation
+
+				if hasFieldValidations || hasPropagation || hasKeyIterations || hasValIterations {
+					nilCheckFunc := validators.FunctionGen{
+						TagName: "SliceNilCheck",
+						Flags:   validators.ShortCircuit,
+						Function: types.Name{
+							Package: "k8s.io/apimachinery/pkg/api/validate",
+							Name:    "SliceNilCheck",
+						},
+						TypeArgs: []types.Name{nt.Elem.Elem.Name},
+					}
+					// Prepend the nil-check so it runs before any other
+					// validations. This is important because the other
+					// validations may assume that the slice has no nil values.
+					fld.fieldValidations.Functions = append([]validators.FunctionGen{nilCheckFunc}, fld.fieldValidations.Functions...)
+				}
+			}
 
 			validations := fld.fieldValidations
 			fldRatchetingChecked := false
