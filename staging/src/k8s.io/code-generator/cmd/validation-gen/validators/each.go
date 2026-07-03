@@ -67,9 +67,8 @@ func (eachValTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	validateEachSliceVal   = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
-	validateEachMapVal     = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
-	validateDirectEqualPtr = types.Name{Package: libValidationPkg, Name: "DirectEqualPtr"}
+	validateEachSliceVal = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
+	validateEachMapVal   = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
 )
 
 func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {

@@ -66,7 +66,7 @@ func Validate_Discriminator(
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Discriminator) field.ErrorList {
 			return validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
 				func(obj *Discriminator) *string { return obj.FieldA },
-				func(obj *Discriminator) string { return obj.Discriminator }, validate.DirectEqualPtr,
+				func(obj *Discriminator) string { return obj.Discriminator }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					errs := field.ErrorList{}
 					errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -96,7 +96,7 @@ func Validate_Discriminator(
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Discriminator) field.ErrorList {
 			return validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldB",
 				func(obj *Discriminator) *string { return obj.FieldB },
-				func(obj *Discriminator) string { return obj.Discriminator }, validate.DirectEqualPtr,
+				func(obj *Discriminator) string { return obj.Discriminator }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					errs := field.ErrorList{}
 					errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -139,7 +139,7 @@ func Validate_DiscriminatorDisabled(
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DiscriminatorDisabled) field.ErrorList {
 			return validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
 				func(obj *DiscriminatorDisabled) *string { return obj.FieldA },
-				func(obj *DiscriminatorDisabled) string { return obj.Discriminator }, validate.DirectEqualPtr,
+				func(obj *DiscriminatorDisabled) string { return obj.Discriminator }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					errs := field.ErrorList{}
 					errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -169,7 +169,7 @@ func Validate_DiscriminatorDisabled(
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DiscriminatorDisabled) field.ErrorList {
 			return validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldB",
 				func(obj *DiscriminatorDisabled) *string { return obj.FieldB },
-				func(obj *DiscriminatorDisabled) string { return obj.Discriminator }, validate.DirectEqualPtr,
+				func(obj *DiscriminatorDisabled) string { return obj.Discriminator }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					errs := field.ErrorList{}
 					errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)

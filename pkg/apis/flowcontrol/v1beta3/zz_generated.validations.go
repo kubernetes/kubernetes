@@ -67,7 +67,7 @@ func Validate_LimitResponse(
 		func(obj *flowcontrolv1beta3.LimitResponse) *flowcontrolv1beta3.QueuingConfiguration {
 			return obj.Queuing
 		},
-		func(obj *flowcontrolv1beta3.LimitResponse) flowcontrolv1beta3.LimitResponseType { return obj.Type }, validate.DirectEqualPtr,
+		func(obj *flowcontrolv1beta3.LimitResponse) flowcontrolv1beta3.LimitResponseType { return obj.Type }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta3.QueuingConfiguration) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)

@@ -409,14 +409,14 @@ func Validate_ReplicationController(
 			func() { // cohort = "name"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue).MarkBeta().MarkShortCircuit(); len(e) != 0 {
+					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqual, validate.OptionalValue).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName).MarkBeta(); len(e) != 0 {
+					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqual, validate.LongName).MarkBeta(); len(e) != 0 {
 					errs = append(errs, e...)
 				}
 			}()

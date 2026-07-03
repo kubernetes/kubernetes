@@ -105,7 +105,7 @@ func Validate_Struct(
 							func(a *v1.OwnerReference, b *v1.OwnerReference) bool { return a.UID == b.UID }, validate.SemanticDeepEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *v1.OwnerReference) field.ErrorList {
 								return validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-									func(o *v1.OwnerReference) *string { return &o.Name }, validate.DirectEqualPtr,
+									func(o *v1.OwnerReference) *string { return &o.Name }, validate.DirectEqual,
 									func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 										return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "ownerReference name error")
 									})
