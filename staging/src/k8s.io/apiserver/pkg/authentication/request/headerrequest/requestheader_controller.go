@@ -240,6 +240,11 @@ func (c *RequestHeaderAuthRequestController) processNextWorkItem() bool {
 func (c *RequestHeaderAuthRequestController) sync() error {
 	configMap, err := c.configmapLister.Get(c.configmapName)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			// the configmap has been deleted, clear the stored bundle
+			c.exportedRequestHeaderBundle.Store(&requestHeaderBundle{})
+			return nil
+		}
 		return err
 	}
 	return c.syncConfigMap(configMap)
