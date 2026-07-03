@@ -602,6 +602,7 @@ func TestUpdatePod(t *testing.T) {
 			} else {
 				expected.cancelFn, status.cancelFn = nil, nil
 			}
+			expected.ctx, status.ctx = nil, nil
 		}
 		if e, a := expected, status; !reflect.DeepEqual(e, a) {
 			t.Fatalf("unexpected status: %s", cmp.Diff(e, a, cmp.AllowUnexported(podSyncStatus{})))
