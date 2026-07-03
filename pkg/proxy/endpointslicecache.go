@@ -301,21 +301,10 @@ func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[strin
 			}
 			// Ensure endpoints are always returned in the same order to simplify diffing.
 			sort.Sort(byEndpoint(endpointsMap[svcPortName]))
-
-			klog.V(3).InfoS("Setting endpoints for service port name", "portName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
 	}
 
 	return endpointsMap
-}
-
-// formatEndpointsList returns a string list converted from an endpoints list.
-func formatEndpointsList(endpoints []Endpoint) []string {
-	var formattedList []string
-	for _, ep := range endpoints {
-		formattedList = append(formattedList, ep.String())
-	}
-	return formattedList
 }
 
 // endpointSliceCacheKeys returns cache keys used for a given EndpointSlice.
