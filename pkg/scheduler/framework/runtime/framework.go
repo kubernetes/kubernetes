@@ -58,6 +58,7 @@ const (
 type frameworkImpl struct {
 	registry                  Registry
 	snapshotSharedLister      fwk.SharedLister
+	mutableSnapshotLister     fwk.MutableSnapshotSharedLister
 	waitingPods               *waitingPodsMap
 	podsInPreBind             *podsInPreBindMap
 	scorePluginWeight         map[string]int
@@ -156,6 +157,7 @@ type frameworkOptions struct {
 	sharedDRAManager       fwk.SharedDRAManager
 	sharedCSIManager       fwk.CSIManager
 	snapshotSharedLister   fwk.SharedLister
+	mutableSnapshotLister  fwk.MutableSnapshotSharedLister
 	metricsRecorder        *metrics.MetricAsyncRecorder
 	podNominator           fwk.PodNominator
 	podActivator           fwk.PodActivator
@@ -228,6 +230,13 @@ func WithSharedCSIManager(sharedCSIManager fwk.CSIManager) Option {
 func WithSnapshotSharedLister(snapshotSharedLister fwk.SharedLister) Option {
 	return func(o *frameworkOptions) {
 		o.snapshotSharedLister = snapshotSharedLister
+	}
+}
+
+// WithMutableSnapshotLister sets the MutableSnapshotLister.
+func WithMutableSnapshotLister(mutableSnapshotLister fwk.MutableSnapshotSharedLister) Option {
+	return func(o *frameworkOptions) {
+		o.mutableSnapshotLister = mutableSnapshotLister
 	}
 }
 
@@ -336,24 +345,25 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		logger = *options.logger
 	}
 	f := &frameworkImpl{
-		registry:             r,
-		snapshotSharedLister: options.snapshotSharedLister,
-		sharedCSIManager:     options.sharedCSIManager,
-		waitingPods:          options.waitingPods,
-		podsInPreBind:        options.podsInPreBind,
-		clientSet:            options.clientSet,
-		kubeConfig:           options.kubeConfig,
-		eventRecorder:        options.eventRecorder,
-		informerFactory:      options.informerFactory,
-		sharedDRAManager:     options.sharedDRAManager,
-		metricsRecorder:      options.metricsRecorder,
-		extenders:            options.extenders,
-		PodNominator:         options.podNominator,
-		PodActivator:         options.podActivator,
-		apiDispatcher:        options.apiDispatcher,
-		podGroupManager:      options.podGroupManager,
-		parallelizer:         options.parallelizer,
-		logger:               logger,
+		registry:              r,
+		snapshotSharedLister:  options.snapshotSharedLister,
+		mutableSnapshotLister: options.mutableSnapshotLister,
+		sharedCSIManager:      options.sharedCSIManager,
+		waitingPods:           options.waitingPods,
+		podsInPreBind:         options.podsInPreBind,
+		clientSet:             options.clientSet,
+		kubeConfig:            options.kubeConfig,
+		eventRecorder:         options.eventRecorder,
+		informerFactory:       options.informerFactory,
+		sharedDRAManager:      options.sharedDRAManager,
+		metricsRecorder:       options.metricsRecorder,
+		extenders:             options.extenders,
+		PodNominator:          options.podNominator,
+		PodActivator:          options.podActivator,
+		apiDispatcher:         options.apiDispatcher,
+		podGroupManager:       options.podGroupManager,
+		parallelizer:          options.parallelizer,
+		logger:                logger,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
@@ -1208,6 +1218,45 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl fwk.PostFilt
 	r, s := pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.PostFilter, pl.Name(), s.Code().String(), metrics.SinceInSeconds(startTime))
 	return r, s
+}
+
+// RunPodGroupPostFilterPlugins runs the set of configured PodGroupPostFilter plugins.
+func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state *framework.CycleState, podGroupInfo fwk.PodGroupInfo, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "generic workload feature is disabled, cannot perform PodGroupPostFilter")
+	}
+
+	logger := klog.FromContext(ctx)
+	verboseLogs := logger.V(4).Enabled()
+	if verboseLogs {
+		logger = klog.LoggerWithName(logger, "PodGroupPostFilter")
+	}
+
+	var reasons []string
+	var rejectorPlugin string
+	for _, pl := range f.podGroupPostFilterPlugins {
+		ctx := ctx
+		if verboseLogs {
+			logger := klog.LoggerWithName(logger, pl.Name())
+			ctx = klog.NewContext(ctx, logger)
+		}
+		res, status := pl.PodGroupPostFilter(ctx, podGroupInfo, pgSchedulingFunc)
+		if status.IsSuccess() {
+			return res, status
+		} else if status.Code() == fwk.UnschedulableAndUnresolvable {
+			return res, status.WithPlugin(pl.Name())
+		} else if status.Code() == fwk.Unschedulable {
+			reasons = append(reasons, status.Reasons()...)
+			if rejectorPlugin == "" {
+				rejectorPlugin = pl.Name()
+			}
+		} else {
+			// Any status other than Success, Unschedulable or UnschedulableAndUnresolvable is Error.
+			return nil, fwk.AsStatus(fmt.Errorf("error in %q PostFilter plugins: %s", pl.Name(), status.Message())).WithPlugin(pl.Name())
+		}
+	}
+
+	return nil, fwk.NewStatus(fwk.Unschedulable, reasons...).WithPlugin(rejectorPlugin)
 }
 
 // RunFilterPluginsWithNominatedPods runs the set of configured filter plugins
@@ -2147,6 +2196,13 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *fwk.Stat
 // remains unchanged after "Reserve".
 func (f *frameworkImpl) SnapshotSharedLister() fwk.SharedLister {
 	return f.snapshotSharedLister
+}
+
+// MutableSnapshotSharedLister returns the scheduler's MutableSnapshotSharedLister of the latest NodeInfo
+// snapshot.
+// Note: Only PodGroupPostFilter extension point can use this.
+func (f *frameworkImpl) MutableSnapshotSharedLister() fwk.MutableSnapshotSharedLister {
+	return f.mutableSnapshotLister
 }
 
 // IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.

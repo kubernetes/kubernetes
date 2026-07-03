@@ -24,7 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -438,8 +437,25 @@ func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisrup
 }
 
 // PodGroupPostFilter runs a default preemption for the pod group.
-func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
-	res, status := pl.podGroupEvaluator.Preempt(ctx, pg, pods, pgSchedulingFunc)
+func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, pgInfo fwk.PodGroupInfo, pgSchedulingFunc framework.PodGroupSchedulingFunc) (postFilterResult *framework.PodGroupPostFilterResult, status *fwk.Status) {
+	pg := pgInfo.GetPodGroup()
+
+	if pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "pod group preemption: not supported with topology constraints")
+	}
+
+	mutableLister := pl.fh.MutableSnapshotSharedLister()
+	err := mutableLister.StartMutations()
+	if err != nil {
+		return nil, fwk.AsStatus(fmt.Errorf("pod group preemption: failed to start mutations: %w", err))
+	}
+	defer func() {
+		if err := mutableLister.EndMutations(); err != nil {
+			status = fwk.AsStatus(fmt.Errorf("pod group preemption: failed to end mutations: %w", err))
+		}
+	}()
+
+	res, status := pl.podGroupEvaluator.Preempt(ctx, pg, pgInfo.GetUnscheduledPods(), pgSchedulingFunc)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)

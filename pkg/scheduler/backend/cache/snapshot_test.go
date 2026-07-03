@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -756,7 +757,7 @@ func TestSnapshot_Placement(t *testing.T) {
 	}
 }
 
-func TestSnapshot_BackupRestore(t *testing.T) {
+func TestSnapshot_Mutations(t *testing.T) {
 	podWithAffinity := st.MakePod().Name("p-aff").Namespace("ns").UID("p-aff").PodAffinity("key", &metav1.LabelSelector{MatchLabels: map[string]string{"key": "value"}}, st.PodAffinityWithRequiredReq).Node("node-1").Obj()
 	podWithAntiAffinity := st.MakePod().Name("p-anti").Namespace("ns").UID("p-anti").PodAntiAffinity("key", &metav1.LabelSelector{MatchLabels: map[string]string{"key": "value"}}, st.PodAntiAffinityWithRequiredReq).Node("node-1").Obj()
 
@@ -815,6 +816,31 @@ func TestSnapshot_BackupRestore(t *testing.T) {
 				s.nodeInfoList[0], s.nodeInfoList[1] = s.nodeInfoList[1], s.nodeInfoList[0]
 			},
 		},
+		{
+			name: "Modify usedPVCRefCounts (Add/Modify)",
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("p1").Namespace("ns").Node("node-1").PVC("pvc-1").Obj(),
+			},
+			initialNodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+			},
+			modifySnapshot: func(_ klog.Logger, s *Snapshot) {
+				s.usedPVCRefCounts["ns/pvc-1"]++
+				s.usedPVCRefCounts["ns/pvc-2"] = 1
+			},
+		},
+		{
+			name: "Modify usedPVCRefCounts (Remove)",
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("p1").Namespace("ns").Node("node-1").PVC("pvc-1").Obj(),
+			},
+			initialNodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+			},
+			modifySnapshot: func(_ klog.Logger, s *Snapshot) {
+				delete(s.usedPVCRefCounts, "ns/pvc-1")
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -823,17 +849,20 @@ func TestSnapshot_BackupRestore(t *testing.T) {
 			s := NewSnapshot(tt.initialPods, tt.initialNodes)
 
 			// Store original state for deep verification
-			origNodeInfoMap, origNodeInfoList, origAffinityList, origAntiAffinityList := simplifySnapshot(s)
+			origNodeInfoMap, origNodeInfoList, origAffinityList, origAntiAffinityList, origUsedPVCRefCounts := simplifySnapshot(s)
 
-			restore, err := s.BackupSnapshot()
+			err := s.StartMutations()
 			if err != nil {
 				t.Fatalf("failed to prepare a backup")
 			}
 			tt.modifySnapshot(logger, s)
-			restore()
+			err = s.EndMutations()
+			if err != nil {
+				t.Fatalf("failed to restore a backup")
+			}
 
 			// Get state after for verification
-			postRestoreNodeInfoMap, postRestoreNodeInfoList, postRestoreAffinityList, postRestoreAntiAffinityList := simplifySnapshot(s)
+			postRestoreNodeInfoMap, postRestoreNodeInfoList, postRestoreAffinityList, postRestoreAntiAffinityList, postRestoreUsedPVCRefCounts := simplifySnapshot(s)
 
 			if cmp.Diff(origNodeInfoMap, postRestoreNodeInfoMap) != "" {
 				t.Errorf("nodeInfoMap mismatch: want %v, got %v", origNodeInfoMap, postRestoreNodeInfoMap)
@@ -847,16 +876,20 @@ func TestSnapshot_BackupRestore(t *testing.T) {
 			if cmp.Diff(origAntiAffinityList, postRestoreAntiAffinityList) != "" {
 				t.Errorf("havePodsWithRequiredAntiAffinityNodeInfoList mismatch: want %v, got %v", origAntiAffinityList, postRestoreAntiAffinityList)
 			}
+			if cmp.Diff(origUsedPVCRefCounts, postRestoreUsedPVCRefCounts) != "" {
+				t.Errorf("usedPVCRefCounts mismatch: want %v, got %v", origUsedPVCRefCounts, postRestoreUsedPVCRefCounts)
+			}
 		})
 	}
 }
 
 // simplifySnapshot for comparison in unit tests
-func simplifySnapshot(s *Snapshot) (map[string][]string, []string, []string, []string) {
+func simplifySnapshot(s *Snapshot) (map[string][]string, []string, []string, []string, map[string]int) {
 	nodeInfoMap := make(map[string][]string)
 	var nodeInfoList []string
 	var affinityList []string
 	var antiAffinityList []string
+	usedPVCRefCounts := make(map[string]int)
 	for _, nodeInfo := range s.nodeInfoMap {
 		for _, p := range nodeInfo.GetPods() {
 			nodeInfoMap[nodeInfo.Node().Name] = append(nodeInfoMap[nodeInfo.Node().Name], p.GetPod().Name)
@@ -871,33 +904,51 @@ func simplifySnapshot(s *Snapshot) (map[string][]string, []string, []string, []s
 	for _, nodeInfo := range s.havePodsWithRequiredAntiAffinityNodeInfoList {
 		antiAffinityList = append(antiAffinityList, nodeInfo.Node().Name)
 	}
-	return nodeInfoMap, nodeInfoList, affinityList, antiAffinityList
+	maps.Copy(usedPVCRefCounts, s.usedPVCRefCounts)
+	return nodeInfoMap, nodeInfoList, affinityList, antiAffinityList, usedPVCRefCounts
 }
 
-func TestSnapshot_MultipleBackups(t *testing.T) {
+func TestSnapshot_MultipleMutations(t *testing.T) {
 	s := NewSnapshot(nil, nil)
 
-	restore, err := s.BackupSnapshot()
+	err := s.StartMutations()
 	if err != nil {
-		t.Fatalf("failed to prepare a backup: %v", err)
+		t.Fatalf("failed to start mutations: %v", err)
 	}
 
-	_, err = s.BackupSnapshot()
+	err = s.StartMutations()
 	if err == nil {
-		t.Fatalf("expected error when stacking backups, got nil")
+		t.Fatalf("expected error when stacking mutations, got nil")
 	}
 
-	expectedErr := "cannot stack backups"
+	expectedErr := "cannot stack mutations"
 	if err.Error() != expectedErr {
 		t.Errorf("expected error %q, got %q", expectedErr, err.Error())
 	}
 
-	// Restore the previous backup, and now it should work again
-	restore()
-
-	_, err = s.BackupSnapshot()
+	// End the previous mutations, and now it should work again
+	err = s.EndMutations()
 	if err != nil {
-		t.Fatalf("failed to prepare a backup after restoring: %v", err)
+		t.Fatalf("failed to end mutations: %v", err)
+	}
+
+	err = s.StartMutations()
+	if err != nil {
+		t.Fatalf("failed to start mutations after ending: %v", err)
+	}
+}
+
+func TestSnapshot_EndMutationsWithoutStartMutations(t *testing.T) {
+	s := NewSnapshot(nil, nil)
+
+	err := s.EndMutations()
+	if err == nil {
+		t.Fatalf("expected error when not starting mutations, got nil")
+	}
+
+	expectedErr := "no mutation session started"
+	if err.Error() != expectedErr {
+		t.Errorf("expected error %q, got %q", expectedErr, err.Error())
 	}
 }
 
