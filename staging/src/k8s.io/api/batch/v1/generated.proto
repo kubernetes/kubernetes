@@ -151,11 +151,11 @@ message Job {
 // JobCondition describes current state of a job.
 message JobCondition {
   // Type of job condition, Complete or Failed.
-  // +required
+  // +optional
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
-  // +required
+  // +optional
   optional string status = 2;
 
   // Last time the condition was checked.
@@ -561,7 +561,7 @@ message PodFailurePolicy {
   // counter of pod failures is incremented and it is checked against
   // the backoffLimit. At most 20 elements are allowed.
   // +listType=atomic
-  // +required
+  // +optional
   repeated PodFailurePolicyRule rules = 1;
 }
 
