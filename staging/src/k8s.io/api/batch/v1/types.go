@@ -257,7 +257,7 @@ type PodFailurePolicy struct {
 	// counter of pod failures is incremented and it is checked against
 	// the backoffLimit. At most 20 elements are allowed.
 	// +listType=atomic
-	// +required
+	// +optional
 	Rules []PodFailurePolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
@@ -721,10 +721,10 @@ const (
 // JobCondition describes current state of a job.
 type JobCondition struct {
 	// Type of job condition, Complete or Failed.
-	// +required
+	// +optional
 	Type JobConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=JobConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	// +required
+	// +optional
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// Last time the condition was checked.
 	// +optional
