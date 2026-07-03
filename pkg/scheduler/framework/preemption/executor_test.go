@@ -903,7 +903,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					// preemptPodCallsCounter helps verify if the last victim pod gets preempted after other victims.
 					preemptPodCallsCounter := 0
 					preemptFunc := executor.PreemptPod
-					executor.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) error {
+					executor.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 						// Verify contents of the sets: preempting and lastVictimsPendingPreemption before preemption of subsequent pods.
 						executor.mu.RLock()
 						preemptPodCallsCounter++
@@ -1391,9 +1391,12 @@ func TestPreemptPod(t *testing.T) {
 					preemptor = &podGroupExecutorPreemptor{pg: preemptorPodGroup, pods: preemptorPods}
 				}
 
-				err = pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimPod, "test-plugin")
+				preemptedInMemory, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimPod, "test-plugin")
 				if err != nil {
 					t.Fatal(err)
+				}
+				if preemptedInMemory != (tt.addVictimToPrebind || tt.addVictimToWaiting) {
+					t.Errorf("PreemptPod() preemptedInMemory = %v, want %v", preemptedInMemory, tt.addVictimToPrebind || tt.addVictimToWaiting)
 				}
 				if tt.expectCancel {
 					if victimCtx.Err() == nil {
@@ -1427,12 +1430,13 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 	apiVictim := st.MakePod().Name("api-v").UID("api-v").Priority(midPriority).Node("node1").Obj()
 
 	tests := []struct {
-		name                  string
-		victimPods            []*v1.Pod
-		inMemoryVictim        *v1.Pod
-		addVictimToPrebind    bool
-		addVictimToWaiting    bool
-		wantPreemptorActivate bool
+		name                        string
+		victimPods                  []*v1.Pod
+		inMemoryVictim              *v1.Pod
+		addVictimToPrebind          bool
+		addVictimToPrebindOnPreempt bool
+		addVictimToWaiting          bool
+		wantPreemptorActivate       bool
 	}{
 		{
 			name:                  "last waiting pod",
@@ -1447,6 +1451,13 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			inMemoryVictim:        preBindVictim,
 			addVictimToPrebind:    true,
 			wantPreemptorActivate: true,
+		},
+		{
+			name:                        "last pod enters preBind during preemption",
+			victimPods:                  []*v1.Pod{preBindVictim.DeepCopy()},
+			inMemoryVictim:              preBindVictim.DeepCopy(),
+			addVictimToPrebindOnPreempt: true,
+			wantPreemptorActivate:       true,
 		},
 		{
 			name:               "non-last waiting pod",
@@ -1520,6 +1531,16 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			}
 
 			executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: true})
+			if tt.addVictimToPrebindOnPreempt {
+				preemptFunc := executor.PreemptPod
+				executor.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
+					if victim.UID == tt.inMemoryVictim.UID {
+						victimCtx, cancelVictim = context.WithCancelCause(context.Background())
+						fwk.AddPodInPreBind(victim.UID, cancelVictim)
+					}
+					return preemptFunc(ctx, c, preemptor, victim, pluginName)
+				}
+			}
 			candidate := &candidate{
 				name: "node1",
 				victims: &extenderv1.Victims{
@@ -1543,7 +1564,7 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			if activated != tt.wantPreemptorActivate {
 				t.Fatalf("Preemptor activation = %v, want %v; activated pods: %v", activated, tt.wantPreemptorActivate, fakeActivator.activatedPods)
 			}
-			if tt.addVictimToPrebind && victimCtx.Err() == nil {
+			if (tt.addVictimToPrebind || tt.addVictimToPrebindOnPreempt) && (victimCtx == nil || victimCtx.Err() == nil) {
 				t.Fatalf("Expected preBind victim context to be cancelled")
 			}
 		})

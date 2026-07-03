@@ -85,9 +85,10 @@ type Executor struct {
 	// to prevent the pods/podgroups from entering the scheduling cycle while waiting for preemption to complete.
 	lastVictimsPendingPreemption map[types.UID]pendingVictim
 
-	// PreemptPod is a function that actually makes API calls to preempt a specific Pod.
+	// PreemptPod is a function that actually preempts a specific Pod. It returns true
+	// when the victim was preempted only in scheduler memory, without a delete call.
 	// This is exposed to be replaced during tests.
-	PreemptPod func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) error
+	PreemptPod func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error)
 }
 
 // NewExecutor creates a new preemption executor.
@@ -100,10 +101,11 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 		fts:                          fts,
 	}
 
-	e.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) error {
+	e.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 		logger := klog.FromContext(ctx)
 
 		skipAPICall := false
+		preemptedInMemory := false
 		eventMessage := fmt.Sprintf("Preempted by %s %v on node %v", preemptor.Type(), preemptor.UID(), c.Name())
 		// If the victim is a WaitingPod, try to preempt it without a delete call (victim will go back to backoff queue).
 		// Otherwise we should delete the victim.
@@ -111,12 +113,14 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 			if waitingPod.Preempt(pluginName, "preempted") {
 				logger.V(2).Info("Preemptor preempted a waiting pod", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
 				skipAPICall = true
+				preemptedInMemory = true
 			}
 		} else if podInPreBind := e.fh.GetPodInPreBind(victim.UID); podInPreBind != nil {
 			// If the victim is in the preBind cancel the binding process.
 			if podInPreBind.CancelPod(fmt.Sprintf("preempted by %s", pluginName)) {
 				logger.V(2).Info("Preemptor rejected a pod in preBind", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
 				skipAPICall = true
+				preemptedInMemory = true
 			} else {
 				logger.V(5).Info("Failed to reject a pod in preBind, falling back to deletion via api call", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
 			}
@@ -135,19 +139,19 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 				if err := util.PatchPodStatus(ctx, fh.ClientSet(), victim.Name, victim.Namespace, &victim.Status, newStatus); err != nil {
 					if !apierrors.IsNotFound(err) {
 						logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim))
-						return err
+						return false, err
 					}
 					logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
-					return nil
+					return false, nil
 				}
 			}
 			if err := util.DeletePod(ctx, fh.ClientSet(), victim); err != nil {
 				if !apierrors.IsNotFound(err) {
 					logger.Error(err, "Tried to preempted pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
-					return err
+					return false, err
 				}
 				logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
-				return nil
+				return false, nil
 			}
 			logger.V(2).Info("Preemptor Pod preempted victim Pod", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
 		} else {
@@ -156,7 +160,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 
 		fh.EventRecorder().WithLogger(logger).Eventf(victim, preemptor.Obj(), v1.EventTypeNormal, "Preempted", "Preempting", eventMessage)
 
-		return nil
+		return preemptedInMemory, nil
 	}
 
 	return e
@@ -227,7 +231,7 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 	preemptedLastVictimInMemory := false
 	preemptPod := func(index int) {
 		victim := victimPods[index]
-		if err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
+		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
 			errCh.SendWithCancel(err, cancel)
 		}
 	}
@@ -292,11 +296,11 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 			e.lastVictimsPendingPreemption[preemptor.UID()] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
 			e.mu.Unlock()
 
-			mayPreemptLastVictimInMemory := e.fh.GetWaitingPod(lastVictim.UID) != nil || e.fh.GetPodInPreBind(lastVictim.UID) != nil
-			if err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName); err != nil {
+			preemptedInMemory, err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
+			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
-			} else if mayPreemptLastVictimInMemory {
+			} else if preemptedInMemory {
 				preemptedLastVictimInMemory = true
 			}
 		}
@@ -330,7 +334,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 			logger.V(2).Info("Victim Pod is already being deleted, skipping the API call for it", "preemptor", klog.KObj(preemptor), "node", c.Name(), "victim", klog.KObj(victim))
 			return
 		}
-		if err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
+		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
 			errCh.SendWithCancel(err, cancel)
 		}
 	}, pluginName)
