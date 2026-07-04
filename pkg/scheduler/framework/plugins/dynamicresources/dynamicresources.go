@@ -926,11 +926,12 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 // requests its deallocation.  This only gets called when filtering found no
 // suitable node.
 func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
+	logger := klog.FromContext(ctx)
 	if !pl.enabled {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "plugin disabled")
+		logger.V(5).Info("plugin disabled", "pod", klog.KObj(pod))
+		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 
-	logger := klog.FromContext(ctx)
 	state, err := getStateData(cs)
 	if err != nil {
 		return nil, statusError(logger, err)
@@ -938,7 +939,8 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 	// If a Pod doesn't have any resource claims attached to it, there is no need for further processing.
 	// Thus we provide a fast path for this case to avoid unnecessary computations.
 	if state.claims.empty() {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "no new claims to deallocate")
+		logger.V(5).Info("no new claims to deallocate", "pod", klog.KObj(pod))
+		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 	extendedResourceClaim := state.claims.extendedResourceClaim()
 
@@ -991,7 +993,7 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 		}
 	}
 
-	return nil, fwk.NewStatus(fwk.Unschedulable, "still not schedulable")
+	return nil, fwk.NewStatus(fwk.Unschedulable)
 }
 
 func (pl *DynamicResources) unreservePodGroupClaims(ctx context.Context, pod *v1.Pod) *fwk.Status {
