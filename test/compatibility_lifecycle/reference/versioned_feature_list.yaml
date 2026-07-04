@@ -2063,7 +2063,7 @@
     version: "1.34"
 - name: WatchListCompression
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
