@@ -2538,9 +2538,11 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 		kl.configMapManager.UnregisterPod(pod)
 	}
 
-	// Note: we leave pod containers to be reclaimed in the background since dockershim requires the
-	// container for retrieving logs and we want to make sure logs are available until the pod is
-	// physically deleted.
+	// Note: we leave pod containers to be reclaimed in the background because kubelet still
+	// uses runtime container status to locate logs, and the normal container removal path
+	// removes those logs. Keep logs available until the pod is physically deleted.
+	// TODO: Revisit this once the kubelet log lifecycle is fully separated from the
+	// container lifecycle.
 
 	// remove any cgroups in the hierarchy for pods that are no longer running.
 	if kl.cgroupsPerQOS {
