@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
@@ -711,7 +712,7 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	}
 
 	container := &testCase.pod.Spec.Containers[0]
-	err = policy.Allocate(logger, st, testCase.pod, container)
+	err = policy.Allocate(logger, st, testCase.pod, container, lifecycle.AddOperation)
 	if !reflect.DeepEqual(err, testCase.expErr) {
 		t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %q but got: %q",
 			testCase.description, testCase.expErr, err)
@@ -788,7 +789,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			_ = policy.Allocate(logger, st, pod, &container)
+			_ = policy.Allocate(logger, st, pod, &container, lifecycle.AddOperation)
 		}
 		if !st.defaultCPUSet.Equals(testCase.expCSetAfterAlloc) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %s but got %s",
@@ -845,7 +846,7 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			err := policy.Allocate(logger, st, pod, &container)
+			err := policy.Allocate(logger, st, pod, &container, lifecycle.AddOperation)
 			if err != nil {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected no error but got %v",
 					testCase.description, err)
@@ -1202,7 +1203,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 		}
 
 		container := &testCase.pod.Spec.Containers[0]
-		err = policy.Allocate(logger, st, testCase.pod, container)
+		err = policy.Allocate(logger, st, testCase.pod, container, lifecycle.AddOperation)
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -1972,7 +1973,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 
 			for idx := range testCase.pod.Spec.Containers {
 				container := &testCase.pod.Spec.Containers[idx]
-				err := policy.Allocate(logger, st, testCase.pod, container)
+				err := policy.Allocate(logger, st, testCase.pod, container, lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("Allocate failed: pod=%q container=%q", testCase.pod.UID, container.Name)
 				}
@@ -2479,7 +2480,7 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			}
 
-			err = policy.AllocatePod(logger, st, testCase.pod)
+			err = policy.AllocatePod(logger, st, testCase.pod, lifecycle.AddOperation)
 			if testCase.expErr != nil {
 				require.Error(t, err)
 

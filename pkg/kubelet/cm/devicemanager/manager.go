@@ -389,7 +389,12 @@ func (m *ManagerImpl) Stop(logger klog.Logger) error {
 
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
-func (m *ManagerImpl) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error {
+func (m *ManagerImpl) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error {
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod), "containerName", container.Name, "operation", operation)
+	if operation != lifecycle.AddOperation {
+		logger.V(2).Info("Device Manager support only Allocate(add)")
+		return nil
+	}
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
 		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.Set[string])
 	}
@@ -1001,7 +1006,8 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(ctx context.Context, pod *v1.
 	}
 	if needsReAllocate {
 		logger.V(2).Info("Needs to re-allocate device plugin resources for pod", "pod", klog.KObj(pod), "containerName", container.Name)
-		if err := m.Allocate(ctx, pod, container); err != nil {
+		// Device Manager support only Allocate(add)
+		if err := m.Allocate(ctx, pod, container, lifecycle.AddOperation); err != nil {
 			return nil, err
 		}
 	}
@@ -1137,7 +1143,7 @@ func (m *ManagerImpl) GetAllocatableDevices(logger klog.Logger) ResourceDeviceIn
 }
 
 // AllocatePod is called to trigger the allocation of resources to a pod.
-func (m *ManagerImpl) AllocatePod(logger klog.Logger, pod *v1.Pod) error {
+func (m *ManagerImpl) AllocatePod(logger klog.Logger, pod *v1.Pod, _ lifecycle.Operation) error {
 	// Device Manager does not support pod level resource allocation.
 	return nil
 }

@@ -29,6 +29,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -137,7 +138,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 
 			// Allocate resources
 			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
-				err = mgr.AllocatePod(logger, pod)
+				err = mgr.AllocatePod(logger, pod, lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("could not allocate pod: %v", err)
 				}
@@ -145,7 +146,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				// Add containers (allocates exclusive resources from the pod pool)
 				for i := range pod.Spec.Containers {
 					container := &pod.Spec.Containers[i]
-					err = mgr.Allocate(ctx, pod, container)
+					err = mgr.Allocate(ctx, pod, container, lifecycle.AddOperation)
 					if err != nil {
 						t.Fatalf("could not allocate container %s: %v", container.Name, err)
 					}
