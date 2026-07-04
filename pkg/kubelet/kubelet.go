@@ -370,11 +370,13 @@ func newCrashLoopBackOff(kubeCfg *kubeletconfiginternal.KubeletConfiguration) (t
 func makePodSourceConfig(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, nodeHasSynced func() bool) (*config.PodConfig, error) {
 	logger := klog.FromContext(ctx)
 	manifestURLHeader := make(http.Header)
+	var manifestURLHeaderKeys []string
 	if len(kubeCfg.StaticPodURLHeader) > 0 {
 		for k, v := range kubeCfg.StaticPodURLHeader {
 			for i := range v {
 				manifestURLHeader.Add(k, v[i])
 			}
+			manifestURLHeaderKeys = append(manifestURLHeaderKeys, k)
 		}
 	}
 
@@ -389,7 +391,7 @@ func makePodSourceConfig(ctx context.Context, kubeCfg *kubeletconfiginternal.Kub
 
 	// define url config source
 	if kubeCfg.StaticPodURL != "" {
-		logger.Info("Adding pod URL with HTTP header", "URL", kubeCfg.StaticPodURL, "header", manifestURLHeader)
+		logger.Info("Adding pod URL with HTTP headers", "URL", kubeCfg.StaticPodURL, "header", manifestURLHeaderKeys)
 		config.NewSourceURL(logger, kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.HTTPSource))
 	}
 
