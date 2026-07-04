@@ -666,6 +666,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 									"UnavailableDevices": gomega.Equal(ptr.To[int32](0)),
 									"NodeName":           gomega.BeNil(),
 									"ValidationError":    gomega.BeNil(),
+									"PartitionSummary":   gomega.BeEmpty(),
+									"CounterSets":        gomega.BeEmpty(),
+									"ShareableSummary":   gomega.BeNil(),
 								}),
 							),
 							"Conditions": gomega.ContainElement(
@@ -713,6 +716,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 									"UnavailableDevices": gomega.Equal(ptr.To[int32](0)),
 									"NodeName":           gomega.BeNil(),
 									"ValidationError":    gomega.BeNil(),
+									"PartitionSummary":   gomega.BeEmpty(),
+									"CounterSets":        gomega.BeEmpty(),
+									"ShareableSummary":   gomega.BeNil(),
 								}),
 							),
 							"Conditions": gomega.ContainElement(
@@ -725,9 +731,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					})))
 			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
 		})
+	})
 
-		// expectPool creates a request for driverName and waits until the
-		// completed status contains a pool matching poolMatcher.
+	// ResourcePoolStatusRequest advanced views. Own driver-less context so each
+	// sub-context's driver is the only one that sets up.
+	framework.Context("control plane views", f.WithFeatureGate(features.DRAResourcePoolStatus), func() {
 		expectPool := func(ctx context.Context, driverName string, poolMatcher any) {
 			client := f.ClientSet.ResourceV1alpha3().ResourcePoolStatusRequests()
 			gomega.Eventually(ctx, func(g gomega.Gomega, ctx context.Context) {
