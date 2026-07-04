@@ -165,74 +165,12 @@ func AddUpdateAutoscalingReactor(fakeClient *fake.Clientset) {
 }
 
 // AddListHPAReactor registers a list reactor that returns a populated HPA list.
-func AddListHPAReactor(fakeClient *fake.Clientset, cfg *horizontalScenario) {
+func AddListHPAReactor(fakeClient *fake.Clientset, cfg *horizontalScenario, t *testing.T) {
+	hpa := buildHPA(t, cfg)
 	fakeClient.AddReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		var behavior *autoscalingv2.HorizontalPodAutoscalerBehavior
-		if cfg.scaleUpRules != nil || cfg.scaleDownRules != nil {
-			behavior = &autoscalingv2.HorizontalPodAutoscalerBehavior{
-				ScaleUp:   cfg.scaleUpRules,
-				ScaleDown: cfg.scaleDownRules,
-			}
-		}
-
-		hpa := autoscalingv2.HorizontalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      hpaName,
-				Namespace: hpaNamespace,
-			},
-			Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
-					Kind:       cfg.resource.kind,
-					Name:       cfg.resource.name,
-					APIVersion: cfg.resource.apiVersion,
-				},
-				MinReplicas: &cfg.minReplicas,
-				MaxReplicas: cfg.maxReplicas,
-				Behavior:    behavior,
-			},
-			Status: autoscalingv2.HorizontalPodAutoscalerStatus{
-				CurrentReplicas: cfg.specReplicas,
-				DesiredReplicas: cfg.specReplicas,
-				LastScaleTime:   cfg.lastScaleTime,
-				Conditions:      cfg.initialConditions,
-			},
-		}
-		autoscalingapiv2.SetDefaults_HorizontalPodAutoscalerBehavior(&hpa)
-
 		obj := &autoscalingv2.HorizontalPodAutoscalerList{
-			Items: []autoscalingv2.HorizontalPodAutoscaler{hpa},
+			Items: []autoscalingv2.HorizontalPodAutoscaler{*hpa},
 		}
-
-		// Inject metrics configurations dynamically based on config
-		if cfg.CPUTarget > 0 {
-			obj.Items[0].Spec.Metrics = []autoscalingv2.MetricSpec{
-				{
-					Type: autoscalingv2.ResourceMetricSourceType,
-					Resource: &autoscalingv2.ResourceMetricSource{
-						Name: v1.ResourceCPU,
-						Target: autoscalingv2.MetricTarget{
-							Type:               autoscalingv2.UtilizationMetricType,
-							AverageUtilization: &cfg.CPUTarget,
-						},
-					},
-				},
-			}
-		}
-		if len(cfg.metricsTarget) > 0 {
-			obj.Items[0].Spec.Metrics = append(obj.Items[0].Spec.Metrics, cfg.metricsTarget...)
-		}
-
-		if len(obj.Items[0].Spec.Metrics) == 0 {
-			obj.Items[0].Spec.Metrics = []autoscalingv2.MetricSpec{
-				{
-					Type: autoscalingv2.ResourceMetricSourceType,
-					Resource: &autoscalingv2.ResourceMetricSource{
-						Name: v1.ResourceCPU,
-					},
-				},
-			}
-		}
-
 		return true, obj, nil
 	})
 }
@@ -1703,7 +1641,7 @@ func TestScaleCPU(t *testing.T) {
 
 			testClient := &fake.Clientset{}
 			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
-			AddListHPAReactor(testClient, &tt.fixture)
+			AddListHPAReactor(testClient, &tt.fixture, t)
 			AddListPodsReactor(testClient, &tt.fixture)
 			AddUpdateAutoscalingReactor(testClient)
 
