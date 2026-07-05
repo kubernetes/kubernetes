@@ -40,7 +40,7 @@ fi
 # e2-standard-2 node.
 # Currently, parallelism only affects when REMOTE=true. For local test,
 # ginkgo default parallelism (cores - 1) is used.
-parallelism=${PARALLELISM:-8}
+parallelism=16
 artifacts="${ARTIFACTS:-"/tmp/_artifacts/$(date +%y%m%dT%H%M%S)"}"
 remote=${REMOTE:-"false"}
 remote_mode=${REMOTE_MODE:-"gce"}
