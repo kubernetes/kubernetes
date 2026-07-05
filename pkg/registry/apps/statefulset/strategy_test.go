@@ -441,13 +441,6 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 func TestStatefulSetStrategy_RecreateStrategy_Validate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
-	if !Strategy.NamespaceScoped() {
-		t.Errorf("StatefulSet must be namespace scoped")
-	}
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
-		t.Errorf("StatefulSet should not allow create on update")
-	}
-
 	cases := map[string]struct {
 		enableRecreateStrategyFG bool
 		set                      *apps.StatefulSet
@@ -486,21 +479,22 @@ func TestStatefulSetStrategy_RecreateStrategy_Validate(t *testing.T) {
 func TestStatefulSetStrategy_RecreateStrategy_ValidateUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
-	if !Strategy.NamespaceScoped() {
-		t.Errorf("StatefulSet must be namespace scoped")
-	}
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
-		t.Errorf("StatefulSet should not allow create on update")
-	}
-
 	cases := map[string]struct {
 		enableRecreateStrategyFG bool
 		set                      *apps.StatefulSet
 		update                   func(*apps.StatefulSet)
 		wantErrs                 field.ErrorList
 	}{
-		"Validate update to Recreate strategy when feature gate is enabled and old set is not using Recreate": {
+		"Rolling to Recreate, RecreateFG on - allowed": {
 			enableRecreateStrategyFG: true,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RollingUpdateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+			},
+		},
+		"Rolling to Recreate, RecreateFG off - forbidden": {
+			enableRecreateStrategyFG: false,
 			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RollingUpdateStatefulSetStrategyType),
 			update: func(ss *apps.StatefulSet) {
 				ss.ObjectMeta.ResourceVersion = "1"
@@ -510,57 +504,16 @@ func TestStatefulSetStrategy_RecreateStrategy_ValidateUpdate(t *testing.T) {
 				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
 			},
 		},
-		"Validate update Recreate strategy when feature gate is disabled and old set is not using Recreate": {
-			enableRecreateStrategyFG: false,
-			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RollingUpdateStatefulSetStrategyType),
-			update: func(ss *apps.StatefulSet) {
-				ss.ObjectMeta.ResourceVersion = "1"
-				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
-			},
-			wantErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-			},
-		},
-		"Validate update Recreate strategy when feature gate is disabled and old set is using Recreate": {
-			enableRecreateStrategyFG: false,
-			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+		"OnDelete to Recreate, RecreateFG on - allowed": {
+			enableRecreateStrategyFG: true,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.OnDeleteStatefulSetStrategyType),
 			update: func(ss *apps.StatefulSet) {
 				ss.ObjectMeta.ResourceVersion = "1"
 				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
 			},
 		},
-		"Validate update Recreate strategy when feature gate is enabled and old set is using Recreate": {
-			enableRecreateStrategyFG: true,
-			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
-			update: func(ss *apps.StatefulSet) {
-				ss.ObjectMeta.ResourceVersion = "1"
-				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
-			},
-		},
-		"Validate update away from Recreate strategy when feature gate is enabled": {
-			enableRecreateStrategyFG: true,
-			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
-			update: func(ss *apps.StatefulSet) {
-				ss.ObjectMeta.ResourceVersion = "1"
-				ss.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
-			},
-			wantErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-			},
-		},
-		"Validate update away from Recreate strategy when feature gate is disabled": {
+		"OnDelete to Recreate, RecreateFG off - forbidden": {
 			enableRecreateStrategyFG: false,
-			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
-			update: func(ss *apps.StatefulSet) {
-				ss.ObjectMeta.ResourceVersion = "1"
-				ss.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
-			},
-			wantErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-			},
-		},
-		"Validate update to Recreate strategy from OnDelete when feature gate is enabled": {
-			enableRecreateStrategyFG: true,
 			set:                      makeValidStatefulSetWithUpdateStrategy(apps.OnDeleteStatefulSetStrategyType),
 			update: func(ss *apps.StatefulSet) {
 				ss.ObjectMeta.ResourceVersion = "1"
@@ -570,12 +523,64 @@ func TestStatefulSetStrategy_RecreateStrategy_ValidateUpdate(t *testing.T) {
 				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
 			},
 		},
-		"Validate update between non-Recreate strategies is allowed when feature gate is enabled": {
+		"Recreate to Recreate, RecreateFG off - allowed": {
+			enableRecreateStrategyFG: false,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+			},
+		},
+		"Recreate to Recreate, RecreateFG on - allowed": {
 			enableRecreateStrategyFG: true,
-			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RollingUpdateStatefulSetStrategyType),
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+			},
+		},
+		"Recreate to RollingUpdate, RecreateFG on - forbidden": {
+			enableRecreateStrategyFG: true,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
+			},
+			wantErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+			},
+		},
+		"Recreate to RollingUpdate, RecreateFG off - forbidden": {
+			enableRecreateStrategyFG: false,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
+			},
+			wantErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+			},
+		},
+		"Recreate to OnDelete, RecreateFG on - forbidden": {
+			enableRecreateStrategyFG: true,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
 			update: func(ss *apps.StatefulSet) {
 				ss.ObjectMeta.ResourceVersion = "1"
 				ss.Spec.UpdateStrategy.Type = apps.OnDeleteStatefulSetStrategyType
+			},
+			wantErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+			},
+		},
+		"Recreate to OnDelete, RecreateFG off - forbidden": {
+			enableRecreateStrategyFG: false,
+			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
+			update: func(ss *apps.StatefulSet) {
+				ss.ObjectMeta.ResourceVersion = "1"
+				ss.Spec.UpdateStrategy.Type = apps.OnDeleteStatefulSetStrategyType
+			},
+			wantErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
 			},
 		},
 	}

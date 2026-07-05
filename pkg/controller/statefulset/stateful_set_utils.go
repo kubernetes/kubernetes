@@ -19,6 +19,7 @@ package statefulset
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"time"
@@ -49,15 +50,9 @@ const (
 	// RecreateCompletedReason is set on the Progressing condition when all pods
 	// have been recreated with the update revision and are ready.
 	RecreateCompletedReason = "RecreateCompleted"
-	// RollingUpdateInProgressReason is set on the Progressing condition when
-	// pods are being updated via the RollingUpdate strategy.
-	RollingUpdateInProgressReason = "RollingUpdateInProgress"
-	// RollingUpdateCompletedReason is set on the Progressing condition when all
-	// pods have been updated via the RollingUpdate strategy.
-	RollingUpdateCompletedReason = "RollingUpdateCompleted"
-	// OnDeleteUpdatePendingReason is set on the Progressing condition when
-	// an update is pending and pods need to be manually deleted.
-	OnDeleteUpdatePendingReason = "OnDeleteUpdatePending"
+	// UnknownStrategyReason is set on the Progressing condition when the UpdateStrategy
+	// is not recognized.
+	UnknownStrategyReason = "UnknownStrategy"
 )
 
 var patchCodec = scheme.Codecs.LegacyCodec(apps.SchemeGroupVersion)
@@ -642,7 +637,8 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 		status.UpdatedReplicas != set.Status.UpdatedReplicas ||
 		status.CurrentRevision != set.Status.CurrentRevision ||
 		status.AvailableReplicas != set.Status.AvailableReplicas ||
-		status.UpdateRevision != set.Status.UpdateRevision
+		status.UpdateRevision != set.Status.UpdateRevision ||
+		!reflect.DeepEqual(set.Status.Conditions, status.Conditions)
 }
 
 // completeUpdate completes an update when all of set's replica Pods have been updated
@@ -657,8 +653,9 @@ func completeUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
 
 		// Update statefulset progressing condition upon completion
 		if getStatefulSetCondition(*status, apps.StatefulSetProgressing) != nil &&
-			set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
-			setProgressingCondition(status, RecreateCompletedReason, "All pods recreated successfully")
+			set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType &&
+			utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
+			setProgressingCondition(status, v1.ConditionFalse, RecreateCompletedReason, "All pods recreated successfully")
 		}
 	}
 }
@@ -716,11 +713,8 @@ func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, replicaCou
 }
 
 // setProgressingCondition sets the Progressing condition on the status.
-func setProgressingCondition(status *apps.StatefulSetStatus, reason, message string) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
-		return
-	}
-	condition := newStatefulSetCondition(apps.StatefulSetProgressing, v1.ConditionTrue, reason, message)
+func setProgressingCondition(status *apps.StatefulSetStatus, conditionStatus v1.ConditionStatus, reason, message string) {
+	condition := newStatefulSetCondition(apps.StatefulSetProgressing, conditionStatus, reason, message)
 	setStatefulSetCondition(status, *condition)
 }
 

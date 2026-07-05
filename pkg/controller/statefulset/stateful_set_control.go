@@ -655,7 +655,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 
 	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
-			return &status, fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+			errMsg := fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+			setProgressingCondition(&status, v1.ConditionFalse, UnknownStrategyReason, errMsg.Error())
+			return &status, errMsg
 		}
 
 		allOldPodsTerminated, err := ssc.recreateDeleteAndWait(ctx, set, updateRevision, replicas, condemned, &status)
@@ -669,7 +671,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 			return &status, nil
 		}
 		if currentRevision.Name != updateRevision.Name {
-			setProgressingCondition(&status, RecreateInProgressReason, "Waiting for new-revision pods to be created")
+			setProgressingCondition(&status, v1.ConditionTrue, RecreateInProgressReason, "Waiting for new-revision pods to be created")
 		}
 	}
 
@@ -717,7 +719,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 	// For the Recreate strategy we return before rolling update deletion process
 	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
-			return &status, fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+			errMsg := fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+			setProgressingCondition(&status, v1.ConditionFalse, UnknownStrategyReason, errMsg.Error())
+			return &status, errMsg
 		}
 		return &status, nil
 	}
@@ -808,7 +812,7 @@ func (ssc *defaultStatefulSetControl) recreateDeleteAndWait(ctx context.Context,
 
 	for _, inProgress := range recreateInProgress {
 		if inProgress {
-			setProgressingCondition(status, RecreateInProgressReason, "Deleting old revision pods")
+			setProgressingCondition(status, v1.ConditionTrue, RecreateInProgressReason, "Deleting old revision pods")
 			return false, nil
 		}
 	}

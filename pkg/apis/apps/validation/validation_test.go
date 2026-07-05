@@ -1173,11 +1173,11 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 	}
 
 	type testCase struct {
-		name                        string
-		old                         apps.StatefulSet
-		update                      apps.StatefulSet
-		errs                        field.ErrorList
-		allowRecreateUpdateStrategy bool
+		name               string
+		old                apps.StatefulSet
+		update             apps.StatefulSet
+		errs               field.ErrorList
+		recreateStrategyFG bool
 	}
 
 	successCases := []testCase{{
@@ -1271,6 +1271,24 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		name:   "invalid old spec (missing volume accessModes) should skip validation",
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(invalidPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(invalidPVCTemplate), tweakReplicas(3)),
+	}, {
+		name: "switch from RollingUpdate to Recreate, RecreateFG on",
+		old: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+		),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
+		),
+		recreateStrategyFG: true,
+	}, {
+		name: "switch from OnDelete to Recreate, RecreateFG on",
+		old: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
+		),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
+		),
+		recreateStrategyFG: true,
 	},
 	}
 
@@ -1360,19 +1378,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			field.Required(field.NewPath("spec", "template", "spec", "containers"), ""),
 		},
 	}, {
-		name: "switch from RollingUpdate to Recreate",
-		old: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
-		),
-		update: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
-		),
-		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-		},
-		allowRecreateUpdateStrategy: true,
-	}, {
-		name: "switch from Recreate to RollingUpdate",
+		name: "switch from Recreate to RollingUpdate, RecreateFG on",
 		old: mkStatefulSet(&validPodTemplate,
 			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
 		),
@@ -1382,9 +1388,21 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		errs: field.ErrorList{
 			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
 		},
-		allowRecreateUpdateStrategy: true,
+		recreateStrategyFG: true,
 	}, {
-		name: "switch from Recreate to OnDelete",
+		name: "switch from Recreate to RollingUpdate, RecreateFG off",
+		old: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
+		),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+		),
+		errs: field.ErrorList{
+			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+		},
+		recreateStrategyFG: false,
+	}, {
+		name: "switch from Recreate to OnDelete, RecreateFG on",
 		old: mkStatefulSet(&validPodTemplate,
 			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
 		),
@@ -1394,41 +1412,21 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		errs: field.ErrorList{
 			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
 		},
-		allowRecreateUpdateStrategy: true,
+		recreateStrategyFG: true,
 	}, {
-		name: "switch from OnDelete to Recreate",
+		name: "switch from Recreate to OnDelete, RecreateFG off",
 		old: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
+			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
 		),
 		update: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
+			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
 		),
 		errs: field.ErrorList{
 			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
 		},
-		allowRecreateUpdateStrategy: true,
+		recreateStrategyFG: false,
 	}, {
-		name: "switch from OnDelete to Recreate",
-		old: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
-		),
-		update: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
-		),
-		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-		},
-		allowRecreateUpdateStrategy: true,
-	}, {
-		name: "feature gate disabled, old and new both use Recreate",
-		old: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
-		),
-		update: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
-		),
-	}, {
-		name: "feature gate disabled, old uses RollingUpdate, new sets Recreate",
+		name: "switch from RollingUpdate to Recreate, RecreateFG off",
 		old: mkStatefulSet(&validPodTemplate,
 			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
 		),
@@ -1438,6 +1436,19 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		errs: field.ErrorList{
 			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
 		},
+		recreateStrategyFG: false,
+	}, {
+		name: "switch from OnDelete to Recreate, RecreateFG off",
+		old: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
+		),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
+		),
+		errs: field.ErrorList{
+			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+		},
+		recreateStrategyFG: false,
 	},
 	}
 
@@ -1458,12 +1469,12 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		t.Run(testTitle, func(t *testing.T) {
 			testCase.old.ObjectMeta.ResourceVersion = "1"
 			testCase.update.ObjectMeta.ResourceVersion = "1"
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetRecreateStrategy, testCase.allowRecreateUpdateStrategy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetRecreateStrategy, testCase.recreateStrategyFG)
 
 			setOpts := StatefulSetValidationOptions{
 				AllowInvalidServiceName:          true, // serviceName is immutable, tolerate existing invalid names on update
 				SkipValidateVolumeClaimTemplates: true, // volumeClaimTemplates are immutable, tolerate previously persisted invalid values on update
-				AllowStatefulSetRecreateStrategy: utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) ||
+				AllowStatefulSetRecreateStrategy: testCase.recreateStrategyFG ||
 					testCase.old.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType,
 			}
 			errs := ValidateStatefulSetUpdate(&testCase.update, &testCase.old, setOpts, pod.GetValidationOptionsFromPodTemplate(&testCase.update.Spec.Template, &testCase.old.Spec.Template))

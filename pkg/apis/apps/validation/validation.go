@@ -269,8 +269,8 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, se
 	if setOpts.AllowStatefulSetRecreateStrategy {
 		oldStrategy := oldStatefulSet.Spec.UpdateStrategy.Type
 		newStrategy := statefulSet.Spec.UpdateStrategy.Type
-		if oldStrategy != newStrategy && (oldStrategy == apps.RecreateStatefulSetStrategyType || newStrategy == apps.RecreateStatefulSetStrategyType) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("updateStrategy").Child("type"), "switching to or from Recreate strategy is not allowed"))
+		if oldStrategy == apps.RecreateStatefulSetStrategyType && newStrategy != apps.RecreateStatefulSetStrategyType {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("updateStrategy").Child("type"), "switching from Recreate strategy is not allowed"))
 		}
 	}
 
