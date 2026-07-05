@@ -1303,6 +1303,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	logger.V(3).Info("Clean up orphaned pod statuses")
 	kl.removeOrphanedPodStatuses(logger, allPods, mirrorPods)
 	kl.allocationManager.RemoveOrphanedPods(allPodsByUID)
+	kl.reasonCache.CleanupOrphanedPods(allPodsByUID)
 
 	// Remove orphaned pod user namespace allocations (if any).
 	logger.V(3).Info("Clean up orphaned pod user namespace allocations")
