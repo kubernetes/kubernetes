@@ -18,6 +18,7 @@ package resourcepoolstatusrequest
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -307,7 +308,7 @@ func computeShareableSummary(in poolViewInput) (*resourcev1alpha3.ShareableSumma
 	for key := range total {
 		keys = append(keys, key)
 	}
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	slices.Sort(keys)
 
 	capacities := make([]resourcev1alpha3.ShareableCapacityStatus, 0, len(keys))
 	for _, key := range keys {

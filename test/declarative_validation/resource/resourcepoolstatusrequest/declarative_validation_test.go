@@ -370,6 +370,128 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			})),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("generation"), "")},
 		},
+		"partitionSummary maxItems exceeded": {
+			// +k8s:maxItems=32
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				summary := make([]resource.PartitionTypeStatus, 33)
+				for i := range summary {
+					summary[i] = resource.PartitionTypeStatus{Type: "Full"}
+				}
+				pool.PartitionSummary = summary
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("status", "pools").Index(0).Child("partitionSummary"), 33, 32).WithOrigin("maxItems")},
+		},
+		"partitionSummary empty type": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Type: ""}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("type"), "")},
+		},
+		"partitionSummary negative total": {
+			// +k8s:minimum=0 (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Type: "Full", Total: -1}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("total"), nil, "").WithOrigin("minimum")},
+		},
+		"partitionSummary negative allocatable": {
+			// +k8s:minimum=0 (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Type: "Full", Allocatable: -1}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("allocatable"), nil, "").WithOrigin("minimum")},
+		},
+		"counterSets maxItems exceeded": {
+			// +k8s:maxItems=32
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				sets := make([]resource.CounterSetStatus, 33)
+				for i := range sets {
+					sets[i] = resource.CounterSetStatus{Name: "set", Counters: map[string]resource.CounterStatus{"c0": {}}}
+				}
+				pool.CounterSets = sets
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("status", "pools").Index(0).Child("counterSets"), 33, 32).WithOrigin("maxItems")},
+		},
+		"counterSets empty name": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.CounterSets = []resource.CounterSetStatus{{Name: "", Counters: map[string]resource.CounterStatus{"c0": {}}}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("counterSets").Index(0).Child("name"), "")},
+		},
+		"counterSets empty counters": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.CounterSets = []resource.CounterSetStatus{{Name: "set", Counters: nil}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("counterSets").Index(0).Child("counters"), "")},
+		},
+		"shareableSummary capacity maxItems exceeded": {
+			// +k8s:maxItems=32
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				caps := make([]resource.ShareableCapacityStatus, 33)
+				for i := range caps {
+					caps[i] = resource.ShareableCapacityStatus{Name: "mem"}
+				}
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{Capacity: caps}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity"), 33, 32).WithOrigin("maxItems")},
+		},
+		"shareableSummary capacity empty name": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{Capacity: []resource.ShareableCapacityStatus{{Name: ""}}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity").Index(0).Child("name"), "")},
+		},
+		"shareableSummary negative fullyAvailableDevices": {
+			// +k8s:minimum=0 (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: -1}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("fullyAvailableDevices"), nil, "").WithOrigin("minimum")},
+		},
+		"shareableSummary negative partiallyAvailableDevices": {
+			// +k8s:minimum=0 (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{PartiallyAvailableDevices: -1}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("partiallyAvailableDevices"), nil, "").WithOrigin("minimum")},
+		},
 	}
 
 	for name, tc := range testCases {
