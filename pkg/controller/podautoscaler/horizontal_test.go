@@ -1739,7 +1739,7 @@ func TestScaleContainerResource(t *testing.T) {
 						Name: v1.ResourceCPU,
 						Target: autoscalingv2.MetricTarget{
 							Type:               autoscalingv2.UtilizationMetricType,
-							AverageUtilization: ptr.To(int32(30)),
+							AverageUtilization: new(int32(30)),
 						},
 						Container: "container1",
 					},
@@ -1769,7 +1769,7 @@ func TestScaleContainerResource(t *testing.T) {
 						Name:      v1.ResourceCPU,
 						Target: autoscalingv2.MetricTarget{
 							Type:               autoscalingv2.UtilizationMetricType,
-							AverageUtilization: ptr.To(int32(50)),
+							AverageUtilization: new(int32(50)),
 						},
 					},
 				}},
