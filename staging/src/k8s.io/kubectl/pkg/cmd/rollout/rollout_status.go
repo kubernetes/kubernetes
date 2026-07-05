@@ -73,9 +73,10 @@ type RolloutStatusOptions struct {
 	Revision int64
 	Timeout  time.Duration
 
-	StatusViewerFn func(*meta.RESTMapping) (polymorphichelpers.StatusViewer, error)
+	StatusViewerFn func(genericclioptions.RESTClientGetter, *meta.RESTMapping) (polymorphichelpers.StatusViewer, error)
 	Builder        func() *resource.Builder
 	DynamicClient  dynamic.Interface
+	RESTClientGetter genericclioptions.RESTClientGetter
 
 	FilenameOptions *resource.FilenameOptions
 	genericiooptions.IOStreams
@@ -140,6 +141,8 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 		return err
 	}
 
+	o.RESTClientGetter = f
+
 	return nil
 }
 
@@ -178,7 +181,7 @@ func (o *RolloutStatusOptions) Run() error {
 	err = r.Visit(func(info *resource.Info, _ error) error {
 		resourceFound = true
 		mapping := info.ResourceMapping()
-		statusViewer, err := o.StatusViewerFn(mapping)
+		statusViewer, err := o.StatusViewerFn(o.RESTClientGetter, mapping)
 		if err != nil {
 			return err
 		}
