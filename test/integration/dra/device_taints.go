@@ -33,7 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
-	resourcebetainformers "k8s.io/client-go/informers/resource/v1beta2"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction"
 	"k8s.io/kubernetes/pkg/features"
@@ -48,6 +48,7 @@ const (
 	useNoRule = useRuleMode(iota)
 	useV1alpha3Rule
 	useV1beta2Rule
+	useV1Rule
 )
 
 // testEvictCluster simulates a cluster with many scheduled pods where each
@@ -141,9 +142,9 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 	// Create a new factory and sync it so that when the controller starts, it is up-to-date.
 	// This works as long as this is the only test running it.
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
-	var ruleInformer resourcebetainformers.DeviceTaintRuleInformer
+	var ruleInformer resourceinformers.DeviceTaintRuleInformer
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
-		ruleInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
+		ruleInformer = informerFactory.Resource().V1().DeviceTaintRules()
 	}
 	controller := devicetainteviction.New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
@@ -199,6 +200,9 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 	}
 	getV1beta2Rule := func(tCtx ktesting.TContext) *resourcebeta.DeviceTaintRule {
 		return must(tCtx, tCtx.Client().ResourceV1beta2().DeviceTaintRules().Get, ruleName, metav1.GetOptions{})
+	}
+	getV1Rule := func(tCtx ktesting.TContext) *resourceapi.DeviceTaintRule {
+		return must(tCtx, tCtx.Client().ResourceV1().DeviceTaintRules().Get, ruleName, metav1.GetOptions{})
 	}
 	var getRule any
 
@@ -322,7 +326,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 		rule = getV1beta2Rule(tCtx)
 		tCtx.Expect(rule).To(gomega.HaveField("Status.Conditions", gomega.ConsistOf(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 			"ObservedGeneration": gomega.Equal(rule.Generation),
-			"Type":               gomega.Equal(resourcealpha.DeviceTaintConditionEvictionInProgress),
+			"Type":               gomega.Equal(resourcebeta.DeviceTaintConditionEvictionInProgress),
 			"Status":             gomega.Equal(metav1.ConditionFalse),
 			"Message":            gomega.Equal(fmt.Sprintf("%[1]d published devices selected. %[1]d allocated devices selected. %[1]d pods would be evicted in 1 namespace if the effect was NoExecute. This information will not be updated again. Recreate the DeviceTaintRule to trigger an update.", numPods)),
 		}))))
@@ -360,6 +364,86 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 		// could change.
 		time.Sleep(time.Second)
 		rule = must(tCtx, tCtx.Client().ResourceV1beta2().DeviceTaintRules().Update, rule, metav1.UpdateOptions{})
+		if newTime.Equal(rule.Spec.Taint.TimeAdded) {
+			tCtx.Error("TimeAdded should have been updated automatically")
+		}
+	case useV1Rule:
+		getRule = getV1Rule
+		// Evict through DeviceTaintRule.
+		//
+		// Let's also test some of the semantics around DeviceTaintRule.
+		// We start with NoEffect, check the report, change TimeAdded manually,
+		// then turn on eviction.
+		rule := &resourceapi.DeviceTaintRule{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ruleName,
+			},
+			Spec: resourceapi.DeviceTaintRuleSpec{
+				DeviceSelector: &resourceapi.DeviceTaintSelector{
+					Driver: &driverName,
+				},
+				Taint: resourceapi.DeviceTaint{
+					Key:    "testing",
+					Effect: resourceapi.DeviceTaintEffectNone,
+				},
+			},
+		}
+		rule = must(tCtx, tCtx.Client().ResourceV1().DeviceTaintRules().Create, rule, metav1.CreateOptions{})
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+			err := tCtx.Client().ResourceV1().DeviceTaintRules().Delete(tCtx, ruleName, metav1.DeleteOptions{})
+			if apierrors.IsNotFound(err) {
+				return
+			}
+			tCtx.ExpectNoError(err)
+		})
+		tCtx.Expect(rule).To(gomega.HaveField("ObjectMeta.Generation", gomega.Equal(int64(1))))
+
+		tCtx.Eventually(getV1Rule).
+			WithPolling(10*time.Second).
+			Should(gomega.HaveField("Status.Conditions", gomega.ConsistOf(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"ObservedGeneration": gomega.Equal(rule.Generation),
+			}))), "waiting for simulation result")
+		rule = getV1Rule(tCtx)
+		tCtx.Expect(rule).To(gomega.HaveField("Status.Conditions", gomega.ConsistOf(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+			"ObservedGeneration": gomega.Equal(rule.Generation),
+			"Type":               gomega.Equal(resourceapi.DeviceTaintConditionEvictionInProgress),
+			"Status":             gomega.Equal(metav1.ConditionFalse),
+			"Message":            gomega.Equal(fmt.Sprintf("%[1]d published devices selected. %[1]d allocated devices selected. %[1]d pods would be evicted in 1 namespace if the effect was NoExecute. This information will not be updated again. Recreate the DeviceTaintRule to trigger an update.", numPods)),
+		}))))
+
+		var newTime *metav1.Time
+		for {
+			newTime = &metav1.Time{Time: time.Now().Truncate(time.Second)}
+			if !newTime.Equal(rule.Spec.Taint.TimeAdded) {
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		rule.Spec.Taint.TimeAdded = newTime
+		rule = must(tCtx, tCtx.Client().ResourceV1().DeviceTaintRules().Update, rule, metav1.UpdateOptions{})
+		if !newTime.Equal(rule.Spec.Taint.TimeAdded) {
+			tCtx.Error("our TimeAdded should have been stored")
+		}
+		tCtx.Expect(rule).To(gomega.HaveField("ObjectMeta.Generation", gomega.Equal(int64(2))))
+		tCtx.Eventually(getV1Rule).
+			WithPolling(10*time.Second).
+			Should(gomega.HaveField("Status.Conditions", gomega.ConsistOf(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"ObservedGeneration": gomega.Equal(rule.Generation),
+			}))), "waiting for reaction to TimeAdded bump")
+		rule = getV1Rule(tCtx)
+		tCtx.Expect(rule).To(gomega.HaveField("Status.Conditions", gomega.ConsistOf(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+			"ObservedGeneration": gomega.Equal(rule.Generation),
+			"Type":               gomega.Equal(resourcealpha.DeviceTaintConditionEvictionInProgress),
+			"Status":             gomega.Equal(metav1.ConditionFalse),
+			"Message":            gomega.Equal(fmt.Sprintf("%[1]d published devices selected. %[1]d allocated devices selected. %[1]d pods would be evicted in 1 namespace if the effect was NoExecute. This information will not be updated again. Recreate the DeviceTaintRule to trigger an update.", numPods)),
+		}))))
+
+		rule.Spec.Taint.Effect = resourceapi.DeviceTaintEffectNoExecute
+		// Must roll over to next second, that's the resolution of TimeAdded.
+		// We could rely on the delay for updating the status, but that
+		// could change.
+		time.Sleep(time.Second)
+		rule = must(tCtx, tCtx.Client().ResourceV1().DeviceTaintRules().Update, rule, metav1.UpdateOptions{})
 		if newTime.Equal(rule.Spec.Taint.TimeAdded) {
 			tCtx.Error("TimeAdded should have been updated automatically")
 		}
@@ -463,6 +547,29 @@ func testNoScheduleRule(tCtx ktesting.TContext, useRule useRuleMode) {
 			}
 			tCtx.ExpectNoError(err)
 		})
+	case useV1Rule:
+		rule := &resourceapi.DeviceTaintRule{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ruleName,
+			},
+			Spec: resourceapi.DeviceTaintRuleSpec{
+				DeviceSelector: &resourceapi.DeviceTaintSelector{
+					Driver: &driverName,
+				},
+				Taint: resourceapi.DeviceTaint{
+					Key:    taintKey,
+					Effect: resourceapi.DeviceTaintEffectNoSchedule,
+				},
+			},
+		}
+		_ = must(tCtx, tCtx.Client().ResourceV1().DeviceTaintRules().Create, rule, metav1.CreateOptions{})
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+			err := tCtx.Client().ResourceV1().DeviceTaintRules().Delete(tCtx, ruleName, metav1.DeleteOptions{})
+			if apierrors.IsNotFound(err) {
+				return
+			}
+			tCtx.ExpectNoError(err)
+		})
 	case useNoRule:
 		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{
 			{
@@ -470,6 +577,8 @@ func testNoScheduleRule(tCtx ktesting.TContext, useRule useRuleMode) {
 				Effect: resourceapi.DeviceTaintEffectNoSchedule,
 			},
 		}
+	default:
+		tCtx.Fatalf("unsupported useRule %d", useRule)
 	}
 
 	// Creating the ResourceSlice after the DeviceTaintRule exercises additional
