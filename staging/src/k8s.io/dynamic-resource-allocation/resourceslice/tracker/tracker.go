@@ -62,8 +62,6 @@ type Tracker struct {
 	resourceSlicesHandle  cache.ResourceEventHandlerRegistration
 	deviceTaints          cache.SharedIndexInformer
 	deviceTaintsHandle    cache.ResourceEventHandlerRegistration
-	deviceClasses         cache.SharedIndexInformer
-	deviceClassesHandle   cache.ResourceEventHandlerRegistration
 	patchedResourceSlices cache.Store
 	broadcaster           record.EventBroadcaster
 	recorder              record.EventRecorder
@@ -110,8 +108,8 @@ type Options struct {
 	// EnableDeviceTaintRules controls whether DeviceTaintRules
 	// will be reflected in ResourceSlices reported by the tracker.
 	//
-	// If false, then TaintInformer and ClassInformer
-	// are not needed. The tracker turns into
+	// If false, then TaintInformer is
+	// not needed. The tracker turns into
 	// a thin wrapper around the underlying
 	// SliceInformer, with no processing of its own.
 	EnableDeviceTaintRules bool
@@ -120,7 +118,6 @@ type Options struct {
 
 	SliceInformer resourceinformers.ResourceSliceInformer
 	TaintInformer resourcebetainformers.DeviceTaintRuleInformer
-	ClassInformer resourceinformers.DeviceClassInformer
 
 	// KubeClient is used to generate Events when CEL expressions
 	// encounter runtime errors.
@@ -160,7 +157,6 @@ func newTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr er
 		resourceSliceLister:    opts.SliceInformer.Lister(),
 		resourceSlices:         opts.SliceInformer.Informer(),
 		deviceTaints:           opts.TaintInformer.Informer(),
-		deviceClasses:          opts.ClassInformer.Informer(),
 		patchedResourceSlices:  cache.NewStore(cache.MetaNamespaceKeyFunc),
 		handleError:            utilruntime.HandleErrorWithContext,
 		synced:                 make(chan struct{}),
@@ -212,22 +208,12 @@ func (t *Tracker) initInformers(ctx context.Context) error {
 		return fmt.Errorf("add event handler for DeviceTaintRules: %w", err)
 	}
 
-	classHandler := cache.ResourceEventHandlerFuncs{
-		AddFunc:    t.deviceClassAdd(ctx),
-		UpdateFunc: t.deviceClassUpdate(ctx),
-		DeleteFunc: t.deviceClassDelete(ctx),
-	}
-	t.deviceClassesHandle, err = t.deviceClasses.AddEventHandler(classHandler)
-	if err != nil {
-		return fmt.Errorf("add event handler for DeviceClasses: %w", err)
-	}
-
 	// This usually short-lived goroutines monitors our upstream event handlers and
 	// closes our own synced channel when they are synced.
 	monitorCtx, cancel := context.WithCancelCause(ctx)
 	t.cancel = cancel
 	t.wg.Go(func() {
-		for _, handle := range []cache.ResourceEventHandlerRegistration{t.resourceSlicesHandle, t.deviceTaintsHandle, t.deviceClassesHandle} {
+		for _, handle := range []cache.ResourceEventHandlerRegistration{t.resourceSlicesHandle, t.deviceTaintsHandle} {
 			select {
 			case <-handle.HasSyncedChecker().Done():
 			case <-monitorCtx.Done():
@@ -283,7 +269,6 @@ func (t *Tracker) Stop() {
 	}
 	_ = t.resourceSlices.RemoveEventHandler(t.resourceSlicesHandle)
 	_ = t.deviceTaints.RemoveEventHandler(t.deviceTaintsHandle)
-	_ = t.deviceClasses.RemoveEventHandler(t.deviceClassesHandle)
 
 	t.wg.Wait()
 }
@@ -525,59 +510,6 @@ func (t *Tracker) deviceTaintDelete(ctx context.Context) func(obj any) {
 		}
 		logger.V(5).Info("DeviceTaintRule deleted", "patch", klog.KObj(patch))
 		for _, sliceName := range t.sliceNamesForPatch(ctx, patch) {
-			t.syncSlice(ctx, sliceName, false)
-		}
-	}
-}
-
-func (t *Tracker) deviceClassAdd(ctx context.Context) func(obj any) {
-	logger := klog.FromContext(ctx)
-	return func(obj any) {
-		class, ok := obj.(*resourceapi.DeviceClass)
-		if !ok {
-			return
-		}
-		logger.V(5).Info("DeviceClass add", "class", klog.KObj(class))
-		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-			t.syncSlice(ctx, sliceName, false)
-		}
-	}
-}
-
-func (t *Tracker) deviceClassUpdate(ctx context.Context) func(oldObj, newObj any) {
-	logger := klog.FromContext(ctx)
-	return func(oldObj, newObj any) {
-		oldClass, ok := oldObj.(*resourceapi.DeviceClass)
-		if !ok {
-			return
-		}
-		newClass, ok := newObj.(*resourceapi.DeviceClass)
-		if !ok {
-			return
-		}
-		if loggerV := logger.V(6); loggerV.Enabled() {
-			loggerV.Info("DeviceClass update", "class", klog.KObj(newClass), "diff", diff.Diff(oldClass, newClass))
-		} else {
-			logger.V(5).Info("DeviceClass update", "class", klog.KObj(newClass))
-		}
-		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-			t.syncSlice(ctx, sliceName, false)
-		}
-	}
-}
-
-func (t *Tracker) deviceClassDelete(ctx context.Context) func(obj any) {
-	logger := klog.FromContext(ctx)
-	return func(obj any) {
-		if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-			obj = tombstone.Obj
-		}
-		class, ok := obj.(*resourceapi.ResourceSlice)
-		if !ok {
-			return
-		}
-		logger.V(5).Info("DeviceClass delete", "class", klog.KObj(class))
-		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
 			t.syncSlice(ctx, sliceName, false)
 		}
 	}

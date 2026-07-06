@@ -292,7 +292,6 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	}
 	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
 		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
-		resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	tCtx.ExpectNoError(err, "start resource slice tracker")

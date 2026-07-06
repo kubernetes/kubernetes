@@ -132,22 +132,6 @@ func applyEventPair(tCtx *testContext, event any) {
 			require.NoError(tCtx, err)
 			tCtx.deviceTaintAdd(tCtx.Context)(pair[1])
 		}
-	case [2]*resourceapi.DeviceClass:
-		store := tCtx.deviceClasses.GetStore()
-		switch {
-		case pair[0] != nil && pair[1] != nil:
-			err := store.Update(pair[1])
-			require.NoError(tCtx, err)
-			tCtx.deviceClassUpdate(tCtx.Context)(pair[0], pair[1])
-		case pair[0] != nil:
-			err := store.Delete(pair[0])
-			require.NoError(tCtx, err)
-			tCtx.deviceClassDelete(tCtx.Context)(pair[0])
-		default:
-			err := store.Add(pair[1])
-			require.NoError(tCtx, err)
-			tCtx.deviceClassAdd(tCtx.Context)(pair[1])
-		}
 	}
 }
 
@@ -179,19 +163,6 @@ var (
 	device0Name = "device-0"
 	device1Name = "device-1"
 	device2Name = "device-2"
-
-	deviceClass1 = &resourceapi.DeviceClass{
-		ObjectMeta: metav1.ObjectMeta{Name: "device-class-1"},
-		Spec: resourceapi.DeviceClassSpec{
-			Selectors: []resourceapi.DeviceSelector{
-				{
-					CEL: &resourceapi.CELDeviceSelector{
-						Expression: `device.driver == "` + driver1 + `"`,
-					},
-				},
-			},
-		},
-	}
 
 	sliceWithDevices = func(slice *resourceapi.ResourceSlice, devices []resourceapi.Device) *resourceapi.ResourceSlice {
 		slice = slice.DeepCopy()
@@ -326,8 +297,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 	type test struct {
 		// events contains pairs of old and new objects which will
 		// be passed to event handler methods.
-		// Objects can be slices, device taint rules, and device
-		// classes.
+		// Objects can be slices and device taint rules.
 		// [add], [remove], and [update] can be used to produce
 		// such pairs.
 		//
@@ -494,7 +464,6 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 		"filter-all-criteria": {
 			events: []any{
-				add(deviceClass1),
 				add(
 					taintDriverDevicesRule(
 						taintPoolDevicesRule(
@@ -554,7 +523,6 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			EnableDeviceTaintRules: true,
 			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
 			TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
-			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:             kubeClient,
 		}
 		tracker, err := newTracker(ctx, opts)
@@ -962,7 +930,6 @@ func BenchmarkEventHandlers(b *testing.B) {
 			EnableDeviceTaintRules: true,
 			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
 			TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
-			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:             kubeClient,
 		}
 		tracker, err := newTracker(ctx, opts)
