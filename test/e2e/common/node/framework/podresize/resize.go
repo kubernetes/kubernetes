@@ -29,8 +29,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	helpers "k8s.io/component-helpers/resource"
 	"k8s.io/kubectl/pkg/util/podutils"
+	"k8s.io/kubernetes/pkg/features"
 	kubeqos "k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -45,13 +47,14 @@ const (
 )
 
 type ResizableContainerInfo struct {
-	Name          string
-	Resources     *cgroups.ContainerResources
-	CPUPolicy     *v1.ResourceResizeRestartPolicy
-	MemPolicy     *v1.ResourceResizeRestartPolicy
-	RestartCount  int32
-	RestartPolicy v1.ContainerRestartPolicy
-	InitCtr       bool
+	Name             string
+	Resources        *cgroups.ContainerResources
+	CPUPolicy        *v1.ResourceResizeRestartPolicy
+	MemPolicy        *v1.ResourceResizeRestartPolicy
+	RestartCount     int32
+	RestartPolicy    v1.ContainerRestartPolicy
+	InitCtr          bool
+	HasExclusiveCPUs bool
 }
 
 func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.ContainerResizePolicy) {
@@ -300,7 +303,8 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 	var errs []error
 	for _, ci := range tcInfo {
 		tc := makeResizableContainer(ci)
-		errs = append(errs, cgroups.VerifyContainerCgroupValues(ctx, f, pod, &tc, onCgroupv2))
+		disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && ci.HasExclusiveCPUs
+		errs = append(errs, cgroups.VerifyContainerCgroupValues(ctx, f, pod, &tc, onCgroupv2, disableCPUQuota))
 	}
 	return utilerrors.NewAggregate(errs)
 }
