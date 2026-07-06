@@ -59,6 +59,12 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			expectedHint: fwk.Queue,
 		},
 		{
+			name:         "add a newPod with NodeName set which matches the pod's scheduling group",
+			pod:          st.MakePod().Name("p").PodGroupName("pg").Obj(),
+			newPod:       st.MakePod().PodGroupName("pg").Node("node1").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
 			name:         "add a newPod which doesn't match the pod's namespace",
 			pod:          st.MakePod().Name("p").PodGroupName("pg").Obj(),
 			newPod:       st.MakePod().Namespace("foo").PodGroupName("pg").Obj(),
@@ -89,10 +95,10 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			}
 			actualHint, err := p.(*GangScheduling).isSchedulableAfterPodAdded(logger, tc.pod, nil, tc.newPod)
 			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
-				t.Errorf("Expected QueuingHint doesn't match (-want,+got):\n%s", diff)
+				t.Errorf("unexpected QueueingHint (-want, +got):\n%s", diff)
 			}
 		})
 	}

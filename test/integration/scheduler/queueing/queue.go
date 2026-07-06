@@ -121,15 +121,6 @@ type CoreResourceEnqueueTestCase struct {
 	EnableGangScheduling bool
 }
 
-var (
-	// These resources are unexported from the framework intentionally
-	// because they're only used internally for the metric labels/logging.
-	// We need to declare them here to use them in the test
-	// because this test is using the metric labels.
-	assignedPod      fwk.EventResource = "AssignedPod"
-	unschedulablePod fwk.EventResource = "UnschedulablePod"
-)
-
 // We define all the test cases here in the one place,
 // and those will be run either in ./former or ./queueinghint tests, depending on EnableSchedulingQueueHint.
 // We needed to do this because running all these test cases resulted in the timeout.
@@ -270,7 +261,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Container("image").Toleration("taint-key").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the pod: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.UpdatePodToleration}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodToleration}: 1}, nil
 		},
 		WantRequeuedPods: sets.New("pod1"),
 	},
@@ -328,7 +319,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateResize(testCtx.Ctx, "pod1", st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to resize the pod: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.UpdatePodScaleDown}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodScaleDown}: 1}, nil
 		},
 		WantRequeuedPods: sets.New("pod1"),
 	},
@@ -616,7 +607,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("key", "val").Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the pod: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.UpdatePodLabel}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
 		},
 		WantRequeuedPods: sets.Set[string]{},
 		// This behaviour is only true when enabling QHint
@@ -677,7 +668,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pod1: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
 		},
 		WantRequeuedPods:          sets.New("pod2"),
 		EnableSchedulingQueueHint: sets.New(true),
@@ -701,7 +692,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete pod1: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.Delete}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.Delete}: 1}, nil
 		},
 		WantRequeuedPods:          sets.New("pod3"),
 		EnableSchedulingQueueHint: sets.New(true),
@@ -725,7 +716,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete pod1: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.Delete}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.Delete}: 1}, nil
 		},
 		WantRequeuedPods:          sets.New("pod3"),
 		EnableSchedulingQueueHint: sets.New(true),
@@ -748,7 +739,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("aaa", "bbb").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pod1: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
 		},
 		WantRequeuedPods:          sets.New("pod2"),
 		EnableSchedulingQueueHint: sets.New(true),
@@ -2621,7 +2612,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
 				return nil, err
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.Update}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}: 1}, nil
 		},
 		WantRequeuedPods: sets.New("pod1"),
 	},
@@ -2647,7 +2638,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
 				return nil, err
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.Update}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}: 1}, nil
 		},
 		WantRequeuedPods: sets.Set[string]{},
 	},

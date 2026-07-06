@@ -76,7 +76,7 @@ func (pl *TaintToleration) EventsToRegister(_ context.Context) ([]fwk.ClusterEve
 			// the scheduling queue uses Pod/Update Queueing Hint
 			// to determine whether a Pod's update makes the Pod schedulable or not.
 			// https://github.com/kubernetes/kubernetes/pull/122234
-			{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
+			{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterTargetPodTolerationChange},
 		}, nil
 	}
 
@@ -225,20 +225,9 @@ func New(_ context.Context, _ runtime.Object, h fwk.Handle, fts feature.Features
 	}, nil
 }
 
-// isSchedulableAfterPodTolerationChange is invoked whenever a pod's toleration changed.
-func (pl *TaintToleration) isSchedulableAfterPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
-	if err != nil {
-		return fwk.Queue, err
-	}
-
-	if pod.UID == modifiedPod.UID {
-		// The updated Pod is the unschedulable Pod.
-		logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
-		return fwk.Queue, nil
-	}
-
-	logger.V(5).Info("a new toleration is added for a Pod, but it's an unrelated Pod and wouldn't change the TaintToleration plugin's decision", "pod", klog.KObj(modifiedPod))
-
-	return fwk.QueueSkip, nil
+// isSchedulableAfterTargetPodTolerationChange is invoked whenever a pod's toleration changed.
+func (pl *TaintToleration) isSchedulableAfterTargetPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	// The updated Pod is the unschedulable Pod.
+	logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(pod))
+	return fwk.Queue, nil
 }

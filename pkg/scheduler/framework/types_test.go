@@ -2367,7 +2367,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	}
 }
 
-func TestCloudEvent_Match(t *testing.T) {
+func TestClusterEventMatching(t *testing.T) {
 	testCases := []struct {
 		name        string
 		event       fwk.ClusterEvent
@@ -2381,15 +2381,15 @@ func TestCloudEvent_Match(t *testing.T) {
 			wantResult:  true,
 		},
 		{
-			name:        "event with resource = 'Pod' matching with coming events carries same actionType",
+			name:        "event with resource = 'Pod' matching with coming events carries matching actionType",
 			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel | fwk.UpdateNodeTaint},
 			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
-			name:        "event with resource = 'Pod' matching with coming events carries unschedulablePod",
+			name:        "event with resource = 'Pod' also matches event with 'UnscheduledPod' resource and matching actionType",
 			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel | fwk.UpdateNodeTaint},
-			comingEvent: fwk.ClusterEvent{Resource: unschedulablePod, ActionType: fwk.UpdateNodeLabel},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
@@ -2422,6 +2422,72 @@ func TestCloudEvent_Match(t *testing.T) {
 			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
+		{
+			name:        "event with resource = 'Pod' also matches event with 'UnscheduledPod' resource and matching actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel | fwk.UpdateNodeTaint},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = 'Pod' also matches event with AssignedPod resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = 'Pod' also matches event with 'TargetPod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeTaint},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdateNodeTaint},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource 'AssignedPod' does not match event with 'UnscheduledPod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'AssignedPod' does not match event with 'TargetPod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Update},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'TargetPod' does not match event with 'AssignedPod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Update},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'AssignedPod' does not match with broad 'Pod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'AssignedPod' does not match with 'WildCard' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.Add},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'UnscheduledPod' does not match with broad 'Pod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'UnscheduledPod' does not match with 'WildCard' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.Add},
+			wantResult:  false,
+		},
+		{
+			name:        "WildCard matches with a pod sub-type resource 'TargetPod' and any actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update},
+			wantResult:  true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2429,6 +2495,44 @@ func TestCloudEvent_Match(t *testing.T) {
 			got := MatchClusterEvents(tc.event, tc.comingEvent)
 			if got != tc.wantResult {
 				t.Fatalf("unexpected result")
+			}
+		})
+	}
+}
+
+func TestUnrollPodEvent(t *testing.T) {
+	tests := []struct {
+		name      string
+		event     fwk.ClusterEvent
+		wantTypes []fwk.EventResource
+	}{
+		{
+			name:      "Pod/Add unrolls into pod sub-types with add action type",
+			event:     fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add},
+			wantTypes: []fwk.EventResource{fwk.AssignedPod, fwk.UnscheduledPod, fwk.TargetPod},
+		},
+		{
+			name:      "Pod/Delete unrolls into pod sub-types with delete action type",
+			event:     fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete},
+			wantTypes: []fwk.EventResource{fwk.AssignedPod, fwk.UnscheduledPod, fwk.TargetPod},
+		},
+		{
+			name:      "Pod/Update unrolls into pod sub-types with update action type",
+			event:     fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Update},
+			wantTypes: []fwk.EventResource{fwk.AssignedPod, fwk.UnscheduledPod, fwk.TargetPod},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := UnrollPodEvent(tt.event)
+			for i, res := range tt.wantTypes {
+				if got[i].Resource != res {
+					t.Errorf("event[%d]: expected resource %q, got %q", i, res, got[i].Resource)
+				}
+				if got[i].ActionType != tt.event.ActionType {
+					t.Errorf("event[%d]: expected ActionType %v, got %v", i, tt.event.ActionType, got[i].ActionType)
+				}
 			}
 		})
 	}

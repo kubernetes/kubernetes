@@ -648,6 +648,7 @@ const (
 	fakeBind                       = "bind-plugin"
 	emptyEventExtensions           = "emptyEventExtensions"
 	fakePermit                     = "fakePermit"
+	fakeAssignedPod                = "fakeAssignedPodPlugin"
 )
 
 func Test_buildQueueingHintMap(t *testing.T) {
@@ -662,7 +663,13 @@ func Test_buildQueueingHintMap(t *testing.T) {
 			name:    "filter without EnqueueExtensions plugin",
 			plugins: []fwk.Plugin{&filterWithoutEnqueueExtensionsPlugin{}},
 			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: fwk.Pod, ActionType: fwk.All}: {
+				{Resource: fwk.AssignedPod, ActionType: fwk.All}: {
+					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: fwk.UnscheduledPod, ActionType: fwk.All}: {
+					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: fwk.TargetPod, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
 				{Resource: fwk.Node, ActionType: fwk.All}: {
@@ -701,7 +708,13 @@ func Test_buildQueueingHintMap(t *testing.T) {
 			name:    "node and pod plugin",
 			plugins: []fwk.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
 			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: fwk.Pod, ActionType: fwk.Add}: {
+				{Resource: fwk.AssignedPod, ActionType: fwk.Add}: {
+					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
+				},
+				{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}: {
+					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
+				},
+				{Resource: fwk.TargetPod, ActionType: fwk.Add}: {
 					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
 				},
 				{Resource: fwk.Node, ActionType: fwk.Add}: {
@@ -717,7 +730,13 @@ func Test_buildQueueingHintMap(t *testing.T) {
 			plugins:             []fwk.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
 			featuregateDisabled: true,
 			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: fwk.Pod, ActionType: fwk.Add}: {
+				{Resource: fwk.AssignedPod, ActionType: fwk.Add}: {
+					{PluginName: fakePod, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
+				},
+				{Resource: fwk.TargetPod, ActionType: fwk.Add}: {
+					{PluginName: fakePod, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
+				},
+				{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}: {
 					{PluginName: fakePod, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
 				},
 				{Resource: fwk.Node, ActionType: fwk.Add}: {
@@ -737,7 +756,13 @@ func Test_buildQueueingHintMap(t *testing.T) {
 			name:    "register plugins including emptyEventPlugin",
 			plugins: []fwk.Plugin{&emptyEventPlugin{}, &fakeNodePlugin{}},
 			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: fwk.Pod, ActionType: fwk.Add}: {
+				{Resource: fwk.AssignedPod, ActionType: fwk.Add}: {
+					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
+				},
+				{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}: {
+					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
+				},
+				{Resource: fwk.TargetPod, ActionType: fwk.Add}: {
 					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
 				},
 				{Resource: fwk.Node, ActionType: fwk.Add}: {
@@ -753,6 +778,15 @@ func Test_buildQueueingHintMap(t *testing.T) {
 			plugins: []fwk.Plugin{&errorEventsToRegisterPlugin{}},
 			want:    map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{},
 			wantErr: errors.New("mock error"),
+		},
+		{
+			name:    "plugin registering to a specific pod resource 'AssignedPod'",
+			plugins: []fwk.Plugin{&fakeAssignedPodPlugin{}},
+			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: fwk.AssignedPod, ActionType: fwk.Update}: {
+					{PluginName: fakeAssignedPod, QueueingHintFn: fakeAssignedPodPluginQueueingFn},
+				},
+			},
 		},
 	}
 
@@ -830,6 +864,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 }
 
 // Test_UnionedGVKs tests UnionedGVKs worked with buildQueueingHintMap.
+// It verifies that a given set of plugins is correctly registered for a specific set of cluster events.
 func Test_UnionedGVKs(t *testing.T) {
 	tests := []struct {
 		name                            string
@@ -852,7 +887,9 @@ func Test_UnionedGVKs(t *testing.T) {
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Pod:                   fwk.All,
+				fwk.AssignedPod:           fwk.All,
+				fwk.UnscheduledPod:        fwk.All,
+				fwk.TargetPod:             fwk.All,
 				fwk.Node:                  fwk.All,
 				fwk.CSINode:               fwk.All,
 				fwk.CSIDriver:             fwk.All,
@@ -875,7 +912,9 @@ func Test_UnionedGVKs(t *testing.T) {
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Pod:                   fwk.All,
+				fwk.AssignedPod:           fwk.All,
+				fwk.UnscheduledPod:        fwk.All,
+				fwk.TargetPod:             fwk.All,
 				fwk.Node:                  fwk.All,
 				fwk.CSINode:               fwk.All,
 				fwk.CSIDriver:             fwk.All,
@@ -917,7 +956,9 @@ func Test_UnionedGVKs(t *testing.T) {
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Pod: fwk.Add,
+				fwk.AssignedPod:    fwk.Add,
+				fwk.UnscheduledPod: fwk.Add,
+				fwk.TargetPod:      fwk.Add,
 			},
 		},
 		{
@@ -932,8 +973,10 @@ func Test_UnionedGVKs(t *testing.T) {
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Pod:  fwk.Add,
-				fwk.Node: fwk.Add | fwk.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+				fwk.AssignedPod:    fwk.Add,
+				fwk.UnscheduledPod: fwk.Add,
+				fwk.TargetPod:      fwk.Add,
+				fwk.Node:           fwk.Add | fwk.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 			},
 		},
 		{
@@ -952,7 +995,8 @@ func Test_UnionedGVKs(t *testing.T) {
 			name:    "plugins with default profile (No feature gate enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Pod:                   fwk.Add | fwk.UpdatePodLabel | fwk.Delete,
+				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.Delete,
+				fwk.TargetPod:             fwk.UpdatePodLabel,
 				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
@@ -967,7 +1011,8 @@ func Test_UnionedGVKs(t *testing.T) {
 			name:    "plugins with default profile (InPlacePodVerticalScaling: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Pod:                   fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
+				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
+				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodScaleDown,
 				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
@@ -983,7 +1028,8 @@ func Test_UnionedGVKs(t *testing.T) {
 			name:    "plugins with default profile (queueingHint/InPlacePodVerticalScaling: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Pod:                   fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Delete,
+				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
+				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.UpdatePodScaleDown,
 				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
@@ -1000,7 +1046,8 @@ func Test_UnionedGVKs(t *testing.T) {
 			name:    "plugins with default profile (DynamicResourceAllocation: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Pod:                   fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.Delete,
+				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.Delete,
+				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim,
 				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
@@ -1019,7 +1066,8 @@ func Test_UnionedGVKs(t *testing.T) {
 			name:    "plugins with default profile (queueingHint/DynamicResourceAllocation: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Pod:                   fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Delete,
+				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.Delete,
+				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated,
 				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
@@ -1040,7 +1088,8 @@ func Test_UnionedGVKs(t *testing.T) {
 			plugins: defaults.PluginsV1.MultiPoint,
 			want: map[fwk.EventResource]fwk.ActionType{
 				// NodeDeclaredFeatures adds fwk.Update
-				fwk.Pod: fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Delete | fwk.Update,
+				fwk.AssignedPod: fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
+				fwk.TargetPod:   fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Update,
 				// NodeDeclaredFeatures adds fwk.UpdateNodeDeclaredFeature
 				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature,
 				fwk.CSINode:               fwk.All - fwk.Delete,
@@ -1060,10 +1109,26 @@ func Test_UnionedGVKs(t *testing.T) {
 			enableInPlacePodVerticalScaling: true,
 		},
 		{
+			name: "plugin registering to a specific pod resource 'AssignedPod'",
+			plugins: schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: fakeAssignedPod},
+					{Name: queueSort},
+					{Name: fakeBind},
+				},
+				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
+			},
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.AssignedPod: fwk.Update,
+			},
+		},
+		{
 			name:    "plugins with default profile and GangScheduling",
 			plugins: schedulerapi.PluginSet{Enabled: append(defaults.PluginsV1.MultiPoint.Enabled, schedulerapi.Plugin{Name: names.GangScheduling})},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Pod:                   fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Delete,
+				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
+				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodScaleDown | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated,
+				fwk.UnscheduledPod:        fwk.Add,
 				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
@@ -1135,7 +1200,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			registry := plugins.NewInTreeRegistry()
 
 			cfgPls := &schedulerapi.Plugins{MultiPoint: tt.plugins}
-			plugins := []fwk.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}, &filterWithoutEnqueueExtensionsPlugin{}, &emptyEventsToRegisterPlugin{}, &fakeQueueSortPlugin{}, &fakebindPlugin{}}
+			plugins := []fwk.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}, &fakeAssignedPodPlugin{}, &filterWithoutEnqueueExtensionsPlugin{}, &emptyEventsToRegisterPlugin{}, &fakeQueueSortPlugin{}, &fakebindPlugin{}}
 			for _, pl := range plugins {
 				tmpPl := pl
 				if err := registry.Register(pl.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
@@ -1397,6 +1462,26 @@ func (*fakePodPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ f
 func (pl *fakePodPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return []fwk.ClusterEventWithHint{
 		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add}, QueueingHintFn: fakePodPluginQueueingFn},
+	}, nil
+}
+
+var hintFromFakeAssignedPod = fwk.QueueingHint(102)
+
+type fakeAssignedPodPlugin struct{}
+
+var fakeAssignedPodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
+	return hintFromFakeAssignedPod, nil
+}
+
+func (*fakeAssignedPodPlugin) Name() string { return fakeAssignedPod }
+
+func (*fakeAssignedPodPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
+	return nil
+}
+
+func (pl *fakeAssignedPodPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Update}, QueueingHintFn: fakeAssignedPodPluginQueueingFn},
 	}, nil
 }
 

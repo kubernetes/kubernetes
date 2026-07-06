@@ -148,7 +148,16 @@ const (
 	// the previous rejection from noderesources plugin can be resolved.
 	// this plugin would implement QueueingHint for Pod/Update event
 	// that returns Queue when such label changes are made in unscheduled Pods.
+	//
+	// There is one general pod resource: Pod, that contains three specific pod resources: AssignedPod, UnscheduledPod, and TargetPod.
+	// Plugins can and are expected to register to specific pod events for better performance.
 	Pod EventResource = "Pod"
+	// AssignedPod resource is associated with the cluster event that gets triggered when a scheduled pod is updated.
+	AssignedPod EventResource = "AssignedPod"
+	// UnscheduledPod resource is associated with the cluster event that gets triggered when an unscheduled pod is updated, other than the target pod.
+	UnscheduledPod EventResource = "UnscheduledPod"
+	// TargetPod resource is associated with the cluster event that gets triggered when an unscheduled pod itself is updated.
+	TargetPod EventResource = "TargetPod"
 
 	// A note about NodeAdd event and UpdateNodeTaint event:
 	// When QHint is disabled, NodeAdd often isn't worked expectedly because of the internal feature called preCheck.

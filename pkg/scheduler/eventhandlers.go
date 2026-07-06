@@ -286,7 +286,8 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 	}
 
 	defer metrics.EventHandlingLatency.ObserveSince(start, framework.EventUnscheduledPodUpdate.Label())()
-	for _, evt := range framework.PodSchedulingPropertiesChange(newPod, oldPod) {
+	// Target pod is not being updated here (target pod gets updated through sched.SchedulingQueue.Update call), hence isTargetPod is set to false.
+	for _, evt := range framework.PodSchedulingPropertiesChange(newPod, oldPod, false) {
 		if evt.Label() != framework.EventUnscheduledPodUpdate.Label() {
 			defer metrics.EventHandlingLatency.ObserveSince(start, evt.Label())()
 		}
@@ -409,7 +410,8 @@ func (sched *Scheduler) updateAssignedPodInCache(oldPod, newPod *v1.Pod) {
 		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
-	events := framework.PodSchedulingPropertiesChange(newPod, oldPod)
+	// This pod is assigned, so it cannot be a target pod.
+	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, false)
 
 	// Save the time it takes to update the pod in the cache.
 	updatingDuration := metrics.SinceInSeconds(start)

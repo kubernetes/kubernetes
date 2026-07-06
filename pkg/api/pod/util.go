@@ -486,6 +486,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// If old spec has userns and volume devices (doesn't work), we still allow
 		// modifications to it.
 		opts.AllowUserNamespacesWithVolumeDevices = hasUserNamespacesWithVolumeDevices(oldPodSpec)
+
+		// If old spec already had an image volume with empty reference, allow it
+		opts.AllowEmptyImageVolumeReference = hasEmptyImageVolumeReference(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -1781,6 +1784,19 @@ func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
 	}
 	for _, c := range podSpec.InitContainers {
 		if IsRestartableInitContainer(&c) && len(c.ResizePolicy) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// hasEmptyImageVolumeReference returns true if the pod spec has any image volume with an empty reference.
+func hasEmptyImageVolumeReference(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, v := range podSpec.Volumes {
+		if v.Image != nil && len(v.Image.Reference) == 0 {
 			return true
 		}
 	}

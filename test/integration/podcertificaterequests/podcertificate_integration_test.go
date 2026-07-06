@@ -497,7 +497,8 @@ func TestNodeAuthorization(t *testing.T) {
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err = node1Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
 		if err != nil {
-			return false, err
+			t.Logf("Create PodCertificateRequest default/pcr1 as node1 failed with error: %v, retrying...", err)
+			return false, nil
 		}
 		return true, nil
 	})
@@ -506,7 +507,16 @@ func TestNodeAuthorization(t *testing.T) {
 	}
 
 	t.Run("node1 can directly get pcr1", func(t *testing.T) {
-		_, err := node1Client.CertificatesV1beta1().PodCertificateRequests("default").Get(ctx, "pcr1", metav1.GetOptions{})
+		// Getting the PCR could fail if there is lag in the node authorizer graph population.
+		// Poll until it succeeds.
+		err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+			_, err := node1Client.CertificatesV1beta1().PodCertificateRequests("default").Get(ctx, "pcr1", metav1.GetOptions{})
+			if err != nil {
+				t.Logf("Get PodCertificateRequest default/pcr1 as node1 failed with error: %v, retrying...", err)
+				return false, nil
+			}
+			return true, nil
+		})
 		if err != nil {
 			t.Fatalf("Unexpected error listing PodCertificateRequests as node1: %v", err)
 		}

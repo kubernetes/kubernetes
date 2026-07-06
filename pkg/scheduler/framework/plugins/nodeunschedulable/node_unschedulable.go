@@ -71,36 +71,31 @@ func (pl *NodeUnschedulable) EventsToRegister(_ context.Context) ([]fwk.ClusterE
 		// the scheduling queue uses Pod/Update Queueing Hint
 		// to determine whether a Pod's update makes the Pod schedulable or not.
 		// https://github.com/kubernetes/kubernetes/pull/122234
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterTargetPodTolerationChange},
 	}, nil
 }
 
-// isSchedulableAfterPodTolerationChange is invoked whenever a pod's toleration changed.
-func (pl *NodeUnschedulable) isSchedulableAfterPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+// isSchedulableAfterTargetPodTolerationChange is invoked whenever a pod's toleration changed.
+func (pl *NodeUnschedulable) isSchedulableAfterTargetPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
 
-	if pod.UID == modifiedPod.UID {
-		// Note: we don't need to check oldPod tolerations the taint because:
-		// - Taint can be added, but can't be modified nor removed.
-		// - If the Pod already has the toleration, it shouldn't have rejected by this plugin in the first place.
-		//   Meaning, here this Pod has been rejected by this plugin, and hence it shouldn't have the toleration yet.
-		if v1helper.TolerationsTolerateTaint(logger, modifiedPod.Spec.Tolerations, &v1.Taint{
-			Key:    v1.TaintNodeUnschedulable,
-			Effect: v1.TaintEffectNoSchedule,
-		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)) {
-			// This update makes the pod tolerate the unschedulable taint.
-			logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
-			return fwk.Queue, nil
-		}
-		logger.V(5).Info("a new toleration is added for the unschedulable Pod, but it's an unrelated toleration", "pod", klog.KObj(modifiedPod))
-		return fwk.QueueSkip, nil
+	// Note: we don't need to check oldPod tolerations the taint because:
+	// - Taint can be added, but can't be modified nor removed.
+	// - If the Pod already has the toleration, it shouldn't have rejected by this plugin in the first place.
+	//   Meaning, here this Pod has been rejected by this plugin, and hence it shouldn't have the toleration yet.
+	if v1helper.TolerationsTolerateTaint(logger, modifiedPod.Spec.Tolerations, &v1.Taint{
+		Key:    v1.TaintNodeUnschedulable,
+		Effect: v1.TaintEffectNoSchedule,
+	}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)) {
+		// This update makes the pod tolerate the unschedulable taint.
+		logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
+		return fwk.Queue, nil
 	}
 
-	logger.V(5).Info("a new toleration is added for a Pod, but it's an unrelated Pod and wouldn't change the TaintToleration plugin's decision", "pod", klog.KObj(modifiedPod))
-
+	logger.V(5).Info("a new toleration is added for the unschedulable Pod, but it's an unrelated toleration", "pod", klog.KObj(modifiedPod))
 	return fwk.QueueSkip, nil
 }
 

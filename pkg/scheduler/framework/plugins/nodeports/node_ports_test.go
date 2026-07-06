@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -220,7 +219,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 }
 
-func Test_isSchedulableAfterPodDeleted(t *testing.T) {
+func Test_isSchedulableAfterAssignedPodDeleted(t *testing.T) {
 	podWithHostPort := st.MakePod().HostPort(8080)
 
 	testcases := map[string]struct {
@@ -262,15 +261,21 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			p, err := New(ctx, nil, nil, feature.Features{})
 			if err != nil {
-				t.Fatalf("Creating plugin: %v", err)
+				t.Fatalf("creating plugin: %v", err)
 			}
-			actualHint, err := p.(*NodePorts).isSchedulableAfterPodDeleted(logger, tc.pod, tc.oldObj, nil)
+			actualHint, err := p.(*NodePorts).isSchedulableAfterAssignedPodDeleted(logger, tc.pod, tc.oldObj, nil)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
 		})
 	}
 }

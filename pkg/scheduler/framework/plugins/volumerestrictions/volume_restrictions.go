@@ -343,7 +343,7 @@ func (pl *VolumeRestrictions) EventsToRegister(_ context.Context) ([]fwk.Cluster
 		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
 		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
 		// Due to immutable fields `spec.volumes`, pod update events are ignored.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeleted},
 		// A new Node may make a pod schedulable.
 		// We intentionally don't set QueueingHint since all Node/Add events could make Pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
@@ -380,12 +380,12 @@ func (pl *VolumeRestrictions) isSchedulableAfterPersistentVolumeClaimAdded(logge
 	return fwk.QueueSkip, nil
 }
 
-// isSchedulableAfterPodDeleted is invoked whenever a pod deleted,
+// isSchedulableAfterAssignedPodDeleted is invoked whenever an assigned pod is deleted,
 // It checks whether the deleted pod will conflict with volumes of other pods on the same node
-func (pl *VolumeRestrictions) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+func (pl *VolumeRestrictions) isSchedulableAfterAssignedPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
-		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterAssignedPodDeleted: %w", err)
 	}
 
 	if deletedPod.Namespace != pod.Namespace {

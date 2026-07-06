@@ -392,22 +392,7 @@ func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
 	}
 	logger.V(4).Info("Pod deleted", "pod", klog.KObj(pod))
 	if d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
-		// Sync if this Deployment now has no more Pods.
-		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client.AppsV1()))
-		if err != nil {
-			return
-		}
-		podMap, err := dc.getPodMapForDeployment(d, rsList)
-		if err != nil {
-			return
-		}
-		numPods := 0
-		for _, podList := range podMap {
-			numPods += len(podList)
-		}
-		if numPods == 0 {
-			dc.enqueueDeployment(d)
-		}
+		dc.enqueueDeployment(d)
 	}
 }
 

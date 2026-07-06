@@ -368,13 +368,6 @@ func getPreFilterState(cycleState fwk.CycleState) (*preFilterState, error) {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	podActionType := fwk.Delete
-	if f.enableInPlacePodVerticalScaling {
-		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then UpdatePodScaleDown event should be registered
-		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
-		podActionType |= fwk.UpdatePodScaleDown
-	}
-
 	// A note about UpdateNodeTaint/UpdateNodeLabel event:
 	// Ideally, it's supposed to register only Add | UpdateNodeAllocatable because the only resource update could change the node resource fit plugin's result.
 	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
@@ -386,7 +379,7 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 	}
 
 	events := []fwk.ClusterEventWithHint{
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodEvent},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: f.isSchedulableAfterAssignedPodDelete},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}, QueueingHintFn: f.isSchedulableAfterNodeChange},
 	}
 	if f.enableDRAExtendedResource {
@@ -394,35 +387,49 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 			// A pod might be waiting for an exteneded resurce from a class to get created or modified.
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: f.isSchedulableAfterDeviceClassEvent})
 	}
+	if f.enableInPlacePodVerticalScaling {
+		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then UpdatePodScaleDown event should be registered
+		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
+		events = append(events,
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleDown},
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleDown})
+	}
 	return events, nil
 }
 
-// isSchedulableAfterPodEvent is invoked whenever a pod deleted or scaled down. It checks whether
-// that change made a previously unschedulable pod schedulable.
-func (f *Fit) isSchedulableAfterPodEvent(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+// isSchedulableAfterAssignedPodDelete is invoked whenever a scheduled pod
+// is deleted and checks whether that change could make a previously unschedulable pod schedulable.
+func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	deletedPod, _, err := schedutil.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+
+	if deletedPod.Spec.NodeName == "" && deletedPod.Status.NominatedNodeName == "" {
+		logger.V(5).Info("the deleted pod was unscheduled and it wouldn't make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+		return fwk.QueueSkip, nil
+	}
+
+	// any deletion event to a scheduled pod could make the unscheduled pod schedulable.
+	logger.V(5).Info("another scheduled pod was deleted, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	return fwk.Queue, nil
+}
+
+// isSchedulableAfterTargetPodScaleDown is invoked when the target pod is scaled down, making itself schedulable.
+func (f *Fit) isSchedulableAfterTargetPodScaleDown(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	logger.V(5).Info("the target pod got scaled down and it may be schedulable now", "pod", klog.KObj(pod))
+	return fwk.Queue, nil
+}
+
+// isSchedulableAfterAssignedPodScaleDown is invoked when a scheduled pod got scaled down, and checks
+// whether that change could make a previously unschedulable pod schedulable.
+func (f *Fit) isSchedulableAfterAssignedPodScaleDown(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalPod, modifiedPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
 
-	if modifiedPod == nil {
-		if originalPod.Spec.NodeName == "" && originalPod.Status.NominatedNodeName == "" {
-			logger.V(5).Info("the deleted pod was unscheduled and it wouldn't make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(originalPod))
-			return fwk.QueueSkip, nil
-		}
-
-		// any deletion event to a scheduled pod could make the unscheduled pod schedulable.
-		logger.V(5).Info("another scheduled pod was deleted, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(originalPod))
-		return fwk.Queue, nil
-	}
-
-	if !f.enableInPlacePodVerticalScaling {
-		// If InPlacePodVerticalScaling (KEP 1287) is disabled, the pod scale down event cannot free up any resources.
-		logger.V(5).Info("another pod was modified, but InPlacePodVerticalScaling is disabled, so it doesn't make the unscheduled pod schedulable", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-		return fwk.QueueSkip, nil
-	}
-
-	if !f.isSchedulableAfterPodScaleDown(pod, originalPod, modifiedPod) {
+	if !f.haveEnoughRelevantResourcesDecreased(pod, originalPod, modifiedPod) {
 		if loggerV := logger.V(10); loggerV.Enabled() {
 			// Log more information.
 			loggerV.Info("pod got scaled down, but the modification isn't related to the resource requests of the target pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod), "diff", diff.Diff(originalPod, modifiedPod))
@@ -432,19 +439,12 @@ func (f *Fit) isSchedulableAfterPodEvent(logger klog.Logger, pod *v1.Pod, oldObj
 		return fwk.QueueSkip, nil
 	}
 
-	logger.V(5).Info("another scheduled pod or the target pod itself got scaled down, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
+	logger.V(5).Info("another scheduled pod got scaled down, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 	return fwk.Queue, nil
 }
 
-// isSchedulableAfterPodScaleDown checks whether the scale down event may make the target pod schedulable. Specifically:
-// - Returns true when the update event is for the target pod itself.
-// - Returns true when the update event shows a scheduled pod's resource request that the target pod also requests got reduced.
-func (f *Fit) isSchedulableAfterPodScaleDown(targetPod, originalPod, modifiedPod *v1.Pod) bool {
-	if modifiedPod.UID == targetPod.UID {
-		// If the scaling down event is for targetPod, it would make targetPod schedulable.
-		return true
-	}
-
+// haveAnyEnoughRelevantResourcesDecreased checks whether a scheduled pod's resource request that the target pod also requests got reduced.
+func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPod, modifiedPod *v1.Pod) bool {
 	if modifiedPod.Spec.NodeName == "" {
 		// If the update event is for a unscheduled Pod,
 		// it wouldn't make targetPod schedulable.

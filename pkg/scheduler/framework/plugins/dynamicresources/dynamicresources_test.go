@@ -4304,10 +4304,10 @@ func testIsSchedulableAfterClaimChange(tCtx ktesting.TContext) {
 	}
 }
 
-func TestIsSchedulableAfterPodChange(t *testing.T) {
-	testIsSchedulableAfterPodChange(ktesting.Init(t))
+func TestIsSchedulableAfterTargetPodUpdate(t *testing.T) {
+	testIsSchedulableAfterTargetPodUpdate(ktesting.Init(t))
 }
-func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
+func testIsSchedulableAfterTargetPodUpdate(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
 		objs     []apiruntime.Object
 		pod      *v1.Pod
@@ -4326,17 +4326,6 @@ func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
 			pod:      podWithClaimTemplate,
 			obj:      podWithClaimTemplateInStatus,
 			wantHint: fwk.Queue,
-		},
-		"wrong-pod": {
-			objs: []apiruntime.Object{pendingClaim},
-			pod: func() *v1.Pod {
-				pod := podWithClaimTemplate.DeepCopy()
-				pod.Name += "2"
-				pod.UID += "2" // This is the relevant difference.
-				return pod
-			}(),
-			obj:      podWithClaimTemplateInStatus,
-			wantHint: fwk.QueueSkip,
 		},
 		"missing-claim": {
 			objs:     nil,
@@ -4369,7 +4358,7 @@ func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
 				EnableDRAResourceClaimDeviceStatus: true,
 			}
 			testCtx := setup(tCtx, nil, nil, tc.claims, nil, nil, tc.objs, features, false, nil)
-			gotHint, err := testCtx.p.isSchedulableAfterPodChange(tCtx.Logger(), tc.pod, nil, tc.obj)
+			gotHint, err := testCtx.p.isSchedulableAfterTargetPodUpdate(tCtx.Logger(), tc.pod, nil, tc.obj)
 			if tc.wantErr {
 				if err == nil {
 					tCtx.Fatal("want an error, got none")

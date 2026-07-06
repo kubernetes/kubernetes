@@ -1264,7 +1264,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	skipPlugin := "skipPlugin"
 	queueingHintMap := QueueingHintMapPerProfile{
 		"": {
-			framework.EventUnscheduledPodUpdate: {
+			framework.EventTargetPodUpdate: {
 				{
 					PluginName:     queuePlugin,
 					QueueingHintFn: queueHintReturnQueue,
@@ -1459,7 +1459,7 @@ func TestPriorityQueue_UpdateWhenInflight(t *testing.T) {
 
 	m := makeEmptyQueueingHintMapPerProfile()
 	// fakePlugin could change its scheduling result by any updates in Pods.
-	m[""][framework.EventUnscheduledPodUpdate] = []*QueueingHintFunction{
+	m[""][framework.EventTargetPodUpdate] = []*QueueingHintFunction{
 		{
 			PluginName:     "fakePlugin",
 			QueueingHintFn: queueHintReturnQueue,
@@ -2586,7 +2586,7 @@ func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
 			name:               "Pod rejected by pod affinity is requeued with matching Pod's update",
 			unschedPod:         st.MakePod().Name("afp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").PodAffinityExists("service", "region", st.PodAffinityWithRequiredReq).Obj(),
 			unschedPlugin:      names.InterPodAffinity,
-			event:              fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodLabel},
+			event:              fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel},
 			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("ns1").Label("service", "securityscan").Node("node1").Obj(),
 			wantToRequeue:      true,
 		},
@@ -2594,7 +2594,7 @@ func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
 			name:               "Pod rejected by pod affinity isn't requeued with unrelated Pod's update",
 			unschedPod:         st.MakePod().Name("afp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").PodAffinityExists("service", "region", st.PodAffinityWithRequiredReq).Obj(),
 			unschedPlugin:      names.InterPodAffinity,
-			event:              fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodLabel},
+			event:              fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel},
 			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("unrelated").Label("unrelated", "unrelated").Node("node1").Obj(),
 			wantToRequeue:      false,
 		},
@@ -2602,7 +2602,7 @@ func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
 			name:               "Pod rejected by pod topology spread is requeued with Pod's update in the same namespace",
 			unschedPod:         st.MakePod().Name("tsp").Namespace("ns1").UID("tsp").SpreadConstraint(1, "node", v1.DoNotSchedule, nil, nil, nil, nil, nil).Obj(),
 			unschedPlugin:      names.PodTopologySpread,
-			event:              fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodLabel},
+			event:              fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel},
 			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("ns1").Label("service", "securityscan").Node("node1").Obj(),
 			wantToRequeue:      true,
 		},
@@ -2610,7 +2610,7 @@ func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
 			name:               "Pod rejected by pod topology spread isn't requeued with unrelated Pod's update",
 			unschedPod:         st.MakePod().Name("afp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").PodAffinityExists("service", "region", st.PodAffinityWithRequiredReq).Obj(),
 			unschedPlugin:      names.PodTopologySpread,
-			event:              fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodLabel},
+			event:              fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel},
 			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("unrelated").Label("unrelated", "unrelated").Node("node1").Obj(),
 			wantToRequeue:      false,
 		},
@@ -2618,7 +2618,7 @@ func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
 			name:               "Pod rejected by resource fit is requeued with assigned Pod's scale down",
 			unschedPod:         st.MakePod().Name("rp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			unschedPlugin:      names.NodeResourcesFit,
-			event:              fwk.ClusterEvent{Resource: fwk.EventResource("AssignedPod"), ActionType: fwk.UpdatePodScaleDown},
+			event:              fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown},
 			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("ns2").Node("node1").Obj(),
 			wantToRequeue:      true,
 		},
@@ -2626,7 +2626,7 @@ func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
 			name:               "Pod rejected by other plugins isn't requeued with any Pod's update",
 			unschedPod:         st.MakePod().Name("afp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").Obj(),
 			unschedPlugin:      "fakePlugin",
-			event:              fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodLabel},
+			event:              fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel},
 			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("unrelated").Label("unrelated", "unrelated").Node("node1").Obj(),
 			wantToRequeue:      false,
 		},
@@ -2641,7 +2641,7 @@ func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
 			c := testingclock.NewFakeClock(time.Now())
 			m := makeEmptyQueueingHintMapPerProfile()
 			m[""] = map[fwk.ClusterEvent][]*QueueingHintFunction{
-				{Resource: fwk.Pod, ActionType: fwk.UpdatePodLabel}: {
+				{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel}: {
 					{
 						PluginName:     "fakePlugin",
 						QueueingHintFn: queueHintReturnQueue,
@@ -2655,7 +2655,7 @@ func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
 						QueueingHintFn: queueHintReturnQueue,
 					},
 				},
-				{Resource: fwk.Pod, ActionType: fwk.UpdatePodScaleDown}: {
+				{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}: {
 					{
 						PluginName:     names.NodeResourcesFit,
 						QueueingHintFn: queueHintReturnQueue,
@@ -3970,7 +3970,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 			resetPodInfos()
 
 			m := makeEmptyQueueingHintMapPerProfile()
-			m[""][framework.EventUnscheduledPodUpdate] = []*QueueingHintFunction{
+			m[""][framework.EventTargetPodUpdate] = []*QueueingHintFunction{
 				{
 					PluginName:     preenqueuePluginName,
 					QueueingHintFn: queueHintReturnQueue,
@@ -4134,37 +4134,37 @@ func TestIncomingPodsMetrics(t *testing.T) {
 				add,
 			},
 			want: `
-            scheduler_queue_incoming_pods_total{event="UnschedulablePodAdd",queue="active"} 3
+            scheduler_queue_incoming_pods_total{event="UnscheduledPodAdd",queue="active"} 3
 `,
 		},
 		{
-			name: "add pods to unschedulablePods",
+			name: "add unscheduled pods then make them unschedulable",
 			operations: []operation{
 				popAndRequeueAsUnschedulable,
 			},
-			want: `scheduler_queue_incoming_pods_total{event="UnschedulablePodAdd",queue="active"} 3
+			want: `scheduler_queue_incoming_pods_total{event="UnscheduledPodAdd",queue="active"} 3
              scheduler_queue_incoming_pods_total{event="ScheduleAttemptFailure",queue="unschedulable"} 3
 `,
 		},
 		{
-			name: "add pods to unschedulablePods and then move all to backoffQ",
+			name: "add unscheduled pods, make them unschedulable, and move them to backoffQ",
 			operations: []operation{
 				popAndRequeueAsUnschedulable,
 				moveAllToActiveOrBackoffQ,
 			},
-			want: `scheduler_queue_incoming_pods_total{event="UnschedulablePodAdd",queue="active"} 3
+			want: `scheduler_queue_incoming_pods_total{event="UnscheduledPodAdd",queue="active"} 3
 			scheduler_queue_incoming_pods_total{event="ScheduleAttemptFailure",queue="unschedulable"} 3
             scheduler_queue_incoming_pods_total{event="UnschedulableTimeout",queue="backoff"} 3
 `,
 		},
 		{
-			name: "add pods to unschedulablePods and then move all to activeQ",
+			name: "add unscheduled pods, make them unschedulable, and move them to activeQ",
 			operations: []operation{
 				popAndRequeueAsUnschedulable,
 				moveClockForward,
 				moveAllToActiveOrBackoffQ,
 			},
-			want: `scheduler_queue_incoming_pods_total{event="UnschedulablePodAdd",queue="active"} 3
+			want: `scheduler_queue_incoming_pods_total{event="UnscheduledPodAdd",queue="active"} 3
 			scheduler_queue_incoming_pods_total{event="ScheduleAttemptFailure",queue="unschedulable"} 3
             scheduler_queue_incoming_pods_total{event="UnschedulableTimeout",queue="active"} 3
 `,
@@ -4176,7 +4176,7 @@ func TestIncomingPodsMetrics(t *testing.T) {
 				moveClockForward,
 				flushBackoffQ,
 			},
-			want: `scheduler_queue_incoming_pods_total{event="UnschedulablePodAdd",queue="active"} 3
+			want: `scheduler_queue_incoming_pods_total{event="UnscheduledPodAdd",queue="active"} 3
 			scheduler_queue_incoming_pods_total{event="BackoffComplete",queue="active"} 3
             scheduler_queue_incoming_pods_total{event="ScheduleAttemptFailure",queue="backoff"} 3
 `,

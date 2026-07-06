@@ -116,16 +116,16 @@ func (pl *NodePorts) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWith
 
 	return []fwk.ClusterEventWithHint{
 		// Due to immutable fields `spec.containers[*].ports`, pod update events are ignored.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeleted},
 		// We don't need the QueueingHintFn here because the scheduling of Pods will be always retried with backoff when this Event happens.
 		// (the same as Queue)
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
 	}, nil
 }
 
-// isSchedulableAfterPodDeleted is invoked whenever a pod deleted. It checks whether
+// isSchedulableAfterAssignedPodDeleted is invoked whenever an assigned pod is deleted. It checks whether
 // that change made a previously unschedulable pod schedulable.
-func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+func (pl *NodePorts) isSchedulableAfterAssignedPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, nil)
 	if err != nil {
 		return fwk.Queue, err

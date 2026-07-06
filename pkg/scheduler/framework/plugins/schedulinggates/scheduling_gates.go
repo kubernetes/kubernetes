@@ -27,7 +27,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // Name of the plugin used in the plugin registry and configurations.
@@ -68,7 +67,7 @@ func (pl *SchedulingGates) EventsToRegister(_ context.Context) ([]fwk.ClusterEve
 	// https://github.com/kubernetes/kubernetes/pull/122234
 	return []fwk.ClusterEventWithHint{
 		// Pods can be more schedulable once it's gates are removed
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodSchedulingGatesEliminated}, QueueingHintFn: pl.isSchedulableAfterUpdatePodSchedulingGatesEliminated},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodSchedulingGatesEliminated}, QueueingHintFn: pl.isSchedulableAfterUpdateTargetPodSchedulingGatesEliminated},
 	}, nil
 }
 
@@ -79,16 +78,6 @@ func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features
 	}, nil
 }
 
-func (pl *SchedulingGates) isSchedulableAfterUpdatePodSchedulingGatesEliminated(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
-	if err != nil {
-		return fwk.Queue, err
-	}
-
-	if modifiedPod.UID != pod.UID {
-		// If the update event is not for targetPod, it wouldn't make targetPod schedulable.
-		return fwk.QueueSkip, nil
-	}
-
+func (pl *SchedulingGates) isSchedulableAfterUpdateTargetPodSchedulingGatesEliminated(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	return fwk.Queue, nil
 }
