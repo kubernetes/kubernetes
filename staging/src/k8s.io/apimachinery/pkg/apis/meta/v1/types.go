@@ -1653,6 +1653,7 @@ type Condition struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Format=date-time
+	// +k8s:alpha(since: "1.37")=+k8s:customValidation
 	LastTransitionTime Time `json:"lastTransitionTime" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	// reason contains a programmatic identifier indicating the reason for the condition's last transition.
 	// Producers of specific condition types may define expected values and meanings for this field,

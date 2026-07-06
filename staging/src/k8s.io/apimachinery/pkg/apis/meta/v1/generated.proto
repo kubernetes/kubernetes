@@ -221,6 +221,7 @@ message Condition {
   // +kubebuilder:validation:Required
   // +kubebuilder:validation:Type=string
   // +kubebuilder:validation:Format=date-time
+  // +k8s:alpha(since: "1.37")=+k8s:customValidation
   optional Time lastTransitionTime = 4;
 
   // reason contains a programmatic identifier indicating the reason for the condition's last transition.
