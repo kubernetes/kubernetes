@@ -61,8 +61,10 @@ type PodGroupLister interface {
 }
 
 // MutableSnapshotSharedLister interface represents a lister that allows mutating snapshot and restoring it afterwards.
+// It extends SharedLister interface.
 // Only PodGroupPostFilter extension point can use this.
 type MutableSnapshotSharedLister interface {
+	SharedLister
 	// StartMutations starts a mutation session.
 	// It is used for operations requiring modifying snapshot state for checking multiple scenarios.
 	// There can be only one mutation session at the moment.

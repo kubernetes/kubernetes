@@ -218,13 +218,15 @@ func TestDryRunPreemption(t *testing.T) {
 			parallelism := parallelize.DefaultParallelism
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			snapshot := internalcache.NewSnapshot(tt.initPods, tt.nodes)
 			fwk, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, tt.nodes)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
@@ -233,7 +235,6 @@ func TestDryRunPreemption(t *testing.T) {
 
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
-			snapshot := internalcache.NewSnapshot(tt.initPods, tt.nodes)
 			nodeInfos, err := snapshot.NodeInfos().List()
 			if err != nil {
 				t.Fatal(err)
@@ -326,6 +327,7 @@ func TestSelectCandidate(t *testing.T) {
 				"",
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
@@ -583,7 +585,7 @@ func TestCallExtenders(t *testing.T) {
 			apiDispatcher := apidispatcher.New(cs, 16, apicalls.Relevances)
 			apiDispatcher.Run(logger)
 			defer apiDispatcher.Close()
-
+			snapshot := internalcache.NewSnapshot([]*v1.Pod{preemptor}, nodes)
 			fwk, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
@@ -592,7 +594,8 @@ func TestCallExtenders(t *testing.T) {
 				frameworkruntime.WithLogger(logger),
 				frameworkruntime.WithExtenders(tt.extenders),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot([]*v1.Pod{preemptor}, nodes)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 			)
 			if err != nil {

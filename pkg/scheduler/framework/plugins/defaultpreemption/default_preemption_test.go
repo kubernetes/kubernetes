@@ -526,6 +526,7 @@ func TestPostFilter(t *testing.T) {
 				for _, podGroup := range tt.podGroups {
 					cache.AddPodGroup(podGroup)
 				}
+				snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.pods, tt.nodes, tt.podGroups)
 
 				f, err := tf.NewFramework(ctx, registeredPlugins, "",
 					frameworkruntime.WithClientSet(cs),
@@ -534,7 +535,8 @@ func TestPostFilter(t *testing.T) {
 					frameworkruntime.WithInformerFactory(informerFactory),
 					frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 					frameworkruntime.WithExtenders(extenders),
-					frameworkruntime.WithSnapshotSharedLister(internalcache.NewTestSnapshotWithPodGroups(tt.pods, tt.nodes, tt.podGroups)),
+					frameworkruntime.WithSnapshotSharedLister(snapshot),
+					frameworkruntime.WithMutableSnapshotLister(snapshot),
 					frameworkruntime.WithLogger(logger),
 					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 					frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
@@ -1276,6 +1278,7 @@ func TestDryRunPreemption(t *testing.T) {
 				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
 				frameworkruntime.WithLogger(logger),
@@ -1522,6 +1525,7 @@ func TestSelectBestCandidate(t *testing.T) {
 				"",
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithLogger(logger),
 			)
@@ -1746,6 +1750,7 @@ func TestCustomSelection(t *testing.T) {
 				"",
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithLogger(logger),
 			)
@@ -1884,6 +1889,7 @@ func TestCustomOrdering(t *testing.T) {
 				"",
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithLogger(logger),
 			)
@@ -1995,8 +2001,10 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
+			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			f, err := tf.NewFramework(ctx, registeredPlugins, "",
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithLogger(logger),
 			)
@@ -2286,6 +2294,7 @@ func TestPreempt(t *testing.T) {
 						extender.CachedNodeNameToInfo = cachedNodeInfoMap
 						extenders = append(extenders, extender)
 					}
+					snapshot := internalcache.NewSnapshot(testPods, nodes)
 					schedFramework, err := tf.NewFramework(
 						ctx,
 						[]tf.RegisterPluginFunc{
@@ -2299,7 +2308,8 @@ func TestPreempt(t *testing.T) {
 						frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 						frameworkruntime.WithExtenders(extenders),
 						frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
-						frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(testPods, nodes)),
+						frameworkruntime.WithSnapshotSharedLister(snapshot),
+						frameworkruntime.WithMutableSnapshotLister(snapshot),
 						frameworkruntime.WithInformerFactory(informerFactory),
 						frameworkruntime.WithWaitingPods(waitingPods),
 						frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
@@ -2834,7 +2844,7 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 			f, err := tf.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
-				frameworkruntime.WithMutableSnapshotLister(&mockMutableSnapshotLister{startMutationError: tt.startMutationError, endMutationError: tt.endMutationError}), // not concrete *cache.Snapshot
+				frameworkruntime.WithMutableSnapshotLister(&mockMutableSnapshotLister{MutableSnapshotSharedLister: snapshot, startMutationError: tt.startMutationError, endMutationError: tt.endMutationError}), // not concrete *cache.Snapshot
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithLogger(logger),
 				frameworkruntime.WithPodGroupManager(cache),
@@ -2877,10 +2887,6 @@ type mockMutableSnapshotLister struct {
 	fwk.MutableSnapshotSharedLister
 	startMutationError error
 	endMutationError   error
-}
-
-func (m *mockMutableSnapshotLister) NodeInfos() fwk.NodeInfoLister {
-	return nil
 }
 
 func (m *mockMutableSnapshotLister) StartMutations() error {

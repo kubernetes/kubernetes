@@ -52,7 +52,7 @@ func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor, enablePodGroupPreem
 	return &PodGroupEvaluator{
 		Handle:                         fh,
 		pdbLister:                      fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
-		podGroupSnapshot:               fh.SnapshotSharedLister().PodGroups(),
+		podGroupSnapshot:               fh.MutableSnapshotSharedLister().PodGroups(),
 		enablePodGroupPreemptionPolicy: enablePodGroupPreemptionPolicy,
 		Executor:                       executor,
 	}
@@ -72,7 +72,7 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodG
 	// In case of workload-aware preemption, the domain is whole cluster.
 	// We do not make a snapshot of node info. Those nodes will be shared
 	// with the PodGroup scheduling algorithm passed as podGroupSchedulingFunc.
-	allNodes, err := ev.Handle.SnapshotSharedLister().NodeInfos().List()
+	allNodes, err := ev.Handle.MutableSnapshotSharedLister().NodeInfos().List()
 	if err != nil {
 		return nil, fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err))
 	}
