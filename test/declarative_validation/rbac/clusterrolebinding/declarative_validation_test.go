@@ -98,25 +98,21 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidClusterRoleBinding(),
 			update: mkValidClusterRoleBinding(tweakRoleRefName("different-role")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("roleRef"), rbac.RoleRef{
-					APIGroup: "rbac.authorization.k8s.io",
-					Kind:     "ClusterRole",
-					Name:     "different-role",
-				}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("roleRef"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"roleRef set from unset - invalid": {
 			old:    mkValidClusterRoleBinding(tweakRoleRef(rbac.RoleRef{})),
 			update: mkValidClusterRoleBinding(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("roleRef"), rbac.RoleRef{}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("roleRef"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"roleRef unset from set - invalid": {
 			old:    mkValidClusterRoleBinding(),
 			update: mkValidClusterRoleBinding(tweakRoleRef(rbac.RoleRef{})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("roleRef"), rbac.RoleRef{}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("roleRef"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 				field.Required(field.NewPath("roleRef", "name"), "").MarkShortCircuitedInDV(),
 				field.NotSupported(field.NewPath("roleRef", "kind"), "", []string{}).MarkFromImperative(),
 				field.NotSupported(field.NewPath("roleRef", "apiGroup"), "", []string{}).MarkFromImperative(),
