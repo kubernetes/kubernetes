@@ -656,7 +656,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
 			errMsg := fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
-			setProgressingCondition(&status, v1.ConditionFalse, UnknownStrategyReason, errMsg.Error())
+			ssc.podControl.recorder.Event(set, v1.EventTypeWarning, "UnknownStrategy", errMsg.Error())
 			return &status, errMsg
 		}
 
@@ -720,7 +720,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
 			errMsg := fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
-			setProgressingCondition(&status, v1.ConditionFalse, UnknownStrategyReason, errMsg.Error())
+			ssc.podControl.recorder.Event(set, v1.EventTypeWarning, "UnknownStrategy", errMsg.Error())
 			return &status, errMsg
 		}
 		return &status, nil

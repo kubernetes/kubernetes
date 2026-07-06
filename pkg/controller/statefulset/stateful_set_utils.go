@@ -50,9 +50,6 @@ const (
 	// RecreateCompletedReason is set on the Progressing condition when all pods
 	// have been recreated with the update revision and are ready.
 	RecreateCompletedReason = "RecreateCompleted"
-	// UnknownStrategyReason is set on the Progressing condition when the UpdateStrategy
-	// is not recognized.
-	UnknownStrategyReason = "UnknownStrategy"
 )
 
 var patchCodec = scheme.Codecs.LegacyCodec(apps.SchemeGroupVersion)
