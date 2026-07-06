@@ -290,6 +290,10 @@ message CSINode {
 
   // spec is the specification of CSINode
   optional CSINodeSpec spec = 2;
+
+  // status contains health and status information for the node's storage.
+  // +optional
+  optional CSINodeStatus status = 3;
 }
 
 // CSINodeDriver holds information about the specification of one CSI driver installed on a node
@@ -350,6 +354,19 @@ message CSINodeSpec {
   // +listType=map
   // +listMapKey=name
   repeated CSINodeDriver drivers = 1;
+}
+
+// CSINodeStatus contains health and status information for storage on a node.
+message CSINodeStatus {
+  // storageHealth is the set of backend health reports for
+  // each CSI driver registered on the node.
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  // +listMapKey=status
+  // +listMapKey=reason
+  // +featureGate=CSIVolumeHealth
+  repeated StorageHealthCondition storageHealth = 1;
 }
 
 // CSIStorageCapacity stores the result of one CSI GetCapacity call.
@@ -512,6 +529,38 @@ message StorageClassList {
 
   // items is the list of StorageClasses
   repeated StorageClass items = 2;
+}
+
+// StorageHealthCondition represents an adverse health condition reported
+// by a CSI driver for its storage backend on a node.
+message StorageHealthCondition {
+  // name is the CSI driver name, matching CSINodeDriver.name.
+  optional string name = 1;
+
+  // status is the health status category.
+  // One of "StorageUnreachable", "StorageDegraded".
+  optional string status = 2;
+
+  // reason is a brief CamelCase machine-parseable reason.
+  // Together with name and status it forms the unique identity of a condition entry.
+  optional string reason = 3;
+
+  // message is a human-readable description.
+  // +optional
+  optional string message = 4;
+
+  // accessModes are the access modes affected. An empty list means all access modes are affected.
+  // +optional
+  // +listType=atomic
+  repeated string accessModes = 5;
+
+  // volumeMode is the volume mode affected. Nil means both are affected.
+  // +optional
+  optional string volumeMode = 6;
+
+  // lastTransitionTime is when this condition first appeared at its current state.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
 }
 
 // TokenRequest contains parameters of a service account token.

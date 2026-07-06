@@ -57,6 +57,11 @@ func (in CSINodeSpec) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CSINodeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.storage.v1beta1.CSINodeStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CSIStorageCapacity) OpenAPIModelName() string {
 	return "io.k8s.api.storage.v1beta1.CSIStorageCapacity"
 }
@@ -74,6 +79,11 @@ func (in StorageClass) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in StorageClassList) OpenAPIModelName() string {
 	return "io.k8s.api.storage.v1beta1.StorageClassList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in StorageHealthCondition) OpenAPIModelName() string {
+	return "io.k8s.api.storage.v1beta1.StorageHealthCondition"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

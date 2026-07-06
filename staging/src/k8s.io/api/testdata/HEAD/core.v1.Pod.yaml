@@ -1504,3 +1504,10 @@ status:
     requests:
       requestsKey: "0"
   startTime: "2007-01-01T01:01:01Z"
+  volumeHealth:
+  - healthConditions:
+    - message: messageValue
+      reason: reasonValue
+      status: statusValue
+    lastTransitionTime: "2003-01-01T01:01:01Z"
+    name: nameValue

@@ -113,6 +113,16 @@
     "modifyVolumeStatus": {
       "targetVolumeAttributesClassName": "targetVolumeAttributesClassNameValue",
       "status": "statusValue"
+    },
+    "healthStatus": {
+      "healthConditions": [
+        {
+          "status": "statusValue",
+          "reason": "reasonValue",
+          "message": "messageValue"
+        }
+      ],
+      "lastTransitionTime": "2002-01-01T01:01:01Z"
     }
   }
 }
