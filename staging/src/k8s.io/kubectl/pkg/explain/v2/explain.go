@@ -36,6 +36,7 @@ func PrintModelDescription(
 	client openapi.Client,
 	gvr schema.GroupVersionResource,
 	recursive bool,
+	maxDepth int,
 	outputFormat string,
 ) error {
 	generator := NewGenerator()
@@ -44,7 +45,7 @@ func PrintModelDescription(
 	}
 
 	return printModelDescriptionWithGenerator(
-		generator, fieldsPath, w, client, gvr, recursive, outputFormat)
+		generator, fieldsPath, w, client, gvr, recursive, maxDepth, outputFormat)
 }
 
 // Factored out for testability
@@ -55,6 +56,7 @@ func printModelDescriptionWithGenerator(
 	client openapi.Client,
 	gvr schema.GroupVersionResource,
 	recursive bool,
+	maxDepth int,
 	outputFormat string,
 ) error {
 	paths, err := client.Paths()
@@ -86,7 +88,7 @@ func printModelDescriptionWithGenerator(
 		return fmt.Errorf("failed to parse openapi schema for %s: %w", resourcePath, err)
 	}
 
-	err = generator.Render(outputFormat, parsedV3Schema, gvr, fieldsPath, recursive, w)
+	err = generator.Render(outputFormat, parsedV3Schema, gvr, fieldsPath, recursive, maxDepth, w)
 
 	explainErr := explainError("")
 	if errors.As(err, &explainErr) {
