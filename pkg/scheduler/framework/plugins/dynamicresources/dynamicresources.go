@@ -928,7 +928,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	if !pl.enabled {
-		logger.V(5).Info("plugin disabled", "pod", klog.KObj(pod))
+		logger.V(5).Info("Nothing to do in PostFilter, plugin disabled", "pod", klog.KObj(pod))
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 
@@ -939,7 +939,7 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 	// If a Pod doesn't have any resource claims attached to it, there is no need for further processing.
 	// Thus we provide a fast path for this case to avoid unnecessary computations.
 	if state.claims.empty() {
-		logger.V(5).Info("no new claims to deallocate", "pod", klog.KObj(pod))
+		logger.V(5).Info("No new claims to deallocate", "pod", klog.KObj(pod))
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 	extendedResourceClaim := state.claims.extendedResourceClaim()
