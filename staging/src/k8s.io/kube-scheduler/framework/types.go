@@ -56,6 +56,8 @@ const (
 	UpdateNodeAnnotation
 	// UpdateNodeDeclaredFeature is an update for node's declared features.
 	UpdateNodeDeclaredFeature
+	// UpdateNodePreemptionPolicy is an update for node's preemption policy.
+	UpdateNodePreemptionPolicy
 
 	// UpdatePodXYZ is only applicable for Pod events.
 	// If you use UpdatePodXYZ,
@@ -79,7 +81,7 @@ const (
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdatePodLabel | UpdatePodScaleDown | UpdatePodScaleUp | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdateNodePreemptionPolicy | UpdatePodLabel | UpdatePodScaleDown | UpdatePodScaleUp | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
 
 	// None is a special ActionType that is only used internally.
 	None ActionType = 0
@@ -103,6 +105,8 @@ func (a ActionType) String() string {
 		return "UpdateNodeAnnotation"
 	case UpdateNodeDeclaredFeature:
 		return "UpdateNodeDeclaredFeature"
+	case UpdateNodePreemptionPolicy:
+		return "UpdateNodePreemptionPolicy"
 	case UpdatePodLabel:
 		return "UpdatePodLabel"
 	case UpdatePodScaleDown:

@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"slices"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -60,6 +62,9 @@ func getDefaultPlugins() *v1.Plugins {
 func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
 		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.NodeDeclaredFeatures})
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		applyDeferredPodScheduling(config)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		applyDynamicResources(config)
@@ -179,4 +184,20 @@ func mergePluginSet(logger klog.Logger, defaultPluginSet, customPluginSet v1.Plu
 		}
 	}
 	return v1.PluginSet{Enabled: enabledPlugins, Disabled: disabled}
+}
+
+// applyDeferredPodScheduling inserts the DeferredPodScheduling plugin.
+// It must be placed before NodeResourcesFit so that if a node has preemption disabled,
+// the pod fails on DeferredPodScheduling first. This ensures DeferredPodScheduling is recorded
+// as the failing plugin, allowing its Queueing Hint to trigger a retry when the policy is enabled.
+// It must run after basic filters like NodeName to avoid useless retries on irrelevant node events.
+func applyDeferredPodScheduling(config *v1.Plugins) {
+	idx := slices.IndexFunc(config.MultiPoint.Enabled, func(p v1.Plugin) bool {
+		return p.Name == names.NodeResourcesFit
+	})
+	if idx != -1 {
+		config.MultiPoint.Enabled = slices.Insert(config.MultiPoint.Enabled, idx, v1.Plugin{Name: names.DeferredPodScheduling})
+	} else {
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.DeferredPodScheduling})
+	}
 }

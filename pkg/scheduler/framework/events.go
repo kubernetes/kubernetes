@@ -202,6 +202,7 @@ func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events 
 		extractNodeTaintsChange,
 		extractNodeConditionsChange,
 		extractNodeAnnotationsChange,
+		extractNodePreemptionPolicyChange,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
@@ -217,6 +218,13 @@ func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events 
 }
 
 type nodeChangeExtractor func(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType
+
+func extractNodePreemptionPolicyChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
+	if !equality.Semantic.DeepEqual(oldNode.Spec.PodPreemptionPolicy, newNode.Spec.PodPreemptionPolicy) {
+		return fwk.UpdateNodePreemptionPolicy
+	}
+	return fwk.None
+}
 
 func extractNodeAllocatableChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {
