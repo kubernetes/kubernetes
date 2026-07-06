@@ -523,7 +523,6 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			EnableDeviceTaintRules: true,
 			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
 			TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
-			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:             kubeClient,
 		}
 		tracker, err := newTracker(ctx, opts)
@@ -931,7 +930,6 @@ func BenchmarkEventHandlers(b *testing.B) {
 			EnableDeviceTaintRules: true,
 			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
 			TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
-			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:             kubeClient,
 		}
 		tracker, err := newTracker(ctx, opts)

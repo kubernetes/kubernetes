@@ -108,8 +108,8 @@ type Options struct {
 	// EnableDeviceTaintRules controls whether DeviceTaintRules
 	// will be reflected in ResourceSlices reported by the tracker.
 	//
-	// If false, then TaintInformer and ClassInformer
-	// are not needed. The tracker turns into
+	// If false, then TaintInformer is
+	// not needed. The tracker turns into
 	// a thin wrapper around the underlying
 	// SliceInformer, with no processing of its own.
 	EnableDeviceTaintRules bool
@@ -118,7 +118,6 @@ type Options struct {
 
 	SliceInformer resourceinformers.ResourceSliceInformer
 	TaintInformer resourcebetainformers.DeviceTaintRuleInformer
-	ClassInformer resourceinformers.DeviceClassInformer
 
 	// KubeClient is used to generate Events when CEL expressions
 	// encounter runtime errors.

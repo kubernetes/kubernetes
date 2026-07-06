@@ -503,7 +503,6 @@ func TestAddAllEventHandlers(t *testing.T) {
 				}
 				if opts.EnableDeviceTaintRules {
 					opts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
-					opts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 
 				}
 				resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, opts)
