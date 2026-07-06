@@ -871,7 +871,7 @@ func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
 		func(ctx context.Context) (bool, error) {
 			for _, p := range pods {
 				st, ok := kl.statusManager.GetPodStatus(p.UID)
-				if !ok || st.Phase != v1.PodFailed && st.Reason != "VolumeAttachmentLimitExceeded" {
+				if !ok || st.Phase != v1.PodFailed || st.Reason != "VolumeAttachmentLimitExceeded" {
 					return false, nil
 				}
 			}
@@ -1550,16 +1550,76 @@ func TestCreateMirrorPod(t *testing.T) {
 			pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 			pods := []*v1.Pod{pod}
 			kl.podManager.SetPods(pods)
-			isTerminal, _, err := kl.SyncPod(tCtx, tt.updateType, pod, nil, &kubecontainer.PodStatus{})
+			isTerminal, postSync, err := kl.SyncPod(tCtx, tt.updateType, pod, nil, &kubecontainer.PodStatus{})
 			assert.NoError(t, err)
 			if isTerminal {
 				t.Fatalf("pod should not be terminal: %#v", pod)
+			}
+			if postSync != nil {
+				postSync()
 			}
 			podFullName := kubecontainer.GetPodFullName(pod)
 			assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
 			assert.Equal(t, 1, manager.NumOfPods(), "Expected only 1 mirror pod %q, got %+v", podFullName, manager.GetPods())
 		})
 	}
+}
+
+func TestCreateMirrorPodWithRuntimePostSync(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorClient
+	testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{
+		SyncResults: []*kubecontainer.SyncResult{{
+			Action: kubecontainer.StartContainer,
+			Target: "container",
+		}},
+	}
+
+	pod := podWithUIDNameNs("12345678", "bar", "foo")
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	isTerminal, postSync, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	require.NoError(t, err)
+	if isTerminal {
+		t.Fatalf("pod should not be terminal: %#v", pod)
+	}
+	require.NotNil(t, postSync)
+
+	postSync()
+
+	podFullName := kubecontainer.GetPodFullName(pod)
+	assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
+}
+
+func TestCreateMirrorPodWithEarlySyncPodReturn(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorClient
+	kl.volumeManager = kubeletvolume.NewFakeVolumeManager(nil, 0, nil, true /* volumeAttachLimitExceeded */)
+
+	pod := podWithUIDNameNs("12345678", "bar", "foo")
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	isTerminal, postSync, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	require.NoError(t, err)
+	if !isTerminal {
+		t.Fatalf("pod should be terminal after admission rejection: %#v", pod)
+	}
+	require.NotNil(t, postSync)
+
+	postSync()
+
+	podFullName := kubecontainer.GetPodFullName(pod)
+	assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
 }
 
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
@@ -1587,10 +1647,13 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*v1.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	isTerminal, _, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
+	isTerminal, postSync, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
 	assert.NoError(t, err)
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
+	}
+	if postSync != nil {
+		postSync()
 	}
 	name := kubecontainer.GetPodFullName(pod)
 	creates, deletes := manager.GetCounts(name)
