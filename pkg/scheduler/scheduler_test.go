@@ -1154,8 +1154,10 @@ func Test_UnionedGVKs(t *testing.T) {
 }
 
 func newFramework(ctx context.Context, r frameworkruntime.Registry, profile schedulerapi.KubeSchedulerProfile) (framework.Framework, error) {
+	snapshot := internalcache.NewSnapshot(nil, nil)
 	return frameworkruntime.NewFramework(ctx, r, &profile,
-		frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(nil, nil)),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
 		frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0)),
 		frameworkruntime.WithPodGroupManager(internalcache.New(ctx, nil, false)),
 	)

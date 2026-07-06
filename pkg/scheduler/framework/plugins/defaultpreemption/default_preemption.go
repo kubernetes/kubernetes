@@ -351,7 +351,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
 
-	nodeInfos := pl.fh.SnapshotSharedLister().NodeInfos()
+	nodeInfos := pl.fh.MutableSnapshotSharedLister().NodeInfos()
 	nomNodeName := pod.Status.NominatedNodeName
 	if len(nomNodeName) > 0 {
 		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,

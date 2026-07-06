@@ -122,7 +122,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 	}
 
 	// 2) Find all preemption candidates.
-	allNodes, err := ev.Handler.SnapshotSharedLister().NodeInfos().List()
+	allNodes, err := ev.Handler.MutableSnapshotSharedLister().NodeInfos().List()
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
@@ -177,7 +177,7 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, a
 	}
 	logger := klog.FromContext(ctx)
 	// Get a list of nodes with failed predicates (Unschedulable) that may be satisfied by removing pods from the node.
-	potentialNodes, err := m.NodesForStatusCode(ev.Handler.SnapshotSharedLister().NodeInfos(), fwk.Unschedulable)
+	potentialNodes, err := m.NodesForStatusCode(ev.Handler.MutableSnapshotSharedLister().NodeInfos(), fwk.Unschedulable)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -201,7 +201,7 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, a
 // node. In that case, scheduler will find a different host for the preemptor in subsequent scheduling cycles.
 func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates []Candidate) ([]Candidate, *fwk.Status) {
 	extenders := ev.Handler.Extenders()
-	nodeLister := ev.Handler.SnapshotSharedLister().NodeInfos()
+	nodeLister := ev.Handler.MutableSnapshotSharedLister().NodeInfos()
 	if len(extenders) == 0 {
 		return candidates, nil
 	}

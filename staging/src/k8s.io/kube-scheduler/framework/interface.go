@@ -830,6 +830,7 @@ type Handle interface {
 	SnapshotSharedLister() SharedLister
 
 	// MutableSnapshotSharedLister returns a lister that supports mutating the snapshot.
+	// It extends SharedLister interface.
 	// Only PodGroupPostFilter extension point can use this.
 	MutableSnapshotSharedLister() MutableSnapshotSharedLister
 
