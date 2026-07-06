@@ -141,7 +141,9 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		logger.Info("Creating topology manager")
-		cm.topologyManager, err = topologymanager.NewManager(machineInfo.Topology,
+		cm.topologyManager, err = topologymanager.NewManager(
+			logger,
+			machineInfo.Topology,
 			nodeConfig.TopologyManagerPolicy,
 			nodeConfig.TopologyManagerScope,
 			nodeConfig.TopologyManagerPolicyOptions)
@@ -186,7 +188,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	}
 
 	logger.Info("Creating device plugin manager")
-	cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
+	cm.deviceManager, err = devicemanager.NewManagerImpl(logger, nil, cm.topologyManager)
 	if err != nil {
 		return nil, err
 	}
@@ -280,10 +282,10 @@ func (cm *containerManagerImpl) GetResources(ctx context.Context, pod *v1.Pod, c
 	return opts, nil
 }
 
-func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, status *v1.PodStatus) {
 	// For now we only support Device Plugin
 
-	cm.deviceManager.UpdateAllocatedResourcesStatus(pod, status)
+	cm.deviceManager.UpdateAllocatedResourcesStatus(logger, pod, status)
 
 	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources when DRA supports Windows
 }
@@ -309,7 +311,7 @@ func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podr
 	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
 }
 
-func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+func (cm *containerManagerImpl) GetAllocatableDevices(_ klog.Logger) []*podresourcesapi.ContainerDevices {
 	return nil
 }
 
@@ -321,7 +323,7 @@ func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler(_ klog.Logge
 	return cm.topologyManager
 }
 
-func (cm *containerManagerImpl) UpdateAllocatedDevices() {
+func (cm *containerManagerImpl) UpdateAllocatedDevices(_ klog.Logger) {
 	return
 }
 
@@ -345,11 +347,11 @@ func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
-func (cm *containerManagerImpl) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetMemory(_ klog.Logger, _, _ string) []*podresourcesapi.ContainerMemory {
 	return nil
 }
 
-func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetAllocatableMemory(_ klog.Logger) []*podresourcesapi.ContainerMemory {
 	return nil
 }
 

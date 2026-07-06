@@ -2533,7 +2533,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 			}
 
 			status := tc.initialStatus.DeepCopy()
-			manager.UpdateAllocatedResourcesStatus(tc.pod, status)
+			manager.UpdateAllocatedResourcesStatus(logger, tc.pod, status)
 
 			require.Len(t, status.ContainerStatuses, 1)
 			assert.Equal(t, tc.expectedAllocatedResourcesStatus, status.ContainerStatuses[0].AllocatedResourcesStatus)
@@ -2542,6 +2542,8 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 }
 
 func TestUpdateAllocatedResourcesStatus_Subrequest(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	directClaimName := "test-claim"
 
 	testCases := []struct {
@@ -2655,7 +2657,7 @@ func TestUpdateAllocatedResourcesStatus_Subrequest(t *testing.T) {
 			}
 
 			// Call UpdateAllocatedResourcesStatus
-			manager.UpdateAllocatedResourcesStatus(pod, status)
+			manager.UpdateAllocatedResourcesStatus(logger, pod, status)
 
 			// Assert results
 			require.Len(t, status.ContainerStatuses, 1)

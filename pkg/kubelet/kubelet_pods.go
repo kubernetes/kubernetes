@@ -1226,7 +1226,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	)
 	if kl.cgroupsPerQOS {
 		pcm := kl.containerManager.NewPodContainerManager()
-		cgroupPods, err = pcm.GetAllPodsFromCgroups()
+		cgroupPods, err = pcm.GetAllPodsFromCgroups(logger)
 		if err != nil {
 			return fmt.Errorf("failed to get list of pods that still exist on cgroup mounts: %v", err)
 		}
@@ -1963,7 +1963,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 
 	// update the allocated resources status
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
-		kl.containerManager.UpdateAllocatedResourcesStatus(pod, s)
+		kl.containerManager.UpdateAllocatedResourcesStatus(logger, pod, s)
 	}
 
 	// preserve all conditions not owned by the kubelet

@@ -537,7 +537,7 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	testManager.endpoints[resourceName2] = endpointInfo{e: e2, opts: nil}
 	testManager.genericDeviceUpdateCallback(logger, resourceName2, resource2Devs)
 
-	allocatableDevs := testManager.GetAllocatableDevices()
+	allocatableDevs := testManager.GetAllocatableDevices(logger)
 	as.Len(allocatableDevs, 2)
 
 	devInstances1, ok := allocatableDevs[resourceName1]
@@ -575,7 +575,7 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 
 	testManager.genericDeviceUpdateCallback(logger, resourceName1, resource1Devs)
 
-	allocatableDevs := testManager.GetAllocatableDevices()
+	allocatableDevs := testManager.GetAllocatableDevices(logger)
 	as.Len(allocatableDevs, 1)
 	devInstances, ok := allocatableDevs[resourceName1]
 	as.True(ok)
@@ -589,7 +589,7 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 	}
 	testManager.genericDeviceUpdateCallback(logger, resourceName1, resource1Devs)
 
-	allocatableDevs = testManager.GetAllocatableDevices()
+	allocatableDevs = testManager.GetAllocatableDevices(logger)
 	as.Len(allocatableDevs, 1)
 	devInstances, ok = allocatableDevs[resourceName1]
 	as.True(ok)
@@ -1278,7 +1278,7 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 
 	go func() {
 		<-waitSetGetPreferredAllocChan
-		testManager.UpdateAllocatedDevices()
+		testManager.UpdateAllocatedDevices(logger)
 		waitUpdateAllocatedDevicesChan <- struct{}{}
 	}()
 
@@ -1343,7 +1343,7 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 
 	activePods = []*v1.Pod{pod2}
 	podsStub.updateActivePods(activePods)
-	testManager.UpdateAllocatedDevices()
+	testManager.UpdateAllocatedDevices(logger)
 
 	// when pod is removed from activePods,G etDeviceRunContainerOptions should return error
 	runContainerOpts, err = testManager.GetDeviceRunContainerOptions(tCtx, pod1, &pod1.Spec.Containers[0])
@@ -1959,7 +1959,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 			},
 		},
 	}
-	testManager.UpdateAllocatedResourcesStatus(pod, status)
+	testManager.UpdateAllocatedResourcesStatus(logger, pod, status)
 
 	expectedStatus := v1.ResourceStatus{
 		Name: v1.ResourceName(resourceName),
