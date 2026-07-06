@@ -92,6 +92,22 @@ func (info *ClaimInfo) addDevice(driverName string, deviceState state.Device) {
 	info.DriverState[driverName] = driverState
 }
 
+// resetDevices clears the device list for a given driver, keeping the
+// entry present in DriverState. Used to discard stale devices left over
+// from a previous NodePrepareResources attempt before applying the
+// new response.
+func (info *ClaimInfo) resetDevices(driverName string) {
+	if info.DriverState == nil {
+		return
+	}
+	driverState, ok := info.DriverState[driverName]
+	if !ok {
+		return
+	}
+	driverState.Devices = nil
+	info.DriverState[driverName] = driverState
+}
+
 // addPodReference adds a pod reference to the claim info.
 func (info *ClaimInfo) addPodReference(podUID types.UID) {
 	info.PodUIDs.Insert(string(podUID))
