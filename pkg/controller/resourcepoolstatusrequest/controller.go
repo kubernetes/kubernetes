@@ -110,14 +110,14 @@ func NewController(
 	metrics.Register()
 
 	// Set up event handlers for ResourcePoolStatusRequests
-	_, err := requestInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := requestInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c.enqueueRequest(logger, obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			c.enqueueRequest(logger, new)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, fmt.Errorf("failed to add request event handler: %w", err)
 	}
