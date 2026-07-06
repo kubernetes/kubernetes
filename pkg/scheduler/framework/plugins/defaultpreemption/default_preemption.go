@@ -338,7 +338,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
 	// importance (priority) pods is not a recommended configuration anyway.
-	if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, cycleState, preemptor, nodeInfo); !status.IsSuccess() {
+	if status := pl.podFitsOnNode(ctx, cycleState, preemptor, nodeInfo); !status.IsSuccess() {
 		return nil, 0, status
 	}
 
@@ -358,7 +358,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 			return false, err
 		}
 
-		status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, cycleState, preemptor, nodeInfo)
+		status := pl.podFitsOnNode(ctx, cycleState, preemptor, nodeInfo)
 		fits := status.IsSuccess()
 		if !fits {
 			if err := removeVictim(v); err != nil {
@@ -405,6 +405,42 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	}
 
 	return victimPods, numViolatingVictim, nil
+}
+
+
+func (pl *DefaultPreemption) podFitsOnNode(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
+	if !status.IsSuccess() {
+		return status
+	}
+
+	logger := klog.FromContext(ctx)
+	nodeName := nodeInfo.Node().Name
+	for _, extender := range pl.fh.Extenders() {
+		if !extender.IsFilter() || !extender.IsInterested(pod) {
+			continue
+		}
+		filtered, failed, failedAndUnresolvable, err := extender.Filter(pod, []fwk.NodeInfo{nodeInfo})
+		if err != nil {
+			if extender.IsIgnorable() {
+				logger.V(2).Info("Skipped extender as it returned error and has ignorable flag set",
+					"extender", extender.Name(), "err", err)
+				continue
+			}
+			return fwk.AsStatus(err)
+		}
+		if len(filtered) != 0 {
+			continue
+		}
+		if msg, ok := failedAndUnresolvable[nodeName]; ok {
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, msg)
+		}
+		if msg, ok := failed[nodeName]; ok {
+			return fwk.NewStatus(fwk.Unschedulable, msg)
+		}
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %q rejected by extender %q", nodeName, extender.Name()))
+	}
+	return status
 }
 
 // PodEligibleToPreemptOthers returns one bool and one string. The bool
