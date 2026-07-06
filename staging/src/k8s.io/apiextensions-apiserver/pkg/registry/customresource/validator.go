@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -31,8 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	apiextensionsvalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
@@ -50,7 +54,7 @@ func (a customResourceValidator) Validate(ctx context.Context, obj *unstructured
 
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, validation.ValidateObjectMetaAccessor(obj, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, a.validateObjectMetaDeclaratively(ctx, obj)...)
 	allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResource(nil, obj.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, obj, scale)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, obj, scale)...)
@@ -65,7 +69,7 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old *u
 
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(obj, old, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, a.validateObjectMetaUpdateDeclaratively(ctx, obj, old)...)
 	allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResourceUpdate(nil, obj.UnstructuredContent(), old.UnstructuredContent(), a.schemaValidator, options...)...)
 	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, obj, scale)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, obj, scale)...)
@@ -103,7 +107,7 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, 
 
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(obj, old, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, a.validateObjectMetaUpdateDeclaratively(ctx, obj, old)...)
 	if status, hasStatus := obj.UnstructuredContent()["status"]; hasStatus {
 		allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResourceUpdate(field.NewPath("status"), status, old.UnstructuredContent()["status"], a.statusSchemaValidator, options...)...)
 	}
@@ -177,4 +181,36 @@ func (a customResourceValidator) ValidateScaleStatus(ctx context.Context, obj *u
 	}
 
 	return allErrs
+}
+
+func (a customResourceValidator) validateObjectMetaDeclaratively(ctx context.Context, obj *unstructured.Unstructured) field.ErrorList {
+	metadata, errs := getObjectMeta(obj)
+	if len(errs) > 0 {
+		return errs
+	}
+	return validation.ValidateObjectMetaDeclaratively(ctx, operation.Create, metadata, nil, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"), utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta))
+}
+
+func (a customResourceValidator) validateObjectMetaUpdateDeclaratively(ctx context.Context, obj, old *unstructured.Unstructured) field.ErrorList {
+	metadata, errs := getObjectMeta(obj)
+	if len(errs) > 0 {
+		return errs
+	}
+	oldMetadata, errs := getObjectMeta(old)
+	if len(errs) > 0 {
+		return errs
+	}
+	return validation.ValidateObjectMetaDeclaratively(ctx, operation.Update, metadata, oldMetadata, a.namespaceScoped, nil, field.NewPath("metadata"), utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta))
+}
+
+func getObjectMeta(obj *unstructured.Unstructured) (*metav1.ObjectMeta, field.ErrorList) {
+	metadata, _, err := objectmeta.GetObjectMeta(obj.UnstructuredContent(), false)
+	if err != nil {
+		return nil, field.ErrorList{field.Invalid(field.NewPath("metadata"), obj.UnstructuredContent()["metadata"], err.Error())}
+	}
+	// If the "metadata" key is entirely missing from the unstructured object, GetObjectMeta returns nil, nil.
+	if metadata == nil {
+		return &metav1.ObjectMeta{}, nil
+	}
+	return metadata, nil
 }

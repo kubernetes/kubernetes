@@ -291,7 +291,7 @@ func (statusStrategy) Canonicalize(obj runtime.Object) {
 }
 
 func (statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateUpdateCustomResourceDefinitionStatus(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
+	return validation.ValidateUpdateCustomResourceDefinitionStatus(ctx, obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
