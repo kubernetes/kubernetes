@@ -17,11 +17,14 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/validate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -134,6 +137,25 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 		allErrs = append(allErrs, field.Invalid(fldPath, newVal, FieldImmutableErrorMsg))
 	}
 	return allErrs
+}
+
+// ValidateObjectMetaDeclaratively validates an ObjectMeta instance declaratively and deduplicates handwritten errors.
+// betaEnabled controls whether declarative validation rules at the Beta stability level are enforced.
+// NOTE: This method should be used in the types for which declarative validation is not enabled yet or cannot be enabled. The types
+// for which declarative validation is enabled and valdiation code is generated must use ValidateObjectMeta and ValidateObjectMetaUpdate.
+func ValidateObjectMetaDeclaratively(ctx context.Context, op operation.Type, obj, oldObj *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path, betaEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+	switch op {
+	case operation.Create:
+		errs = ValidateObjectMeta(obj, requiresNamespace, nameFn, fldPath)
+	case operation.Update:
+		errs = ValidateObjectMetaUpdate(obj, oldObj, fldPath)
+	}
+	dvErrs := v1validation.Validate_ObjectMeta(ctx, operation.Operation{Type: op}, fldPath, obj, oldObj)
+	enforcedDVErrs := validate.FilterEnforcedDeclarativeErrors(ctx, dvErrs, betaEnabled)
+	errs = errs.MarkFromImperative()
+	errs = validate.FilterCoveredHandwrittenErrors(ctx, errs, enforcedDVErrs, betaEnabled)
+	return append(errs, enforcedDVErrs...)
 }
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
