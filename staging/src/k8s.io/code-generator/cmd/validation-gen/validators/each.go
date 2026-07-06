@@ -384,3 +384,13 @@ func (ektv eachKeyTagValidator) Docs() TagDoc {
 	}
 	return doc
 }
+
+var (
+	validatePtrSliceNoNils = types.Name{Package: libValidationPkg, Name: "PtrSliceNoNils"}
+)
+
+// PtrSliceNoNils returns a synthetic validation that rejects nil elements of a
+// pointer slice. It is not tag-driven; the generator injects it for []*T fields.
+func PtrSliceNoNils(elemType types.Name) FunctionGen {
+	return Function("PtrSliceNoNils", ShortCircuit, validatePtrSliceNoNils).WithTypeArgs(elemType)
+}

@@ -1270,19 +1270,11 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				hasValIterations := len(fld.fieldValIterations.Functions) > 0 && hasPropagation
 
 				if hasFieldValidations || hasPropagation || hasKeyIterations || hasValIterations {
-					nilCheckFunc := validators.FunctionGen{
-						TagName: "PtrSliceNoNils",
-						Flags:   validators.ShortCircuit,
-						Function: types.Name{
-							Package: "k8s.io/apimachinery/pkg/api/validate",
-							Name:    "PtrSliceNoNils",
-						},
-						TypeArgs: []types.Name{nt.Elem.Elem.Name},
-					}
 					// Prepend the nil-check so it runs before any other
 					// validations. This is important because the other
 					// validations may assume that the slice has no nil values.
-					fld.fieldValidations.Functions = append([]validators.FunctionGen{nilCheckFunc}, fld.fieldValidations.Functions...)
+					nilCheck := validators.PtrSliceNoNils(nt.Elem.Elem.Name)
+					fld.fieldValidations.Functions = append([]validators.FunctionGen{nilCheck}, fld.fieldValidations.Functions...)
 				}
 			}
 
