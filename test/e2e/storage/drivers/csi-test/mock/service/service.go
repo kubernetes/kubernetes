@@ -118,7 +118,7 @@ type service struct {
 	csi.UnimplementedNodeServer
 	sync.Mutex
 	nodeID       string
-	vols         []csi.Volume
+	vols         []*csi.Volume
 	volsRWL      sync.RWMutex
 	volsNID      atomic.Uint64
 	snapshots    cache.SnapshotCache
@@ -127,7 +127,7 @@ type service struct {
 }
 
 type Volume struct {
-	VolumeCSI             csi.Volume
+	VolumeCSI             *csi.Volume
 	NodeID                string
 	ISStaged              bool
 	ISPublished           bool
@@ -149,7 +149,7 @@ func New(config Config) Service {
 		s.config.IO = OSDirIO{}
 	}
 	s.snapshots = cache.NewSnapshotCache()
-	s.vols = []csi.Volume{
+	s.vols = []*csi.Volume{
 		s.newVolume("Mock Volume 1", gib100),
 		s.newVolume("Mock Volume 2", gib100),
 		s.newVolume("Mock Volume 3", gib100),
@@ -171,17 +171,17 @@ const (
 	tib    int64 = gib * 1024
 )
 
-func (s *service) newVolume(name string, capcity int64) csi.Volume {
-	vol := csi.Volume{
+func (s *service) newVolume(name string, capcity int64) *csi.Volume {
+	vol := &csi.Volume{
 		VolumeId:      fmt.Sprintf("%d", s.volsNID.Add(1)),
 		VolumeContext: map[string]string{"name": name},
 		CapacityBytes: capcity,
 	}
-	s.setTopology(&vol)
+	s.setTopology(vol)
 	return vol
 }
 
-func (s *service) newVolumeFromSnapshot(name string, capacity int64, snapshotID int) csi.Volume {
+func (s *service) newVolumeFromSnapshot(name string, capacity int64, snapshotID int) *csi.Volume {
 	vol := s.newVolume(name, capacity)
 	vol.ContentSource = &csi.VolumeContentSource{
 		Type: &csi.VolumeContentSource_Snapshot{
@@ -190,11 +190,11 @@ func (s *service) newVolumeFromSnapshot(name string, capacity int64, snapshotID 
 			},
 		},
 	}
-	s.setTopology(&vol)
+	s.setTopology(vol)
 	return vol
 }
 
-func (s *service) newVolumeFromVolume(name string, capacity int64, volumeID int) csi.Volume {
+func (s *service) newVolumeFromVolume(name string, capacity int64, volumeID int) *csi.Volume {
 	vol := s.newVolume(name, capacity)
 	vol.ContentSource = &csi.VolumeContentSource{
 		Type: &csi.VolumeContentSource_Volume{
@@ -203,7 +203,7 @@ func (s *service) newVolumeFromVolume(name string, capacity int64, volumeID int)
 			},
 		},
 	}
-	s.setTopology(&vol)
+	s.setTopology(vol)
 	return vol
 }
 
@@ -219,13 +219,13 @@ func (s *service) setTopology(vol *csi.Volume) {
 	}
 }
 
-func (s *service) findVol(k, v string) (volIdx int, volInfo csi.Volume) {
+func (s *service) findVol(k, v string) (volIdx int, volInfo *csi.Volume) {
 	s.volsRWL.RLock()
 	defer s.volsRWL.RUnlock()
 	return s.findVolNoLock(k, v)
 }
 
-func (s *service) findVolNoLock(k, v string) (volIdx int, volInfo csi.Volume) {
+func (s *service) findVolNoLock(k, v string) (volIdx int, volInfo *csi.Volume) {
 	volIdx = -1
 
 	for i, vi := range s.vols {
@@ -245,24 +245,24 @@ func (s *service) findVolNoLock(k, v string) (volIdx int, volInfo csi.Volume) {
 }
 
 func (s *service) findVolByName(
-	ctx context.Context, name string) (int, csi.Volume) {
+	ctx context.Context, name string) (int, *csi.Volume) {
 
 	return s.findVol("name", name)
 }
 
 func (s *service) findVolByID(
-	ctx context.Context, id string) (int, csi.Volume) {
+	ctx context.Context, id string) (int, *csi.Volume) {
 
 	return s.findVol("id", id)
 }
 
-func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string]string) cache.Snapshot {
+func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string]string) *cache.Snapshot {
 
 	ptime := timestamppb.Now()
-	return cache.Snapshot{
+	return &cache.Snapshot{
 		Name:       name,
 		Parameters: parameters,
-		SnapshotCSI: csi.Snapshot{
+		SnapshotCSI: &csi.Snapshot{
 			SnapshotId:     fmt.Sprintf("%d", s.snapshotsNID.Add(1)),
 			CreationTime:   ptime,
 			SourceVolumeId: sourceVolumeId,
@@ -275,7 +275,7 @@ func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string
 func (s *service) getAttachCount(devPathKey string) int64 {
 	var count int64
 	for _, v := range s.vols {
-		if device := v.VolumeContext[devPathKey]; device != "" {
+		if device := v.GetVolumeContext()[devPathKey]; device != "" {
 			count++
 		}
 	}

@@ -55,7 +55,7 @@ func (s *service) CreateVolume(
 			return nil, status.Error(codes.AlreadyExists,
 				fmt.Sprintf("Volume with name %s already exists", req.GetName()))
 		}
-		return &csi.CreateVolumeResponse{Volume: &v}, nil
+		return &csi.CreateVolumeResponse{Volume: v}, nil
 	}
 
 	// If no capacity is specified then use 100GiB
@@ -73,7 +73,7 @@ func (s *service) CreateVolume(
 		return nil, status.Errorf(codes.OutOfRange, "Requested capacity %d exceeds maximum allowed %d", capacity, MaxStorageCapacity)
 	}
 
-	var v csi.Volume
+	var v *csi.Volume
 	// Create volume from content source if provided.
 	if req.GetVolumeContentSource() != nil {
 		switch req.GetVolumeContentSource().GetType().(type) {
@@ -115,7 +115,7 @@ func (s *service) CreateVolume(
 		return nil, status.Error(hookVal, hookMsg)
 	}
 
-	return &csi.CreateVolumeResponse{Volume: &v}, nil
+	return &csi.CreateVolumeResponse{Volume: v}, nil
 }
 
 func (s *service) DeleteVolume(
@@ -145,7 +145,7 @@ func (s *service) DeleteVolume(
 	// leaks. The slice's elements may not be pointers, but the structs
 	// themselves have fields that are.
 	copy(s.vols[i:], s.vols[i+1:])
-	s.vols[len(s.vols)-1] = csi.Volume{}
+	s.vols[len(s.vols)-1] = nil
 	s.vols = s.vols[:len(s.vols)-1]
 	klog.V(5).InfoS("mock delete volume", "volumeID", req.VolumeId)
 
@@ -365,7 +365,7 @@ func (s *service) ControllerGetVolume(
 		return resp, status.Error(codes.NotFound, req.VolumeId)
 	}
 
-	resp.Volume = &v
+	resp.Volume = v
 	if !s.config.DisableAttach {
 		resp.Status.PublishedNodeIds = []string{
 			s.nodeID,
@@ -391,11 +391,11 @@ func (s *service) ListVolumes(
 	// Copy the mock volumes into a new slice in order to avoid
 	// locking the service's volume slice for the duration of the
 	// ListVolumes RPC.
-	var vols []csi.Volume
+	var vols []*csi.Volume
 	func() {
 		s.volsRWL.RLock()
 		defer s.volsRWL.RUnlock()
-		vols = make([]csi.Volume, len(s.vols))
+		vols = make([]*csi.Volume, len(s.vols))
 		copy(vols, s.vols)
 	}()
 
@@ -452,7 +452,7 @@ func (s *service) ListVolumes(
 		}
 
 		entries[i] = &csi.ListVolumesResponse_Entry{
-			Volume: &vols[j],
+			Volume: vols[j],
 			Status: volumeStatus,
 		}
 		j++
@@ -622,7 +622,7 @@ func (s *service) CreateSnapshot(ctx context.Context,
 			return nil, status.Error(codes.AlreadyExists,
 				fmt.Sprintf("Snapshot with name %s already exists", req.GetName()))
 		}
-		return &csi.CreateSnapshotResponse{Snapshot: &v.SnapshotCSI}, nil
+		return &csi.CreateSnapshotResponse{Snapshot: v.SnapshotCSI}, nil
 	}
 
 	// Create the snapshot and add it to the service's in-mem snapshot slice.
@@ -633,7 +633,7 @@ func (s *service) CreateSnapshot(ctx context.Context,
 		return nil, status.Error(hookVal, hookMsg)
 	}
 
-	return &csi.CreateSnapshotResponse{Snapshot: &snapshot.SnapshotCSI}, nil
+	return &csi.CreateSnapshotResponse{Snapshot: snapshot.SnapshotCSI}, nil
 }
 
 func (s *service) DeleteSnapshot(ctx context.Context,
@@ -767,7 +767,7 @@ func getSnapshotById(s *service, req *csi.ListSnapshotsRequest) (*csi.ListSnapsh
 		return &csi.ListSnapshotsResponse{
 			Entries: []*csi.ListSnapshotsResponse_Entry{
 				{
-					Snapshot: &snapshot.SnapshotCSI,
+					Snapshot: snapshot.SnapshotCSI,
 				},
 			},
 		}, nil
@@ -784,7 +784,7 @@ func getSnapshotByVolumeId(s *service, req *csi.ListSnapshotsRequest) (*csi.List
 		return &csi.ListSnapshotsResponse{
 			Entries: []*csi.ListSnapshotsResponse_Entry{
 				{
-					Snapshot: &snapshot.SnapshotCSI,
+					Snapshot: snapshot.SnapshotCSI,
 				},
 			},
 		}, nil
@@ -842,7 +842,7 @@ func getAllSnapshots(s *service, req *csi.ListSnapshotsRequest) (*csi.ListSnapsh
 
 	for i = 0; i < len(entries); i++ {
 		entries[i] = &csi.ListSnapshotsResponse_Entry{
-			Snapshot: &snapshots[j],
+			Snapshot: snapshots[j],
 		}
 		j++
 	}
