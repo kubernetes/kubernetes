@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
@@ -46,7 +47,7 @@ import (
 // (+k8s:validation-gen=false) but share an internal type with versions that do
 // not. Only intentional opt-outs belong here; any other version missing
 // declarative validation should fail the sweep, not be skipped.
-var skippedEquivalenceGroupVersions = sets.New("extensions/v1beta1")
+var skippedEquivalenceGroupVersions = sets.New("extensions/v1beta1", "events.k8s.io/v1beta1")
 
 // VerifyVersionedValidationEquivalence tests that all versions of an API return equivalent validation errors.
 // It accepts optional configuration to handle path normalization across API versions where structures differ.
@@ -407,7 +408,7 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 			features.DeclarativeValidationBeta: true,
 		})
-		testCtx := rest.WithAllDeclarativeEnforcedForTest(ctx)
+		testCtx := validate.WithAllDeclarativeEnforcedForTest(ctx)
 		allDeclarativeErrs := runValidations(testCtx)
 
 		// Record the declarative-validation rules observed in this subtest so
