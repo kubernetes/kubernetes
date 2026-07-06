@@ -267,7 +267,7 @@ func validateObjectMetaAccessorWithOptsCommon(meta metav1.Object, isNamespaced b
 	allErrs = append(allErrs, ValidateAnnotations(meta.GetAnnotations(), fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(meta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
 	allErrs = append(allErrs, ValidateFinalizers(meta.GetFinalizers(), fldPath.Child("finalizers"))...)
-	allErrs = append(allErrs, v1validation.ValidateManagedFields(meta.GetManagedFields(), fldPath.Child("managedFields"))...)
+	allErrs = append(allErrs, v1validation.ValidateManagedFields(meta.GetManagedFields(), fldPath.Child("managedFields"), v1validation.CoveredByDeclarative)...)
 	return allErrs
 }
 
@@ -337,7 +337,7 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.GetAnnotations(), fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(newMeta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
-	allErrs = append(allErrs, v1validation.ValidateManagedFields(newMeta.GetManagedFields(), fldPath.Child("managedFields"))...)
+	allErrs = append(allErrs, v1validation.ValidateManagedFields(newMeta.GetManagedFields(), fldPath.Child("managedFields"), v1validation.CoveredByDeclarative)...)
 
 	return allErrs
 }

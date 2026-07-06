@@ -268,16 +268,39 @@ func ValidateTableOptions(opts *metav1.TableOptions) field.ErrorList {
 
 const MaxSubresourceNameLength = 256
 
-func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *field.Path) field.ErrorList {
+// ManagedFieldsValidationOption specifies options for validating managed fields.
+type ManagedFieldsValidationOption int
+
+const (
+	// CoveredByDeclarative indicates whether errors should be marked as covered by declarative validation.
+	CoveredByDeclarative ManagedFieldsValidationOption = iota + 1
+)
+
+// ValidateManagedFields validates a list of managed fields.
+func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *field.Path, opts ...ManagedFieldsValidationOption) field.ErrorList {
+	coveredByDeclarative := false
+	for _, opt := range opts {
+		if opt == CoveredByDeclarative {
+			coveredByDeclarative = true
+		}
+	}
 	var allErrs field.ErrorList
 	for i, fields := range fieldsList {
 		fldPath := fldPath.Index(i)
 		switch fields.Operation {
 		case "":
-			allErrs = append(allErrs, field.Required(fldPath.Child("operation"), "must not be empty").MarkCoveredByDeclarative())
+			err := field.Required(fldPath.Child("operation"), "must not be empty")
+			if coveredByDeclarative {
+				err = err.MarkCoveredByDeclarative()
+			}
+			allErrs = append(allErrs, err)
 		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
 		default:
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("operation"), fields.Operation, []metav1.ManagedFieldsOperationType{metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate}).MarkCoveredByDeclarative())
+			err := field.NotSupported(fldPath.Child("operation"), fields.Operation, []metav1.ManagedFieldsOperationType{metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate})
+			if coveredByDeclarative {
+				err = err.MarkCoveredByDeclarative()
+			}
+			allErrs = append(allErrs, err)
 		}
 		if len(fields.FieldsType) > 0 && fields.FieldsType != "FieldsV1" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
