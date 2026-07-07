@@ -637,6 +637,16 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 				return nil
 			}
 
+			// Do nothing if the claimInfo doesn't reference this pod.
+			// PrepareResources adds the pod to PodUIDs before any driver work,
+			// so a missing reference means PrepareResources never got that far
+			// for this pod (e.g. the validation pass errored out) and there is
+			// nothing for us to unprepare. Without this check we could
+			// tear down a claim that is still in use by another pod.
+			if !claimInfo.hasPodReference(podUID) {
+				return nil
+			}
+
 			// Skip calling NodeUnprepareResource if other pods are still referencing it
 			if len(claimInfo.PodUIDs) > 1 {
 				// We delay checkpointing of this change until
