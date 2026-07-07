@@ -313,8 +313,11 @@ func ListUsersInConfig(toComplete string) []string {
 	return ret
 }
 
-// compGetResourceList returns the list of api resources which begin with `toComplete`.
-func compGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, toComplete string) []string {
+// CompGetResourceList returns the list of api resources which begin with `toComplete`.
+// When verbs are provided, the result is limited to resources supporting all of them
+// (e.g. "get"); passing no verbs returns every resource, which is what commands like
+// `kubectl explain` need since they operate on any resource, not only gettable ones.
+func CompGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, toComplete string, verbs ...string) []string {
 	buf := new(bytes.Buffer)
 	streams := genericiooptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := apiresources.NewAPIResourceOptions(streams)
@@ -322,7 +325,7 @@ func compGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cm
 	// Get the list of resources
 	o.PrintFlags.OutputFormat = ptr.To("name")
 	o.Cached = true
-	o.Verbs = []string{"get"}
+	o.Verbs = verbs
 	// TODO:Should set --request-timeout=5s
 
 	if err := o.Complete(restClientGetter, cmd, nil); err != nil {
@@ -379,7 +382,7 @@ func resourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string,
 					// So we suggest resource types and let the shell add a space after
 					// the completion.
 					if len(allowedTypes) == 0 {
-						comps = compGetResourceList(f, cmd, toComplete)
+						comps = CompGetResourceList(f, cmd, toComplete, "get")
 					} else {
 						for _, c := range allowedTypes {
 							if strings.HasPrefix(c, toComplete) {
@@ -396,7 +399,7 @@ func resourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string,
 						directive |= cobra.ShellCompDirectiveNoSpace
 
 						if len(allowedTypes) == 0 {
-							typeComps := compGetResourceList(f, cmd, toComplete)
+							typeComps := CompGetResourceList(f, cmd, toComplete, "get")
 							for _, c := range typeComps {
 								comps = append(comps, fmt.Sprintf("%s/", c))
 							}
