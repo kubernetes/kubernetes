@@ -1095,53 +1095,50 @@ func (n *callNode) writeDefaulter(c *generator.Context, varName string, index st
 			// If the destination is a pointer, the last element in
 			// defaultDepth is the element type of the bottommost pointer:
 			// the base type of our default value.
-			destElemType := pointerPath[len(pointerPath)-1]
+			baseElemType := pointerPath[len(pointerPath)-1]
 			pointerArgs := args.WithArgs(generator.Args{
-				"varDepth":     len(pointerPath),
-				"baseElemType": destElemType,
+				"baseElemType": baseElemType,
 			})
 
 			sw.Do(fmt.Sprintf("if %s == nil {\n", variablePlaceholder), pointerArgs)
-			if len(n.defaultValue.InlineConstant) > 0 {
-				// If default value is a literal then it can be assigned via var stmt
-				sw.Do("var ptrVar$.varDepth$ $.baseElemType|raw$ = $.defaultValue$\n", pointerArgs)
-			} else {
-				// If default value is not a literal then it may need to be casted
-				// to the base type of the destination pointer
-				sw.Do("ptrVar$.varDepth$ := $.baseElemType|raw$($.defaultValue$)\n", pointerArgs)
-			}
 
-			for i := len(pointerPath); i >= 1; i-- {
-				dest := fmt.Sprintf("ptrVar%d", i-1)
-				assignment := ":="
-				if i == 1 {
-					// Last assignment is into the storage destination
-					dest = variablePlaceholder
-					assignment = "="
+			// Assignment into the storage destination
+			sw.Do(fmt.Sprintf("%v = ", variablePlaceholder), pointerArgs)
+
+			closingParens := 0
+
+			// Build up all the new calls
+			for i := range pointerPath {
+				destElemType := pointerPath[i]
+				var sourceType string
+				if i < len(pointerPath)-1 {
+					sourceType = "*" + pointerPath[i+1].String()
+				} else {
+					sourceType = baseElemType.String()
 				}
 
-				sourceType := "*" + destElemType.String()
-				if i == len(pointerPath) {
-					// Initial value is not a pointer
-					sourceType = destElemType.String()
-				}
-				destElemType = pointerPath[i-1]
-
-				// Cannot include `dest` into args since its value may be
-				// `variablePlaceholder` which is a template, not a value
 				elementArgs := pointerArgs.WithArgs(generator.Args{
-					"assignment":   assignment,
-					"source":       fmt.Sprintf("ptrVar%d", i),
 					"destElemType": destElemType,
 				})
 
 				// Skip cast if type is exact match
 				if destElemType.String() == sourceType {
-					sw.Do(fmt.Sprintf("%v $.assignment$ &$.source$\n", dest), elementArgs)
+					sw.Do("new(", elementArgs)
+					closingParens++
 				} else {
-					sw.Do(fmt.Sprintf("%v $.assignment$ (*$.destElemType|raw$)(&$.source$)\n", dest), elementArgs)
+					sw.Do("new($.destElemType|raw$(", elementArgs)
+					closingParens += 2
 				}
 			}
+
+			// To avoid headaches with new(), always cast to the base type of the destination pointer
+			sw.Do("$.baseElemType|raw$($.defaultValue$)", pointerArgs)
+
+			// Close all the new calls
+			for range closingParens {
+				sw.Do(")", pointerArgs)
+			}
+			sw.Do("\n", pointerArgs)
 		} else {
 			// For primitive types, nil checks cannot be used and the zero value must be determined
 			defaultZero, err := getTypeZeroValue(n.defaultType.String())
