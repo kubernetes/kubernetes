@@ -65,4 +65,4 @@ replace (
 	k8s.io/client-go => ../../client-go
 )
 
-replace github.com/container-storage-interface/spec => github.com/gnufied/spec v1.7.1-0.20260701153011-15c0135084c5
+replace github.com/container-storage-interface/spec => github.com/gnufied/spec v1.7.1-0.20260718120346-8e06851c4133
