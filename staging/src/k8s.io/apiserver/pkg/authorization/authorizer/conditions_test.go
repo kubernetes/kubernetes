@@ -35,12 +35,27 @@ func TestConditionsAwareDecision(t *testing.T) {
 	ctx := t.Context()
 	sampleAttrs := authorizer.AttributesRecord{}
 
+	makeConditionsSlice := func(conditionCount int) []authorizer.Condition {
+		allowConditionList := make([]authorizer.Condition, conditionCount)
+		for i := range conditionCount {
+			allowConditionList[i] = authorizer.GenericCondition{ID: fmt.Sprintf("cond-%d", i)}
+		}
+		return allowConditionList
+	}
+
+	condMapDenyAndAllow := authorizer.ConditionsAwareDecisionConditionsMap(
+		[]authorizer.Condition{authorizer.GenericCondition{ID: "deny-1"}},
+		nil,
+		[]authorizer.Condition{authorizer.GenericCondition{ID: "allow-1"}},
+	)
+
 	tests := []struct {
 		name                                 string
 		testDecisions                        []authorizer.ConditionsAwareDecision
 		wantIsAllow                          bool
 		wantIsNoOpinion                      bool
 		wantIsDeny                           bool
+		wantIsConditionsMap                  bool
 		wantContainsUnconditionalAllowOrDeny bool
 		wantPossibleDecisions                sets.Set[authorizer.Decision]
 		wantReason                           string
@@ -130,6 +145,130 @@ func TestConditionsAwareDecision(t *testing.T) {
 			wantErrorIs: otherErr,
 			wantString:  `Deny(reason="foo", err="[other error, unknown unconditional decision type: 42]")`,
 		},
+		{
+			name: "construct valid allow/noopinion conditionsmap",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, makeConditionsSlice(authorizer.MaxConditionsPerMap)),
+			},
+			wantIsConditionsMap:   true,
+			wantString:            `ConditionsMap(allows=128)`,
+			wantPossibleDecisions: sets.New(authorizer.DecisionNoOpinion, authorizer.DecisionAllow),
+		},
+		{
+			name: "construct valid allow/noopinion/deny conditionsmap",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				condMapDenyAndAllow,
+			},
+			wantIsConditionsMap:   true,
+			wantString:            `ConditionsMap(denies=1, allows=1)`,
+			wantPossibleDecisions: sets.New(authorizer.DecisionDeny, authorizer.DecisionNoOpinion, authorizer.DecisionAllow),
+		},
+		{
+			name: "too many Allow conditions",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, makeConditionsSlice(authorizer.MaxConditionsPerMap+1)),
+			},
+			wantIsNoOpinion: true,
+			wantReason:      "failed closed",
+			wantAnyError:    true,
+			wantString:      `NoOpinion(reason="failed closed", err="too many conditions: 129 exceeds maximum of 128")`,
+		},
+		{
+			name: "too many conditions, with one Deny",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionConditionsMap([]authorizer.Condition{authorizer.GenericCondition{ID: "deny-cond"}}, nil, makeConditionsSlice(authorizer.MaxConditionsPerMap)),
+			},
+			wantIsDeny:   true,
+			wantReason:   "failed closed",
+			wantAnyError: true,
+			wantString:   `Deny(reason="failed closed", err="too many conditions: 129 exceeds maximum of 128")`,
+		},
+		{
+			name: "duplicate IDs",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "foo"}},
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "foo"}},
+				),
+			},
+			wantIsDeny:   true,
+			wantReason:   "failed closed",
+			wantAnyError: true,
+			wantString:   `Deny(reason="failed closed", err="duplicate condition ID \"foo\"")`,
+		},
+		{
+			name: "condition ID must be a Kubernetes label, one condition error enough to fail closed (in Deny)",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "not a kubernetes label"}},
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "foo"}},
+				),
+			},
+			wantIsDeny:   true,
+			wantReason:   "failed closed",
+			wantAnyError: true,
+			wantString:   `Deny(reason="failed closed", err="invalid condition ID \"not a kubernetes label\": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")`,
+		},
+		{
+			name: "condition ID must be a Kubernetes label, one condition error enough to fail closed (in NoOpinion)",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "not a kubernetes label"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "foo"}},
+				),
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					nil,
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "not a kubernetes label"}},
+				),
+			},
+			wantIsNoOpinion: true,
+			wantReason:      "failed closed",
+			wantAnyError:    true,
+			wantString:      `NoOpinion(reason="failed closed", err="invalid condition ID \"not a kubernetes label\": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")`,
+		},
+		{
+			name: "condition type must be a Kubernetes label",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "bar", Type: "not a kubernetes label"}},
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "foo"}},
+				),
+			},
+			wantIsNoOpinion: true,
+			wantReason:      "failed closed",
+			wantAnyError:    true,
+			wantString:      `NoOpinion(reason="failed closed", err="invalid condition type \"not a kubernetes label\": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")`,
+		},
+		{
+			name: "empty ConditionsMap",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, nil),
+			},
+			wantIsNoOpinion: true,
+			wantReason:      "no conditions",
+			wantAnyError:    true,
+			wantString:      `NoOpinion(reason="no conditions", err="at least one condition must be passed to ConditionsAwareDecisionConditionsMap(), got none")`,
+		},
+		{
+			// Short-circuit: only NoOpinion conditions => the constructor folds the result to NoOpinion
+			// directly, without ever returning a ConditionsMap (which would then evaluate to NoOpinion anyway).
+			name: "noopinion-only conditions short-circuit to NoOpinion",
+			testDecisions: []authorizer.ConditionsAwareDecision{
+				authorizer.ConditionsAwareDecisionConditionsMap(
+					nil,
+					[]authorizer.Condition{authorizer.GenericCondition{ID: "nop-1"}},
+					nil,
+				),
+			},
+			wantIsNoOpinion: true,
+			wantReason:      "only NoOpinion conditions always evaluate to NoOpinion",
+			wantString:      `NoOpinion(reason="only NoOpinion conditions always evaluate to NoOpinion")`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -146,6 +285,10 @@ func TestConditionsAwareDecision(t *testing.T) {
 					isDenied := d.IsDeny()
 					if isDenied != tt.wantIsDeny {
 						t.Errorf("IsDenied() = %v, want %v", isDenied, tt.wantIsDeny)
+					}
+					isConditionsMap := d.IsConditionsMap()
+					if isConditionsMap != tt.wantIsConditionsMap {
+						t.Errorf("IsConditionsMap() = %v, want %v", isConditionsMap, tt.wantIsConditionsMap)
 					}
 					isUnconditional := d.IsUnconditional()
 					wantIsUnconditional := tt.wantIsAllow || tt.wantIsDeny || tt.wantIsNoOpinion
@@ -187,6 +330,13 @@ func TestConditionsAwareDecision(t *testing.T) {
 					failureDecision := d.FailureDecision()
 					if failureDecision != wantFailureDecision {
 						t.Errorf("FailureDecision() = %v, want %v", failureDecision, wantFailureDecision)
+					}
+					if tt.wantIsConditionsMap {
+						// also ensure the ConditionsMap's FailureDecision is aligned
+						failureDecision := d.ConditionsMap().FailureDecision()
+						if failureDecision != wantFailureDecision {
+							t.Errorf("ConditionsMap.FailureDecision() = %v, want %v", failureDecision, wantFailureDecision)
+						}
 					}
 					gotReason := d.Reason()
 					if gotReason != tt.wantReason {
