@@ -1216,6 +1216,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	}
 
 	pod := podInfo.Pod
+	nominatedPodInfo := podInfo.PodInfo
 	err := status.AsError()
 	errMsg := status.Message()
 
@@ -1259,6 +1260,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			// and we can't fix the validation for backwards compatibility.
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			pod = podInfo.Pod
+			nominatedPodInfo = podInfo.PodInfo
 			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
 			}
@@ -1271,7 +1273,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	// and the time the scheduler receives a Pod Update for the nominated pod.
 	// Here we check for nil only for tests.
 	if sched.SchedulingQueue != nil {
-		sched.SchedulingQueue.AddNominatedPod(logger, podInfo.PodInfo, nominatingInfo)
+		sched.SchedulingQueue.AddNominatedPod(logger, nominatedPodInfo, nominatingInfo)
 	}
 
 	if err == nil {
