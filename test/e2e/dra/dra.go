@@ -113,9 +113,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		/*
 		   Release: v1.37
 		   Testname: CRUD operations for devicetaintrules
-		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1beta2 DeviceTaintRule.
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 DeviceTaintRule.
 		*/
-		f.It("resource.k8s.io/v1 DeviceTaintRule", f.WithFeatureGate(features.DRADeviceTaintRules), func(ctx context.Context) {
+		framework.ConformanceIt("resource.k8s.io/v1 DeviceTaintRule", func(ctx context.Context) {
 			lastTransitionTime := metav1.Now()
 			lastTransitionTimeEncoded, err := lastTransitionTime.MarshalJSON()
 			framework.ExpectNoError(err)
