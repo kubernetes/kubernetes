@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/util/jsonpath"
 
@@ -45,6 +46,7 @@ import (
 	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func hasWildcard(slice []string) bool {
@@ -229,6 +231,7 @@ func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingW
 
 func validateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration, opts validationOptions) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, validateQualifiedFinalizerNames(e.Finalizers, opts, field.NewPath("metadata", "finalizers"))...)
 	hookNames := sets.NewString()
 	for i, hook := range e.Webhooks {
 		allErrors = append(allErrors, validateValidatingWebhook(&hook, opts, field.NewPath("webhooks").Index(i))...)
@@ -263,7 +266,19 @@ type validationOptions struct {
 	requireRecognizedAdmissionReviewVersion bool
 	requireUniqueWebhookNames               bool
 	allowInvalidLabelValueInSelector        bool
+	oldFinalizers                           []string
+	ratchetFinalizers                       bool
 	preexistingExpressions                  preexistingExpressions
+}
+
+func validateQualifiedFinalizerNames(finalizers []string, opts validationOptions, fldPath *field.Path) field.ErrorList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StrictFinalizerNameValidation) {
+		return nil
+	}
+	if opts.ratchetFinalizers {
+		return genericvalidation.ValidateNoNewInvalidQualifiedFinalizers(finalizers, opts.oldFinalizers, fldPath)
+	}
+	return genericvalidation.ValidateFinalizersWithQualifiedNames(finalizers, fldPath)
 }
 
 type preexistingExpressions struct {
@@ -341,6 +356,7 @@ func findMutatingPolicyPreexistingExpressions(mutatingPolicy *admissionregistrat
 
 func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration, opts validationOptions) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, validateQualifiedFinalizerNames(e.Finalizers, opts, field.NewPath("metadata", "finalizers"))...)
 
 	hookNames := sets.NewString()
 	for i, hook := range e.Webhooks {
@@ -727,6 +743,8 @@ func mutatingWebhookHasInvalidLabelValueInSelector(webhooks []admissionregistrat
 // ValidateValidatingWebhookConfigurationUpdate validates update of validating webhook configuration
 func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	return validateValidatingWebhookConfiguration(newC, validationOptions{
+		oldFinalizers:                           oldC.Finalizers,
+		ratchetFinalizers:                       true,
 		ignoreMatchConditions:                   ignoreValidatingWebhookMatchConditions(newC.Webhooks, oldC.Webhooks),
 		allowParamsInMatchConditions:            false,
 		requireNoSideEffects:                    validatingHasNoSideEffects(oldC.Webhooks),
@@ -740,6 +758,8 @@ func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistrat
 // ValidateMutatingWebhookConfigurationUpdate validates update of mutating webhook configuration
 func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
 	return validateMutatingWebhookConfiguration(newC, validationOptions{
+		oldFinalizers:                           oldC.Finalizers,
+		ratchetFinalizers:                       true,
 		ignoreMatchConditions:                   ignoreMutatingWebhookMatchConditions(newC.Webhooks, oldC.Webhooks),
 		allowParamsInMatchConditions:            false,
 		requireNoSideEffects:                    mutatingHasNoSideEffects(oldC.Webhooks),
@@ -765,6 +785,7 @@ func ValidateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmiss
 
 func validateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmissionPolicy, opts validationOptions) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&p.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, validateQualifiedFinalizerNames(p.Finalizers, opts, field.NewPath("metadata", "finalizers"))...)
 	allErrors = append(allErrors, validateValidatingAdmissionPolicySpec(p.ObjectMeta, &p.Spec, opts, field.NewPath("spec"))...)
 	return allErrors
 }
@@ -1168,11 +1189,12 @@ func hasNewlines(s string) bool {
 
 // ValidateValidatingAdmissionPolicyBinding validates a ValidatingAdmissionPolicyBinding before create.
 func ValidateValidatingAdmissionPolicyBinding(pb *admissionregistration.ValidatingAdmissionPolicyBinding) field.ErrorList {
-	return validateValidatingAdmissionPolicyBinding(pb)
+	return validateValidatingAdmissionPolicyBinding(pb, validationOptions{})
 }
 
-func validateValidatingAdmissionPolicyBinding(pb *admissionregistration.ValidatingAdmissionPolicyBinding) field.ErrorList {
+func validateValidatingAdmissionPolicyBinding(pb *admissionregistration.ValidatingAdmissionPolicyBinding, opts validationOptions) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&pb.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, validateQualifiedFinalizerNames(pb.Finalizers, opts, field.NewPath("metadata", "finalizers"))...)
 	allErrors = append(allErrors, validateValidatingAdmissionPolicyBindingSpec(&pb.Spec, field.NewPath("spec"))...)
 
 	return allErrors
@@ -1238,6 +1260,8 @@ func validateParamRef(pr *admissionregistration.ParamRef, fldPath *field.Path) f
 // ValidateValidatingAdmissionPolicyUpdate validates update of validating admission policy
 func ValidateValidatingAdmissionPolicyUpdate(newC, oldC *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
 	return validateValidatingAdmissionPolicy(newC, validationOptions{
+		oldFinalizers:          oldC.Finalizers,
+		ratchetFinalizers:      true,
 		ignoreMatchConditions:  ignoreValidatingAdmissionPolicyMatchConditions(newC, oldC),
 		preexistingExpressions: findValidatingPolicyPreexistingExpressions(oldC),
 	})
@@ -1250,7 +1274,10 @@ func ValidateValidatingAdmissionPolicyStatusUpdate(newC, oldC *admissionregistra
 
 // ValidateValidatingAdmissionPolicyBindingUpdate validates update of validating admission policy
 func ValidateValidatingAdmissionPolicyBindingUpdate(newC, oldC *admissionregistration.ValidatingAdmissionPolicyBinding) field.ErrorList {
-	return validateValidatingAdmissionPolicyBinding(newC)
+	return validateValidatingAdmissionPolicyBinding(newC, validationOptions{
+		oldFinalizers:     oldC.Finalizers,
+		ratchetFinalizers: true,
+	})
 }
 
 func validateValidatingAdmissionPolicyStatus(status *admissionregistration.ValidatingAdmissionPolicyStatus, fldPath *field.Path) field.ErrorList {
@@ -1348,6 +1375,8 @@ func isCELIdentifier(name string) bool {
 // ValidateMutatingAdmissionPolicyUpdate validates update of mutating admission policy
 func ValidateMutatingAdmissionPolicyUpdate(newC, oldC *admissionregistration.MutatingAdmissionPolicy) field.ErrorList {
 	return validateMutatingAdmissionPolicy(newC, validationOptions{
+		oldFinalizers:          oldC.Finalizers,
+		ratchetFinalizers:      true,
 		ignoreMatchConditions:  ignoreMutatingAdmissionPolicyMatchConditions(newC, oldC),
 		preexistingExpressions: findMutatingPolicyPreexistingExpressions(oldC),
 	})
@@ -1355,7 +1384,10 @@ func ValidateMutatingAdmissionPolicyUpdate(newC, oldC *admissionregistration.Mut
 
 // ValidateMutatingAdmissionPolicyBindingUpdate validates update of mutating admission policy
 func ValidateMutatingAdmissionPolicyBindingUpdate(newC, oldC *admissionregistration.MutatingAdmissionPolicyBinding) field.ErrorList {
-	return validateMutatingAdmissionPolicyBinding(newC)
+	return validateMutatingAdmissionPolicyBinding(newC, validationOptions{
+		oldFinalizers:     oldC.Finalizers,
+		ratchetFinalizers: true,
+	})
 }
 
 // ValidateMutatingAdmissionPolicy validates a MutatingAdmissionPolicy before creation.
@@ -1365,6 +1397,7 @@ func ValidateMutatingAdmissionPolicy(p *admissionregistration.MutatingAdmissionP
 
 func validateMutatingAdmissionPolicy(p *admissionregistration.MutatingAdmissionPolicy, opts validationOptions) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&p.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, validateQualifiedFinalizerNames(p.Finalizers, opts, field.NewPath("metadata", "finalizers"))...)
 	allErrors = append(allErrors, validateMutatingAdmissionPolicySpec(p.ObjectMeta, &p.Spec, opts, field.NewPath("spec"))...)
 	return allErrors
 }
@@ -1500,11 +1533,12 @@ func validateJSONPatch(compiler plugincel.Compiler, jsonPatch *admissionregistra
 
 // ValidateMutatingAdmissionPolicyBinding validates a MutatingAdmissionPolicyBinding before create.
 func ValidateMutatingAdmissionPolicyBinding(pb *admissionregistration.MutatingAdmissionPolicyBinding) field.ErrorList {
-	return validateMutatingAdmissionPolicyBinding(pb)
+	return validateMutatingAdmissionPolicyBinding(pb, validationOptions{})
 }
 
-func validateMutatingAdmissionPolicyBinding(pb *admissionregistration.MutatingAdmissionPolicyBinding) field.ErrorList {
+func validateMutatingAdmissionPolicyBinding(pb *admissionregistration.MutatingAdmissionPolicyBinding, opts validationOptions) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&pb.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, validateQualifiedFinalizerNames(pb.Finalizers, opts, field.NewPath("metadata", "finalizers"))...)
 	allErrors = append(allErrors, validateMutatingAdmissionPolicyBindingSpec(&pb.Spec, field.NewPath("spec"))...)
 
 	return allErrors

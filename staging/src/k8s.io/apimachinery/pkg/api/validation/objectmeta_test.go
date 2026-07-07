@@ -321,6 +321,136 @@ func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
 	}
 }
 
+func TestValidateQualifiedFinalizerName(t *testing.T) {
+	testcases := map[string]struct {
+		finalizer   string
+		expectErr   bool
+		expectedErr string
+	}{
+		"standard kubernetes finalizer": {
+			finalizer: "kubernetes",
+		},
+		"standard orphan finalizer": {
+			finalizer: metav1.FinalizerOrphanDependents,
+		},
+		"standard foreground deletion finalizer": {
+			finalizer: metav1.FinalizerDeleteDependents,
+		},
+		"domain qualified custom finalizer": {
+			finalizer: "example.com/my-finalizer",
+		},
+		"unqualified custom finalizer": {
+			finalizer:   "my-custom-finalizer",
+			expectErr:   true,
+			expectedErr: "name is neither a standard finalizer name nor is it fully qualified",
+		},
+		"invalid qualified name": {
+			finalizer:   "example.com/",
+			expectErr:   true,
+			expectedErr: "name part must be non-empty",
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateQualifiedFinalizerName(tc.finalizer, field.NewPath("metadata", "finalizers").Index(0))
+			if tc.expectErr && len(errs) == 0 {
+				t.Fatalf("expected error, got none")
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Fatalf("expected no error, got %v", errs)
+			}
+			if tc.expectedErr != "" && !strings.Contains(errs.ToAggregate().Error(), tc.expectedErr) {
+				t.Fatalf("expected error containing %q, got %v", tc.expectedErr, errs)
+			}
+		})
+	}
+}
+
+func TestValidateFinalizersWithQualifiedNames(t *testing.T) {
+	testcases := map[string]struct {
+		finalizers  []string
+		expectErr   bool
+		expectedErr string
+	}{
+		"standard finalizers are allowed": {
+			finalizers: []string{"kubernetes", metav1.FinalizerOrphanDependents, metav1.FinalizerDeleteDependents},
+		},
+		"domain qualified custom finalizer is allowed": {
+			finalizers: []string{"example.com/my-finalizer"},
+		},
+		"unqualified custom finalizer is rejected": {
+			finalizers:  []string{"my-custom-finalizer"},
+			expectErr:   true,
+			expectedErr: "name is neither a standard finalizer name nor is it fully qualified",
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateFinalizersWithQualifiedNames(tc.finalizers, field.NewPath("metadata", "finalizers"))
+			if tc.expectErr && len(errs) == 0 {
+				t.Fatalf("expected error, got none")
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Fatalf("expected no error, got %v", errs)
+			}
+			if tc.expectedErr != "" && !strings.Contains(errs.ToAggregate().Error(), tc.expectedErr) {
+				t.Fatalf("expected error containing %q, got %v", tc.expectedErr, errs)
+			}
+		})
+	}
+}
+
+func TestValidateNoNewInvalidQualifiedFinalizers(t *testing.T) {
+	testcases := map[string]struct {
+		oldFinalizers []string
+		newFinalizers []string
+		expectErr     bool
+		expectedErr   string
+	}{
+		"unchanged invalid finalizer is allowed": {
+			oldFinalizers: []string{"my-custom-finalizer"},
+			newFinalizers: []string{"my-custom-finalizer"},
+		},
+		"new invalid finalizer is rejected": {
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "my-custom-finalizer"},
+			expectErr:     true,
+			expectedErr:   "name is neither a standard finalizer name nor is it fully qualified",
+		},
+		"new standard finalizer is allowed": {
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", metav1.FinalizerDeleteDependents},
+		},
+		"new domain qualified finalizer is allowed": {
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "example.com/new"},
+		},
+		"new invalid qualified name is rejected": {
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "example.com/"},
+			expectErr:     true,
+			expectedErr:   "name part must be non-empty",
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateNoNewInvalidQualifiedFinalizers(tc.newFinalizers, tc.oldFinalizers, field.NewPath("metadata", "finalizers"))
+			if tc.expectErr && len(errs) == 0 {
+				t.Fatalf("expected error, got none")
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Fatalf("expected no error, got %v", errs)
+			}
+			if tc.expectedErr != "" && !strings.Contains(errs.ToAggregate().Error(), tc.expectedErr) {
+				t.Fatalf("expected error containing %q, got %v", tc.expectedErr, errs)
+			}
+		})
+	}
+}
+
 func TestValidateFinalizersUpdate(t *testing.T) {
 	testcases := map[string]struct {
 		Old         metav1.ObjectMeta

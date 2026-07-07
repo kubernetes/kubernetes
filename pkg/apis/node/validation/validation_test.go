@@ -21,8 +21,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/node"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 
 	"github.com/stretchr/testify/assert"
@@ -66,6 +69,123 @@ func TestValidateRuntimeClass(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			errs := ValidateRuntimeClass(&test.rc)
 			if test.expectError {
+				assert.NotEmpty(t, errs)
+			} else {
+				assert.Empty(t, errs)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeClassFinalizerNames(t *testing.T) {
+	tests := []struct {
+		name       string
+		enableGate bool
+		finalizers []string
+		wantErr    bool
+	}{
+		{
+			name:       "gate enabled rejects unqualified custom finalizer",
+			enableGate: true,
+			finalizers: []string{"my-custom-finalizer"},
+			wantErr:    true,
+		},
+		{
+			name:       "gate disabled allows unqualified custom finalizer",
+			enableGate: false,
+			finalizers: []string{"my-custom-finalizer"},
+		},
+		{
+			name:       "gate enabled allows standard finalizer",
+			enableGate: true,
+			finalizers: []string{metav1.FinalizerDeleteDependents},
+		},
+		{
+			name:       "gate enabled allows domain qualified finalizer",
+			enableGate: true,
+			finalizers: []string{"example.com/my-finalizer"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictFinalizerNameValidation, test.enableGate)
+
+			rc := &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "runtime-class",
+					Finalizers: test.finalizers,
+				},
+				Handler: "runc",
+			}
+
+			errs := ValidateRuntimeClass(rc)
+			if test.wantErr {
+				assert.NotEmpty(t, errs)
+			} else {
+				assert.Empty(t, errs)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeClassUpdateFinalizerNameRatcheting(t *testing.T) {
+	tests := []struct {
+		name          string
+		enableGate    bool
+		oldFinalizers []string
+		newFinalizers []string
+		wantErr       bool
+	}{
+		{
+			name:          "gate enabled allows unchanged invalid finalizer",
+			enableGate:    true,
+			oldFinalizers: []string{"my-custom-finalizer"},
+			newFinalizers: []string{"my-custom-finalizer"},
+		},
+		{
+			name:          "gate enabled rejects newly added invalid finalizer",
+			enableGate:    true,
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "my-custom-finalizer"},
+			wantErr:       true,
+		},
+		{
+			name:          "gate disabled allows newly added invalid finalizer",
+			enableGate:    false,
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "my-custom-finalizer"},
+		},
+		{
+			name:          "gate enabled allows newly added domain qualified finalizer",
+			enableGate:    true,
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "example.com/new"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictFinalizerNameValidation, test.enableGate)
+
+			oldRC := &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "runtime-class",
+					Finalizers: test.oldFinalizers,
+				},
+				Handler: "runc",
+			}
+			newRC := &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "runtime-class",
+					ResourceVersion: "2",
+					Finalizers:      test.newFinalizers,
+				},
+				Handler: "runc",
+			}
+
+			errs := ValidateRuntimeClassUpdate(newRC, oldRC)
+			if test.wantErr {
 				assert.NotEmpty(t, errs)
 			} else {
 				assert.Empty(t, errs)
