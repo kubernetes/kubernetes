@@ -28,9 +28,9 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -706,25 +706,23 @@ func (f *customResourceDefinitionFactory) New() runtime.Object {
 }
 
 func (*customResourceDefinitionFactory) Create(tCtx ktesting.TContext, i interface{}) (func(ctx context.Context) error, error) {
-	var err error
-	unstructCRD := &unstructured.Unstructured{}
-	gvr := schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}
-
 	item, ok := i.(*apiextensionsv1.CustomResourceDefinition)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	unstructCRD.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(i)
+	// CreateNewV1CustomResourceDefinitionWatchUnsafe also waits for the CRD
+	// to show up in discovery. Without that, a custom resource created right
+	// after the CRD can intermittently fail with a spurious 404 ("the server
+	// could not find the requested resource") because the apiextensions-apiserver
+	// establishes new CRDs asynchronously.
+	created, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(item, tCtx.APIExtensions())
 	if err != nil {
-		return nil, err
-	}
-
-	if _, err = tCtx.Dynamic().Resource(gvr).Create(tCtx, unstructCRD, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create CustomResourceDefinition: %w", err)
 	}
+
 	return func(ctx context.Context) error {
-		return tCtx.Dynamic().Resource(gvr).Delete(ctx, item.GetName(), metav1.DeleteOptions{})
+		return fixtures.DeleteV1CustomResourceDefinition(created, tCtx.APIExtensions())
 	}, nil
 }
 
