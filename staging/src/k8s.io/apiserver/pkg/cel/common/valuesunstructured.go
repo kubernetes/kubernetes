@@ -281,7 +281,8 @@ func (t *unstructuredMapList) toMapKey(element interface{}) interface{} {
 	for i, kf := range t.escapedKeyProps {
 		key[i] = eObj[kf]
 	}
-	return fmt.Sprintf("%v", key)
+	// Serialize to a string for more than 3 keys. %#v quotes strings.
+	return fmt.Sprintf("%#v", key)
 }
 
 // Equal on a map list ignores list element order.
