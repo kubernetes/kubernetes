@@ -60,14 +60,14 @@ func TestDeclarativeValidateParameter(t *testing.T) {
 						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkAlpha()},
+						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkBeta()},
 				},
 				"missing parameter kind": {
 					input: mkValidIngressClass(func(obj *networking.IngressClass) {
 						obj.Spec.Parameters.Kind = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkBeta(),
 					},
 				},
 			}
@@ -122,7 +122,7 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkBeta(),
 					},
 				},
 				"update fails when parameters kind is cleared": {
@@ -134,7 +134,7 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 						obj.Spec.Parameters.Kind = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkBeta(),
 					},
 				},
 			}

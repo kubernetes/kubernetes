@@ -33,9 +33,9 @@ const (
 type ScaleSpec struct {
 	// replicas is the number of observed instances of the scaled object.
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:optional
 	// +default=0
-	// +k8s:alpha(since: "1.36")=+k8s:minimum=0
+	// +k8s:beta(since: "1.37")=+k8s:minimum=0
 	Replicas int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 }
 

@@ -682,7 +682,7 @@ type DeviceAttribute struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since:"1.36")=+oneOf=ValueType
+	// +oneOf=ValueType
 	// +featureGate=DRAListTypeAttributes
 	IntValues []int64
 
@@ -690,7 +690,7 @@ type DeviceAttribute struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since:"1.36")=+oneOf=ValueType
+	// +oneOf=ValueType
 	// +featureGate=DRAListTypeAttributes
 	BoolValues []bool
 
@@ -701,7 +701,7 @@ type DeviceAttribute struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since:"1.36")=+oneOf=ValueType
+	// +oneOf=ValueType
 	// +featureGate=DRAListTypeAttributes
 	StringValues []string
 
@@ -712,7 +712,7 @@ type DeviceAttribute struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since:"1.36")=+oneOf=ValueType
+	// +oneOf=ValueType
 	// +featureGate=DRAListTypeAttributes
 	VersionValues []string
 }

@@ -65,7 +65,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"spec.type: Limited with limited=nil": {
 			input: mkPLC(tweakLimited(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"spec.type: Exempt with limited set": {
@@ -78,19 +78,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				// Mandatory object check: spec of 'exempt' differs from bootstrap (HW-only)
 				field.Invalid(specPath, nil, "").MarkFromImperative(),
-				field.Forbidden(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Forbidden(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"spec.type: Limited with exempt set": {
 			input: mkPLC(tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"limitResponse.type: Queue with queuing=nil": {
 			input: mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue), tweakQueuing(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"limitResponse.type: Reject with queuing set": {
@@ -100,19 +100,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				QueueLengthLimit: 50,
 			})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"spec.type: empty": {
 			input: mkPLC(tweakSpecType(""), tweakLimited(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("type"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("type"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"limitResponse.type: empty": {
 			input: mkPLC(tweakLimitResponseType("")),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited", "limitResponse", "type"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("limited", "limitResponse", "type"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 	}
@@ -154,21 +154,21 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkPLC(),
 			update: mkPLC(tweakLimited(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"update: add exempt field to Limited PLC": {
 			old:    mkPLC(),
 			update: mkPLC(tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"update: Queue with queuing set to nil": {
 			old:    mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue)),
 			update: mkPLC(tweakLimitResponseType(flowcontrol.LimitResponseTypeQueue), tweakQueuing(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Required(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"update: Reject with queuing added": {
@@ -179,7 +179,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				QueueLengthLimit: 50,
 			})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
+				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 	}
