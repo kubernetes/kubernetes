@@ -2499,6 +2499,19 @@ rules:
       branch: release-1.36
       dirs:
       - staging/src/k8s.io/externaljwt
+- destination: webhook-auth
+  branches:
+  - name: master
+    dependencies:
+    - repository: apimachinery
+      branch: master
+    - repository: api
+      branch: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/webhook-auth
+  library: true
 recursive-delete-patterns:
 - '*/.gitattributes'
 # minimum version with GOTOOLCHAIN support
