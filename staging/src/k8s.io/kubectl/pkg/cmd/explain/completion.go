@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,26 +17,23 @@ limitations under the License.
 package explain
 
 import (
-	"bytes"
-	"io"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubectl/pkg/cmd/apiresources"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/explain"
+	"k8s.io/kubectl/pkg/util/completion"
+	"k8s.io/kubectl/pkg/util/openapi"
 )
 
 // resourceFieldCompletionFunc returns a completion function for kubectl explain that completes:
 // - resource types when no dot is present (e.g., "pods", "deploy")
 // - field paths when a dot is present (e.g., "pods.spec", "pods.spec.containers")
-func resourceFieldCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func resourceFieldCompletionFunc(restClientGetter genericclioptions.RESTClientGetter) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) > 0 || strings.Contains(toComplete, "..") {
 			return nil, cobra.ShellCompDirectiveNoFileComp
@@ -44,28 +41,16 @@ func resourceFieldCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []strin
 
 		if !strings.Contains(toComplete, ".") {
 			// Complete resource type names, appending "." so the next tab press moves
-			// into field completion. Listed directly (not via the shared
-			// util/completion helper) because that helper hardcodes a "get" verb
-			// filter, and explain works for any resource, not just those that
-			// support GET.
-			buf := new(bytes.Buffer)
-			o := apiresources.NewAPIResourceOptions(genericiooptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard})
-			o.PrintFlags.OutputFormat = new("name")
-			o.Cached = true
-			if err := o.Complete(f, cmd, nil); err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
-			}
-			_ = o.RunAPIResources()
+			// into field completion. No verb filter is passed because explain works for
+			// any resource, not just those that support GET.
 			var comps []string
-			for res := range strings.SplitSeq(buf.String(), "\n") {
-				if res != "" && strings.HasPrefix(res, toComplete) {
-					comps = append(comps, res+".")
-				}
+			for _, res := range completion.CompGetResourceList(restClientGetter, cmd, toComplete) {
+				comps = append(comps, res+".")
 			}
 			return comps, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
 		}
 
-		mapper, err := f.ToRESTMapper()
+		mapper, err := restClientGetter.ToRESTMapper()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -92,7 +77,7 @@ func resourceFieldCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []strin
 
 		var comps []string
 		hasExpandable := false
-		expandable, leaves := fieldNamesForGVR(f, mapper, gvr, fieldsPath)
+		expandable, leaves := fieldNamesForGVR(restClientGetter, mapper, gvr, fieldsPath)
 		for _, name := range expandable {
 			if strings.HasPrefix(name, prefix) {
 				comps = append(comps, toComplete[:lastDot+1]+name+".")
@@ -110,7 +95,7 @@ func resourceFieldCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []strin
 			// (e.g. "deployments.ap" → "deployments.apps."). Offer the names that
 			// extend toComplete and that the parser resolves back to themselves,
 			// i.e. that are not shadowed by a shorter resource name.
-			resource := toComplete[:strings.Index(toComplete, ".")]
+			resource, _, _ := strings.Cut(toComplete, ".")
 			gvrs, _ := mapper.ResourcesFor(schema.GroupVersionResource{Resource: resource})
 			seen := map[string]bool{}
 			for _, g := range gvrs {
@@ -140,8 +125,12 @@ func resourceFieldCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []strin
 // fieldNamesForGVR returns the expandable and leaf field names at fieldsPath within the
 // OpenAPI v2 schema for gvr.
 // TODO: use the OpenAPI v3 schema so that CRD fields are always complete.
-func fieldNamesForGVR(f cmdutil.Factory, mapper meta.RESTMapper, gvr schema.GroupVersionResource, fieldsPath []string) (expandable, leaves []string) {
-	openAPIResources, err := f.OpenAPISchema()
+func fieldNamesForGVR(restClientGetter genericclioptions.RESTClientGetter, mapper meta.RESTMapper, gvr schema.GroupVersionResource, fieldsPath []string) (expandable, leaves []string) {
+	discoveryClient, err := restClientGetter.ToDiscoveryClient()
+	if err != nil {
+		return nil, nil
+	}
+	openAPIResources, err := openapi.NewOpenAPIParser(discoveryClient).Parse()
 	if err != nil {
 		return nil, nil
 	}
