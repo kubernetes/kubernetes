@@ -80,9 +80,9 @@ type NodeClient struct {
 	stageUnstageSet          bool
 	expansionSet             bool
 	volumeStatsSet           bool
-	volumeConditionSet       bool
+	volumeHealthSet          bool
 	SetVolumeStats           bool
-	SetVolumecondition       bool
+	SetVolumeHealth          bool
 	singleNodeMultiWriterSet bool
 	volumeMountGroupSet      bool
 	nodeGetInfoResp          *csipb.NodeGetInfoResponse
@@ -118,12 +118,12 @@ func NewNodeClientWithVolumeStats(volumeStatsSet bool) *NodeClient {
 	}
 }
 
-func NewNodeClientWithVolumeStatsAndCondition(volumeStatsSet, volumeConditionSet, setVolumeStats, setVolumeCondition bool) *NodeClient {
+func NewNodeClientWithVolumeStatsAndHealth(volumeStatsSet, volumeHealth, setVolumeStats, setVolumeHealth bool) *NodeClient {
 	return &NodeClient{
-		volumeStatsSet:     volumeStatsSet,
-		volumeConditionSet: volumeConditionSet,
-		SetVolumeStats:     setVolumeStats,
-		SetVolumecondition: setVolumeCondition,
+		volumeStatsSet:  volumeStatsSet,
+		volumeHealthSet: volumeHealth,
+		SetVolumeStats:  setVolumeStats,
+		SetVolumeHealth: setVolumeHealth,
 	}
 }
 
@@ -392,11 +392,11 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 		})
 	}
 
-	if f.volumeConditionSet {
+	if f.volumeHealthSet {
 		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
 			Type: &csipb.NodeServiceCapability_Rpc{
 				Rpc: &csipb.NodeServiceCapability_RPC{
-					Type: csipb.NodeServiceCapability_RPC_VOLUME_CONDITION,
+					Type: csipb.NodeServiceCapability_RPC_GET_VOLUME_HEALTH,
 				},
 			},
 		})
@@ -453,7 +453,20 @@ func (f *NodeClient) NodeGetVolumeHealth(ctx context.Context, req *csipb.NodeGet
 	if f.nextErr != nil {
 		return nil, f.nextErr
 	}
-	return &csipb.NodeGetVolumeHealthResponse{}, nil
+	resp := &csipb.NodeGetVolumeHealthResponse{}
+	if f.SetVolumeHealth {
+		resp.VolumeHealth = &csipb.VolumeHealth{
+			VolumeId: req.GetVolumeId(),
+			HealthStatuses: []*csipb.VolumeHealth_VolumeHealthEntry{
+				{
+					Status:  csipb.VolumeHealthErrorType_DEGRADED,
+					Reason:  "FakeHealthIssue",
+					Message: "fake volume health issue",
+				},
+			},
+		}
+	}
+	return resp, nil
 }
 
 // NodeGetStorageHealth implements csi method

@@ -354,14 +354,10 @@ func (s *service) ControllerGetVolume(
 	}
 
 	resp := &csi.ControllerGetVolumeResponse{
-		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
-			VolumeCondition: &csi.VolumeCondition{},
-		},
+		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{},
 	}
 	i, v := s.findVolByID(ctx, req.VolumeId)
 	if i < 0 {
-		resp.Status.VolumeCondition.Abnormal = true
-		resp.Status.VolumeCondition.Message = "volume not found"
 		return resp, status.Error(codes.NotFound, req.VolumeId)
 	}
 
@@ -441,9 +437,7 @@ func (s *service) ListVolumes(
 	)
 
 	for i = 0; i < len(entries); i++ {
-		volumeStatus := &csi.ListVolumesResponse_VolumeStatus{
-			VolumeCondition: &csi.VolumeCondition{},
-		}
+		volumeStatus := &csi.ListVolumesResponse_VolumeStatus{}
 
 		if !s.config.DisableAttach {
 			volumeStatus.PublishedNodeIds = []string{
@@ -563,7 +557,7 @@ func (s *service) ControllerGetCapabilities(
 		{
 			Type: &csi.ControllerServiceCapability_Rpc{
 				Rpc: &csi.ControllerServiceCapability_RPC{
-					Type: csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
+					Type: csi.ControllerServiceCapability_RPC_GET_VOLUME_HEALTH,
 				},
 			},
 		},

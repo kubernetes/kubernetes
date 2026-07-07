@@ -373,7 +373,7 @@ func (s *service) NodeGetCapabilities(
 		capabilities = append(capabilities, &csi.NodeServiceCapability{
 			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
-					Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
+					Type: csi.NodeServiceCapability_RPC_GET_VOLUME_HEALTH,
 				},
 			},
 		})
@@ -418,12 +418,7 @@ func (s *service) NodeGetInfo(ctx context.Context,
 func (s *service) NodeGetVolumeStats(ctx context.Context,
 	req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 
-	resp := &csi.NodeGetVolumeStatsResponse{
-		VolumeCondition: &csi.VolumeCondition{
-			Abnormal: false,
-			Message:  "volume is normal",
-		},
-	}
+	resp := &csi.NodeGetVolumeStatsResponse{}
 
 	if len(req.GetVolumeId()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID cannot be empty")
@@ -435,8 +430,6 @@ func (s *service) NodeGetVolumeStats(ctx context.Context,
 
 	i, v := s.findVolNoLock("id", req.VolumeId)
 	if i < 0 {
-		resp.VolumeCondition.Abnormal = true
-		resp.VolumeCondition.Message = "Volume not found"
 		return resp, status.Error(codes.NotFound, req.VolumeId)
 	}
 
@@ -449,21 +442,45 @@ func (s *service) NodeGetVolumeStats(ctx context.Context,
 		},
 	}
 
-	if req.GetVolumePath() == "/tmp/csi/health/abnormal" {
-		resp.VolumeCondition.Abnormal = true
-		resp.VolumeCondition.Message = "volume is abnormal"
-		return resp, nil
-	}
-
 	_, exists := v.VolumeContext[nodeMntPathKey]
 	if !exists {
 		msg := fmt.Sprintf("volume %q doest not exist on the specified path %q", req.VolumeId, req.VolumePath)
-		resp.VolumeCondition.Abnormal = true
-		resp.VolumeCondition.Message = msg
 		return resp, status.Error(codes.NotFound, msg)
 	}
 
 	if hookVal, hookMsg := s.execHook("NodeGetVolumeStatsEnd"); hookVal != codes.OK {
+		return nil, status.Error(hookVal, hookMsg)
+	}
+
+	return resp, nil
+}
+
+func (s *service) NodeGetVolumeHealth(ctx context.Context,
+	req *csi.NodeGetVolumeHealthRequest) (*csi.NodeGetVolumeHealthResponse, error) {
+
+	resp := &csi.NodeGetVolumeHealthResponse{
+		VolumeHealth: &csi.VolumeHealth{
+			VolumeId: req.GetVolumeId(),
+		},
+	}
+
+	if len(req.GetVolumeId()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID cannot be empty")
+	}
+
+	i, _ := s.findVolNoLock("id", req.VolumeId)
+	if i < 0 {
+		resp.VolumeHealth.HealthStatuses = []*csi.VolumeHealth_VolumeHealthEntry{
+			{
+				Status:  csi.VolumeHealthErrorType_INACCESSIBLE,
+				Reason:  "VolumeNotFound",
+				Message: "Volume not found",
+			},
+		}
+		return resp, status.Error(codes.NotFound, req.VolumeId)
+	}
+
+	if hookVal, hookMsg := s.execHook("NodeGetVolumeHealthEnd"); hookVal != codes.OK {
 		return nil, status.Error(hookVal, hookMsg)
 	}
 

@@ -24,7 +24,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,8 +100,13 @@ var (
 		},
 	}
 
-	volumeCondition = &csipbv1.VolumeCondition{}
+	volumeHealth = &fakeVolumeHealth{}
 )
+
+type fakeVolumeHealth struct {
+	Abnormal bool
+	Message  string
+}
 
 func TestPVCRef(t *testing.T) {
 	ktesting.Init(t).SyncTest("", testPVCRef)
@@ -217,9 +221,9 @@ func testAbnormalVolumeEvent(tCtx ktesting.TContext) {
 	}
 
 	// Calculate stats for pod
-	if volumeCondition != nil {
-		volumeCondition.Message = "The target path of the volume doesn't exist"
-		volumeCondition.Abnormal = true
+	if volumeHealth != nil {
+		volumeHealth.Message = "The target path of the volume doesn't exist"
+		volumeHealth.Abnormal = true
 	}
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
 	statsCalculator.calcAndStoreStats(logger)
@@ -259,9 +263,9 @@ func expectedMetrics() *volume.Metrics {
 		InodesUsed: resource.NewQuantity(inodesTotal-inodesFree, resource.BinarySI),
 	}
 
-	if volumeCondition != nil {
-		vMetrics.Message = &volumeCondition.Message
-		vMetrics.Abnormal = &volumeCondition.Abnormal
+	if volumeHealth != nil {
+		vMetrics.Message = &volumeHealth.Message
+		vMetrics.Abnormal = &volumeHealth.Abnormal
 	}
 
 	return vMetrics
@@ -318,8 +322,8 @@ func expectedBlockMetrics() *volume.Metrics {
 		Used:      resource.NewQuantity(available-capacity, resource.BinarySI),
 	}
 
-	if volumeCondition != nil {
-		vMetrics.Abnormal = &volumeCondition.Abnormal
+	if volumeHealth != nil {
+		vMetrics.Abnormal = &volumeHealth.Abnormal
 	}
 
 	return vMetrics

@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/ptr"
 )
 
 type csiClient interface {
@@ -624,14 +625,24 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 
 	var isSupportNodeVolumeCondition bool
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
-		isSupportNodeVolumeCondition, err = c.nodeSupportsVolumeCondition(ctx)
+		isSupportNodeVolumeCondition, err = c.nodeSupportsVolumeHealth(ctx)
 		if err != nil {
 			return nil, err
 		}
 
 		if isSupportNodeVolumeCondition {
-			abnormal, message := resp.VolumeCondition.GetAbnormal(), resp.VolumeCondition.GetMessage()
-			metrics.Abnormal, metrics.Message = &abnormal, &message
+			healthRequest := &csipbv1.NodeGetVolumeHealthRequest{
+				VolumeId: volID,
+			}
+			resp, err := nodeClient.NodeGetVolumeHealth(ctx, healthRequest)
+			if err != nil {
+				return nil, err
+			}
+			if len(resp.VolumeHealth.GetHealthStatuses()) > 0 {
+				healthStatus := resp.VolumeHealth.GetHealthStatuses()[0]
+				message := healthStatus.GetMessage()
+				metrics.Abnormal, metrics.Message = ptr.To(true), &message
+			}
 		}
 	}
 
@@ -663,8 +674,8 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 	return metrics, nil
 }
 
-func (c *csiDriverClient) nodeSupportsVolumeCondition(ctx context.Context) (bool, error) {
-	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_VOLUME_CONDITION)
+func (c *csiDriverClient) nodeSupportsVolumeHealth(ctx context.Context) (bool, error) {
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_GET_VOLUME_HEALTH)
 }
 
 func (c *csiDriverClient) NodeSupportsVolumeMountGroup(ctx context.Context) (bool, error) {
