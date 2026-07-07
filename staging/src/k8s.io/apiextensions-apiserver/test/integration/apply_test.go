@@ -151,13 +151,13 @@ func TestApplyNullToObject(t *testing.T) {
 		{name: "nullable and optional field with optional subfield", nullable: true, wantNull: true},
 		{name: "nullable and required field with optional subfield", nullable: true, required: true, wantNull: true},
 		{name: "nullable and optional field with required subfield", nullable: true, subfieldRequired: true, wantNull: true},
-		{name: "nullable and required field with optional subfield", nullable: true, subfieldRequired: true, required: true, wantNull: true},
+		{name: "nullable and required field with required subfield", nullable: true, subfieldRequired: true, required: true, wantNull: true},
 		{name: "non-nullable and optional field with optional subfield", wantEmpty: true},
 		{name: "non-nullable and required field with optional subfield", required: true, wantEmpty: true},
 
 		// Server side apply does not support field clearing, a field must be set to a valid value or omitted from the apply request.
 		{name: "non-nullable and optional field with required subfield", subfieldRequired: true, wantErr: "Required value"},
-		{name: "non-nullable and required field with optional subfield", subfieldRequired: true, required: true, wantErr: "Required value"},
+		{name: "non-nullable and required field with required subfield", subfieldRequired: true, required: true, wantErr: "Required value"},
 	}
 
 	group, version, kind, plural := "stable.example.com", "v1", "Widget", "widgets"
