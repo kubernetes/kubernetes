@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
 
@@ -28,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -37,6 +36,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -72,7 +72,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 
 	// Ensure the user is root
 	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(client, ignorePreflightErrorsSet, printer); err != nil {
+	if err := runPreflightChecks(client, nil, ignorePreflightErrorsSet, printer); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -82,6 +82,13 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", getNodeRegistration, getAPIEndpoint, getComponentConfigs, false)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
+	}
+
+	// Run CoreDNS migration check with the resolved DNS version from cluster config.
+	// This uses GetDNSImageTag which resolves the default version per Kubernetes release
+	// and applies any user override from ClusterConfiguration.dns.imageTag.
+	if err := runPreflightChecks(client, initCfg, ignorePreflightErrorsSet, printer); err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	newK8sVersion := upgradeCfg.Plan.KubernetesVersion
@@ -132,14 +139,23 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 	}
 }
 
-// runPreflightChecks runs the root preflight check
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], printer output.Printer) error {
+// runPreflightChecks runs the root preflight check and optionally the CoreDNS migration check.
+// If initCfg is nil, only root checks are performed.
+// If initCfg is provided, CoreDNS migration check is also performed using the resolved DNS version.
+func runPreflightChecks(client clientset.Interface, initCfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], printer output.Printer) error {
 	printer.Printf("[preflight] Running pre-flight checks.\n")
 	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
 	if err != nil {
 		return err
 	}
-	return upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
+
+	// Only run CoreDNS migration check if initCfg is available
+	if initCfg != nil {
+		targetCoreDNSVersion := images.GetDNSImageTag(&initCfg.ClusterConfiguration)
+		return upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors, targetCoreDNSVersion)
+	}
+
+	return nil
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not

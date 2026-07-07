@@ -72,8 +72,13 @@ type ClusterState struct {
 
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
-func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, printer output.Printer) ([]Upgrade, error) {
+func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, dnsImageTagOverride string, printer output.Printer) ([]Upgrade, error) {
 	printer.Printf("[upgrade] Fetching available versions to upgrade to\n")
+
+	// Use the CoreDNS default version if no override is provided
+	if dnsImageTagOverride == "" {
+		dnsImageTagOverride = kubeadmconstants.CoreDNSVersion
+	}
 
 	// Collect the upgrades kubeadm can do in this list
 	var upgrades []Upgrade
@@ -199,7 +204,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 					Before:      beforeState,
 					After: ClusterState{
 						KubeVersion:    patchVersionStr,
-						DNSVersion:     kubeadmconstants.CoreDNSVersion,
+						DNSVersion:     dnsImageTagOverride,
 						KubeadmVersion: newKubeadmVer,
 						EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, patchVersionStr),
 					},
@@ -214,7 +219,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 			Before:      beforeState,
 			After: ClusterState{
 				KubeVersion:    stableVersionStr,
-				DNSVersion:     kubeadmconstants.CoreDNSVersion,
+				DNSVersion:     dnsImageTagOverride,
 				KubeadmVersion: stableVersionStr,
 				EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, stableVersionStr),
 			},
@@ -260,7 +265,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				Before:      beforeState,
 				After: ClusterState{
 					KubeVersion:    previousBranchLatestVersionStr,
-					DNSVersion:     kubeadmconstants.CoreDNSVersion,
+					DNSVersion:     dnsImageTagOverride,
 					KubeadmVersion: previousBranchLatestVersionStr,
 					EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, previousBranchLatestVersionStr),
 				},
@@ -283,7 +288,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				Before:      beforeState,
 				After: ClusterState{
 					KubeVersion:    unstableKubeVersion,
-					DNSVersion:     kubeadmconstants.CoreDNSVersion,
+					DNSVersion:     dnsImageTagOverride,
 					KubeadmVersion: unstableKubeVersion,
 					EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, unstableKubeVersion),
 				},
