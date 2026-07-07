@@ -30,6 +30,7 @@ import (
 // Lease defines a lease concept.
 type Lease struct {
 	metav1.TypeMeta `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -63,12 +64,12 @@ type LeaseSpec struct {
 	// holders.
 	// +optional
 	LeaseTransitions *int32 `json:"leaseTransitions,omitempty" protobuf:"varint,5,opt,name=leaseTransitions"`
-	// Strategy indicates the strategy for picking the leader for coordinated leader election
+	// strategy indicates the strategy for picking the leader for coordinated leader election.
 	// (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
 	// +featureGate=CoordinatedLeaderElection
 	// +optional
 	Strategy *v1.CoordinatedLeaseStrategy `json:"strategy,omitempty" protobuf:"bytes,6,opt,name=strategy"`
-	// PreferredHolder signals to a lease holder that the lease has a
+	// preferredHolder signals to a lease holder that the lease has a
 	// more optimal holder and should be given up.
 	// +featureGate=CoordinatedLeaderElection
 	// +optional
@@ -100,6 +101,7 @@ type LeaseList struct {
 // Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.
 type LeaseCandidate struct {
 	metav1.TypeMeta `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -112,19 +114,19 @@ type LeaseCandidate struct {
 
 // LeaseCandidateSpec is a specification of a Lease.
 type LeaseCandidateSpec struct {
-	// LeaseName is the name of the lease for which this candidate is contending.
+	// leaseName is the name of the lease for which this candidate is contending.
 	// The limits on this field are the same as on Lease.name. Multiple lease candidates
 	// may reference the same Lease.name.
 	// This field is immutable.
 	// +required
 	LeaseName string `json:"leaseName" protobuf:"bytes,1,name=leaseName"`
-	// PingTime is the last time that the server has requested the LeaseCandidate
+	// pingTime is the last time that the server has requested the LeaseCandidate
 	// to renew. It is only done during leader election to check if any
 	// LeaseCandidates have become ineligible. When PingTime is updated, the
 	// LeaseCandidate will respond by updating RenewTime.
 	// +optional
 	PingTime *metav1.MicroTime `json:"pingTime,omitempty" protobuf:"bytes,2,opt,name=pingTime"`
-	// RenewTime is the time that the LeaseCandidate was last updated.
+	// renewTime is the time that the LeaseCandidate was last updated.
 	// Any time a Lease needs to do leader election, the PingTime field
 	// is updated to signal to the LeaseCandidate that they should update
 	// the RenewTime.
@@ -133,16 +135,16 @@ type LeaseCandidateSpec struct {
 	// garbage collection for still active LeaseCandidates.
 	// +optional
 	RenewTime *metav1.MicroTime `json:"renewTime,omitempty" protobuf:"bytes,3,opt,name=renewTime"`
-	// BinaryVersion is the binary version. It must be in a semver format without leading `v`.
+	// binaryVersion is the binary version. It must be in a semver format without leading `v`.
 	// This field is required.
 	// +required
 	BinaryVersion string `json:"binaryVersion" protobuf:"bytes,4,name=binaryVersion"`
-	// EmulationVersion is the emulation version. It must be in a semver format without leading `v`.
+	// emulationVersion is the emulation version. It must be in a semver format without leading `v`.
 	// EmulationVersion must be less than or equal to BinaryVersion.
 	// This field is required when strategy is "OldestEmulationVersion"
 	// +optional
 	EmulationVersion string `json:"emulationVersion,omitempty" protobuf:"bytes,5,opt,name=emulationVersion"`
-	// Strategy is the strategy that coordinated leader election will use for picking the leader.
+	// strategy is the strategy that coordinated leader election will use for picking the leader.
 	// If multiple candidates for the same Lease return different strategies, the strategy provided
 	// by the candidate with the latest BinaryVersion will be used. If there is still conflict,
 	// this is a user error and coordinated leader election will not operate the Lease until resolved.
