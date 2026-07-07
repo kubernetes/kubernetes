@@ -512,7 +512,7 @@ func TestCreateCoreDNSAddon(t *testing.T) {
 				t.Errorf("unexpected ParseTemplate failure: %+v", err)
 			}
 
-			err = createCoreDNSAddon(nil, nil, configMapBytes, client)
+			err = createCoreDNSAddon(nil, nil, configMapBytes, client, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"))
 			if err != nil {
 				t.Fatalf("error creating the CoreDNS Addon: %v", err)
 			}
@@ -1660,7 +1660,7 @@ func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := isCoreDNSConfigMapMigrationRequired(tt.corefile, tt.currentInstalledCoreDNSVersion)
+			got, err := isCoreDNSConfigMapMigrationRequired(tt.corefile, tt.currentInstalledCoreDNSVersion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("isCoreDNSConfigMapMigrationRequired() error = %v, wantErr %v", err, tt.wantErr)
 				return

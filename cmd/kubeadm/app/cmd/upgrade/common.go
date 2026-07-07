@@ -37,6 +37,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -82,6 +83,13 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", getNodeRegistration, getAPIEndpoint, getComponentConfigs, false)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
+	}
+
+	// Run CoreDNS migration check with the resolved DNS version from cluster config.
+	// This uses GetDNSImageTag which resolves the default version per Kubernetes release
+	// and applies any user override from ClusterConfiguration.dns.imageTag.
+	if err := upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrorsSet, images.GetDNSImageTag(&initCfg.ClusterConfiguration)); err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	newK8sVersion := upgradeCfg.Plan.KubernetesVersion
@@ -135,11 +143,7 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 // runPreflightChecks runs the root preflight check
 func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], printer output.Printer) error {
 	printer.Printf("[preflight] Running pre-flight checks.\n")
-	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
-	if err != nil {
-		return err
-	}
-	return upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
+	return preflight.RunRootCheckOnly(ignorePreflightErrors)
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not
