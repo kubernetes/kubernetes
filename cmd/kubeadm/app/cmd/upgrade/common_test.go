@@ -55,12 +55,13 @@ func TestEnforceRequirements(t *testing.T) {
 		expectedErrNonRoot string
 	}{
 		{
-			name: "Fail pre-flight check",
+			// Preflight checks need the target CoreDNS version from the cluster config,
+			// so an unreachable cluster fails before preflight for root and non-root alike.
+			name: "Fail to fetch cluster config",
 			flags: applyPlanFlags{
 				kubeConfigPath: fullPath,
 			},
-			expectedErr:        "preflight checks failed",
-			expectedErrNonRoot: "preflight checks failed",
+			expectedErr: "[upgrade/init config] FATAL",
 		},
 		{
 			name: "Bogus preflight check specify all with individual check",
