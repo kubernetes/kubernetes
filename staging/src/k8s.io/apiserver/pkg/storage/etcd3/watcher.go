@@ -301,6 +301,7 @@ func (wc *watchChan) sync() error {
 		if grpcstatus.Code(err) != grpccodes.Unimplemented {
 			return err
 		}
+		etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
 		klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", wc.watcher.groupResource)
 	}
 	return wc.syncPaginated()
@@ -374,12 +375,13 @@ func (wc *watchChan) syncStreamRecursive() error {
 	startTime := time.Now()
 	streamResp, err := wc.watcher.client.KV.GetStream(wc.ctx, wc.key, opts...)
 	if err != nil {
-		if grpcstatus.Code(err) == grpccodes.Unimplemented {
-			etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
-		}
 		return err
 	}
 	defer func() {
+		// Only record the listStream metric if streaming was actually exercised.
+		if grpcstatus.Code(err) == grpccodes.Unimplemented {
+			return
+		}
 		metrics.RecordEtcdRequest("listStream", wc.watcher.groupResource, err, startTime)
 	}()
 

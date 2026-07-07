@@ -25,7 +25,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc"
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
@@ -396,7 +398,7 @@ func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 	}
 
 	kvWrapper := newEtcdClientKVWrapper(store.client.KV)
-	kvWrapper.streamUnimplemented = true
+	kvWrapper.streamKV = unimplementedRangeStreamKV()
 	store.client.KV = kvWrapper
 
 	w := store.watcher.createWatchChan(origCtx, "/pods/", 0, true, false, storage.Everything)
@@ -508,7 +510,7 @@ etcd_requests_total{group="",operation="listStream",resource="pods"} 1
 	t.Run("unimplemented is not recorded", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
 		kv := newEtcdClientKVWrapper(store.client.KV)
-		kv.streamUnimplemented = true
+		kv.streamKV = unimplementedRangeStreamKV()
 		store.client.KV = kv
 
 		legacyregistry.Reset()
@@ -533,8 +535,8 @@ type etcdClientKVWrapper struct {
 	getCallCounter int
 	// keeps track of the number of times GetStream method is called
 	getStreamCallCounter int
-	// when true, GetStream returns a gRPC Unimplemented error
-	streamUnimplemented bool
+	// when set, GetStream is served by this KV instead
+	streamKV clientv3.KV
 	// when nonzero, GetStream pins the stream to this revision
 	streamRev int64
 	// getReactors is called after the etcd KV's get function is executed.
@@ -550,13 +552,31 @@ func newEtcdClientKVWrapper(kv clientv3.KV) *etcdClientKVWrapper {
 
 func (ecw *etcdClientKVWrapper) GetStream(ctx context.Context, key string, opts ...clientv3.OpOption) (clientv3.GetStreamChan, error) {
 	ecw.getStreamCallCounter++
-	if ecw.streamUnimplemented {
-		return nil, grpcstatus.Error(grpccodes.Unimplemented, "RangeStream is unimplemented")
+	if ecw.streamKV != nil {
+		return ecw.streamKV.GetStream(ctx, key, opts...)
 	}
 	if ecw.streamRev != 0 {
 		opts = append(opts, clientv3.WithRev(ecw.streamRev))
 	}
 	return ecw.KV.GetStream(ctx, key, opts...)
+}
+
+// unimplementedRangeStreamKV returns a clientv3.KV whose RangeStream fails with
+// Unimplemented on the first Recv, like an etcd server before 3.7.
+func unimplementedRangeStreamKV() clientv3.KV {
+	return clientv3.NewKVFromKVClient(unimplementedRangeStreamKVClient{}, nil)
+}
+
+type unimplementedRangeStreamKVClient struct{ pb.KVClient }
+
+func (unimplementedRangeStreamKVClient) RangeStream(ctx context.Context, in *pb.RangeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[pb.RangeStreamResponse], error) {
+	return unimplementedRangeStream{}, nil
+}
+
+type unimplementedRangeStream struct{ grpc.ClientStream }
+
+func (unimplementedRangeStream) Recv() (*pb.RangeStreamResponse, error) {
+	return nil, grpcstatus.Error(grpccodes.Unimplemented, "RangeStream is unimplemented")
 }
 
 func (ecw *etcdClientKVWrapper) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
