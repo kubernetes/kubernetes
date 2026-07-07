@@ -740,13 +740,14 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 	}
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
-		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.PodGroupKey("default", "pg"): {qInfo1, qInfo2, qInfo3}},
 		PodGroupInfo: &framework.PodGroupInfo{
 			GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup),
-			UnscheduledPods: []*v1.Pod{p1, p2, p3},
+			UnscheduledPods: []*v1.Pod{},
 		},
 	}
-
+	podGroupInfo.AddPod(qInfo1)
+	podGroupInfo.AddPod(qInfo2)
+	podGroupInfo.AddPod(qInfo3)
 	logger, ctx := ktesting.NewTestContext(t)
 
 	cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
@@ -786,6 +787,9 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 
 	if podGroupInfo.Size() != 1 {
 		t.Errorf("Expected 1 queued pod left, got %d", podGroupInfo.Size())
+		t.Logf("podGroupInfo: %+v", podGroupInfo)
+		t.Logf("podGroupInfo: %+v", podGroupInfo.PodGroupInfo)
+		t.Logf("podGroupInfo: %+v", podGroupInfo.QueuedPodInfos)
 	}
 	if podGroupInfo.QueuedPodInfos[fwk.PodGroupKey("default", "pg")][0].Pod.Name != "p1" {
 		t.Errorf("Expected p1 to be left in queued pods, got %s", podGroupInfo.QueuedPodInfos[fwk.PodGroupKey("default", "pg")][0].Pod.Name)
