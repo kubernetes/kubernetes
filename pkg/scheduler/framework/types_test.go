@@ -18,10 +18,11 @@ package framework
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -98,7 +99,7 @@ func TestPodGroupMemberPodsOrderingFunc(t *testing.T) {
 	timestamp := time.Now()
 	timestampNewer := timestamp.Add(time.Second)
 
-	// Desired order: pod3 > pod5 > pod1 > pod4 > pod2.
+	// Desired order: pod4 > pod1 > pod3 > pod2.
 	pInfo1 := &QueuedPodInfo{
 		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod1").UID("uid1").Priority(midPriority).Obj()},
 		QueueingParams: QueueingParams{
@@ -114,20 +115,13 @@ func TestPodGroupMemberPodsOrderingFunc(t *testing.T) {
 		},
 	}
 	pInfo3 := &QueuedPodInfo{
-		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod3").UID("uid3").Priority(highPriority).Obj()},
-		QueueingParams: QueueingParams{
-			Attempts:  1,
-			Timestamp: timestamp,
-		},
-	}
-	pInfo4 := &QueuedPodInfo{
 		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod4").UID("uid4").Priority(midPriority).Obj()},
 		QueueingParams: QueueingParams{
 			Attempts:  1,
 			Timestamp: timestamp,
 		},
 	}
-	pInfo5 := &QueuedPodInfo{
+	pInfo4 := &QueuedPodInfo{
 		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod5").UID("uid5").Priority(midPriority).Obj()},
 		QueueingParams: QueueingParams{
 			Attempts:  2,
@@ -142,27 +136,15 @@ func TestPodGroupMemberPodsOrderingFunc(t *testing.T) {
 		expected int
 	}{
 		{
-			name:     "higher priority comes first",
-			a:        pInfo3,
-			b:        pInfo1,
-			expected: -1,
-		},
-		{
-			name:     "lower priority comes second",
-			a:        pInfo1,
-			b:        pInfo3,
-			expected: 1,
-		},
-		{
 			name:     "higher attempts comes first",
-			a:        pInfo5,
+			a:        pInfo4,
 			b:        pInfo1,
 			expected: -1,
 		},
 		{
 			name:     "lower attempts comes second",
 			a:        pInfo1,
-			b:        pInfo5,
+			b:        pInfo4,
 			expected: 1,
 		},
 		{
@@ -178,14 +160,14 @@ func TestPodGroupMemberPodsOrderingFunc(t *testing.T) {
 			expected: 1,
 		},
 		{
-			name:     "same priority, same attempts, same timestamp, lower name comes first",
+			name:     "same attempts, same timestamp, lower name comes first",
 			a:        pInfo1,
-			b:        pInfo4,
+			b:        pInfo3,
 			expected: -1,
 		},
 		{
-			name:     "same priority, same attempts, same timestamp, higher name comes second",
-			a:        pInfo4,
+			name:     "same attempts, same timestamp, higher name comes second",
+			a:        pInfo3,
 			b:        pInfo1,
 			expected: 1,
 		},
@@ -209,7 +191,7 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 		cmp.AllowUnexported(QueuedPodInfo{}, PodInfo{}, fwk.PodResource{}),
 	}
 
-	// Desired order: pod3 > pod5 > pod1 > pod4 > pod2.
+	// Desired order: pod4 > pod1 > pod3 > pod2.
 	pInfo1 := &QueuedPodInfo{
 		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod1").UID("uid1").Priority(midPriority).PodGroupName("pg1").Obj()},
 		QueueingParams: QueueingParams{
@@ -225,20 +207,13 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 		},
 	}
 	pInfo3 := &QueuedPodInfo{
-		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod3").UID("uid3").Priority(highPriority).PodGroupName("pg1").Obj()},
-		QueueingParams: QueueingParams{
-			Attempts:  1,
-			Timestamp: timestamp,
-		},
-	}
-	pInfo4 := &QueuedPodInfo{
 		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod4").UID("uid4").Priority(midPriority).PodGroupName("pg1").Obj()},
 		QueueingParams: QueueingParams{
 			Attempts:  1,
 			Timestamp: timestamp,
 		},
 	}
-	pInfo5 := &QueuedPodInfo{
+	pInfo4 := &QueuedPodInfo{
 		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod5").UID("uid5").Priority(midPriority).PodGroupName("pg1").Obj()},
 		QueueingParams: QueueingParams{
 			Attempts:  2,
@@ -253,73 +228,63 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 		expectedOrder []*QueuedPodInfo
 	}{
 		{
-			name:          "Add high priority pod to empty group",
-			podsToAdd:     []*QueuedPodInfo{pInfo3},
-			expectedOrder: []*QueuedPodInfo{pInfo3},
+			name:          "Add pod to empty group",
+			podsToAdd:     []*QueuedPodInfo{pInfo1},
+			expectedOrder: []*QueuedPodInfo{pInfo1},
 		},
 		{
-			name:          "Add lower priority pod, goes to end",
-			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo1},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1},
+			name:          "Add pod with lower attempts, goes to end",
+			podsToAdd:     []*QueuedPodInfo{pInfo4, pInfo1},
+			expectedOrder: []*QueuedPodInfo{pInfo4, pInfo1},
 		},
 		{
-			name:          "Add pod with higher priority to front",
-			podsToAdd:     []*QueuedPodInfo{pInfo1, pInfo2, pInfo3},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1, pInfo2},
+			name:          "Add pod with higher attempts, goes before",
+			podsToAdd:     []*QueuedPodInfo{pInfo1, pInfo4},
+			expectedOrder: []*QueuedPodInfo{pInfo4, pInfo1},
 		},
 		{
-			name:          "Add pod with same priority but lower attempts, goes to end",
-			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
+			name:          "Add pod with later timestamp, goes to end",
+			podsToAdd:     []*QueuedPodInfo{pInfo4, pInfo2},
+			expectedOrder: []*QueuedPodInfo{pInfo4, pInfo2},
 		},
 		{
-			name:          "Add pod with same priority but higher attempts, goes before",
-			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo1, pInfo5},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
+			name:          "Add pod with earlier timestamp, goes before",
+			podsToAdd:     []*QueuedPodInfo{pInfo2, pInfo1},
+			expectedOrder: []*QueuedPodInfo{pInfo1, pInfo2},
 		},
 		{
-			name:          "Add pod with same priority but later timestamp, goes to end",
-			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo2},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo2},
-		},
-		{
-			name:          "Add pod with same priority but earlier timestamp, goes before",
-			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo2, pInfo1},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1, pInfo2},
-		},
-		{
-			name:          "Add pod with same priority and timestamp, ordered by name",
-			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2, pInfo4},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo4, pInfo2},
+			name:          "Add pod with same attempts and timestamp, ordered by name",
+			podsToAdd:     []*QueuedPodInfo{pInfo4, pInfo1, pInfo2, pInfo3},
+			expectedOrder: []*QueuedPodInfo{pInfo4, pInfo1, pInfo3, pInfo2},
 		},
 		{
 			name:          "Add pods out of order, gets sorted",
-			podsToAdd:     []*QueuedPodInfo{pInfo1, pInfo2, pInfo3, pInfo4, pInfo5},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo4, pInfo2},
+			podsToAdd:     []*QueuedPodInfo{pInfo1, pInfo2, pInfo3, pInfo4},
+			expectedOrder: []*QueuedPodInfo{pInfo4, pInfo1, pInfo3, pInfo2},
 		},
 		{
 			name:          "Remove pod from middle",
-			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podsToAdd:     []*QueuedPodInfo{pInfo4, pInfo1, pInfo2},
 			podToRemove:   pInfo1,
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo2},
+			expectedOrder: []*QueuedPodInfo{pInfo4, pInfo2},
 		},
 		{
 			name:          "Remove first pod",
-			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
-			podToRemove:   pInfo3,
-			expectedOrder: []*QueuedPodInfo{pInfo5, pInfo1, pInfo2},
+			podsToAdd:     []*QueuedPodInfo{pInfo4, pInfo1, pInfo2},
+			podToRemove:   pInfo4,
+			expectedOrder: []*QueuedPodInfo{pInfo1, pInfo2},
 		},
 		{
 			name:          "Remove last pod",
-			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podsToAdd:     []*QueuedPodInfo{pInfo4, pInfo1, pInfo2},
 			podToRemove:   pInfo2,
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
+			expectedOrder: []*QueuedPodInfo{pInfo4, pInfo1},
 		},
 		{
 			name:          "Remove non-existent pod",
-			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo1},
+			podsToAdd:     []*QueuedPodInfo{pInfo1},
 			podToRemove:   pInfo2,
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1},
+			expectedOrder: []*QueuedPodInfo{pInfo1},
 		},
 	}
 
@@ -350,6 +315,397 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 			}
 			if diff := cmp.Diff(expectedUnscheduled, pgqi.UnscheduledPods); diff != "" {
 				t.Errorf("Unexpected order in UnscheduledPods (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_SubGroups(t *testing.T) {
+	timestamp := time.Now()
+	opts := []cmp.Option{
+		cmp.AllowUnexported(QueuedPodInfo{}, PodInfo{}, fwk.PodResource{}),
+	}
+
+	worker1 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("worker1").UID("w1").Priority(highPriority).PodGroupName("pg1").Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp.Add(10 * time.Second),
+		},
+		PodSignature: fwk.PodSignature("worker"),
+	}
+	worker2 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("worker2").UID("w2").Priority(highPriority).PodGroupName("pg1").Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp.Add(30 * time.Second),
+		},
+		PodSignature: fwk.PodSignature("worker"),
+	}
+	worker3 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("worker3").UID("w3").Priority(highPriority).PodGroupName("pg1").Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp.Add(20 * time.Second),
+		},
+		PodSignature: fwk.PodSignature("worker"),
+	}
+	driver1 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("driver1").UID("d1").Priority(highPriority).PodGroupName("pg1").Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp.Add(25 * time.Second),
+		},
+		PodSignature: fwk.PodSignature("driver"),
+	}
+	driver2 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("driver2").UID("d2").Priority(highPriority).PodGroupName("pg1").Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp.Add(40 * time.Second),
+		},
+		PodSignature: fwk.PodSignature("driver"),
+	}
+	ps1 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("ps1").UID("p1").Priority(highPriority).PodGroupName("pg1").Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+		PodSignature: fwk.PodSignature("ps"),
+	}
+
+	tests := []struct {
+		name          string
+		podsToAdd     []*QueuedPodInfo
+		podToAdd      *QueuedPodInfo
+		podToRemove   *QueuedPodInfo
+		expectedOrder []*QueuedPodInfo
+	}{
+		{
+			name:          "SetPods groups by signature and sorts sub-groups by oldest representative pod",
+			podsToAdd:     []*QueuedPodInfo{driver1, worker2, driver2, worker1},
+			expectedOrder: []*QueuedPodInfo{worker1, worker2, driver1, driver2},
+		},
+		{
+			name:          "AddPod inserts into existing bucket and maintains sub-group order",
+			podsToAdd:     []*QueuedPodInfo{worker1, worker2, driver1, driver2},
+			podToAdd:      worker3,
+			expectedOrder: []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2},
+		},
+		{
+			name:          "AddPod with older timestamp creates new bucket and shifts sub-group order to front",
+			podsToAdd:     []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2},
+			podToAdd:      ps1,
+			expectedOrder: []*QueuedPodInfo{ps1, worker1, worker3, worker2, driver1, driver2},
+		},
+		{
+			name:          "RemovePod removing sole pod in bucket removes sub-group",
+			podsToAdd:     []*QueuedPodInfo{ps1, worker1, worker3, worker2, driver1, driver2},
+			podToRemove:   ps1,
+			expectedOrder: []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2},
+		},
+		{
+			name:          "RemovePod removing representative pod updates bucket head without breaking sub-group order",
+			podsToAdd:     []*QueuedPodInfo{worker1, worker3, worker2, driver1, driver2},
+			podToRemove:   worker1,
+			expectedOrder: []*QueuedPodInfo{worker3, worker2, driver1, driver2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pg := st.MakePodGroup().Namespace("default").Name("pg1").Obj()
+			pgqi := newQueuedPodGroupInfo(pg)
+			for _, p := range tt.podsToAdd {
+				pgqi.AddPod(p)
+			}
+			if tt.podToAdd != nil {
+				pgqi.AddPod(tt.podToAdd)
+			}
+			if tt.podToRemove != nil {
+				pgqi.RemovePod(tt.podToRemove.Pod)
+			}
+
+			key := fwk.PodGroupKey("default", "pg1")
+			var actualOrder []*QueuedPodInfo
+			if pgqi.QueuedPodInfos != nil {
+				actualOrder = pgqi.QueuedPodInfos[key]
+			}
+
+			if diff := cmp.Diff(tt.expectedOrder, actualOrder, opts...); diff != "" {
+				t.Errorf("Unexpected order in QueuedPodInfos (-want, +got):\n%s", diff)
+			}
+
+			expectedUnscheduled := make([]*v1.Pod, len(tt.expectedOrder))
+			for i, qpi := range tt.expectedOrder {
+				expectedUnscheduled[i] = qpi.Pod
+			}
+			if diff := cmp.Diff(expectedUnscheduled, pgqi.UnscheduledPods); diff != "" {
+				t.Errorf("Unexpected order in UnscheduledPods (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_UpdateAndAddPod(t *testing.T) {
+	timestamp := time.Now()
+	opts := []cmp.Option{
+		cmp.AllowUnexported(QueuedPodInfo{}, PodInfo{}, fwk.PodResource{}),
+	}
+
+	worker1 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("worker1").UID("w1").Priority(highPriority).PodGroupName("pg-update").Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp.Add(10 * time.Second),
+		},
+		PodSignature: fwk.PodSignature("worker"),
+	}
+	driver1 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("driver1").UID("d1").Priority(highPriority).PodGroupName("pg-update").Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp.Add(20 * time.Second),
+		},
+		PodSignature: fwk.PodSignature("driver"),
+	}
+	worker2 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("worker2").UID("w2").Priority(highPriority).PodGroupName("pg-update").Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp.Add(30 * time.Second),
+		},
+		PodSignature: fwk.PodSignature("worker"),
+	}
+	pg := st.MakePodGroup().Namespace("default").Name("pg-update").Obj()
+	pgqi := newQueuedPodGroupInfo(pg)
+	pgqi.AddPod(worker1)
+	pgqi.AddPod(driver1)
+
+	// Now update worker1's pod object and signature (simulating a spec or label change)
+	updatedPod := worker1.Pod.DeepCopy()
+	updatedPod.Labels = map[string]string{"role": "driver"}
+	if _, err := pgqi.Update(updatedPod, fwk.PodSignature("driver")); err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+
+	// Now add worker2 (whose signature is "worker")
+	pgqi.AddPod(worker2)
+
+	// Since worker1's signature changed to "driver", both worker1 and driver1 are in the "driver" bucket.
+	// Worker2 is in the "worker" bucket.
+	// Since worker1 (ts=10s) is older than worker2 (ts=30s), the "driver" bucket comes before the "worker" bucket!
+	expectedOrder := []*QueuedPodInfo{worker1, driver1, worker2}
+	if diff := cmp.Diff(expectedOrder, pgqi.QueuedPodInfos[fwk.PodGroupKey("default", "pg-update")], opts...); diff != "" {
+		t.Errorf("Unexpected order in QueuedPodInfos after Update and AddPod (-want, +got):\n%s", diff)
+	}
+}
+
+func TestQueuedPodGroupInfo_Update(t *testing.T) {
+	timestamp := time.Now()
+
+	tests := []struct {
+		name         string
+		initialPods  []*QueuedPodInfo
+		updatePod    *v1.Pod
+		newSignature fwk.PodSignature
+		expectError  bool
+		verifyState  func(t *testing.T, pgqi *QueuedPodGroupInfo)
+	}{
+		{
+			name: "Update non-existent pod",
+			initialPods: []*QueuedPodInfo{
+				{
+					PodInfo:      &PodInfo{Pod: st.MakePod().Namespace("default").Name("p1").UID("p1").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					PodSignature: fwk.PodSignature("sig1"),
+				},
+			},
+			updatePod:    st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg-test").Obj(),
+			newSignature: fwk.PodSignature("sig1"),
+			expectError:  true,
+		},
+		{
+			name: "Update without signature change",
+			initialPods: []*QueuedPodInfo{
+				{
+					PodInfo:      &PodInfo{Pod: st.MakePod().Namespace("default").Name("p1").UID("p1").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					PodSignature: fwk.PodSignature("sig1"),
+				},
+			},
+			updatePod:    st.MakePod().Namespace("default").Name("p1").UID("p1").Label("foo", "bar").PodGroupName("pg-test").Obj(),
+			newSignature: fwk.PodSignature("sig1"),
+			verifyState: func(t *testing.T, pgqi *QueuedPodGroupInfo) {
+				if len(pgqi.QueuedPodInfos) != 1 {
+					t.Fatalf("expected 1 pod, got %d", len(pgqi.QueuedPodInfos))
+				}
+				pInfo := pgqi.QueuedPodInfos[fwk.PodGroupKey("default", "pg-test")][0]
+				if pInfo.Pod.Labels["foo"] != "bar" {
+					t.Errorf("pod was not updated correctly")
+				}
+				if string(pInfo.PodSignature) != "sig1" {
+					t.Errorf("pod signature changed unexpectedly")
+				}
+				if len(pgqi.buckets) != 1 || len(pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig1"]) != 1 {
+					t.Errorf("buckets state is invalid")
+				}
+				if len(pgqi.signatureOrder) != 1 || pgqi.signatureOrder[fwk.PodGroupKey("default", "pg-test")][0] != "sig1" {
+					t.Errorf("signatureOrder state is invalid")
+				}
+			},
+		},
+		{
+			name: "Update with signature change - old bucket becomes empty",
+			initialPods: []*QueuedPodInfo{
+				{
+					PodInfo:      &PodInfo{Pod: st.MakePod().Namespace("default").Name("p1").UID("p1").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					PodSignature: fwk.PodSignature("sig1"),
+				},
+				{
+					PodInfo:      &PodInfo{Pod: st.MakePod().Namespace("default").Name("p2").UID("p2").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					PodSignature: fwk.PodSignature("sig2"),
+				},
+			},
+			updatePod:    st.MakePod().Namespace("default").Name("p1").UID("p1").Priority(highPriority).PodGroupName("pg-test").Obj(),
+			newSignature: fwk.PodSignature("sig2"),
+			verifyState: func(t *testing.T, pgqi *QueuedPodGroupInfo) {
+				// sig1 bucket should be completely removed
+				if _, ok := pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig1"]; ok {
+					t.Errorf("sig1 bucket should have been deleted")
+				}
+				if len(pgqi.signatureOrder[fwk.PodGroupKey("default", "pg-test")]) != 1 || pgqi.signatureOrder[fwk.PodGroupKey("default", "pg-test")][0] != "sig2" {
+					t.Errorf("sig1 should have been removed from signatureOrder, got order: %v", pgqi.signatureOrder[fwk.PodGroupKey("default", "pg-test")])
+				}
+				// sig2 bucket should contain both p1 and p2
+				if len(pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]) != 2 {
+					t.Errorf("expected 2 pods in sig2 bucket, got %d", len(pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]))
+				}
+			},
+		},
+		{
+			name: "Update with signature change - insert in middle of existing bucket",
+			initialPods: []*QueuedPodInfo{
+				{
+					PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("p1").UID("p1").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					QueueingParams: QueueingParams{
+						Timestamp: timestamp.Add(10 * time.Second),
+					},
+					PodSignature: fwk.PodSignature("sig1"),
+				},
+				{
+					PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("p2-early").UID("p2-early").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					QueueingParams: QueueingParams{
+						Timestamp: timestamp.Add(5 * time.Second),
+					},
+					PodSignature: fwk.PodSignature("sig2"),
+				},
+				{
+					PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("p2-late").UID("p2-late").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					QueueingParams: QueueingParams{
+						Timestamp: timestamp.Add(20 * time.Second),
+					},
+					PodSignature: fwk.PodSignature("sig2"),
+				},
+			},
+			updatePod:    st.MakePod().Namespace("default").Name("p1").UID("p1").Priority(highPriority).PodGroupName("pg-test").Obj(),
+			newSignature: fwk.PodSignature("sig2"),
+			verifyState: func(t *testing.T, pgqi *QueuedPodGroupInfo) {
+				// p1 (ts=10s) should be inserted in the middle of sig2 bucket: p2-early (5s), p1 (10s), p2-late (20s)
+				bucket := pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]
+				if len(bucket) != 3 {
+					t.Fatalf("expected 3 pods in sig2 bucket, got %d", len(bucket))
+				}
+				if bucket[0].Pod.Name != "p2-early" || bucket[1].Pod.Name != "p1" || bucket[2].Pod.Name != "p2-late" {
+					t.Errorf("sig2 bucket pods are in wrong order: %s, %s, %s", bucket[0].Pod.Name, bucket[1].Pod.Name, bucket[2].Pod.Name)
+				}
+			},
+		},
+		{
+			name: "Update with signature change - update first pod in bucket add it to front of other bucket",
+			initialPods: []*QueuedPodInfo{
+				{
+					PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("p1").UID("p1").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					QueueingParams: QueueingParams{
+						Timestamp: timestamp.Add(5 * time.Second),
+					},
+					PodSignature: fwk.PodSignature("sig1"),
+				}, {
+					PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("p2").UID("p2").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					QueueingParams: QueueingParams{
+						Timestamp: timestamp.Add(6 * time.Second),
+					},
+					PodSignature: fwk.PodSignature("sig1"),
+				},
+				{
+					PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("p3-early").UID("p3-early").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					QueueingParams: QueueingParams{
+						Timestamp: timestamp.Add(5 * time.Second),
+					},
+					PodSignature: fwk.PodSignature("sig2"),
+				},
+				{
+					PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("p3-late").UID("p3-late").Priority(highPriority).PodGroupName("pg-test").Obj()},
+					QueueingParams: QueueingParams{
+						Timestamp: timestamp.Add(20 * time.Second),
+					},
+					PodSignature: fwk.PodSignature("sig2"),
+				},
+			},
+			updatePod:    st.MakePod().Namespace("default").Name("p1").UID("p1").Priority(highPriority).PodGroupName("pg-test").Obj(),
+			newSignature: fwk.PodSignature("sig2"),
+			verifyState: func(t *testing.T, pgqi *QueuedPodGroupInfo) {
+				// p2 (ts=6s) should be the only pod in sig1 bucket
+				bucket1 := pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig1"]
+				if len(bucket1) != 1 {
+					t.Fatalf("expected 1 pod in sig1 bucket, got %d", len(bucket1))
+				}
+				if bucket1[0].Pod.Name != "p2" {
+					t.Errorf("sig1 bucket pods are in wrong order: %s", bucket1[0].Pod.Name)
+				}
+				// p1 (ts=5s) should be inserted in the front of sig2 bucket2: p1 (5s), p3-early(5s), p3-late(20s)
+				bucket2 := pgqi.buckets[fwk.PodGroupKey("default", "pg-test")]["sig2"]
+				if len(bucket2) != 3 {
+					t.Fatalf("expected 3 pods in sig2 bucket, got %d", len(bucket2))
+				}
+				if bucket2[0].Pod.Name != "p1" || bucket2[1].Pod.Name != "p3-early" || bucket2[2].Pod.Name != "p3-late" {
+					t.Errorf("sig2 bucket pods are in wrong order: %s, %s, %s", bucket2[0].Pod.Name, bucket2[1].Pod.Name, bucket2[2].Pod.Name)
+				}
+				// sigOrder should be [sig2, sig1]
+				sigOrder := pgqi.signatureOrder[fwk.PodGroupKey("default", "pg-test")]
+				if len(sigOrder) != 2 || sigOrder[0] != "sig2" || sigOrder[1] != "sig1" {
+					t.Errorf("expected signatureOrder to be [sig2, sig1], got %v", sigOrder)
+				}
+				// QueuedPodInfos should be [p1, p3-early, p3-late, p2]
+				names := []string{"p1", "p3-early", "p3-late", "p2"}
+				for i, pInfo := range pgqi.QueuedPodInfos[fwk.PodGroupKey("default", "pg-update")] {
+					if names[i] != pInfo.Pod.Name {
+						t.Errorf("Unexpected order in QueuedPodInfos after Update and AddPod: expected %s, got %s", names[i], pInfo.Pod.Name)
+					}
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pg := st.MakePodGroup().Namespace("default").Name("pg-test").Obj()
+			pgqi := newQueuedPodGroupInfo(pg)
+			for _, pInfo := range tt.initialPods {
+				pgqi.AddPod(pInfo)
+			}
+
+			_, err := pgqi.Update(tt.updatePod, tt.newSignature)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.verifyState != nil {
+				tt.verifyState(t, pgqi)
 			}
 		})
 	}
@@ -3273,7 +3629,7 @@ func TestQueuedPodInfo_UpdateInvalidatesSignature(t *testing.T) {
 		PodSignature: fwk.PodSignature("sig-1"),
 	}
 
-	_, err := queuedPodInfo.Update(pod2)
+	_, err := queuedPodInfo.Update(pod2, nil)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
@@ -4237,7 +4593,7 @@ func TestQueuedPodGroupInfo_UpdateAndRemovePod(t *testing.T) {
 		{
 			name: "Update Pod",
 			execute: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
-				pInfo, err := qpgi.Update(pod1Updated)
+				pInfo, err := qpgi.Update(pod1Updated, nil)
 				if err != nil {
 					t.Errorf("Update failed: %v", err)
 				}
@@ -4251,7 +4607,7 @@ func TestQueuedPodGroupInfo_UpdateAndRemovePod(t *testing.T) {
 			execute: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
 				podNotFound := st.MakePod().Name("pod-not-found").Namespace("ns1").Obj()
 				podNotFound.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-standalone"; return &s }()}
-				_, err := qpgi.Update(podNotFound)
+				_, err := qpgi.Update(podNotFound, nil)
 				if err == nil {
 					t.Errorf("Expected error when updating non-existent pod")
 				}
@@ -4289,10 +4645,14 @@ func TestQueuedPodGroupInfo_UpdateAndRemovePod(t *testing.T) {
 					PodGroup: pgStandalone, Name: pgStandalone.Name, Namespace: pgStandalone.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0),
 				},
 				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+				signatureOrder: make(map[fwk.EntityKey][]string),
+				buckets:        make(map[fwk.EntityKey]map[string][]*QueuedPodInfo),
 			}
 			pInfo1 := &QueuedPodInfo{PodInfo: &PodInfo{Pod: pod1}}
 			qpgi.QueuedPodInfos[podKeyStandalone] = []*QueuedPodInfo{pInfo1}
-
+			qpgi.buckets[podKeyStandalone] = make(map[string][]*QueuedPodInfo)
+			qpgi.buckets[podKeyStandalone][string(pInfo1.PodSignature)] = []*QueuedPodInfo{pInfo1}
+			qpgi.signatureOrder[podKeyStandalone] = []string{string(pInfo1.PodSignature)}
 			tt.execute(t, qpgi)
 		})
 	}

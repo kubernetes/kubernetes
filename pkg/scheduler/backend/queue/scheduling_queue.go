@@ -1373,6 +1373,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 		entityLookup = newQueuedPodInfoForLookup(oldPod)
 	}
 
+	newSignature := p.signPod(ctx, newPod)
 	updated := false
 	// Run the following code under the activeQ lock to make sure that in the meantime entity is not popped from either activeQ or backoffQ.
 	// This way, the event will be registered or the entity will be updated consistently.
@@ -1390,17 +1391,15 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 			return
 		}
 		// If the entity is already in the active queue, just update the pod there.
-		if pInfo := unlockedActiveQ.update(newPod, entityLookup); pInfo != nil {
+		if pInfo := unlockedActiveQ.update(newPod, entityLookup, newSignature); pInfo != nil {
 			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-			pInfo.PodSignature = p.signPod(ctx, newPod)
 			updated = true
 			return
 		}
 
 		// If the entity is in the backoff queue, update the pod there.
-		if pInfo := p.backoffQ.update(newPod, entityLookup); pInfo != nil {
+		if pInfo := p.backoffQ.update(newPod, entityLookup, newSignature); pInfo != nil {
 			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-			pInfo.PodSignature = p.signPod(ctx, newPod)
 			updated = true
 			return
 		}
@@ -1412,7 +1411,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 
 	// If the pod is in the unschedulable queue, updating it may make it schedulable.
 	if entity := p.unschedulableEntities.get(entityLookup); entity != nil {
-		pInfo, err := entity.Update(newPod)
+		pInfo, err := entity.Update(newPod, newSignature)
 		if err != nil {
 			logger.Error(err, "Failed to update pod in an entity", "type", entity.Type(), "entity", klog.KObj(entity), "pod", klog.KObj(newPod))
 			// Handle this case gracefully by adding the newPod to the queue.
@@ -1420,7 +1419,6 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 			return
 		}
 		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-		pInfo.PodSignature = p.signPod(ctx, newPod)
 
 		// When unscheduled Pods are updated, we check with QueueingHint
 		// whether the update may make the entities schedulable.
