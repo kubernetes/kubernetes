@@ -19,6 +19,7 @@ package cache
 import (
 	"fmt"
 	"maps"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
@@ -88,9 +89,15 @@ type Snapshot struct {
 	// keyed in the format "namespace/name".
 	usedPVCRefCounts map[string]int
 	generation       int64
-	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
-	// This map should be emptied before the next cycle starts.
-	assumedPods map[string]*v1.Pod
+	// assumedPodStates maps a pod key to its assume-time state during a single pod
+	// group scheduling cycle. The state records exactly what AssumePod added
+	// to the snapshot-wide indexes so that ForgetPod can revert it without
+	// rescanning the snapshot. This map should be emptied before the next cycle starts.
+	assumedPodStates map[string]*assumedPodState
+	// assumedPodKeys records the keys of assumed pods in assume order. It lets
+	// forgetAllAssumedPods revert leftover pods in reverse assume order, which the
+	// LIFO contract documented on assumedPodState relies on.
+	assumedPodKeys []string
 	// podGroupStates maps a pod group key to a snapshot of its state, used during a pod group scheduling cycle.
 	podGroupStates map[podGroupKey]*podGroupStateSnapshot
 	// placementNodes stores nodes that are present in the current placement.
@@ -109,12 +116,38 @@ type Snapshot struct {
 var _ fwk.SharedLister = &Snapshot{}
 var _ fwk.MutableSnapshotSharedLister = &Snapshot{}
 
+// assumedPodState captures what an AssumePod call added to the snapshot's
+// shared affinity indexes (havePodsWithAffinityNodeInfoList,
+// havePodsWithRequiredAntiAffinityNodeInfoList). ForgetPod reads it to undo
+// exactly those additions in O(1) per index. The PVC index is reference
+// counted (usedPVCRefCounts) and reverted directly from the pod's volumes, so
+// it needs no per-pod bookkeeping here.
+//
+// This relies on the contract of snapshot-level Assume/Forget:
+//  1. ForgetPod is only called for a pod that was previously assumed.
+//  2. Pods are forgotten in reverse order of being assumed.
+//  3. No other snapshot mutations happen between AssumePod and ForgetPod
+//     of the same pod.
+type assumedPodState struct {
+	// pod is the assumed pod. It is retained so forgetAllAssumedPods can
+	// revert leftover pods without the caller re-supplying them.
+	pod *v1.Pod
+	// addedToAffinityList is true if AssumePod appended the pod's node to the
+	// snapshot's affinity list (the node had no pods with affinity terms
+	// before this pod was assumed).
+	addedToAffinityList bool
+	// addedToAntiAffinityList is true if AssumePod appended the pod's node to
+	// the snapshot's required anti-affinity list (the node had no pods with
+	// required anti-affinity terms before this pod was assumed).
+	addedToAntiAffinityList bool
+}
+
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
 		nodeInfoMap:            make(map[string]*framework.NodeInfo),
 		usedPVCRefCounts:       make(map[string]int),
-		assumedPods:            make(map[string]*v1.Pod),
+		assumedPodStates:       make(map[string]*assumedPodState),
 		podGroupStates:         make(map[podGroupKey]*podGroupStateSnapshot),
 		genericWorkloadEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 	}
@@ -393,7 +426,13 @@ func (s *Snapshot) IsPVCUsedByPods(key string) bool {
 	return s.usedPVCRefCounts[key] > 0
 }
 
-// AssumePod assumes a given pod in the snapshot.
+// AssumePod assumes a given pod in the snapshot. In addition to adding the
+// pod to its node's NodeInfo, it keeps the snapshot-wide affinity, anti-affinity
+// and PVC indexes (havePodsWithAffinityNodeInfoList,
+// havePodsWithRequiredAntiAffinityNodeInfoList, usedPVCRefCounts) consistent so
+// that scheduling plugins observe up-to-date state during the pod group cycle.
+// The affinity additions are recorded in assumedPodState so ForgetPod can undo
+// them directly.
 // ForgetPod should be called on the snapshot before syncing it with the cache.
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
 func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
@@ -411,9 +450,27 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	// Since this operation only affects the snapshot,
 	// we should keep the old number to remain consistent with the cached value.
 	oldGeneration := nodeInfo.Generation
+	hadPodsWithAffinity := len(nodeInfo.PodsWithAffinity) > 0
+	hadPodsWithRequiredAntiAffinity := len(nodeInfo.PodsWithRequiredAntiAffinity) > 0
 	nodeInfo.AddPodInfo(podInfo)
 	nodeInfo.Generation = oldGeneration
-	s.assumedPods[key] = pod
+	// nodeInfo.AddPodInfo maintains the NodeInfo's affinity and PVC indexes;
+	// the snapshot-wide indexes must be updated to match, otherwise inter-pod
+	// (anti-)affinity and VolumeRestrictions plugins observe stale state.
+	state := &assumedPodState{pod: pod}
+	if !hadPodsWithAffinity && len(nodeInfo.PodsWithAffinity) > 0 {
+		s.havePodsWithAffinityNodeInfoList = append(s.havePodsWithAffinityNodeInfoList, nodeInfo)
+		state.addedToAffinityList = true
+	}
+	if !hadPodsWithRequiredAntiAffinity && len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
+		s.havePodsWithRequiredAntiAffinityNodeInfoList = append(s.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
+		state.addedToAntiAffinityList = true
+	}
+	for pvcKey := range framework.PodPVCKeys(pod) {
+		s.usedPVCRefCounts[pvcKey]++
+	}
+	s.assumedPodStates[key] = state
+	s.assumedPodKeys = append(s.assumedPodKeys, key)
 	// Update the pod group state in the snapshot if the pod belongs to a pod group.
 	if !s.genericWorkloadEnabled || pod.Spec.SchedulingGroup == nil {
 		return nil
@@ -425,18 +482,31 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	return nil
 }
 
-// ForgetPod forgets a given pod from the snapshot.
+// ForgetPod forgets a given pod from the snapshot. In addition to removing
+// the pod from its node's NodeInfo, it reverts the snapshot-wide index
+// additions recorded by AssumePod (havePodsWithAffinityNodeInfoList,
+// havePodsWithRequiredAntiAffinityNodeInfoList, usedPVCRefCounts). Reverting the
+// affinity lists relies on the LIFO Assume/Forget contract documented on
+// assumedPodState.
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
 func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
-	assumedPod, ok := s.assumedPods[key]
+	state, ok := s.assumedPodStates[key]
 	if !ok {
 		return fmt.Errorf("assumed pod %q not found in the snapshot", key)
 	}
-	delete(s.assumedPods, key)
+	delete(s.assumedPodStates, key)
+	// The LIFO Assume/Forget contract (see assumedPodState) guarantees the pod
+	// being forgotten is the last assumed one, so its key is popped from the end.
+	if n := len(s.assumedPodKeys); n > 0 && s.assumedPodKeys[n-1] == key {
+		s.assumedPodKeys = s.assumedPodKeys[:n-1]
+	} else {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot remove assumed pod key on ForgetPod: the pod is not the last assumed one", "pod", klog.KObj(pod))
+	}
+	assumedPod := state.pod
 	nodeName := assumedPod.Spec.NodeName
 	if nodeInfo, ok := s.nodeInfoMap[nodeName]; ok {
 		// Calling RemovePod increases the Generation number of the nodeInfo.
@@ -448,6 +518,20 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 			return err
 		}
 		nodeInfo.Generation = oldGeneration
+		// Undo only what this pod's AssumePod added to the snapshot-wide
+		// indexes; the NodeInfo's own indexes are maintained by RemovePod.
+		if state.addedToAffinityList {
+			s.havePodsWithAffinityNodeInfoList = removeAssumedNodeInfo(logger, s.havePodsWithAffinityNodeInfoList, nodeInfo, "havePodsWithAffinityNodeInfoList", pod)
+		}
+		if state.addedToAntiAffinityList {
+			s.havePodsWithRequiredAntiAffinityNodeInfoList = removeAssumedNodeInfo(logger, s.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo, "havePodsWithRequiredAntiAffinityNodeInfoList", pod)
+		}
+		for pvcKey := range framework.PodPVCKeys(pod) {
+			s.usedPVCRefCounts[pvcKey]--
+			if s.usedPVCRefCounts[pvcKey] <= 0 {
+				delete(s.usedPVCRefCounts, pvcKey)
+			}
+		}
 		if len(nodeInfo.Pods) == 0 && nodeInfo.Node() == nil {
 			delete(s.nodeInfoMap, nodeName)
 		}
@@ -466,16 +550,37 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 // forgetAllAssumedPods forgets all assumed pods from the snapshot.
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
 func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
-	if len(s.assumedPods) == 0 {
+	if len(s.assumedPodStates) == 0 {
 		return
 	}
-	for _, pod := range s.assumedPods {
-		err := s.ForgetPod(logger, pod)
-		if err != nil {
+	logger.Error(nil, "Found assumed pods in the snapshot that were not forgotten", "assumedPodsCount", len(s.assumedPodStates))
+	// Forget in reverse assume order to honor the LIFO contract that ForgetPod
+	// relies on to revert the snapshot-wide indexes (see assumedPodState).
+	keys := slices.Clone(s.assumedPodKeys)
+	for i := len(keys) - 1; i >= 0; i-- {
+		state, ok := s.assumedPodStates[keys[i]]
+		if !ok {
+			utilruntime.HandleErrorWithLogger(logger, nil, "Assumed pod state not found for the recorded assumed pod key", "podKey", keys[i])
+			continue
+		}
+		if err := s.ForgetPod(logger, state.pod); err != nil {
 			utilruntime.HandleErrorWithLogger(logger, err, "Failed to forget assumed pod")
 		}
 	}
-	logger.Error(nil, "Found assumed pods in the snapshot that were not forgotten", "assumedPodsCount", len(s.assumedPods))
+}
+
+// removeAssumedNodeInfo removes nodeInfo from the end of list. AssumePod only
+// ever appends to these lists, and the LIFO Assume/Forget contract guarantees
+// the entry added for the pod now being forgotten is the last one. If the last
+// entry is not nodeInfo the contract was violated: the error is reported and
+// list is returned unchanged.
+func removeAssumedNodeInfo(logger klog.Logger, list []fwk.NodeInfo, nodeInfo fwk.NodeInfo, listName string, pod *v1.Pod) []fwk.NodeInfo {
+	if len(list) == 0 || list[len(list)-1] != nodeInfo {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot revert snapshot index on ForgetPod: list does not end with the assumed pod's node", "list", listName, "pod", klog.KObj(pod), "node", nodeInfo.Node().Name)
+		return list
+	}
+	list[len(list)-1] = nil
+	return list[:len(list)-1]
 }
 
 // AssumePlacement sets placement context in the snapshot.
