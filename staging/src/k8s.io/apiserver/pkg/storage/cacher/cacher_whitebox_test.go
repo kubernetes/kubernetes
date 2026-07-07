@@ -381,6 +381,7 @@ func TestConsistentReadFallback(t *testing.T) {
 		expectTooManyRequests   bool
 		expectRV                string
 		expectBlock             bool
+		expectFallbackRequest   bool
 		expectRequestsToStorage int
 		expectMetric            string
 	}{
@@ -402,6 +403,7 @@ apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource
 			storageRV:               "42",
 			expectRV:                "42",
 			expectBlock:             true,
+			expectFallbackRequest:   true,
 			expectRequestsToStorage: 2,
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
@@ -416,6 +418,7 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 			fallbackError:           true,
 			expectError:             true,
 			expectBlock:             true,
+			expectFallbackRequest:   true,
 			expectRequestsToStorage: 2,
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
@@ -473,6 +476,7 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 				t.Fatalf("Expected watch cache RV to equal watchCacheRV, got: %d, want: %s", cacher.watchCache.resourceVersion, tc.watchCacheRV)
 			}
 			requestToStorageCount := 0
+			var fallbackRequests []storage.ListOptions
 			backingStorage.GetListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 				requestToStorageCount += 1
 				podList := listObj.(*example.PodList)
@@ -480,6 +484,7 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 					podList.ResourceVersion = tc.storageRV
 					return nil
 				}
+				fallbackRequests = append(fallbackRequests, opts)
 				if tc.fallbackError {
 					return errDummy
 				}
@@ -533,6 +538,17 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 			blocked := duration >= blockTimeout
 			if blocked != tc.expectBlock {
 				t.Fatalf("Unexpected block, got: %v, want: %v", blocked, tc.expectBlock)
+			}
+			if tc.expectFallbackRequest {
+				if len(fallbackRequests) != 1 {
+					t.Fatalf("Unexpected number of fallback requests to storage, got: %d, want: 1", len(fallbackRequests))
+				}
+				got := fallbackRequests[0]
+				if !got.Recursive || !storage.IsConsistentReadList(got) {
+					t.Errorf("Expected fallback to pass through the client's recursive consistent list options, got: %+v", got)
+				}
+			} else if len(fallbackRequests) != 0 {
+				t.Errorf("Unexpected fallback requests to storage: %+v", fallbackRequests)
 			}
 
 			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetric), "apiserver_watch_cache_consistent_read_total"); err != nil {

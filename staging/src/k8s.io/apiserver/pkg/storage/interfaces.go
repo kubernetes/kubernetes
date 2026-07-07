@@ -338,6 +338,10 @@ type ListOptions struct {
 	SendInitialEvents *bool
 }
 
+func IsConsistentReadList(opts ListOptions) bool {
+	return opts.ResourceVersion == "" && opts.ResourceVersionMatch == "" && opts.Predicate.Continue == ""
+}
+
 // DeleteOptions provides the options that may be provided for storage delete operations.
 type DeleteOptions struct {
 	// ExpectTransformOrDecodeError, if enabled, will return an error if the object can be
