@@ -26,7 +26,6 @@ import (
 
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,11 +35,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcev1informers "k8s.io/client-go/informers/resource/v1"
 	resourcev1alpha3informers "k8s.io/client-go/informers/resource/v1alpha3"
-	resourcev1beta2informers "k8s.io/client-go/informers/resource/v1beta2"
 	clientset "k8s.io/client-go/kubernetes"
 	resourcev1listers "k8s.io/client-go/listers/resource/v1"
 	resourcev1alpha3listers "k8s.io/client-go/listers/resource/v1alpha3"
-	resourcev1beta2listers "k8s.io/client-go/listers/resource/v1beta2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -82,7 +79,7 @@ type Controller struct {
 
 	// taintRuleLister can list/get DeviceTaintRules from the shared informer's store.
 	// Only consulted when the DRADeviceTaintRules feature gate is enabled.
-	taintRuleLister resourcev1beta2listers.DeviceTaintRuleLister
+	taintRuleLister resourcev1listers.DeviceTaintRuleLister
 
 	// requestSynced returns true if the ResourcePoolStatusRequest store has been synced
 	requestSynced cache.InformerSynced
@@ -107,7 +104,7 @@ func NewController(
 	requestInformer resourcev1alpha3informers.ResourcePoolStatusRequestInformer,
 	sliceInformer resourcev1informers.ResourceSliceInformer,
 	claimInformer resourcev1informers.ResourceClaimInformer,
-	taintRuleInformer resourcev1beta2informers.DeviceTaintRuleInformer,
+	taintRuleInformer resourcev1informers.DeviceTaintRuleInformer,
 ) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 
@@ -123,7 +120,7 @@ func NewController(
 	}
 
 	// Only consume the DeviceTaintRule informer when the gate is enabled, so
-	// clusters that don't serve the v1beta2 API don't block on its cache sync.
+	// clusters that don't serve the DeviceTaintRule API don't block on its cache sync.
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 		c.taintRuleLister = taintRuleInformer.Lister()
 		c.taintRuleSynced = taintRuleInformer.Informer().HasSynced
@@ -293,7 +290,7 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 
 // deviceUnavailable reports whether a device should count as unavailable,
 // considering both its embedded taints and any matching DeviceTaintRules.
-func deviceUnavailable(driver, pool string, device *resourcev1.Device, rules []*resourcev1beta2.DeviceTaintRule) bool {
+func deviceUnavailable(driver, pool string, device *resourcev1.Device, rules []*resourcev1.DeviceTaintRule) bool {
 	if hasUnavailableTaint(device) {
 		return true
 	}
@@ -319,9 +316,9 @@ func hasUnavailableTaint(device *resourcev1.Device) bool {
 
 // ruleMakesDeviceUnavailable reports whether a DeviceTaintRule selects the given
 // device and applies a NoSchedule/NoExecute taint. A nil selector matches nothing.
-func ruleMakesDeviceUnavailable(rule *resourcev1beta2.DeviceTaintRule, driver, pool, device string) bool {
+func ruleMakesDeviceUnavailable(rule *resourcev1.DeviceTaintRule, driver, pool, device string) bool {
 	switch rule.Spec.Taint.Effect {
-	case resourcev1beta2.DeviceTaintEffectNoSchedule, resourcev1beta2.DeviceTaintEffectNoExecute:
+	case resourcev1.DeviceTaintEffectNoSchedule, resourcev1.DeviceTaintEffectNoExecute:
 	default:
 		return false
 	}
@@ -381,7 +378,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 
 	// DeviceTaintRules taint devices externally (admin-applied), independent of
 	// the driver's embedded taints. Only consulted when the gate is enabled.
-	var taintRules []*resourcev1beta2.DeviceTaintRule
+	var taintRules []*resourcev1.DeviceTaintRule
 	if c.taintRuleLister != nil && utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 		taintRules, err = c.taintRuleLister.List(labels.Everything())
 		if err != nil {
