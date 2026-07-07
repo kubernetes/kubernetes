@@ -295,13 +295,16 @@ func (t *typedList) Add(other ref.Val) ref.Val {
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
-	resultValue := t.value
-	for it := oList.Iterator(); it.HasNext() == types.True; {
-		next := it.Next().Value()
-		resultValue = reflect.Append(resultValue, reflect.ValueOf(next))
+	sz := t.value.Len()
+	otherSz, _ := oList.Size().(types.Int)
+	elements := make([]ref.Val, 0, sz+int(otherSz))
+	for i := range sz {
+		elements = append(elements, t.Get(types.Int(i)))
 	}
-
-	return &typedList{value: resultValue, itemsSchema: t.itemsSchema}
+	for it := oList.Iterator(); it.HasNext() == types.True; {
+		elements = append(elements, it.Next())
+	}
+	return types.NewRefValList(types.DefaultTypeAdapter, elements)
 }
 
 func (t *typedList) Contains(val ref.Val) ref.Val {
