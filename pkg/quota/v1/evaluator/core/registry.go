@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -67,7 +68,7 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 			podLister = i.Core().V1().Pods().Lister()
 			logger := klog.FromContext(context.Background())
 			deviceClassMapping = extendedresourcecache.NewExtendedResourceCache(logger)
-			if _, err := i.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceClassMapping); err != nil {
+			if _, err := i.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(deviceClassMapping, cache.HandlerOptions{Logger: &logger}); err != nil {
 				return nil, fmt.Errorf("failed to add device class informer event handler: %w", err)
 			}
 			var err error
