@@ -52,14 +52,27 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	if dnsImageRepository == kubeadmapiv1.DefaultImageRepository {
 		dnsImageRepository = fmt.Sprintf("%s/coredns", dnsImageRepository)
 	}
-	// DNS uses an imageTag that corresponds to the DNS version matching the Kubernetes version
-	dnsImageTag := constants.CoreDNSVersion
+	dnsImageTag := GetDNSImageTag(cfg, constants.SupportedCoreDNSVersion)
+	return GetGenericImage(dnsImageRepository, constants.CoreDNSImageName, dnsImageTag)
+}
 
+// GetDNSImageTag generates and returns the image tag for CoreDNS
+func GetDNSImageTag(cfg *kubeadmapi.ClusterConfiguration, supportedCoreDNSVersion map[uint8]string) string {
+	// DNS uses an imageTag that corresponds to the CoreDNS version matching the Kubernetes version
+	dnsImageTag := constants.DefaultCoreDNSVersion
+	coreDNSVersion, warning, err := constants.CoreDNSSupportedVersion(supportedCoreDNSVersion, cfg.KubernetesVersion)
+	if err == nil {
+		// CoreDNS images are tagged with a "v" prefix (e.g. "v1.14.4"), unlike version.Version.String().
+		dnsImageTag = "v" + coreDNSVersion.String()
+	}
+	if warning != nil {
+		klog.V(1).Infof("WARNING: %v", warning)
+	}
 	// unless an override is specified
 	if cfg.DNS.ImageTag != "" {
 		dnsImageTag = cfg.DNS.ImageTag
 	}
-	return GetGenericImage(dnsImageRepository, constants.CoreDNSImageName, dnsImageTag)
+	return dnsImageTag
 }
 
 // GetEtcdImage generates and returns the image for etcd

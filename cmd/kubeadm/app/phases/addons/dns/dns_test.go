@@ -512,7 +512,7 @@ func TestCreateCoreDNSAddon(t *testing.T) {
 				t.Errorf("unexpected ParseTemplate failure: %+v", err)
 			}
 
-			err = createCoreDNSAddon(nil, nil, configMapBytes, client)
+			err = createCoreDNSAddon(nil, nil, configMapBytes, client, strings.TrimLeft(kubeadmconstants.DefaultCoreDNSVersion, "v"))
 			if err != nil {
 				t.Fatalf("error creating the CoreDNS Addon: %v", err)
 			}
@@ -872,7 +872,7 @@ kind: ServiceAccount
 metadata:
   name: coredns
   namespace: kube-system
-`, kubeadmconstants.CoreDNSVersion)),
+`, kubeadmconstants.DefaultCoreDNSVersion)),
 			wantErr: false,
 		},
 	}
@@ -1162,7 +1162,7 @@ kind: ServiceAccount
 metadata:
   name: coredns
   namespace: kube-system
-`, kubeadmconstants.CoreDNSVersion)),
+`, kubeadmconstants.DefaultCoreDNSVersion)),
 			wantErr: false,
 		},
 	}
@@ -1435,28 +1435,28 @@ func TestDeployedDNSAddon(t *testing.T) {
 	}{
 		{
 			name:           "default",
-			image:          "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion,
+			image:          "registry.k8s.io/coredns/coredns:" + kubeadmconstants.DefaultCoreDNSVersion,
 			deploymentSize: 1,
-			wantVersion:    kubeadmconstants.CoreDNSVersion,
+			wantVersion:    kubeadmconstants.DefaultCoreDNSVersion,
 		},
 		{
 			name:           "no dns addon deployment",
-			image:          "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion,
+			image:          "registry.k8s.io/coredns/coredns:" + kubeadmconstants.DefaultCoreDNSVersion,
 			deploymentSize: 0,
 			wantVersion:    "",
 		},
 		{
 			name:           "multiple dns addon deployment",
-			image:          "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion,
+			image:          "registry.k8s.io/coredns/coredns:" + kubeadmconstants.DefaultCoreDNSVersion,
 			deploymentSize: 2,
 			wantVersion:    "",
 			wantErr:        true,
 		},
 		{
 			name:           "with digest",
-			image:          fmt.Sprintf("registry.k8s.io/coredns/coredns:%s@sha256:1391544c978029fcddc65068f6ad67f396e55585b664ecccd7fefba029b9b706", kubeadmconstants.CoreDNSVersion),
+			image:          fmt.Sprintf("registry.k8s.io/coredns/coredns:%s@sha256:1391544c978029fcddc65068f6ad67f396e55585b664ecccd7fefba029b9b706", kubeadmconstants.DefaultCoreDNSVersion),
 			deploymentSize: 1,
-			wantVersion:    kubeadmconstants.CoreDNSVersion,
+			wantVersion:    kubeadmconstants.DefaultCoreDNSVersion,
 		},
 		{
 			name:           "without registry",
@@ -1639,7 +1639,7 @@ func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
 		{
 			name:                           "currentInstalledCoreDNSVersion is consistent with the standard version",
 			corefile:                       "",
-			currentInstalledCoreDNSVersion: kubeadmconstants.CoreDNSVersion,
+			currentInstalledCoreDNSVersion: kubeadmconstants.DefaultCoreDNSVersion,
 			want:                           false,
 			wantErr:                        false,
 		},
@@ -1660,7 +1660,7 @@ func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := isCoreDNSConfigMapMigrationRequired(tt.corefile, tt.currentInstalledCoreDNSVersion)
+			got, err := isCoreDNSConfigMapMigrationRequired(tt.corefile, tt.currentInstalledCoreDNSVersion, strings.TrimLeft(kubeadmconstants.DefaultCoreDNSVersion, "v"))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("isCoreDNSConfigMapMigrationRequired() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1676,7 +1676,7 @@ func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
 // deploymentSize is the number of deployments with `k8s-app=kube-dns` label.
 func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, image string, configMap string, configData string) *clientsetfake.Clientset {
 	if image == "" {
-		image = "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion
+		image = "registry.k8s.io/coredns/coredns:" + kubeadmconstants.DefaultCoreDNSVersion
 	}
 	client := clientsetfake.NewSimpleClientset()
 	for i := range deploymentSize {
