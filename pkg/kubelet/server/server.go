@@ -33,6 +33,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/emicklei/go-restful/v3"
 	cadvisormetrics "github.com/google/cadvisor/lib/container"
 	"github.com/google/cadvisor/lib/metrics"
@@ -271,7 +273,13 @@ func ListenAndServePodResources(ctx context.Context, endpoint string, providers 
 // ListenAndServePodsServer initializes an HTTP server to serve the Pod API.
 func ListenAndServePodsServer(ctx context.Context, endpoint string, srv podsv1alpha1.PodsServer) {
 	logger := klog.FromContext(ctx)
-	server := grpc.NewServer(apisgrpc.WithRateLimiter(ctx, "pods", pods.DefaultQPS, pods.DefaultBurstTokens))
+	server := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			apisgrpc.LimiterUnaryServerInterceptor(rate.NewLimiter(rate.Limit(pods.DefaultQPS), int(pods.DefaultBurstTokens))),
+			pods.MetricsUnaryServerInterceptor,
+		),
+		grpc.StreamInterceptor(pods.MetricsStreamServerInterceptor),
+	)
 
 	podsv1alpha1.RegisterPodsServer(server, srv)
 

@@ -706,9 +706,9 @@ func NewMainKubelet(ctx context.Context,
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 
+	broadcaster := pods.NewBroadcaster(ctx)
+	klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager, klet.sourcesReady)
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
-		broadcaster := pods.NewBroadcaster(ctx)
-		klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager)
 		klet.statusManager.AddPodUpdateNotifier(klet.podsServer)
 	}
 	klet.allocationManager = allocation.NewManager(
@@ -3389,18 +3389,16 @@ func (kl *Kubelet) ListenAndServePodResources(ctx context.Context) {
 
 // ListenAndServePod initializes an HTTP server to serve the Pod API.
 func (kl *Kubelet) ListenAndServePods(ctx context.Context) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
-		endpoint, err := util.LocalEndpoint(kl.getPodsAPIDir(), pods.Socket)
-		if err != nil {
-			klog.FromContext(ctx).Error(err, "Failed to get local endpoint for pod api")
-			return
-		}
-		server.ListenAndServePodsServer(
-			ctx,
-			endpoint,
-			kl.podsServer,
-		)
+	endpoint, err := util.LocalEndpoint(kl.getPodsAPIDir(), pods.Socket)
+	if err != nil {
+		klog.FromContext(ctx).Error(err, "Failed to get local endpoint for pod api")
+		return
 	}
+	server.ListenAndServePodsServer(
+		ctx,
+		endpoint,
+		kl.podsServer,
+	)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.

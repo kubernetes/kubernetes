@@ -203,8 +203,14 @@ const (
 	// Metric key for podcertificate states.
 	PodCertificateStatesKey = "podcertificate_states"
 
-	// Metric key for podsapi
 	PodWatchEventsDroppedKey = "pod_watch_events_dropped_total"
+	PodRequestsTotalKey      = "pod_requests_total"
+	PodErrorsGetKey          = "pod_errors_get_total"
+	PodErrorsListKey         = "pod_errors_list_total"
+	PodErrorsWatchKey        = "pod_errors_watch_total"
+	PodRequestsListKey       = "pod_requests_list_total"
+	PodRequestsGetKey        = "pod_requests_get_total"
+	PodRequestsWatchKey      = "pod_requests_watch_total"
 )
 
 type imageSizeBucket struct {
@@ -1303,6 +1309,83 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// PodRequestsTotal tracks the cumulative number of requests to the PodsAPI endpoints.
+	PodRequestsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodRequestsTotalKey,
+			Help:           "Cumulative number of requests to the PodsAPI endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodErrorsGet tracks the cumulative number of errors returned by the GetPod endpoint.
+	PodErrorsGet = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodErrorsGetKey,
+			Help:           "Cumulative number of errors returned by the GetPod endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodErrorsList tracks the cumulative number of errors returned by the ListPods endpoint.
+	PodErrorsList = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodErrorsListKey,
+			Help:           "Cumulative number of errors returned by the ListPods endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodErrorsWatch tracks the cumulative number of errors returned by the WatchPods endpoint.
+	PodErrorsWatch = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodErrorsWatchKey,
+			Help:           "Cumulative number of errors returned by the WatchPods endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodRequestsList tracks the cumulative number of requests to the ListPods endpoint.
+	PodRequestsList = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodRequestsListKey,
+			Help:           "Number of requests to the PodsAPI List endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodRequestsGet tracks the cumulative number of requests to the GetPod endpoint.
+	PodRequestsGet = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodRequestsGetKey,
+			Help:           "Number of requests to the PodsAPI Get endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodRequestsWatch tracks the cumulative number of requests to the WatchPods endpoint.
+	PodRequestsWatch = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodRequestsWatchKey,
+			Help:           "Number of requests to the PodsAPI Watch endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1433,6 +1516,13 @@ func Register() {
 		}
 
 		legacyregistry.MustRegister(PodWatchEventsDroppedTotal)
+		legacyregistry.MustRegister(PodRequestsTotal)
+		legacyregistry.MustRegister(PodErrorsGet)
+		legacyregistry.MustRegister(PodErrorsList)
+		legacyregistry.MustRegister(PodErrorsWatch)
+		legacyregistry.MustRegister(PodRequestsList)
+		legacyregistry.MustRegister(PodRequestsGet)
+		legacyregistry.MustRegister(PodRequestsWatch)
 	})
 }
 

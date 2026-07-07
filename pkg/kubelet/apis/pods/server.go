@@ -19,8 +19,10 @@ package pods
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
@@ -29,8 +31,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	podstatus "k8s.io/kubernetes/pkg/kubelet/status"
@@ -122,14 +127,16 @@ type PodsServer struct {
 	podManager     pod.Manager
 	statusProvider podstatus.PodStatusProvider
 	broadcaster    *broadcaster
+	sourcesReady   config.SourcesReady
 }
 
 // NewPodsServer creates a new PodServer for production use.
-func NewPodsServer(broadcaster *broadcaster, podManager pod.Manager, statusProvider podstatus.PodStatusProvider) *PodsServer {
+func NewPodsServer(broadcaster *broadcaster, podManager pod.Manager, statusProvider podstatus.PodStatusProvider, sourcesReady config.SourcesReady) *PodsServer {
 	return &PodsServer{
 		podManager:     podManager,
 		statusProvider: statusProvider,
 		broadcaster:    broadcaster,
+		sourcesReady:   sourcesReady,
 	}
 }
 
@@ -172,6 +179,13 @@ func (s *PodsServer) ListPods(ctx context.Context, req *podsv1alpha1.ListPodsReq
 	logger := klog.FromContext(ctx)
 	logger.Info("ListPods called")
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
+		return nil, status.Error(codes.FailedPrecondition, "PodsAPI feature gate is disabled")
+	}
+	if s.sourcesReady != nil && !s.sourcesReady.AllReady() {
+		return nil, status.Error(codes.FailedPrecondition, "Kubelet is initializing")
+	}
+
 	// TODO: Implement filtering based on req.Filter, pagination with req.PageToken and req.PageSize
 	podsToReturn := s.podManager.GetPods()
 	sort.Slice(podsToReturn, func(i, j int) bool {
@@ -200,6 +214,13 @@ func (s *PodsServer) ListPods(ctx context.Context, req *podsv1alpha1.ListPodsReq
 func (s *PodsServer) GetPod(ctx context.Context, req *podsv1alpha1.GetPodRequest) (*podsv1alpha1.GetPodResponse, error) {
 	logger := klog.FromContext(ctx)
 	logger.Info("GetPod called", "podUID", req.PodUID)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
+		return nil, status.Error(codes.FailedPrecondition, "PodsAPI feature gate is disabled")
+	}
+	if s.sourcesReady != nil && !s.sourcesReady.AllReady() {
+		return nil, status.Error(codes.FailedPrecondition, "Kubelet is initializing")
+	}
 
 	podUID := types.UID(req.PodUID)
 	pod, ok := s.podManager.GetPodByUID(podUID)
@@ -230,6 +251,13 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 	}
 	logger := klog.FromContext(stream.Context())
 	logger.Info("WatchPods called", "client", clientAddr)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
+		return status.Error(codes.FailedPrecondition, "PodsAPI feature gate is disabled")
+	}
+	if s.sourcesReady != nil && !s.sourcesReady.AllReady() {
+		return status.Error(codes.FailedPrecondition, "Kubelet is initializing")
+	}
 
 	clientChannel := make(chan PodWatchEvent, 100)
 	s.broadcaster.Register(logger, clientChannel)
@@ -340,4 +368,63 @@ func convertWatchEventType(watchType watch.EventType) (podsv1alpha1.EventType, e
 	default:
 		return podsv1alpha1.EventType_UNSPECIFIED, status.Errorf(codes.Internal, "unknown watch event type: %v", watchType)
 	}
+}
+
+// MetricsUnaryServerInterceptor is a gRPC interceptor that updates metrics for unary RPCs.
+func MetricsUnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	version, method := parseFullMethod(info.FullMethod)
+
+	metrics.PodRequestsTotal.WithLabelValues(version).Inc()
+
+	switch method {
+	case "ListPods":
+		metrics.PodRequestsList.WithLabelValues(version).Inc()
+	case "GetPod":
+		metrics.PodRequestsGet.WithLabelValues(version).Inc()
+	}
+
+	resp, err := handler(ctx, req)
+
+	if err != nil {
+		switch method {
+		case "GetPod":
+			metrics.PodErrorsGet.WithLabelValues(version).Inc()
+		case "ListPods":
+			metrics.PodErrorsList.WithLabelValues(version).Inc()
+		}
+	}
+	return resp, err
+}
+
+// MetricsStreamServerInterceptor is a gRPC interceptor that updates metrics for streaming RPCs.
+func MetricsStreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	version, method := parseFullMethod(info.FullMethod)
+
+	metrics.PodRequestsTotal.WithLabelValues(version).Inc()
+
+	if method == "WatchPods" {
+		metrics.PodRequestsWatch.WithLabelValues(version).Inc()
+	}
+
+	err := handler(srv, ss)
+	if err != nil {
+		if method == "WatchPods" {
+			metrics.PodErrorsWatch.WithLabelValues(version).Inc()
+		}
+	}
+	return err
+}
+
+func parseFullMethod(fullMethod string) (string, string) {
+	// fullMethod is like "/v1alpha1.Pods/ListPods"
+	parts := strings.Split(strings.TrimPrefix(fullMethod, "/"), "/")
+	if len(parts) != 2 {
+		return "unknown", "unknown"
+	}
+	service := parts[0] // "v1alpha1.Pods"
+	method := parts[1]  // "ListPods"
+
+	serviceParts := strings.Split(service, ".")
+	version := serviceParts[0] // "v1alpha1"
+	return version, method
 }
