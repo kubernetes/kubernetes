@@ -108,6 +108,22 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 			},
 			ExpectedErrs: nil,
 		},
+		{
+			Name: "invalid missing lastTransitionTime",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakLastTransitionTime(metav1.Time{})),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Required(fldPath.Index(0).Child("lastTransitionTime"), "").MarkAlpha(),
+			},
+		},
+		{
+			Name: "valid lastTransitionTime",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakLastTransitionTime(metav1.Unix(1, 0))),
+			},
+			ExpectedErrs: nil,
+		},
 	}
 }
 
@@ -156,5 +172,11 @@ func TweakStatus(status metav1.ConditionStatus) func(*metav1.Condition) {
 func TweakObservedGeneration(gen int64) func(*metav1.Condition) {
 	return func(c *metav1.Condition) {
 		c.ObservedGeneration = gen
+	}
+}
+
+func TweakLastTransitionTime(t metav1.Time) func(*metav1.Condition) {
+	return func(c *metav1.Condition) {
+		c.LastTransitionTime = t
 	}
 }
