@@ -1041,6 +1041,7 @@ func TestListAdd(t *testing.T) {
 		Nested  []Nested       `json:"nested"`
 		Empty   []int64        `json:"empty"`
 		MapList []MapListEntry `json:"mapList"`
+		SetList []SetEntry     `json:"setList"`
 	}
 
 	mapListEntrySchema := &spec.Schema{SchemaProps: spec.SchemaProps{
@@ -1068,6 +1069,12 @@ func TestListAdd(t *testing.T) {
 					}},
 					SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: mapListEntrySchema}},
 				},
+				"setList": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type": "set",
+					}},
+					SchemaProps: intArraySchema.SchemaProps,
+				},
 			},
 		},
 	}
@@ -1079,6 +1086,7 @@ func TestListAdd(t *testing.T) {
 		Nested:  []Nested{{Name: "n1", Info: Struct{S: "hello"}}},
 		Empty:   []int64{},
 		MapList: []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
+		SetList: []SetEntry{1, 2, 3},
 	}, schema: addListsSchema}
 	y := typedValue{value: AddListsStruct{
 		Tags:    []string{"d", "e"},
@@ -1087,6 +1095,7 @@ func TestListAdd(t *testing.T) {
 		Nested:  []Nested{},
 		Empty:   []int64{},
 		MapList: []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 10}, {Key1: "k1v3", Key2: "k2v3", Value: 3}},
+		SetList: []SetEntry{3, 30},
 	}, schema: addListsSchema}
 	// z.mapList contains the same entries as (x.mapList + y.mapList), in a different order.
 	z := typedValue{value: AddListsStruct{
@@ -1211,6 +1220,27 @@ func TestListAdd(t *testing.T) {
 		{testCase: testCase{
 			name:       "schemaless map list concatenates atomically",
 			expression: "size(x.mapList + [{'key1': 'k1v1', 'key2': 'k2v1', 'value': 99}]) == 3",
+		}, skipTyped: true, skipUnstructured: true},
+		// Lists with x-kubernetes-list-type=set.
+		{testCase: testCase{
+			name:       "set list union with literal list",
+			expression: "(x.setList + [3, 4]) == [1, 2, 3, 4]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set list union with set list",
+			expression: "(x.setList + y.setList) == [1, 2, 3, 30]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set list equality ignores element order",
+			expression: "(x.setList + [4]) == [4, 3, 2, 1]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "chained set list union",
+			expression: "(x.setList + [4] + [4, 5]) == [1, 2, 3, 4, 5]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "schemaless set list concatenates atomically",
+			expression: "(x.setList + [3, 4]) == [1, 2, 3, 3, 4]",
 		}, skipTyped: true, skipUnstructured: true},
 	}
 

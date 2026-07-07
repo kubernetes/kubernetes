@@ -631,34 +631,91 @@ func (t *typedSetList) Equal(other ref.Val) ref.Val {
 	return types.True
 }
 
-// Add for a set list `X + Y` performs a union where the array positions of all elements in `X` are preserved and
-// non-intersecting elements in `Y` are appended, retaining their partial order.
 func (t *typedSetList) Add(other ref.Val) ref.Val {
-	setType := t.value.Type()
-	elementType := setType.Elem()
 	oSetList, ok := other.(traits.Lister)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
 	sz := t.value.Len()
-	elements := reflect.MakeSlice(setType, sz, sz)
-	for i := 0; i < sz; i++ {
-		e := t.Get(types.Int(i)).Value()
-		re := reflect.ValueOf(e)
-		elements.Index(i).Set(re.Convert(elementType))
+	elements := make([]ref.Val, sz)
+	for i := range sz {
+		elements[i] = t.Get(types.Int(i))
 	}
-	set := t.getSet()
-	for it := oSetList.Iterator(); it.HasNext() == types.True; {
-		e := it.Next().Value()
-		re := reflect.ValueOf(e)
-		if _, ok := set[e]; !ok {
-			set[e] = struct{}{}
-			elements = reflect.Append(elements, re.Convert(elementType))
+	return addToSetList(elements, oSetList)
+}
+
+func addToSetList(elements []ref.Val, other traits.Lister) ref.Val {
+	set := make(map[interface{}]struct{}, len(elements))
+	for _, e := range elements {
+		if k, ok := setElementKey(e); ok {
+			set[k] = struct{}{}
 		}
 	}
-	return &typedSetList{
-		typedList: typedList{value: elements, itemsSchema: t.itemsSchema},
+	for it := other.Iterator(); it.HasNext() == types.True; {
+		v := it.Next()
+		k, ok := setElementKey(v)
+		if !ok {
+			elements = append(elements, v)
+			continue
+		}
+		if _, exists := set[k]; !exists {
+			set[k] = struct{}{}
+			elements = append(elements, v)
+		}
 	}
+	return &refValSetList{Lister: types.NewRefValList(types.DefaultTypeAdapter, elements)}
+}
+
+func setElementKey(element ref.Val) (interface{}, bool) {
+	raw := element.Value()
+	if raw != nil && !reflect.TypeOf(raw).Comparable() {
+		return nil, false
+	}
+	return raw, true
+}
+
+type refValSetList struct {
+	traits.Lister
+}
+
+func (l *refValSetList) Add(other ref.Val) ref.Val {
+	oSetList, ok := other.(traits.Lister)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(other)
+	}
+	sz, _ := l.Size().(types.Int)
+	elements := make([]ref.Val, int(sz))
+	for i := range types.Int(sz) {
+		elements[i] = l.Get(i)
+	}
+	return addToSetList(elements, oSetList)
+}
+
+func (l *refValSetList) Equal(other ref.Val) ref.Val {
+	oSetList, ok := other.(traits.Lister)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(other)
+	}
+	sz, _ := l.Size().(types.Int)
+	if sz != oSetList.Size() {
+		return types.False
+	}
+	set := make(map[interface{}]struct{}, int(sz))
+	for i := range types.Int(sz) {
+		if k, ok := setElementKey(l.Get(i)); ok {
+			set[k] = struct{}{}
+		}
+	}
+	for it := oSetList.Iterator(); it.HasNext() == types.True; {
+		k, ok := setElementKey(it.Next())
+		if !ok {
+			return types.False
+		}
+		if _, exists := set[k]; !exists {
+			return types.False
+		}
+	}
+	return types.True
 }
 
 type typedMap struct {
