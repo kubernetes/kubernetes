@@ -1241,7 +1241,7 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 			claim.Status.Allocation = allocation
 			err := pl.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim)
 			if err != nil {
-				return statusError(logger, fmt.Errorf("internal error, couldn't signal allocation for claim %s", claim.Name))
+				return statusError(logger, fmt.Errorf("internal error, couldn't signal allocation for claim %s: %w", claim.Name, err))
 			}
 			logger.V(5).Info("Reserved resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(allocation))
 			allocIndex++

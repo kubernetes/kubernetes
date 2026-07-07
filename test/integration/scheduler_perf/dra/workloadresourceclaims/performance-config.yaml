@@ -128,20 +128,17 @@
       nodesWithoutDRA: 0
       podGroups: 10
       measurePods: 10
-
-  # These larger cases are flaky:
-  # https://github.com/kubernetes/kubernetes/issues/140263
-  # - name: 1podgroup_1000pods
-  #   labels: [integration-test, short]
-  #   params:
-  #     nodesWithDRA: 10
-  #     nodesWithoutDRA: 0
-  #     podGroups: 1
-  #     measurePods: 1000
-  # - name: 100podgroups_5000pods
-  #   labels: [performance]
-  #   params:
-  #     nodesWithDRA: 50
-  #     nodesWithoutDRA: 0
-  #     podGroups: 100
-  #     measurePods: 5000
+  - name: 1podgroup_1000pods
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 10
+      nodesWithoutDRA: 0
+      podGroups: 1
+      measurePods: 1000
+  - name: 100podgroups_5000pods
+    labels: [performance]
+    params:
+      nodesWithDRA: 50
+      nodesWithoutDRA: 0
+      podGroups: 100
+      measurePods: 5000
