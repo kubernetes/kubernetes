@@ -142,36 +142,39 @@ func TestQoSContainerCgroup(t *testing.T) {
 	guaranteedMin := resource.MustParse("128Mi")
 
 	tests := []struct {
-		name               string
-		pods               []*v1.Pod
-		initialGuaranteed  string
-		initialBurstable   string
-		expectedGuaranteed string
-		expectedBurstable  string
+		name                  string
+		pods                  []*v1.Pod
+		initialGuaranteed     string
+		initialBurstable      string
+		expectedGuaranteedMin string
+		expectedGuaranteedLow string
+		expectedBurstableLow  string
 	}{
 		{
-			name:               "writes aggregated memory min",
-			pods:               activeTestPods(),
-			initialGuaranteed:  "",
-			initialBurstable:   "",
-			expectedGuaranteed: strconv.FormatInt(burstableMin.Value()+guaranteedMin.Value(), 10),
-			expectedBurstable:  strconv.FormatInt(burstableMin.Value(), 10),
+			name:                  "writes aggregated memory protection",
+			pods:                  activeTestPods(),
+			initialGuaranteed:     "",
+			initialBurstable:      "",
+			expectedGuaranteedMin: strconv.FormatInt(burstableMin.Value()+guaranteedMin.Value(), 10),
+			expectedGuaranteedLow: strconv.FormatInt(burstableMin.Value(), 10),
+			expectedBurstableLow:  strconv.FormatInt(burstableMin.Value(), 10),
 		},
 		{
-			name: "writes zero memory min for best effort pod",
+			name: "writes zero memory protection for best effort pod",
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{UID: "99999999", Name: "besteffort-pod", Namespace: "test"},
 					Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "foo", Image: "busybox"}}},
 				},
 			},
-			initialGuaranteed:  "",
-			initialBurstable:   "",
-			expectedGuaranteed: "0",
-			expectedBurstable:  "0",
+			initialGuaranteed:     "",
+			initialBurstable:      "",
+			expectedGuaranteedMin: "0",
+			expectedGuaranteedLow: "0",
+			expectedBurstableLow:  "0",
 		},
 		{
-			name: "writes zero memory min for burstable pod without memory request",
+			name: "writes zero memory protection for burstable pod without memory request",
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{UID: "88888888", Name: "burstable-pod-no-memory-request", Namespace: "test"},
@@ -188,18 +191,20 @@ func TestQoSContainerCgroup(t *testing.T) {
 					},
 				},
 			},
-			initialGuaranteed:  "",
-			initialBurstable:   "",
-			expectedGuaranteed: "0",
-			expectedBurstable:  "0",
+			initialGuaranteed:     "",
+			initialBurstable:      "",
+			expectedGuaranteedMin: "0",
+			expectedGuaranteedLow: "0",
+			expectedBurstableLow:  "0",
 		},
 		{
-			name:               "clears stale memory min when all pods removed",
-			pods:               nil,
-			initialGuaranteed:  "1234",
-			initialBurstable:   "5678",
-			expectedGuaranteed: "0",
-			expectedBurstable:  "0",
+			name:                  "clears stale memory protection when all pods removed",
+			pods:                  nil,
+			initialGuaranteed:     "1234",
+			initialBurstable:      "5678",
+			expectedGuaranteedMin: "0",
+			expectedGuaranteedLow: "0",
+			expectedBurstableLow:  "0",
 		},
 	}
 
@@ -242,8 +247,9 @@ func TestQoSContainerCgroup(t *testing.T) {
 
 			m.setMemoryQoS(logger, qosConfigs)
 
-			assert.Equal(t, tc.expectedGuaranteed, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
-			assert.Equal(t, tc.expectedBurstable, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
+			assert.Equal(t, tc.expectedGuaranteedMin, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
+			assert.Equal(t, tc.expectedGuaranteedLow, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryLow])
+			assert.Equal(t, tc.expectedBurstableLow, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
 		})
 	}
 }
@@ -284,6 +290,7 @@ func TestQoSContainerCgroupWithMemoryReservationPolicyNone(t *testing.T) {
 	m.setMemoryQoS(logger, qosConfigs)
 
 	assert.Equal(t, "0", qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
+	assert.Equal(t, "0", qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryLow])
 	assert.Equal(t, "0", qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
 }
 

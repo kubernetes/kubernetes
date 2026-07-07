@@ -408,10 +408,16 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			gomega.Expect(kubepodsMemMin).To(gomega.BeNumerically(">", 0),
 				"kubepods cgroup must have memory.min > 0 for hierarchy protection to work")
 
-			burstableMemMin, err := memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
+			kubepodsMemLow, err := memqosReadCgroupInt64(kubepodsCgroupPath, cgroupMemoryLow)
+			framework.ExpectNoError(err, "reading kubepods memory.low")
+			framework.Logf("kubepods memory.low: %d", kubepodsMemLow)
+			gomega.Expect(kubepodsMemLow).To(gomega.BeNumerically(">", 0),
+				"kubepods cgroup must have memory.low > 0 for burstable effective_low to propagate")
+
+			burstableMemLow, err := memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
 			framework.ExpectNoError(err, "reading burstable QoS memory.low")
-			framework.Logf("burstable QoS memory.low: %d", burstableMemMin)
-			gomega.Expect(burstableMemMin).To(gomega.BeNumerically(">", 0),
+			framework.Logf("burstable QoS memory.low: %d", burstableMemLow)
+			gomega.Expect(burstableMemLow).To(gomega.BeNumerically(">", 0),
 				"burstable QoS cgroup must have memory.low > 0")
 		})
 	})
