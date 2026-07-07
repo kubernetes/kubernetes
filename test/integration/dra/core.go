@@ -824,7 +824,7 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 			expectedPodScheduledCondition: gstruct.Fields{
 				"Type":    gomega.Equal(v1.PodScheduled),
 				"Status":  gomega.Equal(v1.ConditionFalse),
-				"Message": gomega.Equal("0/8 nodes are available: 1 invalid resource pools were encountered, 7 cannot allocate all claims. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
+				"Message": gomega.Equal("0/8 nodes are available: 1 invalid resource pools were encountered, 7 cannot allocate all claims. preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
 			},
 		},
 		"invalid-for-all-nodes": {
@@ -847,7 +847,7 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 			expectedPodScheduledCondition: gstruct.Fields{
 				"Type":    gomega.Equal(v1.PodScheduled),
 				"Status":  gomega.Equal(v1.ConditionFalse),
-				"Message": gomega.Equal("0/8 nodes are available: 8 invalid resource pools were encountered. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
+				"Message": gomega.Equal("0/8 nodes are available: 8 invalid resource pools were encountered. preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
 			},
 		},
 	}

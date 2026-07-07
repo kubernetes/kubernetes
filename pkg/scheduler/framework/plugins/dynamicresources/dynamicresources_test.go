@@ -80,6 +80,27 @@ func init() {
 	metrics.InitMetrics()
 }
 
+func TestPostFilterNoOpStatusHasNoUserVisibleReason(t *testing.T) {
+	pod := st.MakePod().Name("pod").Namespace("default").Obj()
+
+	t.Run("plugin disabled", func(t *testing.T) {
+		_, status := (&DynamicResources{}).PostFilter(context.Background(), framework.NewCycleState(), pod, nil)
+
+		require.Equal(t, fwk.Unschedulable, status.Code())
+		assert.Empty(t, status.Reasons())
+	})
+
+	t.Run("no claims", func(t *testing.T) {
+		state := framework.NewCycleState()
+		state.Write(stateKey, &stateData{})
+
+		_, status := (&DynamicResources{enabled: true}).PostFilter(context.Background(), state, pod, nil)
+
+		require.Equal(t, fwk.Unschedulable, status.Code())
+		assert.Empty(t, status.Reasons())
+	})
+}
+
 var (
 	podKind      = v1.SchemeGroupVersion.WithKind("Pod")
 	podGroupKind = schedulingapi.SchemeGroupVersion.WithKind("PodGroup")
@@ -1459,7 +1480,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -1681,7 +1702,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -1706,7 +1727,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				postfilter: result{
 					inFlightClaims: []metav1.Object{otherAllocatedClaim},
-					status:         fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+					status:         fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -1798,7 +1819,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -1959,7 +1980,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("request req-1: device class %s does not exist", className)),
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `no new claims to deallocate`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -2123,7 +2144,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -2183,7 +2204,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -2243,7 +2264,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.Skip),
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `plugin disabled`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 				preBindPreFlightStatus: fwk.NewStatus(fwk.Skip),
 			},
@@ -2257,7 +2278,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.Unschedulable, `request req-1: device class does-not-exist does not exist`),
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `no new claims to deallocate`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -2271,7 +2292,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource, request req-1: has subrequests, but the DRAPrioritizedList feature is disabled`),
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `no new claims to deallocate`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -2284,7 +2305,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					status: fwk.NewStatus(fwk.Unschedulable, `request req-1/subreq-1: device class does-not-exist does not exist`),
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `no new claims to deallocate`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -2387,7 +2408,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
@@ -2622,7 +2643,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					},
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -3541,7 +3562,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.Unschedulable, `Insufficient cpu`)},
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, "still not schedulable"),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
@@ -3562,7 +3583,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.Unschedulable, `cannot allocate all claims`)},
 				},
 				postfilter: result{
-					status: fwk.NewStatus(fwk.Unschedulable, "still not schedulable"),
+					status: fwk.NewStatus(fwk.Unschedulable),
 				},
 			},
 		},
