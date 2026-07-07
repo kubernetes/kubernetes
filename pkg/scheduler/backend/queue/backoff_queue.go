@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -61,9 +62,7 @@ type backoffQueuer interface {
 	// The event should show which event triggered this addition and is used for the metric recording.
 	// It also ensures that entity is not in both queues.
 	add(logger klog.Logger, entity framework.QueuedEntityInfo, event string)
-	// update updates the pod in backoffQueue if oldEntity is already in the queue and the pod is present there.
-	// It returns new pod info if updated, nil otherwise.
-	update(newPod *v1.Pod, oldEntity framework.QueuedEntityInfo) *framework.QueuedPodInfo
+	update(newPod *v1.Pod, oldEntity framework.QueuedEntityInfo, newSignature fwk.PodSignature) *framework.QueuedPodInfo
 	// delete deletes the entity from backoffQueue.
 	// It returns the removed entity if found, nil otherwise.
 	delete(entityLookup framework.QueuedEntityInfo) framework.QueuedEntityInfo
@@ -324,13 +323,13 @@ func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInf
 
 // update updates the pod in backoffQueue if oldEntity is already in the queue and the pod is present there.
 // It returns new pod info if updated, nil otherwise.
-func (bq *backoffQueue) update(newPod *v1.Pod, oldEntity framework.QueuedEntityInfo) *framework.QueuedPodInfo {
+func (bq *backoffQueue) update(newPod *v1.Pod, oldEntity framework.QueuedEntityInfo, newSignature fwk.PodSignature) *framework.QueuedPodInfo {
 	bq.lock.Lock()
 	defer bq.lock.Unlock()
 
 	// If the entity is in the backoff queue, update the pod there.
 	if entity, exists := bq.entityBackoffQ.Get(oldEntity); exists {
-		podInfo, err := entity.Update(newPod)
+		podInfo, err := entity.Update(newPod, newSignature)
 		if err != nil {
 			return nil
 		}
@@ -339,7 +338,7 @@ func (bq *backoffQueue) update(newPod *v1.Pod, oldEntity framework.QueuedEntityI
 	}
 	// If the entity is in the error backoff queue, update the pod there.
 	if entity, exists := bq.entityErrorBackoffQ.Get(oldEntity); exists {
-		podInfo, err := entity.Update(newPod)
+		podInfo, err := entity.Update(newPod, newSignature)
 		if err != nil {
 			return nil
 		}
