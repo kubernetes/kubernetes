@@ -30,6 +30,9 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRoleBinding"},
 		coverage.FieldRules{
+			"roleRef": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"roleRef.name": {
 				{ErrorType: "FieldValueRequired"},
 			},

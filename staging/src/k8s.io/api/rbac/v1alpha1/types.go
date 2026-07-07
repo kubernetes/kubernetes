@@ -240,6 +240,7 @@ type ClusterRoleBinding struct {
 	// RoleRef can only reference a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
 	// +required
+	// +k8s:alpha(since:"1.37")=+k8s:immutable
 	RoleRef RoleRef `json:"roleRef" protobuf:"bytes,3,opt,name=roleRef"`
 }
 
