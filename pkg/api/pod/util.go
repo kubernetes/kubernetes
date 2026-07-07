@@ -432,6 +432,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowRestartAllContainers:                               utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
 		AllowImageVolumeWithDigest:                              utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
 		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
+		AllowDownwardAPIAssignedResources:                       utilfeature.DefaultFeatureGate.Enabled(features.DownwardAPIAssignedResources),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -486,6 +487,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		// If old spec already had an image volume with empty reference, allow it
 		opts.AllowEmptyImageVolumeReference = hasEmptyImageVolumeReference(oldPodSpec)
+
+		// If old spec has assigned.cpuset in downwardAPI volumes, allow it
+		opts.AllowDownwardAPIAssignedResources = opts.AllowDownwardAPIAssignedResources || assignedCpusetInUse(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -729,6 +733,7 @@ func dropDisabledFields(
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
 	dropDisabledSchedulingGroup(podSpec, oldPodSpec)
+	dropDisabledAssignedCpuset(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -1887,6 +1892,61 @@ func dropImageVolumeWithDigest(podStatus *api.PodStatus) {
 			podStatus.EphemeralContainerStatuses[i].VolumeMounts[j].VolumeStatus = nil
 		}
 	}
+}
+
+// dropDisabledAssignedCpuset removes assigned.cpuset references from downwardAPI volumes
+// when the DownwardAPIAssignedResources feature gate is disabled.
+//
+// Note: This function is not designed in KEP-6122 alpha1 (v1.37), but it is required to support
+// mixed kubelet versions on the same node. When there is a 1.36 kubelet and a 1.37 kubelet
+// on the same node, even if DownwardAPIAssignedResources is disabled, the 1.36 kubelet will
+// not report an error "unsupported container resource: assigned.cpuset" because assigned.cpuset
+// is dropped by this function.
+//
+// TODO: The KEP-6122 documentation will be updated in alpha2 (v1.38) to reflect this behavior.
+func dropDisabledAssignedCpuset(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DownwardAPIAssignedResources) || assignedCpusetInUse(oldPodSpec) {
+		return
+	}
+
+	if podSpec == nil {
+		return
+	}
+
+	// Filter assigned.cpuset items from downwardAPI volumes
+	for i := range podSpec.Volumes {
+		vol := &podSpec.Volumes[i]
+		if vol.DownwardAPI != nil {
+			filteredItems := []api.DownwardAPIVolumeFile{}
+			for _, item := range vol.DownwardAPI.Items {
+				if item.ResourceFieldRef != nil && item.ResourceFieldRef.Resource == "assigned.cpuset" {
+					// Skip assigned.cpuset items
+					continue
+				}
+				filteredItems = append(filteredItems, item)
+			}
+			vol.DownwardAPI.Items = filteredItems
+		}
+	}
+}
+
+// assignedCpusetInUse returns true if the pod spec has assigned.cpuset references
+// in downwardAPI volumes.
+func assignedCpusetInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	for _, vol := range podSpec.Volumes {
+		if vol.DownwardAPI != nil {
+			for _, item := range vol.DownwardAPI.Items {
+				if item.ResourceFieldRef != nil && item.ResourceFieldRef.Resource == "assigned.cpuset" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // hasRestartContainerForNonSidecarInitContainer returns true if any non-sidecar init container
