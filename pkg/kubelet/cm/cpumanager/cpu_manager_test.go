@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/utils/cpuset"
 )
@@ -163,7 +164,8 @@ func (s *mockState) GetCPUBaselines() state.ContainerCPUBaselines {
 }
 
 type mockPolicy struct {
-	err error
+	err                  error
+	duringScaleDownDelay bool
 }
 
 func (p *mockPolicy) Name() string {
@@ -196,6 +198,18 @@ func (p *mockPolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod, _ li
 
 func (p *mockPolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.New()
+}
+
+func (p *mockPolicy) ReleaseTimedOutScaleDownCPUs(_ klog.Logger, s state.State) {
+	// Do nothing
+}
+
+func (p *mockPolicy) IsDuringScaleDownDelay(podID, containerName string) bool {
+	return p.duringScaleDownDelay
+}
+
+func (p *mockPolicy) GetAssignments(s state.State, podUID, containerName string) string {
+	return ""
 }
 
 type mockRuntimeService struct {
@@ -1374,6 +1388,7 @@ func TestReconcileState(t *testing.T) {
 				podStatus: testCase.pspPS,
 				found:     testCase.pspFound,
 			},
+			runtimeHelper: &containertest.FakeRuntimeHelper{},
 		}
 		mgr.sourcesReady = &sourcesReadyStub{}
 		success, failure := mgr.reconcileState(tCtx)
@@ -2746,6 +2761,7 @@ func TestReconcileStateWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) 
 				podStatus: testCase.pspPS,
 				found:     testCase.pspFound,
 			},
+			runtimeHelper: &containertest.FakeRuntimeHelper{},
 		}
 		mgr.sourcesReady = &sourcesReadyStub{}
 		success, failure := mgr.reconcileState(context.Background())
@@ -3025,5 +3041,191 @@ func TestCPUManagerGetAllocatableCPUsWithInPlacePodVerticalScalingExclusiveCPUs(
 			t.Errorf("Policy GetAllocatableCPUs() error (%v). expected cpuset %v for container %v but got %v",
 				testCase.description, testCase.expAllocatableCPUs, "fakeContainer", mgr.GetAllocatableCPUs())
 		}
+	}
+}
+
+func TestIsContainerCPUSetUpdateInProgress(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, true)
+
+	testCases := []struct {
+		description           string
+		stateCPUSet           cpuset.CPUSet
+		lastUpdateStateCPUSet cpuset.CPUSet
+		duringScaleDownDelay  bool
+		expectedInProgress    bool
+	}{
+		{
+			description:           "cpuset not equal - update in progress",
+			stateCPUSet:           cpuset.New(1, 2),
+			lastUpdateStateCPUSet: cpuset.New(1),
+			duringScaleDownDelay:  false,
+			expectedInProgress:    true,
+		},
+		{
+			description:           "cpuset equal - no update in progress",
+			stateCPUSet:           cpuset.New(1, 2),
+			lastUpdateStateCPUSet: cpuset.New(1, 2),
+			duringScaleDownDelay:  false,
+			expectedInProgress:    false,
+		},
+		{
+			description:           "during scale down delay - update in progress",
+			stateCPUSet:           cpuset.New(1, 2),
+			lastUpdateStateCPUSet: cpuset.New(1, 2),
+			duringScaleDownDelay:  true,
+			expectedInProgress:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			mockPolicy := &mockPolicy{
+				duringScaleDownDelay: tc.duringScaleDownDelay,
+			}
+
+			mgr := &manager{
+				policy: mockPolicy,
+				state: &mockState{
+					assignments: state.ContainerCPUAssignments{
+						"podUID": {
+							"containerName": tc.stateCPUSet,
+						},
+					},
+					defaultCPUSet: cpuset.New(3, 4),
+				},
+				lastUpdateState: &mockState{
+					assignments: state.ContainerCPUAssignments{
+						"podUID": {
+							"containerName": tc.lastUpdateStateCPUSet,
+						},
+					},
+					defaultCPUSet: cpuset.New(3, 4),
+				},
+			}
+
+			result := mgr.IsContainerCPUSetUpdateInProgress("podUID", "containerName")
+			if result != tc.expectedInProgress {
+				t.Errorf("IsContainerCPUSetUpdateInProgress() error: expected %v, got %v", tc.expectedInProgress, result)
+			}
+		})
+	}
+}
+
+func TestReconcileState_RequestPodReinspect(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	testPolicy, _ := NewStaticPolicy(
+		logger,
+		&topology.CPUTopology{
+			NumCPUs:    8,
+			NumSockets: 2,
+			NumCores:   4,
+			CPUDetails: map[int]topology.CPUInfo{
+				0: {CoreID: 0, SocketID: 0},
+				1: {CoreID: 1, SocketID: 0},
+				2: {CoreID: 2, SocketID: 0},
+				3: {CoreID: 3, SocketID: 0},
+				4: {CoreID: 0, SocketID: 1},
+				5: {CoreID: 1, SocketID: 1},
+				6: {CoreID: 2, SocketID: 1},
+				7: {CoreID: 3, SocketID: 1},
+			},
+		},
+		0,
+		cpuset.New(),
+		topologymanager.NewFakeManager(logger),
+		nil)
+
+	testCases := []struct {
+		description               string
+		stAssignments             state.ContainerCPUAssignments
+		lastUpdateStAssignments   state.ContainerCPUAssignments
+		expectRequestPodReinspect bool
+	}{
+		{
+			description: "cpuset updated - should trigger RequestPodReinspect",
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePodUID": map[string]cpuset.CPUSet{
+					"fakeContainerName": cpuset.New(1, 2),
+				},
+			},
+			lastUpdateStAssignments:   state.ContainerCPUAssignments{},
+			expectRequestPodReinspect: true,
+		},
+		{
+			description: "cpuset not changed - should not trigger RequestPodReinspect",
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePodUID": map[string]cpuset.CPUSet{
+					"fakeContainerName": cpuset.New(1, 2),
+				},
+			},
+			lastUpdateStAssignments: state.ContainerCPUAssignments{
+				"fakePodUID": map[string]cpuset.CPUSet{
+					"fakeContainerName": cpuset.New(1, 2),
+				},
+			},
+			expectRequestPodReinspect: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			fakeRuntimeHelper := &containertest.FakeRuntimeHelper{}
+
+			mgr := &manager{
+				policy: testPolicy,
+				state: &mockState{
+					assignments:   tc.stAssignments,
+					defaultCPUSet: cpuset.New(3, 4, 5, 6, 7),
+				},
+				lastUpdateState: &mockState{
+					assignments: tc.lastUpdateStAssignments,
+				},
+				containerRuntime: mockRuntimeService{},
+				containerMap:     containermap.NewContainerMap(),
+				activePods: func() []*v1.Pod {
+					return []*v1.Pod{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "fakePodName",
+								UID:  "fakePodUID",
+							},
+							Spec: v1.PodSpec{
+								Containers: []v1.Container{
+									{
+										Name: "fakeContainerName",
+									},
+								},
+							},
+						},
+					}
+				},
+				podStatusProvider: mockPodStatusProvider{
+					podStatus: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name:        "fakeContainerName",
+								ContainerID: "docker://fakeContainerID",
+								State: v1.ContainerState{
+									Running: &v1.ContainerStateRunning{},
+								},
+							},
+						},
+					},
+					found: true,
+				},
+				runtimeHelper: fakeRuntimeHelper,
+			}
+			mgr.sourcesReady = &sourcesReadyStub{}
+
+			mgr.reconcileState(tCtx)
+
+			if tc.expectRequestPodReinspect && !fakeRuntimeHelper.RequestPodReinspectCalled {
+				t.Errorf("Expected RequestPodReinspect to be called, but it was not")
+			}
+			if !tc.expectRequestPodReinspect && fakeRuntimeHelper.RequestPodReinspectCalled {
+				t.Errorf("Expected RequestPodReinspect not to be called, but it was")
+			}
+		})
 	}
 }

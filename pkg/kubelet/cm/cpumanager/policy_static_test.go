@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -5264,5 +5265,577 @@ func TestStaticPolicyAllocatePodWithInPlacePodVerticalScalingExclusiveCPUs(t *te
 			require.NoError(t, err)
 			require.InDelta(t, float64(testCase.requiredMetrics.expPodSharedPoolAssignments), podSharedPoolAssignments, 0.001, "unexpected number of assignments")
 		})
+	}
+}
+
+// expResizeResult defines the expected results for a resize operation
+type resizeCheck struct {
+	resizeLimitAndRequest    string
+	expAssignedCSet          map[string]cpuset.CPUSet
+	expDefaultCPUSet         cpuset.CPUSet
+	expHasScaleDownTimerInfo bool
+	expPreAssignments        map[string]cpuset.CPUSet
+	expGetAssignmentsResult  map[string]string
+}
+
+type staticPolicyScaleDownDelayTest struct {
+	description                  string
+	topo                         *topology.CPUTopology
+	numReservedCPUs              int
+	options                      map[string]string
+	stAssignments                state.ContainerCPUAssignments
+	stBaselines                  state.ContainerCPUBaselines
+	stDefaultCPUSet              cpuset.CPUSet
+	pod                          *v1.Pod
+	qosClass                     v1.PodQOSClass
+	containerNames               []string
+	resizeCheck                  []resizeCheck
+	expDefaultCPUSetAfterRelease cpuset.CPUSet
+	expAssignedCSetAfterRelease  map[string]cpuset.CPUSet
+}
+
+func TestStaticPolicyPodResizeScaleDownDelay(t *testing.T) {
+	testCases := []staticPolicyScaleDownDelayTest{
+		{
+			description:     "PodResize, scale down 1 container of 1 Pod without scale down delay configured",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 2,
+			options:         map[string]string{ScaleDelayTimeOption: "0s"},
+			pod: makeMultiContainerPodWithOptions(
+				nil,
+				[]*containerOptions{
+					{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}},
+			),
+			qosClass:       v1.PodQOSGuaranteed,
+			containerNames: []string{"appContainer-0"},
+			stAssignments: state.ContainerCPUAssignments{
+				"podUID": map[string]cpuset.CPUSet{
+					"appContainer-0": cpuset.New(1, 2, 5, 6),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"podUID": map[string]state.ContainerCPUBaseline{
+					"appContainer-0": {Baseline: cpuset.New(1, 5)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 3, 4, 7),
+			resizeCheck: []resizeCheck{
+				{
+					resizeLimitAndRequest: "2000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 5),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 2, 3, 4, 6, 7),
+					expHasScaleDownTimerInfo: false,
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1,5",
+					},
+				},
+			},
+		},
+		{
+			description:     "PodResize, scale up 1 container of 1 Pod with scale down delay configured",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 2,
+			options:         map[string]string{ScaleDelayTimeOption: "2s"},
+			pod: makeMultiContainerPodWithOptions(
+				nil,
+				[]*containerOptions{
+					{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}},
+			),
+			qosClass:       v1.PodQOSGuaranteed,
+			containerNames: []string{"appContainer-0"},
+			stAssignments: state.ContainerCPUAssignments{
+				"podUID": map[string]cpuset.CPUSet{
+					"appContainer-0": cpuset.New(1, 2, 5, 6),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"podUID": map[string]state.ContainerCPUBaseline{
+					"appContainer-0": {Baseline: cpuset.New(1, 5)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 3, 4, 7),
+			resizeCheck: []resizeCheck{
+				{
+					resizeLimitAndRequest: "6000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 4),
+					expHasScaleDownTimerInfo: false,
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1-3,5-7",
+					},
+				},
+			},
+		},
+		{
+			description:     "PodResize, scale down 1 container of 1 Pod with scale down delay configured",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 2,
+			options:         map[string]string{ScaleDelayTimeOption: "2s"},
+			pod: makeMultiContainerPodWithOptions(
+				nil,
+				[]*containerOptions{
+					{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}},
+			),
+			qosClass:       v1.PodQOSGuaranteed,
+			containerNames: []string{"appContainer-0"},
+			stAssignments: state.ContainerCPUAssignments{
+				"podUID": map[string]cpuset.CPUSet{
+					"appContainer-0": cpuset.New(1, 2, 5, 6),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"podUID": map[string]state.ContainerCPUBaseline{
+					"appContainer-0": {Baseline: cpuset.New(1, 5)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 3, 4, 7),
+			resizeCheck: []resizeCheck{
+				{
+					resizeLimitAndRequest: "2000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 5, 6),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 3, 4, 7),
+					expHasScaleDownTimerInfo: true,
+					expPreAssignments: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 5),
+					},
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1,5",
+					},
+				},
+			},
+			expDefaultCPUSetAfterRelease: cpuset.New(0, 2, 3, 4, 6, 7),
+			expAssignedCSetAfterRelease: map[string]cpuset.CPUSet{
+				"appContainer-0": cpuset.New(1, 5),
+			},
+		},
+		{
+			description:     "PodResize, scale down 2 containers of 1 Pod with scale down delay configured",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 2,
+			options:         map[string]string{ScaleDelayTimeOption: "2s"},
+			pod: makeMultiContainerPodWithOptions(
+				nil,
+				[]*containerOptions{
+					{request: "3000m", limit: "3000m", restartPolicy: v1.ContainerRestartPolicy("Never")},
+					{request: "3000m", limit: "3000m", restartPolicy: v1.ContainerRestartPolicy("Never")}},
+			),
+			qosClass:       v1.PodQOSGuaranteed,
+			containerNames: []string{"appContainer-0", "appContainer-1"},
+			stAssignments: state.ContainerCPUAssignments{
+				"podUID": map[string]cpuset.CPUSet{
+					"appContainer-0": cpuset.New(1, 3, 5),
+					"appContainer-1": cpuset.New(2, 6, 7),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"podUID": map[string]state.ContainerCPUBaseline{
+					"appContainer-0": {Baseline: cpuset.New(1, 5)},
+					"appContainer-1": {Baseline: cpuset.New(2, 6)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 4),
+			resizeCheck: []resizeCheck{
+				{
+					resizeLimitAndRequest: "2000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 3, 5),
+						"appContainer-1": cpuset.New(2, 6, 7),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 4),
+					expHasScaleDownTimerInfo: true,
+					expPreAssignments: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 5),
+						"appContainer-1": cpuset.New(2, 6),
+					},
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1,5",
+						"appContainer-1": "2,6",
+					},
+				},
+			},
+			expDefaultCPUSetAfterRelease: cpuset.New(0, 3, 4, 7),
+			expAssignedCSetAfterRelease: map[string]cpuset.CPUSet{
+				"appContainer-0": cpuset.New(1, 5),
+				"appContainer-1": cpuset.New(2, 6),
+			},
+		},
+		{
+			description:     "PodResize, 1 pod 1 container scale down twice with scale down delay configured",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 2,
+			options:         map[string]string{ScaleDelayTimeOption: "2s"},
+			pod: makeMultiContainerPodWithOptions(
+				nil,
+				[]*containerOptions{
+					{request: "6000m", limit: "6000m", restartPolicy: v1.ContainerRestartPolicy("Never")}},
+			),
+			qosClass:       v1.PodQOSGuaranteed,
+			containerNames: []string{"appContainer-0"},
+			stAssignments: state.ContainerCPUAssignments{
+				"podUID": map[string]cpuset.CPUSet{
+					"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"podUID": map[string]state.ContainerCPUBaseline{
+					"appContainer-0": {Baseline: cpuset.New(1, 5)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 4),
+			resizeCheck: []resizeCheck{
+				{
+					resizeLimitAndRequest: "4000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 4),
+					expHasScaleDownTimerInfo: true,
+					expPreAssignments: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 5, 6),
+					},
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1-2,5-6",
+					},
+				},
+				{
+					resizeLimitAndRequest: "2000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 4),
+					expHasScaleDownTimerInfo: true,
+					expPreAssignments: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 5),
+					},
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1,5",
+					},
+				},
+			},
+			expDefaultCPUSetAfterRelease: cpuset.New(0, 2, 3, 4, 6, 7),
+			expAssignedCSetAfterRelease: map[string]cpuset.CPUSet{
+				"appContainer-0": cpuset.New(1, 5),
+			},
+		},
+		{
+			description:     "PodResize, 1 pod 1 container scale down then scale up less with scale down delay configured",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 2,
+			options:         map[string]string{ScaleDelayTimeOption: "2s"},
+			pod: makeMultiContainerPodWithOptions(
+				nil,
+				[]*containerOptions{
+					{request: "6000m", limit: "6000m", restartPolicy: v1.ContainerRestartPolicy("Never")}},
+			),
+			qosClass:       v1.PodQOSGuaranteed,
+			containerNames: []string{"appContainer-0"},
+			stAssignments: state.ContainerCPUAssignments{
+				"podUID": map[string]cpuset.CPUSet{
+					"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"podUID": map[string]state.ContainerCPUBaseline{
+					"appContainer-0": {Baseline: cpuset.New(1, 5)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 4),
+			resizeCheck: []resizeCheck{
+				{
+					resizeLimitAndRequest: "2000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 4),
+					expHasScaleDownTimerInfo: true,
+					expPreAssignments: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 5),
+					},
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1,5",
+					},
+				},
+				{
+					resizeLimitAndRequest: "4000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 4),
+					expHasScaleDownTimerInfo: true,
+					expPreAssignments: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 5, 6),
+					},
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1-2,5-6",
+					},
+				},
+			},
+			expDefaultCPUSetAfterRelease: cpuset.New(0, 3, 4, 7),
+			expAssignedCSetAfterRelease: map[string]cpuset.CPUSet{
+				"appContainer-0": cpuset.New(1, 2, 5, 6),
+			},
+		},
+		{
+			description:     "PodResize, 1 pod 1 container scale down then scale up same with scale down delay configured",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 2,
+			options:         map[string]string{ScaleDelayTimeOption: "2s"},
+			pod: makeMultiContainerPodWithOptions(
+				nil,
+				[]*containerOptions{
+					{request: "6000m", limit: "6000m", restartPolicy: v1.ContainerRestartPolicy("Never")}},
+			),
+			qosClass:       v1.PodQOSGuaranteed,
+			containerNames: []string{"appContainer-0"},
+			stAssignments: state.ContainerCPUAssignments{
+				"podUID": map[string]cpuset.CPUSet{
+					"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"podUID": map[string]state.ContainerCPUBaseline{
+					"appContainer-0": {Baseline: cpuset.New(1, 5)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 4),
+			resizeCheck: []resizeCheck{
+				{
+					resizeLimitAndRequest: "2000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 4),
+					expHasScaleDownTimerInfo: true,
+					expPreAssignments: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 5),
+					},
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1,5",
+					},
+				},
+				{
+					resizeLimitAndRequest: "6000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 4),
+					expHasScaleDownTimerInfo: false,
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1-3,5-7",
+					},
+				},
+			},
+			expDefaultCPUSetAfterRelease: cpuset.New(0, 4),
+			expAssignedCSetAfterRelease: map[string]cpuset.CPUSet{
+				"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+			},
+		},
+		{
+			description:     "PodResize, 1 pod 1 container scale down then scale up more with scale down delay configured",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 2,
+			options:         map[string]string{ScaleDelayTimeOption: "2s"},
+			pod: makeMultiContainerPodWithOptions(
+				nil,
+				[]*containerOptions{
+					{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}},
+			),
+			qosClass:       v1.PodQOSGuaranteed,
+			containerNames: []string{"appContainer-0"},
+			stAssignments: state.ContainerCPUAssignments{
+				"podUID": map[string]cpuset.CPUSet{
+					"appContainer-0": cpuset.New(1, 2, 5, 6),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"podUID": map[string]state.ContainerCPUBaseline{
+					"appContainer-0": {Baseline: cpuset.New(1, 5)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 3, 4, 7),
+			resizeCheck: []resizeCheck{
+				{
+					resizeLimitAndRequest: "2000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 5, 6),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 3, 4, 7),
+					expHasScaleDownTimerInfo: true,
+					expPreAssignments: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 5),
+					},
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1,5",
+					},
+				},
+				{
+					resizeLimitAndRequest: "6000m",
+					expAssignedCSet: map[string]cpuset.CPUSet{
+						"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+					},
+					expDefaultCPUSet:         cpuset.New(0, 4),
+					expHasScaleDownTimerInfo: false,
+					expGetAssignmentsResult: map[string]string{
+						"appContainer-0": "1-3,5-7",
+					},
+				},
+			},
+			expDefaultCPUSetAfterRelease: cpuset.New(0, 4),
+			expAssignedCSetAfterRelease: map[string]cpuset.CPUSet{
+				"appContainer-0": cpuset.New(1, 2, 3, 5, 6, 7),
+			},
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+
+	for _, testCase := range testCases {
+		runScaleDownDelayTestCase(t, testCase)
+	}
+}
+
+func runScaleDownDelayTestCase(t *testing.T, testCase staticPolicyScaleDownDelayTest) {
+	logger, _ := ktesting.NewTestContext(t)
+	t.Run(testCase.description, func(t *testing.T) {
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), testCase.options)
+		if err != nil {
+			t.Fatalf("NewStaticPolicy() failed: %v", err)
+		}
+		staticPolicy := policy.(*staticPolicy)
+		st := &mockState{
+			assignments:   testCase.stAssignments,
+			baselines:     testCase.stBaselines,
+			defaultCPUSet: testCase.stDefaultCPUSet,
+		}
+
+		pod := testCase.pod
+		pod.Status.QOSClass = testCase.qosClass
+
+		// Process each resize check in sequence
+		for resizeIdx, check := range testCase.resizeCheck {
+			// Simulate pod resize by updating container resources
+			for i := range pod.Spec.Containers {
+				pod.Spec.Containers[i].Resources = v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceName(v1.ResourceCPU): resource.MustParse(check.resizeLimitAndRequest),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceName(v1.ResourceCPU): resource.MustParse(check.resizeLimitAndRequest),
+					},
+				}
+			}
+
+			for _, container := range pod.Spec.Containers {
+				// Perform resize allocation
+				err = policy.Allocate(logger, st, pod, &container, lifecycle.ResizeOperation)
+				if err != nil {
+					t.Errorf("StaticPolicy Allocate() error (%v) during resize %d. expected no error but got %v",
+						testCase.description, resizeIdx, err)
+				}
+				checkExpectedScaleDownDelayResult(t, testCase.description, st, staticPolicy, pod, container, check)
+			}
+
+			// Verify state after this resize
+			if !st.GetDefaultCPUSet().Equals(check.expDefaultCPUSet) {
+				t.Errorf("StaticPolicy Allocate() error (%v) after resize %d. expected default cpuset %v but got %v",
+					testCase.description, resizeIdx, check.expDefaultCPUSet, st.GetDefaultCPUSet())
+			}
+		}
+
+		// Check if the last resize has scale down timer info for release test
+		lastCheck := testCase.resizeCheck[len(testCase.resizeCheck)-1]
+		if lastCheck.expHasScaleDownTimerInfo {
+			checkExpectedScaleDownDelayReleaseResult(t, logger, testCase, pod, st, staticPolicy)
+		}
+	})
+}
+
+func checkExpectedScaleDownDelayResult(t *testing.T, description string, st *mockState, staticPolicy *staticPolicy, pod *v1.Pod, container v1.Container, check resizeCheck) {
+	// Check container assigned CPUs after resize
+	assignedCPUsAfterResize, found := st.GetCPUSet(string(pod.UID), container.Name)
+	if !found {
+		t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
+			description, container.Name, st.assignments)
+	}
+	if !assignedCPUsAfterResize.Equals(check.expAssignedCSet[container.Name]) {
+		t.Errorf("StaticPolicy Allocate() error (%v) after resize. expected assigned cpuset %v but got %v",
+			description, check.expAssignedCSet[container.Name], assignedCPUsAfterResize)
+	}
+
+	// Check scaleDelayTimerInfos
+	if check.expHasScaleDownTimerInfo {
+		if staticPolicy.scaleDelayTimerInfos == nil {
+			t.Errorf("StaticPolicy scaleDelayTimerInfos error (%v). staticPolicy.scaleDelayTimerInfos is nil", description)
+		}
+		podTimerInfos, exists := staticPolicy.scaleDelayTimerInfos[string(pod.UID)]
+		if !exists {
+			t.Errorf("StaticPolicy scaleDelayTimerInfos error (%v). staticPolicy.scaleDelayTimerInfos for pod %v is not exist", description, pod.ObjectMeta.Name)
+		}
+		if check.expPreAssignments[container.Name].Size() > 0 {
+			timerInfo, timerExists := podTimerInfos[container.Name]
+			if !timerExists {
+				t.Errorf("StaticPolicy scaleDelayTimerInfos error (%v). staticPolicy.scaleDelayTimerInfos for pod %v, container %v is not exist", description, pod.ObjectMeta.Name, container.Name)
+			}
+			if !timerInfo.preAssignments.Equals(check.expPreAssignments[container.Name]) {
+				t.Errorf("StaticPolicy scaleDelayTimerInfos error (%v). expected preAssignments %v but got %v",
+					description, check.expPreAssignments, timerInfo.preAssignments)
+			}
+		}
+	}
+
+	// Test GetAssignments function
+	getAssignmentsResult := staticPolicy.GetAssignments(st, string(pod.UID), container.Name)
+	if getAssignmentsResult != check.expGetAssignmentsResult[container.Name] {
+		t.Errorf("StaticPolicy Allocate() error (%v) after resize. expected GetAssignments result %v but got %v",
+			description, check.expGetAssignmentsResult[container.Name], getAssignmentsResult)
+	}
+
+	// Test IsDuringScaleDownDelay function
+	isDuringScaleDownDelay := staticPolicy.IsDuringScaleDownDelay(string(pod.UID), container.Name)
+	if isDuringScaleDownDelay != check.expHasScaleDownTimerInfo {
+		t.Errorf("StaticPolicy IsDuringScaleDownDelay() error (%v). expected %v but got %v",
+			description, check.expHasScaleDownTimerInfo, isDuringScaleDownDelay)
+	}
+}
+
+func checkExpectedScaleDownDelayReleaseResult(t *testing.T, logger klog.Logger, testCase staticPolicyScaleDownDelayTest, pod *v1.Pod, st *mockState, staticPolicy *staticPolicy) {
+	time.Sleep(2 * time.Second)
+	staticPolicy.ReleaseTimedOutScaleDownCPUs(logger, st)
+	if !st.GetDefaultCPUSet().Equals(testCase.expDefaultCPUSetAfterRelease) {
+		t.Errorf("StaticPolicy ReleaseTimedOutScaleDownCPUs() error (%v). expected default cpuset %v but got %v",
+			testCase.description, testCase.expDefaultCPUSetAfterRelease, st.GetDefaultCPUSet())
+	}
+	for _, container := range pod.Spec.Containers {
+		assignedCPUsAfterResize, found := st.GetCPUSet(string(pod.UID), container.Name)
+		if !found {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
+				testCase.description, container.Name, st.assignments)
+		}
+		if !assignedCPUsAfterResize.Equals(testCase.expAssignedCSetAfterRelease[container.Name]) {
+			t.Errorf("StaticPolicy ReleaseTimedOutScaleDownCPUs() error (%v). expected assign cpuset %v but got %v",
+				testCase.description, testCase.expAssignedCSetAfterRelease[container.Name], assignedCPUsAfterResize)
+		}
+
+		// Test GetAssignments function
+		getAssignmentsResult := staticPolicy.GetAssignments(st, string(pod.UID), container.Name)
+		if getAssignmentsResult != testCase.expAssignedCSetAfterRelease[container.Name].String() {
+			t.Errorf("StaticPolicy GetAssignments() error (%v) after release. expected %v but got %v",
+				testCase.description, testCase.expAssignedCSetAfterRelease[container.Name], getAssignmentsResult)
+		}
+
+		// Test IsDuringScaleDownDelay function
+		isDuringScaleDownDelay := staticPolicy.IsDuringScaleDownDelay(string(pod.UID), container.Name)
+		if isDuringScaleDownDelay != false {
+			t.Errorf("StaticPolicy IsDuringScaleDownDelay() error (%v). expected false but got %v",
+				testCase.description, isDuringScaleDownDelay)
+		}
 	}
 }
