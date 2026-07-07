@@ -18,6 +18,7 @@ package authorizer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -114,8 +115,15 @@ type Authorizer interface {
 	//
 	// An authorizer who does not support conditions should fail closed and
 	// return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+	//
+	// The context should only be used for timeouts/cancellation/tracing, and should not influence the
+	// evaluation outcome. Only the given decision and data may infuence the outcome. data must be non-nil.
 	EvaluateConditions(ctx context.Context, decision ConditionsAwareDecision, data ConditionsData) (authorized Decision, reason string, err error)
 }
+
+// ErrorConditionEvaluationNotSupported is returned by authorizer implementations
+// that do not support condition evaluation.
+var ErrorConditionEvaluationNotSupported = errors.New("condition evaluation not supported")
 
 // AuthorizerFunc implements Authorizer
 var _ Authorizer = AuthorizerFunc(nil)
@@ -242,4 +250,9 @@ func (d Decision) String() string {
 	default:
 		return fmt.Sprintf("Unknown (%d)", int(d))
 	}
+}
+
+// ConditionsData represents the data available for conditions
+// to evaluate against. This is by design a subset of admission.Attributes.
+type ConditionsData interface {
 }

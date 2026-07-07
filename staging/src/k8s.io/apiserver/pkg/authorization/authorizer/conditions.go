@@ -17,16 +17,11 @@ limitations under the License.
 package authorizer
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
-
-// ErrorConditionEvaluationNotSupported is returned by authorizer implementations
-// that do not support condition evaluation.
-var ErrorConditionEvaluationNotSupported = errors.New("condition evaluation not supported")
 
 // ConditionsAwareDecision models an authorization decision that is conditions-aware.
 // It is an enum type of the following five variants:
@@ -38,6 +33,7 @@ var ErrorConditionEvaluationNotSupported = errors.New("condition evaluation not 
 //
 // The zero value (ConditionsAwareDecision{}) is equivalent to ConditionsAwareDecisionDeny().
 // A ConditionsAwareDecision is passed by value.
+// Important: A ConditionsAwareDecision is immutable after construction.
 type ConditionsAwareDecision struct {
 	unconditionalDecision Decision
 
@@ -75,7 +71,7 @@ func ConditionsAwareDecisionNoOpinion(reason string, err error) ConditionsAwareD
 }
 
 // ConditionsAwareDecisionFromParts is meant to be used by conditions-unaware Authorizer implementations
-// in order to implement Authorizer.ConditionsAwareAuthorize as:
+// in order to implement ConditionsAwareAuthorize as:
 // "return authorizer.ConditionsAwareDecisionFromParts(self.Authorize(ctx, a))"
 func ConditionsAwareDecisionFromParts(unconditional Decision, reason string, err error) ConditionsAwareDecision {
 	switch unconditional {
@@ -115,12 +111,16 @@ func (d ConditionsAwareDecision) IsUnconditional() bool {
 	return d.IsAllow() || d.IsDeny() || d.IsNoOpinion()
 }
 
-// Reason returns the reason associated with the decision.
+// Reason returns the reason supplied when constructing
+// an unconditional decision.
+// Reason is an empty string for conditional decisions.
 func (d ConditionsAwareDecision) Reason() string {
 	return d.reason
 }
 
-// Error returns the error associated with the decision.
+// Error returns the error supplied when constructing
+// an unconditional decision.
+// Error is nil for conditional decisions.
 func (d ConditionsAwareDecision) Error() error {
 	return d.err
 }
@@ -149,10 +149,4 @@ func (d ConditionsAwareDecision) String() string {
 	// Deny is written such that if none of the other modes apply,
 	// IsDenied() is true.
 	return fmt.Sprintf("Deny%s", paramsStr())
-}
-
-// ConditionsData is an enum type for various evaluation targets conditions
-// can be written against.
-// TODO(luxas): Implement this in the follow-up PR.
-type ConditionsData struct {
 }
