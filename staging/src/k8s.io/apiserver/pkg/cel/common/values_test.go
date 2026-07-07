@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -1011,6 +1012,24 @@ func TestToValue(t *testing.T) {
 				testUnstructuredToVal(t, tt, env)
 			})
 		})
+	}
+}
+
+func TestReflectiveWrapperValueReturnsGoValue(t *testing.T) {
+	list := common.TypedToVal([]int64{1, 2, 3}, &openapi.Schema{Schema: intArraySchema})
+	if _, ok := list.Value().([]int64); !ok {
+		t.Errorf("typedList.Value() returned %T, want []int64", list.Value())
+	}
+	m := common.TypedToVal(map[string]int64{"a": 1}, &openapi.Schema{Schema: intMapSchema})
+	if _, ok := m.Value().(map[string]int64); !ok {
+		t.Errorf("typedMap.Value() returned %T, want map[string]int64", m.Value())
+	}
+	native, err := m.ConvertToNative(reflect.TypeFor[map[string]int64]())
+	if err != nil {
+		t.Fatalf("typedMap.ConvertToNative failed: %v", err)
+	}
+	if _, ok := native.(map[string]int64); !ok {
+		t.Errorf("typedMap.ConvertToNative returned %T, want map[string]int64", native)
 	}
 }
 

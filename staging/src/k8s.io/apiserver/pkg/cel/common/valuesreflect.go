@@ -287,7 +287,7 @@ func (t *typedList) Type() ref.Type {
 }
 
 func (t *typedList) Value() interface{} {
-	return t.value
+	return t.value.Interface()
 }
 
 func (t *typedList) Add(other ref.Val) ref.Val {
@@ -572,7 +572,7 @@ type typedMap struct {
 func (t *typedMap) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	switch typeDesc.Kind() {
 	case reflect.Map:
-		return t.value, nil
+		return t.value.Interface(), nil
 	default:
 		return nil, fmt.Errorf("type conversion error from '%s' to '%s'", t.Type(), typeDesc)
 	}
@@ -617,7 +617,7 @@ func (t *typedMap) Type() ref.Type {
 }
 
 func (t *typedMap) Value() interface{} {
-	return t.value
+	return t.value.Interface()
 }
 
 func (t *typedMap) Contains(key ref.Val) ref.Val {
