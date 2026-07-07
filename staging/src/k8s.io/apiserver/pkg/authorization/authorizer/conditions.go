@@ -23,6 +23,27 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
+// conditionsAwareDecisionType is a small enum-like type for keeping track of what type a ConditionsAwareDecision is.
+// These values must never be exposed to users outside of this package, and should not be used for anything else than
+// keeping track of what type of a ConditionsAwareDecision is.
+type conditionsAwareDecisionType int
+
+const (
+	// conditionsAwareDecisionTypeDeny represents the unconditional Deny decision.
+	// It is zero such that ConditionsAwareDecision{}.IsDeny() == true
+	conditionsAwareDecisionTypeDeny conditionsAwareDecisionType = 0
+	// conditionsAwareDecisionTypeAllow represents the unconditional Allow decision.
+	// It has a different value from DecisionAllow to never be conflated with that.
+	conditionsAwareDecisionTypeAllow conditionsAwareDecisionType = 11
+	// conditionsAwareDecisionTypeNoOpinion represents the unconditional NoOpinion decision.
+	// It has a different value from DecisionNoOpinion to never be conflated with that.
+	conditionsAwareDecisionTypeNoOpinion conditionsAwareDecisionType = 12
+	// conditionsAwareDecisionTypeConditionsMap represents the conditional ConditionsMap decision.
+	conditionsAwareDecisionTypeConditionsMap conditionsAwareDecisionType = 13
+	// conditionsAwareDecisionTypeUnion represents a conditional Union decision.
+	conditionsAwareDecisionTypeUnion conditionsAwareDecisionType = 14
+)
+
 // ConditionsAwareDecision models an authorization decision that is conditions-aware.
 // It is an enum type of the following five variants:
 // - Allow: unconditional Allow.
@@ -35,7 +56,7 @@ import (
 // A ConditionsAwareDecision is passed by value.
 // Important: A ConditionsAwareDecision is immutable after construction.
 type ConditionsAwareDecision struct {
-	unconditionalDecision Decision
+	decisionType conditionsAwareDecisionType
 
 	reason string
 	err    error
@@ -44,29 +65,29 @@ type ConditionsAwareDecision struct {
 // ConditionsAwareDecisionDeny constructs a Deny decision with the given reason and error.
 func ConditionsAwareDecisionDeny(reason string, err error) ConditionsAwareDecision {
 	return ConditionsAwareDecision{
-		// DecisionDeny == int(0) == zero value
+		// conditionsAwareDecisionTypeDeny == 0 == zero value
 		// => ConditionsAwareDecision{} == ConditionsAwareDecisionDeny()
-		unconditionalDecision: DecisionDeny,
-		reason:                reason,
-		err:                   err,
+		decisionType: conditionsAwareDecisionTypeDeny,
+		reason:       reason,
+		err:          err,
 	}
 }
 
 // ConditionsAwareDecisionAllow constructs an Allow decision with the given reason and error.
 func ConditionsAwareDecisionAllow(reason string, err error) ConditionsAwareDecision {
 	return ConditionsAwareDecision{
-		unconditionalDecision: DecisionAllow,
-		reason:                reason,
-		err:                   err,
+		decisionType: conditionsAwareDecisionTypeAllow,
+		reason:       reason,
+		err:          err,
 	}
 }
 
 // ConditionsAwareDecisionNoOpinion constructs a NoOpinion decision with the given reason and error.
 func ConditionsAwareDecisionNoOpinion(reason string, err error) ConditionsAwareDecision {
 	return ConditionsAwareDecision{
-		unconditionalDecision: DecisionNoOpinion,
-		reason:                reason,
-		err:                   err,
+		decisionType: conditionsAwareDecisionTypeNoOpinion,
+		reason:       reason,
+		err:          err,
 	}
 }
 
@@ -93,17 +114,17 @@ func ConditionsAwareDecisionFromParts(unconditional Decision, reason string, err
 
 // IsAllow returns true if the decision is an unconditional Allow.
 func (d ConditionsAwareDecision) IsAllow() bool {
-	return d.unconditionalDecision == DecisionAllow
+	return d.decisionType == conditionsAwareDecisionTypeAllow
 }
 
 // IsNoOpinion returns true if the decision is an unconditional NoOpinion.
 func (d ConditionsAwareDecision) IsNoOpinion() bool {
-	return d.unconditionalDecision == DecisionNoOpinion
+	return d.decisionType == conditionsAwareDecisionTypeNoOpinion
 }
 
 // IsDeny returns true if the decision is an unconditional Deny.
 func (d ConditionsAwareDecision) IsDeny() bool {
-	return d.unconditionalDecision == DecisionDeny // == 0 == zero value
+	return d.decisionType == conditionsAwareDecisionTypeDeny // == 0 == zero value
 }
 
 // IsUnconditional is true if d is Allow, Deny or NoOpinion.
