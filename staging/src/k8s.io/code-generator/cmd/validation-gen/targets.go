@@ -37,9 +37,22 @@ import (
 
 // These are the comment tags that carry parameters for validation generation.
 const (
-	mainTagName           = "k8s:validation-gen"                 // defines which types to generate validation for
-	schemeRegistryTagName = "k8s:validation-gen-scheme-registry" // defaults to k8s.io/apimachinery/pkg.runtime.Scheme
-	testFixtureTagName    = "k8s:validation-gen-test-fixture"    // if set, generate go test files for test fixtures.  Supported values: "validateFalse".
+	// Defines which types to generate validation for.  There are two places
+	// this can be used:
+	//   Per-package:
+	//     * "*": generate validation for all types in this package
+	//	   * "FooBar": generate validation for all types with a field named "FooBar"
+	//   Per-type:
+	//	   * "true": generate validation for this type
+	//	   * "false": do not generate validation for this type
+	mainTagName = "k8s:validation-gen"
+	// Defines the type of the scheme used to register validations. Defaults to
+	// "k8s.io/apimachinery/pkg.runtime.Scheme", but can be set to another type
+	// (e.g. in tests), or set to "nil" to disable scheme registration for this
+	// package.
+	schemeRegistryTagName = "k8s:validation-gen-scheme-registry"
+	// If set, generate go test files for test fixtures.  Supported values: "validateFalse".
+	testFixtureTagName = "k8s:validation-gen-test-fixture"
 
 	// name of the subresource that this type represents and can validate declaratively.
 	isSubresourceTagName = "k8s:isSubresource"
@@ -114,7 +127,7 @@ func checkMainTag(comments []string, require ...string) bool {
 	return reflect.DeepEqual(valueStrings, require)
 }
 
-func schemeRegistryTag(pkg *types.Package) types.Name {
+func schemeRegistryTag(pkg *types.Package) (types.Name, bool) {
 	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
 	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{schemeRegistryTagName}, pkg.Comments)
 	if err != nil {
@@ -122,12 +135,17 @@ func schemeRegistryTag(pkg *types.Package) types.Name {
 	}
 	values, found := tags[schemeRegistryTagName]
 	if !found || len(values) == 0 {
-		return schemeType // default
+		return schemeType, true // default
 	}
 	if len(values) > 1 {
 		panic(fmt.Sprintf("Package %q contains more than one usage of %q", pkg.Path, schemeRegistryTagName))
 	}
-	return types.ParseFullyQualifiedName(values[0].Value)
+	val := values[0].Value
+	if val == "nil" {
+		// no registration wanted for this package
+		return types.Name{}, false
+	}
+	return types.ParseFullyQualifiedName(val), true
 }
 
 func isSubresourceTag(t *types.Type) (string, bool) {
@@ -322,7 +340,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 		pkg := context.Universe[input]
 
-		schemeRegistry := schemeRegistryTag(pkg)
+		schemeRegistry, registerThisPkg := schemeRegistryTag(pkg)
 
 		typesWith, found := validationTypeMatch(pkg, idOpts)
 		if !found {
@@ -423,7 +441,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					generators = []generator.Generator{
-						NewGenValidations(args.OutputFile, pkg.Path, rootTypes, td, inputToPkg, schemeRegistry, args.EmitRegisterFuncs),
+						NewGenValidations(args.OutputFile, pkg.Path, rootTypes, td, inputToPkg, schemeRegistry, registerThisPkg),
 					}
 					testFixtureTags := testFixtureTag(pkg)
 					if testFixtureTags.Len() > 0 {
