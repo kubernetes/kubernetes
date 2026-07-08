@@ -31,7 +31,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 
-	"github.com/go-logr/logr"
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	v1 "k8s.io/api/core/v1"
@@ -39,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -137,27 +137,27 @@ func (p *mockPolicy) Name() string {
 	return "mock"
 }
 
-func (p *mockPolicy) Start(_ logr.Logger, s state.State) error {
+func (p *mockPolicy) Start(_ klog.Logger, s state.State) error {
 	return p.err
 }
 
-func (p *mockPolicy) Allocate(_ logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *mockPolicy) Allocate(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) error {
 	return p.err
 }
 
-func (p *mockPolicy) RemoveContainer(_ logr.Logger, s state.State, podUID string, containerName string) error {
+func (p *mockPolicy) RemoveContainer(_ klog.Logger, s state.State, podUID string, containerName string) error {
 	return p.err
 }
 
-func (p *mockPolicy) GetTopologyHints(_ logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *mockPolicy) GetPodTopologyHints(_ logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetPodTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *mockPolicy) AllocatePod(_ logr.Logger, s state.State, pod *v1.Pod) error {
+func (p *mockPolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod) error {
 	return p.err
 }
 

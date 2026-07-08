@@ -17,9 +17,8 @@ limitations under the License.
 package cpumanager
 
 import (
-	"github.com/go-logr/logr"
-
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/utils/cpuset"
@@ -28,21 +27,21 @@ import (
 // Policy implements logic for pod container to CPU assignment.
 type Policy interface {
 	Name() string
-	Start(logger logr.Logger, s state.State) error
+	Start(logger klog.Logger, s state.State) error
 	// Allocate call is idempotent
-	Allocate(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) error
+	Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) error
 	// RemoveContainer call is idempotent
-	RemoveContainer(logger logr.Logger, s state.State, podUID string, containerName string) error
+	RemoveContainer(logger klog.Logger, s state.State, podUID string, containerName string) error
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment per Pod
 	// among this and other resource controllers.
-	GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 	// AllocatePod is called to trigger the allocation of CPUs to a pod.
-	AllocatePod(logger logr.Logger, s state.State, pod *v1.Pod) error
+	AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod) error
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
 }

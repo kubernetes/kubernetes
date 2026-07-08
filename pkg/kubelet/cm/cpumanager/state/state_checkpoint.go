@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/go-logr/logr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -37,7 +36,7 @@ var _ State = &stateCheckpoint{}
 
 type stateCheckpoint struct {
 	mux               sync.RWMutex
-	logger            logr.Logger
+	logger            klog.Logger
 	policyName        string
 	cache             State
 	checkpointManager checkpointmanager.CheckpointManager
@@ -46,7 +45,7 @@ type stateCheckpoint struct {
 }
 
 // NewCheckpointState creates new State for keeping track of CPU/pod assignment with checkpoint backend
-func NewCheckpointState(logger logr.Logger, stateDir, checkpointName, policyName string, initialContainers containermap.ContainerMap) (State, error) {
+func NewCheckpointState(logger klog.Logger, stateDir, checkpointName, policyName string, initialContainers containermap.ContainerMap) (State, error) {
 	// we store a logger instance because the checkpointmanager code gets no context yet, so it's pointless to add on our outer layer
 	// since we store a checkpoint, we can use the relatively expensive "WithName".
 	logger = klog.LoggerWithName(logger, "CPUManager state checkpoint")
