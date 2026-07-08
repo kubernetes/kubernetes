@@ -205,6 +205,28 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					ExpectedErrs: nil,
 				},
 				{
+					Name: "invalid missing lastTransitionTime",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakLastTransitionTime(metav1.Time{}),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						field.Required(field.NewPath("status", "conditions").Index(0).Child("lastTransitionTime"), "").MarkAlpha(),
+					},
+				},
+				{
+					Name: "valid lastTransitionTime",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakLastTransitionTime(metav1.Unix(1, 0)),
+						),
+					},
+					ExpectedErrs: nil,
+				},
+				{
 					Name: "invalid missing status",
 					Conditions: []metav1.Condition{
 						meta.MkCondition(

@@ -834,7 +834,14 @@ func TestImpersonateIsForbidden(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Prepend an impersonation authorizer with specific opinions about alice and bob
-			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(impersonateAuthorizer{}, config.ControlPlane.Generic.Authorization.Authorizer)
+			authz, err := unionauthz.New(
+				unionauthz.NamedAuthorizer{AuthorizerName: "impersonate", Authorizer: impersonateAuthorizer{}},
+				unionauthz.NamedAuthorizer{AuthorizerName: "default", Authorizer: config.ControlPlane.Generic.Authorization.Authorizer},
+			)
+			if err != nil {
+				t.Fatalf("unionauthz.New: %v", err)
+			}
+			config.ControlPlane.Generic.Authorization.Authorizer = authz
 		},
 	})
 	defer tearDownFn()
@@ -1865,7 +1872,14 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
-			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, trackingAuthorizer)
+			authz, err := unionauthz.New(
+				unionauthz.NamedAuthorizer{AuthorizerName: "default", Authorizer: config.ControlPlane.Generic.Authorization.Authorizer},
+				unionauthz.NamedAuthorizer{AuthorizerName: "tracking", Authorizer: trackingAuthorizer},
+			)
+			if err != nil {
+				t.Fatalf("unionauthz.New: %v", err)
+			}
+			config.ControlPlane.Generic.Authorization.Authorizer = authz
 		},
 	})
 	defer tearDownFn()

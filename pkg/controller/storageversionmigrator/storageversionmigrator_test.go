@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
-	svminformers "k8s.io/client-go/informers/storagemigration/v1beta1"
+	svminformers "k8s.io/client-go/informers/storagemigration/v1"
 	"k8s.io/client-go/kubernetes"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -127,26 +127,26 @@ func newTestSVMController(
 	}
 }
 
-func newSVM(name, resourceVersion string, conditions ...metav1.Condition) *svmv1beta1.StorageVersionMigration {
-	return &svmv1beta1.StorageVersionMigration{
+func newSVM(name, resourceVersion string, conditions ...metav1.Condition) *svmv1.StorageVersionMigration {
+	return &svmv1.StorageVersionMigration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			CreationTimestamp: metav1.Now(),
 		},
-		Spec: svmv1beta1.StorageVersionMigrationSpec{
+		Spec: svmv1.StorageVersionMigrationSpec{
 			Resource: metav1.GroupResource{
 				Group:    testGVR.Group,
 				Resource: testGVR.Resource,
 			},
 		},
-		Status: svmv1beta1.StorageVersionMigrationStatus{
+		Status: svmv1.StorageVersionMigrationStatus{
 			ResourceVersion: resourceVersion,
 			Conditions:      conditions,
 		},
 	}
 }
 
-func newSVMWithConditions(name, resourceVersion string, conditions []metav1.Condition) *svmv1beta1.StorageVersionMigration {
+func newSVMWithConditions(name, resourceVersion string, conditions []metav1.Condition) *svmv1.StorageVersionMigration {
 	svm := newSVM(name, resourceVersion)
 	svm.Status.Conditions = conditions
 	return svm
@@ -172,7 +172,7 @@ func TestSync(t *testing.T) {
 	testCases := []struct {
 		name                 string
 		key                  string
-		svm                  *svmv1beta1.StorageVersionMigration
+		svm                  *svmv1.StorageVersionMigration
 		graphBuilder         *mockGraphBuilder
 		expectErr            bool
 		expectKubeActions    []k8stesting.Action
@@ -183,7 +183,7 @@ func TestSync(t *testing.T) {
 			name: "Successful migration",
 			key:  "test-svm",
 			svm: newSVM("test-svm", "100", metav1.Condition{
-				Type:   string(svmv1beta1.MigrationRunning),
+				Type:   string(svmv1.MigrationRunning),
 				Status: metav1.ConditionTrue,
 				Reason: migrationRunningReason,
 			}),
@@ -197,15 +197,15 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationRunning),
+							Type:   string(svmv1.MigrationRunning),
 							Status: metav1.ConditionTrue,
 						},
 						{
-							Type:   string(svmv1beta1.MigrationSucceeded),
+							Type:   string(svmv1.MigrationSucceeded),
 							Status: metav1.ConditionTrue,
 						},
 					}),
@@ -232,7 +232,7 @@ func TestSync(t *testing.T) {
 			name: "SVM already succeeded",
 			key:  "succeeded-svm",
 			svm: newSVM("succeeded-svm", "100", metav1.Condition{
-				Type:   string(svmv1beta1.MigrationSucceeded),
+				Type:   string(svmv1.MigrationSucceeded),
 				Status: metav1.ConditionTrue,
 			}),
 			expectErr: false,
@@ -249,7 +249,7 @@ func TestSync(t *testing.T) {
 		{
 			name: "Resource not in GC",
 			key:  "no-resource",
-			svm: func() *svmv1beta1.StorageVersionMigration {
+			svm: func() *svmv1.StorageVersionMigration {
 				s := newSVM("no-resource", "100")
 				s.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Minute))
 				return s
@@ -261,10 +261,10 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{{
-						Type:   string(svmv1beta1.MigrationFailed),
+						Type:   string(svmv1.MigrationFailed),
 						Status: metav1.ConditionTrue,
 					}}),
 				),
@@ -282,15 +282,15 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationRunning),
+							Type:   string(svmv1.MigrationRunning),
 							Status: metav1.ConditionTrue,
 						},
 						{
-							Type:   string(svmv1beta1.MigrationFailed),
+							Type:   string(svmv1.MigrationFailed),
 							Status: metav1.ConditionTrue,
 						},
 					}),
@@ -313,15 +313,15 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationRunning),
+							Type:   string(svmv1.MigrationRunning),
 							Status: metav1.ConditionTrue,
 						},
 						{
-							Type:   string(svmv1beta1.MigrationSucceeded),
+							Type:   string(svmv1.MigrationSucceeded),
 							Status: metav1.ConditionTrue,
 						},
 					}),
@@ -364,7 +364,7 @@ func TestSync(t *testing.T) {
 		{
 			name: "Incomparable resource version for gc fails migration",
 			key:  "incomparable-resource",
-			svm: func() *svmv1beta1.StorageVersionMigration {
+			svm: func() *svmv1.StorageVersionMigration {
 				s := newSVM("incomparable-resource", "100")
 				s.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Minute))
 				return s
@@ -377,10 +377,10 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{{
-						Type:   string(svmv1beta1.MigrationFailed),
+						Type:   string(svmv1.MigrationFailed),
 						Status: metav1.ConditionTrue,
 					}}),
 				),
@@ -389,7 +389,7 @@ func TestSync(t *testing.T) {
 		{
 			name: "Incomparable resource version for object fails migration",
 			key:  "incomparable-resource-obj",
-			svm: func() *svmv1beta1.StorageVersionMigration {
+			svm: func() *svmv1.StorageVersionMigration {
 				s := newSVM("incomparable-resource-obj", "100")
 				s.CreationTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Minute))
 				return s
@@ -402,11 +402,11 @@ func TestSync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationFailed),
+							Type:   string(svmv1.MigrationFailed),
 							Status: metav1.ConditionTrue,
 						},
 					}),
@@ -424,7 +424,7 @@ func TestSync(t *testing.T) {
 			}
 			kubeClient := kubefake.NewClientset(initialSVMs...)
 			kubeInformerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
-			svmInformer := kubeInformerFactory.Storagemigration().V1beta1().StorageVersionMigrations()
+			svmInformer := kubeInformerFactory.Storagemigration().V1().StorageVersionMigrations()
 
 			if tc.svm != nil {
 				err := svmInformer.Informer().GetStore().Add(tc.svm)
@@ -460,8 +460,8 @@ func TestSync(t *testing.T) {
 					require.Equal(t, expected.GetVerb(), actual.GetVerb(), "kube action %d: verb mismatch", i)
 					require.Equal(t, expected.GetResource(), actual.GetResource(), "kube action %d: resource mismatch", i)
 
-					actualSvm := actual.(k8stesting.UpdateAction).GetObject().(*svmv1beta1.StorageVersionMigration)
-					expectedSvm := expected.(k8stesting.UpdateAction).GetObject().(*svmv1beta1.StorageVersionMigration)
+					actualSvm := actual.(k8stesting.UpdateAction).GetObject().(*svmv1.StorageVersionMigration)
+					expectedSvm := expected.(k8stesting.UpdateAction).GetObject().(*svmv1.StorageVersionMigration)
 					expectedConditions := expectedSvm.Status.Conditions
 					actualConditions := actualSvm.Status.Conditions
 					require.Len(t, expectedConditions, len(actualConditions), "kube action %d: conditions mismatch", i)
@@ -543,7 +543,7 @@ func TestSVMConditions(t *testing.T) {
 		items                  []runtime.Object
 		dynamicClientErrors    map[string]error
 		expectErr              bool
-		expectConditionType    svmv1beta1.MigrationConditionType
+		expectConditionType    svmv1.MigrationConditionType
 		expectConditionMessage string
 	}{
 		{
@@ -554,7 +554,7 @@ func TestSVMConditions(t *testing.T) {
 				newResource("res3", "ns2", "101", "uid3"), // Should be skipped
 			},
 			expectErr:              false,
-			expectConditionType:    svmv1beta1.MigrationSucceeded,
+			expectConditionType:    svmv1.MigrationSucceeded,
 			expectConditionMessage: "Migration completed",
 		},
 		{
@@ -567,7 +567,7 @@ func TestSVMConditions(t *testing.T) {
 				"ns1/res2": apierrors.NewTooManyRequests("simulating throttling", 1),
 			},
 			expectErr:              true,
-			expectConditionType:    svmv1beta1.MigrationRunning,
+			expectConditionType:    svmv1.MigrationRunning,
 			expectConditionMessage: "The migration is running, 1/2 objects not yet migrated; transient error: simulating throttling",
 		},
 		{
@@ -580,7 +580,7 @@ func TestSVMConditions(t *testing.T) {
 				"ns1/res2": fmt.Errorf("fatal error"),
 			},
 			expectErr:              false, // sync returns nil when runMigration returns true for failed
-			expectConditionType:    svmv1beta1.MigrationFailed,
+			expectConditionType:    svmv1.MigrationFailed,
 			expectConditionMessage: "1/2 not yet migrated. migration encountered unhandled error: fatal error",
 		},
 	}
@@ -591,7 +591,7 @@ func TestSVMConditions(t *testing.T) {
 			svm := newSVM("test-svm", "100")
 			kubeClient := kubefake.NewClientset(svm)
 			kubeInformerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
-			svmInformer := kubeInformerFactory.Storagemigration().V1beta1().StorageVersionMigrations()
+			svmInformer := kubeInformerFactory.Storagemigration().V1().StorageVersionMigrations()
 
 			err := svmInformer.Informer().GetStore().Add(svm)
 			require.NoError(t, err)
@@ -620,7 +620,7 @@ func TestSVMConditions(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			updatedSVM, err := kubeClient.StoragemigrationV1beta1().StorageVersionMigrations().Get(ctx, "test-svm", metav1.GetOptions{})
+			updatedSVM, err := kubeClient.StoragemigrationV1().StorageVersionMigrations().Get(ctx, "test-svm", metav1.GetOptions{})
 			require.NoError(t, err)
 
 			cond := meta.FindStatusCondition(updatedSVM.Status.Conditions, string(tc.expectConditionType))

@@ -18,11 +18,14 @@ package authorizer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -114,8 +117,15 @@ type Authorizer interface {
 	//
 	// An authorizer who does not support conditions should fail closed and
 	// return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+	//
+	// The context should only be used for timeouts/cancellation/tracing, and should not influence the
+	// evaluation outcome. Only the given decision and data may infuence the outcome. data must be non-nil.
 	EvaluateConditions(ctx context.Context, decision ConditionsAwareDecision, data ConditionsData) (authorized Decision, reason string, err error)
 }
+
+// ErrorConditionEvaluationNotSupported is returned by authorizer implementations
+// that do not support condition evaluation.
+var ErrorConditionEvaluationNotSupported = errors.New("condition evaluation not supported")
 
 // AuthorizerFunc implements Authorizer
 var _ Authorizer = AuthorizerFunc(nil)
@@ -242,4 +252,92 @@ func (d Decision) String() string {
 	default:
 		return fmt.Sprintf("Unknown (%d)", int(d))
 	}
+}
+
+// Condition represents one authorization condition that is part of a ConditionsMap.
+// The effect of a condition is defined by whether it is part of the Deny/NoOpinion/Allow
+// conditions list in the ConditionsMap.
+//
+// A Condition must be immutable and thread-safe.
+type Condition interface {
+	// GetID uniquely identifies this condition within the scope of the authorizer
+	// that authored it. Validated as a Kubernetes label key.
+	// Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
+	// Required.
+	GetID() string
+
+	// GetType describes the type of the condition, if there are multiple possibilities.
+	// Should be formatted as a Kubernetes label key.
+	// Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
+	// Optional. Can be omitted if the authorizer already knows how to evaluate the condition.
+	GetType() string
+
+	// GetCondition returns a string encoding of the condition to be evaluated.
+	// It is a pure, deterministic function from ConditionsData to a boolean (or error).
+	// Might or might not be human-readable.
+	// Optional, if the ID alone is enough for the authorizer to know how to evaluate the condition.
+	GetCondition() string
+
+	// GetDescription is an optional human-friendly description that can be shown
+	// as an error message or for debugging. Optional.
+	GetDescription() string
+
+	// Evaluate evaluates the condition to a boolean, returns an error, or returns "unevaluatable".
+	// If an authorizer already has a pre-compiled condition, this avoids one serialization roundtrip,
+	// with potentially expensive deserialization/parsing. However, if the condition underwent a
+	// serialize/deserialize roundtrip (e.g. when the caller is an aggregated API server), the authorizer
+	// might have to evaluate the condition from its serialized form using evaluateFunc in
+	// ConditionsMap.Evaluate.
+	// Evaluate must be safe to call repeatedly and concurrently.
+	//
+	// The context should only be used for timeouts/cancellation/tracing, and should not influence the
+	// evaluation outcome. Only the condition itself and data can infuence the outcome.
+	Evaluate(ctx context.Context, data ConditionsData) ConditionEvaluationResult
+}
+
+// EvaluateConditionFunc is a function that is able to concretely evaluate a condition to a boolean or error.
+type EvaluateConditionFunc func(ctx context.Context, condition Condition, data ConditionsData) (bool, error)
+
+// MaybeEvaluateConditionFunc allows potentially evaluating a condition, returning Unevaluatable if a truth value or error cannot be assigned.
+type MaybeEvaluateConditionFunc func(ctx context.Context, condition Condition, data ConditionsData) ConditionEvaluationResult
+
+// AdmissionOperation represents the admission operation,
+// for example CREATE, UPDATE, DELETE. The constants are
+// defined in k8s.io/apiserver/pkg/admission, but the
+// type is defined here, because this package is more generic
+// than the admission package (thus avoiding import cycles)
+type AdmissionOperation string
+
+// ConditionsData represents the data available for conditions
+// to evaluate against. This is by design a subset of admission.Attributes.
+type ConditionsData interface {
+	// GetName returns the name of the object as presented in the request. On a CREATE operation, the client
+	// may omit name and rely on the server to generate the name. If that is the case, this method will return
+	// the empty string
+	GetName() string
+	// GetNamespace is the namespace associated with the request (if any)
+	GetNamespace() string
+	// GetResource is the name of the resource being requested. This is not the kind. For example: pods
+	GetResource() schema.GroupVersionResource
+	// GetSubresource is the name of the subresource being requested. This is a different resource, scoped to the parent resource, but it may have a different kind.
+	// For instance, /pods has the resource "pods" and the kind "Pod", while /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod"
+	// (because status operates on pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource "binding", and kind "Binding".
+	GetSubresource() string
+	// GetOperation is the operation being performed
+	GetOperation() AdmissionOperation
+	// GetOperationOptions is the options for the operation being performed
+	GetOperationOptions() runtime.Object
+	// IsDryRun indicates that modifications will definitely not be persisted for this request. This is to prevent
+	// admission controllers with side effects and a method of reconciliation from being overwhelmed.
+	// However, a value of false for this does not mean that the modification will be persisted, because it
+	// could still be rejected by a subsequent validation step.
+	IsDryRun() bool
+	// GetObject is the object from the incoming request. Only populated for CREATE and UPDATE requests.
+	GetObject() runtime.Object
+	// GetOldObject is the existing object in storage. Only populated for UPDATE and DELETE requests.
+	GetOldObject() runtime.Object
+	// GetKind is the type of object being manipulated. For example: Pod
+	GetKind() schema.GroupVersionKind
+	// GetUserInfo is information about the requesting user
+	GetUserInfo() user.Info
 }

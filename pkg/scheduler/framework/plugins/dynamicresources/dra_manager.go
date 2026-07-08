@@ -222,6 +222,22 @@ func (c *claimTracker) SignalClaimPendingAllocation(claimUID types.UID, allocate
 		return nil
 	}
 
+	// Check that the claim really is unallocated. The Pod's CycleState may be
+	// stale and this claim may have been allocated since that was calculated.
+	//
+	// Extended resources claims cannot be shared, so skip checking the assume
+	// cache because we already know it's not allocated.
+	if !isSpecialClaimName(allocatedClaim.Name) {
+		assumedClaim, err := c.Get(allocatedClaim.Namespace, allocatedClaim.Name)
+		if err != nil {
+			return fmt.Errorf("look up assumed claim %s/%s, UID=%s: %w", allocatedClaim.Namespace, allocatedClaim.Name, claimUID, err)
+		}
+		if assumedClaim.UID == claimUID && assumedClaim.Status.Allocation != nil {
+			c.logger.V(6).Info("Claim is already allocated, not creating in-flight", "claim", klog.KObj(assumedClaim), "uid", claimUID, "version", assumedClaim.ResourceVersion)
+			return nil
+		}
+	}
+
 	c.inFlightAllocations[claimUID] = inFlightAllocation{
 		claim:   allocatedClaim,
 		sharers: 1,

@@ -34,11 +34,11 @@ import (
 // Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRole, and will no longer be served in v1.22.
 type ClusterRoleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Rules holds all the PolicyRules for this ClusterRole
+	// rules holds all the PolicyRules for this ClusterRole
 	Rules []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
-	// AggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
+	// aggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
 	// If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be
 	// stomped by the controller.
 	AggregationRule *AggregationRuleApplyConfiguration `json:"aggregationRule,omitempty"`

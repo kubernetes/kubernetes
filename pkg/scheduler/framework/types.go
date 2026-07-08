@@ -19,6 +19,7 @@ package framework
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"slices"
 	"sort"
 	"strings"
@@ -512,12 +513,7 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 
 // updatePVCRefCounts updates the PVCRefCounts of NodeInfo.
 func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
-	for _, v := range pod.Spec.Volumes {
-		if v.PersistentVolumeClaim == nil {
-			continue
-		}
-
-		key := GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
+	for key := range PodPVCKeys(pod) {
 		if add {
 			n.PVCRefCounts[key] += 1
 		} else {
@@ -1458,4 +1454,20 @@ func GetPodNamespacedName(pod *v1.Pod) string {
 // GetNamespacedName returns the string format of a namespaced resource name.
 func GetNamespacedName(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
+}
+
+// PodPVCKeys returns an iterator over the namespaced keys ("namespace/name") of
+// the PersistentVolumeClaims referenced by the pod's volumes. Volumes that are
+// not backed by a PVC are skipped.
+func PodPVCKeys(pod *v1.Pod) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for _, v := range pod.Spec.Volumes {
+			if v.PersistentVolumeClaim == nil {
+				continue
+			}
+			if !yield(GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)) {
+				return
+			}
+		}
+	}
 }

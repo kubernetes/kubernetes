@@ -23,6 +23,9 @@ import (
 	"github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -31,21 +34,62 @@ const (
 	otherClaimUID = types.UID("claim-uid-2")
 )
 
+// testInformer implements [assumecache.Informer] and can be used to feed changes into an assume
+// cache during unit testing. Only a single event handler is supported, which is
+// sufficient for one assume cache.
+type testInformer struct {
+	handler cache.ResourceEventHandler
+}
+
+func (i *testInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
+	i.handler = handler
+	return nil, nil
+}
+
+func (i *testInformer) add(obj any) {
+	if i.handler == nil {
+		return
+	}
+	i.handler.OnAdd(obj, false)
+}
+
 func TestSignalClaimPendingAllocation(t *testing.T) {
 	testSignalClaimPendingAllocation(ktesting.Init(t))
 }
 func testSignalClaimPendingAllocation(tCtx ktesting.TContext) {
+	specialAllocatedClaim := allocatedClaim.DeepCopy()
+	specialAllocatedClaim.Name = specialClaimInMemName
+
 	tests := map[string]struct {
 		inFlightAllocations         map[types.UID]inFlightAllocation
+		cachedClaims                []*resourceapi.ResourceClaim
 		claimUID                    types.UID
 		allocatedClaim              *resourceapi.ResourceClaim
 		expectedInFlightAllocations map[types.UID]inFlightAllocation
 	}{
 		"empty": {
+			cachedClaims: []*resourceapi.ResourceClaim{
+				st.FromResourceClaim(pendingClaim).UID(string(claimUID)).Obj(),
+			},
 			claimUID:       claimUID,
 			allocatedClaim: allocatedClaim,
 			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
 				claimUID: {claim: allocatedClaim, sharers: 1},
+			},
+		},
+		"claim-already-allocated": {
+			claimUID: claimUID,
+			cachedClaims: []*resourceapi.ResourceClaim{
+				st.FromResourceClaim(allocatedClaim).UID(string(claimUID)).Obj(),
+			},
+			allocatedClaim:              allocatedClaim,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{},
+		},
+		"extended-resource-claim-not-in-cache": {
+			claimUID:       claimUID,
+			allocatedClaim: specialAllocatedClaim,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID: {claim: specialAllocatedClaim, sharers: 1},
 			},
 		},
 		"already-exists": {
@@ -79,6 +123,12 @@ func testSignalClaimPendingAllocation(tCtx ktesting.TContext) {
 				inFlightAllocations: make(map[types.UID]inFlightAllocation),
 			}
 			maps.Copy(c.inFlightAllocations, test.inFlightAllocations)
+
+			informer := &testInformer{}
+			c.cache = assumecache.NewAssumeCache(tCtx.Logger(), informer, "", "", nil)
+			for _, cached := range test.cachedClaims {
+				informer.add(cached)
+			}
 
 			err := c.SignalClaimPendingAllocation(test.claimUID, test.allocatedClaim)
 			tCtx.ExpectNoError(err)
