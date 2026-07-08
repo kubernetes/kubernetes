@@ -19,6 +19,7 @@ package ttrpc
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 type streamID uint32
@@ -38,11 +39,11 @@ type stream struct {
 	recvClose chan struct{}
 }
 
-func newStream(id streamID, send sender) *stream {
+func newStream(id streamID, send sender, recvBuf int) *stream {
 	return &stream{
 		id:        id,
 		sender:    send,
-		recv:      make(chan *streamMessage, 1),
+		recv:      make(chan *streamMessage, recvBuf),
 		recvClose: make(chan struct{}),
 	}
 }
@@ -63,6 +64,11 @@ func (s *stream) send(mt messageType, flags uint8, b []byte) error {
 	return s.sender.send(uint32(s.id), mt, flags, b)
 }
 
+// receive delivers a message to this stream from the connection receive loop.
+// If the stream's recv buffer is full, it waits up to 1 second for the
+// consumer to make progress. This keeps the receive loop moving for other
+// streams while still providing backpressure under normal operation. If the
+// timeout expires the stream is closed with ErrStreamFull.
 func (s *stream) receive(ctx context.Context, msg *streamMessage) error {
 	select {
 	case <-s.recvClose:
@@ -76,6 +82,20 @@ func (s *stream) receive(ctx context.Context, msg *streamMessage) error {
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	default:
+		// If recv channel is full, wait up to a second for an item
+		// to drain and unblock, otherwise close the stream.
+		select {
+		case <-s.recvClose:
+			return s.recvErr
+		case s.recv <- msg:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
+			s.closeWithError(ErrStreamFull)
+			return ErrStreamFull
+		}
 	}
 }
 

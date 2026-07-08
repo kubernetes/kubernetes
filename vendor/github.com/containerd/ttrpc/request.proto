@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package ttrpc;
 
-import "proto/status.proto";
+import "google/rpc/status.proto";
 
 option go_package = "github.com/containerd/ttrpc";
 
@@ -15,7 +15,7 @@ message Request {
 }
 
 message Response {
-	Status status = 1;
+	google.rpc.Status status = 1;
 	bytes payload = 2;
 }
 
