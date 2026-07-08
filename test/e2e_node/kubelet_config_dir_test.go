@@ -148,10 +148,17 @@ featureGates:
 			// Meanwhile, this value was not explicitly set, but could have been overridden by a "default" of 0 for the type.
 			// Ensure the true default persists.
 			initialConfig.CPUCFSQuotaPeriod = metav1.Duration{Duration: time.Duration(100000000)}
-			// This covers the case for a map with the list of values.
+			// This covers the case for a map with the list of values. Both
+			// drop-ins set these keys and the second wins, but the merged values
+			// are not observable here: StaticPodURLHeader carries a datapolicy
+			// tag, so configz.Set redacts the object it registers and /configz
+			// serves each key with its values collapsed to the single CLASSIFIED
+			// sentinel. What survives for this field is that the key set made it
+			// through the merge; that the later drop-in's values win is covered
+			// by the merge unit tests, which read the config directly.
 			initialConfig.StaticPodURLHeader = map[string][]string{
-				"kubelet-api-support": {"Authorization: 8945AFSG1", "X-Custom-Header: 987"},
-				"custom-static-pod":   {"Authorization: 223EWRWER", "X-Custom-Header: 345"},
+				"kubelet-api-support": {"CLASSIFIED"},
+				"custom-static-pod":   {"CLASSIFIED"},
 			}
 			// This covers the case where the fields within the list of structs are overridden.
 			initialConfig.ShutdownGracePeriodByPodPriority = []kubeletconfig.ShutdownGracePeriodByPodPriority{

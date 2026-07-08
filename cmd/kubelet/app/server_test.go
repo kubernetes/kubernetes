@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/component-base/logs/datapol"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -610,11 +611,11 @@ func TestMarshalKubeletConfigForLog(t *testing.T) {
 	require.Contains(t, out, "failSwapOn: false")
 	require.Contains(t, out, "memory.available: 200Mi")
 
-	// (3) Sensitive StaticPodURLHeader values are masked, never leaked.
-	require.Contains(t, out, "<masked>")
+	// (3) Sensitive StaticPodURLHeader values are redacted via datapolicy tags, never leaked.
+	require.Contains(t, out, "CLASSIFIED")
 	require.NotContains(t, out, "super-secret-token")
 
-	// The helper must not mutate the caller's config when masking.
+	// The helper must not mutate the caller's config when redacting.
 	require.Equal(t, []string{"Bearer super-secret-token"}, kc.StaticPodURLHeader["Authorization"])
 }
 
@@ -696,4 +697,35 @@ func TestInitializeTLSSelfSignedKeyAlgorithm(t *testing.T) {
 			verifySelfSignedKey(t, &algorithm, wantKey)
 		})
 	}
+}
+
+// TestConfigzVersionedConfigIsRedactable guards that the datapolicy tag lives on
+// the *versioned* (v1beta1) KubeletConfiguration as well as the internal type.
+// setConfigz stores the versioned object and configz.Config.Set redacts a deep
+// copy of it at registration time, so a tag present only on the internal type
+// would leak the StaticPodURLHeader credentials over /configz
+// (kubernetes#140101).
+//
+// That tag is the whole of what this test asserts: it calls datapol.Redact
+// directly rather than configz.Set or the handler, so it would still pass if Set
+// stopped redacting. TestConfigzSetRedactsOnce in the configz package is what
+// pins down that redaction happens once, at Set time.
+func TestConfigzVersionedConfigIsRedactable(t *testing.T) {
+	kc := &kubeletconfiginternal.KubeletConfiguration{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "KubeletConfiguration",
+			APIVersion: "kubelet.config.k8s.io/v1beta1",
+		},
+		StaticPodURLHeader: map[string][]string{
+			"Authorization": {"Bearer super-secret-token"},
+		},
+	}
+
+	// Mirror what setConfigz stores and what configz.Config.Set redacts.
+	versioned, err := convertToVersionedKubeletConfig(kc)
+	require.NoError(t, err)
+	require.NoError(t, datapol.Redact(versioned))
+
+	require.Equal(t, []string{"CLASSIFIED"}, versioned.StaticPodURLHeader["Authorization"],
+		"versioned StaticPodURLHeader must be redacted; the datapolicy tag must exist on the v1beta1 type")
 }
