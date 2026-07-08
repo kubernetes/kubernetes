@@ -19,8 +19,8 @@ package fuzzer
 import (
 	"sigs.k8s.io/randfill"
 
+	corev1 "k8s.io/api/core/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 )
 
@@ -40,7 +40,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 
 				if endpointPort.Protocol == nil {
-					protos := []api.Protocol{api.ProtocolTCP, api.ProtocolUDP, api.ProtocolSCTP}
+					protos := []corev1.Protocol{corev1.ProtocolTCP, corev1.ProtocolUDP, corev1.ProtocolSCTP}
 					obj.Ports[i].Protocol = &protos[c.Rand.Intn(len(protos))]
 				}
 			}
