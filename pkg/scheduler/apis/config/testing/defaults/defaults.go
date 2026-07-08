@@ -105,6 +105,11 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.DefaultPreemption},
 		},
 	},
+	PodGroupPostFilter: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.DefaultPreemption},
+		},
+	},
 	PreScore: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.TaintToleration},
