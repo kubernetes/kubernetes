@@ -27,9 +27,6 @@ import (
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-// TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1", "v1beta1"}
-
 // Helper function to create a baseline valid ValidatingWebhookConfiguration with optional tweaks
 func mkValidatingWebhookConfiguration(tweaks ...func(*admissionregistration.ValidatingWebhookConfiguration)) admissionregistration.ValidatingWebhookConfiguration {
 	obj := admissionregistration.ValidatingWebhookConfiguration{

@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -96,19 +97,6 @@ type DeclarativeValidationConfig struct {
 	// ShortCircuitMismatch allows a short-circuit declarative validation error for a field
 	// to match with any handwritten validation error on its subfields.
 	ShortCircuitMismatch bool
-}
-
-type allDeclarativeEnforcedKeyType struct{}
-
-var allDeclarativeEnforcedKey = allDeclarativeEnforcedKeyType{}
-
-// WithAllDeclarativeEnforcedForTest returns a copy of parent context with allDeclarativeEnforcedKey set to true.
-// This is used for testing to expose all declarative validation errors and filter all handwritten validation errors
-// that are covered by declarative validation, regardless of the feature gate or maturity level.
-//
-// NOTE: This function is intended for testing purposes only and should not be used in production code.
-func WithAllDeclarativeEnforcedForTest(ctx context.Context) context.Context {
-	return context.WithValue(ctx, allDeclarativeEnforcedKey, true)
 }
 
 // ValidationConfigOption is the internal configuration used by
@@ -374,13 +362,27 @@ func metricIdentifier(ctx context.Context, scheme *runtime.Scheme, obj runtime.O
 //
 // Mismatches between HV and DV are logged when the DeclarativeValidation gate is enabled. Only Alpha and
 // Beta errors are mismatch-checked, since Standard DV errors may have no HV counterpart in new APIs.
+// WithAllDeclarativeEnforcedForTest returns a copy of parent context with allDeclarativeEnforcedKey set to true.
+// This is used for testing to expose all declarative validation errors and filter all handwritten validation errors
+// that are covered by declarative validation, regardless of the feature gate or maturity level.
+//
+// NOTE: This function is intended for testing purposes only and should not be used in production code.
+func WithAllDeclarativeEnforcedForTest(ctx context.Context) context.Context {
+	return validate.WithAllDeclarativeEnforcedForTest(ctx)
+}
+
+// ValidateDeclarativelyWithMigrationChecks executes declarative validation and implements the Validation Lifecycle strategy.
+// Declarative validation is always authoritative; the lifecycle prefix on each tag controls the visible behavior:
+//   - Standard (no prefix): Enforced. HV counterparts are expected to be deleted from source.
+//   - Beta (+k8s:beta): Enforced when DeclarativeValidationBeta is enabled. Otherwise shadowed (HV remains authoritative).
+//   - Alpha (+k8s:alpha): Always shadowed; HV remains authoritative.
+//
+// Mismatches between HV and DV are logged when the DeclarativeValidation gate is enabled. Only Alpha and
+// Beta errors are mismatch-checked, since Standard DV errors may have no HV counterpart in new APIs.
 //
 // For testing purposes, WithAllDeclarativeEnforcedForTest enforces all declarative validations regardless
 // of lifecycle and filters all covered handwritten validations.
 func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, config DeclarativeValidationConfig) field.ErrorList {
-	betaEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta)
-	// allDeclarativeEnforced indicates that we should check all declarative errors for testing purposes.
-	allDeclarativeEnforced := ctx.Value(allDeclarativeEnforcedKey) == true
 	// These errors must be errors returned by the handwritten validation.
 	errs = errs.MarkFromImperative()
 	validationIdentifier, err := metricIdentifier(ctx, scheme, obj, opType)
@@ -397,6 +399,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 
 	declarativeErrs := runDeclarativeValidationWithRecover(ctx, scheme, obj, oldObj, cfg)
 
+	betaEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta)
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Standard errors are authoritative and may not have handwritten counterparts (e.g., in new APIs).
 		// Only Alpha and Beta errors are eligible for mismatch checking.
@@ -409,58 +412,15 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, mismatchCandidateErrs, validationIdentifier, betaEnabled, *cfg)
 	}
 
-	// Collect the declarative errors that are enforced (i.e. surfaced to the user) in the
-	// current mode. A declarative error is enforced when any of the following holds:
-	//   - allDeclarativeEnforced is set (testing): every declarative error is enforced.
-	//   - It is an internal error: always enforced, regardless of lifecycle.
-	//   - It is a beta error and the beta gate is enabled.
-	//   - It is a standard (unprefixed) error: always enforced.
-	// Alpha errors are never enforced; they remain shadowed by handwritten validation.
-	enforcedDeclarativeErrs := make(field.ErrorList, 0, len(declarativeErrs))
-	for _, dvErr := range declarativeErrs {
-		switch {
-		case allDeclarativeEnforced:
-			enforcedDeclarativeErrs = append(enforcedDeclarativeErrs, dvErr)
-		case dvErr.Type == field.ErrorTypeInternal:
-			enforcedDeclarativeErrs = append(enforcedDeclarativeErrs, dvErr)
-		case dvErr.IsBeta():
-			if betaEnabled {
-				enforcedDeclarativeErrs = append(enforcedDeclarativeErrs, dvErr)
-			}
-		case !dvErr.IsAlpha():
-			enforcedDeclarativeErrs = append(enforcedDeclarativeErrs, dvErr) // Standard
-		}
-	}
-
+	// Collect the declarative errors that are enforced (i.e. surfaced to the user) in the current mode.
+	enforcedDeclarativeErrs := validate.FilterEnforcedDeclarativeErrors(ctx, declarativeErrs, betaEnabled)
 	// Remove handwritten errors that are superseded by an enforced declarative counterpart.
-	errs = filterHandwrittenErrors(errs, enforcedDeclarativeErrs, allDeclarativeEnforced, cfg)
+	errs = validate.FilterCoveredHandwrittenErrors(ctx, errs, enforcedDeclarativeErrs, betaEnabled, cfg.NormalizationRules...)
 
 	// Append the enforced declarative errors.
 	errs = append(errs, enforcedDeclarativeErrs...)
 
 	return errs
-}
-
-// filterHandwrittenErrors removes a CoveredByDeclarative handwritten error when a matching enforced
-// beta declarative error exists (matched by type, field, and origin). In allDeclarativeEnforced
-// (testing-only) mode every covered handwritten error is removed.
-func filterHandwrittenErrors(errs, enforcedDeclarativeErrs field.ErrorList, allDeclarativeEnforced bool, opts *ValidationConfigOption) field.ErrorList {
-	matcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(opts.NormalizationRules)
-	return errs.Filter(func(e error) bool {
-		var fe *field.Error
-		if !errors.As(e, &fe) || !fe.CoveredByDeclarative {
-			return false
-		}
-		if allDeclarativeEnforced {
-			return true
-		}
-		for _, dErr := range enforcedDeclarativeErrs {
-			if dErr.IsBeta() && matcher.Matches(fe, dErr) {
-				return true
-			}
-		}
-		return false
-	})
 }
 
 // RecordDuplicateValidationErrors increments a metric and log the error when duplicate validation errors are found.

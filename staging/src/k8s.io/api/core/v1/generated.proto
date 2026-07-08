@@ -185,6 +185,7 @@ message Binding {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The target object that you want to bind to the standard object.
@@ -495,6 +496,7 @@ message ComponentStatus {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // List of component conditions observed
@@ -2562,6 +2564,7 @@ message NFSVolumeSource {
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
 // +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/finalize"
 message Namespace {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -3420,6 +3423,7 @@ message PersistentVolumeClaimTemplate {
   // validation.
   //
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The specification for the PersistentVolumeClaim. The entire content is
@@ -5035,6 +5039,7 @@ message PodTemplateSpec {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the pod.
@@ -5350,6 +5355,7 @@ message RangeAllocation {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Range is string that identifies the range represented by 'data'.

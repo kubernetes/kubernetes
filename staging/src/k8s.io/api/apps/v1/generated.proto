@@ -745,6 +745,7 @@ message StatefulSetSpec {
   // +optional
   // +k8s:alpha(since: "1.37")=+k8s:immutable
   // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
   // +listType=atomic
   repeated .k8s.io.api.core.v1.PersistentVolumeClaim volumeClaimTemplates = 4;
 

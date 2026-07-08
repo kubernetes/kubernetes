@@ -1684,6 +1684,7 @@ message ResourceClaimTemplateSpec {
   // when creating it. No other fields are allowed and will be rejected during
   // validation.
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec for the ResourceClaim. The entire content is copied unchanged

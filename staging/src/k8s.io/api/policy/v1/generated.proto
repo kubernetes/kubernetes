@@ -35,6 +35,7 @@ option go_package = "k8s.io/api/policy/v1";
 message Eviction {
   // metadata describes the pod that is being evicted.
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // deleteOptions may be provided

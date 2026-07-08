@@ -58,6 +58,7 @@ type APIGroupDiscovery struct {
 	// name is allowed to be "" to represent the legacy, ungroupified resources.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:opaqueType
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// versions are the versions supported in this group. They are sorted in descending order of preference,
 	// with the preferred version being the first entry.

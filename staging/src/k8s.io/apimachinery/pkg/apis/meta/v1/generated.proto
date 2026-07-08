@@ -708,6 +708,7 @@ message ManagedFieldsEntry {
 
   // Operation is the type of operation which lead to this ManagedFieldsEntry being created.
   // The only valid values for this field are 'Apply' and 'Update'.
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional string operation = 2;
 
   // APIVersion defines the version of this resource that this field set
@@ -828,6 +829,8 @@ message ObjectMeta {
   // A sequence number representing a specific generation of the desired state.
   // Populated by the system. Read-only.
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:minimum=0
   optional int64 generation = 7;
 
   // CreationTimestamp is a timestamp representing the server time when this object was
@@ -922,6 +925,7 @@ message ObjectMeta {
   //
   // +optional
   // +listType=atomic
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   repeated ManagedFieldsEntry managedFields = 17;
 }
 
@@ -968,6 +972,7 @@ message PartialObjectMetadata {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:opaqueType
   optional ObjectMeta metadata = 1;
 }
 

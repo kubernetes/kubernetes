@@ -20,11 +20,15 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsvalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // TestValidateCustomResourceName verifies that:
@@ -107,6 +111,169 @@ func TestValidateCustomResourceName(t *testing.T) {
 			}
 			if got := errs.ToAggregate().Error(); !strings.Contains(got, tc.errContains) {
 				t.Errorf("error %q does not contain %q", got, tc.errContains)
+			}
+		})
+	}
+}
+
+func TestGetObjectMeta(t *testing.T) {
+	cases := []struct {
+		name         string
+		obj          *unstructured.Unstructured
+		expectedMeta *metav1.ObjectMeta
+		expectErr    bool
+		errContains  string
+	}{
+		{
+			name:         "nil unstructured object",
+			obj:          nil,
+			expectedMeta: &metav1.ObjectMeta{},
+		},
+		{
+			name:         "unstructured object with nil content",
+			obj:          &unstructured.Unstructured{Object: nil},
+			expectedMeta: &metav1.ObjectMeta{},
+		},
+		{
+			name: "metadata field missing entirely",
+			obj: &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "example.com/v1",
+				"kind":       "Foo",
+			}},
+			expectedMeta: &metav1.ObjectMeta{},
+		},
+		{
+			name: "metadata field is explicitly nil",
+			obj: &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "example.com/v1",
+				"kind":       "Foo",
+				"metadata":   nil,
+			}},
+			expectedMeta: &metav1.ObjectMeta{},
+		},
+		{
+			name: "valid populated metadata block with labels, annotations, and ownerReferences",
+			obj: &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "example.com/v1",
+				"kind":       "Foo",
+				"metadata": map[string]interface{}{
+					"name":        "test-cr",
+					"namespace":   "test-ns",
+					"uid":         "abc-123",
+					"generation":  int64(2),
+					"labels":      map[string]interface{}{"env": "production", "app": "example"},
+					"annotations": map[string]interface{}{"example.com/note": "test-annotation"},
+					"ownerReferences": []interface{}{
+						map[string]interface{}{
+							"apiVersion": "example.com/v1",
+							"kind":       "Parent",
+							"name":       "parent-cr",
+							"uid":        "parent-uid-456",
+						},
+					},
+				},
+			}},
+			expectedMeta: &metav1.ObjectMeta{
+				Name:        "test-cr",
+				Namespace:   "test-ns",
+				UID:         types.UID("abc-123"),
+				Generation:  2,
+				Labels:      map[string]string{"env": "production", "app": "example"},
+				Annotations: map[string]string{"example.com/note": "test-annotation"},
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "example.com/v1",
+						Kind:       "Parent",
+						Name:       "parent-cr",
+						UID:        types.UID("parent-uid-456"),
+					},
+				},
+			},
+		},
+		{
+			name: "valid populated metadata block with managedFields",
+			obj: &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "example.com/v1",
+				"kind":       "Foo",
+				"metadata": map[string]interface{}{
+					"name":      "test-cr",
+					"namespace": "test-ns",
+					"managedFields": []interface{}{
+						map[string]interface{}{
+							"manager":    "kubectl-client-side-apply",
+							"operation":  "Update",
+							"apiVersion": "example.com/v1",
+							"time":       "2026-07-08T12:00:00Z",
+							"fieldsType": "FieldsV1",
+							"fieldsV1": map[string]interface{}{
+								"f:metadata": map[string]interface{}{
+									"f:labels": map[string]interface{}{
+										".":                        map[string]interface{}{},
+										"f:app.kubernetes.io/name": map[string]interface{}{},
+									},
+								},
+							},
+						},
+					},
+				},
+			}},
+			expectedMeta: &metav1.ObjectMeta{
+				Name:      "test-cr",
+				Namespace: "test-ns",
+				ManagedFields: []metav1.ManagedFieldsEntry{
+					{
+						Manager:    "kubectl-client-side-apply",
+						Operation:  metav1.ManagedFieldsOperationUpdate,
+						APIVersion: "example.com/v1",
+						Time:       &metav1.Time{Time: time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC).Local()},
+						FieldsType: "FieldsV1",
+						FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:labels":{".":{},"f:app.kubernetes.io/name":{}}}}`)},
+					},
+				},
+			},
+		},
+		{
+			name: "metadata is not a map",
+			obj: &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "example.com/v1",
+				"kind":       "Foo",
+				"metadata":   "invalid-string-metadata",
+			}},
+			expectErr:   true,
+			errContains: "expected map[string]interface{}",
+		},
+		{
+			name: "metadata contains invalid field type (labels is a string instead of map)",
+			obj: &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "example.com/v1",
+				"kind":       "Foo",
+				"metadata": map[string]interface{}{
+					"name":   "test-cr",
+					"labels": "not-a-map",
+				},
+			}},
+			expectErr:   true,
+			errContains: "cannot restore map from string",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotMeta, errs := getObjectMeta(tc.obj)
+			if tc.expectErr {
+				if len(errs) == 0 {
+					t.Fatalf("expected error containing %q, got none", tc.errContains)
+				}
+				if got := errs.ToAggregate().Error(); !strings.Contains(got, tc.errContains) {
+					t.Errorf("expected error containing %q, got %q", tc.errContains, got)
+				}
+				return
+			}
+			if len(errs) != 0 {
+				t.Fatalf("expected no errors, got: %v", errs.ToAggregate())
+			}
+			if !apiequality.Semantic.DeepEqual(gotMeta, tc.expectedMeta) {
+				t.Errorf("metadata mismatch:\ngot:  %#v\nwant: %#v", gotMeta, tc.expectedMeta)
 			}
 		})
 	}

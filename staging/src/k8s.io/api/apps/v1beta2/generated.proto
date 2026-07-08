@@ -624,6 +624,7 @@ message RollingUpdateStatefulSetStrategy {
 message Scale {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
@@ -795,6 +796,7 @@ message StatefulSetSpec {
   // +k8s:alpha(since: "1.37")=+k8s:immutable
   // +k8s:alpha(since: "1.37")=+k8s:optional
   // +listType=atomic
+  // +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
   repeated .k8s.io.api.core.v1.PersistentVolumeClaim volumeClaimTemplates = 4;
 
   // serviceName is the name of the service that governs this StatefulSet.

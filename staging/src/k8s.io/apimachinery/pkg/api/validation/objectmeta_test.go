@@ -17,12 +17,14 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -579,5 +581,142 @@ func TestValidateAnnotations(t *testing.T) {
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
 		}
+	}
+}
+
+func TestValidateObjectMetaDeclaratively(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("metadata")
+
+	createCases := []struct {
+		name              string
+		obj               *metav1.ObjectMeta
+		requiresNamespace bool
+		betaEnabled       bool
+		expectedErrs      field.ErrorList
+	}{
+		{
+			name: "valid metadata",
+			obj: &metav1.ObjectMeta{
+				Name:      "valid-name",
+				Namespace: "valid-ns",
+			},
+			requiresNamespace: true,
+			betaEnabled:       true,
+			expectedErrs:      nil,
+		},
+		{
+			name: "invalid name format",
+			obj: &metav1.ObjectMeta{
+				Name:      "invalid_name",
+				Namespace: "valid-ns",
+			},
+			requiresNamespace: true,
+			betaEnabled:       true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("name"), "invalid_name", "").MarkFromImperative(),
+			},
+		},
+		{
+			name: "missing required namespace",
+			obj: &metav1.ObjectMeta{
+				Name: "valid-name",
+			},
+			requiresNamespace: true,
+			betaEnabled:       true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("namespace"), "").MarkFromImperative(),
+			},
+		},
+		{
+			name: "negative generation",
+			obj: &metav1.ObjectMeta{
+				Name:       "valid-name",
+				Namespace:  "valid-ns",
+				Generation: -1,
+			},
+			requiresNamespace: true,
+			betaEnabled:       true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("generation"), int64(-1), "").WithOrigin("minimum").MarkCoveredByDeclarative().MarkFromImperative(),
+			},
+		},
+		{
+			name: "managedFields empty operation",
+			obj: &metav1.ObjectMeta{
+				Name:      "valid-name",
+				Namespace: "valid-ns",
+				ManagedFields: []metav1.ManagedFieldsEntry{
+					{
+						FieldsType: "FieldsV1",
+					},
+				},
+			},
+			requiresNamespace: true,
+			betaEnabled:       true,
+			expectedErrs: field.ErrorList{
+				field.Required(fldPath.Child("managedFields").Index(0).Child("operation"), "").MarkCoveredByDeclarative().MarkFromImperative(),
+			},
+		},
+	}
+
+	matcher := field.ErrorMatcher{}.ByField().ByType().BySource().ByOrigin()
+
+	for _, tc := range createCases {
+		t.Run("Create: "+tc.name, func(t *testing.T) {
+			errs := ValidateObjectMetaDeclaratively(ctx, operation.Create, tc.obj, nil, tc.requiresNamespace, NameIsDNSSubdomain, fldPath, tc.betaEnabled)
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
+	}
+
+	updateCases := []struct {
+		name              string
+		obj               *metav1.ObjectMeta
+		oldObj            *metav1.ObjectMeta
+		requiresNamespace bool
+		betaEnabled       bool
+		expectedErrs      field.ErrorList
+	}{
+		{
+			name: "valid update",
+			obj: &metav1.ObjectMeta{
+				Name:            "valid-name",
+				Namespace:       "valid-ns",
+				ResourceVersion: "2",
+			},
+			oldObj: &metav1.ObjectMeta{
+				Name:            "valid-name",
+				Namespace:       "valid-ns",
+				ResourceVersion: "1",
+			},
+			requiresNamespace: true,
+			betaEnabled:       true,
+			expectedErrs:      nil,
+		},
+		{
+			name: "immutable namespace",
+			obj: &metav1.ObjectMeta{
+				Name:            "valid-name",
+				Namespace:       "new-ns",
+				ResourceVersion: "2",
+			},
+			oldObj: &metav1.ObjectMeta{
+				Name:            "valid-name",
+				Namespace:       "valid-ns",
+				ResourceVersion: "1",
+			},
+			requiresNamespace: true,
+			betaEnabled:       true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("namespace"), "new-ns", "").MarkFromImperative(),
+			},
+		},
+	}
+
+	for _, tc := range updateCases {
+		t.Run("Update: "+tc.name, func(t *testing.T) {
+			errs := ValidateObjectMetaDeclaratively(ctx, operation.Update, tc.obj, tc.oldObj, tc.requiresNamespace, NameIsDNSSubdomain, fldPath, tc.betaEnabled)
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
 	}
 }

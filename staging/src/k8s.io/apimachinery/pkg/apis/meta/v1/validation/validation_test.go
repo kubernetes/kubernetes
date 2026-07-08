@@ -375,6 +375,10 @@ func TestValidateManagedFieldsInvalid(t *testing.T) {
 			if len(errs) == 0 {
 				t.Errorf("Validation should have failed")
 			}
+			errs = ValidateManagedFields([]metav1.ManagedFieldsEntry{test}, field.NewPath("managedFields"), CoveredByDeclarative)
+			if len(errs) == 0 {
+				t.Errorf("Validation with CoveredByDeclarative should have failed")
+			}
 		})
 	}
 }
@@ -405,6 +409,10 @@ func TestValidateMangedFieldsValid(t *testing.T) {
 			err := ValidateManagedFields([]metav1.ManagedFieldsEntry{test}, field.NewPath("managedFields"))
 			if err != nil {
 				t.Errorf("Validation failed: %v", err)
+			}
+			err = ValidateManagedFields([]metav1.ManagedFieldsEntry{test}, field.NewPath("managedFields"), CoveredByDeclarative)
+			if err != nil {
+				t.Errorf("Validation with CoveredByDeclarative failed: %v", err)
 			}
 		})
 	}
