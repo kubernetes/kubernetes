@@ -17,6 +17,8 @@ limitations under the License.
 package statefulset
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -27,8 +29,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1510,6 +1514,156 @@ func TestNewPodControllerRef(t *testing.T) {
 	}
 }
 
+func TestApplyRevision(t *testing.T) {
+	set := newStatefulSet(1)
+
+	testCases := []struct {
+		name       string
+		sts        *apps.StatefulSet
+		revisionFn func() *apps.ControllerRevision
+		expectSts  *apps.StatefulSet
+		expectErr  bool
+	}{
+		{
+			name: "clean revision",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				revision, err := newRevision(set, 1, new(int32))
+				if err != nil {
+					panic(err)
+				}
+				return revision
+			},
+			expectSts: set,
+		},
+		{
+			name: "empty revision",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				return &apps.ControllerRevision{}
+			},
+			expectSts: set,
+		},
+		{
+			name: "malformed revision data",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				return &apps.ControllerRevision{
+					Data: runtime.RawExtension{Raw: []byte(`[]`)},
+				}
+			},
+			expectErr: true,
+		},
+		{
+			name: "spec change is applied",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				changed := newStatefulSet(1)
+				changed.Spec.Template.Spec.Containers[0].Image = "nginx:latest"
+				changed.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{{Name: "foo", Value: "bar"}}
+				revision, err := newRevision(changed, 1, new(int32))
+				if err != nil {
+					panic(err)
+				}
+				return revision
+			},
+			expectSts: func() *apps.StatefulSet {
+				changed := newStatefulSet(1)
+				changed.Spec.Template.Spec.Containers[0].Image = "nginx:latest"
+				changed.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{{Name: "foo", Value: "bar"}}
+				return changed
+			}(),
+		},
+		{
+			name: "metadata changes are ignored",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				copy := set.DeepCopy()
+				copy.Namespace = "non-default-namespace"
+				copy.UID = "non-default-uid"
+				copy.Annotations = map[string]string{"injected": "true"}
+				buf := new(bytes.Buffer)
+				enc := json.NewEncoder(buf)
+				if err := enc.Encode(copy); err != nil {
+					panic(err)
+				}
+				return &apps.ControllerRevision{
+					Data: runtime.RawExtension{Raw: buf.Bytes()},
+				}
+			},
+			expectSts: set,
+		},
+		{
+			name: "status changes are ignored",
+			sts: func() *apps.StatefulSet {
+				s := newStatefulSet(1)
+				cc := int32(1)
+				s.Status.CollisionCount = &cc
+				s.Status.ObservedGeneration = 5
+				return s
+			}(),
+			revisionFn: func() *apps.ControllerRevision {
+				copy := set.DeepCopy()
+				cc := int32(99)
+				copy.Status.CollisionCount = &cc
+				copy.Status.ObservedGeneration = 100
+				buf := new(bytes.Buffer)
+				enc := json.NewEncoder(buf)
+				if err := enc.Encode(copy); err != nil {
+					panic(err)
+				}
+				return &apps.ControllerRevision{
+					Data: runtime.RawExtension{Raw: buf.Bytes()},
+				}
+			},
+			expectSts: func() *apps.StatefulSet {
+				s := newStatefulSet(1)
+				cc := int32(1)
+				s.Status.CollisionCount = &cc
+				s.Status.ObservedGeneration = 5
+				return s
+			}(),
+		},
+		{
+			name: "typemeta changes are ignored",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				copy := set.DeepCopy()
+				copy.Kind = "NotAStatefulSet"
+				copy.APIVersion = "v0fake"
+				buf := new(bytes.Buffer)
+				enc := json.NewEncoder(buf)
+				if err := enc.Encode(copy); err != nil {
+					panic(err)
+				}
+				return &apps.ControllerRevision{
+					Data: runtime.RawExtension{Raw: buf.Bytes()},
+				}
+			},
+			expectSts: set,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			revision := tc.revisionFn()
+			restoredSet, err := ApplyRevision(tc.sts, revision)
+			if tc.expectErr && err == nil {
+				t.Errorf("expected error but got nil")
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("unexpected error %s", err)
+			}
+			if tc.expectErr {
+				return
+			}
+			if !apiequality.Semantic.DeepEqual(tc.expectSts, restoredSet) {
+				t.Errorf("unexpected diff between expected and restored: %s", cmp.Diff(tc.expectSts, restoredSet))
+			}
+		})
+	}
+}
+
 func TestCreateApplyRevision(t *testing.T) {
 	set := newStatefulSet(1)
 	set.Status.CollisionCount = new(int32)
@@ -1541,39 +1695,6 @@ func TestCreateApplyRevision(t *testing.T) {
 	}
 	if value != expectedValue {
 		t.Errorf("for annotation %s wanted %s got %s", key, expectedValue, value)
-	}
-}
-
-func TestRollingUpdateApplyRevision(t *testing.T) {
-	set := newStatefulSet(1)
-	set.Status.CollisionCount = new(int32)
-	currentSet := set.DeepCopy()
-	currentRevision, err := newRevision(set, 1, set.Status.CollisionCount)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	set.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{{Name: "foo", Value: "bar"}}
-	updateSet := set.DeepCopy()
-	updateRevision, err := newRevision(set, 2, set.Status.CollisionCount)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	restoredCurrentSet, err := ApplyRevision(set, currentRevision)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(currentSet.Spec.Template, restoredCurrentSet.Spec.Template) {
-		t.Errorf("want %v got %v", currentSet.Spec.Template, restoredCurrentSet.Spec.Template)
-	}
-
-	restoredUpdateSet, err := ApplyRevision(set, updateRevision)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(updateSet.Spec.Template, restoredUpdateSet.Spec.Template) {
-		t.Errorf("want %v got %v", updateSet.Spec.Template, restoredUpdateSet.Spec.Template)
 	}
 }
 
