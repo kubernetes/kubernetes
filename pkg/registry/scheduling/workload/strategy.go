@@ -62,6 +62,9 @@ func (workloadStrategy) DeclarativeValidationConfig(ctx context.Context, obj, ol
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
 		opts = append(opts, string(features.DRAWorkloadResourceClaims))
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
+		opts = append(opts, string(features.PodGroupPreemptionPolicy))
+	}
 	return rest.DeclarativeValidationConfig{Options: opts}
 }
 
@@ -124,6 +127,7 @@ func dropDisabledPodGroupTemplatesFields(templates, oldTemplates []scheduling.Po
 		template := &templates[i]
 		dropDisabledSchedulingConstraintsFields(template, oldTemplate)
 		dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate)
+		dropDisabledPreemptionPolicyFields(template, oldTemplate)
 	}
 }
 
@@ -145,10 +149,24 @@ func dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate *scheduli
 	template.ResourceClaims = nil
 }
 
+// dropDisabledPreemptionPolicyFields removes the PreemptionPolicy field
+// from the PodGroupTemplate if the PodGroupPreemptionPolicy feature gate is disabled,
+// unless the field already used in the old PodGroupTemplate.
+func dropDisabledPreemptionPolicyFields(template, oldTemplate *scheduling.PodGroupTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldTemplate) {
+		return
+	}
+	template.PreemptionPolicy = nil
+}
+
 func schedulingConstraintsInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && pgt.SchedulingConstraints != nil
 }
 
 func draWorkloadResourceClaimsInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && len(pgt.ResourceClaims) > 0
+}
+
+func preemptionPolicyInUse(pgt *scheduling.PodGroupTemplate) bool {
+	return pgt != nil && pgt.PreemptionPolicy != nil
 }

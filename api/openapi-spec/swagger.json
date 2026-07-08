@@ -19924,6 +19924,10 @@
           "description": "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
           "type": "string"
         },
+        "preemptionPolicy": {
+          "description": "PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.",
+          "type": "string"
+        },
         "priority": {
           "description": "Priority is the value of priority of pod groups created from this template. Various system components use this field to find the priority of the pod group. The higher the value, the higher the priority. This field is immutable.",
           "format": "int32",
