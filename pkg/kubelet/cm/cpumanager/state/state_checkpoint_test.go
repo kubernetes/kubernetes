@@ -744,6 +744,13 @@ func AssertStateEqual(t *testing.T, sf State, sm State) {
 	if !reflect.DeepEqual(podcpuassignmentSf, podcpuassignmentSm) {
 		t.Errorf("State CPU assignments mismatch. Have %s, want %s", podcpuassignmentSf, podcpuassignmentSm)
 	}
+
+	cpubaselinesSf := sf.GetCPUBaselines()
+	cpubaselinesSm := sm.GetCPUBaselines()
+	if !reflect.DeepEqual(cpubaselinesSf, cpubaselinesSm) {
+		t.Errorf("State CPU baseline entries mismatch. Have %s, want %s", cpubaselinesSf, cpubaselinesSm)
+	}
+
 }
 
 func TestCPUManagerCheckpoint_MarshalCheckpoint_HashCompatibility(t *testing.T) {

@@ -30,6 +30,7 @@ type stateMemory struct {
 	sync.RWMutex
 	logger         klog.Logger
 	assignments    ContainerCPUAssignments
+	baselines      ContainerCPUBaselines
 	podAssignments PodCPUAssignments
 	defaultCPUSet  cpuset.CPUSet
 }
@@ -42,21 +43,21 @@ func NewMemoryState(logger klog.Logger) State {
 	// since we store a checkpoint, we can use the relatively expensive "WithName".
 	logger = klog.LoggerWithName(logger, "CPUManager state memory")
 	logger.Info("Initialized")
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
-		return &stateMemory{
-			logger:         logger,
-			assignments:    ContainerCPUAssignments{},
-			podAssignments: PodCPUAssignments{},
-			defaultCPUSet:  cpuset.New(),
-		}
-	}
-
 	return &stateMemory{
-		logger:        logger,
-		assignments:   ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.New(),
+		logger:         logger,
+		assignments:    ContainerCPUAssignments{},
+		baselines:      ContainerCPUBaselines{},
+		podAssignments: PodCPUAssignments{},
+		defaultCPUSet:  cpuset.New(),
 	}
+}
+
+func (s *stateMemory) GetBaselineCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	entry, exists := s.baselines[podUID][containerName]
+	return entry.Baseline.Clone(), exists
 }
 
 func (s *stateMemory) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
@@ -102,16 +103,35 @@ func (s *stateMemory) GetPodCPUAssignments() PodCPUAssignments {
 	return clone
 }
 
+func (s *stateMemory) GetCPUBaselines() ContainerCPUBaselines {
+	s.RLock()
+	defer s.RUnlock()
+	return s.baselines.Clone()
+}
+
 func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
-
 	if _, ok := s.assignments[podUID]; !ok {
 		s.assignments[podUID] = make(map[string]cpuset.CPUSet)
 	}
 
 	s.assignments[podUID][containerName] = cset
-	s.logger.Info("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "cpuSet", cset)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		if _, ok := s.baselines[podUID]; !ok {
+			s.baselines[podUID] = make(map[string]ContainerCPUBaseline)
+		}
+
+		if _, ok := s.baselines[podUID][containerName]; !ok {
+			s.baselines[podUID][containerName] = ContainerCPUBaseline{Baseline: cset.Clone()}
+		}
+
+		baselineSet := s.baselines[podUID][containerName].Baseline
+		s.logger.Info("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "CPUSet", cset, "Baseline CPUSet", baselineSet)
+	} else {
+		s.logger.Info("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "CPUSet", cset)
+	}
 }
 
 func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) {
@@ -149,6 +169,14 @@ func (s *stateMemory) SetPodCPUAssignments(a PodCPUAssignments) {
 	s.logger.Info("Updated pod CPUSet assignments", "assignments", a)
 }
 
+func (s *stateMemory) SetCPUBaselines(a ContainerCPUBaselines) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.baselines = a.Clone()
+	s.logger.Info("Updated CPUSet baselines", "baselines", a)
+}
+
 func (s *stateMemory) Delete(podUID string, containerName string) {
 	s.Lock()
 	defer s.Unlock()
@@ -158,6 +186,14 @@ func (s *stateMemory) Delete(podUID string, containerName string) {
 		delete(s.assignments, podUID)
 	}
 	s.logger.V(2).Info("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		delete(s.baselines[podUID], containerName)
+		if len(s.baselines[podUID]) == 0 {
+			delete(s.baselines, podUID)
+		}
+		s.logger.V(2).Info("Deleted CPUSet baseline entry", "podUID", podUID, "containerName", containerName)
+	}
 }
 
 // DeletePod deletes pod-level CPU assignments for specified pod. It does not
@@ -176,8 +212,7 @@ func (s *stateMemory) ClearState() {
 
 	s.defaultCPUSet = cpuset.New()
 	s.assignments = make(ContainerCPUAssignments)
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
-		s.podAssignments = make(PodCPUAssignments)
-	}
+	s.baselines = make(ContainerCPUBaselines)
+	s.podAssignments = make(PodCPUAssignments)
 	s.logger.V(2).Info("Cleared state")
 }
