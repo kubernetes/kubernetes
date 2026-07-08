@@ -8474,7 +8474,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
               }
             ],
-            "description": "DeleteOptions may be provided"
+            "description": "deleteOptions may be provided"
           },
           "kind": {
             "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
@@ -8487,7 +8487,7 @@
               }
             ],
             "default": {},
-            "description": "ObjectMeta describes the pod that is being evicted."
+            "description": "metadata describes the pod that is being evicted."
           }
         },
         "type": "object",
