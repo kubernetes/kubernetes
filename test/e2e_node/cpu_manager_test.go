@@ -3599,8 +3599,11 @@ func BePackedCPUs() types.GomegaMatcher {
 // Custom matcher for checking distributed CPUs.
 func BeDistributedCPUs(expectedSpread int) types.GomegaMatcher {
 	return gcustom.MakeMatcher(func(allocatedCPUs cpuset.CPUSet) (bool, error) {
-		distribution := computeNUMADistribution(allocatedCPUs)
-		for _, count := range distribution {
+		counts, err := numaAllocationCounts(allocatedCPUs, false)
+		if err != nil {
+			return false, err
+		}
+		for _, count := range counts {
 			if count != expectedSpread {
 				return false, nil
 			}
@@ -3610,6 +3613,21 @@ func BeDistributedCPUs(expectedSpread int) types.GomegaMatcher {
 }
 
 // Other helpers
+
+func numaAllocationCounts(allocatedCPUs cpuset.CPUSet, activeOnly bool) ([]int, error) {
+	distribution := computeNUMADistribution(allocatedCPUs)
+	counts := make([]int, 0, len(distribution))
+	for _, count := range distribution {
+		if activeOnly && count == 0 {
+			continue
+		}
+		counts = append(counts, count)
+	}
+	if len(counts) == 0 {
+		return nil, fmt.Errorf("no CPUs allocated on any NUMA node")
+	}
+	return counts, nil
+}
 
 func getContainerAllowedCPUsFromLogs(podName, cntName, logs string) cpuset.CPUSet {
 	framework.Logf("got pod logs: <%v>", logs)
