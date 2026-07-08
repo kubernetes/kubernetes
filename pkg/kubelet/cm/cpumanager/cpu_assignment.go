@@ -1065,30 +1065,26 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 				})
 			}
 
-			// If alignBySocket is enabled, combo in same socket will be considered firstly.
-			// If the best "balance score" for this combo is less than the
-			// lowest "balance score" of all previous combos, then update this
-			// combo (and remainder set) to be the best one found so far.
+			// If alignBySocket is enabled, prefer combinations whose NUMA nodes
+			// are in one socket over any cross-socket combination. When comparing
+			// combinations in the same socket category, pick the one with the
+			// lower balance score.
+			inSameSocket := false
 			if alignBySocket {
-				if topo.CPUDetails.AreNUMANodesInSameSocket(combo) && !bestBalanceInOneSocket {
-					bestBalance = bestLocalBalance
-					bestRemainder = bestLocalRemainder
-					bestCombo = combo
-					bestBalanceInOneSocket = true
-					return Continue
-				}
-				if topo.CPUDetails.AreNUMANodesInSameSocket(combo) == bestBalanceInOneSocket && bestLocalBalance < bestBalance {
-					bestBalance = bestLocalBalance
-					bestRemainder = bestLocalRemainder
-					bestCombo = combo
-				}
-				return Continue
+				inSameSocket = topo.CPUDetails.AreNUMANodesInSameSocket(combo)
+			}
+			isBetter := bestLocalBalance < bestBalance
+			if alignBySocket && inSameSocket != bestBalanceInOneSocket {
+				isBetter = inSameSocket
 			}
 
-			if bestLocalBalance < bestBalance {
+			if isBetter {
 				bestBalance = bestLocalBalance
 				bestRemainder = bestLocalRemainder
 				bestCombo = combo
+				if alignBySocket {
+					bestBalanceInOneSocket = inSameSocket
+				}
 			}
 
 			return Continue
