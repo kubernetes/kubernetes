@@ -470,15 +470,12 @@ func (s *RawSerializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runti
 	return err
 }
 
-func doEncodeWithHeader(obj any, w io.Writer, field byte, precomputedSize int, memAlloc runtime.MemoryAllocator) (size int, err error) {
-	// Field identifier
-	n, err := w.Write([]byte{field})
-	size += n
-	if err != nil {
-		return size, err
-	}
-	// Size
-	n, err = writeVarintGenerated(w, precomputedSize)
+func doEncodeWithHeader(obj any, w io.Writer, field byte, precomputedSize int, headerScratch []byte, memAlloc runtime.MemoryAllocator) (size int, err error) {
+	// Field identifier and size
+	header := headerScratch[:1+sovGenerated(uint64(precomputedSize))]
+	header[0] = field
+	encodeVarintGenerated(header, len(header), uint64(precomputedSize))
+	n, err := w.Write(header)
 	size += n
 	if err != nil {
 		return size, err
