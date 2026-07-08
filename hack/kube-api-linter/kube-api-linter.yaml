@@ -43,6 +43,14 @@ lintersConfig:
         type: "All"
         dependsOn:
           - "k8s:optional"
+      - identifier: "listType"
+        type: "All"
+        dependsOn:
+          - "k8s:listType"
+      - identifier: "listMapKey"
+        type: "All"
+        dependsOn:
+          - "k8s:listMapKey"
   # jsonTags:
   #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
   # nomaps:
