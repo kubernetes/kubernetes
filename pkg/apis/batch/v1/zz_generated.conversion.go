@@ -25,11 +25,9 @@ import (
 	unsafe "unsafe"
 
 	batchv1 "k8s.io/api/batch/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func init() {
@@ -106,6 +104,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*batch.JobList)(nil), (*batchv1.JobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_batch_JobList_To_v1_JobList(a.(*batch.JobList), b.(*batchv1.JobList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batchv1.JobSpec)(nil), (*batch.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobSpec_To_batch_JobSpec(a.(*batchv1.JobSpec), b.(*batch.JobSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.JobSpec)(nil), (*batchv1.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobSpec_To_v1_JobSpec(a.(*batch.JobSpec), b.(*batchv1.JobSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -199,16 +207,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*batch.JobSpec)(nil), (*batchv1.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_JobSpec_To_v1_JobSpec(a.(*batch.JobSpec), b.(*batchv1.JobSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*batchv1.JobSpec)(nil), (*batch.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JobSpec_To_batch_JobSpec(a.(*batchv1.JobSpec), b.(*batch.JobSpec), scope)
-	}); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -246,17 +244,7 @@ func Convert_batch_CronJob_To_v1_CronJob(in *batch.CronJob, out *batchv1.CronJob
 
 func autoConvert_v1_CronJobList_To_batch_CronJobList(in *batchv1.CronJobList, out *batch.CronJobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batch.CronJob, len(*in))
-		for i := range *in {
-			if err := Convert_v1_CronJob_To_batch_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batch.CronJob)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -267,17 +255,7 @@ func Convert_v1_CronJobList_To_batch_CronJobList(in *batchv1.CronJobList, out *b
 
 func autoConvert_batch_CronJobList_To_v1_CronJobList(in *batch.CronJobList, out *batchv1.CronJobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batchv1.CronJob, len(*in))
-		for i := range *in {
-			if err := Convert_batch_CronJob_To_v1_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batchv1.CronJob)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -287,16 +265,7 @@ func Convert_batch_CronJobList_To_v1_CronJobList(in *batch.CronJobList, out *bat
 }
 
 func autoConvert_v1_CronJobSpec_To_batch_CronJobSpec(in *batchv1.CronJobSpec, out *batch.CronJobSpec, s conversion.Scope) error {
-	out.Schedule = in.Schedule
-	out.TimeZone = (*string)(unsafe.Pointer(in.TimeZone))
-	out.StartingDeadlineSeconds = (*int64)(unsafe.Pointer(in.StartingDeadlineSeconds))
-	out.ConcurrencyPolicy = batch.ConcurrencyPolicy(in.ConcurrencyPolicy)
-	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
-	if err := Convert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
-		return err
-	}
-	out.SuccessfulJobsHistoryLimit = (*int32)(unsafe.Pointer(in.SuccessfulJobsHistoryLimit))
-	out.FailedJobsHistoryLimit = (*int32)(unsafe.Pointer(in.FailedJobsHistoryLimit))
+	*out = *(*batch.CronJobSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -306,16 +275,7 @@ func Convert_v1_CronJobSpec_To_batch_CronJobSpec(in *batchv1.CronJobSpec, out *b
 }
 
 func autoConvert_batch_CronJobSpec_To_v1_CronJobSpec(in *batch.CronJobSpec, out *batchv1.CronJobSpec, s conversion.Scope) error {
-	out.Schedule = in.Schedule
-	out.TimeZone = (*string)(unsafe.Pointer(in.TimeZone))
-	out.StartingDeadlineSeconds = (*int64)(unsafe.Pointer(in.StartingDeadlineSeconds))
-	out.ConcurrencyPolicy = batchv1.ConcurrencyPolicy(in.ConcurrencyPolicy)
-	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
-	if err := Convert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
-		return err
-	}
-	out.SuccessfulJobsHistoryLimit = (*int32)(unsafe.Pointer(in.SuccessfulJobsHistoryLimit))
-	out.FailedJobsHistoryLimit = (*int32)(unsafe.Pointer(in.FailedJobsHistoryLimit))
+	*out = *(*batchv1.CronJobSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -398,17 +358,7 @@ func Convert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *
 
 func autoConvert_v1_JobList_To_batch_JobList(in *batchv1.JobList, out *batch.JobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batch.Job, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Job_To_batch_Job(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batch.Job)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -419,17 +369,7 @@ func Convert_v1_JobList_To_batch_JobList(in *batchv1.JobList, out *batch.JobList
 
 func autoConvert_batch_JobList_To_v1_JobList(in *batch.JobList, out *batchv1.JobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batchv1.Job, len(*in))
-		for i := range *in {
-			if err := Convert_batch_Job_To_v1_Job(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batchv1.Job)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -439,61 +379,27 @@ func Convert_batch_JobList_To_v1_JobList(in *batch.JobList, out *batchv1.JobList
 }
 
 func autoConvert_v1_JobSpec_To_batch_JobSpec(in *batchv1.JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
-	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
-	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.PodFailurePolicy = (*batch.PodFailurePolicy)(unsafe.Pointer(in.PodFailurePolicy))
-	out.SuccessPolicy = (*batch.SuccessPolicy)(unsafe.Pointer(in.SuccessPolicy))
-	out.BackoffLimit = (*int32)(unsafe.Pointer(in.BackoffLimit))
-	out.BackoffLimitPerIndex = (*int32)(unsafe.Pointer(in.BackoffLimitPerIndex))
-	out.MaxFailedIndexes = (*int32)(unsafe.Pointer(in.MaxFailedIndexes))
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
-	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	out.TTLSecondsAfterFinished = (*int32)(unsafe.Pointer(in.TTLSecondsAfterFinished))
-	out.CompletionMode = (*batch.CompletionMode)(unsafe.Pointer(in.CompletionMode))
-	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
-	out.PodReplacementPolicy = (*batch.PodReplacementPolicy)(unsafe.Pointer(in.PodReplacementPolicy))
-	out.ManagedBy = (*string)(unsafe.Pointer(in.ManagedBy))
+	*out = *(*batch.JobSpec)(unsafe.Pointer(in))
 	return nil
+}
+
+// Convert_v1_JobSpec_To_batch_JobSpec is an autogenerated conversion function.
+func Convert_v1_JobSpec_To_batch_JobSpec(in *batchv1.JobSpec, out *batch.JobSpec, s conversion.Scope) error {
+	return autoConvert_v1_JobSpec_To_batch_JobSpec(in, out, s)
 }
 
 func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *batchv1.JobSpec, s conversion.Scope) error {
-	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
-	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
-	out.PodFailurePolicy = (*batchv1.PodFailurePolicy)(unsafe.Pointer(in.PodFailurePolicy))
-	out.SuccessPolicy = (*batchv1.SuccessPolicy)(unsafe.Pointer(in.SuccessPolicy))
-	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.BackoffLimit = (*int32)(unsafe.Pointer(in.BackoffLimit))
-	out.BackoffLimitPerIndex = (*int32)(unsafe.Pointer(in.BackoffLimitPerIndex))
-	out.MaxFailedIndexes = (*int32)(unsafe.Pointer(in.MaxFailedIndexes))
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
-	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	out.TTLSecondsAfterFinished = (*int32)(unsafe.Pointer(in.TTLSecondsAfterFinished))
-	out.CompletionMode = (*batchv1.CompletionMode)(unsafe.Pointer(in.CompletionMode))
-	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
-	out.PodReplacementPolicy = (*batchv1.PodReplacementPolicy)(unsafe.Pointer(in.PodReplacementPolicy))
-	out.ManagedBy = (*string)(unsafe.Pointer(in.ManagedBy))
+	*out = *(*batchv1.JobSpec)(unsafe.Pointer(in))
 	return nil
 }
 
+// Convert_batch_JobSpec_To_v1_JobSpec is an autogenerated conversion function.
+func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *batchv1.JobSpec, s conversion.Scope) error {
+	return autoConvert_batch_JobSpec_To_v1_JobSpec(in, out, s)
+}
+
 func autoConvert_v1_JobStatus_To_batch_JobStatus(in *batchv1.JobStatus, out *batch.JobStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]batch.JobCondition)(unsafe.Pointer(&in.Conditions))
-	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*metav1.Time)(unsafe.Pointer(in.CompletionTime))
-	out.Active = in.Active
-	out.Succeeded = in.Succeeded
-	out.Failed = in.Failed
-	out.Terminating = (*int32)(unsafe.Pointer(in.Terminating))
-	out.CompletedIndexes = in.CompletedIndexes
-	out.FailedIndexes = (*string)(unsafe.Pointer(in.FailedIndexes))
-	out.UncountedTerminatedPods = (*batch.UncountedTerminatedPods)(unsafe.Pointer(in.UncountedTerminatedPods))
-	out.Ready = (*int32)(unsafe.Pointer(in.Ready))
+	*out = *(*batch.JobStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -503,17 +409,7 @@ func Convert_v1_JobStatus_To_batch_JobStatus(in *batchv1.JobStatus, out *batch.J
 }
 
 func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *batchv1.JobStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]batchv1.JobCondition)(unsafe.Pointer(&in.Conditions))
-	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*metav1.Time)(unsafe.Pointer(in.CompletionTime))
-	out.Active = in.Active
-	out.Terminating = (*int32)(unsafe.Pointer(in.Terminating))
-	out.Ready = (*int32)(unsafe.Pointer(in.Ready))
-	out.Succeeded = in.Succeeded
-	out.Failed = in.Failed
-	out.CompletedIndexes = in.CompletedIndexes
-	out.FailedIndexes = (*string)(unsafe.Pointer(in.FailedIndexes))
-	out.UncountedTerminatedPods = (*batchv1.UncountedTerminatedPods)(unsafe.Pointer(in.UncountedTerminatedPods))
+	*out = *(*batchv1.JobStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -523,10 +419,7 @@ func Convert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *batchv1.J
 }
 
 func autoConvert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(in *batchv1.JobTemplateSpec, out *batch.JobTemplateSpec, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
+	*out = *(*batch.JobTemplateSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -536,10 +429,7 @@ func Convert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(in *batchv1.JobTemplate
 }
 
 func autoConvert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(in *batch.JobTemplateSpec, out *batchv1.JobTemplateSpec, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
+	*out = *(*batchv1.JobTemplateSpec)(unsafe.Pointer(in))
 	return nil
 }
 

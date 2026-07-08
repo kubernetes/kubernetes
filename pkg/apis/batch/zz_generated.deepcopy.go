@@ -252,6 +252,11 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.ActiveDeadlineSeconds != nil {
+		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	if in.PodFailurePolicy != nil {
 		in, out := &in.PodFailurePolicy, &out.PodFailurePolicy
 		*out = new(PodFailurePolicy)
@@ -261,11 +266,6 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 		in, out := &in.SuccessPolicy, &out.SuccessPolicy
 		*out = new(SuccessPolicy)
 		(*in).DeepCopyInto(*out)
-	}
-	if in.ActiveDeadlineSeconds != nil {
-		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-		*out = new(int64)
-		**out = **in
 	}
 	if in.BackoffLimit != nil {
 		in, out := &in.BackoffLimit, &out.BackoffLimit
@@ -354,11 +354,6 @@ func (in *JobStatus) DeepCopyInto(out *JobStatus) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.Ready != nil {
-		in, out := &in.Ready, &out.Ready
-		*out = new(int32)
-		**out = **in
-	}
 	if in.FailedIndexes != nil {
 		in, out := &in.FailedIndexes, &out.FailedIndexes
 		*out = new(string)
@@ -368,6 +363,11 @@ func (in *JobStatus) DeepCopyInto(out *JobStatus) {
 		in, out := &in.UncountedTerminatedPods, &out.UncountedTerminatedPods
 		*out = new(UncountedTerminatedPods)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.Ready != nil {
+		in, out := &in.Ready, &out.Ready
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
