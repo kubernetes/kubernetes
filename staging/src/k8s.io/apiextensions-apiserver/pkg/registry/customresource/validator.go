@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -36,7 +37,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	apiextensionsvalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
@@ -204,13 +204,20 @@ func (a customResourceValidator) validateObjectMetaUpdateDeclaratively(ctx conte
 }
 
 func getObjectMeta(obj *unstructured.Unstructured) (*metav1.ObjectMeta, field.ErrorList) {
-	metadata, _, err := objectmeta.GetObjectMeta(obj.UnstructuredContent(), false)
-	if err != nil {
-		return nil, field.ErrorList{field.Invalid(field.NewPath("metadata"), obj.UnstructuredContent()["metadata"], err.Error())}
-	}
-	// If the "metadata" key is entirely missing from the unstructured object, GetObjectMeta returns nil, nil.
-	if metadata == nil {
+	if obj == nil || obj.UnstructuredContent() == nil {
 		return &metav1.ObjectMeta{}, nil
 	}
-	return metadata, nil
+	raw := obj.UnstructuredContent()["metadata"]
+	if raw == nil {
+		return &metav1.ObjectMeta{}, nil
+	}
+	metadataMap, ok := raw.(map[string]interface{})
+	if !ok {
+		return nil, field.ErrorList{field.Invalid(field.NewPath("metadata"), raw, fmt.Sprintf("expected map[string]interface{}, got %T", raw))}
+	}
+	meta := &metav1.ObjectMeta{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(metadataMap, meta); err != nil {
+		return nil, field.ErrorList{field.Invalid(field.NewPath("metadata"), raw, err.Error())}
+	}
+	return meta, nil
 }
