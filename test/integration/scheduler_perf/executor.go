@@ -20,12 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"strings"
 	"sync"
 	"testing"
@@ -105,9 +108,6 @@ func (e *WorkloadExecutor) runOp(tCtx ktesting.TContext, op realOp, opIndex int)
 		return e.runStartCollectingProfileOp(tCtx, opIndex, concreteOp)
 	case *stopCollectingProfileOp:
 		return e.runStopCollectingProfileOp(tCtx, opIndex, concreteOp)
-	case *createResourceDriverOp:
-		concreteOp.run(tCtx, e.scheduler.Profiles["default-scheduler"].SharedDRAManager())
-		return nil
 	default:
 		return e.runDefaultOp(tCtx, opIndex, concreteOp)
 	}
@@ -602,11 +602,66 @@ func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup,
 			collector.run(collectorCtx)
 		}()
 	}
+	startMemFileName := ""
+	if enableMemProfile {
+		gcForMemProfile()
+		startMemFileName = startCumulativeProfile(tCtx, "allocs", "mem.prof")
+	}
+	startBlockFileName := ""
+	if enableBlockProfile {
+		// Rate of 1 captures every blocking event.
+		runtime.SetBlockProfileRate(1)
+		startBlockFileName = startCumulativeProfile(tCtx, "block", "block.prof")
+	}
+	startMutexFileName := ""
+	if enableMutexProfile {
+		// Fraction of 1 captures every mutex contention event.
+		runtime.SetMutexProfileFraction(1)
+		startMutexFileName = startCumulativeProfile(tCtx, "mutex", "mutex.prof")
+	}
+	var cpuProfile io.WriteCloser
+	if enableCPUProfile {
+		f, err := createOutputFile("-cpu.prof")
+		tCtx.ExpectNoError(err, "create CPU profile")
+		cpuProfile = f
+		tCtx.ExpectNoError(pprof.StartCPUProfile(f), "start CPU profile")
+	}
+	var traceFile io.WriteCloser
+	if enableTrace {
+		f, err := createOutputFile("-trace.out")
+		tCtx.ExpectNoError(err, "create trace file")
+		traceFile = f
+		tCtx.ExpectNoError(trace.Start(f), "start trace")
+	}
 	if b, ok := tCtx.TB().(*testing.B); ok {
 		b.ResetTimer()
 	}
-	tCtx.Log("Started metrics collection")
-	return collectorsList, collectorCtx.Cancel, nil
+	tCtx.Logf("Started metrics collection (%s)", perTestFilePrefix)
+	cancel := func(reason string) {
+		if cpuProfile != nil {
+			pprof.StopCPUProfile()
+			tCtx.ExpectNoError(cpuProfile.Close(), "close CPU profile")
+		}
+		if traceFile != nil {
+			trace.Stop()
+			tCtx.ExpectNoError(traceFile.Close(), "close trace file")
+		}
+		if enableBlockProfile {
+			runtime.SetBlockProfileRate(0)
+			endCumulativeProfile(tCtx, "block", "block.prof", startBlockFileName)
+		}
+		if enableMutexProfile {
+			runtime.SetMutexProfileFraction(0)
+			endCumulativeProfile(tCtx, "mutex", "mutex.prof", startMutexFileName)
+		}
+		if enableMemProfile {
+			gcForMemProfile()
+			endCumulativeProfile(tCtx, "allocs", "mem.prof", startMemFileName)
+		}
+		collectorCtx.Cancel(reason)
+	}
+
+	return collectorsList, cancel, nil
 }
 
 func stopCollectingMetrics(tCtx ktesting.TContext, collectorCancel func(string), collectorWG *sync.WaitGroup, threshold float64, tms thresholdMetricSelector, opIndex int, collectors []testDataCollector) ([]DataItem, error) {
@@ -627,7 +682,7 @@ func stopCollectingMetrics(tCtx ktesting.TContext, collectorCancel func(string),
 			tCtx.Errorf("op %d: %s", opIndex, err)
 		}
 	}
-	tCtx.Log("Stopped metrics collection")
+	tCtx.Logf("Stopped metrics collection (%s)", perTestFilePrefix)
 	return dataItems, nil
 }
 
@@ -1140,4 +1195,45 @@ func getUnstructuredFromFile(path string) (*unstructured.Unstructured, *schema.G
 		return nil, nil, fmt.Errorf("cannot convert spec file in %v to an unstructured obj", path)
 	}
 	return unstructuredObj, gvk, nil
+}
+
+// gcForMemProfile forces the runtime to update memory profile statistics.
+// According to https://go.dev/wiki/Performance#memory-profiler, memprof stats
+// are updated in a deferred way. Several consecutive GCs push the update
+// pipeline forward to present a consistent snapshot.
+func gcForMemProfile() {
+	runtime.GC()
+	runtime.GC()
+	runtime.GC()
+}
+
+// startCumulativeProfile writes an initial snapshot of the named pprof profile
+// to a "-start-<fileSuffix>" output file.
+// Returns the path of the snapshot file to be passed to endCumulativeProfile.
+func startCumulativeProfile(tCtx ktesting.TContext, pprofName, fileSuffix string) string {
+	f, err := createOutputFile("-start-" + fileSuffix)
+	tCtx.ExpectNoError(err, "create start "+pprofName+" profile")
+	startFileName := f.Name()
+	tCtx.ExpectNoError(pprof.Lookup(pprofName).WriteTo(f, 0), "write to "+pprofName+" profile")
+	tCtx.ExpectNoError(f.Close(), "close start "+pprofName+" profile")
+	return startFileName
+}
+
+// endCumulativeProfile writes a final snapshot of the named pprof profile to a
+// "-end-<fileSuffix>" file and computes a "-delta-<fileSuffix>" file via
+// go tool pprof. Developers don't need to remember the go tool pprof invocation
+// for deltas.
+func endCumulativeProfile(tCtx ktesting.TContext, pprofName, fileSuffix, startFileName string) {
+	f, err := createOutputFile("-end-" + fileSuffix)
+	tCtx.ExpectNoError(err, "create end "+pprofName+" profile")
+	endFileName := f.Name()
+	tCtx.ExpectNoError(pprof.Lookup(pprofName).WriteTo(f, 0), "write to "+pprofName+" profile")
+	tCtx.ExpectNoError(f.Close(), "close end "+pprofName+" profile")
+
+	deltaFileName := strings.ReplaceAll(endFileName, "-end-"+fileSuffix, "-delta-"+fileSuffix)
+	cmdString := fmt.Sprintf("go tool pprof -proto -output=%s -base=%s %s", deltaFileName, startFileName, endFileName)
+	tCtx.Log(cmdString)
+	cmd := exec.Command("go", "tool", "pprof", "-proto", "-output="+deltaFileName, "-base="+startFileName, endFileName)
+	out, err := cmd.CombinedOutput()
+	tCtx.ExpectNoError(err, cmdString+":\n"+string(out))
 }

@@ -21,17 +21,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
 	"maps"
 	"os"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
@@ -41,7 +42,12 @@ import (
 )
 
 // createAny defines an op where some object gets created from a YAML file.
-// The nameset can be specified.
+// The namespace can be specified.
+// Go templating is supported with some additional methods (see getTemplateFuncs)
+// and parameters:
+// .Index: start index for counting
+// .Count: number of items to create
+// .<template param>: a member of the operation's templateParams
 type createAny struct {
 	// Must match createAnyOpcode.
 	Opcode operationCode
@@ -819,6 +825,9 @@ func (scp stopCollectingProfileOp) patchParams(_ *Workload) (realOp, error) {
 }
 
 // resolveTemplateParams resolves the template parameters using the workload parameters.
+// Values starting with $ are references to workload parameters.
+// The string after an optional | is the default value, using YAML encoding
+// (in particular, a plain string without quotation marks is valid).
 func resolveTemplateParams(templateParams map[string]any, w *Workload) (map[string]any, error) {
 	if len(templateParams) == 0 {
 		return templateParams, nil
@@ -827,8 +836,24 @@ func resolveTemplateParams(templateParams map[string]any, w *Workload) (map[stri
 	for k, v := range resolved {
 		if s, ok := v.(string); ok && strings.HasPrefix(s, "$") {
 			paramKey := s[1:]
+			var def *string
+			sep := strings.Index(paramKey, "|")
+			if sep > 0 {
+				def = new(paramKey[sep+1:])
+				paramKey = paramKey[:sep]
+			}
 			if val, found := w.Params.params[paramKey]; found {
 				w.Params.isUsed[paramKey] = true
+				resolved[k] = val
+				continue
+			}
+			if def != nil {
+				// Must convert string into actual value first,
+				// otherwise only string values could have defaults.
+				var val any
+				if err := yaml.Unmarshal([]byte(*def), &val); err != nil {
+					return nil, fmt.Errorf("decoding parameter %q default %q as YAML: %w", paramKey, *def, err)
+				}
 				resolved[k] = val
 				continue
 			}
@@ -844,6 +869,8 @@ func getTemplateFuncs() template.FuncMap {
 		"AddInt":        addInt,
 		"DivideFloat":   divideFloat,
 		"DivideInt":     divideInt,
+		"Int":           toInt,
+		"JSON":          toJSON,
 		"Mod":           mod,
 		"MultiplyFloat": multiplyFloat,
 		"MultiplyInt":   multiplyInt,
@@ -877,6 +904,43 @@ func toFloat64(val any) float64 {
 		}
 	}
 	panic(fmt.Sprintf("cannot cast %v to float64", val))
+}
+
+func toInt(val any) int {
+	switch i := val.(type) {
+	case float64:
+		return int(i)
+	case float32:
+		return int(i)
+	case int64:
+		return int(i)
+	case int32:
+		return int(i)
+	case int:
+		return i
+	case uint64:
+		return int(i)
+	case uint32:
+		return int(i)
+	case uint:
+		return int(i)
+	case string:
+		v, err := strconv.Atoi(i)
+		if err == nil {
+			return v
+		}
+	}
+	panic(fmt.Sprintf("cannot cast %v to int", val))
+}
+
+func toJSON(val any) string {
+	var buffer strings.Builder
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(val); err != nil {
+		panic(fmt.Sprintf("cannot JSON-encode %v: %v", val, err))
+	}
+	return strings.TrimSpace(buffer.String())
 }
 
 func addInt(numbers ...any) int {

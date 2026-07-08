@@ -33,10 +33,12 @@
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    # one ResourceSlice with 10 devices
+    templatePath: ../templates/resourceslice-basic-devices.yaml
+    countParam: $nodesWithDRA
+    templateParams:
+      numDevices: 10
   - opcode: createAny
     templatePath: ../templates/deviceclass-extended-resource.yaml
     countParam: $classes
@@ -71,7 +73,6 @@
       nodesWithoutDRA: 1
       initPods: 0
       measurePods: 10
-      maxClaimsPerNode: 10
   - name: Explicit_25classes_2000pods_200nodes
     params:
       class: example.com/gpu
@@ -80,7 +81,6 @@
       nodesWithoutDRA: 0
       initPods: 1000
       measurePods: 1000
-      maxClaimsPerNode: 10
   - name: Explicit_25classes_5000pods_500nodes
     labels: [performance]
     threshold: 120
@@ -91,7 +91,6 @@
       nodesWithoutDRA: 0
       initPods: 2500
       measurePods: 2500
-      maxClaimsPerNode: 10
   - name: Explicit_50classes_2000pods_200nodes
     params:
       class: example.com/gpu
@@ -100,7 +99,6 @@
       nodesWithoutDRA: 0
       initPods: 1000
       measurePods: 1000
-      maxClaimsPerNode: 10
   - name: Explicit_50classes_5000pods_500nodes
     labels: [performance]
     threshold: 130
@@ -111,7 +109,6 @@
       nodesWithoutDRA: 0
       initPods: 2500
       measurePods: 2500
-      maxClaimsPerNode: 10
   - name: Implicit_25classes_2000pods_200nodes
     params:
       class: deviceclass.resource.kubernetes.io/test-class
@@ -120,7 +117,6 @@
       nodesWithoutDRA: 0
       initPods: 1000
       measurePods: 1000
-      maxClaimsPerNode: 10
   - name: Implicit_25classes_5000pods_500nodes
     labels: [performance]
     threshold: 130
@@ -131,4 +127,3 @@
       nodesWithoutDRA: 0
       initPods: 2500
       measurePods: 2500
-      maxClaimsPerNode: 10

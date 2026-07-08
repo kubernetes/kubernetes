@@ -35,10 +35,9 @@
     countParam: $nodesWithDRA
   - opcode: startCollectingMetrics
     namespaces: ["default"]
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: templates/resourceslice-basic-devices.yaml
+    countParam: $nodesWithDRA
   - opcode: stopCollectingMetrics
   workloads:
   - name: 500nodes
@@ -46,17 +45,26 @@
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
-      maxClaimsPerNode: 10
   - name: 5000nodes
     labels: [performance]
     params:
       nodesWithDRA: 5000
       nodesWithoutDRA: 0
-      maxClaimsPerNode: 10
 
 # SchedulingWithResourceClaimTemplate uses a ResourceClaimTemplate
-# and dynamically creates ResourceClaim instances for each pod. Node, pod and
-# device counts are chosen so that the cluster gets filled up completely.
+# to let the cluster dynamically create ResourceClaim instances for each pod.
+# There are 10 simulated GPUs per node, with each pod requesting one.
+#
+# Initial utilization of the cluster varies, which is achieved by
+# directly allocating a certain number of claims (faster than
+# going through pod scheduling).
+#
+# In the burst scheduling scenarios, the time required to fill up the remaining
+# capacity is measured after creating all pods at once.
+#
+# In steady-state, the cluster utilization is kept at the same level by
+# creating a few pods and then one more each time one pod is scheduled.
+# Throughput is fairly consistent, with stable results after 10 seconds.
 - name: SchedulingWithResourceClaimTemplate
   featureGates:
     DynamicResourceAllocation: true
@@ -66,84 +74,13 @@
   - opcode: createNodes
     nodeTemplatePath: templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
   - opcode: createAny
-    templatePath: templates/deviceclass.yaml
-  - opcode: createAny
-    templatePath: templates/resourceclaimtemplate.yaml
-    namespace: init
-  - opcode: createPods
-    namespace: init
-    countParam: $initPods
-    podTemplatePath: templates/pod-with-claim-template.yaml
-  - opcode: createAny
-    templatePath: templates/resourceclaimtemplate.yaml
-    namespace: test
-  - opcode: createPods
-    namespace: test
-    countParam: $measurePods
-    podTemplatePath: templates/pod-with-claim-template.yaml
-    collectMetrics: true
-  workloads:
-  - name: fast
-    labels: [integration-test, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initPods: 0
-      measurePods: 10
-      maxClaimsPerNode: 10
-  - name: 2000pods_100nodes
-    params:
-      nodesWithDRA: 100
-      nodesWithoutDRA: 0
-      initPods: 1000
-      measurePods: 1000
-      maxClaimsPerNode: 20
-  - name: 2000pods_200nodes
-    params:
-      nodesWithDRA: 200
-      nodesWithoutDRA: 0
-      initPods: 1000
-      measurePods: 1000
-      maxClaimsPerNode: 10
-  - name: 5000pods_500nodes
-    labels: [performance]
-    threshold:
-      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra: 56 # typically above 70
-    params:
-      nodesWithDRA: 500
-      nodesWithoutDRA: 0
-      initPods: 2500
-      measurePods: 2500
-      maxClaimsPerNode: 10
-
-# SteadyStateClusterResourceClaimTemplate uses a ResourceClaimTemplate and
-# dynamically creates ResourceClaim instances for each pod. It creates ten
-# pods, then deletes each scheduled pod and creates a new one immediately,
-# so the cluster remains at the same level of utilization.
-#
-# The number of already allocated claims can be varied, thus simulating
-# various degrees of pre-existing resource utilization.
-- name: SteadyStateClusterResourceClaimTemplate
-  featureGates:
-    DynamicResourceAllocation: true
-  workloadTemplate:
-  - opcode: createNodes
-    countParam: $nodesWithoutDRA
-  - opcode: createNodes
-    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    # one ResourceSlice with 10 devices
+    templatePath: templates/resourceslice-basic-devices.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
+    templateParams:
+      numPCIRoots: $numPCIRoots|2
+      numDevices: 10
   - opcode: createAny
     templatePath: templates/deviceclass.yaml
   - opcode: createAny
@@ -155,27 +92,62 @@
   - opcode: createAny
     templatePath: templates/resourceclaimtemplate.yaml
     namespace: test
+    templateParams:
+      numRequests: $numRequests|1
+      selectors: $selectors|
+      constraints: $constraints|
   - opcode: createPods
     namespace: test
-    count: 10
-    steadyState: true
+    countParam: $measurePods
+    steadyStateParam: $steadyState
     durationParam: $duration
     podTemplatePath: templates/pod-with-claim-template.yaml
     collectMetrics: true
   workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      measurePods: 10
+      steadyState: false
+      duration: 0s # unused
+  - name: 2000pods_200nodes
+    params:
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initClaims: 1000
+      measurePods: 1000
+      steadyState: false
+      duration: 0s # unused
+  - name: 5000pods_500nodes
+    labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 56 # typically above 70
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 2500
+      measurePods: 2500
+      steadyState: false
+      duration: 0s # unused
   - name: empty_100nodes
     params:
       nodesWithDRA: 100
       nodesWithoutDRA: 0
       initClaims: 0
-      maxClaimsPerNode: 10
+      steadyState: true
       duration: 10s
   - name: empty_200nodes
     params:
       nodesWithDRA: 200
       nodesWithoutDRA: 0
       initClaims: 0
-      maxClaimsPerNode: 10
+      steadyState: true
       duration: 10s
   - name: empty_500nodes
     labels: [performance]
@@ -186,7 +158,8 @@
       nodesWithDRA: 500
       nodesWithoutDRA: 0
       initClaims: 0
-      maxClaimsPerNode: 10
+      measurePods: 10
+      steadyState: true
       duration: 10s
   # In the "half" scenarios, half of the devices are in use.
   - name: half_100nodes
@@ -194,14 +167,16 @@
       nodesWithDRA: 100
       nodesWithoutDRA: 0
       initClaims: 500
-      maxClaimsPerNode: 10
+      measurePods: 10
+      steadyState: true
       duration: 10s
   - name: half_200nodes
     params:
       nodesWithDRA: 200
       nodesWithoutDRA: 0
       initClaims: 1000
-      maxClaimsPerNode: 10
+      measurePods: 10
+      steadyState: true
       duration: 10s
   - name: half_500nodes
     labels: [performance]
@@ -212,7 +187,8 @@
       nodesWithDRA: 500
       nodesWithoutDRA: 0
       initClaims: 2500
-      maxClaimsPerNode: 10
+      measurePods: 10
+      steadyState: true
       duration: 10s
   # In the "full" scenarios, the cluster can accommodate exactly 10 additional pods.
   - name: full_100nodes
@@ -220,14 +196,16 @@
       nodesWithDRA: 100
       nodesWithoutDRA: 0
       initClaims: 990
-      maxClaimsPerNode: 10
+      measurePods: 10
+      steadyState: true
       duration: 10s
   - name: full_200nodes
     params:
       nodesWithDRA: 200
       nodesWithoutDRA: 0
       initClaims: 1990
-      maxClaimsPerNode: 10
+      measurePods: 10
+      steadyState: true
       duration: 10s
   - name: full_500nodes
     labels: [performance]
@@ -238,12 +216,118 @@
       nodesWithDRA: 500
       nodesWithoutDRA: 0
       initClaims: 4990
-      maxClaimsPerNode: 10
+      measurePods: 10
+      steadyState: true
       duration: 10s
 
-# SchedulingWithResourceClaimTemplate uses ResourceClaims
+  # "selector" adds usage of a CEL selector compared to the base workloads.
+  # All devices match, but CEL nonetheless must be evaluated.
+  - name: selector_fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      measurePods: 10
+      steadyState: false
+      duration: 0s # unused
+      selectors:
+      - cel:
+          expression: device.attributes["test-driver.cdi.k8s.io"].driverVersion.major() >= 1 && device.capacity["test-driver.cdi.k8s.io"].memory.isGreaterThan(quantity("1Mi"))
+  - name: selector_empty_500nodes
+    labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fselector_empty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 64 # TODO: update this
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+      selectors:
+      - cel:
+          expression: device.attributes["test-driver.cdi.k8s.io"].driverVersion.major() >= 1 && device.capacity["test-driver.cdi.k8s.io"].memory.isGreaterThan(quantity("1Mi"))
+
+  # "match" adds usage of a match attribute with five requests, so each pod allocates half of one node.
+  #
+  # Devices are defined with alternating PCI roots, which means that always one device has to be skipped
+  # to find the next matching one.
+  - name: match_fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      measurePods: 2
+      steadyState: false
+      duration: 0s # unused
+      numRequests: 5
+      numPCIRoots: 2
+      constraints:
+      - matchAttribute: resource.kubernetes.io/pciRoot
+  - name: match_empty_500nodes
+    labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fmatch_empty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 64 # TODO: update this
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+      selectors:
+      numRequests: 5
+      numPCIRoots: 2
+      constraints:
+      - matchAttribute: resource.kubernetes.io/pciRoot
+
+  # "distinct" adds usage of a distinct attribute with five requests for five different PCI roots (more than for the match case
+  # to allow allocating the same number of pods).
+  #
+  # Devices are defined with different PCI roots next to each other, which means that no device has to be skipped
+  # to find the next with a distinct attribute.
+  #
+  # distinctAttribute is part of DRAConsumableCapacity which might be disabled for some executions of this test.
+  # Therefore we cannot cover it here yet. This can be changed once it is GA and locked to true.
+  # - name: distinct_fast
+  #   labels: [integration-test, short]
+  #   params:
+  #     nodesWithDRA: 1
+  #     nodesWithoutDRA: 1
+  #     initClaims: 0
+  #     measurePods: 2
+  #     steadyState: false
+  #     duration: 0s # unused
+  #     numRequests: 5
+  #     numPCIRoots: 5
+  #     constraints:
+  #     - distinctAttribute: resource.kubernetes.io/pciRoot
+  # - name: distinct_empty_500nodes
+  #   labels: [performance]
+  #   threshold:
+  #     # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fdistinct_empty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+  #     dra: 64 # TODO: update this
+  #   params:
+  #     nodesWithDRA: 500
+  #     nodesWithoutDRA: 0
+  #     initClaims: 0
+  #     measurePods: 10
+  #     steadyState: true
+  #     duration: 10s
+  #     selectors:
+  #     numRequests: 5
+  #     numPCIRoots: 5
+  #     constraints:
+  #     - distinctAttribute: resource.kubernetes.io/pciRoot
+
+# SchedulingWithResourceClaim uses ResourceClaims
 # with deterministic names that are shared between pods.
-# There is a fixed ratio of 1:5 between claims and pods.
+# There is a fixed ratio of 1:5 between claims and pods
+# and only 2 instead of 10 devices per node.
 - name: SchedulingWithResourceClaim
   featureGates:
     DynamicResourceAllocation: true
@@ -253,10 +337,11 @@
   - opcode: createNodes
     nodeTemplatePath: templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: templates/resourceslice-basic-devices.yaml
+    countParam: $nodesWithDRA
+    templateParams:
+      numDevices: 2
   - opcode: createAny
     templatePath: templates/deviceclass.yaml
   - opcode: createAny
@@ -288,16 +373,6 @@
       initClaims: 0
       measurePods: 10
       measureClaims: 2 # must be measurePods / 5
-      maxClaimsPerNode: 2
-  - name: 2000pods_100nodes
-    params:
-      nodesWithDRA: 100
-      nodesWithoutDRA: 0
-      initPods: 1000
-      initClaims: 200 # must be initPods / 5
-      measurePods: 1000
-      measureClaims: 200 # must be initPods / 5
-      maxClaimsPerNode: 4
   - name: 2000pods_200nodes
     params:
       nodesWithDRA: 200
@@ -306,7 +381,6 @@
       initClaims: 200 # must be initPods / 5
       measurePods: 1000
       measureClaims: 200 # must be measurePods / 5
-      maxClaimsPerNode: 2
   - name: 5000pods_500nodes
     params:
       nodesWithDRA: 500
@@ -315,4 +389,3 @@
       initClaims: 500 # must be initPods / 5
       measurePods: 2500
       measureClaims: 500 # must be measurePods / 5
-      maxClaimsPerNode: 2
