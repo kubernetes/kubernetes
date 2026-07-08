@@ -778,6 +778,8 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 		Labels(map[string]string{"foo": "bar"}).PodGroupName(podGroupName).Obj()
 	// assigned pod with a pod group name
 	assignedPod := st.MakePod().Namespace("namespace").Name("assigned-pod").UID("pod2").Node("node").PodGroupName(podGroupName).Obj()
+	// same pod as assignedPod but with its node assignment cleared
+	unassignedPod := st.MakePod().Namespace("namespace").Name("assigned-pod").UID("pod2").PodGroupName(podGroupName).Obj()
 	// pod with no pod group name
 	noPodGroupPod := st.MakePod().Namespace("namespace").Name("no-pod-group-pod").UID("pod3").Obj()
 	// updated pod with no pod group name
@@ -821,6 +823,13 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 			newPod:                 assignedPod,
 			genericWorkloadEnabled: true,
 			expectInAssignedPods:   true,
+		},
+		{
+			name:                    "update an assigned pod group member, clear NodeName",
+			oldPod:                  assignedPod,
+			newPod:                  unassignedPod,
+			genericWorkloadEnabled:  true,
+			expectInUnscheduledPods: true,
 		},
 	}
 

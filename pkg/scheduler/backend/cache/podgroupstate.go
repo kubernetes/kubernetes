@@ -112,7 +112,11 @@ func (d *podGroupStateData) addPod(pod *v1.Pod) {
 }
 
 // updatePod updates the pod in this group.
-// In case of binding, it moves the pod to assignedPods.
+// It keeps the pod in the set that matches its NodeName: assignedPods when the
+// pod is bound, unscheduledPods otherwise. This handles both a pod becoming
+// assigned (NodeName set) and the reverse transition of a pod losing its node
+// assignment (NodeName cleared), so counts such as scheduledPodsCount stay
+// accurate.
 func (d *podGroupStateData) updatePod(oldPod, newPod *v1.Pod) {
 	d.generation = nextPodGroupGeneration()
 	d.allPods[newPod.UID] = newPod
@@ -120,6 +124,12 @@ func (d *podGroupStateData) updatePod(oldPod, newPod *v1.Pod) {
 		d.assignedPods.Insert(newPod.UID)
 		// Clear pod from unscheduled and assumed when it is assigned.
 		d.unscheduledPods.Delete(newPod.UID)
+		delete(d.assumedPods, newPod.UID)
+	} else if oldPod.Spec.NodeName != "" && newPod.Spec.NodeName == "" {
+		// The pod lost its node assignment; move it back to unscheduled so it is
+		// no longer counted as scheduled.
+		d.unscheduledPods.Insert(newPod.UID)
+		d.assignedPods.Delete(newPod.UID)
 		delete(d.assumedPods, newPod.UID)
 	}
 }
