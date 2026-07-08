@@ -71,7 +71,7 @@ type fakePodGroupPlugin struct {
 
 var _ fwk.FilterPlugin = &fakePodGroupPlugin{}
 var _ fwk.PostFilterPlugin = &fakePodGroupPlugin{}
-var _ framework.PodGroupPostFilterPlugin = &fakePodGroupPlugin{}
+var _ fwk.PodGroupPostFilterPlugin = &fakePodGroupPlugin{}
 
 func (mp *fakePodGroupPlugin) Name() string { return "FakePodGroupPlugin" }
 
@@ -94,7 +94,7 @@ func (mp *fakePodGroupPlugin) Permit(ctx context.Context, state fwk.CycleState, 
 	return fwk.NewStatus(fwk.Error, "unexpected call to permit"), 0
 }
 
-func (mp *fakePodGroupPlugin) PodGroupPostFilter(ctx context.Context, pgInfo fwk.PodGroupInfo, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
+func (mp *fakePodGroupPlugin) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	mp.podGroupPostFilterCalled = true
 	if mp.podGroupPostFilterStatus == nil {
 		return nil, fwk.NewStatus(fwk.Unschedulable, "default fake podgroup postfilter failure")
@@ -107,7 +107,7 @@ func (mp *fakePodGroupPlugin) PodGroupPostFilter(ctx context.Context, pgInfo fwk
 	for _, passedPod := range pods {
 		n[passedPod] = mp.podGroupPostFilterResult[passedPod.Name]
 	}
-	return &framework.PodGroupPostFilterResult{NominatedNodeNames: n}, mp.podGroupPostFilterStatus
+	return &fwk.PodGroupPostFilterResult{NominatingInfos: n}, mp.podGroupPostFilterStatus
 }
 
 type fakePlacementFeasibleState struct {
@@ -662,6 +662,11 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 				}
 			}
 
+			var pgPostFilterPlugins []config.Plugin
+			if tt.postFilterPlugin == "DefaultPreemption" {
+				pgPostFilterPlugins = []config.Plugin{{Name: "DefaultPreemption"}}
+			}
+
 			profileCfg := config.KubeSchedulerProfile{
 				SchedulerName: "test-scheduler",
 				Plugins: &config.Plugins{
@@ -676,6 +681,9 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 					},
 					PostFilter: config.PluginSet{
 						Enabled: []config.Plugin{{Name: tt.postFilterPlugin}},
+					},
+					PodGroupPostFilter: config.PluginSet{
+						Enabled: pgPostFilterPlugins,
 					},
 				},
 			}
@@ -2835,7 +2843,7 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Mock PodGroupPostFilter to return NominatedNodeNames
+	// Mock PodGroupPostFilter to return NominatingInfos
 	nominatedNodes := map[string]*fwk.NominatingInfo{
 		p1.Name: {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
 	}
@@ -2862,6 +2870,9 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 				Enabled: []config.Plugin{{Name: defaultbinder.Name}},
 			},
 			PostFilter: config.PluginSet{
+				Enabled: []config.Plugin{{Name: "DefaultPreemption"}},
+			},
+			PodGroupPostFilter: config.PluginSet{
 				Enabled: []config.Plugin{{Name: "DefaultPreemption"}},
 			},
 		},

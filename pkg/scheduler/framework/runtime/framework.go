@@ -76,7 +76,7 @@ type frameworkImpl struct {
 	postBindPlugins           []fwk.PostBindPlugin
 	permitPlugins             []fwk.PermitPlugin
 	batchablePlugins          []fwk.SignPlugin
-	podGroupPostFilterPlugins []framework.PodGroupPostFilterPlugin
+	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
 	placementFeasiblePlugins   []framework.PlacementFeasiblePlugin
@@ -140,6 +140,7 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.QueueSort, &f.queueSortPlugins},
 		{&plugins.PlacementGenerate, &f.placementGeneratePlugins},
 		{&plugins.PlacementScore, &f.placementScorePlugins},
+		{&plugins.PodGroupPostFilter, &f.podGroupPostFilterPlugins},
 	}
 }
 
@@ -483,19 +484,6 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
 		f.computeBatchablePlugins()
-	}
-
-	// Put default preemption as the only PodGroupPostFilterPlugin
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		if dp, ok := f.pluginsMap[names.DefaultPreemption]; ok {
-			if _, ok := dp.(framework.PodGroupPostFilterPlugin); ok {
-				f.podGroupPostFilterPlugins = append(f.podGroupPostFilterPlugins, dp.(framework.PodGroupPostFilterPlugin))
-			} else {
-				logger.V(2).Info("Workload Aware Preemption is enabled, but default preemption plugin does not fulfill PodGroupPostFilterPlugin interface. Workload Aware Preemption will not be used.")
-			}
-		} else {
-			logger.V(2).Info("Workload Aware Preemption is enabled, but default preemption plugin is not set. Workload Aware Preemption will not be used.")
-		}
 	}
 
 	// Use GangScheduling plugin as the only PlacementFeasiblePlugin.
@@ -1221,7 +1209,7 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl fwk.PostFilt
 }
 
 // RunPodGroupPostFilterPlugins runs the set of configured PodGroupPostFilter plugins.
-func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state *framework.CycleState, podGroupInfo fwk.PodGroupInfo, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
+func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state *framework.CycleState, podGroupInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		return nil, fwk.NewStatus(fwk.Unschedulable, "generic workload feature is disabled, cannot perform PodGroupPostFilter")
 	}
@@ -1240,7 +1228,7 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		res, status := pl.PodGroupPostFilter(ctx, podGroupInfo, pgSchedulingFunc)
+		res, status := pl.PodGroupPostFilter(ctx, state, podGroupInfo, pgSchedulingFunc)
 		if status.IsSuccess() {
 			return res, status
 		} else if status.Code() == fwk.UnschedulableAndUnresolvable {
@@ -2260,8 +2248,8 @@ func (f *frameworkImpl) HasScorePlugins() bool {
 	return len(f.scorePlugins) > 0
 }
 
-// PodGroupPostFilterPlugins returns registered PodGroup PostFilter plugins.
-func (f *frameworkImpl) PodGroupPostFilterPlugins() []framework.PodGroupPostFilterPlugin {
+// PodGroupPostFilterPlugins returns registered PodGroupPostFilter plugins.
+func (f *frameworkImpl) PodGroupPostFilterPlugins() []fwk.PodGroupPostFilterPlugin {
 	return f.podGroupPostFilterPlugins
 }
 

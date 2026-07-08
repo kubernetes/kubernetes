@@ -218,10 +218,10 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	result = completePodGroupAlgorithmResult(ctx, podGroupInfo, podGroupCycleState, runAllPostFilters, result)
 	metrics.PodGroupSchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 
-	// Run workload aware preemption if required. If the preemption is successful,
+	// Run pod group post filter plugins if scheduling failed. If any of the plugins is successful,
 	// we need to put the pods from pod group back into the scheduling queue.
 	if result.status.Code() == fwk.Unschedulable {
-		var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+		var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 			res := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runWithoutPostFilters)
 			return &fwk.PodGroupAssignments{
 				ProposedAssignments: makeProposedAssignments(&res),
@@ -229,16 +229,18 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 		}
 		pgPostFilterResult, status := schedFwk.RunPodGroupPostFilterPlugins(ctx, podGroupCycleState, podGroupInfo.PodGroupInfo, pgSchedulingFunc)
 		if status.IsSuccess() {
-			result.waitingOnPreemption = true
 			for i := range result.podResults {
-				if nodeNameInfo, ok := pgPostFilterResult.NominatedNodeNames[result.podResults[i].pod]; ok {
+				if nodeNameInfo, ok := pgPostFilterResult.NominatingInfos[result.podResults[i].pod]; ok {
 					result.podResults[i].scheduleResult.nominatingInfo = nodeNameInfo
+					result.waitingOnPreemption = true
 				}
 			}
-		} else if status.IsError() {
+		}
+
+		if status.IsError() {
 			result.status = status
-		} else {
-			result.status.AppendReason(status.String())
+		} else if msg := status.Message(); msg != "" {
+			result.status.AppendReason(msg)
 		}
 	}
 

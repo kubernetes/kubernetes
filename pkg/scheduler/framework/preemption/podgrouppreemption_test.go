@@ -1212,7 +1212,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			// Create a mock podGroupSchedulingFunc.
 			// This simulates whether the preempting PodGroup can schedule given the current
 			// hypothetical state of the cluster (where some candidate victims might be removed).
-			var mockSchedulingFunc framework.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+			var mockSchedulingFunc fwk.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 				if tt.customMockSchedulingFunc != nil {
 					return tt.customMockSchedulingFunc(ctx, domainNodes)
 				}

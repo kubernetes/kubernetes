@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -753,6 +754,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 
 // mockPostFilterPlugin is a custom PostFilter plugin that just counts invocations.
 type mockPostFilterPlugin struct {
+	lock  sync.Mutex
 	count int
 }
 
@@ -761,8 +763,16 @@ func (m *mockPostFilterPlugin) Name() string {
 }
 
 func (m *mockPostFilterPlugin) PostFilter(ctx context.Context, state framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.count++
 	return nil, framework.NewStatus(framework.Unschedulable)
+}
+
+func (m *mockPostFilterPlugin) getCount() int {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.count
 }
 
 func TestPostFilterInvocationCount(t *testing.T) {
@@ -866,12 +876,130 @@ func TestPostFilterInvocationCount(t *testing.T) {
 	// but should not be called in WAP.
 	// Only one pod is evaluated for pod group because minCount=3 can't be satisfied with the remaining 2 pods.
 	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-		if mockPlugin.count == 1 {
+		if mockPlugin.getCount() == 1 {
 			return true, nil
 		}
 		return false, nil
 	})
 	if err != nil {
-		t.Errorf("MockPostFilter was called %d times, expected exactly 3", mockPlugin.count)
+		t.Errorf("MockPostFilter was called %d times, expected exactly 3", mockPlugin.getCount())
+	}
+}
+
+// mockPodGroupPostFilterPlugin is a custom PodGroupPostFilter plugin that just counts invocations.
+type mockPodGroupPostFilterPlugin struct {
+	name  string
+	lock  sync.Mutex
+	count int
+}
+
+func (m *mockPodGroupPostFilterPlugin) Name() string {
+	return m.name
+}
+
+func (m *mockPodGroupPostFilterPlugin) PodGroupPostFilter(ctx context.Context, state framework.PodGroupCycleState, pgInfo framework.PodGroupInfo, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *framework.Status) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.count++
+	return &framework.PodGroupPostFilterResult{}, framework.NewStatus(framework.Unschedulable)
+}
+
+func (m *mockPodGroupPostFilterPlugin) getCount() int {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.count
+}
+
+func TestPodGroupPostFilterIteration(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload: true,
+	})
+
+	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+
+	pg := st.MakePodGroup().Namespace("default").Name("pg1").DisruptionModeAll().Priority(100).MinCount(2).Obj()
+
+	highPods := []*v1.Pod{
+		st.MakePod().Namespace("default").Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+		st.MakePod().Namespace("default").Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+	}
+
+	mockPlugin1 := &mockPodGroupPostFilterPlugin{name: "MockPlugin1"}
+	mockPlugin2 := &mockPodGroupPostFilterPlugin{name: "MockPlugin2"}
+
+	registry := frameworkruntime.Registry{
+		"MockPlugin1": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+			return mockPlugin1, nil
+		},
+		"MockPlugin2": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+			return mockPlugin2, nil
+		},
+	}
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			Plugins: &configv1.Plugins{
+				MultiPoint: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
+						{Name: "GangScheduling"},
+					},
+				},
+				PodGroupPostFilter: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
+						{Name: "MockPlugin1"},
+						{Name: "MockPlugin2"},
+					},
+					Disabled: []configv1.Plugin{
+						{Name: "DefaultPreemption"},
+					},
+				},
+			},
+		}},
+	})
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "pg-post-filter-iter",
+		scheduler.WithPodMaxBackoffSeconds(100),
+		scheduler.WithPodInitialBackoffSeconds(100),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry),
+		scheduler.WithProfiles(cfg.Profiles...),
+	)
+	cs, ns := testCtx.ClientSet, testCtx.NS.Name
+
+	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	pg.Namespace = ns
+	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup: %v", err)
+	}
+
+	pgLister := testCtx.InformerFactory.Scheduling().V1alpha3().PodGroups().Lister()
+	err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		_, err := pgLister.PodGroups(ns).Get(pg.Name)
+		return err == nil, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for PodGroup to be synced: %v", err)
+	}
+
+	for _, p := range highPods {
+		p.Namespace = ns
+		_, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+
+	}
+
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		if mockPlugin1.getCount() == 1 && mockPlugin2.getCount() == 1 {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Errorf("Plugins were not called exactly once. MockPlugin1: %d, MockPlugin2: %d", mockPlugin1.getCount(), mockPlugin2.getCount())
 	}
 }
