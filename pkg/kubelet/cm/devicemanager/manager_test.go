@@ -2078,6 +2078,75 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 	}
 }
 
+// TestDeviceHealthUpdateWithDuplicateDeviceIDs verifies that a health change is
+// routed to the pod that owns the device under the reporting resource, even when
+// another pod owns a device with the same ID under a different resource.
+func TestDeviceHealthUpdateWithDuplicateDeviceIDs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	require.NoError(t, err, "err should be nil")
+	defer func() {
+		err = os.RemoveAll(tmpDir)
+		if err != nil {
+			t.Fatalf("Fail to remove tmpdir: %v", err)
+		}
+	}()
+	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
+	require.NoError(t, err, "err should be nil")
+
+	// Two resources expose a device with the same ID. Device IDs are only
+	// unique within a resource.
+	resourceName1 := "domain1.com/resource1"
+	resourceName2 := "domain2.com/resource2"
+	deviceID := "testdevice"
+	existDevices := map[string]DeviceInstances{
+		resourceName1: {deviceID: &pluginapi.Device{ID: deviceID, Health: pluginapi.Healthy}},
+		resourceName2: {deviceID: &pluginapi.Device{ID: deviceID, Health: pluginapi.Healthy}},
+	}
+
+	testManager := &ManagerImpl{
+		allDevices:        ResourceDeviceInstances(existDevices),
+		endpoints:         make(map[string]endpointInfo),
+		healthyDevices:    make(map[string]sets.Set[string]),
+		unhealthyDevices:  make(map[string]sets.Set[string]),
+		allocatedDevices:  make(map[string]sets.Set[string]),
+		podDevices:        newPodDevices(),
+		checkpointManager: ckm,
+		update:            make(chan resourceupdates.Update, 10),
+	}
+
+	testManager.podDevices.insert("pod1", "con1", resourceName1,
+		checkpoint.DevicesPerNUMA{0: []string{deviceID}},
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1"}),
+		),
+	)
+	testManager.podDevices.insert("pod2", "con2", resourceName2,
+		checkpoint.DevicesPerNUMA{0: []string{deviceID}},
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r2dev1": "/dev/r2dev1"}),
+		),
+	)
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceHealthStatus, true)
+
+	// The device of resource2 becomes unhealthy: only pod2 must be notified.
+	testManager.genericDeviceUpdateCallback(logger, resourceName2, []*pluginapi.Device{
+		{ID: deviceID, Health: pluginapi.Unhealthy},
+	})
+	u := <-testManager.update
+	assert.Equal(t, resourceupdates.Update{PodUIDs: []string{"pod2"}}, u)
+	assert.Empty(t, testManager.update)
+
+	// The device of resource1 becomes unhealthy: only pod1 must be notified.
+	testManager.genericDeviceUpdateCallback(logger, resourceName1, []*pluginapi.Device{
+		{ID: deviceID, Health: pluginapi.Unhealthy},
+	})
+	u = <-testManager.update
+	assert.Equal(t, resourceupdates.Update{PodUIDs: []string{"pod1"}}, u)
+	assert.Empty(t, testManager.update)
+}
+
 // TestAdmitPodWithDRAResources verifies the behavior of admission
 // of the pods referring DRA extended resources depending on whether
 // the DRAExtendedResource feature gate is enabled or disabled.
