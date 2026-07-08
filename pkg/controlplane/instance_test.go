@@ -776,6 +776,7 @@ var gvrToStorageVersionHash = map[string]string{
 	"storage.k8s.io/v1/csistoragecapacities":                            "xeVl+2Ly1kE=",
 	"storage.k8s.io/v1/volumeattachments":                               "tJx/ezt6UDU=",
 	"storage.k8s.io/v1/volumeattributesclasses":                         "tIjydgKBC5w=",
+	"storagemigration.k8s.io/v1/storageversionmigrations":               "pCjmmKOkLy4=",
 	"apps/v1/controllerrevisions":                                       "85nkx63pcBU=",
 	"apps/v1/daemonsets":                                                "dd7pWHUlMKQ=",
 	"apps/v1/deployments":                                               "8aSe+NMegvE=",
