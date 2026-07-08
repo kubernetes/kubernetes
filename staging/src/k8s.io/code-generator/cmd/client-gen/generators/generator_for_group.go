@@ -235,8 +235,9 @@ func setConfigDefaults(config *$.restConfig|raw$) {
 		gv := $.SchemePrioritizedVersionsForGroup|raw$("$.groupName$")[0]
 		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = $.restCodecFactoryForGeneratedClient|raw$($.Scheme|raw$, $.Codecs|raw$)
-
+    if config.NegotiatedSerializer == nil {
+	    config.NegotiatedSerializer = $.restCodecFactoryForGeneratedClient|raw$($.Scheme|raw$, $.Codecs|raw$)
+    }
 	if config.QPS == 0 {
 		config.QPS = 5
 	}
@@ -251,7 +252,9 @@ func setConfigDefaults(config *$.restConfig|raw$) {
 	gv := $.SchemeGroupVersion|raw$
 	config.GroupVersion =  &gv
 	config.APIPath = $.apiPath$
-	config.NegotiatedSerializer = $.restCodecFactoryForGeneratedClient|raw$($.Scheme|raw$, $.Codecs|raw$).WithoutConversion()
+    if config.NegotiatedSerializer == nil {
+        config.NegotiatedSerializer = $.restCodecFactoryForGeneratedClient|raw$($.Scheme|raw$, $.Codecs|raw$).WithoutConversion()
+    }
 
 	if config.UserAgent == "" {
 		config.UserAgent = $.restDefaultKubernetesUserAgent|raw$()
