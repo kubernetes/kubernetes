@@ -181,13 +181,13 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 			},
 			want: true,
 		},
-		"CronJob-owned Job is treated as parent-owned (not managed)": {
+		"CronJob-owned Job is a standalone root -> managed": {
 			workloadWithJob: true,
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{OwnerReferences: cronJobOwner},
 				Spec:       batch.JobSpec{Parallelism: new(int32(4))},
 			},
-			want: false,
+			want: true,
 		},
 	}
 

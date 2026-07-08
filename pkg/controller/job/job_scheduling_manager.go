@@ -83,13 +83,28 @@ func shouldManageWorkloadForJob(job *batch.Job) bool {
 	if job.Spec.Template.Spec.SchedulingGroup != nil {
 		return false
 	}
-	// A Job with any controller owner is a non-root workload node whose parent
-	// (e.g. JobSet) owns the Workload; unless the parent delegates the PodGroup,
-	// manage neither. Any controller owner counts, including CronJob.
-	if metav1.GetControllerOf(job) != nil && !hasDelegatedPodGroup(job) {
+	// Parent owns the Workload and does not delegate the PodGroup: manage neither.
+	if hasParentWorkloadOwner(job) && !hasDelegatedPodGroup(job) {
 		return false
 	}
 	return true
+}
+
+// hasParentWorkloadOwner reports whether the Job is a non-root workload node,
+// i.e. it carries a controller OwnerReference to a parent controller that
+// compiles and owns the Workload (e.g. JobSet). Jobs created by a CronJob are
+// standalone roots (CronJob stamps out independent Jobs rather than owning a
+// shared Workload) and are not treated as parent-owned.
+func hasParentWorkloadOwner(job *batch.Job) bool {
+	ref := metav1.GetControllerOf(job)
+	if ref == nil {
+		return false
+	}
+	gv, err := schema.ParseGroupVersion(ref.APIVersion)
+	if err != nil {
+		return false
+	}
+	return gv.Group != batch.SchemeGroupVersion.Group || ref.Kind != "CronJob"
 }
 
 // hasDelegatedPodGroup reports whether a parent controller delegated runtime
@@ -128,9 +143,9 @@ func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.
 	// but never creates new ones.
 	newJob := isNewJob(job, pods)
 
-	// A Job with any controller owner is a non-root node; its parent owns the
-	// Workload. Without a delegated PodGroup the controller manages nothing.
-	if metav1.GetControllerOf(job) != nil {
+	// A non-root Job's parent owns the Workload. Without a delegated PodGroup
+	// the controller manages nothing.
+	if hasParentWorkloadOwner(job) {
 		if !hasDelegatedPodGroup(job) {
 			return nil, nil, nil
 		}
