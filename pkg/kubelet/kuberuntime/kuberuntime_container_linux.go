@@ -446,45 +446,8 @@ func (m *kubeGenericRuntimeManager) isMemoryQoSEnforced() bool {
 
 // applyPodLevelMemoryHigh sets pod-level memory.high; kernel enforces hierarchically.
 func (m *kubeGenericRuntimeManager) applyPodLevelMemoryHigh(pod *v1.Pod, rc *cm.ResourceConfig) {
-	if m.memoryThrottlingFactor == 0 {
-		return
-	}
-	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
-	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
-		return
-	}
-	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources: !podLevelResourcesEnabled,
-	})
-	memoryLimitsDeclared := true
-	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources: !podLevelResourcesEnabled,
-		ContainerFn: func(res v1.ResourceList, _ resourcehelper.ContainerType) {
-			if res.Memory().IsZero() {
-				memoryLimitsDeclared = false
-			}
-		},
-	})
-	if podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(pod) &&
-		!pod.Spec.Resources.Limits.Memory().IsZero() {
-		memoryLimitsDeclared = true
-	}
-	if !memoryLimitsDeclared {
-		return
-	}
-	memoryRequest := int64(0)
-	memoryLimit := int64(0)
-	if req, found := reqs[v1.ResourceMemory]; found {
-		memoryRequest = req.Value()
-	}
-	if lim, found := limits[v1.ResourceMemory]; found {
-		memoryLimit = lim.Value()
-	}
-	if val := cm.MemoryHighForPod(memoryRequest, memoryLimit, m.memoryThrottlingFactor); val != "" {
-		if rc.Unified == nil {
-			rc.Unified = map[string]string{}
-		}
-		rc.Unified[cm.Cgroup2MemoryHigh] = val
+	if m.memoryThrottlingFactor != 0 {
+		cm.ApplyPodLevelMemoryHigh(pod, rc, m.memoryThrottlingFactor)
 	}
 }
 

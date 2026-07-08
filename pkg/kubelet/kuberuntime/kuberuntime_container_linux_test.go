@@ -2243,4 +2243,103 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
 		assert.False(t, ok, "memory.high should NOT be set on container without own limit when PodLevelResources is active")
 	})
+
+	t.Run("cpu-only pod-level resources does not skip container memory.high", func(t *testing.T) {
+		cpuOnlyPod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: "cpu-only", Name: "cpu-only-test", Namespace: "test"},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				},
+				Containers: []v1.Container{{
+					Name: "c1", Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: containerRequest,
+							v1.ResourceCPU:    resource.MustParse("100m"),
+						},
+					},
+				}},
+			},
+		}
+		lcr := m.generateLinuxContainerResources(tCtx, cpuOnlyPod, &cpuOnlyPod.Spec.Containers[0], true)
+		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
+		assert.True(t, ok, "memory.high should be set via node-allocatable fallback when pod has CPU-only resources")
+	})
+
+	// Pod is Guaranteed via pod-level req==limit, but container req!=limit:
+	// memory.high is gated by the container's own req vs limit, not the pod's QoS class.
+	t.Run("guaranteed pod with container req!=limit sets container memory.high", func(t *testing.T) {
+		guaranteedPod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "12345678",
+				Name:      "guaranteed-test",
+				Namespace: "test",
+			},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+						v1.ResourceCPU:    resource.MustParse("1"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+						v1.ResourceCPU:    resource.MustParse("1"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  "c1",
+						Image: "busybox",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: containerRequest,
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: containerLimit,
+							},
+						},
+					},
+				},
+			},
+		}
+		lcr := m.generateLinuxContainerResources(tCtx, guaranteedPod, &guaranteedPod.Spec.Containers[0], true)
+		pageSize := int64(os.Getpagesize())
+		expectedHigh := int64(math.Floor(
+			float64(containerRequest.Value())+
+				(float64(containerLimit.Value())-float64(containerRequest.Value()))*0.9)/float64(pageSize)) * pageSize
+		actualHigh, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
+		assert.True(t, ok, "memory.high should be set when container req!=limit")
+		assert.Equal(t, strconv.FormatInt(expectedHigh, 10), actualHigh)
+	})
+
+	// memory.high is skipped when container memory req==limit regardless of pod QoS class.
+	t.Run("burstable pod with container memory req==limit skips memory.high", func(t *testing.T) {
+		burstablePod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "12345678",
+				Name:      "burstable-test",
+				Namespace: "test",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "c1",
+						Image: "busybox",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: containerRequest,
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: containerRequest,
+							},
+						},
+					},
+				},
+			},
+		}
+		lcr := m.generateLinuxContainerResources(tCtx, burstablePod, &burstablePod.Spec.Containers[0], true)
+		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
+		assert.False(t, ok, "memory.high should NOT be set when container memory req==limit, even if pod is Burstable")
+	})
 }

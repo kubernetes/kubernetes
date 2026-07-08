@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -116,45 +115,8 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 // The kernel enforces memory.high hierarchically (try_charge_memcg walks ancestors),
 // so this throttles all containers in the pod without per-container memory.high.
 func (m *podContainerManagerImpl) applyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig) {
-	if m.memoryThrottlingFactor == nil {
-		return
-	}
-	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
-	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
-		return
-	}
-	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources: !podLevelResourcesEnabled,
-	})
-	memoryLimitsDeclared := true
-	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources: !podLevelResourcesEnabled,
-		ContainerFn: func(res v1.ResourceList, _ resourcehelper.ContainerType) {
-			if res.Memory().IsZero() {
-				memoryLimitsDeclared = false
-			}
-		},
-	})
-	if podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(pod) &&
-		!pod.Spec.Resources.Limits.Memory().IsZero() {
-		memoryLimitsDeclared = true
-	}
-	if !memoryLimitsDeclared {
-		return
-	}
-	memoryRequest := int64(0)
-	memoryLimit := int64(0)
-	if req, found := reqs[v1.ResourceMemory]; found {
-		memoryRequest = req.Value()
-	}
-	if lim, found := limits[v1.ResourceMemory]; found {
-		memoryLimit = lim.Value()
-	}
-	if val := MemoryHighForPod(memoryRequest, memoryLimit, *m.memoryThrottlingFactor); val != "" {
-		if rc.Unified == nil {
-			rc.Unified = map[string]string{}
-		}
-		rc.Unified[Cgroup2MemoryHigh] = val
+	if m.memoryThrottlingFactor != nil {
+		ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
 	}
 }
 

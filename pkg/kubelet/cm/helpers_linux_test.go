@@ -857,3 +857,91 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 		}
 	}
 }
+
+func TestApplyPodLevelMemoryHigh(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+
+	t.Run("cpu-only pod-level resources does not set memory.high", func(t *testing.T) {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("2"),
+					},
+				},
+				Containers: []v1.Container{
+					{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", ""))},
+				},
+			},
+		}
+		rc := &ResourceConfig{}
+		ApplyPodLevelMemoryHigh(pod, rc, 0.9)
+		if rc.Unified != nil {
+			t.Errorf("expected no Unified map, got %v", rc.Unified)
+		}
+	})
+
+	// Overhead is included via PodResourcesOptions{ExcludeOverhead: false} (the default).
+	t.Run("pod overhead is included in memory.high calculation", func(t *testing.T) {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Overhead: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+						v1.ResourceCPU:    resource.MustParse("1"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+						v1.ResourceCPU:    resource.MustParse("1"),
+					},
+				},
+				Containers: []v1.Container{
+					{Resources: getResourceRequirements(getResourceList("1", "128Mi"), getResourceList("1", "256Mi"))},
+				},
+			},
+		}
+		rc := &ResourceConfig{}
+		ApplyPodLevelMemoryHigh(pod, rc, 0.9)
+		if rc.Unified == nil {
+			t.Fatal("expected Unified map to be set")
+		}
+		// Without overhead: request=128Mi, limit=256Mi → memory.high based on 128Mi..256Mi
+		rcNoOverhead := &ResourceConfig{}
+		podNoOverhead := pod.DeepCopy()
+		podNoOverhead.Spec.Overhead = nil
+		ApplyPodLevelMemoryHigh(podNoOverhead, rcNoOverhead, 0.9)
+		if rcNoOverhead.Unified == nil {
+			t.Fatal("expected Unified map without overhead")
+		}
+		withOverhead, _ := strconv.ParseInt(rc.Unified[Cgroup2MemoryHigh], 10, 64)
+		withoutOverhead, _ := strconv.ParseInt(rcNoOverhead.Unified[Cgroup2MemoryHigh], 10, 64)
+		if withOverhead <= withoutOverhead {
+			t.Errorf("memory.high with overhead (%d) should be greater than without overhead (%d)",
+				withOverhead, withoutOverhead)
+		}
+	})
+
+	t.Run("mixed declared/undeclared memory limits does not set memory.high", func(t *testing.T) {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("2"),
+					},
+				},
+				Containers: []v1.Container{
+					{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi"))},
+					{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("", ""))},
+				},
+			},
+		}
+		rc := &ResourceConfig{}
+		ApplyPodLevelMemoryHigh(pod, rc, 0.9)
+		if rc.Unified != nil {
+			t.Errorf("expected no Unified map for mixed limits, got %v", rc.Unified)
+		}
+	})
+}
