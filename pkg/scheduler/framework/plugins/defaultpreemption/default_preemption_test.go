@@ -196,7 +196,7 @@ func TestPostFilter(t *testing.T) {
 				"node1": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
 		},
 		{
 			name: "pod with tied priority is still unschedulable",
@@ -257,7 +257,7 @@ func TestPostFilter(t *testing.T) {
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node2, preempting 1 victims"),
 		},
 		{
 			name: "pod can be made schedulable on minHighestPriority node",
@@ -280,7 +280,7 @@ func TestPostFilter(t *testing.T) {
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node2, preempting 1 victims"),
 		},
 		{
 			name: "preemption result filtered out by extenders",
@@ -302,7 +302,7 @@ func TestPostFilter(t *testing.T) {
 				Predicates:   []tf.FitPredicate{tf.Node1PredicateExtender},
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
 		},
 		{
 			name: "no candidate nodes found, no enough resource after removing low priority pods",
@@ -395,7 +395,7 @@ func TestPostFilter(t *testing.T) {
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node2, preempting 1 victims"),
 		},
 		{
 			name: "pod with SchedulingGroup with TAS with scheduling constraint enabled should not preempt",
@@ -465,7 +465,7 @@ func TestPostFilter(t *testing.T) {
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 			features:   feature.Features{EnableGenericWorkload: false, EnableTopologyAwareWorkloadScheduling: false},
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
-			wantStatus: fwk.NewStatus(fwk.Success),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
 		},
 	}
 

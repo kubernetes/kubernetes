@@ -13128,7 +13128,7 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "note": {
           "description": "note is a human-readable description of the status of this operation. Maximal length of the note is 1kB, but libraries should be prepared to handle values up to 64kB.",
@@ -13195,7 +13195,7 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
-          "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         }
       },
       "required": [
@@ -14642,7 +14642,7 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "overhead": {
           "$ref": "#/definitions/io.k8s.api.node.v1.Overhead",
@@ -14731,7 +14731,7 @@
         },
         "deleteOptions": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions",
-          "description": "DeleteOptions may be provided"
+          "description": "deleteOptions may be provided"
         },
         "kind": {
           "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
@@ -14739,7 +14739,7 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "ObjectMeta describes the pod that is being evicted."
+          "description": "metadata describes the pod that is being evicted."
         }
       },
       "type": "object",
@@ -14764,15 +14764,15 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          "description": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "spec": {
           "$ref": "#/definitions/io.k8s.api.policy.v1.PodDisruptionBudgetSpec",
-          "description": "Specification of the desired behavior of the PodDisruptionBudget."
+          "description": "spec is the specification of the desired behavior of the PodDisruptionBudget."
         },
         "status": {
           "$ref": "#/definitions/io.k8s.api.policy.v1.PodDisruptionBudgetStatus",
-          "description": "Most recently observed status of the PodDisruptionBudget."
+          "description": "status is the most recently observed status of the PodDisruptionBudget."
         }
       },
       "type": "object",
@@ -14824,19 +14824,19 @@
       "properties": {
         "maxUnavailable": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString",
-          "description": "An eviction is allowed if at most \"maxUnavailable\" pods selected by \"selector\" are unavailable after the eviction, i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions by specifying 0. This is a mutually exclusive setting with \"minAvailable\"."
+          "description": "maxUnavailable indicates that an eviction is allowed if at most \"maxUnavailable\" pods selected by \"selector\" are unavailable after the eviction, i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions by specifying 0. This is a mutually exclusive setting with \"minAvailable\"."
         },
         "minAvailable": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString",
-          "description": "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\"."
+          "description": "minAvailable indicates that an eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\"."
         },
         "selector": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector",
-          "description": "Label query over pods whose evictions are managed by the disruption budget. A null selector will match no pods, while an empty ({}) selector will select all pods within the namespace.",
+          "description": "selector is a label query over pods whose evictions are managed by the disruption budget. A null selector will match no pods, while an empty ({}) selector will select all pods within the namespace.",
           "x-kubernetes-patch-strategy": "replace"
         },
         "unhealthyPodEvictionPolicy": {
-          "description": "UnhealthyPodEvictionPolicy defines the criteria for when unhealthy pods should be considered for eviction. Current implementation considers healthy pods, as pods that have status.conditions item with type=\"Ready\",status=\"True\".\n\nValid policies are IfHealthyBudget and AlwaysAllow. If no policy is specified, the default behavior will be used, which corresponds to the IfHealthyBudget policy.\n\nIfHealthyBudget policy means that running pods (status.phase=\"Running\"), but not yet healthy can be evicted only if the guarded application is not disrupted (status.currentHealthy is at least equal to status.desiredHealthy). Healthy pods will be subject to the PDB for eviction.\n\nAlwaysAllow policy means that all running pods (status.phase=\"Running\"), but not yet healthy are considered disrupted and can be evicted regardless of whether the criteria in a PDB is met. This means perspective running pods of a disrupted application might not get a chance to become healthy. Healthy pods will be subject to the PDB for eviction.\n\nAdditional policies may be added in the future. Clients making eviction decisions should disallow eviction of unhealthy pods if they encounter an unrecognized policy in this field.",
+          "description": "unhealthyPodEvictionPolicy defines the criteria for when unhealthy pods should be considered for eviction. Current implementation considers healthy pods, as pods that have status.conditions item with type=\"Ready\",status=\"True\".\n\nValid policies are IfHealthyBudget and AlwaysAllow. If no policy is specified, the default behavior will be used, which corresponds to the IfHealthyBudget policy.\n\nIfHealthyBudget policy means that running pods (status.phase=\"Running\"), but not yet healthy can be evicted only if the guarded application is not disrupted (status.currentHealthy is at least equal to status.desiredHealthy). Healthy pods will be subject to the PDB for eviction.\n\nAlwaysAllow policy means that all running pods (status.phase=\"Running\"), but not yet healthy are considered disrupted and can be evicted regardless of whether the criteria in a PDB is met. This means perspective running pods of a disrupted application might not get a chance to become healthy. Healthy pods will be subject to the PDB for eviction.\n\nAdditional policies may be added in the future. Clients making eviction decisions should disallow eviction of unhealthy pods if they encounter an unrecognized policy in this field.",
           "type": "string"
         }
       },
@@ -14897,7 +14897,7 @@
       "description": "AggregationRule describes how to locate ClusterRoles to aggregate into the ClusterRole",
       "properties": {
         "clusterRoleSelectors": {
-          "description": "ClusterRoleSelectors holds a list of selectors which will be used to find ClusterRoles and create the rules. If any of the selectors match, then the ClusterRole's permissions will be added",
+          "description": "clusterRoleSelectors holds a list of selectors which will be used to find ClusterRoles and create the rules. If any of the selectors match, then the ClusterRole's permissions will be added",
           "items": {
             "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
           },
@@ -14912,7 +14912,7 @@
       "properties": {
         "aggregationRule": {
           "$ref": "#/definitions/io.k8s.api.rbac.v1.AggregationRule",
-          "description": "AggregationRule is an optional field that describes how to build the Rules for this ClusterRole. If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be stomped by the controller."
+          "description": "aggregationRule is an optional field that describes how to build the Rules for this ClusterRole. If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be stomped by the controller."
         },
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -14924,10 +14924,10 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object's metadata."
+          "description": "metadata is the standard object's metadata."
         },
         "rules": {
-          "description": "Rules holds all the PolicyRules for this ClusterRole",
+          "description": "rules holds all the PolicyRules for this ClusterRole",
           "items": {
             "$ref": "#/definitions/io.k8s.api.rbac.v1.PolicyRule"
           },
@@ -14957,14 +14957,14 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object's metadata."
+          "description": "metadata is the standard object's metadata."
         },
         "roleRef": {
           "$ref": "#/definitions/io.k8s.api.rbac.v1.RoleRef",
-          "description": "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable."
+          "description": "roleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable."
         },
         "subjects": {
-          "description": "Subjects holds references to the objects the role applies to.",
+          "description": "subjects holds references to the objects the role applies to.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.rbac.v1.Subject"
           },
@@ -15058,7 +15058,7 @@
       "description": "PolicyRule holds information that describes a policy rule, but does not contain information about who the rule applies to or which namespace the rule applies to.",
       "properties": {
         "apiGroups": {
-          "description": "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. \"\" represents the core API group and \"*\" represents all API groups.",
+          "description": "apiGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. \"\" represents the core API group and \"*\" represents all API groups.",
           "items": {
             "type": "string"
           },
@@ -15066,7 +15066,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "nonResourceURLs": {
-          "description": "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding. Rules can either apply to API resources (such as \"pods\" or \"secrets\") or non-resource URL paths (such as \"/api\"),  but not both.",
+          "description": "nonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding. Rules can either apply to API resources (such as \"pods\" or \"secrets\") or non-resource URL paths (such as \"/api\"),  but not both.",
           "items": {
             "type": "string"
           },
@@ -15074,7 +15074,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "resourceNames": {
-          "description": "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.",
+          "description": "resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.",
           "items": {
             "type": "string"
           },
@@ -15082,7 +15082,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "resources": {
-          "description": "Resources is a list of resources this rule applies to. '*' represents all resources.",
+          "description": "resources is a list of resources this rule applies to. '*' represents all resources.",
           "items": {
             "type": "string"
           },
@@ -15090,7 +15090,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "verbs": {
-          "description": "Verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.",
+          "description": "verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.",
           "items": {
             "type": "string"
           },
@@ -15116,10 +15116,10 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object's metadata."
+          "description": "metadata is the standard object's metadata."
         },
         "rules": {
-          "description": "Rules holds all the PolicyRules for this Role",
+          "description": "rules holds all the PolicyRules for this Role",
           "items": {
             "$ref": "#/definitions/io.k8s.api.rbac.v1.PolicyRule"
           },
@@ -15149,14 +15149,14 @@
         },
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object's metadata."
+          "description": "metadata is the standard object's metadata."
         },
         "roleRef": {
           "$ref": "#/definitions/io.k8s.api.rbac.v1.RoleRef",
-          "description": "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable."
+          "description": "roleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable."
         },
         "subjects": {
-          "description": "Subjects holds references to the objects the role applies to.",
+          "description": "subjects holds references to the objects the role applies to.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.rbac.v1.Subject"
           },
@@ -15250,15 +15250,15 @@
       "description": "RoleRef contains information that points to the role being used",
       "properties": {
         "apiGroup": {
-          "description": "APIGroup is the group for the resource being referenced",
+          "description": "apiGroup is the group for the resource being referenced",
           "type": "string"
         },
         "kind": {
-          "description": "Kind is the type of resource being referenced",
+          "description": "kind is the type of resource being referenced",
           "type": "string"
         },
         "name": {
-          "description": "Name is the name of resource being referenced",
+          "description": "name is the name of resource being referenced",
           "type": "string"
         }
       },
@@ -15273,19 +15273,19 @@
       "description": "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
       "properties": {
         "apiGroup": {
-          "description": "APIGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects.",
+          "description": "apiGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects.",
           "type": "string"
         },
         "kind": {
-          "description": "Kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error.",
+          "description": "kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error.",
           "type": "string"
         },
         "name": {
-          "description": "Name of the object being referenced.",
+          "description": "name of the object being referenced.",
           "type": "string"
         },
         "namespace": {
-          "description": "Namespace of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error.",
+          "description": "namespace of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error.",
           "type": "string"
         }
       },
