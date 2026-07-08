@@ -903,8 +903,11 @@ type matchAttributeConstraint struct {
 
 	// For list values (when DRAListTypeAttributes feature gate is enabled)
 	intersection *deviceAttributeListAsSet
-
-	numDevices int
+	// intersectionHistory records intersection's value before each add()
+	// narrowed it. remove() pops this stack to restore intersection on
+	// backtrack. Only used when features.ListTypeAttributes is enabled.
+	intersectionHistory []*deviceAttributeListAsSet
+	numDevices          int
 }
 
 func (m *matchAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool {
@@ -926,11 +929,13 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 		// Initialize either scalar attribute or list set based on the attribute type.
 		if m.features.ListTypeAttributes {
 			// Convert attribute to set representation (both scalar and list)
-			m.intersection = attributeAsSet(attribute)
-			if m.intersection == nil {
+			newIntersection := attributeAsSet(attribute)
+			if newIntersection == nil {
 				m.logger.V(7).Info("Attribute type unknown")
 				return false
 			}
+			m.intersectionHistory = append(m.intersectionHistory, nil)
+			m.intersection = newIntersection
 		} else {
 			// Scalar attribute: use existing behavior
 			m.attribute = attribute
@@ -952,6 +957,8 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 			m.logger.V(7).Info("Attribute values have no common elements")
 			return false
 		}
+		previousIntersection := *m.intersection
+		m.intersectionHistory = append(m.intersectionHistory, &previousIntersection)
 		// Update to intersection
 		m.intersection.updateToIntersection(newSet)
 	} else {
@@ -999,6 +1006,11 @@ func (m *matchAttributeConstraint) remove(requestName, subRequestName string, de
 	}
 
 	m.numDevices--
+	if m.features.ListTypeAttributes && len(m.intersectionHistory) > 0 {
+		last := len(m.intersectionHistory) - 1
+		m.intersection = m.intersectionHistory[last]
+		m.intersectionHistory = m.intersectionHistory[:last]
+	}
 	m.logger.V(7).Info("Device removed from constraint set", "device", deviceID, "numDevices", m.numDevices)
 }
 
