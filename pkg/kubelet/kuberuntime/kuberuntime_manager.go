@@ -882,7 +882,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 	resizeResult := kubecontainer.NewSyncResult(kubecontainer.ResizePodInPlace, format.Pod(pod))
 	pcm := m.containerManager.NewPodContainerManager()
-	
 	enforceCPULimits := m.cpuCFSQuota
 	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(logger, pod) {
 		enforceCPULimits = false
@@ -893,6 +892,9 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		logger.Error(nil, "Unable to get resource configuration", "pod", klog.KObj(pod))
 		resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get resource configuration processing resize for pod %q", format.Pod(pod)))
 		return resizeResult
+	}
+	if m.isMemoryQoSEnforced() {
+		m.applyPodLevelMemoryHigh(pod, podResources)
 	}
 	currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
 	if err != nil {

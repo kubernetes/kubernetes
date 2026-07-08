@@ -2170,3 +2170,77 @@ func setCgroupVersionDuringTest(version CgroupVersion) {
 		return version == cgroupV2
 	}
 }
+
+func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	setCgroupVersionDuringTest(cgroupV2)
+	m.memoryThrottlingFactor = 0.9
+	m.memoryReservationPolicy = kubeletconfiginternal.NoneMemoryReservationPolicy
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+	containerRequest := resource.MustParse("256Mi")
+	containerLimit := resource.MustParse("512Mi")
+	podLimitMemory := resource.MustParse("1Gi")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "pod-level-test",
+			Namespace: "test",
+		},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: podLimitMemory,
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:  "c1-with-limit",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: containerRequest,
+							v1.ResourceCPU:    resource.MustParse("100m"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: containerLimit,
+							v1.ResourceCPU:    resource.MustParse("200m"),
+						},
+					},
+				},
+				{
+					Name:  "c2-no-limit",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: containerRequest,
+							v1.ResourceCPU:    resource.MustParse("100m"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	t.Run("container with own limit gets per-container memory.high", func(t *testing.T) {
+		lcr := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], true)
+		pageSize := int64(os.Getpagesize())
+		expectedHigh := int64(math.Floor(
+			float64(containerRequest.Value())+
+				(float64(containerLimit.Value())-float64(containerRequest.Value()))*0.9)/float64(pageSize)) * pageSize
+		actualHigh, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
+		assert.True(t, ok, "memory.high should be set for container with own limit")
+		assert.Equal(t, strconv.FormatInt(expectedHigh, 10), actualHigh)
+	})
+
+	t.Run("container without limit skips memory.high (pod-level handles it)", func(t *testing.T) {
+		lcr := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[1], true)
+		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
+		assert.False(t, ok, "memory.high should NOT be set on container without own limit when PodLevelResources is active")
+	})
+}

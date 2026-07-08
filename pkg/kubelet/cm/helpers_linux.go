@@ -39,6 +39,23 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
+// MemoryHighForPod computes the memory.high cgroup v2 value for a pod using the
+// KEP-2570 formula. Returns "" if memory.high should not be set (e.g., Guaranteed
+// pods where request == limit, or when no memory limit is declared).
+func MemoryHighForPod(memoryRequest, memoryLimit int64, throttlingFactor float64) string {
+	if (memoryRequest == memoryLimit && memoryRequest != 0) || memoryLimit == 0 {
+		return ""
+	}
+	pageSize := int64(os.Getpagesize())
+	memoryHigh := int64(math.Floor(
+		float64(memoryRequest)+
+			(float64(memoryLimit)-float64(memoryRequest))*throttlingFactor)/float64(pageSize)) * pageSize
+	if memoryHigh > 0 && memoryHigh > memoryRequest {
+		return strconv.FormatInt(memoryHigh, 10)
+	}
+	return ""
+}
+
 const (
 	// These limits are defined in the kernel:
 	// https://github.com/torvalds/linux/blob/0bddd227f3dc55975e2b8dfa7fc6f959b062a2c7/kernel/sched/sched.h#L427-L428

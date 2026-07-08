@@ -199,3 +199,6 @@ func initSwapControllerAvailabilityCheck(ctx context.Context) func() bool {
 func (m *kubeGenericRuntimeManager) isMemoryQoSEnforced() bool {
 	return false
 }
+
+func (m *kubeGenericRuntimeManager) applyPodLevelMemoryHigh(_ *v1.Pod, _ *cm.ResourceConfig) {
+}

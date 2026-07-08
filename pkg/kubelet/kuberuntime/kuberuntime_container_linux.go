@@ -154,7 +154,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 	if enforceMemoryQoS {
 		unified := map[string]string{}
 		memoryRequest := container.Resources.Requests.Memory().Value()
-		memoryLimit := container.Resources.Limits.Memory().Value()
+		memoryLimitValue := container.Resources.Limits.Memory().Value()
 		if memoryRequest != 0 && m.memoryReservationPolicy == kubeletconfiginternal.TieredReservationMemoryReservationPolicy {
 			// Guaranteed pods get memory.min (hard protection).
 			// Burstable pods get memory.low (soft protection).
@@ -168,19 +168,24 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			unified[cm.Cgroup2MemoryLow] = "0"
 		}
 
-		// Skip memory.high only for equal, positive memory request/limit (container guaranteed memory).
-		// For Burstable pods, memory.high uses the memory limit, for BestEffort pods (request=limit=0), node allocatable is used.
-		if memoryRequest != memoryLimit || memoryRequest == 0 {
+		// When PodLevelResources is active and the container has no memory limit,
+		// skip container-level memory.high — the pod cgroup's memory.high handles
+		// throttling hierarchically (kernel walks ancestors in try_charge_memcg).
+		skipContainerMemoryHigh := memoryLimitValue == 0 &&
+			utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) &&
+			resourcehelper.IsPodLevelResourcesSet(pod) &&
+			!pod.Spec.Resources.Limits.Memory().IsZero()
+		if !skipContainerMemoryHigh && (memoryRequest != memoryLimitValue || memoryRequest == 0) {
 			// The formula for memory.high for container cgroup is modified in Alpha stage of the feature in K8s v1.27.
 			// It will be set based on formula:
 			// `memory.high=floor[(requests.memory + memory throttling factor * (limits.memory or node allocatable memory - requests.memory))/pageSize] * pageSize`
 			// where default value of memory throttling factor is set to 0.9
 			// More info: https://git.k8s.io/enhancements/keps/sig-node/2570-memory-qos
 			memoryHigh := int64(0)
-			if memoryLimit != 0 {
+			if memoryLimitValue != 0 {
 				memoryHigh = int64(math.Floor(
 					float64(memoryRequest)+
-						(float64(memoryLimit)-float64(memoryRequest))*float64(m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+						(float64(memoryLimitValue)-float64(memoryRequest))*float64(m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
 			} else {
 				allocatable := m.getNodeAllocatable()
 				allocatableMemory, ok := allocatable[v1.ResourceMemory]
@@ -434,6 +439,55 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 // the cgroup version would solely depend on the environment running the test.
 var isCgroup2UnifiedMode = libcontainercgroups.IsCgroup2UnifiedMode
 
+// isMemoryQoSEnforced reports whether MemoryQoS is enabled on cgroup v2.
+func (m *kubeGenericRuntimeManager) isMemoryQoSEnforced() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && isCgroup2UnifiedMode()
+}
+
+// applyPodLevelMemoryHigh sets pod-level memory.high; kernel enforces hierarchically.
+func (m *kubeGenericRuntimeManager) applyPodLevelMemoryHigh(pod *v1.Pod, rc *cm.ResourceConfig) {
+	if m.memoryThrottlingFactor == 0 {
+		return
+	}
+	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
+	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
+		return
+	}
+	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources: !podLevelResourcesEnabled,
+	})
+	memoryLimitsDeclared := true
+	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources: !podLevelResourcesEnabled,
+		ContainerFn: func(res v1.ResourceList, _ resourcehelper.ContainerType) {
+			if res.Memory().IsZero() {
+				memoryLimitsDeclared = false
+			}
+		},
+	})
+	if podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(pod) &&
+		!pod.Spec.Resources.Limits.Memory().IsZero() {
+		memoryLimitsDeclared = true
+	}
+	if !memoryLimitsDeclared {
+		return
+	}
+	memoryRequest := int64(0)
+	memoryLimit := int64(0)
+	if req, found := reqs[v1.ResourceMemory]; found {
+		memoryRequest = req.Value()
+	}
+	if lim, found := limits[v1.ResourceMemory]; found {
+		memoryLimit = lim.Value()
+	}
+	if val := cm.MemoryHighForPod(memoryRequest, memoryLimit, m.memoryThrottlingFactor); val != "" {
+		if rc.Unified == nil {
+			rc.Unified = map[string]string{}
+		}
+		rc.Unified[cm.Cgroup2MemoryHigh] = val
+	}
+}
+
 // checkSwapControllerAvailability checks if swap controller is available.
 // It returns true if the swap controller is available, false otherwise.
 func checkSwapControllerAvailability(ctx context.Context) bool {
@@ -556,9 +610,4 @@ func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.Co
 	}
 
 	return user
-}
-
-// isMemoryQoSEnforced reports whether MemoryQoS is enabled on cgroup v2.
-func (m *kubeGenericRuntimeManager) isMemoryQoSEnforced() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && isCgroup2UnifiedMode()
 }
