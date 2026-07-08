@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	units "github.com/docker/go-units"
-	"github.com/go-logr/logr"
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
@@ -332,7 +331,7 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 	setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, burstableRequests)
 }
 
-func (m *qosContainerManagerImpl) UpdateCgroups(logger logr.Logger) error {
+func (m *qosContainerManagerImpl) UpdateCgroups(logger klog.Logger) error {
 	m.Lock()
 	defer m.Unlock()
 

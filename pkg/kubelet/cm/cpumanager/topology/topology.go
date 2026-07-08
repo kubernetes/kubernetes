@@ -19,8 +19,8 @@ package topology
 import (
 	"fmt"
 
-	"github.com/go-logr/logr"
 	cadvisorapi "github.com/google/cadvisor/lib/model"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/cpuset"
 )
 
@@ -338,7 +338,7 @@ func getUncoreCacheID(core cadvisorapi.Core) int {
 }
 
 // Discover returns CPUTopology based on cadvisor node info
-func Discover(logger logr.Logger, machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
+func Discover(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 	if machineInfo.NumCores == 0 {
 		return nil, fmt.Errorf("could not detect number of cpus")
 	}

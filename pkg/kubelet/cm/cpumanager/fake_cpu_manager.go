@@ -19,7 +19,6 @@ package cpumanager
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -32,7 +31,7 @@ import (
 )
 
 type fakeManager struct {
-	logger logr.Logger
+	logger klog.Logger
 	state  state.State
 }
 
@@ -54,11 +53,11 @@ func (m *fakeManager) Allocate(ctx context.Context, pod *v1.Pod, container *v1.C
 	return nil
 }
 
-func (m *fakeManager) AddContainer(logger logr.Logger, pod *v1.Pod, container *v1.Container, containerID string) {
+func (m *fakeManager) AddContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerID string) {
 	logger.Info("AddContainer", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
-func (m *fakeManager) RemoveContainer(logger logr.Logger, containerID string) error {
+func (m *fakeManager) RemoveContainer(logger klog.Logger, containerID string) error {
 	logger.Info("RemoveContainer", "containerID", containerID)
 	return nil
 }
@@ -68,7 +67,7 @@ func (m *fakeManager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, containe
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) GetPodTopologyHints(logger logr.Logger, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (m *fakeManager) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	logger.Info("Get pod topology hints")
 	return map[string][]topologymanager.TopologyHint{}
 }
@@ -107,7 +106,7 @@ func (m *fakeManager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Conta
 }
 
 // NewFakeManager creates empty/fake cpu manager
-func NewFakeManager(logger logr.Logger) Manager {
+func NewFakeManager(logger klog.Logger) Manager {
 	logger = klog.LoggerWithName(logger, "cpu.fake")
 	return &fakeManager{
 		logger: logger,

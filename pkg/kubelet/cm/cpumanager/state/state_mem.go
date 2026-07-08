@@ -20,7 +20,6 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/go-logr/logr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -29,7 +28,7 @@ import (
 
 type stateMemory struct {
 	sync.RWMutex
-	logger         logr.Logger
+	logger         klog.Logger
 	assignments    ContainerCPUAssignments
 	podAssignments PodCPUAssignments
 	defaultCPUSet  cpuset.CPUSet
@@ -38,7 +37,7 @@ type stateMemory struct {
 var _ State = &stateMemory{}
 
 // NewMemoryState creates new State for keeping track of cpu/pod assignment
-func NewMemoryState(logger logr.Logger) State {
+func NewMemoryState(logger klog.Logger) State {
 	// we store a logger instance to be consistent with the CheckpointState interface (see comments there)
 	// since we store a checkpoint, we can use the relatively expensive "WithName".
 	logger = klog.LoggerWithName(logger, "CPUManager state memory")

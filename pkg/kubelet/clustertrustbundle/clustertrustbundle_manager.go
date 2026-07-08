@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-logr/logr"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -344,7 +343,7 @@ type LazyInformerManager struct {
 	client            clientset.Interface
 	cacheSize         int
 	contextWithLogger context.Context
-	logger            logr.Logger
+	logger            klog.Logger
 }
 
 func NewLazyInformerManager(ctx context.Context, kubeClient clientset.Interface, cacheSize int) Manager {
