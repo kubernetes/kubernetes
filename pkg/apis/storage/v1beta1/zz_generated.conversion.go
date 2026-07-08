@@ -282,17 +282,7 @@ func Convert_storage_CSIDriver_To_v1beta1_CSIDriver(in *storage.CSIDriver, out *
 
 func autoConvert_v1beta1_CSIDriverList_To_storage_CSIDriverList(in *storagev1beta1.CSIDriverList, out *storage.CSIDriverList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]storage.CSIDriver, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_CSIDriver_To_storage_CSIDriver(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]storage.CSIDriver)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -303,17 +293,7 @@ func Convert_v1beta1_CSIDriverList_To_storage_CSIDriverList(in *storagev1beta1.C
 
 func autoConvert_storage_CSIDriverList_To_v1beta1_CSIDriverList(in *storage.CSIDriverList, out *storagev1beta1.CSIDriverList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]storagev1beta1.CSIDriver, len(*in))
-		for i := range *in {
-			if err := Convert_storage_CSIDriver_To_v1beta1_CSIDriver(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]storagev1beta1.CSIDriver)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -323,17 +303,7 @@ func Convert_storage_CSIDriverList_To_v1beta1_CSIDriverList(in *storage.CSIDrive
 }
 
 func autoConvert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(in *storagev1beta1.CSIDriverSpec, out *storage.CSIDriverSpec, s conversion.Scope) error {
-	out.AttachRequired = (*bool)(unsafe.Pointer(in.AttachRequired))
-	out.PodInfoOnMount = (*bool)(unsafe.Pointer(in.PodInfoOnMount))
-	out.VolumeLifecycleModes = *(*[]storage.VolumeLifecycleMode)(unsafe.Pointer(&in.VolumeLifecycleModes))
-	out.StorageCapacity = (*bool)(unsafe.Pointer(in.StorageCapacity))
-	out.FSGroupPolicy = (*storage.FSGroupPolicy)(unsafe.Pointer(in.FSGroupPolicy))
-	out.TokenRequests = *(*[]storage.TokenRequest)(unsafe.Pointer(&in.TokenRequests))
-	out.RequiresRepublish = (*bool)(unsafe.Pointer(in.RequiresRepublish))
-	out.SELinuxMount = (*bool)(unsafe.Pointer(in.SELinuxMount))
-	out.NodeAllocatableUpdatePeriodSeconds = (*int64)(unsafe.Pointer(in.NodeAllocatableUpdatePeriodSeconds))
-	out.ServiceAccountTokenInSecrets = (*bool)(unsafe.Pointer(in.ServiceAccountTokenInSecrets))
-	out.PreventPodSchedulingIfMissing = (*bool)(unsafe.Pointer(in.PreventPodSchedulingIfMissing))
+	*out = *(*storage.CSIDriverSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -343,17 +313,7 @@ func Convert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(in *storagev1beta1.C
 }
 
 func autoConvert_storage_CSIDriverSpec_To_v1beta1_CSIDriverSpec(in *storage.CSIDriverSpec, out *storagev1beta1.CSIDriverSpec, s conversion.Scope) error {
-	out.AttachRequired = (*bool)(unsafe.Pointer(in.AttachRequired))
-	out.FSGroupPolicy = (*storagev1beta1.FSGroupPolicy)(unsafe.Pointer(in.FSGroupPolicy))
-	out.PodInfoOnMount = (*bool)(unsafe.Pointer(in.PodInfoOnMount))
-	out.VolumeLifecycleModes = *(*[]storagev1beta1.VolumeLifecycleMode)(unsafe.Pointer(&in.VolumeLifecycleModes))
-	out.StorageCapacity = (*bool)(unsafe.Pointer(in.StorageCapacity))
-	out.TokenRequests = *(*[]storagev1beta1.TokenRequest)(unsafe.Pointer(&in.TokenRequests))
-	out.RequiresRepublish = (*bool)(unsafe.Pointer(in.RequiresRepublish))
-	out.SELinuxMount = (*bool)(unsafe.Pointer(in.SELinuxMount))
-	out.NodeAllocatableUpdatePeriodSeconds = (*int64)(unsafe.Pointer(in.NodeAllocatableUpdatePeriodSeconds))
-	out.ServiceAccountTokenInSecrets = (*bool)(unsafe.Pointer(in.ServiceAccountTokenInSecrets))
-	out.PreventPodSchedulingIfMissing = (*bool)(unsafe.Pointer(in.PreventPodSchedulingIfMissing))
+	*out = *(*storagev1beta1.CSIDriverSpec)(unsafe.Pointer(in))
 	return nil
 }
 
