@@ -57778,7 +57778,7 @@ func schema_k8sio_api_scheduling_v1alpha3_TopologyConstraint(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"key": {
 						SchemaProps: spec.SchemaProps{
-							Description: "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
+							Description: "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Nodes where this label is missing or has an empty value do not belong to any domain instance, so pods within the PodGroup cannot be scheduled onto them. Examples: \"topology.kubernetes.io/rack\"",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -59352,7 +59352,7 @@ func schema_k8sio_api_scheduling_v1beta1_TopologyConstraint(ref common.Reference
 				Properties: map[string]spec.Schema{
 					"key": {
 						SchemaProps: spec.SchemaProps{
-							Description: "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
+							Description: "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Nodes where this label is missing or has an empty value do not belong to any domain instance, so pods within the PodGroup cannot be scheduled onto them. Examples: \"topology.kubernetes.io/rack\"",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",

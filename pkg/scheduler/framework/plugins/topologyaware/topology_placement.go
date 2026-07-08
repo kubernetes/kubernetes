@@ -79,7 +79,7 @@ func (pl *TopologyPlacement) GeneratePlacements(ctx context.Context, state fwk.P
 
 	nodesPerTopologyDomain := make(map[string][]fwk.NodeInfo)
 	for _, node := range parentPlacement.Nodes {
-		if domain, ok := node.Node().Labels[topologyKey]; ok {
+		if domain, ok := node.Node().Labels[topologyKey]; ok && domain != "" {
 			if requiredDomain == nil || *requiredDomain == domain {
 				nodesPerTopologyDomain[domain] = append(nodesPerTopologyDomain[domain], node)
 			}
@@ -110,8 +110,12 @@ func (pl *TopologyPlacement) getScheduledPodsTopologyDomain(topologyKey string, 
 		if !ok {
 			return "", fmt.Errorf("no topology domain found for pod %v", klog.KObj(pod))
 		}
+		// An empty label value is treated as a node labeling mistake, not as a domain.
+		if domain == "" {
+			return "", fmt.Errorf("empty topology domain found for pod %v", klog.KObj(pod))
+		}
 		if topologyDomain != "" && topologyDomain != domain {
-			return "", fmt.Errorf("more than 1 domain found for pod group: %v, %v", topologyDomain, domain)
+			return "", fmt.Errorf("more than 1 domain found for pod group: %q, %q", topologyDomain, domain)
 		}
 		topologyDomain = domain
 	}
