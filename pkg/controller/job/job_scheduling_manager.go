@@ -114,18 +114,6 @@ func hasDelegatedPodGroup(job *batch.Job) bool {
 	return ok
 }
 
-// filterControlledByJob returns only the objects whose controller ownerRef
-// points at the given Job, i.e. the ones this controller created and owns.
-func filterControlledByJob[T metav1.Object](objs []T, job *batch.Job) []T {
-	matched := make([]T, 0, len(objs))
-	for _, obj := range objs {
-		if metav1.IsControlledBy(obj, job) {
-			matched = append(matched, obj)
-		}
-	}
-	return matched
-}
-
 // ensureWorkloadAndPodGroup discovers or creates Workload and PodGroup for the given Job.
 // Returns both objects when workload integration is active, or nils when the Job
 // should fall back to default scheduling / defers ownership to a parent.
@@ -366,16 +354,17 @@ func (jm *Controller) getOrCreateWorkload(ctx context.Context,
 
 	var result *schedulingv1alpha3.Workload
 	err := retry.OnError(retry.DefaultRetry, apierrors.IsAlreadyExists, func() error {
-		allWorkloads, err := jm.listWorkloadsForJob(job)
+		matched, err := jm.listWorkloadsForJob(job)
 		if err != nil {
 			logger.V(2).Info("Failed to list Workloads, falling back to default scheduling",
 				"job", klog.KObj(job), "err", err)
 			return nil
 		}
-		// Only Workloads this controller created are managed, identified by a
-		// controller ownerRef to the Job. User pre-created (BYO) Workloads are
-		// ignored so the controller always owns the objects it schedules against.
-		matched := filterControlledByJob(allWorkloads, job)
+		// Adopt any Workload referencing this Job, whether the controller created
+		// it or a user pre-created it (BYO), e.g. a higher-level controller that
+		// provisions the Workload for quota/admission gating before the Job
+		// exists. Ownership (controller ownerRef / managed-by) governs only
+		// update and GC, not whether the Workload is adopted here.
 
 		switch len(matched) {
 		case 0:
@@ -412,8 +401,20 @@ func (jm *Controller) getOrCreateWorkload(ctx context.Context,
 // default scheduling, or reject the update via admission.
 func (jm *Controller) validateWorkloadStructure(logger klog.Logger, job *batch.Job,
 	wl *schedulingv1alpha3.Workload) (*schedulingv1alpha3.Workload, error) {
+	// A BYO Workload may carry multiple templates; the Job disambiguates which
+	// one to bind by naming it via the podGroupTemplate annotation. When the
+	// annotation is set we only require that named template to exist. Without
+	// it, the controller can only bind an unambiguous single-template Workload.
+	if name, ok := job.Annotations[apischeduling.GroupTemplateNameAnnotation]; ok {
+		if _, err := getPodGroupTemplateByName(wl, name); err != nil {
+			logger.V(2).Info("Named PodGroupTemplate not found in Workload, falling back to default scheduling",
+				"job", klog.KObj(job), "workload", klog.KObj(wl), "template", name)
+			return nil, nil
+		}
+		return wl, nil
+	}
 	if len(wl.Spec.PodGroupTemplates) != 1 {
-		logger.V(2).Info("Workload has unsupported number of PodGroupTemplates, falling back to default scheduling",
+		logger.V(2).Info("Workload has unsupported number of PodGroupTemplates and no podGroupTemplate annotation, falling back to default scheduling",
 			"job", klog.KObj(job), "workload", klog.KObj(wl), "count", len(wl.Spec.PodGroupTemplates))
 		return nil, nil
 	}
@@ -429,16 +430,14 @@ func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
 
 	var result *schedulingv1alpha3.PodGroup
 	err := retry.OnError(retry.DefaultRetry, apierrors.IsAlreadyExists, func() error {
-		allPodGroups, err := jm.listPodGroupsForWorkload(workload)
+		matched, err := jm.listPodGroupsForWorkload(workload)
 		if err != nil {
 			logger.V(2).Info("Failed to list PodGroups, falling back to default scheduling",
 				"job", klog.KObj(job), "workload", klog.KObj(workload), "err", err)
 			return nil
 		}
-		// Only PodGroups this controller created are managed, identified by a
-		// controller ownerRef to the Job. User pre-created (BYO) PodGroups are
-		// ignored so the controller always owns the objects it schedules against.
-		matched := filterControlledByJob(allPodGroups, job)
+		// Adopt any PodGroup referencing this Workload, whether controller-created
+		// or BYO. Ownership only governs update/GC, not adoption.
 
 		switch len(matched) {
 		case 0:
@@ -449,9 +448,12 @@ func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
 				return nil
 			}
 			// A root Job owns its Workload, so the PodGroup links it as a
-			// non-controller owner (linkWorkloadOwner=true). An empty template
-			// name selects the Workload's single template.
-			pg, err := jm.createPodGroup(ctx, job, workload, "", true)
+			// non-controller owner (linkWorkloadOwner=true). The Job may name a
+			// specific template (BYO multi-template Workload) via the
+			// podGroupTemplate annotation; an empty name selects the Workload's
+			// single template.
+			templateName := job.Annotations[apischeduling.GroupTemplateNameAnnotation]
+			pg, err := jm.createPodGroup(ctx, job, workload, templateName, true)
 			if err != nil {
 				return err
 			}

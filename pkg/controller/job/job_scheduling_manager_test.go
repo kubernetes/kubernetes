@@ -578,7 +578,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			wantPodGroup:      true,
 		},
 
-		"BYO Workload (no controller ownerRef) is ignored; controller creates its own": {
+		"BYO Workload (no controller ownerRef) is adopted and a PodGroup is created": {
 			job: baseJob,
 			existingWorkloads: []*schedulingv1alpha3.Workload{
 				{
@@ -601,7 +601,32 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 				},
 			},
 			wantPodGroup:     true,
-			wantPodGroupName: podGroupName,
+			wantPodGroupName: computePodGroupName("user-created-workload", templateName),
+		},
+		"BYO multi-template Workload binds the template named by the podGroupTemplate annotation": {
+			job: func() *batch.Job {
+				j := baseJob.DeepCopy()
+				j.Annotations = map[string]string{apischeduling.GroupTemplateNameAnnotation: "workers"}
+				return j
+			}(),
+			existingWorkloads: []*schedulingv1alpha3.Workload{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "byo-multi",
+						Namespace: metav1.NamespaceDefault,
+						UID:       types.UID("byo-multi-uid"),
+					},
+					Spec: schedulingv1alpha3.WorkloadSpec{
+						ControllerRef: newWorkloadJobControllerRef(baseJob.Name),
+						PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
+							{Name: "drivers", SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.BasicSchedulingPolicy{}}},
+							{Name: "workers", SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4}}},
+						},
+					},
+				},
+			},
+			wantPodGroup:     true,
+			wantPodGroupName: computePodGroupName("byo-multi", "workers"),
 		},
 		"ambiguous Workloads fall back": {
 			job: baseJob,
@@ -610,7 +635,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 				makeWorkload("workload-2", baseJob.Name),
 			},
 		},
-		"BYO PodGroup (no controller ownerRef) is ignored; controller creates its own": {
+		"BYO PodGroup (no controller ownerRef) is discovered and used as-is": {
 			job:               baseJob,
 			existingWorkloads: []*schedulingv1alpha3.Workload{makeWorkload(workloadName, baseJob.Name)},
 			existingPodGroups: []*schedulingv1alpha3.PodGroup{
@@ -628,7 +653,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 				},
 			},
 			wantPodGroup:     true,
-			wantPodGroupName: podGroupName,
+			wantPodGroupName: "external-pg",
 		},
 		"ambiguous PodGroups fall back": {
 			job:               baseJob,
