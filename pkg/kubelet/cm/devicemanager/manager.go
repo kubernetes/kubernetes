@@ -303,7 +303,7 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(logger klog.Logger, resourceNa
 		if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
 			// compare with old device's health and send update to the channel if needed
 			updatePodUIDFn := func(deviceID string) {
-				podUID, _ := m.podDevices.getPodAndContainerForDevice(deviceID)
+				podUID, _ := m.podDevices.getPodAndContainerForDevice(resourceName, deviceID)
 				if podUID != "" {
 					podsToUpdate.Insert(podUID)
 				}
