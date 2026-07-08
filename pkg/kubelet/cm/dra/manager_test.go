@@ -1360,6 +1360,59 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 	}
 }
 
+// TestPrepareResourcesWithUnpreparingClaim is a regression test for the race
+// where reconcileLoop-initiated (or otherwise concurrent) unprepareResources
+// has committed to calling NodeUnprepareResources on a claim, released the
+// cache lock during the RPC, and prepareResources for a different pod would
+// otherwise attach itself to the still-cached-but-being-torn-down claim.
+// PrepareResources must refuse to touch a claim marked as unpreparing.
+func TestPrepareResourcesWithUnpreparingClaim(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	fakeKubeClient := fake.NewClientset()
+
+	manager, err := NewManager(logger, fakeKubeClient, t.TempDir())
+	require.NoError(t, err)
+	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
+
+	pod := genTestPod()
+	claim := genTestClaim(claimName, driverName, deviceName, podUID)
+	_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, genPrepareResourcesResponse(claim.UID), nil, nil)
+	require.NoError(t, err)
+	defer draServerInfo.teardownFn()
+
+	plg := manager.GetWatcherHandler()
+	require.NoError(t, plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+
+	// Seed the cache with a claimInfo that is fully prepared for another
+	// pod and marked as unpreparing (mimicking the state after
+	// unprepareResources has committed to calling NodeUnprepareResources
+	// but before the terminal cache delete). The other pod is still
+	// referenced so we can also check its reference survives.
+	existing := genTestClaimInfo(claimUID, []string{"another-pod-uid"}, true, nil)
+	existing.setUnpreparing()
+	manager.cache.add(existing)
+
+	err = manager.PrepareResources(tCtx, pod)
+	require.Error(t, err, "PrepareResources must fail while the claim is being unprepared")
+
+	assert.Equal(t, uint32(0), draServerInfo.server.prepareResourceCalls.Load(),
+		"driver must not be called while the claim is being unprepared")
+
+	// The seeded claimInfo must be untouched: no new pod reference, still
+	// unpreparing, still prepared, other pod's reference intact.
+	cached, ok := manager.cache.get(claimName, namespace)
+	require.True(t, ok, "claim info must still be in the cache")
+	assert.False(t, cached.PodUIDs.Has(string(pod.UID)),
+		"failing PrepareResources must not have added this pod to PodUIDs")
+	assert.True(t, cached.PodUIDs.Has("another-pod-uid"),
+		"other pod's reference must survive")
+	assert.True(t, cached.isUnpreparing(),
+		"unpreparing flag must still be set")
+}
+
 func TestUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 	for _, test := range []struct {

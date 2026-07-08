@@ -41,6 +41,12 @@ import (
 type ClaimInfo struct {
 	state.ClaimInfoState
 	prepared bool
+	// unpreparing is true from the moment unprepareResources commits to
+	// calling NodeUnprepareResources for the last referencing pod until
+	// the cache entry is deleted. While set, prepareResources must not
+	// attach new pods to this claim: the claim resources are being unprepared
+	// and new pods shouldn't prepare this claim until it has been fully unprepared.
+	unpreparing bool
 }
 
 // claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
@@ -115,6 +121,18 @@ func (info *ClaimInfo) setPrepared() {
 // isPrepared checks if claim info is prepared or not.
 func (info *ClaimInfo) isPrepared() bool {
 	return info.prepared
+}
+
+// setUnpreparing marks the claim info as being torn down, so
+// prepareResources refuses to attach new pods to it.
+func (info *ClaimInfo) setUnpreparing() {
+	info.unpreparing = true
+}
+
+// isUnpreparing reports whether unprepareResources is in the process
+// of calling NodeUnprepareResources on this claim.
+func (info *ClaimInfo) isUnpreparing() bool {
+	return info.unpreparing
 }
 
 // cdiDevicesAsList returns a list of CDIDevices from the provided claim info.

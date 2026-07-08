@@ -348,6 +348,12 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				if claimInfo.ClaimUID != resourceClaim.UID {
 					return fmt.Errorf("old ResourceClaim with same name %s and different UID %s still exists (previous pod force-deleted?!)", resourceClaim.Name, claimInfo.ClaimUID)
 				}
+				// Reject attaching a new pod to a claim if unprepareResources
+				// has already started as cache entry will be deleted when resources
+				// are fully unprepared.
+				if claimInfo.isUnpreparing() {
+					return fmt.Errorf("ResourceClaim %s is being unprepared", resourceClaim.Name)
+				}
 				logger.V(6).Info("Found existing claim info cache entry", "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			}
 
@@ -662,6 +668,14 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 			// This claimInfo name will be used to update ClaimInfo cache
 			// after NodeUnprepareResources GRPC succeeds
 			claimNamesMap[claimInfo.ClaimUID] = claimInfo.ClaimName
+
+			// Mark the claim as being unprepared while we hold the cache
+			// lock. NodeUnprepareResources runs below without the lock
+			// held; any concurrent prepareResources for a different pod
+			// that finds this entry must refuse to attach itself, since
+			// the resources are being unprepared and the cache entry
+			// will be deleted on completion.
+			claimInfo.setUnpreparing()
 
 			// Loop through all drivers and prepare for calling NodeUnprepareResources.
 			claim := &drapb.Claim{
