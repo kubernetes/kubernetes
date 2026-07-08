@@ -101,7 +101,7 @@ func (pl *TopologyPlacement) GeneratePlacements(ctx context.Context, state fwk.P
 
 func (pl *TopologyPlacement) getScheduledPodsTopologyDomain(topologyKey string, scheduledPods []*v1.Pod) (string, error) {
 	topologyDomain := ""
-	for _, pod := range scheduledPods {
+	for i, pod := range scheduledPods {
 		node, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(pod.Spec.NodeName)
 		if err != nil {
 			return "", fmt.Errorf("getting node for pod %v: %w", klog.KObj(pod), err)
@@ -110,8 +110,8 @@ func (pl *TopologyPlacement) getScheduledPodsTopologyDomain(topologyKey string, 
 		if !ok {
 			return "", fmt.Errorf("no topology domain found for pod %v", klog.KObj(pod))
 		}
-		if topologyDomain != "" && topologyDomain != domain {
-			return "", fmt.Errorf("more than 1 domain found for pod group: %v, %v", topologyDomain, domain)
+		if i > 0 && topologyDomain != domain {
+			return "", fmt.Errorf("more than 1 domain found for pod group: %q, %q", topologyDomain, domain)
 		}
 		topologyDomain = domain
 	}
