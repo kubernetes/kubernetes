@@ -260,7 +260,8 @@ func (s *btreeStore) OrderedListPrefix(prefix, continueKey string) ([]interface{
 	if continueKey == "" {
 		continueKey = prefix
 	}
-	var result []interface{}
+	// Count the matching elements first so the result is allocated exactly once.
+	result := make([]interface{}, 0, s.Count(prefix, continueKey))
 	s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
 		if !strings.HasPrefix(item.Key, prefix) {
 			return false

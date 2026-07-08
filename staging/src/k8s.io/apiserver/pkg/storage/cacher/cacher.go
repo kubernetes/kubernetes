@@ -811,13 +811,17 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
 		//   so we try to delay this action as much as possible
 		var selectedObjects []runtime.Object
+		if limit > 0 && limit < int64(len(resp.Items)) {
+			selectedObjects = make([]runtime.Object, 0, limit)
+		}
+		shardingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch)
 		for i, obj := range resp.Items {
 			elem, ok := obj.(*store.Element)
 			if !ok {
 				return fmt.Errorf("non *store.Element returned from storage: %v", obj)
 			}
 			shardMatch := true
-			if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+			if shardingEnabled {
 				var err error
 				shardMatch, err = opts.Predicate.MatchesSharding(elem.Object)
 				if err != nil {
