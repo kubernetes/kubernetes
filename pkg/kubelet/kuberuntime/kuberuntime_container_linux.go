@@ -557,3 +557,8 @@ func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.Co
 
 	return user
 }
+
+// isMemoryQoSEnforced reports whether MemoryQoS is enabled on cgroup v2.
+func (m *kubeGenericRuntimeManager) isMemoryQoSEnforced() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && isCgroup2UnifiedMode()
+}
