@@ -6396,7 +6396,7 @@ func TestPrintEndpoint(t *testing.T) {
 }
 
 func TestPrintEndpointSlice(t *testing.T) {
-	tcpProtocol := api.ProtocolTCP
+	tcpProtocol := apiv1.ProtocolTCP
 
 	tests := []struct {
 		endpointSlice discovery.EndpointSlice
