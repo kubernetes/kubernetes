@@ -2789,6 +2789,57 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
 }
 
+// Test verifies that HandlePodAdditions only tracks pod certificates for pods
+// that pass admission, not for pods that are rejected.
+// See https://github.com/kubernetes/kubernetes/issues/138920
+func TestHandlePodAdditionsTracksCertificatesOnlyForAdmittedPods(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+
+	recorder := &recordingPodCertificateManager{}
+	kl.podCertificateManager = recorder
+
+	pods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "123456789",
+				Name:      "podA",
+				Namespace: "foo",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "987654321",
+				Name:      "podB",
+				Namespace: "foo",
+			},
+		},
+	}
+	podToReject := pods[0]
+	podToAdmit := pods[1]
+	podsToReject := []*v1.Pod{podToReject}
+
+	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{podsToReject: podsToReject}})
+
+	kl.HandlePodAdditions(tCtx, pods)
+
+	if len(recorder.TrackedPods) != 1 || recorder.TrackedPods[0] != podToAdmit.UID {
+		t.Errorf("expected only admitted pod %q to be tracked, got %v", podToAdmit.UID, recorder.TrackedPods)
+	}
+}
+
 func TestPodResourceAllocationReset(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 
