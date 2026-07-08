@@ -52,6 +52,22 @@ const (
 	podGroupByWorkloadNameIndexKey = "podGroupByWorkloadName"
 )
 
+// addWorkloadManagedByAnnotation marks the object's metadata as managed by the
+// built-in Job controller, so controller-created Workload/PodGroup objects can
+// be told apart from user-provided (BYO) ones that may carry identical
+// ownerReferences before the controller updates them or relies on GC.
+func addWorkloadManagedByAnnotation(meta *metav1.ObjectMeta) {
+	if meta.Annotations == nil {
+		meta.Annotations = make(map[string]string, 1)
+	}
+	meta.Annotations[batch.JobWorkloadManagedByAnnotation] = batch.JobControllerName
+}
+
+// isManagedByJobController reports whether the object was created by the Job controller.
+func isManagedByJobController(obj metav1.Object) bool {
+	return obj.GetAnnotations()[batch.JobWorkloadManagedByAnnotation] == batch.JobControllerName
+}
+
 // shouldManageWorkloadForJob reports whether the Job controller should
 // materialize scheduling objects for the Job. With the WorkloadWithJob gate
 // enabled, every eligible Job gets a Workload/PodGroup, defaulting to Basic
@@ -152,8 +168,10 @@ func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.
 func (jm *Controller) syncGangMinCount(ctx context.Context, job *batch.Job,
 	workload *schedulingv1alpha3.Workload, podGroup *schedulingv1alpha3.PodGroup) error {
 	// Only mutate objects the controller created, identified by a controller
-	// ownerRef to the Job.
-	if workload == nil || !metav1.IsControlledBy(workload, job) {
+	// ownerRef to the Job and the managed-by annotation. BYO Workload/PodGroup
+	// is never updated even on a minCount change.
+	if workload == nil || !metav1.IsControlledBy(workload, job) ||
+		!isManagedByJobController(workload) {
 		return nil
 	}
 	desired, err := jm.generateWorkload(job)
@@ -173,6 +191,7 @@ func (jm *Controller) syncGangMinCount(ctx context.Context, job *batch.Job,
 		}
 	}
 	if podGroup != nil && metav1.IsControlledBy(podGroup, job) &&
+		isManagedByJobController(podGroup) &&
 		podGroup.Spec.SchedulingPolicy.Gang != nil && podGroup.Spec.SchedulingPolicy.Gang.MinCount != desiredMinCount {
 		if err := jm.updatePodGroupMinCount(ctx, podGroup.Namespace, podGroup.Name, desiredMinCount); err != nil {
 			return err
@@ -546,6 +565,8 @@ func (jm *Controller) createWorkloadForJob(ctx context.Context, job *batch.Job) 
 		return nil, err
 	}
 
+	addWorkloadManagedByAnnotation(&workload.ObjectMeta)
+
 	created, err := jm.kubeClient.SchedulingV1alpha3().Workloads(job.Namespace).Create(ctx, workload, metav1.CreateOptions{})
 	if err != nil {
 		jm.recorder.Eventf(job, v1.EventTypeWarning, "FailedWorkloadCreate",
@@ -627,6 +648,7 @@ func (jm *Controller) createPodGroup(ctx context.Context, job *batch.Job, worklo
 		},
 		Spec: podGroupSpecFromTemplate(workload.Name, *template),
 	}
+	addWorkloadManagedByAnnotation(&podGroup.ObjectMeta)
 
 	created, err := jm.kubeClient.SchedulingV1alpha3().PodGroups(job.Namespace).Create(ctx, podGroup, metav1.CreateOptions{})
 	if err != nil {

@@ -761,6 +761,10 @@ func TestCreateWorkloadForJob(t *testing.T) {
 	if len(wl.OwnerReferences) != 1 || wl.OwnerReferences[0].Name != job.Name {
 		t.Errorf("unexpected ownerReferences: %v", wl.OwnerReferences)
 	}
+
+	if got := wl.Annotations[batch.JobWorkloadManagedByAnnotation]; got != batch.JobControllerName {
+		t.Errorf("managed-by annotation = %q, want %q", got, batch.JobControllerName)
+	}
 }
 
 func TestCreatePodGroup(t *testing.T) {
@@ -832,12 +836,16 @@ func TestSyncGangMinCount(t *testing.T) {
 	tmplName := podGroupTemplateName(job)
 	pgName := computePodGroupName(wlName, tmplName)
 
-	makeWL := func(minCount int32, owned bool) *schedulingv1alpha3.Workload {
+	// Controller-created objects always carry a controller ownerRef; the
+	// managed-by annotation (managed) is the additional signal the controller
+	// requires before mutating them. BYO objects lack the annotation.
+	makeWL := func(minCount int32, managed bool) *schedulingv1alpha3.Workload {
 		wl := &schedulingv1alpha3.Workload{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      wlName,
-				Namespace: job.Namespace,
-				UID:       "wl-uid",
+				Name:            wlName,
+				Namespace:       job.Namespace,
+				UID:             "wl-uid",
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 			},
 			Spec: schedulingv1alpha3.WorkloadSpec{
 				ControllerRef: newWorkloadJobControllerRef(job.Name),
@@ -847,25 +855,26 @@ func TestSyncGangMinCount(t *testing.T) {
 				}},
 			},
 		}
-		if owned {
-			wl.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)}
+		if managed {
+			wl.Annotations = map[string]string{batch.JobWorkloadManagedByAnnotation: batch.JobControllerName}
 		}
 		return wl
 	}
-	makePG := func(minCount int32, owned bool) *schedulingv1alpha3.PodGroup {
+	makePG := func(minCount int32, managed bool) *schedulingv1alpha3.PodGroup {
 		pg := &schedulingv1alpha3.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      pgName,
-				Namespace: job.Namespace,
-				UID:       "pg-uid",
+				Name:            pgName,
+				Namespace:       job.Namespace,
+				UID:             "pg-uid",
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 			},
 			Spec: schedulingv1alpha3.PodGroupSpec{
 				WorkloadRef:      &schedulingv1alpha3.WorkloadReference{WorkloadName: wlName, TemplateName: tmplName},
 				SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: minCount}},
 			},
 		}
-		if owned {
-			pg.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)}
+		if managed {
+			pg.Annotations = map[string]string{batch.JobWorkloadManagedByAnnotation: batch.JobControllerName}
 		}
 		return pg
 	}
@@ -875,13 +884,13 @@ func TestSyncGangMinCount(t *testing.T) {
 		podGroup     *schedulingv1alpha3.PodGroup
 		wantMinCount int32
 	}{
-		"controller-owned objects are resized to the Job's minCount": {
+		"managed objects are resized to the Job's minCount": {
 			workload: makeWL(2, true), podGroup: makePG(2, true), wantMinCount: 5,
 		},
 		"already at desired minCount is left unchanged": {
 			workload: makeWL(5, true), podGroup: makePG(5, true), wantMinCount: 5,
 		},
-		"objects without a controller ownerRef are never resized": {
+		"BYO objects (no managed-by marker) are never resized": {
 			workload: makeWL(2, false), podGroup: makePG(2, false), wantMinCount: 2,
 		},
 	}
