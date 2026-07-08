@@ -282,9 +282,11 @@ type PodSpecApplyConfiguration struct {
 	// the Pod is treated as a single unit in all of these aspects.
 	// The group object referenced by this field may not exist at the time the
 	// Pod is created.
-	// This field is immutable, but a group object with the same name may be
-	// recreated with different policies. Doing this during pod scheduling
-	// may result in the placement not conforming to the expected policies.
+	// This field is immutable. The scheduler cannot distinguish PodGroup runtime
+	// instances that reuse the same namespace and name. Controllers should use a
+	// new PodGroup name for each runtime instance. Reusing a name for a PodGroup
+	// with different policies may result in Pod placement not conforming to the
+	// expected policies.
 	SchedulingGroup *PodSchedulingGroupApplyConfiguration `json:"schedulingGroup,omitempty"`
 	// evictionResponders reference responders that react to Evictions based on EvictionRequests.
 	// Responders should observe and communicate through the Eviction Resource API to help with
