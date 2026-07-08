@@ -342,6 +342,7 @@ type Cacher struct {
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
+	watcherMetrics          *metrics.WatcherMetricsObservers
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -414,6 +415,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		clock:            config.Clock,
 		timer:            time.NewTimer(time.Duration(0)),
 		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
+		watcherMetrics:   metrics.NewWatcherMetricsObservers(config.GroupResource),
 	}
 
 	// Ensure that timer is stopped.
@@ -442,7 +444,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	listerWatcher := NewListerWatcher(config.Storage, resourcePrefix, config.NewListFunc, contextMetadata)
 	reflectorName := "storage/cacher.go:" + resourcePrefix
 
-	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
+	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, nil, watchCache, 0)
 	// Configure reflector's pager to for an appropriate pagination chunk size for fetching data from
 	// storage. The pager falls back to full list if paginated list calls fail due to an "Expired" error.
 	reflector.WatchListPageSize = storageWatchListPageSize
@@ -604,6 +606,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		deadline,
 		pred.AllowWatchBookmarks,
 		c.groupResource,
+		c.watcherMetrics,
 		identifier,
 	)
 

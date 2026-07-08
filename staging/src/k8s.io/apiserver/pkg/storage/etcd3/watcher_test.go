@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
@@ -315,6 +316,7 @@ func TestWatchChanSync(t *testing.T) {
 					0,
 					true,
 					false,
+					false,
 					storage.Everything)
 
 				sync := w.syncPaginated
@@ -375,7 +377,7 @@ func TestWatchChanSyncStreamMatchesPaginated(t *testing.T) {
 	if len(stream) != len(want) {
 		t.Errorf("syncStreamRecursive queued %d events, expected %d", len(stream), len(want))
 	}
-	if diff := cmp.Diff(paginated, stream, cmp.AllowUnexported(event{})); diff != "" {
+	if diff := cmp.Diff(paginated, stream, cmp.AllowUnexported(event{}), cmpopts.IgnoreFields(event{}, "recordTime")); diff != "" {
 		t.Errorf("syncStreamRecursive and syncPaginated queued different events (-paginated +stream):\n%s", diff)
 	}
 }
@@ -401,7 +403,7 @@ func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 	kvWrapper.streamKV = unimplementedRangeStreamKV()
 	store.client.KV = kvWrapper
 
-	w := store.watcher.createWatchChan(origCtx, "/pods/", 0, true, false, storage.Everything)
+	w := store.watcher.createWatchChan(origCtx, "/pods/", 0, true, false, false, storage.Everything)
 
 	if err := w.sync(); err != nil {
 		t.Fatalf("sync failed: %v", err)
@@ -430,7 +432,7 @@ func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 
 func drainSync(t *testing.T, store *store, ctx context.Context, sync func(*watchChan) error) map[string]*event {
 	t.Helper()
-	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, storage.Everything)
 	if err := sync(wc); err != nil {
 		t.Fatalf("sync failed: %v", err)
 	}
@@ -466,7 +468,7 @@ func TestWatchChanSyncStreamCompactionError(t *testing.T) {
 	legacyregistry.Reset()
 	t.Cleanup(legacyregistry.Reset)
 
-	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, storage.Everything)
 	if err := wc.syncStreamRecursive(); !apierrors.IsResourceExpired(err) {
 		t.Fatalf("expected ResourceExpired from a compacted revision, got %T %v", err, err)
 	}
@@ -493,7 +495,7 @@ func TestWatchChanSyncStreamMetrics(t *testing.T) {
 		legacyregistry.Reset()
 		t.Cleanup(legacyregistry.Reset)
 
-		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, storage.Everything)
 		if err := wc.syncStreamRecursive(); err != nil {
 			t.Fatal(err)
 		}
@@ -516,7 +518,7 @@ etcd_requests_total{group="",operation="listStream",resource="pods"} 1
 		legacyregistry.Reset()
 		t.Cleanup(legacyregistry.Reset)
 
-		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, storage.Everything)
 		err := wc.syncStreamRecursive()
 		if grpcstatus.Code(err) != grpccodes.Unimplemented {
 			t.Fatalf("expected Unimplemented error, got %v", err)
