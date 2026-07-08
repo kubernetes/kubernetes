@@ -273,6 +273,11 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 
 	allErrs = append(allErrs, validatePodReplacementPolicy(spec, fldPath.Child("podReplacementPolicy"))...)
 
+	// The scheduling gang minCount must not exceed parallelism. This runs on both
+	// create and update, and for Jobs embedded in a CronJob jobTemplate. It is a
+	// no-op when spec.scheduling is unset.
+	allErrs = append(allErrs, validateGangMinCount(spec, fldPath)...)
+
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
 
 	// spec.Template.Spec.RestartPolicy can be defaulted as RestartPolicyAlways
@@ -628,6 +633,38 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	return allErrs
 }
 
+// gangMinCountExceedsParallelism reports whether spec sets an explicit gang
+// minCount greater than parallelism.
+func gangMinCountExceedsParallelism(spec *batch.JobSpec) bool {
+	if spec == nil || spec.Scheduling == nil || spec.Scheduling.Policy == nil || spec.Scheduling.Policy.Gang == nil {
+		return false
+	}
+	minCount := spec.Scheduling.Policy.Gang.MinCount
+	if minCount == nil {
+		return false
+	}
+	parallelism := int32(1)
+	if spec.Parallelism != nil {
+		parallelism = *spec.Parallelism
+	}
+	return *minCount > parallelism
+}
+
+// validateGangMinCount rejects a gang minCount that exceeds the Job's parallelism.
+func validateGangMinCount(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	if !gangMinCountExceedsParallelism(spec) {
+		return nil
+	}
+	parallelism := int32(1)
+	if spec.Parallelism != nil {
+		parallelism = *spec.Parallelism
+	}
+	return field.ErrorList{field.Invalid(
+		fldPath.Child("scheduling", "policy", "gang", "minCount"),
+		*spec.Scheduling.Policy.Gang.MinCount,
+		fmt.Sprintf("must not be greater than parallelism (%d)", parallelism))}
+}
+
 func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	template := &spec.Template
@@ -763,10 +800,14 @@ func ValidateCronJobCreate(cronJob *batch.CronJob, opts apivalidation.PodValidat
 }
 
 // ValidateCronJobUpdate validates an update to a CronJob and returns an ErrorList with any errors.
+//
+// spec.scheduling immutability is intentionally not enforced for a CronJob's
+// jobTemplate: each Job created from a CronJob gets its own Workload/PodGroup, so
+// the template may be freely changed. The structural gang minCount check still
+// runs via validateCronJobSpec -> ValidateJobTemplateSpec -> validateJobSpec.
 func ValidateCronJobUpdate(job, oldJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateCronJobSpec(&job.Spec, &oldJob.Spec, field.NewPath("spec"), opts)...)
-
 	// skip the 52-character name validation limit on update validation
 	// to allow old cronjobs with names > 52 chars to be updated/deleted
 	return allErrs

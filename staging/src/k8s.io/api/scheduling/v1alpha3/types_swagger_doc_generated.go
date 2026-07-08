@@ -212,6 +212,79 @@ func (WorkloadList) SwaggerDoc() map[string]string {
 	return map_WorkloadList
 }
 
+var map_WorkloadPodGroupAllDisruptionMode = map[string]string{
+	"": "WorkloadPodGroupAllDisruptionMode indicates that all pods in the group must be disrupted together.",
+}
+
+func (WorkloadPodGroupAllDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupAllDisruptionMode
+}
+
+var map_WorkloadPodGroupBasicSchedulingPolicy = map[string]string{
+	"": "WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes scheduling behavior.",
+}
+
+func (WorkloadPodGroupBasicSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupBasicSchedulingPolicy
+}
+
+var map_WorkloadPodGroupDisruptionMode = map[string]string{
+	"":       "The selected mode is immutable in the compiled Workload, so the mode must not change in place after the Workload exists. This building block deliberately does not mark its members immutable, leaving that decision to the embedder. Pick one of:\n\n 1. Freeze the whole field so the mode can never change once set:\n\n    // +k8s:immutable\n\n 2. Allow the field to change and have the controller react by recreating the\n    Workload (and its PodGroups) instead of updating them in place.\n\nDisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode `json:\"disruptionMode,omitempty\" protobuf:\"bytes,N,opt,name=disruptionMode\"`",
+	"single": "Single specifies that pods can be disrupted independently from each other.",
+	"all":    "All specifies that all pods in the group must be disrupted together.",
+}
+
+func (WorkloadPodGroupDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupDisruptionMode
+}
+
+var map_WorkloadPodGroupGangSchedulingPolicy = map[string]string{
+	"":         "WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang (all-or-nothing) scheduling.",
+	"minCount": "MinCount is the minimum number of pods that must be scheduled at the same time for the scheduler to admit the entire group. This field is optional. If it is not specified, the controller should inject a context-specific sane default (e.g., parallelism for a Job). If set, it must be a positive integer.",
+}
+
+func (WorkloadPodGroupGangSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupGangSchedulingPolicy
+}
+
+var map_WorkloadPodGroupResourceClaim = map[string]string{
+	"":                          "WorkloadPodGroupResourceClaim references a dynamic resource claim that is shared across pods in the group.\n\nThis is a reusable building block meant to be embedded in a controller's own API as a list. Copy the following field into your spec, picking your own protobuf tag number:\n\n\t// ResourceClaims lists the ResourceClaims shared among the group's pods.\n\t// +optional\n\t// +listType=map\n\t// +listMapKey=name\n\t// +k8s:optional\n\t// +k8s:listType=map\n\t// +k8s:listMapKey=name\n\t// +k8s:maxItems=4\n\t// It's recommended to block adding or removing entries after creation, since the\n\t// list is immutable in the compiled Workload:\n\t// +k8s:update=NoAddItem\n\t// +k8s:update=NoRemoveItem\n\tResourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim `json:\"resourceClaims,omitempty\" protobuf:\"bytes,N,rep,name=resourceClaims\"`",
+	"name":                      "Name uniquely identifies this resource claim inside the group. This field is required. It must be a DNS_LABEL.",
+	"resourceClaimName":         "ResourceClaimName is the name of a ResourceClaim object in the same namespace. This field is optional. If it is not specified, no resource claim is used. If set, it must be a DNS subdomain.",
+	"resourceClaimTemplateName": "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace. This field is optional. If it is not specified, no resource claim template is used. If set, it must be a DNS subdomain.",
+}
+
+func (WorkloadPodGroupResourceClaim) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupResourceClaim
+}
+
+var map_WorkloadPodGroupSchedulingConstraints = map[string]string{
+	"":         "WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling constraints, such as topology.\n\nThis is a reusable building block meant to be embedded in a controller's own API (for example, a Job's spec.scheduling). Copy the following field into your spec, picking your own protobuf tag number and relative placement next to your other scheduling fields:\n\n\t// Constraints defines scheduling constraints (e.g. topology).\n\t// +optional\n\t// +k8s:optional\n\t// It's recommended to freeze after creation, since constraints are immutable in\n\t// the compiled Workload.\n\t// +k8s:immutable\n\tConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints `json:\"constraints,omitempty\" protobuf:\"bytes,N,opt,name=constraints\"`",
+	"topology": "Topology specifies desired topological placements for all pods within the scheduling group. This field is optional, which means if unset, no topology placement is required.",
+}
+
+func (WorkloadPodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSchedulingConstraints
+}
+
+var map_WorkloadPodGroupSchedulingPolicy = map[string]string{
+	"":      "WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a group of pods managed by a workload controller. Exactly one policy must be set.\n\nThis is a reusable building block meant to be embedded in a controller's own API (for example, a Job's spec.scheduling). Copy the following field into your spec, picking your own protobuf tag number:\n\n\t// Policy defines the scheduling policy.\n\t// Exactly one of Basic or Gang must be set.\n\t// +optional\n\t// +k8s:optional\n\t// It's recommended to block adding or removing the policy after creation, while\n\t// still allowing gang.minCount to change:\n\t// +k8s:update=NoSet\n\t// +k8s:update=NoUnset\n\tPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy `json:\"policy,omitempty\" protobuf:\"bytes,N,opt,name=policy\"`",
+	"basic": "Basic specifies that standard, pod-by-pod Kubernetes scheduling behavior should be used.",
+	"gang":  "Gang specifies all-or-nothing scheduling semantics.",
+}
+
+func (WorkloadPodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSchedulingPolicy
+}
+
+var map_WorkloadPodGroupSingleDisruptionMode = map[string]string{
+	"": "WorkloadPodGroupSingleDisruptionMode indicates that individual pods can be disrupted independently.",
+}
+
+func (WorkloadPodGroupSingleDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSingleDisruptionMode
+}
+
 var map_WorkloadReference = map[string]string{
 	"":             "WorkloadReference references the Workload object together with the template that was used to create a particular PodGroup.",
 	"workloadName": "WorkloadName is the name of the Workload object that contains a template that was used when creating a pod group. It must be a DNS name. This field is required.",
