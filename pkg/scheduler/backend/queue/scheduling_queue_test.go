@@ -1075,7 +1075,7 @@ func Test_InFlightPods(t *testing.T) {
 							t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 						}
 					case action.podGroupAttempted != nil:
-						err := q.AddAttemptedPodGroupIfNeeded(logger, action.podGroupAttempted, q.SchedulingCycle())
+						err := q.AddAttemptedPodGroupIfNeeded(logger, action.podGroupAttempted, q.SchedulingCycle(), fwk.NewStatus(fwk.Error))
 						if err != nil {
 							t.Fatalf("unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
 						}
@@ -3728,6 +3728,7 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 		disableBackoff                  bool
 		blockOnPreEnqueue               bool
 		skipAddPodGroup                 bool
+		status                          *fwk.Status
 		expectedUnschedulableCount      int
 		expectedConsecutiveErrorsCount  int
 		expectedInActiveQ               bool
@@ -3735,6 +3736,7 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 		expectedInUnschedulableEntities bool
 		expectedInIncomplete            []*v1.Pod
 		expectedPodsInGroup             int
+		expectPreservedTimestamp        bool
 	}{
 		{
 			name: "No pending pods, pod group is not enqueued",
@@ -3744,53 +3746,43 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			expectedPodsInGroup: 1,
 		},
 		{
-			name: "Pods present, no unschedulable plugins, pod group not backing off",
+			name: "Pods present, pod group scheduling had an error, and pod group not backing off",
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
 				q.pendingPodGroupPods.add(pInfo1)
 				q.pendingPodGroupPods.add(pInfo2)
 			},
+			status:                         fwk.NewStatus(fwk.Error),
 			disableBackoff:                 true,
 			expectedConsecutiveErrorsCount: 1,
 			expectedInActiveQ:              true,
 			expectedPodsInGroup:            2,
 		},
 		{
-			name: "Pods present, one with unschedulable plugins, pod group not backing off",
-			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
-				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
-				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
-				q.pendingPodGroupPods.add(pInfo1)
-				q.pendingPodGroupPods.add(pInfo2)
-			},
-			disableBackoff:                 true,
-			expectedConsecutiveErrorsCount: 1,
-			expectedInActiveQ:              true,
-			expectedPodsInGroup:            2,
-		},
-		{
-			name: "Pods present, with unschedulable plugins, pod group not backing off",
+			name: "Pods present, pod group scheduling result is unschedulable, and pod group not backing off",
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1, "fakePlugin")
-				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
+				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
 				q.pendingPodGroupPods.add(pInfo1)
 				q.pendingPodGroupPods.add(pInfo2)
 				pgInfo.ConsecutiveErrorsCount = 5 // Set to non-zero to verify reset
 			},
+			status:                     fwk.NewStatus(fwk.Unschedulable),
 			disableBackoff:             true,
 			expectedUnschedulableCount: 1,
 			expectedInActiveQ:          true,
 			expectedPodsInGroup:        2,
 		},
 		{
-			name: "Pods present, with unschedulable plugins, pod group not backing off, but blocked on PreEnqueue",
+			name: "Pods present, pod group scheduling result is unschedulable, and pod group not backing off, but blocked on PreEnqueue",
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1, "fakePlugin")
-				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
+				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
 				q.pendingPodGroupPods.add(pInfo1)
 				q.pendingPodGroupPods.add(pInfo2)
 			},
+			status:                          fwk.NewStatus(fwk.Unschedulable),
 			disableBackoff:                  true,
 			blockOnPreEnqueue:               true,
 			expectedUnschedulableCount:      1,
@@ -3798,50 +3790,41 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			expectedPodsInGroup:             2,
 		},
 		{
-			name: "Pods present, no unschedulable plugins, pod group backing off",
+			name: "Pods present, pod group scheduling result is Error, and pod group backing off",
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
 				q.pendingPodGroupPods.add(pInfo1)
 				q.pendingPodGroupPods.add(pInfo2)
 			},
+			status:                         fwk.NewStatus(fwk.Error),
 			expectedConsecutiveErrorsCount: 1,
 			expectedInBackoffQ:             true,
 			expectedPodsInGroup:            2,
 		},
 		{
-			name: "Pods present, one with unschedulable plugin, pod group backing off",
-			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
-				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
-				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
-				q.pendingPodGroupPods.add(pInfo1)
-				q.pendingPodGroupPods.add(pInfo2)
-			},
-			expectedConsecutiveErrorsCount: 1,
-			expectedInBackoffQ:             true,
-			expectedPodsInGroup:            2,
-		},
-		{
-			name: "Pods present, with unschedulable plugins, pod group backing off",
+			name: "Pods present, pod group scheduling result is Unschedulable, and pod group backing off",
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1, "fakePlugin")
-				pInfo2 := q.newQueuedPodInfo(tCtx, pod2, "fakePlugin")
+				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
 				q.pendingPodGroupPods.add(pInfo1)
 				q.pendingPodGroupPods.add(pInfo2)
 				pgInfo.ConsecutiveErrorsCount = 5 // Set to non-zero to verify reset
 			},
+			status:                     fwk.NewStatus(fwk.Unschedulable),
 			expectedUnschedulableCount: 1,
 			expectedInBackoffQ:         true,
 			expectedPodsInGroup:        2,
 		},
 		{
-			name: "Pods present, with unschedulable plugins, pod group backing off, but blocked on PreEnqueue",
+			name: "Pods present, pod group scheduling result is Error, and pod group backing off, but blocked on PreEnqueue",
 			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
 				pInfo1 := q.newQueuedPodInfo(tCtx, pod1)
 				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
 				q.pendingPodGroupPods.add(pInfo1)
 				q.pendingPodGroupPods.add(pInfo2)
 			},
+			status:                          fwk.NewStatus(fwk.Error),
 			blockOnPreEnqueue:               true,
 			expectedConsecutiveErrorsCount:  1,
 			expectedInUnschedulableEntities: true,
@@ -3855,9 +3838,32 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 				q.pendingPodGroupPods.add(pInfo1)
 				q.pendingPodGroupPods.add(pInfo2)
 			},
+			status:               fwk.NewStatus(fwk.Error),
 			skipAddPodGroup:      true,
 			expectedInIncomplete: []*v1.Pod{pod1, pod2},
 			expectedPodsInGroup:  2,
+		},
+		{
+			name: "Unschedulable pods are present but pod group scheduling was successful, requeue to active queue directly and preserve timestamp",
+			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
+				pInfo1 := q.newQueuedPodInfo(tCtx, pod1, "fakePlugin")
+				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
+				q.pendingPodGroupPods.add(pInfo1)
+				q.pendingPodGroupPods.add(pInfo2)
+			},
+			expectedInActiveQ:        true,
+			expectedPodsInGroup:      2,
+			expectPreservedTimestamp: true,
+		},
+		{
+			name: "New pods only are present and pod group scheduling was successful, requeue to active queue directly with new timestamp",
+			setup: func(tCtx ktesting.TContext, q *PriorityQueue, pgInfo *framework.QueuedPodGroupInfo) {
+				pInfo2 := q.newQueuedPodInfo(tCtx, pod2)
+				q.pendingPodGroupPods.add(pInfo2)
+			},
+			expectedInActiveQ:        true,
+			expectedPodsInGroup:      1,
+			expectPreservedTimestamp: false,
 		},
 	}
 
@@ -3885,14 +3891,22 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			}
 
 			pgInfo := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(tCtx, pod1), podGroup)
+			oldTimestamp := pgInfo.Timestamp
 
 			test.setup(tCtx, q, pgInfo)
+			c.Step(time.Second)
 
-			err := q.AddAttemptedPodGroupIfNeeded(tCtx.Logger(), pgInfo, q.SchedulingCycle())
+			err := q.AddAttemptedPodGroupIfNeeded(tCtx.Logger(), pgInfo, q.SchedulingCycle(), test.status)
 			if err != nil {
 				tCtx.Fatalf("Unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
 			}
 
+			if test.expectPreservedTimestamp && !pgInfo.Timestamp.Equal(oldTimestamp) {
+				tCtx.Errorf("Expected timestamp to be preserved (%v), but got %v", oldTimestamp, pgInfo.Timestamp)
+			}
+			if !test.expectPreservedTimestamp && (test.expectedInActiveQ || test.expectedInBackoffQ || test.expectedInUnschedulableEntities) && pgInfo.Timestamp != c.Now() {
+				tCtx.Errorf("Expected timestamp to be %v, but got %v", c.Now(), pgInfo.Timestamp)
+			}
 			if pgInfo.UnschedulableCount != test.expectedUnschedulableCount {
 				tCtx.Errorf("Expected UnschedulableCount to be %v, got %v", test.expectedUnschedulableCount, pgInfo.UnschedulableCount)
 			}
