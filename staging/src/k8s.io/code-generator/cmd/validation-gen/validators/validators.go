@@ -587,7 +587,7 @@ type FunctionGen struct {
 	// Emits, when non-empty, declares the field.Errors the runtime validator
 	// produces on failure. Set via WithEmits; empty for wrappers and
 	// non-emitting validators. A single function call may emit errors of
-	// different types and/or at different path fragments (e.g. UpdateSlice
+	// different types and/or at different path fragments (e.g. ValSliceUpdate
 	// with NoAddItem and NoRemoveItem), so this is a slice.
 	Emits []Emission
 }

@@ -193,7 +193,7 @@ func Validate_T1(
 				}
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T5); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T5); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -217,7 +217,7 @@ func Validate_T1(
 				}
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T6); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T6); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -250,7 +250,7 @@ func Validate_T2(
 				}
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T1); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T1); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -318,7 +318,7 @@ func Validate_T4(
 				}
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T3); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T3); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -355,7 +355,7 @@ func Validate_T5(
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T5); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T5); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -412,7 +412,7 @@ func Validate_T6(
 				}
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T6); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T6); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

@@ -78,7 +78,7 @@ func Validate_Struct(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", true,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ObjectMeta) field.ErrorList {
 					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "xEnabledField",
-						func(o *ObjectMeta) *string { return &o.XEnabledField }, validate.DirectEqualPtr,
+						func(o *ObjectMeta) *string { return &o.XEnabledField }, validate.DirectEqual,
 						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 							return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ObjectMeta.XEnabledField")
 						})
@@ -109,7 +109,7 @@ func Validate_Struct(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", false,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ObjectMeta) field.ErrorList {
 					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "xDisabledField",
-						func(o *ObjectMeta) *string { return &o.XDisabledField }, validate.DirectEqualPtr,
+						func(o *ObjectMeta) *string { return &o.XDisabledField }, validate.DirectEqual,
 						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 							return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ObjectMetaDisabled.XDisabledField")
 						})

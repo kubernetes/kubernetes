@@ -168,17 +168,19 @@ func UpdateStruct[T any](_ context.Context, op operation.Operation, fldPath *fie
 	return errs
 }
 
-// UpdateSlice verifies update constraints for slice types.
+// ValSliceUpdate verifies update constraints for slices of values.
 // NoAddItem and NoRemoveItem use the match function to find corresponding
 // elements between value and oldValue. NoSet and NoUnset treat len == 0 as
 // "unset".
-func UpdateSlice[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue []T, match MatchFunc[T], constraints ...UpdateConstraint) field.ErrorList {
+//
+// The match function will never be called with nil arguments.
+func ValSliceUpdate[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue []T, match MatchFunc[*T], constraints ...UpdateConstraint) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}
 
 	if match == nil && (slices.Contains(constraints, NoAddItem) || slices.Contains(constraints, NoRemoveItem)) {
-		return field.ErrorList{field.InternalError(fldPath, fmt.Errorf("UpdateSlice: NoAddItem/NoRemoveItem require a non-nil match function"))}
+		return field.ErrorList{field.InternalError(fldPath, fmt.Errorf("ValSliceUpdate: NoAddItem/NoRemoveItem require a non-nil match function"))}
 	}
 
 	var errs field.ErrorList
@@ -194,14 +196,70 @@ func UpdateSlice[T any](_ context.Context, op operation.Operation, fldPath *fiel
 				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
 			}
 		case NoAddItem:
-			for i, newItem := range value {
+			for i := range value {
+				newItem := &value[i]
 				if lookup(oldValue, newItem, match) == nil {
 					errs = append(errs, field.Forbidden(fldPath.Index(i), "item may not be added").WithOrigin("update"))
 				}
 			}
 		case NoRemoveItem:
-			for _, oldItem := range oldValue {
+			for i := range oldValue {
+				oldItem := &oldValue[i]
 				if lookup(value, oldItem, match) == nil {
+					errs = append(errs, field.Forbidden(fldPath, "item may not be removed").WithOrigin("update"))
+				}
+			}
+		}
+	}
+
+	return errs
+}
+
+// PtrSliceUpdate verifies update constraints for slices of pointers.
+// NoAddItem and NoRemoveItem use the match function to find corresponding
+// elements between value and oldValue. NoSet and NoUnset treat len == 0 as
+// "unset".
+//
+// The match function will never be called with nil arguments.
+func PtrSliceUpdate[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue []*T, match MatchFunc[*T], constraints ...UpdateConstraint) field.ErrorList {
+	if op.Type != operation.Update {
+		return nil
+	}
+
+	if match == nil && (slices.Contains(constraints, NoAddItem) || slices.Contains(constraints, NoRemoveItem)) {
+		return field.ErrorList{field.InternalError(fldPath, fmt.Errorf("PtrSliceUpdate: NoAddItem/NoRemoveItem require a non-nil match function"))}
+	}
+
+	var errs field.ErrorList
+
+	for _, constraint := range constraints {
+		switch constraint {
+		case NoSet:
+			if len(oldValue) == 0 && len(value) > 0 {
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be set once created").WithOrigin("update"))
+			}
+		case NoUnset:
+			if len(oldValue) > 0 && len(value) == 0 {
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
+			}
+		case NoAddItem:
+			for i := range value {
+				newItem := value[i]
+				if newItem == nil {
+					// Ignore nil items; they are supposed to have been checked by PtrSliceNoNils.
+					continue
+				}
+				if lookupPointer(oldValue, newItem, match) == nil {
+					errs = append(errs, field.Forbidden(fldPath.Index(i), "item may not be added").WithOrigin("update"))
+				}
+			}
+		case NoRemoveItem:
+			for i := range oldValue {
+				oldItem := oldValue[i]
+				if oldItem == nil {
+					continue
+				}
+				if lookupPointer(value, oldItem, match) == nil {
 					errs = append(errs, field.Forbidden(fldPath, "item may not be removed").WithOrigin("update"))
 				}
 			}

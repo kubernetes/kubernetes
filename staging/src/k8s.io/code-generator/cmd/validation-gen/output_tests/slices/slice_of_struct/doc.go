@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 // +k8s:validation-gen-test-fixture=validateFalse
 
@@ -38,7 +38,17 @@ type Struct struct {
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListTypedefField[*]"
 	ListTypedefField []OtherTypedefStruct `json:"listTypedefField"`
 
-	UnvalidatedListField []OtherStruct `json:"UnvalidatedListField"`
+	UnvalidatedListField []UnvalidatedStruct `json:"UnvalidatedListField"`
+
+	// +k8s:validateFalse="field Struct.ListPtrField"
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrField[*]"
+	ListPtrField []*OtherStruct `json:"listPtrField"`
+
+	// +k8s:validateFalse="field Struct.ListPtrTypedefField"
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrTypedefField[*]"
+	ListPtrTypedefField []*OtherTypedefStruct `json:"listPtrTypedefField"`
+
+	UnvalidatedListPtrField []*UnvalidatedStruct `json:"UnvalidatedListPtrField"`
 }
 
 // +k8s:validateFalse="type OtherStruct"
@@ -46,3 +56,5 @@ type OtherStruct struct{}
 
 // +k8s:validateFalse="type OtherTypedefStruct"
 type OtherTypedefStruct OtherStruct
+
+type UnvalidatedStruct struct{}

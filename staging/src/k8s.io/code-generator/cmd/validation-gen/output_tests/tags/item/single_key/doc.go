@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
@@ -63,6 +63,11 @@ type Struct struct {
 	// +k8s:listMapKey=key
 	// +k8s:item(key: "target-ptr")=+k8s:validateFalse="item PtrKeyItems[key=target-ptr]"
 	PtrKeyItems []PtrKeyItem `json:"ptrKeyItems"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=key
+	// +k8s:item(key: "target")=+k8s:validateFalse="item PointerItems[key=target]"
+	PointerItems []*Item `json:"pointerItems"`
 }
 
 type StructWithNestedTypedef struct {

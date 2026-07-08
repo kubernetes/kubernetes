@@ -78,14 +78,14 @@ func Validate_Struct(
 			// call field-attached validations
 			func() { // cohort = "stringField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-					func(o *OtherStruct) *string { return &o.StringField }, validate.DirectEqualPtr,
+					func(o *OtherStruct) *string { return &o.StringField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructField.StringField 1")
 					}); len(e) != 0 {
 					errs = append(errs, e...)
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-					func(o *OtherStruct) *string { return &o.StringField }, validate.DirectEqualPtr,
+					func(o *OtherStruct) *string { return &o.StringField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructField.StringField 2")
 					}); len(e) != 0 {
@@ -94,7 +94,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "pointerField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "pointerField",
-					func(o *OtherStruct) *string { return o.PointerField }, validate.DirectEqualPtr,
+					func(o *OtherStruct) *string { return o.PointerField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructField.PointerField")
 					}); len(e) != 0 {
@@ -103,7 +103,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "structField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
-					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqualPtr,
+					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructField.StructField")
 					}); len(e) != 0 {
@@ -151,14 +151,14 @@ func Validate_Struct(
 			// call field-attached validations
 			func() { // cohort = "stringField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-					func(o *OtherStruct) *string { return &o.StringField }, validate.DirectEqualPtr,
+					func(o *OtherStruct) *string { return &o.StringField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructPtrField.StringField 1")
 					}); len(e) != 0 {
 					errs = append(errs, e...)
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-					func(o *OtherStruct) *string { return &o.StringField }, validate.DirectEqualPtr,
+					func(o *OtherStruct) *string { return &o.StringField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructPtrField.StringField 2")
 					}); len(e) != 0 {
@@ -167,7 +167,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "pointerField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "pointerField",
-					func(o *OtherStruct) *string { return o.PointerField }, validate.DirectEqualPtr,
+					func(o *OtherStruct) *string { return o.PointerField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructPtrField.PointerField")
 					}); len(e) != 0 {
@@ -176,7 +176,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "structField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
-					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqualPtr,
+					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructPtrField.StructField")
 					}); len(e) != 0 {

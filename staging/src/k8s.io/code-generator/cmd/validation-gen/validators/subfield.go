@@ -108,7 +108,7 @@ func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Ta
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(submemb.Type))) {
 		// It must be a pointer, since other nilable types are not directly
 		// comparable.
-		equivArg = Identifier(validateDirectEqualPtr)
+		equivArg = Identifier(validateDirectEqual)
 	}
 
 	tagValidations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag)

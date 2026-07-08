@@ -77,21 +77,21 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *Item, b *Item) bool {
 					return a.StringKey == b.StringKey && a.IntKey == b.IntKey && a.BoolKey == b.BoolKey
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"stringKey": "target", "intKey": 42, "boolKey": true}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.StringKey == "target" && item.IntKey == 42 && item.BoolKey == true }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[stringKey=target,intKey=42,boolKey=true] 1")
 					}); len(e) != 0 {
 					errs = append(errs, e...)
 				}
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.StringKey == "target" && item.IntKey == 42 && item.BoolKey == true }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[stringKey=target,intKey=42,boolKey=true] 2")
@@ -121,14 +121,14 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *Item, b *Item) bool {
 					return a.StringKey == b.StringKey && a.IntKey == b.IntKey && a.BoolKey == b.BoolKey
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"boolKey": true, "stringKey": "target", "intKey": 42}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.StringKey == "target" && item.IntKey == 42 && item.BoolKey == true }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item OutOfOrder[boolKey=42,stringKey=target,intKey=42]")
@@ -158,14 +158,14 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a PtrItem, b PtrItem) bool {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *PtrItem, b *PtrItem) bool {
 					return ((a.StringKey == nil && b.StringKey == nil) || (a.StringKey != nil && b.StringKey != nil && *a.StringKey == *b.StringKey)) && a.IntKey == b.IntKey && a.BoolKey == b.BoolKey
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"stringKey": "target-ptr", "intKey": 42, "boolKey": true}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *PtrItem) bool {
 						return item.StringKey != nil && *item.StringKey == "target-ptr" && item.IntKey == 42 && item.BoolKey == true
 					}, validate.SemanticDeepEqual,
@@ -197,14 +197,14 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MixedPtrItem, b MixedPtrItem) bool {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *MixedPtrItem, b *MixedPtrItem) bool {
 					return ((a.StringPtrKey == nil && b.StringPtrKey == nil) || (a.StringPtrKey != nil && b.StringPtrKey != nil && *a.StringPtrKey == *b.StringPtrKey)) && a.StringKey == b.StringKey
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"stringPtrKey": "target-ptr", "stringKey": "target"}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MixedPtrItem) bool {
 						return item.StringPtrKey != nil && *item.StringPtrKey == "target-ptr" && item.StringKey == "target"
 					}, validate.SemanticDeepEqual,

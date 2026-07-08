@@ -153,7 +153,7 @@ func Validate_ChainedValidation(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
 		func(obj *ChainedValidation) *string { return obj.FieldA },
-		func(obj *ChainedValidation) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *ChainedValidation) string { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -263,7 +263,7 @@ func Validate_ImplicitForbidden(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
 		func(obj *ImplicitForbidden) *string { return obj.FieldA },
-		func(obj *ImplicitForbidden) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *ImplicitForbidden) string { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -303,7 +303,7 @@ func Validate_MultipleDiscriminators(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
 		func(obj *MultipleDiscriminators) *string { return obj.FieldA },
-		func(obj *MultipleDiscriminators) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *MultipleDiscriminators) string { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -331,7 +331,7 @@ func Validate_MultipleDiscriminators(
 	}
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldB",
 		func(obj *MultipleDiscriminators) *string { return obj.FieldB },
-		func(obj *MultipleDiscriminators) string { return obj.D2 }, validate.DirectEqualPtr,
+		func(obj *MultipleDiscriminators) string { return obj.D2 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -374,7 +374,7 @@ func Validate_NonStringDiscriminator(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
 		func(obj *NonStringDiscriminator) *string { return obj.FieldA },
-		func(obj *NonStringDiscriminator) bool { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *NonStringDiscriminator) bool { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -415,7 +415,7 @@ func Validate_SharedField(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
 		func(obj *SharedField) *string { return obj.FieldA },
-		func(obj *SharedField) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *SharedField) string { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -470,7 +470,7 @@ func Validate_StrictUnion(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
 		func(obj *StrictUnion) *string { return obj.FieldA },
-		func(obj *StrictUnion) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *StrictUnion) string { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
@@ -498,7 +498,7 @@ func Validate_StrictUnion(
 	}
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldB",
 		func(obj *StrictUnion) *string { return obj.FieldB },
-		func(obj *StrictUnion) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(obj *StrictUnion) string { return obj.D1 }, validate.DirectEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)

@@ -173,8 +173,8 @@ func Validate_MyListStruct(
 				errs = append(errs, e...)
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Task, b Task) bool { return a.Name == b.Name }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *Task, b *Task) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -231,8 +231,8 @@ func Validate_MyListStructBeta(
 				errs = append(errs, e...)
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Task, b Task) bool { return a.Name == b.Name }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *Task, b *Task) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

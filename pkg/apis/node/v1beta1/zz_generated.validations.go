@@ -167,7 +167,7 @@ func Validate_Scheduling(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, v1.Validate_Toleration); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, v1.Validate_Toleration); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

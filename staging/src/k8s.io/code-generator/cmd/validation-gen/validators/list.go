@@ -106,7 +106,7 @@ func (lm *listMetadata) makeListMapMatchFunc(t *types.Type) FunctionLiteral {
 	// If no keys are defined, we will throw a good error later.
 
 	matchFn := FunctionLiteral{
-		Parameters: []ParamResult{{"a", t}, {"b", t}},
+		Parameters: []ParamResult{{"a", types.PointerTo(util.NonPointer(t))}, {"b", types.PointerTo(util.NonPointer(t))}},
 		Results:    []ParamResult{{"", types.Bool}},
 	}
 	buf := strings.Builder{}
@@ -186,7 +186,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		if lm.semantic != "" && lm.semantic != semanticAtomic {
 			return Validations{}, fmt.Errorf("unique tag is redundant for listType=%q", tag.Value)
 		}
-		if util.NativeType(t.Elem).Kind != types.Struct {
+		if util.NonPointer(util.NativeType(t.Elem)).Kind != types.Struct {
 			return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 		}
 		lm.semantic = semanticMap
@@ -239,13 +239,13 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
-	// NOTE: lists of pointers are not supported, so we should never see a pointer here.
-	if util.NativeType(t.Elem).Kind != types.Struct {
+	structT := util.NonPointer(util.NativeType(t.Elem))
+	if structT.Kind != types.Struct {
 		return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 	}
 
 	var memb *types.Member
-	if m := util.GetMemberByJSON(util.NativeType(t.Elem), tag.Value); m == nil {
+	if m := util.GetMemberByJSON(structT, tag.Value); m == nil {
 		return Validations{}, fmt.Errorf("no field for JSON name %q", tag.Value)
 	} else {
 		keyType := m.Type
@@ -328,7 +328,7 @@ func (utv uniqueTagValidator) GetValidations(context Context, tag codetags.Tag) 
 	case "set":
 		lm.semantic = semanticSet
 	case "map":
-		if util.NativeType(t.Elem).Kind != types.Struct {
+		if util.NonPointer(util.NativeType(t.Elem)).Kind != types.Struct {
 			return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 		}
 		lm.semantic = semanticMap
@@ -406,7 +406,8 @@ func (cutv customUniqueTagValidator) Docs() TagDoc {
 }
 
 var (
-	validateUnique            = types.Name{Package: libValidationPkg, Name: "Unique"}
+	validateValSliceUnique    = types.Name{Package: libValidationPkg, Name: "ValSliceUnique"}
+	validatePtrSliceUnique    = types.Name{Package: libValidationPkg, Name: "PtrSliceUnique"}
 	validateSemanticDeepEqual = types.Name{Package: libValidationPkg, Name: "SemanticDeepEqual"}
 	validateDirectEqual       = types.Name{Package: libValidationPkg, Name: "DirectEqual"}
 )
@@ -486,13 +487,16 @@ func getListValidations(byPath map[string]*listMetadata, context Context) (Valid
 		// comparable, and structs might hold pointer fields, which are directly
 		// comparable but not what we need.
 		//
-		// NOTE: lists of pointers are not supported, so we should never see a pointer here.
 		matchArg := validateSemanticDeepEqual
 		if util.IsDirectComparable(util.NonPointer(util.NativeType(nt.Elem))) {
 			matchArg = validateDirectEqual
 		}
+		validateFunc := validateValSliceUnique
+		if nt.Elem.Kind == types.Pointer {
+			validateFunc = validatePtrSliceUnique
+		}
 		comment := "lists with set semantics require unique values"
-		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg)).
+		f := Function("listValidator", DefaultFlags, validateFunc, Identifier(matchArg)).
 			WithComment(comment).
 			WithEmits(Emission{field.ErrorTypeDuplicate, "", "[*]"})
 		if lm.stabilityLevel != "" {
@@ -506,9 +510,13 @@ func getListValidations(byPath map[string]*listMetadata, context Context) (Valid
 		// maps or we need to allow types to opt-out from this validation.  SSA
 		// is also not able to handle these well.
 		matchArg := lm.makeListMapMatchFunc(nt.Elem)
+		validateFunc := validateValSliceUnique
+		if nt.Elem.Kind == types.Pointer {
+			validateFunc = validatePtrSliceUnique
+		}
 		comment := "lists with map semantics require unique keys"
 
-		f := Function("listValidator", DefaultFlags, validateUnique, matchArg).
+		f := Function("listValidator", DefaultFlags, validateFunc, matchArg).
 			WithComment(comment).
 			WithStabilityLevel(lm.stabilityLevel).
 			WithEmits(Emission{field.ErrorTypeDuplicate, "", "[*]"})

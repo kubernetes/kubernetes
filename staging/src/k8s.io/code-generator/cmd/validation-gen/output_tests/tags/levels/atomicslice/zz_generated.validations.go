@@ -76,7 +76,7 @@ func Validate_AtomicSliceStruct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
 				}); len(e) != 0 {
@@ -103,7 +103,7 @@ func Validate_AtomicSliceStruct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
 				}).MarkAlpha(); len(e) != 0 {
@@ -130,7 +130,7 @@ func Validate_AtomicSliceStruct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
 				}).MarkBeta(); len(e) != 0 {
@@ -157,7 +157,7 @@ func Validate_AtomicSliceStruct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
 				}); len(e) != 0 {
@@ -184,7 +184,7 @@ func Validate_AtomicSliceStruct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
 				}); len(e) != 0 {

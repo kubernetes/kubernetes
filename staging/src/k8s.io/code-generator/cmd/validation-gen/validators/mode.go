@@ -420,7 +420,7 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 	// looking up and comparing correlated list elements for validation ratcheting.
 	var equivArg any
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(fieldType))) {
-		equivArg = Identifier(validateDirectEqualPtr)
+		equivArg = Identifier(validateDirectEqual)
 	} else {
 		equivArg = Identifier(validateSemanticDeepEqual)
 	}

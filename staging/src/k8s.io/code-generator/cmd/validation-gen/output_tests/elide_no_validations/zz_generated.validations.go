@@ -76,7 +76,7 @@ func Validate_DeepTypedefSlice(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj DeepTypedefSlice) (errs field.ErrorList) {
 
-	if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+	if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
 			return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type DeepTypedefSlice")
 		}); len(e) != 0 {
@@ -84,7 +84,7 @@ func Validate_DeepTypedefSlice(
 	}
 
 	// iterate the list and call the type's validation function
-	if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
+	if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 
@@ -112,7 +112,7 @@ func Validate_DoubleDeepTypedefSlice(
 	obj, oldObj DoubleDeepTypedefSlice) (errs field.ErrorList) {
 
 	// iterate the list and call the type's validation function
-	if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
+	if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 
@@ -450,7 +450,7 @@ func Validate_TypedefSliceWithValidations(
 	obj, oldObj TypedefSliceWithValidations) (errs field.ErrorList) {
 
 	// iterate the list and call the type's validation function
-	if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
+	if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 

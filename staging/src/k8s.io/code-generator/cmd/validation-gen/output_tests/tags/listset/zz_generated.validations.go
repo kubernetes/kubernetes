@@ -92,7 +92,7 @@ func Validate_ImmutableStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -121,7 +121,7 @@ func Validate_ImmutableStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -129,7 +129,7 @@ func Validate_ImmutableStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -154,7 +154,7 @@ func Validate_ImmutableStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -183,7 +183,7 @@ func Validate_ImmutableStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -191,7 +191,7 @@ func Validate_ImmutableStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -216,7 +216,7 @@ func Validate_ImmutableStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -245,7 +245,7 @@ func Validate_ImmutableStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -253,7 +253,7 @@ func Validate_ImmutableStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -278,7 +278,7 @@ func Validate_ImmutableStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -286,7 +286,7 @@ func Validate_ImmutableStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -322,7 +322,7 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -347,7 +347,7 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -372,7 +372,7 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -397,7 +397,7 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -422,7 +422,7 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

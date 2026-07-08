@@ -12,6 +12,26 @@
     "listField[1]": [
       "field Struct.ListField[*]"
     ],
+    "listPtrField": [
+      "field Struct.ListPtrField"
+    ],
+    "listPtrField[0]": [
+      "field Struct.ListPtrField[*]"
+    ],
+    "listPtrField[1]": [
+      "field Struct.ListPtrField[*]"
+    ],
+    "listPtrTypedefField": [
+      "field Struct.ListPtrTypedefField"
+    ],
+    "listPtrTypedefField[0]": [
+      "field Struct.ListPtrTypedefField[*]",
+      "type StringType"
+    ],
+    "listPtrTypedefField[1]": [
+      "field Struct.ListPtrTypedefField[*]",
+      "type StringType"
+    ],
     "listTypedefField": [
       "field Struct.ListTypedefField"
     ],

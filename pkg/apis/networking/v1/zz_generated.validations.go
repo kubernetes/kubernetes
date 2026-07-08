@@ -412,7 +412,7 @@ func Validate_NetworkPolicyEgressRule(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyPeer); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyPeer); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -455,7 +455,7 @@ func Validate_NetworkPolicyIngressRule(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyPeer); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyPeer); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -540,7 +540,7 @@ func Validate_NetworkPolicySpec(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyIngressRule); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyIngressRule); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -572,7 +572,7 @@ func Validate_NetworkPolicySpec(
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyEgressRule); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyEgressRule); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
