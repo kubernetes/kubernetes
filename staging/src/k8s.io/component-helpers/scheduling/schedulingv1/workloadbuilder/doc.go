@@ -23,12 +23,12 @@ limitations under the License.
 // assembles a WorkloadItem tree, calls Build() to compile the Workload, then
 // NewPodGroup() to materialize its runtime PodGroup.
 //
-// For validating a controller's own API, use declarative validation (DV)
-// on building-block types. DV enforces the structural constraints so the
-// in-tree Job adds only the cross-field checks DV cannot express.
-// ValidateSchedulingPolicy and ValidateDisruptionMode cover what DV cannot.
-// Validate() runs the full pre-Build compile check over an already-resolved
-// tree.
+// For validating a controller's own API, use ValidateSchedulingPolicy/Update and
+// ValidateDisruptionMode/Update. They combine the controller's capability
+// allow-list with the generated declarative validation (DV) for the
+// building-block types, so out-of-tree controllers enforce the same structural
+// constraints the kube-apiserver applies to built-in types. Validate() runs the
+// full pre-Build compile check over an already-resolved tree.
 //
 // Build and Validate return a plain error describing why compilation failed,
 // using paths relative to the library's internal IR.

@@ -1452,16 +1452,16 @@ var unionMembershipFor_k8s_io_api_scheduling_v1alpha3_WorkloadPodGroupDisruption
 // to declarative validation rules in the API schema.
 func Validate_WorkloadPodGroupDisruptionMode(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *schedulingv1alpha3.WorkloadPodGroupDisruptionMode) (errs field.ErrorList) {
+	obj, oldObj *v1alpha3.WorkloadPodGroupDisruptionMode) (errs field.ErrorList) {
 
 	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_scheduling_v1alpha3_WorkloadPodGroupDisruptionMode_,
-		func(obj *schedulingv1alpha3.WorkloadPodGroupDisruptionMode) bool {
+		func(obj *v1alpha3.WorkloadPodGroupDisruptionMode) bool {
 			if obj == nil {
 				return false
 			}
 			return obj.Single != nil
 		},
-		func(obj *schedulingv1alpha3.WorkloadPodGroupDisruptionMode) bool {
+		func(obj *v1alpha3.WorkloadPodGroupDisruptionMode) bool {
 			if obj == nil {
 				return false
 			}
@@ -1470,10 +1470,10 @@ func Validate_WorkloadPodGroupDisruptionMode(
 		errs = append(errs, e...)
 	}
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupDisruptionMode.Single
+	{ // field v1alpha3.WorkloadPodGroupDisruptionMode.Single
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode,
+			obj, oldObj *v1alpha3.WorkloadPodGroupSingleDisruptionMode,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -1492,16 +1492,16 @@ func Validate_WorkloadPodGroupDisruptionMode(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupDisruptionMode) *schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode {
+			func(oldObj *v1alpha3.WorkloadPodGroupDisruptionMode) *v1alpha3.WorkloadPodGroupSingleDisruptionMode {
 				return oldObj.Single
 			})
 		errs = append(errs, fn(fldPath.Child("single"), obj.Single, oldVal, oldObj != nil)...)
 	}
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupDisruptionMode.All
+	{ // field v1alpha3.WorkloadPodGroupDisruptionMode.All
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode,
+			obj, oldObj *v1alpha3.WorkloadPodGroupAllDisruptionMode,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -1520,7 +1520,7 @@ func Validate_WorkloadPodGroupDisruptionMode(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupDisruptionMode) *schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode {
+			func(oldObj *v1alpha3.WorkloadPodGroupDisruptionMode) *v1alpha3.WorkloadPodGroupAllDisruptionMode {
 				return oldObj.All
 			})
 		errs = append(errs, fn(fldPath.Child("all"), obj.All, oldVal, oldObj != nil)...)
@@ -1533,9 +1533,9 @@ func Validate_WorkloadPodGroupDisruptionMode(
 // to declarative validation rules in the API schema.
 func Validate_WorkloadPodGroupGangSchedulingPolicy(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy) (errs field.ErrorList) {
+	obj, oldObj *v1alpha3.WorkloadPodGroupGangSchedulingPolicy) (errs field.ErrorList) {
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy.MinCount
+	{ // field v1alpha3.WorkloadPodGroupGangSchedulingPolicy.MinCount
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -1560,7 +1560,7 @@ func Validate_WorkloadPodGroupGangSchedulingPolicy(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy) *int32 {
+			func(oldObj *v1alpha3.WorkloadPodGroupGangSchedulingPolicy) *int32 {
 				return oldObj.MinCount
 			})
 		errs = append(errs, fn(fldPath.Child("minCount"), obj.MinCount, oldVal, oldObj != nil)...)
@@ -1575,16 +1575,16 @@ var unionMembershipFor_k8s_io_api_scheduling_v1alpha3_WorkloadPodGroupResourceCl
 // to declarative validation rules in the API schema.
 func Validate_WorkloadPodGroupResourceClaim(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *schedulingv1alpha3.WorkloadPodGroupResourceClaim) (errs field.ErrorList) {
+	obj, oldObj *v1alpha3.WorkloadPodGroupResourceClaim) (errs field.ErrorList) {
 
 	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_scheduling_v1alpha3_WorkloadPodGroupResourceClaim_,
-		func(obj *schedulingv1alpha3.WorkloadPodGroupResourceClaim) bool {
+		func(obj *v1alpha3.WorkloadPodGroupResourceClaim) bool {
 			if obj == nil {
 				return false
 			}
 			return obj.ResourceClaimName != nil
 		},
-		func(obj *schedulingv1alpha3.WorkloadPodGroupResourceClaim) bool {
+		func(obj *v1alpha3.WorkloadPodGroupResourceClaim) bool {
 			if obj == nil {
 				return false
 			}
@@ -1593,7 +1593,7 @@ func Validate_WorkloadPodGroupResourceClaim(
 		errs = append(errs, e...)
 	}
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupResourceClaim.Name
+	{ // field v1alpha3.WorkloadPodGroupResourceClaim.Name
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1619,13 +1619,13 @@ func Validate_WorkloadPodGroupResourceClaim(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupResourceClaim) *string {
+			func(oldObj *v1alpha3.WorkloadPodGroupResourceClaim) *string {
 				return &oldObj.Name
 			})
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupResourceClaim.ResourceClaimName
+	{ // field v1alpha3.WorkloadPodGroupResourceClaim.ResourceClaimName
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1654,13 +1654,13 @@ func Validate_WorkloadPodGroupResourceClaim(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupResourceClaim) *string {
+			func(oldObj *v1alpha3.WorkloadPodGroupResourceClaim) *string {
 				return oldObj.ResourceClaimName
 			})
 		errs = append(errs, fn(fldPath.Child("resourceClaimName"), obj.ResourceClaimName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupResourceClaim.ResourceClaimTemplateName
+	{ // field v1alpha3.WorkloadPodGroupResourceClaim.ResourceClaimTemplateName
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1689,7 +1689,7 @@ func Validate_WorkloadPodGroupResourceClaim(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupResourceClaim) *string {
+			func(oldObj *v1alpha3.WorkloadPodGroupResourceClaim) *string {
 				return oldObj.ResourceClaimTemplateName
 			})
 		errs = append(errs, fn(fldPath.Child("resourceClaimTemplateName"), obj.ResourceClaimTemplateName, oldVal, oldObj != nil)...)
@@ -1702,12 +1702,12 @@ func Validate_WorkloadPodGroupResourceClaim(
 // to declarative validation rules in the API schema.
 func Validate_WorkloadPodGroupSchedulingConstraints(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints) (errs field.ErrorList) {
+	obj, oldObj *v1alpha3.WorkloadPodGroupSchedulingConstraints) (errs field.ErrorList) {
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints.Topology
+	{ // field v1alpha3.WorkloadPodGroupSchedulingConstraints.Topology
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj []schedulingv1alpha3.TopologyConstraint,
+			obj, oldObj []v1alpha3.TopologyConstraint,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -1734,7 +1734,7 @@ func Validate_WorkloadPodGroupSchedulingConstraints(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints) []schedulingv1alpha3.TopologyConstraint {
+			func(oldObj *v1alpha3.WorkloadPodGroupSchedulingConstraints) []v1alpha3.TopologyConstraint {
 				return oldObj.Topology
 			})
 		errs = append(errs, fn(fldPath.Child("topology"), obj.Topology, oldVal, oldObj != nil)...)
@@ -1749,16 +1749,16 @@ var unionMembershipFor_k8s_io_api_scheduling_v1alpha3_WorkloadPodGroupScheduling
 // to declarative validation rules in the API schema.
 func Validate_WorkloadPodGroupSchedulingPolicy(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy) (errs field.ErrorList) {
+	obj, oldObj *v1alpha3.WorkloadPodGroupSchedulingPolicy) (errs field.ErrorList) {
 
 	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_scheduling_v1alpha3_WorkloadPodGroupSchedulingPolicy_,
-		func(obj *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy) bool {
+		func(obj *v1alpha3.WorkloadPodGroupSchedulingPolicy) bool {
 			if obj == nil {
 				return false
 			}
 			return obj.Basic != nil
 		},
-		func(obj *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy) bool {
+		func(obj *v1alpha3.WorkloadPodGroupSchedulingPolicy) bool {
 			if obj == nil {
 				return false
 			}
@@ -1767,10 +1767,10 @@ func Validate_WorkloadPodGroupSchedulingPolicy(
 		errs = append(errs, e...)
 	}
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy.Basic
+	{ // field v1alpha3.WorkloadPodGroupSchedulingPolicy.Basic
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy,
+			obj, oldObj *v1alpha3.WorkloadPodGroupBasicSchedulingPolicy,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -1793,16 +1793,16 @@ func Validate_WorkloadPodGroupSchedulingPolicy(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy) *schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy {
+			func(oldObj *v1alpha3.WorkloadPodGroupSchedulingPolicy) *v1alpha3.WorkloadPodGroupBasicSchedulingPolicy {
 				return oldObj.Basic
 			})
 		errs = append(errs, fn(fldPath.Child("basic"), obj.Basic, oldVal, oldObj != nil)...)
 	}
 
-	{ // field schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy.Gang
+	{ // field v1alpha3.WorkloadPodGroupSchedulingPolicy.Gang
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy,
+			obj, oldObj *v1alpha3.WorkloadPodGroupGangSchedulingPolicy,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -1827,7 +1827,7 @@ func Validate_WorkloadPodGroupSchedulingPolicy(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy) *schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy {
+			func(oldObj *v1alpha3.WorkloadPodGroupSchedulingPolicy) *v1alpha3.WorkloadPodGroupGangSchedulingPolicy {
 				return oldObj.Gang
 			})
 		errs = append(errs, fn(fldPath.Child("gang"), obj.Gang, oldVal, oldObj != nil)...)
