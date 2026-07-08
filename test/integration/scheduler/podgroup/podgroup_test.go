@@ -147,6 +147,31 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
+			name: "any available pod group members get scheduled",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object",
+					CreatePodGroup: gangPodGroup,
+				},
+				{
+					Name:       "Create initial subset of pods satisfying minCount",
+					CreatePods: []*v1.Pod{p1, p2, p3},
+				},
+				{
+					Name:                 "Verify initial gang pods are scheduled successfully",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name:       "Create additional pod belonging to the gang",
+					CreatePods: []*v1.Pod{p4},
+				},
+				{
+					Name:                 "Verify all gang pods are scheduled successfully",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
+				},
+			},
+		},
+		{
 			name: "gang waits for quorum to start, then schedules",
 			steps: []stepsframework.Step{
 				{
@@ -308,6 +333,27 @@ func TestPodGroupScheduling(t *testing.T) {
 				{
 					Name:                     "Verify the entire other gang becomes unschedulable",
 					WaitForPodsUnschedulable: []string{"other-p1", "other-p2", "other-p3"},
+				},
+			},
+		},
+		{
+			name: "pod group interleaving with an individual pod shouldn't deadlock nor livelock, and the individual pod gets scheduled",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object",
+					CreatePodGroup: gangPodGroup,
+				},
+				{
+					Name:       "Create pods from gang and individual pod",
+					CreatePods: []*v1.Pod{blockerPod, p1, p2, p3},
+				},
+				{
+					Name:                 "Verify the individual pod is scheduled",
+					WaitForPodsScheduled: []string{"blocker"},
+				},
+				{
+					Name:                     "Verify the gang becomes unschedulable",
+					WaitForPodsUnschedulable: []string{"p1", "p2", "p3"},
 				},
 			},
 		},
