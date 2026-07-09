@@ -30,7 +30,6 @@ import (
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 	testscheme "k8s.io/code-generator/cmd/validation-gen/testscheme"
 )
@@ -78,12 +77,20 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
+			func() { // cohort = "labels"
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "labels",
+					func(o *v1.ObjectMeta) map[string]string { return o.Labels }, validate.SemanticDeepEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
+						return validate.EachMapKey(ctx, op, fldPath, obj, oldObj,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "labels key error")
+							})
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
 			func() { // cohort = "ownerReferences"
 				earlyReturn := false
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ownerReferences",
-					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, validate.SemanticDeepEqual, validate.OptionalSlice).MarkShortCircuit(); len(e) != 0 {
-					earlyReturn = true
-				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ownerReferences",
 					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []v1.OwnerReference) field.ErrorList {
@@ -123,18 +130,6 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
-			func() { // cohort = "labels"
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "labels",
-					func(o *v1.ObjectMeta) map[string]string { return o.Labels }, validate.SemanticDeepEqual,
-					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
-						return validate.EachMapKey(ctx, op, fldPath, obj, oldObj,
-							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "labels key error")
-							})
-					}); len(e) != 0 {
-					errs = append(errs, e...)
-				}
-			}()
 			func() { // cohort = "finalizers"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "finalizers",
 					func(o *v1.ObjectMeta) []string { return o.Finalizers }, validate.SemanticDeepEqual,
@@ -144,8 +139,6 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
-			// call the type's validation function
-			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
