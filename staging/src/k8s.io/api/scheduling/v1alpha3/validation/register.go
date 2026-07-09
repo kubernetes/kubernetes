@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/scheduling
-// +k8s:conversion-gen-external-types=k8s.io/api/scheduling/v1alpha3
-// +groupName=scheduling.k8s.io
-// +k8s:defaulter-gen=TypeMeta
-// +k8s:defaulter-gen-input=k8s.io/api/scheduling/v1alpha3
-// +k8s:validation-gen=false
+package validation
 
-// Declarative validation for this group is generated into
-// k8s.io/api/scheduling/v1alpha3/validation so it is importable by
-// out-of-tree controllers.
+import (
+	v1alpha3 "k8s.io/api/scheduling/v1alpha3"
+)
 
-package v1alpha3
+// localSchemeBuilder is used by the generated validation code to register
+// validation functions on the scheduling/v1alpha3 SchemeBuilder. Registration
+// only happens for schemes built by consumers that import this package.
+var localSchemeBuilder = &v1alpha3.SchemeBuilder

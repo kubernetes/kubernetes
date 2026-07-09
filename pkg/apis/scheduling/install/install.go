@@ -19,6 +19,9 @@ limitations under the License.
 package install
 
 import (
+	// Ensure the generated declarative validation for scheduling/v1alpha3 is
+	// registered on the v1alpha3 SchemeBuilder before AddToScheme runs below.
+	_ "k8s.io/api/scheduling/v1alpha3/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"

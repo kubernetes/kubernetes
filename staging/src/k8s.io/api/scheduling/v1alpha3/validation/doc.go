@@ -14,15 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/scheduling
-// +k8s:conversion-gen-external-types=k8s.io/api/scheduling/v1alpha3
-// +groupName=scheduling.k8s.io
-// +k8s:defaulter-gen=TypeMeta
-// +k8s:defaulter-gen-input=k8s.io/api/scheduling/v1alpha3
-// +k8s:validation-gen=false
+// +k8s:validation-gen=TypesWithField=TypeMeta
+// +k8s:validation-gen-input=k8s.io/api/scheduling/v1alpha3
 
-// Declarative validation for this group is generated into
-// k8s.io/api/scheduling/v1alpha3/validation so it is importable by
-// out-of-tree controllers.
-
-package v1alpha3
+// Package validation holds generated declarative validation for
+// scheduling/v1alpha3 types. It lives next to the API types (instead of
+// k8s.io/kubernetes/pkg/apis) so that out-of-tree consumers, such as
+// workload controllers using the workloadbuilder library, can run the same
+// validation the kube-apiserver enforces.
+package validation
