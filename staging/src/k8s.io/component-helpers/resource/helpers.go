@@ -320,29 +320,7 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 		}
 	}
 
-	// Add resources from node allocatable ResourceClaims
-	if opts.UseDRANodeAllocatableResourceClaimStatus && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
-		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
-			for _, mapping := range claimStatus.Mapping {
-				if mapping.Quantity != nil {
-					addResourceList(reqs, v1.ResourceList{mapping.Name: *mapping.Quantity})
-				}
-			}
-			// TODO(pravk03): Handle claim references by init containers and peak resource calculations.
-			for _, overhead := range claimStatus.Overhead {
-				var quantity resource.Quantity
-				if overhead.PerPod != nil {
-					quantity.Add(*overhead.PerPod)
-				}
-				if overhead.PerContainer != nil && len(claimStatus.Containers) > 0 {
-					varOverhead := overhead.PerContainer.DeepCopy()
-					varOverhead.Mul(int64(len(claimStatus.Containers)))
-					quantity.Add(varOverhead)
-				}
-				addResourceList(reqs, v1.ResourceList{overhead.Name: quantity})
-			}
-		}
-	}
+	addDRANodeAllocatableClaimResources(reqs, pod, opts)
 
 	return reqs
 }
@@ -456,6 +434,7 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 			addResourceList(limits, max(specLimits, actuatedLimits))
 		}
 	}
+	addDRANodeAllocatableClaimResources(limits, pod, opts)
 	return limits
 }
 
@@ -505,4 +484,34 @@ func reuseOrClearResourceList(reuse v1.ResourceList) v1.ResourceList {
 		delete(reuse, k)
 	}
 	return reuse
+}
+
+func addDRANodeAllocatableClaimResources(resources v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) {
+	if opts.UseDRANodeAllocatableResourceClaimStatus && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+			// TODO(pravk03): Handle claim references by init containers and peak resource calculation based on that.
+			// Currently, any DRA allocation is always added into the pod footprint.
+			for _, mapping := range claimStatus.Mapping {
+				if mapping.Quantity != nil {
+					q := resources[mapping.Name]
+					q.Add(*mapping.Quantity)
+					resources[mapping.Name] = q
+				}
+			}
+			for _, overhead := range claimStatus.Overhead {
+				var quantity resource.Quantity
+				if overhead.PerPod != nil {
+					quantity.Add(*overhead.PerPod)
+				}
+				if overhead.PerContainer != nil && len(claimStatus.Containers) > 0 {
+					varOverhead := overhead.PerContainer.DeepCopy()
+					varOverhead.Mul(int64(len(claimStatus.Containers)))
+					quantity.Add(varOverhead)
+				}
+				q := resources[overhead.Name]
+				q.Add(quantity)
+				resources[overhead.Name] = q
+			}
+		}
+	}
 }
