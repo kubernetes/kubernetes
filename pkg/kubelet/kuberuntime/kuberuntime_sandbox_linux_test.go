@@ -311,6 +311,65 @@ func TestApplySandboxResources(t *testing.T) {
 			expectedOverhead: &runtimeapi.LinuxContainerResources{},
 			cgroupVersion:    cgroupV2,
 		},
+		{
+			description: "pod with DRA memory combined mapping and overhead claims",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("128Mi"),
+									v1.ResourceCPU:    resource.MustParse("2"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+									v1.ResourceCPU:    resource.MustParse("4"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "combined-claim",
+							Containers:        []string{"c1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
+								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
+							},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{
+									Name:         v1.ResourceCPU,
+									PerPod:       new(resource.MustParse("100m")),
+									PerContainer: new(resource.MustParse("50m")),
+								},
+								{
+									Name:         v1.ResourceMemory,
+									PerPod:       new(resource.MustParse("100Mi")),
+									PerContainer: new(resource.MustParse("50Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			draEnabled: true,
+			expectedResource: &runtimeapi.LinuxContainerResources{
+				// spec 256Mi + mapping 128Mi + perPod 100Mi + perContainer 50Mi = 534Mi = 560000000 bytes approx.
+				MemoryLimitInBytes: (256 + 128 + 100 + 50) * 1024 * 1024,
+				CpuPeriod:          100000,
+				// limit: spec 4 + mapping 200m + perPod 100m + perContainer 50m = 4.35 CPUs
+				CpuQuota: 435000,
+				// request: spec 2 + mapping 200m + perPod 100m + perContainer 50m  = 2.35 CPUs
+				CpuShares: 2406,
+				Unified:   map[string]string{"memory.oom.group": "1"},
+			},
+			expectedOverhead: &runtimeapi.LinuxContainerResources{},
+			cgroupVersion:    cgroupV2,
+		},
 	}
 
 	for i, test := range tests {
