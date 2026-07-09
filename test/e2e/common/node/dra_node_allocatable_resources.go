@@ -23,23 +23,27 @@ import (
 	"slices"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
+	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 type draContainerInfo struct {
@@ -49,20 +53,11 @@ type draContainerInfo struct {
 	HugepageReqLim string
 }
 
-var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DRANodeAllocatableResources), func() {
-	f := framework.NewDefaultFramework("dra-node-allocatable-resources")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+var (
+	overheadMem = resource.MustParse("100Mi")
+	overheadCPU = resource.MustParse("100m")
 
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		if framework.NodeOSDistroIs("windows") {
-			e2eskipper.Skipf("not supported on windows -- skipping")
-		}
-	})
-
-	overheadMem := resource.MustParse("100Mi")
-	overheadCPU := resource.MustParse("100m")
-
-	overheadDevices := []resourceapi.Device{
+	overheadDevices = []resourceapi.Device{
 		{
 			Name: "device-01",
 			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
@@ -82,7 +77,7 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 		},
 	}
 
-	directDevices := []resourceapi.Device{
+	directDevices = []resourceapi.Device{
 		{
 			Name: "device-01",
 			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
@@ -100,7 +95,7 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 		},
 	}
 
-	directDevices2 := []resourceapi.Device{
+	directDevices2 = []resourceapi.Device{
 		{
 			Name: "device-01",
 			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
@@ -133,7 +128,68 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 		},
 	}
 
-	hugepageDevices := []resourceapi.Device{
+	combinedDevices = []resourceapi.Device{
+		{
+			Name: "device-direct-01",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceMemory: {
+					Mapping: &resourceapi.NodeAllocatableMapping{
+						DeviceMultiplier: new(resource.MustParse("1000Mi")),
+					},
+				},
+				v1.ResourceCPU: {
+					Mapping: &resourceapi.NodeAllocatableMapping{
+						DeviceMultiplier: new(resource.MustParse("1")),
+					},
+				},
+			},
+		},
+		{
+			Name: "device-overhead-01",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceMemory: {
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod:       &overheadMem,
+						PerContainer: &overheadMem,
+					},
+				},
+				v1.ResourceCPU: {
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod:       &overheadCPU,
+						PerContainer: &overheadCPU,
+					},
+				},
+			},
+		},
+	}
+
+	mappingAndOverheadDevice = []resourceapi.Device{
+		{
+			Name: "device-mapping-overhead-01",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceMemory: {
+					Mapping: &resourceapi.NodeAllocatableMapping{
+						DeviceMultiplier: new(resource.MustParse("1000Mi")),
+					},
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod:       &overheadMem,
+						PerContainer: &overheadMem,
+					},
+				},
+				v1.ResourceCPU: {
+					Mapping: &resourceapi.NodeAllocatableMapping{
+						DeviceMultiplier: new(resource.MustParse("1")),
+					},
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod:       &overheadCPU,
+						PerContainer: &overheadCPU,
+					},
+				},
+			},
+		},
+	}
+
+	hugepageDevices = []resourceapi.Device{
 		{
 			Name: "device-hugepages-01",
 			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
@@ -147,29 +203,31 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 		},
 	}
 
-	res100mCpu1GiCg := &cgroups.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "1Gi", MemLim: "2Gi"}
-	res1Cpu1GiCg := &cgroups.ContainerResources{CPUReq: "1", CPULim: "2", MemReq: "1Gi", MemLim: "2Gi"}
-	res2Cpu2GiCg := &cgroups.ContainerResources{CPUReq: "2", CPULim: "4", MemReq: "2Gi", MemLim: "4Gi"}
-	res2500m2500MiCg := &cgroups.ContainerResources{CPUReq: "2500m", CPULim: "4", MemReq: "2500Mi", MemLim: "4Gi"}
-	req1Cpu1GiCg := &cgroups.ContainerResources{CPUReq: "1000m", MemReq: "1Gi"}
-	res1Cpu1GiGuaranteed := &cgroups.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "1Gi", MemLim: "1Gi"}
+	res100mCPU1GiCg      = &cgroups.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "1Gi", MemLim: "2Gi"}
+	res1CPU1GiCg         = &cgroups.ContainerResources{CPUReq: "1", CPULim: "2", MemReq: "1Gi", MemLim: "2Gi"}
+	res2CPU2GiCg         = &cgroups.ContainerResources{CPUReq: "2", CPULim: "4", MemReq: "2Gi", MemLim: "4Gi"}
+	res2500m2500MiCg     = &cgroups.ContainerResources{CPUReq: "2500m", CPULim: "4", MemReq: "2500Mi", MemLim: "4Gi"}
+	req1CPU1GiCg         = &cgroups.ContainerResources{CPUReq: "1000m", MemReq: "1Gi"}
+	res1CPU1GiGuaranteed = &cgroups.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "1Gi", MemLim: "1Gi"}
 
-	claimCpuMem := &resourceapi.ResourceClaim{
+	claimCPUMem = &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cpu-mem-claim",
 		},
 	}
-	claimCpuMem2 := &resourceapi.ResourceClaim{
+	claimCPUMem2 = &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cpu-mem-claim-2",
 		},
 	}
-	claimHugepages := &resourceapi.ResourceClaim{
+	claimHugepages = &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "hugepages-claim",
 		},
 	}
+)
 
+func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 	tests := []struct {
 		name                              string
 		resourceSliceDevices              []resourceapi.Device
@@ -187,8 +245,8 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 			name:                 "direct mappings",
 			resourceSliceDevices: directDevices,
 			containers: []draContainerInfo{
-				{Name: "c1", Resources: res1Cpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
-				{Name: "c2", Resources: res1Cpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
+				{Name: "c1", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+				{Name: "c2", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
 			},
 			expectedPodCgroup: cgroups.ContainerResources{
 				// CPU request: 1000m (c1 from spec) + 1000m (c2 from spec) + 1000m (CPU claim)
@@ -214,8 +272,8 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 			name:                 "overhead mappings",
 			resourceSliceDevices: overheadDevices,
 			containers: []draContainerInfo{
-				{Name: "c1", Resources: res1Cpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
-				{Name: "c2", Resources: res1Cpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
+				{Name: "c1", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+				{Name: "c2", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
 			},
 			expectedPodCgroup: cgroups.ContainerResources{
 				// CPU request: 1000m (c1 from spec) + 1000m (c2 from spec) + 100m (CPU Claim - PerPod) + 200m (CPU Claim - PerContainer * 2)
@@ -239,12 +297,66 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 			expectedContainersScoreMemRequest: []int64{1174, 1174}, // 1024 (c1) + 100 (PerContainer) + 100/2 (PerPod) = 1174Mi
 		},
 		{
+			name:                 "combined direct and overhead mappings",
+			resourceSliceDevices: combinedDevices,
+			containers: []draContainerInfo{
+				{Name: "c1", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem, claimCPUMem2}},
+				{Name: "c2", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem, claimCPUMem2}},
+			},
+			expectedPodCgroup: cgroups.ContainerResources{
+				// CPU request: 1000m (c1 from spec) + 1000m (c2 from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerPod) + 200m (CPU Claim - PerContainer * 2)
+				// CPU limit: 2000m (c1 from spec) + 2000m (c2 from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerPod) + 200m (CPU Claim - PerContainer * 2)
+				// Memory limit: 2048Mi (c1 from spec) + 2048Mi (c2 from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerPod) + 200Mi (Memory Claim - PerContainer * 2)
+				CPUReq: "3300m",
+				CPULim: "5300m",
+				MemLim: "5396Mi",
+			},
+			expectedContainersCgroup: []cgroups.ContainerResources{
+				// CPU request: 1000m (from spec)
+				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
+				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
+				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
+				// CPU request: 1000m (from spec)
+				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
+				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
+				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
+			},
+			expectedContainersScoreMemRequest: []int64{1674, 1674}, // 1024 (c1) + 1000/2 (Direct Mem) + 100 (PerContainer) + 100/2 (PerPod) = 1674Mi
+		},
+		{
+			name:                 "single device with both mapping and overhead",
+			resourceSliceDevices: mappingAndOverheadDevice,
+			containers: []draContainerInfo{
+				{Name: "c1", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+				{Name: "c2", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			expectedPodCgroup: cgroups.ContainerResources{
+				// CPU request: 1000m (c1 from spec) + 1000m (c2 from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerPod) + 200m (CPU Claim - PerContainer * 2)
+				// CPU limit: 2000m (c1 from spec) + 2000m (c2 from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerPod) + 200m (CPU Claim - PerContainer * 2)
+				// Memory limit: 2048Mi (c1 from spec) + 2048Mi (c2 from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerPod) + 200Mi (Memory Claim - PerContainer * 2)
+				CPUReq: "3300m",
+				CPULim: "5300m",
+				MemLim: "5396Mi",
+			},
+			expectedContainersCgroup: []cgroups.ContainerResources{
+				// CPU request: 1000m (from spec)
+				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
+				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
+				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
+				// CPU request: 1000m (from spec)
+				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
+				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim -PerPod)
+				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
+			},
+			expectedContainersScoreMemRequest: []int64{1674, 1674}, // 1024 (c1) + 1000/2 (Direct Mem) + 100 (PerContainer) + 100/2 (PerPod) = 1674Mi
+		},
+		{
 			name:                 "unreferenced overhead claim",
 			resourceSliceDevices: overheadDevices,
-			unreferencedClaims:   []*resourceapi.ResourceClaim{claimCpuMem},
+			unreferencedClaims:   []*resourceapi.ResourceClaim{claimCPUMem},
 			containers: []draContainerInfo{
-				{Name: "c1", Resources: res1Cpu1GiCg},
-				{Name: "c2", Resources: res1Cpu1GiCg},
+				{Name: "c1", Resources: res1CPU1GiCg},
+				{Name: "c2", Resources: res1CPU1GiCg},
 			},
 			expectedPodCgroup: cgroups.ContainerResources{
 				// CPU request: 1000m (c1 from spec) + 1000m (c2 from spec) + 100m (CPU Claim - PerPod)
@@ -269,10 +381,10 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 		{
 			name:                 "pod-level resources specified, container-level limits omitted",
 			resourceSliceDevices: directDevices,
-			podResources:         res2Cpu2GiCg,
+			podResources:         res2CPU2GiCg,
 			containers: []draContainerInfo{
-				{Name: "c1", Resources: nil, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
-				{Name: "c2", Resources: nil, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
+				{Name: "c1", Resources: nil, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+				{Name: "c2", Resources: nil, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
 			},
 			expectedPodCgroup: cgroups.ContainerResources{
 				// CPU request: 2000m (from pod-level spec)
@@ -299,8 +411,8 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 			resourceSliceDevices: overheadDevices,
 			podResources:         res2500m2500MiCg,
 			containers: []draContainerInfo{
-				{Name: "c1", Resources: res1Cpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
-				{Name: "c2", Resources: res1Cpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
+				{Name: "c1", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+				{Name: "c2", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
 			},
 			expectedPodCgroup: cgroups.ContainerResources{
 				// CPU request: 2500m (from pod-level spec)
@@ -326,8 +438,8 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 			name:                 "hugepages overhead mapping",
 			resourceSliceDevices: hugepageDevices,
 			containers: []draContainerInfo{
-				{Name: "c1", Resources: res1Cpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimHugepages}, HugepageReqLim: "2Mi"},
-				{Name: "c2", Resources: res1Cpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimHugepages}},
+				{Name: "c1", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimHugepages}, HugepageReqLim: "2Mi"},
+				{Name: "c2", Resources: res1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimHugepages}},
 			},
 			expectedPodCgroup: cgroups.ContainerResources{
 				// CPU request: 1000m (c1 from spec) + 1000m (c2 from spec)
@@ -359,8 +471,8 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 			name:                 "container-level requests and limits omitted (BestEffort)",
 			resourceSliceDevices: directDevices,
 			containers: []draContainerInfo{
-				{Name: "c1", Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
-				{Name: "c2", Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
+				{Name: "c1", Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+				{Name: "c2", Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
 			},
 			expectedPodCgroup: cgroups.ContainerResources{
 				CPUReq: "",
@@ -377,8 +489,8 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 			name:                 "container-level CPU/Memory limits omitted (Burstable)",
 			resourceSliceDevices: directDevices,
 			containers: []draContainerInfo{
-				{Name: "c1", Resources: req1Cpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
-				{Name: "c2", Resources: req1Cpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
+				{Name: "c1", Resources: req1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+				{Name: "c2", Resources: req1CPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
 			},
 			expectedPodCgroup: cgroups.ContainerResources{
 				// CPU request: 1000m (c1 from spec) + 1000m (c2 from spec) + 1000m (DRA Direct CPU)
@@ -422,8 +534,8 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 			name:                 "Guaranteed QoS pod with direct mapping",
 			resourceSliceDevices: directDevices,
 			containers: []draContainerInfo{
-				{Name: "c1", Resources: res1Cpu1GiGuaranteed, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
-				{Name: "c2", Resources: res1Cpu1GiGuaranteed, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
+				{Name: "c1", Resources: res1CPU1GiGuaranteed, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+				{Name: "c2", Resources: res1CPU1GiGuaranteed, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
 			},
 			expectedPodCgroup: cgroups.ContainerResources{
 				// CPU request: 1000m (c1 from spec) + 1000m (c2 from spec) + 1000m (DRA Direct CPU)
@@ -443,15 +555,14 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 				// Memory limit: 1024Mi (from spec) + 1000Mi (DRA Direct memory)
 				{CPUReq: "1000m", CPULim: "2000m", MemLim: "2024Mi"},
 			},
-			// OOM score is set to default value (-997) for guaranteed pod
 			expectedContainersScoreMemRequest: []int64{0, 0},
 		},
 		{
 			name:                 "direct mapping multiple claims",
 			resourceSliceDevices: directDevices2,
 			containers: []draContainerInfo{
-				{Name: "c1", Resources: res100mCpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimCpuMem}},
-				{Name: "c2", Resources: res100mCpu1GiCg, Claims: []*resourceapi.ResourceClaim{claimCpuMem2}},
+				{Name: "c1", Resources: res100mCPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+				{Name: "c2", Resources: res100mCPU1GiCg, Claims: []*resourceapi.ResourceClaim{claimCPUMem2}},
 			},
 			expectedPodCgroup: cgroups.ContainerResources{
 				// CPU request: 100m (c1 from spec) + 100m (c2 from spec) + 100m (direct1) + 100m (direct2)
@@ -573,7 +684,243 @@ var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), fe
 			framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
 		})
 	}
-})
+}
+
+func doNodeAllocatableResizeTests(f *framework.Framework) {
+	tests := []struct {
+		name                                            string
+		resourceSliceDevices                            []resourceapi.Device
+		podResources                                    *cgroups.ContainerResources
+		desiredPodResources                             *cgroups.ContainerResources
+		containers                                      []draContainerInfo
+		desiredContainers                               []draContainerInfo
+		unreferencedClaims                              []*resourceapi.ResourceClaim
+		expectedPodCgroupAfterResize                    cgroups.ContainerResources
+		expectedContainersCgroupAfterResize             []cgroups.ContainerResources // per container
+		expectedPodAllocatedResourcesAfterResize        v1.ResourceList
+		expectedContainersAllocatedResourcesAfterResize []v1.ResourceList
+	}{
+		{
+			name:                 "direct mappings with resize",
+			resourceSliceDevices: directDevices,
+			containers: []draContainerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "500m", CPULim: "1000m", MemReq: "500Mi", MemLim: "1000Mi"}, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			desiredContainers: []draContainerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "500m", CPULim: "1500m", MemReq: "1000Mi", MemLim: "2000Mi"}, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			// CPU request: 500m (from resized spec) + 1000m (DRA Direct CPU)
+			// CPU limit: 1500m (from resized spec) + 1000m (DRA Direct CPU)
+			// Memory limit: 2000Mi (from resized spec) + 1000Mi (DRA Direct memory)
+			expectedPodCgroupAfterResize: cgroups.ContainerResources{CPUReq: "1500m", CPULim: "2500m", MemLim: "3000Mi"},
+			expectedContainersCgroupAfterResize: []cgroups.ContainerResources{
+				{CPUReq: "500m", CPULim: "2500m", MemLim: "3000Mi"},
+			},
+			// Pod level allocated resources includes DRA resources
+			expectedPodAllocatedResourcesAfterResize: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1500m"),
+				v1.ResourceMemory: resource.MustParse("2000Mi"),
+			},
+			// Container level allocated resources does not include DRA resources
+			expectedContainersAllocatedResourcesAfterResize: []v1.ResourceList{
+				{
+					v1.ResourceCPU:    resource.MustParse("500m"),
+					v1.ResourceMemory: resource.MustParse("1000Mi"),
+				},
+			},
+		},
+		{
+			name:                 "overhead mappings with resize",
+			resourceSliceDevices: overheadDevices,
+			containers: []draContainerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "1", CPULim: "2", MemReq: "1Gi", MemLim: "2Gi"}, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			desiredContainers: []draContainerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "1500m", CPULim: "2500m", MemReq: "1500Mi", MemLim: "3000Mi"}, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			// CPU request: 1500m (from resized spec) + 100m (DRA PerPod CPU) + 100m (DRA PerContainer CPU)
+			// CPU limit: 2500m (from resized spec) + 100m (DRA PerPod CPU) + 100m (DRA PerContainer CPU)
+			// Memory limit: 3000Mi (from resized spec) + 100Mi (DRA PerPod memory) + 100Mi (DRA PerContainer memory)
+			expectedPodCgroupAfterResize: cgroups.ContainerResources{CPUReq: "1700m", CPULim: "2700m", MemLim: "3200Mi"},
+			expectedContainersCgroupAfterResize: []cgroups.ContainerResources{
+				{CPUReq: "1500m", CPULim: "2700m", MemLim: "3200Mi"},
+			},
+			expectedPodAllocatedResourcesAfterResize: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1700m"),
+				v1.ResourceMemory: resource.MustParse("1700Mi"),
+			},
+			expectedContainersAllocatedResourcesAfterResize: []v1.ResourceList{
+				{
+					v1.ResourceCPU:    resource.MustParse("1500m"),
+					v1.ResourceMemory: resource.MustParse("1500Mi"),
+				},
+			},
+		},
+		{
+			name:                 "pod-level resources resize with container level request/limit omitted",
+			resourceSliceDevices: directDevices,
+			podResources:         &cgroups.ContainerResources{CPUReq: "2", CPULim: "4", MemReq: "2Gi", MemLim: "4Gi"},
+			containers: []draContainerInfo{
+				{Name: "c1", Resources: nil, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			desiredPodResources: &cgroups.ContainerResources{CPUReq: "3", CPULim: "5", MemReq: "3Gi", MemLim: "5Gi"},
+			desiredContainers: []draContainerInfo{
+				{Name: "c1", Resources: nil, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			// CPU request: 3000m (from resized pod-level spec)
+			// CPU limit: 5000m (from resized pod-level spec)
+			// Memory limit: 5Gi (from resized pod-level spec)
+			expectedPodCgroupAfterResize: cgroups.ContainerResources{CPUReq: "3000m", CPULim: "5000m", MemLim: "5120Mi"},
+			// Container level limit default to pod level values and limits are not explicitly specified in the container spec
+			expectedContainersCgroupAfterResize: []cgroups.ContainerResources{
+				{CPULim: "5", MemLim: "5Gi"},
+			},
+			// Pod status allocated resources is purely based on pod level resources
+			expectedPodAllocatedResourcesAfterResize: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3"),
+				v1.ResourceMemory: resource.MustParse("3Gi"),
+			},
+		},
+		{
+			name:                 "Pod level resize, container level request/limit present",
+			resourceSliceDevices: directDevices,
+			podResources:         &cgroups.ContainerResources{CPUReq: "2", CPULim: "4", MemReq: "2Gi", MemLim: "4Gi"},
+			containers: []draContainerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "1", CPULim: "2", MemReq: "1Gi", MemLim: "2Gi"}, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			desiredPodResources: &cgroups.ContainerResources{CPUReq: "3", CPULim: "6", MemReq: "3Gi", MemLim: "6Gi"},
+			desiredContainers: []draContainerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "1", CPULim: "2", MemReq: "1Gi", MemLim: "2Gi"}, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			expectedPodCgroupAfterResize: cgroups.ContainerResources{CPUReq: "3000m", CPULim: "6000m", MemLim: "6Gi"},
+			expectedContainersCgroupAfterResize: []cgroups.ContainerResources{
+				{CPUReq: "1000m", CPULim: "3000m", MemLim: "3048Mi"},
+			},
+			expectedPodAllocatedResourcesAfterResize: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3"),
+				v1.ResourceMemory: resource.MustParse("3Gi"),
+			},
+			expectedContainersAllocatedResourcesAfterResize: []v1.ResourceList{
+				{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+		},
+		{
+			name:                 "pod level resources present, container level resize",
+			resourceSliceDevices: directDevices,
+			podResources:         &cgroups.ContainerResources{CPUReq: "2", CPULim: "4", MemReq: "2Gi", MemLim: "4Gi"},
+			containers: []draContainerInfo{
+				{Name: "c1", Resources: nil, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			desiredPodResources: &cgroups.ContainerResources{CPUReq: "2", CPULim: "4", MemReq: "2Gi", MemLim: "4Gi"},
+			desiredContainers: []draContainerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "1", CPULim: "2", MemReq: "1Gi", MemLim: "2Gi"}, Claims: []*resourceapi.ResourceClaim{claimCPUMem}},
+			},
+			// Pod cgroup remains the same after container resize
+			expectedPodCgroupAfterResize: cgroups.ContainerResources{CPUReq: "2000m", CPULim: "4000m", MemLim: "4Gi"},
+			// Container cgroup updated after resize and includes DRA
+			expectedContainersCgroupAfterResize: []cgroups.ContainerResources{
+				{CPUReq: "1000m", CPULim: "3000m", MemLim: "3048Mi"},
+			},
+			// Pod level allocated resources based on only pod level resources
+			expectedPodAllocatedResourcesAfterResize: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			// Container level allocated resources includes resized spec values (and excludes DRA)
+			expectedContainersAllocatedResourcesAfterResize: []v1.ResourceList{
+				{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		ginkgo.It(fmt.Sprintf("verifies cgroup settings and pod status after resize with %s", tc.name), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			nodes := drautils.NewNodesNow(tCtx, 1, 4)
+			driver := drautils.NewDriverInstance(tCtx)
+			b := drautils.NewBuilderNow(tCtx, driver)
+
+			driverResources := map[string]resourceslice.DriverResources{
+				nodes.NodeNames[0]: {
+					Pools: map[string]resourceslice.Pool{
+						nodes.NodeNames[0]: {
+							Slices: []resourceslice.Slice{{
+								Devices: tc.resourceSliceDevices,
+							}},
+						},
+					},
+				},
+			}
+			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, driverResources)
+
+			createdClaims := createClaims(tCtx, b, tc.containers, tc.unreferencedClaims)
+
+			pod := makeTestPod(tc.podResources, tc.containers, tc.unreferencedClaims, createdClaims)
+			pod.Namespace = f.Namespace.Name
+
+			podJSON, _ := json.Marshal(pod)
+			tCtx.Logf("Pod JSON to create: %s", string(podJSON))
+
+			ginkgo.By("creating pod and waiting for it to be running")
+			podClient := e2epod.NewPodClient(f)
+			pod = podClient.CreateSync(ctx, pod)
+
+			originalContainers := mapToResizableContainerInfo(tc.containers)
+			desiredContainers := mapToResizableContainerInfo(tc.desiredContainers)
+
+			var originalPodResources *v1.ResourceRequirements
+			if tc.podResources != nil {
+				originalPodResources = tc.podResources.ResourceRequirements()
+			}
+			var desiredPodResources *v1.ResourceRequirements
+			if tc.desiredPodResources != nil {
+				desiredPodResources = tc.desiredPodResources.ResourceRequirements()
+			}
+			patch := podresize.MakeResizePatch(originalContainers, desiredContainers, originalPodResources, desiredPodResources)
+
+			ginkgo.By("patching the pod for resize")
+			patchedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+			framework.ExpectNoError(err)
+
+			ginkgo.By("waiting for resize actuation to complete")
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, pod, desiredContainers)
+
+			ginkgo.By("verifying updated pod cgroup limits after resize")
+			err = cgroups.VerifyPodCgroups(ctx, f, resizedPod, &tc.expectedPodCgroupAfterResize)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("verifying updated container cgroup limits after resize")
+			onCgroupV2 := cgroups.IsPodOnCgroupv2Node(f, resizedPod.Name, resizedPod.Spec.Containers[0].Name)
+			for i, container := range resizedPod.Spec.Containers {
+				expectedContainer := &v1.Container{
+					Name:      container.Name,
+					Resources: *tc.expectedContainersCgroupAfterResize[i].ResourceRequirements(),
+				}
+				if expectedContainer.Resources.Requests == nil {
+					expectedContainer.Resources.Requests = container.Resources.Requests
+				}
+				err = cgroups.VerifyContainerCgroupValues(ctx, f, resizedPod, expectedContainer, onCgroupV2)
+				framework.ExpectNoError(err)
+			}
+
+			ginkgo.By("verifying pod status updates match spec after resize")
+			framework.ExpectNoError(verifyDRAPodLevelStatusResources(resizedPod, tc.expectedPodAllocatedResourcesAfterResize))
+
+			ginkgo.By("verifying pod spec resources after patch")
+			podresize.VerifyPodResources(patchedPod, desiredContainers, desiredPodResources)
+
+			ginkgo.By("deleting pods")
+			delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, resizedPod)
+			framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+		})
+	}
+}
 
 func makeTestPod(podResources *cgroups.ContainerResources, containers []draContainerInfo, unreferencedClaims []*resourceapi.ResourceClaim, createdClaims map[string]*resourceapi.ResourceClaim) *v1.Pod {
 	var testContainers []v1.Container
@@ -667,3 +1014,39 @@ func createClaims(tCtx ktesting.TContext, b *drautils.Builder, containers []draC
 	}
 	return createdClaims
 }
+
+func verifyDRAPodLevelStatusResources(gotPod *v1.Pod, wantAllocatedResources v1.ResourceList) error {
+	ginkgo.GinkgoHelper()
+	var errs []error
+	if wantAllocatedResources != nil {
+		if err := framework.Gomega().Expect(gotPod.Status.AllocatedResources).To(gomega.BeComparableTo(wantAllocatedResources)); err != nil {
+			errs = append(errs, fmt.Errorf("pod[%s] status allocatedResources mismatch: %w", gotPod.Name, err))
+		}
+	}
+	return errors.NewAggregate(errs)
+}
+
+func mapToResizableContainerInfo(containers []draContainerInfo) []podresize.ResizableContainerInfo {
+	res := make([]podresize.ResizableContainerInfo, len(containers))
+	for i, c := range containers {
+		res[i] = podresize.ResizableContainerInfo{
+			Name:      c.Name,
+			Resources: c.Resources,
+		}
+	}
+	return res
+}
+
+var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DRANodeAllocatableResources), framework.WithFeatureGate(features.InPlacePodLevelResourcesVerticalScaling), func() {
+	f := framework.NewDefaultFramework("dra-node-allocatable-resources")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		if framework.NodeOSDistroIs("windows") {
+			e2eskipper.Skipf("not supported on windows -- skipping")
+		}
+	})
+
+	doNodeAllocatableCgroupsTests(f)
+	doNodeAllocatableResizeTests(f)
+})
