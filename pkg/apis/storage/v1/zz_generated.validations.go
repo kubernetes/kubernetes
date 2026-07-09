@@ -165,7 +165,80 @@ func Validate_CSIDriver(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1.CSIDriver.Spec has no validation
+	{ // field storagev1.CSIDriver.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *storagev1.CSIDriverSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CSIDriverSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1.CSIDriver) *storagev1.CSIDriverSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_CSIDriverSpec validates an instance of CSIDriverSpec according
+// to declarative validation rules in the API schema.
+func Validate_CSIDriverSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1.CSIDriverSpec) (errs field.ErrorList) {
+
+	// field storagev1.CSIDriverSpec.AttachRequired has no validation
+	// field storagev1.CSIDriverSpec.PodInfoOnMount has no validation
+
+	{ // field storagev1.CSIDriverSpec.VolumeLifecycleModes
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []storagev1.VolumeLifecycleMode,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1.CSIDriverSpec) []storagev1.VolumeLifecycleMode {
+				return oldObj.VolumeLifecycleModes
+			})
+		errs = append(errs, fn(fldPath.Child("volumeLifecycleModes"), obj.VolumeLifecycleModes, oldVal, oldObj != nil)...)
+	}
+
+	// field storagev1.CSIDriverSpec.StorageCapacity has no validation
+	// field storagev1.CSIDriverSpec.FSGroupPolicy has no validation
+	// field storagev1.CSIDriverSpec.TokenRequests has no validation
+	// field storagev1.CSIDriverSpec.RequiresRepublish has no validation
+	// field storagev1.CSIDriverSpec.SELinuxMount has no validation
+	// field storagev1.CSIDriverSpec.NodeAllocatableUpdatePeriodSeconds has no validation
+	// field storagev1.CSIDriverSpec.ServiceAccountTokenInSecrets has no validation
+	// field storagev1.CSIDriverSpec.PreventPodSchedulingIfMissing has no validation
 	return errs
 }
 
