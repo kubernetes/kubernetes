@@ -20,7 +20,9 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	registry "k8s.io/kubernetes/pkg/registry/storage/csidriver"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -67,6 +69,45 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		Verb:              "update",
 	})
 
+	testCases := map[string]struct {
+		oldObj       storage.CSIDriver
+		updateObj    storage.CSIDriver
+		expectedErrs field.ErrorList
+	}{
+		"valid update": {
+			oldObj:    mkCSIDriver(),
+			updateObj: mkCSIDriver(),
+		},
+		"invalid update volumeLifecycleModes changed": {
+			oldObj:    mkCSIDriver(TweakVolumeLifecycleModes(storage.VolumeLifecyclePersistent)),
+			updateObj: mkCSIDriver(TweakVolumeLifecycleModes(storage.VolumeLifecycleEphemeral)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "volumeLifecycleModes"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"invalid update volumeLifecycleModes unset to set": {
+			oldObj:    mkCSIDriver(),
+			updateObj: mkCSIDriver(TweakVolumeLifecycleModes(storage.VolumeLifecyclePersistent)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "volumeLifecycleModes"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"invalid update volumeLifecycleModes set to unset": {
+			oldObj:    mkCSIDriver(TweakVolumeLifecycleModes(storage.VolumeLifecyclePersistent)),
+			updateObj: mkCSIDriver(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "volumeLifecycleModes"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			tc.oldObj.ResourceVersion = "1"
+			tc.updateObj.ResourceVersion = "2"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
 	updateObj := mkCSIDriver()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
@@ -88,4 +129,10 @@ func mkCSIDriver(tweaks ...func(csi *storage.CSIDriver)) storage.CSIDriver {
 		tweak(&csi)
 	}
 	return csi
+}
+
+func TweakVolumeLifecycleModes(modes ...storage.VolumeLifecycleMode) func(csi *storage.CSIDriver) {
+	return func(csi *storage.CSIDriver) {
+		csi.Spec.VolumeLifecycleModes = modes
+	}
 }

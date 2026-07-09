@@ -127,6 +127,8 @@ message CSIDriverSpec {
   //
   // +optional
   // +listType=atomic
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   repeated string volumeLifecycleModes = 3;
 
   // storageCapacity indicates that the CSI volume driver wants pod scheduling to consider the storage
