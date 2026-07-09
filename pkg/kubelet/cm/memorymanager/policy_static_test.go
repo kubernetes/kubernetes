@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
 
 const (
@@ -5704,6 +5706,341 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 			podSharedPoolAssignments, err := testutil.GetCounterMetricValue(metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerSharedPod))
 			require.NoError(t, err)
 			require.InDelta(t, float64(testCase.requiredMetrics.expPodSharedPoolAssignments), podSharedPoolAssignments, 0.001, "unexpected number of assignments")
+		})
+	}
+}
+
+// The following lifecycle tests verify that the static memory manager policy
+// processes or skips operations based on the given lifecycle.Operation.
+// Since Allocate* and GetTopologyHints* do not return an error when an
+// operation is unsupported (they silently return nil/empty hints to avoid
+// aborting the entire operation across all hint providers), the tests check
+// log output to confirm whether an operation was processed or skipped.
+//
+// The test values used (e.g. memory sizes, cpusets, pod resource requests)
+// are arbitrary but correct values that let the code run the happy path; the
+// exact values have no special meaning. These tests do not validate the
+// correctness of the allocation or hint results, only whether the operation
+// is processed or skipped for a given lifecycle operation.
+
+func TestStaticPolicyLifecycleAllocate(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			err = policy.Allocate(tCtx, st, pod, &pod.Spec.Containers[0], testCase.operation)
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "Container-level memory allocation skipped, Memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			err = policy.AllocatePod(logger, st, pod, testCase.operation)
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "Pod-level memory allocation skipped, memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			hints := policy.GetTopologyHints(logger, st, pod, &pod.Spec.Containers[0], testCase.operation)
+			if hints != nil {
+				t.Errorf("Unexpected hints: %v", hints)
+			}
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "GetTopologyHints skipped, memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			hints := policy.GetPodTopologyHints(logger, st, pod, testCase.operation)
+			if hints != nil {
+				t.Errorf("Unexpected hints: %v", hints)
+			}
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "GetPodTopologyHints skipped, memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
 		})
 	}
 }

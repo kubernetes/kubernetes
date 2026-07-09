@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 	"k8s.io/utils/cpuset"
 )
 
@@ -2789,4 +2791,271 @@ func getPodUncoreCacheIDs(s state.Reader, topo *topology.CPUTopology, pod *v1.Po
 		}
 	}
 	return uncoreCacheIDs, nil
+}
+
+// The following lifecycle tests verify that the static CPU manager policy
+// processes or skips operations based on the given lifecycle.Operation.
+// Since Allocate* and GetTopologyHints* do not return an error when an
+// operation is unsupported (they silently return nil/empty hints to avoid
+// aborting the entire operation across all hint providers), the tests check
+// log output to confirm whether an operation was processed or skipped.
+//
+// The test values used (e.g. cpusets, pod resource requests) are arbitrary
+// but correct values that let the code run the happy path; the exact values
+// have no special meaning. These tests do not validate the correctness of
+// the allocation or hint results, only whether the operation is processed
+// or skipped for a given lifecycle operation.
+
+func TestStaticPolicyLifecycleAllocate(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "CPUManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "CPUManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "CPUManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			}
+			pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"1", "2"}})
+			container := pod.Spec.Containers[0]
+
+			err = policy.Allocate(logger, st, pod, &container, testCase.operation)
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "CPUManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "CPUManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "CPUManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			}
+			pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"1", "2"}})
+
+			err = policy.AllocatePod(logger, st, pod, testCase.operation)
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "CPU Manager pod-level resource allocation skipped, operation not supported by the static CPU manager policy"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "CPUManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "CPUManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "CPUManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			}
+			pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"1", "2"}})
+			container := pod.Spec.Containers[0]
+
+			hints := policy.GetTopologyHints(logger, st, pod, &container, testCase.operation)
+			if hints != nil {
+				t.Errorf("Unexpected hints: %v", hints)
+			}
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "CPUManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "CPUManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "CPUManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			}
+			pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"1", "2"}})
+
+			hints := policy.GetPodTopologyHints(logger, st, pod, testCase.operation)
+			if hints != nil {
+				t.Errorf("Unexpected hints: %v", hints)
+			}
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "CPU Manager pod hint generation skipped, operation not supported by the static CPU manager policy"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
 }
