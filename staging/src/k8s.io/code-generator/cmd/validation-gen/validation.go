@@ -64,6 +64,7 @@ var (
 type genValidations struct {
 	generator.GoGenerator
 	outputPackage    string
+	inputPackage     string
 	inputToPkg       map[string]string // Maps input packages to generated validation packages
 	rootTypes        []*types.Type
 	discovered       *typeDiscoverer
@@ -73,12 +74,13 @@ type genValidations struct {
 }
 
 // NewGenValidations creates a new generator for the specified package.
-func NewGenValidations(outputFilename, outputPackage string, rootTypes []*types.Type, discovered *typeDiscoverer, inputToPkg map[string]string, schemeRegistry types.Name, emitRegisterFunc bool) generator.Generator {
+func NewGenValidations(outputFilename, outputPackage, inputPackage string, rootTypes []*types.Type, discovered *typeDiscoverer, inputToPkg map[string]string, schemeRegistry types.Name, emitRegisterFunc bool) generator.Generator {
 	return &genValidations{
 		GoGenerator: generator.GoGenerator{
 			OutputFilename: outputFilename,
 		},
 		outputPackage:    outputPackage,
+		inputPackage:     inputPackage,
 		inputToPkg:       inputToPkg,
 		rootTypes:        rootTypes,
 		discovered:       discovered,
@@ -86,6 +88,19 @@ func NewGenValidations(outputFilename, outputPackage string, rootTypes []*types.
 		schemeRegistry:   schemeRegistry,
 		emitRegisterFunc: emitRegisterFunc,
 	}
+}
+
+// resolveFunc maps a validator reference to the package it should be called
+// from: if this generator validates the reference's input package, its own
+// local copy; else if another generated package is that input's canonical
+// target, that package; otherwise the reference is left unchanged.
+func (g *genValidations) resolveFunc(name types.Name) types.Name {
+	if name.Package == g.inputPackage {
+		name.Package = g.outputPackage
+	} else if pkg, ok := g.inputToPkg[name.Package]; ok {
+		name.Package = pkg
+	}
+	return name
 }
 
 func (g *genValidations) Namers(_ *generator.Context) namer.NameSystems {
@@ -915,8 +930,9 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 	return nil
 }
 
-// getValidationFunctionName looks up the name of the specified type's
-// validation function.
+// getValidationFunctionName returns a type's validator identity: (input
+// package, Validate_T). Which package a call actually targets is output-
+// dependent, so it's resolved at emit time (resolveFunc), not baked in here.
 //
 // TODO: Currently this is a "blind" call - we hope that the expected function
 // exists, but we don't verify that, and we only emit calls into packages which
@@ -924,11 +940,10 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 // to verify the target, either by naming convention + fingerprint or by
 // explicit comment-tags or something.
 func (td *typeDiscoverer) getValidationFunctionName(t *types.Type) (types.Name, bool) {
-	pkg, ok := td.inputToPkg[t.Name.Package]
-	if !ok {
+	if _, ok := td.inputToPkg[t.Name.Package]; !ok {
 		return types.Name{}, false
 	}
-	return types.Name{Package: pkg, Name: "Validate_" + t.Name.Name}, true
+	return types.Name{Package: t.Name.Package, Name: "Validate_" + t.Name.Name}, true
 }
 
 func mkSymbolArgs(c *generator.Context, names []types.Name) generator.Args {
@@ -1165,7 +1180,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			panic(fmt.Sprintf("unexpected type-validations on type %v, kind %s", thisNode.valueType, thisNode.valueType.Kind))
 		}
 		emitComments(validations.Comments, sw)
-		emitCallsToValidators(c, validations.Functions, sw)
+		g.emitCallsToValidators(c, validations.Functions, sw)
 		sw.Do("\n", nil)
 		didSome = true
 	}
@@ -1174,7 +1189,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 		keyNode := thisNode.resolveKeyNode()
 		if keyNode != nil && g.hasValidations(keyNode) {
 			emitComments(validations.Comments, sw)
-			emitCallsToValidators(c, validations.Functions, sw)
+			g.emitCallsToValidators(c, validations.Functions, sw)
 			sw.Do("\n", nil)
 			didSome = true
 		}
@@ -1184,7 +1199,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 		elemNode := thisNode.resolveElemNode()
 		if elemNode != nil && g.hasValidations(elemNode) {
 			emitComments(validations.Comments, sw)
-			emitCallsToValidators(c, validations.Functions, sw)
+			g.emitCallsToValidators(c, validations.Functions, sw)
 			sw.Do("\n", nil)
 			didSome = true
 		}
@@ -1286,7 +1301,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 					emitRatchetingCheck(c, fld.childType, bufsw)
 					fldRatchetingChecked = true
 					bufsw.Do("// call field-attached validations\n", nil)
-					emitCallsToValidators(c, validations.Functions, bufsw)
+					g.emitCallsToValidators(c, validations.Functions, bufsw)
 				}
 			}
 
@@ -1319,7 +1334,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 								emitRatchetingCheck(c, fld.childType, bufsw)
 								fldRatchetingChecked = true
 							}
-							emitCallsToValidators(c, iterations.Functions, bufsw)
+							g.emitCallsToValidators(c, iterations.Functions, bufsw)
 						}
 					}
 				}
@@ -1410,7 +1425,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 // named "fldPath".
 func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typeNode, sw *generator.SnippetWriter) {
 	targs := generator.Args{
-		"funcName": c.Universe.Type(node.funcName),
+		"funcName": c.Universe.Type(g.resolveFunc(node.funcName)),
 	}
 	sw.Do("// call the type's validation function\n", nil)
 	sw.Do("errs = append(errs, $.funcName|raw$(ctx, op, fldPath, obj, oldObj)...)\n", targs)
@@ -1457,7 +1472,7 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 // Emitted code assumes that the value in question is always a pair of nilable
 // variables named "obj" and "oldObj", and the field path to this value is
 // named "fldPath".
-func emitCallsToValidators(c *generator.Context, validations []validators.FunctionGen, sw *generator.SnippetWriter) {
+func (g *genValidations) emitCallsToValidators(c *generator.Context, validations []validators.FunctionGen, sw *generator.SnippetWriter) {
 	// Group and sort the inputs.
 	cohorts := sortIntoCohorts(validations)
 
@@ -1485,7 +1500,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 			isNonError := v.Flags.IsSet(validators.NonError)
 
 			targs := generator.Args{
-				"funcName": c.Universe.Type(v.Function),
+				"funcName": c.Universe.Type(g.resolveFunc(v.Function)),
 				"field":    mkSymbolArgs(c, fieldPkgSymbols),
 			}
 
@@ -1504,7 +1519,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
 				for _, arg := range v.Args {
 					sw.Do(", ", nil)
-					toGolangSourceDataLiteral(sw, c, arg, flNewlineOK)
+					g.toGolangSourceDataLiteral(sw, c, arg, flNewlineOK)
 				}
 				sw.Do(")", targs)
 				switch v.StabilityLevel {
@@ -1661,7 +1676,7 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 			}
 
 			sw.Do("var $.varName|private$ = ", targs)
-			toGolangSourceDataLiteral(sw, c, variable.Initializer, flNewlineOK)
+			g.toGolangSourceDataLiteral(sw, c, variable.Initializer, flNewlineOK)
 			sw.Do("\n", nil)
 		}
 	}
@@ -1688,7 +1703,7 @@ const (
 // types (e.g. basic types, types.Type, validators.Identifier, etc.) which are
 // commonly used as arguments to validation functions. The flags parameter can
 // be used to control certain aspects of the rendering.
-func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context, value any, flags uint64) {
+func (g *genValidations) toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context, value any, flags uint64) {
 	// For safety, be strict in what values we output to visited source, and ensure strings
 	// are quoted.
 
@@ -1721,7 +1736,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			// If the function to be wrapped has no additional arguments, we can
 			// just use it directly.
 			targs := generator.Args{
-				"funcName": c.Universe.Type(v.Function.Function),
+				"funcName": c.Universe.Type(g.resolveFunc(v.Function.Function)),
 			}
 			for _, comment := range v.Function.Comments {
 				sw.Do("// $.$\n", comment)
@@ -1731,7 +1746,6 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			// If the function to be wrapped has additional arguments, we need
 			// a "standard signature" validation function to wrap it.
 			targs := generator.Args{
-				"funcName":   c.Universe.Type(v.Function.Function),
 				"field":      mkSymbolArgs(c, fieldPkgSymbols),
 				"operation":  mkSymbolArgs(c, operationPkgSymbols),
 				"context":    mkSymbolArgs(c, contextPkgSymbols),
@@ -1752,7 +1766,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			sw.Do("    obj, oldObj $.objTypePfx$$.objType|raw$ ", targs)
 			sw.Do(")    $.field.ErrorList|raw$ {\n", targs)
 			sw.Do("return ", nil)
-			emitFunctionCall(sw, c, v.Function, "ctx", "op", "fldPath", "obj", "oldObj")
+			g.emitFunctionCall(sw, c, v.Function, "ctx", "op", "fldPath", "obj", "oldObj")
 			sw.Do("\n}", targs)
 		}
 	case validators.MultiWrapperFunction:
@@ -1799,7 +1813,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			if fg.Flags.IsSet(validators.ShortCircuit) {
 				// Short-circuiting functions stop execution if they return an error.
 				sw.Do("if e := ", nil)
-				emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
+				g.emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
 				sw.Do("; len(e) != 0 {\n", nil)
 				if !isNonError {
 					sw.Do("  errs = append(errs, e...)\n", nil)
@@ -1816,10 +1830,10 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			} else {
 				// Standard functions append errors to the list.
 				if isNonError {
-					emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
+					g.emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
 				} else {
 					sw.Do("errs = append(errs, ", nil)
-					emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
+					g.emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
 					sw.Do("...)\n", nil)
 				}
 			}
@@ -1831,7 +1845,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 		for _, comment := range v.Comments {
 			sw.Do("// $.$\\n", comment)
 		}
-		emitFunctionCall(sw, c, v)
+		g.emitFunctionCall(sw, c, v)
 	case validators.FunctionLiteral:
 		if flags&flNewlineOK != 0 {
 			sw.Do("\n", nil)
@@ -1890,7 +1904,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 		for _, f := range v.Fields {
 			sw.Do(f.Name, nil)
 			sw.Do(": ", nil)
-			toGolangSourceDataLiteral(sw, c, f.Value, flags)
+			g.toGolangSourceDataLiteral(sw, c, f.Value, flags)
 			sw.Do(",", nil)
 			if flags&flNewlineOK != 0 {
 				sw.Do("\n", nil)
@@ -1926,7 +1940,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			// should track "isNewLine" in sw, and instead of unconditionally
 			// adding a newline after each element, call sw.NewLine() which
 			// only adds a newline if the previous write did not end with one.
-			toGolangSourceDataLiteral(sw, c, e, flags)
+			g.toGolangSourceDataLiteral(sw, c, e, flags)
 			sw.Do(",", nil)
 			if flags&flNewlineOK != 0 {
 				sw.Do("\n", nil)
@@ -1952,7 +1966,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			sw.Do("[$.arraySize$]$.itemType${", map[string]string{"arraySize": arraySize, "itemType": itemType})
 			for i := range rv.Len() {
 				val := rv.Index(i)
-				toGolangSourceDataLiteral(sw, c, val.Interface(), flags)
+				g.toGolangSourceDataLiteral(sw, c, val.Interface(), flags)
 				if i < rv.Len()-1 {
 					sw.Do(", ", nil)
 				}
@@ -1965,9 +1979,9 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 	}
 }
 
-func emitFunctionCall(sw *generator.SnippetWriter, c *generator.Context, v validators.FunctionGen, leadingArgs ...string) {
+func (g *genValidations) emitFunctionCall(sw *generator.SnippetWriter, c *generator.Context, v validators.FunctionGen, leadingArgs ...string) {
 	targs := generator.Args{
-		"funcName": c.Universe.Type(v.Function),
+		"funcName": c.Universe.Type(g.resolveFunc(v.Function)),
 	}
 	sw.Do("$.funcName|raw$", targs)
 	if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
@@ -1991,7 +2005,7 @@ func emitFunctionCall(sw *generator.SnippetWriter, c *generator.Context, v valid
 		if i != 0 {
 			sw.Do(", ", nil)
 		}
-		toGolangSourceDataLiteral(sw, c, arg, flNewlineOK)
+		g.toGolangSourceDataLiteral(sw, c, arg, flNewlineOK)
 	}
 	sw.Do(")", nil)
 	switch v.StabilityLevel {
