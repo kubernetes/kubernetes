@@ -26,8 +26,8 @@ import (
 	"k8s.io/code-generator/cmd/validation-gen/output_tests/multiple_packages/types"
 )
 
-// TestSelfContained runs this scheme-free package's validators via direct calls
-// (no scheme) and checks they agree with the registered copy.
+// TestSelfContained runs this non-registering package's validators via direct
+// calls (no scheme) and checks they agree with the registered copy.
 func TestSelfContained(t *testing.T) {
 	ctx := context.Background()
 	matcher := field.ErrorMatcher{}.ByField().ByDetailExact()
