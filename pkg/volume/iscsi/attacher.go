@@ -129,7 +129,7 @@ func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string,
 		options = volumeutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
 	}
 	if notMnt {
-		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: utilexec.New()}
+		diskMounter := mount.NewSafeFormatAndMountWithStorageManager(mounter, utilexec.New(), mount.NewDefaultStorageManager())
 		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, fsType, mountOptions)
 		if err != nil {
@@ -227,7 +227,7 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks 
 		fsType:     fsType,
 		volumeMode: volumeMode,
 		readOnly:   readOnly,
-		mounter:    &mount.SafeFormatAndMount{Interface: host.GetMounter(), Exec: exec},
+		mounter:    mount.NewSafeFormatAndMountWithStorageManager(host.GetMounter(), exec, mount.NewDefaultStorageManager()),
 		exec:       exec,
 		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 	}, nil

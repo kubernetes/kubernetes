@@ -310,13 +310,13 @@ func (plugin *localVolumePlugin) NewDeviceMounter() (volume.DeviceMounter, error
 	if !ok {
 		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
 	}
-	return plugin.newDeviceMounterInternal(kvh, plugin.host.GetMounter(), utilexec.New())
+	return plugin.newDeviceMounterInternal(kvh, plugin.host.GetMounter(), utilexec.New(), mount.NewDefaultStorageManager())
 }
 
-func (plugin *localVolumePlugin) newDeviceMounterInternal(kvh volume.KubeletVolumeHost, mounter mount.Interface, exec utilexec.Interface) (volume.DeviceMounter, error) {
+func (plugin *localVolumePlugin) newDeviceMounterInternal(kvh volume.KubeletVolumeHost, mounter mount.Interface, exec utilexec.Interface, storageManager mount.StorageManager) (volume.DeviceMounter, error) {
 	return &deviceMounter{
 		plugin:   plugin,
-		mounter:  mount.NewSafeFormatAndMount(mounter, exec),
+		mounter:  mount.NewSafeFormatAndMountWithStorageManager(mounter, exec, storageManager),
 		hostUtil: kvh.GetHostUtil(),
 	}, nil
 }
@@ -454,13 +454,13 @@ func (dm *deviceMounter) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 }
 
 func (plugin *localVolumePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
-	return plugin.newDeviceUnmounterInternal(plugin.host.GetMounter(), utilexec.New())
+	return plugin.newDeviceUnmounterInternal(plugin.host.GetMounter(), utilexec.New(), mount.NewDefaultStorageManager())
 }
 
-func (plugin *localVolumePlugin) newDeviceUnmounterInternal(mounter mount.Interface, exec utilexec.Interface) (volume.DeviceUnmounter, error) {
+func (plugin *localVolumePlugin) newDeviceUnmounterInternal(mounter mount.Interface, exec utilexec.Interface, storageManager mount.StorageManager) (volume.DeviceUnmounter, error) {
 	return &deviceMounter{
 		plugin:  plugin,
-		mounter: mount.NewSafeFormatAndMount(mounter, exec),
+		mounter: mount.NewSafeFormatAndMountWithStorageManager(mounter, exec, storageManager),
 	}, nil
 }
 
