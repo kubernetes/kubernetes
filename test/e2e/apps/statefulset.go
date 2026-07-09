@@ -52,7 +52,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -1242,7 +1241,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
-	f.Describe("Deploy clustered applications", feature.StatefulSet, framework.WithSlow(), func() {
+	f.Describe("Deploy clustered applications", framework.WithSlow(), func() {
 		var appTester *clusterAppTester
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
