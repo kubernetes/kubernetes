@@ -1070,10 +1070,18 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 	// never ran and will re-execute improperly except for the restartable init containers.
 	podHasInitialized := false
 	for _, container := range pod.Spec.Containers {
-		status := podStatus.FindContainerStatusByName(container.Name)
+		var status *kubecontainer.Status
+		for _, s := range podStatus.ActiveContainerStatuses {
+			if s.Name == container.Name {
+				status = s
+				break
+			}
+		}
+
 		if status == nil {
 			continue
 		}
+
 		switch status.State {
 		case kubecontainer.ContainerStateCreated,
 			kubecontainer.ContainerStateRunning:
@@ -1089,6 +1097,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 		default:
 			// Ignore other states
 		}
+
 		if podHasInitialized {
 			break
 		}
