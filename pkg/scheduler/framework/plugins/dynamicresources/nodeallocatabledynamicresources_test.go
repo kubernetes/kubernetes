@@ -111,81 +111,257 @@ func (m *mockDRAManager) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlic
 func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 	claimName := "node-allocatable-claim"
 	claimNameSpace := "test-ns"
-	claim1Key := types.NamespacedName{Namespace: claimNameSpace, Name: claimName}
+
+	mappedMultiplier := resource.MustParse("1")
+	cpuDevice := resourceapi.Device{
+		Name: "cpu0",
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+			v1.ResourceCPU: {
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					DeviceMultiplier: &mappedMultiplier,
+				},
+			},
+		},
+	}
+
+	gpuOverheadDevice := resourceapi.Device{
+		Name: "gpu0",
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+			v1.ResourceMemory: {
+				Overhead: &resourceapi.NodeAllocatableOverhead{
+					PerContainer: resource.NewQuantity(100, resource.DecimalSI),
+				},
+			},
+		},
+	}
+
+	sliceMapped := &resourceapi.ResourceSlice{
+		Spec: resourceapi.ResourceSliceSpec{
+			Pool: resourceapi.ResourcePool{
+				Name: "pool-1",
+			},
+			Devices: []resourceapi.Device{cpuDevice},
+		},
+	}
+
+	sliceOverhead := &resourceapi.ResourceSlice{
+		Spec: resourceapi.ResourceSliceSpec{
+			Pool: resourceapi.ResourcePool{
+				Name: "pool-2",
+			},
+			Devices: []resourceapi.Device{gpuOverheadDevice},
+		},
+	}
+
+	claimMapped := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      claimName,
+			Namespace: claimNameSpace,
+			UID:       "claim-uid",
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Pool:   "pool-1",
+							Device: "cpu0",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	claimOverhead := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      claimName,
+			Namespace: claimNameSpace,
+			UID:       "claim-uid",
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Pool:   "pool-2",
+							Device: "gpu0",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	combinedMappingAndOverheadDevice := resourceapi.Device{
+		Name: "combined",
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+			v1.ResourceCPU: {
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					DeviceMultiplier: &mappedMultiplier,
+				},
+				Overhead: &resourceapi.NodeAllocatableOverhead{
+					PerContainer: resource.NewQuantity(100, resource.DecimalSI),
+				},
+			},
+		},
+	}
+
+	sliceCombinedOverheadAndMapped := &resourceapi.ResourceSlice{
+		Spec: resourceapi.ResourceSliceSpec{
+			Pool: resourceapi.ResourcePool{
+				Name: "pool-combined",
+			},
+			Devices: []resourceapi.Device{combinedMappingAndOverheadDevice},
+		},
+	}
+
+	claimCombinedOverheadAndMappedDevice := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      claimName,
+			Namespace: claimNameSpace,
+			UID:       "claim-uid",
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Pool:   "pool-combined",
+							Device: "combined",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	claimMappedReserved := claimMapped.DeepCopy()
+	claimMappedReserved.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{
+		{UID: "other-pod-uid"},
+	}
+
+	claimCombinedReserved := claimCombinedOverheadAndMappedDevice.DeepCopy()
+	claimCombinedReserved.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{
+		{UID: "other-pod-uid"},
+	}
 
 	tests := []struct {
-		name       string
-		pod        *v1.Pod
-		claim      *resourceapi.ResourceClaim
-		nodeInfo   *framework.NodeInfo
-		wantStatus *fwk.Status
+		name          string
+		pod           *v1.Pod
+		claim         *resourceapi.ResourceClaim
+		nodeInfo      *framework.NodeInfo
+		draManager    fwk.SharedDRAManager
+		podGroupState *podGroupStateData
+		features      feature.Features
+		wantStatus    *fwk.Status
 	}{
 		{
 			name:  "empty claim",
 			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").Obj(),
 			claim: nil,
-			nodeInfo: &framework.NodeInfo{
-				NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
+			nodeInfo: func() *framework.NodeInfo {
+				return framework.NewNodeInfo()
+			}(),
+			draManager: &mockDRAManager{},
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name: "claim not allocated yet",
+			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      claimName,
+					Namespace: claimNameSpace,
+				},
+			},
+			nodeInfo: func() *framework.NodeInfo {
+				return framework.NewNodeInfo()
+			}(),
+			draManager: &mockDRAManager{},
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:  "mapped claim, not shared (no other pods on node)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMapped,
+			nodeInfo: func() *framework.NodeInfo {
+				return framework.NewNodeInfo()
+			}(),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
 			},
 			wantStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name: "claim not in node info",
-			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
-			claim: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      claimName,
-					Namespace: claimNameSpace,
-					UID:       "claim-uid",
-				},
+			name:  "mapped claim, shared (other pod using it)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMappedReserved,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
 			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
+			name:  "overhead-only mapped claim, shared (other pod using it)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimOverhead,
 			nodeInfo: func() *framework.NodeInfo {
 				ni := framework.NewNodeInfo()
-				ni.NodeAllocatableDRAClaimStates = map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{}
+				otherPod := st.MakePod().Name("other-pod").Namespace(claimNameSpace).UID("other-pod-uid").Obj()
+				otherPod.Spec.ResourceClaims = []v1.PodResourceClaim{
+					{
+						Name:              "my-claim-ref",
+						ResourceClaimName: new(claimName),
+					},
+				}
+				otherPod.Status = v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: claimName,
+						},
+					},
+				}
+				ni.AddPod(otherPod)
 				return ni
 			}(),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceOverhead},
+			},
 			wantStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name: "claim shared, current pod not in consumers",
-			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
-			claim: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      claimName,
-					Namespace: claimNameSpace,
-					UID:       "claim-uid",
-				},
-			},
+			name:  "mapped claim, same name but different namespace (sharing allowed)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMapped,
 			nodeInfo: func() *framework.NodeInfo {
 				ni := framework.NewNodeInfo()
-				ni.NodeAllocatableDRAClaimStates = map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
-					claim1Key: {ConsumerPods: sets.New[types.UID]("other-pod-uid", "another-pod-uid")},
+				otherPod := st.MakePod().Name("other-pod").Namespace("other-namespace").UID("other-pod-uid").Obj()
+				otherPod.Spec.ResourceClaims = []v1.PodResourceClaim{
+					{
+						Name:              "my-claim-ref",
+						ResourceClaimName: new(claimName),
+					},
 				}
+				ni.AddPod(otherPod)
 				return ni
 			}(),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim shared by multiple pods"),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			wantStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name: "claim shared, current pod in consumers",
-			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
-			claim: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      claimName,
-					Namespace: claimNameSpace,
-					UID:       "claim-uid",
-				},
+			name:  "mapped claim, shared (other pod using it via template)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMappedReserved,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
 			},
-			nodeInfo: func() *framework.NodeInfo {
-				ni := framework.NewNodeInfo()
-				ni.NodeAllocatableDRAClaimStates = map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
-					claim1Key: {ConsumerPods: sets.New[types.UID]("pod-uid", "another-pod-uid")},
-				}
-				return ni
-			}(),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim shared by multiple pods"),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
 		},
 		{
-			name: "claim only used by other pod",
+			name: "mapped claim, already reserved for another pod - early exit",
 			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
 			claim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -193,22 +369,176 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 					Namespace: claimNameSpace,
 					UID:       "claim-uid",
 				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{{Pool: "pool-1", Device: "cpu0"}},
+						},
+					},
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+						{UID: "other-pod-uid"},
+					},
+				},
 			},
 			nodeInfo: func() *framework.NodeInfo {
-				ni := framework.NewNodeInfo()
-				ni.NodeAllocatableDRAClaimStates = map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
-					claim1Key: {ConsumerPods: sets.New[types.UID]("other-pod-uid")},
-				}
-				return ni
+				return framework.NewNodeInfo() // no pods on node, early exit triggers purely on reservation
 			}(),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim is already used by another pod"),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
+			name: "mapped claim, reserved for same pod group, workload claims enabled - allowed since no pods on node",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").
+				PodGroupName("my-pod-group").Obj(),
+			claim: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      claimName,
+					Namespace: claimNameSpace,
+					UID:       "claim-uid",
+				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{{Pool: "pool-1", Device: "cpu0"}},
+						},
+					},
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+						{
+							APIGroup: "scheduling.k8s.io",
+							Resource: "podgroups",
+							Name:     "my-pod-group",
+						},
+					},
+				},
+			},
+			nodeInfo: func() *framework.NodeInfo {
+				return framework.NewNodeInfo()
+			}(),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			features:   feature.Features{EnableDRAWorkloadResourceClaims: true},
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name: "mapped claim, reserved for different pod group, workload claims enabled - exit early",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").
+				PodGroupName("my-pod-group").Obj(),
+			claim: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      claimName,
+					Namespace: claimNameSpace,
+					UID:       "claim-uid",
+				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{{Pool: "pool-1", Device: "cpu0"}},
+						},
+					},
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+						{
+							APIGroup: "scheduling.k8s.io",
+							Resource: "podgroups",
+							Name:     "other-pod-group", // reserved for a different group
+						},
+					},
+				},
+			},
+			nodeInfo: func() *framework.NodeInfo {
+				return framework.NewNodeInfo() // no pods on node, early exit triggers purely on reservation mismatch
+			}(),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			features:   feature.Features{EnableDRAWorkloadResourceClaims: true},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
+			name:  "mapping and overhead in same device, shared (other pod using it)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimCombinedReserved,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceCombinedOverheadAndMapped},
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
+			name:  "mapped claim, pending allocation by another pod in same group",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMapped,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			podGroupState: &podGroupStateData{
+				pendingAllocations: map[types.UID]sets.Set[types.UID]{
+					"claim-uid": sets.New[types.UID]("other-pod-uid"),
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
+			name:  "mapped claim, pending allocation by same pod in same group",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMapped,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			podGroupState: &podGroupStateData{
+				pendingAllocations: map[types.UID]sets.Set[types.UID]{
+					"claim-uid": sets.New[types.UID]("pod-uid"),
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:  "overhead-only claim, pending allocation by another pod in same group",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimOverhead,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceOverhead},
+			},
+			podGroupState: &podGroupStateData{
+				pendingAllocations: map[types.UID]sets.Set[types.UID]{
+					"claim-uid": sets.New[types.UID]("other-pod-uid"),
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.Success),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pl := &DynamicResources{}
-			gotStatus := pl.validateNodeAllocatableDRAClaimSharing(tt.pod, tt.nodeInfo, tt.claim)
+			pl := &DynamicResources{
+				draManager: tt.draManager,
+				fts:        tt.features,
+			}
+			state := &stateData{
+				claimHasNodeAllocatableMappedDevice: make(map[types.UID]bool),
+			}
+			if tt.claim != nil {
+				if tt.claim.Status.Allocation != nil {
+					isMapped := false
+					for _, result := range tt.claim.Status.Allocation.Devices.Results {
+						device, err := getDeviceFromManager(tt.draManager, &result)
+						if err == nil && device != nil && device.NodeAllocatableResources != nil {
+							for _, mapping := range device.NodeAllocatableResources {
+								if mapping.Mapping != nil {
+									isMapped = true
+									break
+								}
+							}
+						}
+						if isMapped {
+							break
+						}
+					}
+					state.claimHasNodeAllocatableMappedDevice[tt.claim.UID] = isMapped
+				}
+			}
+			gotStatus := pl.validateNodeAllocatableDRAClaimSharing(tt.pod, tt.claim, state, tt.podGroupState)
 			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
 				t.Errorf("validateDRAClaimShareState() returned diff (-want +got):\n%s", diff)
 			}

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -349,20 +350,32 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 }
 
 // validateNodeAllocatableDRAClaimSharing ensures that a node-allocatable DRA claim is not already in use by another pod on this node.
-func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, nodeInfo fwk.NodeInfo, claim *resourceapi.ResourceClaim) *fwk.Status {
+func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, claim *resourceapi.ResourceClaim, state *stateData, podGroupState *podGroupStateData) *fwk.Status {
 	if claim == nil {
 		return nil
 	}
-	claimKey := types.NamespacedName{Namespace: pod.Namespace, Name: claim.Name}
-	claimStates := nodeInfo.GetNodeAllocatableDRAClaimState()
-	if state, ok := claimStates[claimKey]; ok && state != nil {
-		if state.ConsumerPods.Len() > 1 {
-			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node allocatable resource claim %s shared by multiple pods", claimKey.Name))
-		}
-		if state.ConsumerPods.Len() == 1 && !state.ConsumerPods.Has(pod.UID) {
-			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node allocatable resource claim %s is already used by another pod", claimKey.Name))
+
+	if !state.claimHasNodeAllocatableMappedDevice[claim.UID] {
+		// Overhead-only claims are allowed to be shared.
+		return nil
+	}
+
+	// If the claim is already reserved for another pod or pod group, fail immediately.
+	if len(claim.Status.ReservedFor) > 0 && !resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node allocatable resource claim %s has a mapped device and cannot be shared across pods", claim.Name))
+	}
+
+	// Check if another pod in the same PodGroup has reserved/allocated this claim in the current cycle.
+	if podGroupState != nil {
+		if pendingAllocPodUIDs, ok := podGroupState.pendingAllocations[claim.UID]; ok {
+			for uid := range pendingAllocPodUIDs {
+				if uid != pod.UID {
+					return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node allocatable resource claim %s has a mapped device and cannot be shared across pods", claim.Name))
+				}
+			}
 		}
 	}
+
 	return nil
 }
 
