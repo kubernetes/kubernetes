@@ -38,6 +38,7 @@ type SuiteConfig struct {
 	OutputInterceptorMode string
 	SourceRoots           []string
 	GracePeriod           time.Duration
+	SleepOnFailure        time.Duration
 
 	ParallelProcess int
 	ParallelTotal   int
@@ -94,6 +95,7 @@ type ReporterConfig struct {
 	GithubOutput   bool
 	SilenceSkips   bool
 	ForceNewlines  bool
+	FdOutput       bool
 
 	JSONReport     string
 	GoJSONReport   string
@@ -293,6 +295,8 @@ var SuiteConfigFlags = GinkgoFlags{
 		Usage: "Make up to this many attempts to run each spec. If any of the attempts succeed, the suite will not be failed."},
 	{KeyPath: "S.FailOnEmpty", Name: "fail-on-empty", SectionKey: "failure",
 		Usage: "If set, ginkgo will mark the test suite as failed if no specs are run."},
+	{KeyPath: "S.SleepOnFailure", Name: "sleep-on-failure", SectionKey: "failure", UsageDefaultValue: "0 - disabled",
+		Usage: "If set, ginkgo will pause for this duration after a spec fails - before its teardown (AfterEach/JustAfterEach/DeferCleanup) runs - so you can inspect the live system. Press ^C to end the pause early and proceed to cleanup. Serial only: cannot be combined with -p/--procs."},
 
 	{KeyPath: "S.DryRun", Name: "dry-run", SectionKey: "debug", DeprecatedName: "dryRun", DeprecatedDocLink: "changed-command-line-flags",
 		Usage: "If set, ginkgo will walk the test hierarchy without actually running anything.  Best paired with -v."},
@@ -358,7 +362,8 @@ var ReporterConfigFlags = GinkgoFlags{
 		Usage: "If set, default reporter will not print out skipped tests."},
 	{KeyPath: "R.ForceNewlines", Name: "force-newlines", SectionKey: "output",
 		Usage: "If set, default reporter will ensure a newline appears after each test."},
-
+	{KeyPath: "R.FdOutput", Name: "fd", SectionKey: "output",
+		Usage: "If set, emits RSpec-style 'format documentation' output instead of Ginkgo's default output.  --fd is exclusive: it overrides -p/-procs and -randomize-all, forcing specs to run serially in declaration order, since fd's hierarchical output can't be rendered sensibly when specs are parallelized or randomized."},
 	{KeyPath: "R.JSONReport", Name: "json-report", UsageArgument: "filename.json", SectionKey: "output",
 		Usage: "If set, Ginkgo will generate a JSON-formatted test report at the specified location."},
 	{KeyPath: "R.GoJSONReport", Name: "gojson-report", UsageArgument: "filename.json", SectionKey: "output",
@@ -429,6 +434,14 @@ func VetConfig(flagSet GinkgoFlagSet, suiteConfig SuiteConfig, reporterConfig Re
 		errors = append(errors, GinkgoErrors.GracePeriodCannotBeZero())
 	}
 
+	if suiteConfig.SleepOnFailure < 0 {
+		errors = append(errors, GinkgoErrors.InvalidSleepOnFailureConfiguration())
+	}
+
+	if suiteConfig.SleepOnFailure > 0 && suiteConfig.ParallelTotal > 1 {
+		errors = append(errors, GinkgoErrors.SleepOnFailureInParallelConfiguration())
+	}
+
 	if len(suiteConfig.FocusFiles) > 0 {
 		_, err := ParseFileFilters(suiteConfig.FocusFiles)
 		if err != nil {
@@ -474,6 +487,30 @@ func VetConfig(flagSet GinkgoFlagSet, suiteConfig SuiteConfig, reporterConfig Re
 	}
 
 	return errors
+}
+
+// ReconcileFdOutputConfiguration forces serial, in-order execution when --fd is combined with
+// -p, -procs (>1), or -randomize-all.  fd's RSpec-style hierarchical output assumes specs run
+// one at a time, in declaration order -- parallelism and randomization both break that assumption
+// and produce fragmented, hard-to-read output.  Rather than refusing to run, Ginkgo ignores those
+// flags and runs in series instead.  suiteConfig and cliConfig are mutated in place; the return
+// value is true if anything was overridden, so callers can let the user know what was ignored.
+func ReconcileFdOutputConfiguration(reporterConfig ReporterConfig, suiteConfig *SuiteConfig, cliConfig *CLIConfig) bool {
+	if !reporterConfig.FdOutput {
+		return false
+	}
+
+	changed := false
+	if cliConfig.ComputedProcs() > 1 {
+		cliConfig.Procs = 1
+		cliConfig.Parallel = false
+		changed = true
+	}
+	if suiteConfig.RandomizeAllSpecs {
+		suiteConfig.RandomizeAllSpecs = false
+		changed = true
+	}
+	return changed
 }
 
 // GinkgoCLISharedFlags provides flags shared by the Ginkgo CLI's build, watch, and run commands

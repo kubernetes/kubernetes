@@ -1,3 +1,34 @@
+## 2.32.0
+
+`-fd` generate RSpec-style documentation output.  Thank @woodie !
+--sleep-on-failure pauses a failed spec before teardown. Thanks @qinqon !
+
+## 2.31.0
+
+Add a bunch of Claude Skills via the marketplace:
+
+```
+/plugin marketplace add onsi/ginkgo
+/plugin install ginkgo@ginkgo
+```
+
+## 2.30.0
+
+### Features
+Ginkgo now allows `extentions/global.Reset` to support running multiple suites from within a single process.  This may take some massaging on your part (see [1672](https://github.com/onsi/ginkgo/issues/1672)) but can dramatically speed up codebases with O(hundreds) of test suites.
+
+Thanks @lawrencejones !
+
+### Fixes
+
+- Fix nested --github-output group for progress report nested inside timeline [4f62d7a]
+
+## 2.29.0
+
+`GinkgoHelperGo` makes it easier to write test helpers that need to run in goroutines.  Specifically, it makes managing the failure state and capturing failure panics correctly straightforward.
+
+`ginkgo outline` now includes entries defined in `DescribeTableSubtree`
+
 ## 2.28.3
 
 ### Maintenance

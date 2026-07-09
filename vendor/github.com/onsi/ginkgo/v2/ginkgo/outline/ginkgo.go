@@ -163,17 +163,17 @@ func ginkgoNodeFromCallExpr(fset *token.FileSet, ce *ast.CallExpr, ginkgoPackage
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
 		n.Labels = labelFromCallExpr(ce)
 		return &n, ginkgoPackageName != nil && *ginkgoPackageName == packageName
-	case "Context", "Describe", "When", "DescribeTable":
+	case "Context", "Describe", "When", "DescribeTable", "DescribeTableSubtree":
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
 		n.Labels = labelFromCallExpr(ce)
 		n.Pending = pendingFromCallExpr(ce)
 		return &n, ginkgoPackageName != nil && *ginkgoPackageName == packageName
-	case "FContext", "FDescribe", "FWhen", "FDescribeTable":
+	case "FContext", "FDescribe", "FWhen", "FDescribeTable", "FDescribeTableSubtree":
 		n.Focused = true
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
 		n.Labels = labelFromCallExpr(ce)
 		return &n, ginkgoPackageName != nil && *ginkgoPackageName == packageName
-	case "PContext", "PDescribe", "PWhen", "XContext", "XDescribe", "XWhen", "PDescribeTable", "XDescribeTable":
+	case "PContext", "PDescribe", "PWhen", "XContext", "XDescribe", "XWhen", "PDescribeTable", "XDescribeTable", "PDescribeTableSubtree", "XDescribeTableSubtree":
 		n.Pending = true
 		n.Text = textOrAltFromCallExpr(ce, undefinedTextAlt)
 		n.Labels = labelFromCallExpr(ce)
