@@ -1553,26 +1553,39 @@ func (g *genValidations) emitCallsToValidators(c *generator.Context, validations
 			if !v.Conditions.Empty() {
 				emitBaseFunction := emitCall
 				emitCall = func() {
+					// emitOptionLookup emits "<var>, err := op.HasOption(<option>)" and
+					// surfaces an undeclared option as an internal error.
+					emitOptionLookup := func(varName, option string) {
+						sw.Do("  "+varName+", err := op.HasOption($.$)\n", strconv.Quote(option))
+						sw.Do("  if err != nil {\n", nil)
+						sw.Do("    return $.field.ErrorList|raw${$.field.InternalError|raw$(fldPath, err)}\n", targs)
+						sw.Do("  }\n", nil)
+					}
 					sw.Do("func() $.field.ErrorList|raw$ {\n", targs)
+					if len(v.Conditions.OptionEnabled) > 0 {
+						emitOptionLookup("optionEnabled", v.Conditions.OptionEnabled)
+					}
+					if len(v.Conditions.OptionDisabled) > 0 {
+						emitOptionLookup("optionDisabled", v.Conditions.OptionDisabled)
+					}
 					sw.Do("  if ", nil)
 					firstCondition := true
 					if len(v.Conditions.OptionEnabled) > 0 {
-						sw.Do("op.HasOption($.$)", strconv.Quote(v.Conditions.OptionEnabled))
+						sw.Do("optionEnabled", nil)
 						firstCondition = false
 					}
 					if len(v.Conditions.OptionDisabled) > 0 {
 						if !firstCondition {
 							sw.Do(" && ", nil)
 						}
-						sw.Do("!op.HasOption($.$)", strconv.Quote(v.Conditions.OptionDisabled))
+						sw.Do("!optionDisabled", nil)
 					}
 					sw.Do(" {\n", nil)
 					sw.Do("    return ", nil)
 					emitBaseFunction()
 					sw.Do("\n", nil)
-					sw.Do("  } else {\n", nil)
-					sw.Do("    return nil // skip validation\n", nil)
 					sw.Do("  }\n", nil)
+					sw.Do("  return nil // skip validation\n", nil)
 					sw.Do("}()", nil)
 				}
 			}
