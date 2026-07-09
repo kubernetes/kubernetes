@@ -165,27 +165,40 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		ginkgo.By("retrieving the second page until the token expires")
 		opts.Continue = firstToken
 		var inconsistentToken string
-		wait.Poll(20*time.Second, 2*storagebackend.DefaultCompactInterval, func() (bool, error) {
-			_, err := client.List(ctx, opts)
-			if err == nil {
-				framework.Logf("Token %s has not expired yet", firstToken)
-				return false, nil
-			}
-			if err != nil && !apierrors.IsResourceExpired(err) {
-				return false, err
-			}
-			framework.Logf("got error %s", err)
-			status, ok := err.(apierrors.APIStatus)
-			if !ok {
-				return false, fmt.Errorf("expect error to implement the APIStatus interface, got %v", reflect.TypeOf(err))
-			}
-			inconsistentToken = status.Status().ListMeta.Continue
-			if len(inconsistentToken) == 0 {
-				return false, fmt.Errorf("expect non empty continue token")
-			}
-			framework.Logf("Retrieved inconsistent continue %s", inconsistentToken)
-			return true, nil
-		})
+		err = wait.Poll(20*time.Second, 2*storagebackend.DefaultCompactInterval, func() (bool, error) {
+    _, err := client.List(ctx, opts)
+
+    if err == nil {
+        framework.Logf("Token %s has not expired yet", firstToken)
+        return false, nil
+    }
+
+    if !apierrors.IsResourceExpired(err) {
+        return false, err
+    }
+
+    framework.Logf("got error %s", err)
+
+    status, ok := err.(apierrors.APIStatus)
+    if !ok {
+        return false, fmt.Errorf("expect error to implement APIStatus, got %v", reflect.TypeOf(err))
+    }
+
+    inconsistentToken = status.Status().ListMeta.Continue
+    if inconsistentToken == "" {
+        return false, fmt.Errorf("expect non empty continue token")
+    }
+
+    framework.Logf("Retrieved inconsistent continue %s", inconsistentToken)
+    return true, nil
+})
+		if err == wait.ErrWaitTimeout {
+    framework.Failf(
+        "continue token never expired; compaction appears to be disabled",
+    )
+}
+
+framework.ExpectNoError(err)
 
 		ginkgo.By("retrieving the second page again with the token received with the error message")
 		opts.Continue = inconsistentToken
