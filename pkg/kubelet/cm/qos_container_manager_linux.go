@@ -309,6 +309,7 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 
 	if m.memoryReservationPolicy != kubeletconfig.TieredReservationMemoryReservationPolicy {
 		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, 0)
+		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryLow, 0)
 		setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, 0)
 		kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(0)
 		kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(0)
@@ -323,11 +324,11 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 	kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(float64(guaranteedRequests))
 	kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(float64(burstableRequests))
 
-	// Guaranteed QoS class: memory.min = sum of guaranteed + burstable requests
-	// (parent must cover children's protection for it to be effective)
+	// Root (kubepods.slice): ancestor coverage for both protection chains.
+	// v1.PodQOSGuaranteed is the map key for the root cgroup, not per-pod config.
 	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, guaranteedRequests+burstableRequests)
+	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryLow, burstableRequests)
 
-	// Burstable QoS class: memory.low = sum of burstable pod requests
 	setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, burstableRequests)
 }
 
