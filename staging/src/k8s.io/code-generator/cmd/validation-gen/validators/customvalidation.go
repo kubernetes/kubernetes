@@ -52,8 +52,8 @@ func init() {
 // (in the generated package, found by naming convention) into the generated
 // traversal, so it inherits traversal, ratcheting and short-circuiting.
 type customValidationTagValidator struct {
-	gengoContext *generator.Context
-	inputToPkg   map[string]string
+	gengoContext        *generator.Context
+	inputToCanonicalPkg map[string]string
 	// claimed records every function a tag wired (directly or via a composing
 	// tag such as ifEnabled), so verifyCustomFunctions can spot ValidateCustom_*
 	// functions defined without a tag.
@@ -62,7 +62,7 @@ type customValidationTagValidator struct {
 
 func (v *customValidationTagValidator) Init(cfg Config) {
 	v.gengoContext = cfg.GengoContext
-	v.inputToPkg = cfg.InputToPkg
+	v.inputToCanonicalPkg = cfg.InputToCanonicalPkg
 	v.claimed = map[types.Name]bool{}
 }
 
@@ -83,7 +83,7 @@ func (v *customValidationTagValidator) GetValidations(context Context, _ codetag
 	if context.Scope == ScopeField {
 		definingType = context.ParentType
 	}
-	outPkg, ok := v.inputToPkg[definingType.Name.Package]
+	outPkg, ok := v.inputToCanonicalPkg[definingType.Name.Package]
 	if !ok {
 		return Validations{}, fmt.Errorf("cannot resolve generated package for %s (is it being processed by validation-gen?)", definingType.Name.Package)
 	}
@@ -130,7 +130,7 @@ func (v *customValidationTagValidator) verifyCustomFunctions() error {
 	}
 	var issues []string
 	scanned := map[string]bool{}
-	for inPkg, outPkg := range v.inputToPkg {
+	for inPkg, outPkg := range v.inputToCanonicalPkg {
 		// A ValidateCustom_* function in the input package is misplaced; it must
 		// live in the generated package. (inPkg == outPkg for self-contained
 		// packages, e.g. test fixtures.)

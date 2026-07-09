@@ -67,7 +67,7 @@ func (reg *registry) addTagValidator(tv TagValidator) {
 	globalRegistry.tagValidators[name] = tv
 }
 
-func (reg *registry) init(c *generator.Context, inputToPkg map[string]string) {
+func (reg *registry) init(c *generator.Context, inputToCanonicalPkg map[string]string) {
 	if reg.initialized.Load() {
 		panic("registry.init() was called twice")
 	}
@@ -76,9 +76,9 @@ func (reg *registry) init(c *generator.Context, inputToPkg map[string]string) {
 	defer reg.lock.Unlock()
 
 	cfg := Config{
-		GengoContext: c,
-		TagValidator: reg,
-		InputToPkg:   inputToPkg,
+		GengoContext:        c,
+		TagValidator:        reg,
+		InputToCanonicalPkg: inputToCanonicalPkg,
 	}
 
 	for _, tv := range globalRegistry.tagValidators {
@@ -263,7 +263,7 @@ func IsKnownTag(tag string) bool {
 // InitGlobalValidator must be called exactly once by the main application to
 // initialize and safely access the global tag registry.  Once this is called,
 // no more validators may be registered.
-func InitGlobalValidator(c *generator.Context, inputToPkg map[string]string) ValidationExtractor {
-	globalRegistry.init(c, inputToPkg)
+func InitGlobalValidator(c *generator.Context, inputToCanonicalPkg map[string]string) ValidationExtractor {
+	globalRegistry.init(c, inputToCanonicalPkg)
 	return globalRegistry
 }
