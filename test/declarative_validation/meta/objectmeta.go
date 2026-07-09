@@ -127,7 +127,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("ownerReferences").Child("apiVersion"), "", "version must not be empty").MarkFromImperative(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "must not be empty").MarkAlpha(),
 			},
 		},
 		{
@@ -138,7 +138,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("ownerReferences").Child("kind"), "", "must not be empty").MarkFromImperative(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("kind"), "must not be empty").MarkAlpha(),
 			},
 		},
 		{
@@ -149,7 +149,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("ownerReferences").Child("name"), "", "must not be empty").MarkFromImperative(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("name"), "must not be empty").MarkAlpha(),
 			},
 		},
 		{
@@ -160,7 +160,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("ownerReferences").Child("uid"), "", "must not be empty").MarkFromImperative(),
+				field.Required(fldPath.Child("ownerReferences").Index(0).Child("uid"), "must not be empty").MarkAlpha(),
 			},
 		},
 		{
@@ -171,7 +171,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("ownerReferences"), "", "v1, Kind=Event is disallowed from being an owner").MarkFromImperative(),
+				field.Invalid(fldPath.Child("ownerReferences").Index(0), "", "v1, Kind=Event is disallowed from being an owner").MarkFromImperative(),
 			},
 		},
 		{
