@@ -57,7 +57,7 @@ import (
 // node.
 type CSIStorageCapacityApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// The name has no particular meaning. It must be a DNS subdomain (dots allowed, 253 characters).
 	// To ensure that there are no conflicts with other CSI drivers on the cluster,
 	// the recommendation is to use csisc-<uuid>, a generated name, or a reverse-domain name
