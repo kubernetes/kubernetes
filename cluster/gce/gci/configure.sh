@@ -841,7 +841,10 @@ function log-init {
   # Used by log-* functions.
   LOG_CLUSTER_ID=$(get-metadata-value 'instance/attributes/cluster-uid' 'get-metadata-value-error')
   LOG_INSTANCE_NAME=$(hostname)
-  LOG_BOOT_ID=$(journalctl --list-boots | grep -E '^ *0' | awk '{print $2}')
+  LOG_BOOT_ID=$(tr -d '-' < /proc/sys/kernel/random/boot_id 2>/dev/null) || LOG_BOOT_ID="unknown"
+  if [[ -z "${LOG_BOOT_ID}" ]]; then
+    LOG_BOOT_ID="unknown"
+  fi
   declare -Ag LOG_START_TIMES
   declare -ag LOG_TRAP_STACK
 
