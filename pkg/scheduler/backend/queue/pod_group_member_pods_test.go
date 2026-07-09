@@ -28,7 +28,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestIncompletePodGroupPods_Add(t *testing.T) {
+func TestPodGroupMemberPods_Add(t *testing.T) {
 	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj()
 	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("uid2").PodGroupName("pg1").Obj()
 	pod3 := st.MakePod().Name("pod3").Namespace("ns1").UID("uid3").PodGroupName("pg2").Obj()
@@ -68,21 +68,29 @@ func TestIncompletePodGroupPods_Add(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ie := newIncompletePodGroupPods()
+			ppm := newPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo)
+				ppm.add(pInfo)
 			}
 
-			if diff := cmp.Diff(tt.want, ie.podGroupToPodInfos, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
+			if diff := cmp.Diff(tt.want, ppm.podGroupToPodInfos, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected podGroupToPodInfos (-want,+got)\n%s", diff)
+			}
+
+			for _, pInfo := range tt.podsToAdd {
+				gotPod := ppm.get(pInfo.Pod)
+				if diff := cmp.Diff(pInfo, gotPod, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
+					t.Errorf("Unexpected pod info for %s (-want,+got)\n%s", pInfo.Pod.Name, diff)
+				}
 			}
 		})
 	}
 }
 
-func TestIncompletePodGroupPods_Get(t *testing.T) {
+func TestPodGroupMemberPods_Get(t *testing.T) {
 	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj()
 	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("uid2").PodGroupName("pg1").Obj()
+	pod3 := st.MakePod().Name("pod3").Namespace("ns1").UID("uid3").PodGroupName("pg3").Obj()
 
 	pInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod1)}
 	pInfo2 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod2)}
@@ -108,19 +116,19 @@ func TestIncompletePodGroupPods_Get(t *testing.T) {
 		{
 			name:      "get non-existent pod in non-existing pod group",
 			podsToAdd: []*framework.QueuedPodInfo{},
-			targetPod: pod2,
+			targetPod: pod3,
 			want:      nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ie := newIncompletePodGroupPods()
+			ppm := newPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo)
+				ppm.add(pInfo)
 			}
 
-			got := ie.get(tt.targetPod)
+			got := ppm.get(tt.targetPod)
 			if diff := cmp.Diff(tt.want, got, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected pod info (-want,+got)\n%s", diff)
 			}
@@ -128,7 +136,7 @@ func TestIncompletePodGroupPods_Get(t *testing.T) {
 	}
 }
 
-func TestIncompletePodGroupPods_Has(t *testing.T) {
+func TestPodGroupMemberPods_Has(t *testing.T) {
 	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj()
 	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("uid2").PodGroupName("pg1").Obj()
 
@@ -163,12 +171,12 @@ func TestIncompletePodGroupPods_Has(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ie := newIncompletePodGroupPods()
+			ppm := newPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo)
+				ppm.add(pInfo)
 			}
 
-			got := ie.has(tt.targetPod)
+			got := ppm.has(tt.targetPod)
 			if got != tt.want {
 				t.Errorf("Expected has() to return %v, got %v", tt.want, got)
 			}
@@ -176,7 +184,7 @@ func TestIncompletePodGroupPods_Has(t *testing.T) {
 	}
 }
 
-func TestIncompletePodGroupPods_Update(t *testing.T) {
+func TestPodGroupMemberPods_Update(t *testing.T) {
 	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj()
 	updatedPod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").Label("updated", "true").PodGroupName("pg1").Obj()
 	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("uid2").PodGroupName("pg1").Obj()
@@ -206,12 +214,12 @@ func TestIncompletePodGroupPods_Update(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ie := newIncompletePodGroupPods()
+			ppm := newPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo.DeepCopy())
+				ppm.add(pInfo.DeepCopy())
 			}
 
-			got := ie.update(tt.updatePod)
+			got := ppm.update(tt.updatePod)
 			if diff := cmp.Diff(tt.wantUpdated, got, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected updated pod info (-want,+got)\n%s", diff)
 			}
@@ -219,7 +227,7 @@ func TestIncompletePodGroupPods_Update(t *testing.T) {
 	}
 }
 
-func TestIncompletePodGroupPods_Delete(t *testing.T) {
+func TestPodGroupMemberPods_Delete(t *testing.T) {
 	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj()
 	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("uid2").PodGroupName("pg1").Obj()
 	pod3 := st.MakePod().Name("pod3").Namespace("ns1").UID("uid3").PodGroupName("pg1").Obj()
@@ -270,17 +278,17 @@ func TestIncompletePodGroupPods_Delete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ie := newIncompletePodGroupPods()
+			ppm := newPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo.DeepCopy())
+				ppm.add(pInfo.DeepCopy())
 			}
 
-			gotDeleted := ie.delete(tt.podToDelete)
+			gotDeleted := ppm.delete(tt.podToDelete)
 			if diff := cmp.Diff(tt.wantDeleted, gotDeleted, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected deleted pod info (-want,+got)\n%s", diff)
 			}
 
-			gotRemaining := ie.podGroupToPodInfos[podGroupKeyForPod(tt.podToDelete)]
+			gotRemaining := ppm.podGroupToPodInfos[podGroupKeyForPod(tt.podToDelete)]
 			if diff := cmp.Diff(tt.want, gotRemaining, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected remaining pod infos (-want,+got)\n%s", diff)
 			}
@@ -288,7 +296,7 @@ func TestIncompletePodGroupPods_Delete(t *testing.T) {
 	}
 }
 
-func TestIncompletePodGroupPods_Clear(t *testing.T) {
+func TestPodGroupMemberPods_Clear(t *testing.T) {
 	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj()
 	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("uid2").PodGroupName("pg1").Obj()
 	pod3 := st.MakePod().Name("pod3").Namespace("ns1").UID("uid3").PodGroupName("pg2").Obj()
@@ -333,19 +341,56 @@ func TestIncompletePodGroupPods_Clear(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ie := newIncompletePodGroupPods()
+			ppm := newPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo)
+				ppm.add(pInfo)
 			}
 
-			gotCleared := ie.clear(tt.clearGroup)
+			gotCleared := ppm.clear(tt.clearGroup.Namespace, tt.clearGroup.Name)
 			gotClearedSet := sets.New(gotCleared...)
 			if diff := cmp.Diff(tt.wantCleared, gotClearedSet, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected cleared pod infos (-want,+got)\n%s", diff)
 			}
 
-			if diff := cmp.Diff(tt.want, ie.podGroupToPodInfos, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
+			if diff := cmp.Diff(tt.want, ppm.podGroupToPodInfos, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected remaining podGroupToPodInfos (-want,+got)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPodGroupMemberPods_Len(t *testing.T) {
+	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj()
+	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("uid2").PodGroupName("pg1").Obj()
+	pInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod1)}
+	pInfo2 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod2)}
+
+	tests := []struct {
+		name      string
+		podsToAdd []*framework.QueuedPodInfo
+		wantLen   int
+	}{
+		{
+			name:      "empty map",
+			podsToAdd: nil,
+			wantLen:   0,
+		},
+		{
+			name:      "multiple pods",
+			podsToAdd: []*framework.QueuedPodInfo{pInfo1, pInfo2},
+			wantLen:   2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ppm := newPodGroupMemberPods()
+			for _, pInfo := range tt.podsToAdd {
+				ppm.add(pInfo)
+			}
+
+			if got := ppm.len(); got != tt.wantLen {
+				t.Errorf("Expected length %v, got %v", tt.wantLen, got)
 			}
 		})
 	}
