@@ -215,10 +215,10 @@ type PriorityQueue struct {
 	unschedulableEntities *unschedulableEntities
 	// pendingPodGroupPods stores all pending pods that wait for their corresponding pod group to be requeued.
 	// It should be only used when GenericWorkload feature is enabled.
-	pendingPodGroupPods *pendingPodGroupMemberPods
+	pendingPodGroupPods *podGroupMemberPods
 	// incompletePodGroupPods stores pod infos that wait for their corresponding PodGroup object to be observed.
 	// It should be only used when GenericWorkload feature is enabled.
-	incompletePodGroupPods *incompletePodGroupPods
+	incompletePodGroupPods *podGroupMemberPods
 
 	// workloadForest maintains a consistent view of observed PodGroup objects.
 	// It ensures that scheduling queue invariants are preserved, independent of
@@ -433,8 +433,8 @@ func NewPriorityQueue(
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
 		backoffQ:                          backoffQ,
 		unschedulableEntities:             newUnschedulableEntities(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
-		pendingPodGroupPods:               newPendingPodGroupMemberPods(),
-		incompletePodGroupPods:            newIncompletePodGroupPods(),
+		pendingPodGroupPods:               newPodGroupMemberPods(),
+		incompletePodGroupPods:            newPodGroupMemberPods(),
 		workloadForest:                    newWorkloadForest(),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
@@ -1126,7 +1126,7 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 
 	p.activeQ.clearPoppedEntity()
 	// Get the pending pods and put them into the pod group.
-	pendingPods := p.pendingPodGroupPods.clear()
+	pendingPods := p.pendingPodGroupPods.clear(pgInfo.Namespace, pgInfo.Name)
 	if len(pendingPods) == 0 {
 		// No pending pods, nothing to requeue.
 		return nil
@@ -1489,7 +1489,7 @@ func (p *PriorityQueue) AddPodGroup(logger klog.Logger, podGroup *schedulingv1al
 
 	p.workloadForest.addPodGroup(podGroup)
 
-	pInfos := p.incompletePodGroupPods.clear(podGroup)
+	pInfos := p.incompletePodGroupPods.clear(podGroup.Namespace, podGroup.Name)
 	if len(pInfos) == 0 {
 		return
 	}
@@ -1555,7 +1555,7 @@ func (p *PriorityQueue) DeletePodGroup(logger klog.Logger, podGroup *schedulingv
 		return
 	}
 	// Get the pending pods and move them to incompletePodGroupPods.
-	pendingPods := p.pendingPodGroupPods.clear()
+	pendingPods := p.pendingPodGroupPods.clear(podGroup.Namespace, podGroup.Name)
 	if len(pendingPods) == 0 {
 		// No pending pods, nothing to move.
 		return
@@ -1701,11 +1701,7 @@ func (p *PriorityQueue) UnschedulablePods() []*v1.Pod {
 func (p *PriorityQueue) PendingPodGroupPods() []*v1.Pod {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	var result []*v1.Pod
-	for _, pInfo := range p.pendingPodGroupPods.keyToPod {
-		result = append(result, pInfo.Pod)
-	}
-	return result
+	return p.pendingPodGroupPods.list()
 }
 
 // IncompletePodGroupPodsPods returns all the pending pods in incompletePodGroupPods.
@@ -1713,13 +1709,7 @@ func (p *PriorityQueue) PendingPodGroupPods() []*v1.Pod {
 func (p *PriorityQueue) IncompletePodGroupPodsPods() []*v1.Pod {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	var result []*v1.Pod
-	for _, pInfos := range p.incompletePodGroupPods.podGroupToPodInfos {
-		for _, pInfo := range pInfos {
-			result = append(result, pInfo.Pod)
-		}
-	}
-	return result
+	return p.incompletePodGroupPods.list()
 }
 
 // GetPod searches for a pod in the activeQ, backoffQ, and unschedulableEntities.
@@ -1822,14 +1812,10 @@ func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 	if !p.isGenericWorkloadEnabled {
 		return result, fmt.Sprintf(pendingPodsSummary, activeQLen, backoffQLen, unschedulablePodsLen)
 	}
-	incompletePodGroupPodsPodsLen := 0
-	for _, pInfos := range p.incompletePodGroupPods.podGroupToPodInfos {
-		for _, pInfo := range pInfos {
-			result = append(result, pInfo.Pod)
-			incompletePodGroupPodsPodsLen++
-		}
-	}
+	incompletePodGroupPodsPodsLen := p.incompletePodGroupPods.len()
+	result = append(result, p.incompletePodGroupPods.list()...)
 	pendingPodGroupPodsLen := p.pendingPodGroupPods.len()
+	result = append(result, p.pendingPodGroupPods.list()...)
 	return result, fmt.Sprintf(pendingPodsExtendedSummary, activeQLen, backoffQLen, unschedulablePodsLen, pendingPodGroupPodsLen, incompletePodGroupPodsPodsLen)
 }
 
@@ -1970,8 +1956,12 @@ func podGroupKeyForPod(pod *v1.Pod) string {
 	return fmt.Sprintf("pg/%s/%s", pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 }
 
+func podGroupKeyFromName(namespace, name string) string {
+	return fmt.Sprintf("pg/%s/%s", namespace, name)
+}
+
 func podGroupKey(podGroup *schedulingv1alpha3.PodGroup) string {
-	return fmt.Sprintf("pg/%s/%s", podGroup.Namespace, podGroup.Name)
+	return podGroupKeyFromName(podGroup.Namespace, podGroup.Name)
 }
 
 func podKey(pod *v1.Pod) string {
