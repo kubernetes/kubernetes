@@ -14,7 +14,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/thales-e-security/pool v0.0.2 // indirect
 	golang.org/x/net v0.55.1-0.20260602153038-42abb857022c // indirect
-	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/grpc v1.81.1 // indirect

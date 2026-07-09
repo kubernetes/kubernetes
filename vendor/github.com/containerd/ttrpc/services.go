@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"time"
 	"unsafe"
 
 	"google.golang.org/grpc/codes"
@@ -128,10 +129,14 @@ func (s *serviceSet) handle(ctx context.Context, req *Request, respond func(*sta
 			StreamingClient: stream.StreamingClient,
 			StreamingServer: stream.StreamingServer,
 		}
+		recvBuf := streamRecvBufferSize
+		if !stream.StreamingClient {
+			recvBuf = 1
+		}
 		sh := &streamHandler{
 			ctx:     ctx,
 			respond: respond,
-			recv:    make(chan Unmarshaler, 5),
+			recv:    make(chan Unmarshaler, recvBuf),
 			info:    info,
 		}
 		go func() {
@@ -157,6 +162,12 @@ func (s *serviceSet) handle(ctx context.Context, req *Request, respond func(*sta
 	}
 	return nil, status.Errorf(codes.Unimplemented, "method %v", req.Method)
 }
+
+// streamRecvBufferSize is the buffer size for stream recv channels. It
+// should be large enough to absorb normal bursts without hitting the
+// 1-second timeout fallback in receive/data, but small enough that
+// per-stream memory overhead stays trivial.
+const streamRecvBufferSize = 64
 
 type streamHandler struct {
 	ctx     context.Context
@@ -184,6 +195,17 @@ func (s *streamHandler) data(unmarshal Unmarshaler) error {
 		return nil
 	case <-s.ctx.Done():
 		return s.ctx.Err()
+	default:
+		// If recv channel is full, wait up to a second for an item
+		// to drain and unblock, otherwise return an error.
+		select {
+		case s.recv <- unmarshal:
+			return nil
+		case <-s.ctx.Done():
+			return s.ctx.Err()
+		case <-time.After(time.Second):
+			return ErrStreamFull
+		}
 	}
 }
 

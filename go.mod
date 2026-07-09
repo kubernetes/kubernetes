@@ -71,7 +71,7 @@ require (
 	golang.org/x/net v0.55.1-0.20260602153038-42abb857022c
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.45.0
+	golang.org/x/sys v0.46.0
 	golang.org/x/term v0.43.0
 	golang.org/x/text v0.37.0
 	golang.org/x/time v0.15.0
@@ -137,7 +137,7 @@ require (
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/containerd/containerd/api v1.11.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
-	github.com/containerd/ttrpc v1.2.8 // indirect
+	github.com/containerd/ttrpc v1.2.9 // indirect
 	github.com/coredns/caddy v1.1.1 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

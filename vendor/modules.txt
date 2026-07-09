@@ -80,8 +80,8 @@ github.com/containerd/containerd/api/types/task
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
-# github.com/containerd/ttrpc v1.2.8
-## explicit; go 1.22
+# github.com/containerd/ttrpc v1.2.9
+## explicit; go 1.25.0
 github.com/containerd/ttrpc
 # github.com/coredns/caddy v1.1.1
 ## explicit; go 1.13
@@ -834,7 +834,7 @@ golang.org/x/oauth2/internal
 ## explicit; go 1.25.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.45.0
+# golang.org/x/sys v0.46.0
 ## explicit; go 1.25.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9

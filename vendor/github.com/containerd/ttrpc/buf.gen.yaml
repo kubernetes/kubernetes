@@ -1,0 +1,11 @@
+version: v2
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.28.1
+    out: .
+    opt:
+      - paths=source_relative
+  - local: bin/protoc-gen-go-ttrpc
+    out: .
+    opt:
+      - paths=source_relative
+      - prefix=TTRPC

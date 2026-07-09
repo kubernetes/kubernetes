@@ -568,8 +568,6 @@ func (c *serverConn) run(sctx context.Context) {
 	}
 }
 
-var noopFunc = func() {}
-
 func getRequestContext(ctx context.Context, req *Request) (retCtx context.Context, cancel func()) {
 	if len(req.Metadata) > 0 {
 		md := MD{}
@@ -577,11 +575,10 @@ func getRequestContext(ctx context.Context, req *Request) (retCtx context.Contex
 		ctx = WithMetadata(ctx, md)
 	}
 
-	cancel = noopFunc
 	if req.TimeoutNano == 0 {
-		return ctx, cancel
+		// Cancellable so handlers' deferred cancel propagates to RecvMsg.
+		return context.WithCancel(ctx)
 	}
 
-	ctx, cancel = context.WithTimeout(ctx, time.Duration(req.TimeoutNano))
-	return ctx, cancel
+	return context.WithTimeout(ctx, time.Duration(req.TimeoutNano))
 }

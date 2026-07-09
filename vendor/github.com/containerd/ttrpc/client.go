@@ -386,7 +386,7 @@ func (c *Client) receiveLoop() error {
 
 // createStream creates a new stream and registers it with the client
 // Introduce stream types for multiple or single response
-func (c *Client) createStream(flags uint8, b []byte) (*stream, error) {
+func (c *Client) createStream(flags uint8, b []byte, recvBuf int) (*stream, error) {
 	// sendLock must be held across both allocation of the stream ID and sending it across the wire.
 	// This ensures that new stream IDs sent on the wire are always increasing, which is a
 	// requirement of the TTRPC protocol.
@@ -417,7 +417,7 @@ func (c *Client) createStream(flags uint8, b []byte) (*stream, error) {
 		default:
 		}
 
-		s = newStream(c.nextStreamID, c)
+		s = newStream(c.nextStreamID, c, recvBuf)
 		c.streams[s.id] = s
 		c.nextStreamID = c.nextStreamID + 2
 
@@ -517,7 +517,7 @@ func (c *Client) NewStream(ctx context.Context, desc *StreamDesc, service, metho
 	} else {
 		flags = flagRemoteClosed
 	}
-	s, err := c.createStream(flags, p)
+	s, err := c.createStream(flags, p, streamRecvBufferSize)
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +536,7 @@ func (c *Client) dispatch(ctx context.Context, req *Request, resp *Response) err
 		return err
 	}
 
-	s, err := c.createStream(0, p)
+	s, err := c.createStream(0, p, 1)
 	if err != nil {
 		return err
 	}
