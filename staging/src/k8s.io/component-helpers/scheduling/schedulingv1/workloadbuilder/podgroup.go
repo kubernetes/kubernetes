@@ -23,12 +23,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NewPodGroup materializes a runtime PodGroup from the named PodGroupTemplate,
-// which Build does not create. The template's scheduling fields are deep-copied
-// into the spec, podGroupTemplateRef points back at the template, and the
-// PodGroup lands in the workload's namespace. Owners are caller-supplied
-// because they differ by case (e.g. a parent-owned Workload gets no ownerRef).
-func NewPodGroup(workload *schedulingv1alpha3.Workload, templateName, podGroupName string, owners []metav1.OwnerReference) (*schedulingv1alpha3.PodGroup, error) {
+// materializes a runtime PodGroup from the named PodGroupTemplate, which
+// BuildWorkload does not create. The template's scheduling fields are
+// deep-copied into the spec, workloadRef points back at the template,
+// and the PodGroup lands in the workload's namespace. Owners are
+// caller-supplied because they differ by case.
+func newPodGroup(workload *schedulingv1alpha3.Workload, templateName, podGroupName string, owners []metav1.OwnerReference) (*schedulingv1alpha3.PodGroup, error) {
 	if workload == nil {
 		return nil, fmt.Errorf("workload must not be nil")
 	}

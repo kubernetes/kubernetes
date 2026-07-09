@@ -202,7 +202,7 @@ func TestMapPodGroupConfigEndToEnd(t *testing.T) {
 		Callbacks:     []SchedulingConfigFunc{defaultGangMinCount(4)},
 	}
 
-	wl, err := Build(root, BuildOptions{
+	wl, err := NewBuilder(root, BuildOptions{
 		Name:      "job",
 		Namespace: "ns",
 		Owner: &metav1.OwnerReference{
@@ -211,7 +211,7 @@ func TestMapPodGroupConfigEndToEnd(t *testing.T) {
 			Name:       "test-job",
 			UID:        "12345",
 		},
-	})
+	}).BuildWorkload()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

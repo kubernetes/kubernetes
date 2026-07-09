@@ -52,7 +52,7 @@ func TestNewPodGroup(t *testing.T) {
 		{APIVersion: "scheduling.k8s.io/v1alpha3", Kind: "Workload", Name: wl.Name},
 	}
 
-	pg, err := NewPodGroup(wl, "workers", "job-abc-workers-xyz", owners)
+	pg, err := newPodGroup(wl, "workers", "job-abc-workers-xyz", owners)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestNewPodGroup(t *testing.T) {
 
 func TestNewPodGroupDoesNotAliasWorkload(t *testing.T) {
 	wl := gangWorkload()
-	pg, err := NewPodGroup(wl, "workers", "pg", nil)
+	pg, err := newPodGroup(wl, "workers", "pg", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -124,10 +124,10 @@ func TestNewPodGroupDoesNotAliasWorkload(t *testing.T) {
 }
 
 func TestNewPodGroupErrors(t *testing.T) {
-	if _, err := NewPodGroup(nil, "workers", "pg", nil); err == nil {
+	if _, err := newPodGroup(nil, "workers", "pg", nil); err == nil {
 		t.Error("expected error for nil workload")
 	}
-	if _, err := NewPodGroup(gangWorkload(), "missing", "pg", nil); err == nil {
+	if _, err := newPodGroup(gangWorkload(), "missing", "pg", nil); err == nil {
 		t.Error("expected error for unknown template name")
 	}
 }

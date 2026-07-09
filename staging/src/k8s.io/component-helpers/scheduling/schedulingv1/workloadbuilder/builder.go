@@ -22,101 +22,114 @@ import (
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// BuildOptions carries the identity of the Workload object that
-// Build produces.
+// SchedulingPolicyOption enumerates the scheduling policies a controller opts
+// into. The allow-list rejects any policy not listed, so building-block
+// additions stay denied until a controller extends its list.
+type SchedulingPolicyOption int
+
+const (
+	// BasicPolicy allows the Basic scheduling policy.
+	BasicPolicy SchedulingPolicyOption = iota
+	// GangPolicy allows the Gang scheduling policy.
+	GangPolicy
+)
+
+// DisruptionModeOption enumerates the disruption modes a controller opts into.
+type DisruptionModeOption int
+
+const (
+	// SingleMode allows the Single disruption mode.
+	SingleMode DisruptionModeOption = iota
+	// AllMode allows the All disruption mode.
+	AllMode
+)
+
+// BuildOptions carries the identity of the Workload object that BuildWorkload
+// produces, plus the controller's scheduling allow-lists.
 type BuildOptions struct {
 	Name      string
 	Namespace string
 	// optional owner reference for garbage collection
 	Owner *metav1.OwnerReference
+
+	// AllowedPolicies is the set of scheduling policies the controller opts
+	// into. Validate rejects any policy outside this set. An empty set allows
+	// nothing.
+	AllowedPolicies []SchedulingPolicyOption
+	// AllowedDisruptionModes is the set of disruption modes the controller opts
+	// into. Validate rejects any mode outside this set. An empty set allows
+	// nothing.
+	AllowedDisruptionModes []DisruptionModeOption
 }
 
-// Build resolves config, runs callbacks, validates, and compiles the tree into
-// a Workload. Errors describe why compilation failed using paths relative to
-// the library's internal IR; callers are expected to wrap them against their
-// own API surface (e.g. the Job controller wraps at spec.scheduling).
-func Build(root *WorkloadItem, opts BuildOptions) (*schedulingv1alpha3.Workload, error) {
-	wl, errs := build(root, opts)
-	return wl, errs.ToAggregate()
+// Builder turns a controller's WorkloadItem tree into scheduler-facing objects.
+// Construct it once with NewBuilder, then call Validate, BuildWorkload, and
+// NewPodGroup as needed.
+type Builder struct {
+	root *WorkloadItem
+	opts BuildOptions
+
+	// workload holds the Workload NewPodGroup materializes from: either the
+	// Workload compiled by BuildWorkload, or one supplied via SetExistingWorkload.
+	workload *schedulingv1alpha3.Workload
+
+	// externalWorkload records that workload was supplied via SetExistingWorkload
+	// rather than compiled by this library. BuildWorkload refuses to run in this
+	// mode so a caller can't recompile over a persisted or parent-authored Workload.
+	externalWorkload bool
 }
 
-// Validate checks if the WorkloadItem tree can be compiled into a Workload,
-// returning the error that would prevent compilation. It runs the same
-// resolution, callbacks, and semantic checks as Build, but discards the
-// compiled result.
-func Validate(root *WorkloadItem) error {
-	_, errs := compileWorkloadItemTree(root)
-	return errs.ToAggregate()
-}
-
-// build compiles the tree and sets the Workload's identity, accumulating any
-// errors as a field.ErrorList with IR-relative paths. Build wraps it to expose
-// a plain error.
-func build(root *WorkloadItem, opts BuildOptions) (*schedulingv1alpha3.Workload, field.ErrorList) {
-	spec, errs := compileWorkloadItemTree(root)
-	if len(errs) > 0 {
-		return nil, errs
+// build compiles the tree and sets the Workload's identity. It fails fast,
+// returning the first error it encounters.
+func (b *Builder) build() (*schedulingv1alpha3.Workload, error) {
+	spec, err := compileWorkloadItemTree(b.root)
+	if err != nil {
+		return nil, err
 	}
 
 	wl := &schedulingv1alpha3.Workload{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      opts.Name,
-			Namespace: opts.Namespace,
+			Name:      b.opts.Name,
+			Namespace: b.opts.Namespace,
 		},
 		Spec: spec,
 	}
 
-	ownerPath := field.NewPath("ownerReference")
-	if opts.Owner == nil {
-		return nil, field.ErrorList{field.Required(ownerPath, "a Workload must be owned by its controller for garbage collection")}
+	if b.opts.Owner == nil {
+		return nil, fmt.Errorf("a Workload must be owned by its controller for garbage collection")
 	}
 
-	gv, err := schema.ParseGroupVersion(opts.Owner.APIVersion)
+	gv, err := schema.ParseGroupVersion(b.opts.Owner.APIVersion)
 	if err != nil {
-		return nil, field.ErrorList{field.Invalid(ownerPath.Child("apiVersion"), opts.Owner.APIVersion, err.Error())}
+		return nil, fmt.Errorf("invalid owner apiVersion %q: %w", b.opts.Owner.APIVersion, err)
 	}
 
-	wl.OwnerReferences = []metav1.OwnerReference{*opts.Owner}
+	wl.OwnerReferences = []metav1.OwnerReference{*b.opts.Owner}
 	wl.Spec.ControllerRef = &schedulingv1alpha3.TypedLocalObjectReference{
 		APIGroup: gv.Group,
-		Kind:     opts.Owner.Kind,
-		Name:     opts.Owner.Name,
+		Kind:     b.opts.Owner.Kind,
+		Name:     b.opts.Owner.Name,
 	}
 
 	return wl, nil
 }
 
-// isComposite reports whether the item is a structural group (has children)
-// rather than a leaf that compiles to a single PodGroupTemplate.
-func isComposite(item *WorkloadItem) bool {
-	return len(item.Children) > 0
-}
-
 // compileWorkloadItemTree compiles the root item into the WorkloadSpec it
-// produces. For now, only single-level (leaf) items are supported, so the
-// returned spec carries exactly one PodGroupTemplate; Build fills in the object
-// identity separately.
-func compileWorkloadItemTree(root *WorkloadItem) (schedulingv1alpha3.WorkloadSpec, field.ErrorList) {
+// produces. Only single-level (leaf) items are supported, so the returned spec
+// carries exactly one PodGroupTemplate; Build fills in the object identity
+// separately.
+func compileWorkloadItemTree(root *WorkloadItem) (schedulingv1alpha3.WorkloadSpec, error) {
 	var spec schedulingv1alpha3.WorkloadSpec
 
 	if root == nil {
-		return spec, field.ErrorList{field.Required(field.NewPath("workloadItem"), "root WorkloadItem must not be nil")}
+		return spec, fmt.Errorf("root WorkloadItem must not be nil")
 	}
 
-	if isComposite(root) {
-		// TODO: once CompositePodGroupTemplate lands, a composite item should compile to
-		// a CompositePodGroupTemplate (nesting its children) instead of being rejected,
-		// and parent-child conflict validation (plus leaf-name uniqueness and the
-		// WorkloadMaxPodGroupTemplates cap) belongs here.
-		return spec, field.ErrorList{field.Forbidden(field.NewPath("children"), fmt.Sprintf("composite WorkloadItem %q (with children) is not yet supported: the CompositePodGroup API has not landed", root.Name))}
-	}
-
-	pgTemplate, errs := compilePodGroupTemplate(root)
-	if len(errs) > 0 {
-		return spec, errs
+	pgTemplate, err := compilePodGroupTemplate(root)
+	if err != nil {
+		return spec, err
 	}
 	spec.PodGroupTemplates = append(spec.PodGroupTemplates, pgTemplate)
 
@@ -124,14 +137,12 @@ func compileWorkloadItemTree(root *WorkloadItem) (schedulingv1alpha3.WorkloadSpe
 }
 
 // compilePodGroupTemplate resolves a leaf item's config, runs its callbacks,
-// then compiles it into a single PodGroupTemplate, accumulating any errors.
-func compilePodGroupTemplate(item *WorkloadItem) (schedulingv1alpha3.PodGroupTemplate, field.ErrorList) {
+// then compiles it into a single PodGroupTemplate.
+func compilePodGroupTemplate(item *WorkloadItem) (schedulingv1alpha3.PodGroupTemplate, error) {
 	// Reject an empty name before resolution and callbacks run, so defaulting or
 	// a callback cannot "recover" a name the caller never set.
 	if item.Name == "" {
-		return schedulingv1alpha3.PodGroupTemplate{},
-			field.ErrorList{field.Required(field.NewPath("name"),
-				"workload item name cannot be empty")}
+		return schedulingv1alpha3.PodGroupTemplate{}, fmt.Errorf("workload item name cannot be empty")
 	}
 
 	// resolveSchedulingConfig also runs the item's callbacks.
@@ -164,6 +175,9 @@ func resolveSchedulingConfig(item *WorkloadItem) *SchedulingConfig {
 		if len(user.ResourceClaims) > 0 {
 			resolved.ResourceClaims = user.ResourceClaims
 		}
+		if user.PriorityClassName != "" {
+			resolved.PriorityClassName = user.PriorityClassName
+		}
 	}
 
 	for _, cb := range item.Callbacks {
@@ -175,27 +189,23 @@ func resolveSchedulingConfig(item *WorkloadItem) *SchedulingConfig {
 	return resolved
 }
 
-// buildLeafTemplate converts a resolved config into one PodGroupTemplate,
-// accumulating semantic validation errors against IR-relative paths.
-func buildLeafTemplate(name string, cfg *SchedulingConfig) (schedulingv1alpha3.PodGroupTemplate, field.ErrorList) {
-	var allErrs field.ErrorList
+// buildLeafTemplate converts a resolved config into one PodGroupTemplate.
+func buildLeafTemplate(name string, cfg *SchedulingConfig) (schedulingv1alpha3.PodGroupTemplate, error) {
 	tmpl := schedulingv1alpha3.PodGroupTemplate{Name: name}
 
 	if cfg == nil {
 		cfg = &SchedulingConfig{}
 	}
 
-	policy, errs := compileSchedulingPolicy(cfg.Policy)
-	allErrs = append(allErrs, errs...)
+	tmpl.PriorityClassName = cfg.PriorityClassName
+
+	policy, err := compileSchedulingPolicy(cfg.Policy)
+	if err != nil {
+		return schedulingv1alpha3.PodGroupTemplate{}, err
+	}
 	tmpl.SchedulingPolicy = policy
 
 	if cfg.Constraints != nil && len(cfg.Constraints.Topology) > 0 {
-		// Mirror the validation for maxItems=1 on PodGroupSchedulingConstraints.Topology
-		// so we fail early.
-		if len(cfg.Constraints.Topology) > 1 {
-			allErrs = append(allErrs,
-				field.TooMany(field.NewPath("constraints", "topology"), len(cfg.Constraints.Topology), 1).WithOrigin("maxItems"))
-		}
 		topology := make([]schedulingv1alpha3.TopologyConstraint, len(cfg.Constraints.Topology))
 		copy(topology, cfg.Constraints.Topology)
 		tmpl.SchedulingConstraints = &schedulingv1alpha3.PodGroupSchedulingConstraints{
@@ -204,50 +214,21 @@ func buildLeafTemplate(name string, cfg *SchedulingConfig) (schedulingv1alpha3.P
 	}
 
 	if cfg.DisruptionMode != nil {
-		dm, errs := compileDisruptionMode(cfg.DisruptionMode)
-		allErrs = append(allErrs, errs...)
-		if len(errs) == 0 {
-			tmpl.DisruptionMode = dm
-		}
+		tmpl.DisruptionMode = compileDisruptionMode(cfg.DisruptionMode)
 	}
 
 	if len(cfg.ResourceClaims) > 0 {
-		claimsPath := field.NewPath("resourceClaims")
-		if len(cfg.ResourceClaims) > schedulingv1alpha3.MaxPodGroupResourceClaims {
-			allErrs = append(allErrs, field.TooMany(claimsPath,
-				len(cfg.ResourceClaims), schedulingv1alpha3.MaxPodGroupResourceClaims).WithOrigin("maxItems"))
-		}
-
-		seenClaims := make(map[string]struct{})
-		for i := range cfg.ResourceClaims {
-			rc := cfg.ResourceClaims[i]
-			claimPath := claimsPath.Index(i)
-
-			if rc.Name == "" {
-				allErrs = append(allErrs, field.Required(claimPath.Child("name"), "resource claim name cannot be empty"))
-			} else if _, ok := seenClaims[rc.Name]; ok {
-				allErrs = append(allErrs, field.Duplicate(claimPath, rc.Name))
-			} else {
-				seenClaims[rc.Name] = struct{}{}
-			}
-
-			if (rc.ResourceClaimName == nil && rc.ResourceClaimTemplateName == nil) ||
-				(rc.ResourceClaimName != nil && rc.ResourceClaimTemplateName != nil) {
-				allErrs = append(allErrs, field.Invalid(claimPath, "",
-					"exactly one of resourceClaimName or resourceClaimTemplateName must be set").WithOrigin("union"))
-			}
-		}
-
 		tmpl.ResourceClaims = compileResourceClaims(cfg.ResourceClaims)
 	}
 
-	return tmpl, allErrs
+	return tmpl, nil
 }
 
 // compileSchedulingPolicy maps the IR policy onto the API policy. A nil
-// policy resolves to Basic, while Gang requires a positive MinCount
-// resolved beforehand.
-func compileSchedulingPolicy(policy *SchedulingPolicy) (schedulingv1alpha3.PodGroupSchedulingPolicy, field.ErrorList) {
+// policy resolves to Basic; Gang requires a MinCount resolved beforehand so it
+// can populate the non-pointer API field. The minCount>=1 bound is a structural
+// constraint enforced by declarative validation, so it is not repeated here.
+func compileSchedulingPolicy(policy *SchedulingPolicy) (schedulingv1alpha3.PodGroupSchedulingPolicy, error) {
 	basic := schedulingv1alpha3.PodGroupSchedulingPolicy{
 		Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
 	}
@@ -256,18 +237,13 @@ func compileSchedulingPolicy(policy *SchedulingPolicy) (schedulingv1alpha3.PodGr
 		return basic, nil
 	}
 
-	policyPath := field.NewPath("policy")
-
+	// The basic/gang union is enforced by declarative validation when the
+	// compiled Workload is submitted, only the compile-time invariant that a
+	// resolved gang policy carries a minCount value is checked here.
 	switch {
-	case policy.Basic != nil && policy.Gang != nil:
-		return schedulingv1alpha3.PodGroupSchedulingPolicy{}, field.ErrorList{field.Invalid(policyPath, "", "exactly one scheduling policy must be set").WithOrigin("union")}
 	case policy.Gang != nil:
-		minCountPath := field.NewPath("policy", "gang", "minCount")
 		if policy.Gang.MinCount == nil {
-			return schedulingv1alpha3.PodGroupSchedulingPolicy{}, field.ErrorList{field.Required(minCountPath, "gang scheduling requires minCount to be set after resolution")}
-		}
-		if *policy.Gang.MinCount < 1 {
-			return schedulingv1alpha3.PodGroupSchedulingPolicy{}, field.ErrorList{field.Invalid(minCountPath, *policy.Gang.MinCount, "must be at least 1").WithOrigin("minimum")}
+			return schedulingv1alpha3.PodGroupSchedulingPolicy{}, fmt.Errorf("gang scheduling requires minCount to be set after resolution")
 		}
 		return schedulingv1alpha3.PodGroupSchedulingPolicy{
 			Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: *policy.Gang.MinCount},
@@ -278,18 +254,17 @@ func compileSchedulingPolicy(policy *SchedulingPolicy) (schedulingv1alpha3.PodGr
 	}
 }
 
-func compileDisruptionMode(dm *DisruptionMode) (*schedulingv1alpha3.DisruptionMode, field.ErrorList) {
-	dmPath := field.NewPath("disruptionMode")
-
+// compileDisruptionMode maps the IR disruption mode onto the API mode. The
+// exactly-one-of union is enforced by declarative validation when the compiled
+// Workload is submitted, so a mode with neither member set compiles to nil.
+func compileDisruptionMode(dm *DisruptionMode) *schedulingv1alpha3.DisruptionMode {
 	switch {
-	case dm.Single != nil && dm.All != nil:
-		return nil, field.ErrorList{field.Invalid(dmPath, "", "exactly one disruption mode must be set").WithOrigin("union")}
 	case dm.All != nil:
-		return &schedulingv1alpha3.DisruptionMode{All: &schedulingv1alpha3.AllDisruptionMode{}}, nil
+		return &schedulingv1alpha3.DisruptionMode{All: &schedulingv1alpha3.AllDisruptionMode{}}
 	case dm.Single != nil:
-		return &schedulingv1alpha3.DisruptionMode{Single: &schedulingv1alpha3.SingleDisruptionMode{}}, nil
+		return &schedulingv1alpha3.DisruptionMode{Single: &schedulingv1alpha3.SingleDisruptionMode{}}
 	default:
-		return nil, field.ErrorList{field.Invalid(dmPath, "", "exactly one disruption mode must be set").WithOrigin("union")}
+		return nil
 	}
 }
 

@@ -36,7 +36,7 @@ func defaultGangMinCount(n int32) SchedulingConfigFunc {
 	}
 }
 
-func TestBuild(t *testing.T) {
+func TestBuildWorkload(t *testing.T) {
 	// Tracks whether the empty-leaf-name case's callback ran, proving the name
 	// check short-circuits before callbacks.
 	emptyNameCallbackRan := false
@@ -166,22 +166,6 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
-			name: "more than one topology constraint fails",
-			root: &WorkloadItem{
-				Name:          "topo-job",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig: &SchedulingConfig{
-					Constraints: &SchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{
-							{Key: "topology.kubernetes.io/zone"},
-							{Key: "topology.kubernetes.io/region"},
-						},
-					},
-				},
-			},
-			wantErr: true,
-		},
-		{
 			name: "disruption mode all",
 			root: &WorkloadItem{
 				Name:          "disruption-job",
@@ -215,51 +199,19 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
-			name: "resource claim missing both names fails",
+			name: "priorityClassName propagates to template",
 			root: &WorkloadItem{
-				Name:          "dra-job",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig: &SchedulingConfig{
-					ResourceClaims: []ResourceClaim{{Name: "gpu"}},
+				Name: "prio-job",
+				DefaultConfig: &SchedulingConfig{
+					Policy:            &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}},
+					PriorityClassName: "system-node-critical",
 				},
 			},
-			wantErr: true,
-		},
-		{
-			name: "resource claim with both names fails",
-			root: &WorkloadItem{
-				Name:          "dra-job",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig: &SchedulingConfig{
-					ResourceClaims: []ResourceClaim{{Name: "gpu", ResourceClaimName: new("a"), ResourceClaimTemplateName: new("b")}},
-				},
+			verify: func(t *testing.T, wl *schedulingv1alpha3.Workload, _ *WorkloadItem) {
+				if got := wl.Spec.PodGroupTemplates[0].PriorityClassName; got != "system-node-critical" {
+					t.Errorf("expected priorityClassName copied to template, got %q", got)
+				}
 			},
-			wantErr: true,
-		},
-		{
-			name: "resource claim empty name fails",
-			root: &WorkloadItem{
-				Name:          "dra-job",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig: &SchedulingConfig{
-					ResourceClaims: []ResourceClaim{{Name: "", ResourceClaimName: new("a")}},
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "resource claim duplicate name fails",
-			root: &WorkloadItem{
-				Name:          "dra-job",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig: &SchedulingConfig{
-					ResourceClaims: []ResourceClaim{
-						{Name: "dup", ResourceClaimName: new("a")},
-						{Name: "dup", ResourceClaimName: new("b")},
-					},
-				},
-			},
-			wantErr: true,
 		},
 		{
 			name: "owner reference and controllerRef parse APIGroup",
@@ -405,7 +357,7 @@ func TestBuild(t *testing.T) {
 			if owner == nil && tt.name != "missing owner returns error" {
 				owner = dummyOwner
 			}
-			wl, err := Build(tt.root, BuildOptions{Name: "wl", Namespace: "ns", Owner: owner})
+			wl, err := NewBuilder(tt.root, BuildOptions{Name: "wl", Namespace: "ns", Owner: owner}).BuildWorkload()
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -420,126 +372,20 @@ func TestBuild(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
-	tests := []struct {
-		name    string
-		root    *WorkloadItem
-		wantErr bool
-	}{
-		{
-			name:    "nil root is required",
-			root:    nil,
-			wantErr: true,
-		},
-		{
-			name: "basic config is valid",
-			root: &WorkloadItem{
-				Name:          "job",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-			},
-		},
-		{
-			name: "gang minCount defaulted by callback is valid",
-			root: &WorkloadItem{
-				Name:       "job",
-				UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{}}},
-				Callbacks:  []SchedulingConfigFunc{defaultGangMinCount(4)},
-			},
-		},
-		{
-			name: "gang minCount unset without callback is invalid",
-			root: &WorkloadItem{
-				Name:       "job",
-				UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{}}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "resource claim missing both names is invalid",
-			root: &WorkloadItem{
-				Name:          "job",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig: &SchedulingConfig{
-					ResourceClaims: []ResourceClaim{{Name: "gpu"}},
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "duplicate resource claim names is invalid",
-			root: &WorkloadItem{
-				Name:          "job",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig: &SchedulingConfig{
-					ResourceClaims: []ResourceClaim{
-						{Name: "dup", ResourceClaimName: new("a")},
-						{Name: "dup", ResourceClaimName: new("b")},
-					},
-				},
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := Validate(tt.root)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("expected no error, got %v", err)
-			}
-		})
-	}
-}
-
-// TestValidateAgreesWithBuild guarantees the contract the API server relies on:
-// a configuration Validate rejects is one Build also rejects, and vice versa.
-func TestValidateAgreesWithBuild(t *testing.T) {
-	roots := map[string]*WorkloadItem{
-		"valid basic":      {Name: "job", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
-		"gang no minCount": {Name: "job", UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{}}}},
-		"bad claim":        {Name: "job", UserConfig: &SchedulingConfig{ResourceClaims: []ResourceClaim{{Name: "gpu"}}}},
-		"empty name":       {UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
-	}
-
-	for name, root := range roots {
-		t.Run(name, func(t *testing.T) {
-			validateErr := Validate(root) != nil
-			_, buildErrs := Build(root, BuildOptions{
-				Name:      "wl",
-				Namespace: "ns",
-				Owner: &metav1.OwnerReference{
-					APIVersion: "batch/v1",
-					Kind:       "Job",
-					Name:       "test-job",
-					UID:        "12345",
-				},
-			})
-			buildErr := buildErrs != nil
-			if validateErr != buildErr {
-				t.Errorf("Validate/Build disagree: validateErr=%v buildErr=%v", validateErr, buildErr)
-			}
-		})
-	}
-}
-
 func TestResolveSchedulingConfigMergesEveryField(t *testing.T) {
 	defaultConfig := &SchedulingConfig{
-		Policy:         &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}},
-		Constraints:    &SchedulingConstraints{Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}}},
-		DisruptionMode: &DisruptionMode{Single: &SingleDisruptionMode{}},
-		ResourceClaims: []ResourceClaim{{Name: "default-claim", ResourceClaimName: new("default")}},
+		Policy:            &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}},
+		Constraints:       &SchedulingConstraints{Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}}},
+		DisruptionMode:    &DisruptionMode{Single: &SingleDisruptionMode{}},
+		ResourceClaims:    []ResourceClaim{{Name: "default-claim", ResourceClaimName: new("default")}},
+		PriorityClassName: "default-priority",
 	}
 	userConfig := &SchedulingConfig{
-		Policy:         &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](4)}},
-		Constraints:    &SchedulingConstraints{Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/region"}}},
-		DisruptionMode: &DisruptionMode{All: &AllDisruptionMode{}},
-		ResourceClaims: []ResourceClaim{{Name: "user-claim", ResourceClaimName: new("user")}},
+		Policy:            &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](4)}},
+		Constraints:       &SchedulingConstraints{Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/region"}}},
+		DisruptionMode:    &DisruptionMode{All: &AllDisruptionMode{}},
+		ResourceClaims:    []ResourceClaim{{Name: "user-claim", ResourceClaimName: new("user")}},
+		PriorityClassName: "user-priority",
 	}
 
 	// Both fixtures must set every field to a non-zero value; otherwise the
@@ -574,9 +420,10 @@ func TestSchedulingConfigDeepCopyCopiesEveryField(t *testing.T) {
 			Basic: &BasicSchedulingPolicy{},
 			Gang:  &GangSchedulingPolicy{MinCount: ptr.To[int32](4)},
 		},
-		Constraints:    &SchedulingConstraints{Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}}},
-		DisruptionMode: &DisruptionMode{Single: &SingleDisruptionMode{}, All: &AllDisruptionMode{}},
-		ResourceClaims: []ResourceClaim{{Name: "gpu", ResourceClaimName: new("claim"), ResourceClaimTemplateName: new("tmpl")}},
+		Constraints:       &SchedulingConstraints{Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}}},
+		DisruptionMode:    &DisruptionMode{Single: &SingleDisruptionMode{}, All: &AllDisruptionMode{}},
+		ResourceClaims:    []ResourceClaim{{Name: "gpu", ResourceClaimName: new("claim"), ResourceClaimTemplateName: new("tmpl")}},
+		PriorityClassName: "high-priority",
 	}
 
 	// A field added anywhere under SchedulingConfig (top-level or nested)

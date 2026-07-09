@@ -20,8 +20,8 @@ import (
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 )
 
-// WorkloadPodGroupConfig bundles the leaf-level building blocks a 
-// controller embeds in its own API. The zero value means "nothing 
+// WorkloadPodGroupConfig bundles the leaf-level building blocks a
+// controller embeds in its own API. The zero value means "nothing
 // set", so callers only populate the blocks they care about.
 type WorkloadPodGroupConfig struct {
 	Policy         *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy

@@ -31,6 +31,10 @@ type SchedulingConfig struct {
 
 	// ResourceClaims lists dynamic resource claims shared across the group.
 	ResourceClaims []ResourceClaim
+
+	// PriorityClassName is copied onto the compiled PodGroupTemplate so a
+	// PodGroup materialized from it inherits the group's priority.
+	PriorityClassName string
 }
 
 // SchedulingPolicy selects the scheduling mode. Exactly one field must be set.
@@ -95,9 +99,6 @@ type WorkloadItem struct {
 	// Callbacks run in order against the resolved config after the
 	// default/user merge.
 	Callbacks []SchedulingConfigFunc
-
-	// Children, when non-empty, mark this node as a structural group.
-	Children []*WorkloadItem
 }
 
 // DeepCopy returns a deep copy of c, or nil if c is nil. Build copies configs
@@ -107,7 +108,7 @@ func (c *SchedulingConfig) DeepCopy() *SchedulingConfig {
 	if c == nil {
 		return nil
 	}
-	out := &SchedulingConfig{}
+	out := &SchedulingConfig{PriorityClassName: c.PriorityClassName}
 	if c.Policy != nil {
 		p := &SchedulingPolicy{}
 		if c.Policy.Basic != nil {
