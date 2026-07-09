@@ -2782,9 +2782,10 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 						{
 							ResourceClaimName: "node-allocatable-claim",
 							Containers:        []string{"c1"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU: resource.MustParse("50m"),
-							},
+							Mapping: []v1.NodeAllocatableMappedResources{{
+								Name:     v1.ResourceCPU,
+								Quantity: new(resource.MustParse("50m")),
+							}},
 						},
 					},
 				},
@@ -2829,9 +2830,10 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 						{
 							ResourceClaimName: "node-allocatable-claim",
 							Containers:        []string{"c1"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU: resource.MustParse("50m"),
-							},
+							Mapping: []v1.NodeAllocatableMappedResources{{
+								Name:     v1.ResourceCPU,
+								Quantity: new(resource.MustParse("50m")),
+							}},
 						},
 					},
 				},

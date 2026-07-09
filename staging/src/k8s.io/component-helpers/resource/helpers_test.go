@@ -2154,9 +2154,9 @@ func TestPodResourceRequestsWithDRANodeAllocatableClaims(t *testing.T) {
 						{
 							ResourceClaimName: "node-allocatable-claim-1",
 							Containers:        []string{"c1"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU:      resource.MustParse("50m"),
-								hugePageResource1Gi: resource.MustParse("1"),
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
+								{Name: hugePageResource1Gi, Quantity: new(resource.MustParse("1"))},
 							},
 						},
 					},
@@ -2204,16 +2204,16 @@ func TestPodResourceRequestsWithDRANodeAllocatableClaims(t *testing.T) {
 						{
 							ResourceClaimName: "node-allocatable-claim-1",
 							Containers:        []string{"c1"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU: resource.MustParse("50m"),
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
 							},
 						},
 						{
 							ResourceClaimName: "node-allocatable-claim-2",
 							Containers:        []string{"c1"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU:    resource.MustParse("25m"),
-								v1.ResourceMemory: resource.MustParse("512Mi"),
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("25m"))},
+								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("512Mi"))},
 							},
 						},
 					},
@@ -2261,8 +2261,8 @@ func TestPodResourceRequestsWithDRANodeAllocatableClaims(t *testing.T) {
 						{
 							ResourceClaimName: "node-allocatable-claim-1",
 							Containers:        []string{"c1", "c2"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU: resource.MustParse("50m"),
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
 							},
 						},
 					},
@@ -2320,18 +2320,18 @@ func TestPodResourceRequestsWithDRANodeAllocatableClaims(t *testing.T) {
 						{
 							ResourceClaimName: "node-allocatable-claim-1",
 							Containers:        []string{"c1"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU:      resource.MustParse("50m"),
-								hugePageResource1Gi: resource.MustParse("1"),
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
+								{Name: hugePageResource1Gi, Quantity: new(resource.MustParse("1"))},
 							},
 						},
 						{
 							ResourceClaimName: "node-allocatable-claim-2",
 							Containers:        []string{"c2"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU:      resource.MustParse("25m"),
-								v1.ResourceMemory:   resource.MustParse("512Mi"),
-								hugePageResource1Gi: resource.MustParse("2"),
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("25m"))},
+								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("512Mi"))},
+								{Name: hugePageResource1Gi, Quantity: new(resource.MustParse("2"))},
 							},
 						},
 					},
@@ -2379,8 +2379,8 @@ func TestPodResourceRequestsWithDRANodeAllocatableClaims(t *testing.T) {
 						{
 							ResourceClaimName: "node-allocatable-claim",
 							Containers:        []string{"ic1"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU: resource.MustParse("25m"),
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("25m"))},
 							},
 						},
 					},
@@ -2420,8 +2420,8 @@ func TestPodResourceRequestsWithDRANodeAllocatableClaims(t *testing.T) {
 						{
 							ResourceClaimName: "node-allocatable-claim",
 							Containers:        []string{"c1"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU: resource.MustParse("50m"),
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
 							},
 						},
 					},
@@ -2458,8 +2458,8 @@ func TestPodResourceRequestsWithDRANodeAllocatableClaims(t *testing.T) {
 						{
 							ResourceClaimName: "node-allocatable-claim",
 							Containers:        []string{"c1"},
-							Resources: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU: resource.MustParse("3"),
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("3"))},
 							},
 						},
 					},

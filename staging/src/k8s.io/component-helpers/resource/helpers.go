@@ -322,8 +322,10 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 	// Add resources from node allocatable ResourceClaims
 	if opts.UseDRANodeAllocatableResourceClaimStatus && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
 		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
-			for resName, resQty := range claimStatus.Resources {
-				addResourceList(reqs, v1.ResourceList{resName: resQty})
+			for _, mapping := range claimStatus.Mapping {
+				if mapping.Quantity != nil {
+					addResourceList(reqs, v1.ResourceList{mapping.Name: *mapping.Quantity})
+				}
 			}
 		}
 	}

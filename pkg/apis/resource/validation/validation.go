@@ -973,12 +973,12 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	}
 
 	allErrs = append(allErrs, validateDeviceBindingParameters(device.BindingConditions, device.BindingFailureConditions, fldPath)...)
-	allErrs = append(allErrs, validateNodeAllocatableResourceMappings(device.NodeAllocatableResourceMappings, device.Capacity, fldPath.Child("nodeAllocatableResourceMappings"))...)
+	allErrs = append(allErrs, validateNodeAllocatableResources(device.NodeAllocatableResources, device.Capacity, fldPath.Child("nodeAllocatableResources"))...)
 
 	return allErrs
 }
 
-func validateNodeAllocatableResourceMappings(mappings map[corev1.ResourceName]resource.NodeAllocatableResourceMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
+func validateNodeAllocatableResources(mappings map[corev1.ResourceName]resource.NodeAllocatableResource, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	for resourceName, mapping := range mappings {
 		keyPath := fldPath.Key(string(resourceName))
@@ -986,21 +986,36 @@ func validateNodeAllocatableResourceMappings(mappings map[corev1.ResourceName]re
 			allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
 		}
 
-		if mapping.AllocationMultiplier == nil && mapping.CapacityKey == nil {
-			allErrs = append(allErrs, field.Invalid(keyPath, "", "at least one of allocationMultiplier or capacityKey must be set"))
-		} else {
-			if mapping.AllocationMultiplier != nil {
-				if mapping.AllocationMultiplier.Sign() <= 0 {
-					allErrs = append(allErrs, field.Invalid(keyPath.Child("allocationMultiplier"), mapping.AllocationMultiplier.String(), "must be positive"))
-				}
-			}
-			if mapping.CapacityKey != nil {
-				if *mapping.CapacityKey == "" {
-					allErrs = append(allErrs, field.Invalid(keyPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
+		if mapping.Mapping == nil && mapping.Overhead == nil {
+			allErrs = append(allErrs, field.Required(keyPath, "exactly one of mapping or overhead must be set"))
+		} else if mapping.Mapping != nil && mapping.Overhead != nil {
+			allErrs = append(allErrs, field.Invalid(keyPath, "", "mapping and overhead are mutually exclusive"))
+		} else if mapping.Mapping != nil {
+			mappingPath := keyPath.Child("mapping")
+			if mapping.Mapping.CapacityKey != nil {
+				if *mapping.Mapping.CapacityKey == "" {
+					allErrs = append(allErrs, field.Invalid(mappingPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
 				} else if capacities == nil {
-					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
-				} else if _, exists := capacities[*mapping.CapacityKey]; !exists {
-					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
+					allErrs = append(allErrs, field.NotFound(mappingPath.Child("capacityKey"), *mapping.Mapping.CapacityKey))
+				} else if _, exists := capacities[*mapping.Mapping.CapacityKey]; !exists {
+					allErrs = append(allErrs, field.NotFound(mappingPath.Child("capacityKey"), *mapping.Mapping.CapacityKey))
+				}
+				if mapping.Mapping.DeviceMultiplier != nil {
+					allErrs = append(allErrs, field.Invalid(mappingPath.Child("deviceMultiplier"), mapping.Mapping.DeviceMultiplier.String(), "must not be set when capacityKey is set"))
+				}
+				if mapping.Mapping.CapacityMultiplier != nil {
+					if mapping.Mapping.CapacityMultiplier.Sign() <= 0 {
+						allErrs = append(allErrs, field.Invalid(mappingPath.Child("capacityMultiplier"), mapping.Mapping.CapacityMultiplier.String(), "must be positive"))
+					}
+				}
+			} else {
+				if mapping.Mapping.CapacityMultiplier != nil {
+					allErrs = append(allErrs, field.Invalid(mappingPath.Child("capacityMultiplier"), mapping.Mapping.CapacityMultiplier.String(), "must not be set when capacityKey is not set"))
+				}
+				if mapping.Mapping.DeviceMultiplier != nil {
+					if mapping.Mapping.DeviceMultiplier.Sign() <= 0 {
+						allErrs = append(allErrs, field.Invalid(mappingPath.Child("deviceMultiplier"), mapping.Mapping.DeviceMultiplier.String(), "must be positive"))
+					}
 				}
 			}
 		}

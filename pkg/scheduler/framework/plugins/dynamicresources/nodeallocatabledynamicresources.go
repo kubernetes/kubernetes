@@ -75,7 +75,7 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 					logger.Error(err, "Failed to get device from manager", "claim", klog.KObj(claim), "device", result.Device, "pool", result.Pool)
 					continue
 				}
-				if device != nil && len(device.NodeAllocatableResourceMappings) > 0 {
+				if device != nil && len(device.NodeAllocatableResources) > 0 {
 					if !nodeAllocatableClaimUIDs.Has(claim.UID) {
 						nodeAllocatableClaims = append(nodeAllocatableClaims, claim)
 						nodeAllocatableClaimUIDs.Insert(claim.UID)
@@ -134,7 +134,7 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 		currentClaimStatus := v1.NodeAllocatableResourceClaimStatus{
 			ResourceClaimName: key.Name,
 			Containers:        []string{},
-			Resources:         map[v1.ResourceName]resource.Quantity{},
+			Mapping:           []v1.NodeAllocatableMappedResources{},
 		}
 
 		hasNodeAllocatableClaims := false
@@ -143,23 +143,26 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 			if err != nil {
 				return nil, fmt.Errorf("claim %s/%s, device %s: %w", key.Namespace, key.Name, result.Device, err)
 			}
-			if device == nil || device.NodeAllocatableResourceMappings == nil {
+			if device == nil || device.NodeAllocatableResources == nil {
 				continue
 			}
 
-			for resourceName, resourceMap := range device.NodeAllocatableResourceMappings {
+			for resourceName, resourceMap := range device.NodeAllocatableResources {
+				if resourceMap.Mapping == nil {
+					continue
+				}
+				mappingMap := resourceMap.Mapping
 				quantity := resource.Quantity{}
-
-				if resourceMap.CapacityKey != nil && *resourceMap.CapacityKey != "" {
-					capacityKey := *resourceMap.CapacityKey
+				if mappingMap.CapacityKey != nil && *mappingMap.CapacityKey != "" {
+					capacityKey := *mappingMap.CapacityKey
 					if result.ConsumedCapacity == nil {
-						return nil, fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity is nil, but Capacity key '%s' is set in NodeAllocatableResourceMappings for resource %s", key.Namespace, key.Name, result.Device, capacityKey, resourceName)
+						return nil, fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity is nil, but Capacity key '%s' is set in NodeAllocatableResources for resource %s", key.Namespace, key.Name, result.Device, capacityKey, resourceName)
 					}
 					if consumed, exists := result.ConsumedCapacity[capacityKey]; exists {
 						quantity = consumed.DeepCopy()
-						if resourceMap.AllocationMultiplier != nil {
+						if mappingMap.CapacityMultiplier != nil {
 							qDec := quantity.AsDec()
-							multiplier := resourceMap.AllocationMultiplier.DeepCopy()
+							multiplier := mappingMap.CapacityMultiplier.DeepCopy()
 							qDec.Mul(qDec, multiplier.AsDec())
 							quantity = *resource.NewDecimalQuantity(*qDec, quantity.Format)
 						}
@@ -167,24 +170,33 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 						// If the capacityKey is not in ConsumedCapacity, this mapping is not relevant for this allocation
 						continue
 					}
-				} else if resourceMap.AllocationMultiplier != nil {
-					quantity = resourceMap.AllocationMultiplier.DeepCopy()
+				} else if mappingMap.DeviceMultiplier != nil {
+					quantity = mappingMap.DeviceMultiplier.DeepCopy()
 				}
 
-				curQuantity, ok := currentClaimStatus.Resources[resourceName]
-				if !ok {
-					currentClaimStatus.Resources[resourceName] = quantity
-				} else {
-					curQuantity.Add(quantity)
-					currentClaimStatus.Resources[resourceName] = curQuantity
+				found := false
+				for idx := range currentClaimStatus.Mapping {
+					if currentClaimStatus.Mapping[idx].Name == resourceName {
+						currentClaimStatus.Mapping[idx].Quantity.Add(quantity)
+						found = true
+						break
+					}
 				}
-
+				if !found {
+					currentClaimStatus.Mapping = append(currentClaimStatus.Mapping, v1.NodeAllocatableMappedResources{
+						Name:     resourceName,
+						Quantity: new(quantity),
+					})
+				}
 				hasNodeAllocatableClaims = true
 
 			}
 		}
 
 		if hasNodeAllocatableClaims {
+			sort.Slice(currentClaimStatus.Mapping, func(i, j int) bool {
+				return currentClaimStatus.Mapping[i].Name < currentClaimStatus.Mapping[j].Name
+			})
 			claimToStatus[key.UID] = currentClaimStatus
 		}
 	}

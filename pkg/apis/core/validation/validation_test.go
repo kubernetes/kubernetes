@@ -17142,9 +17142,9 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU:    resource.MustParse("1"),
-							core.ResourceMemory: resource.MustParse("1Gi"),
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+							{Name: core.ResourceMemory, Quantity: new(resource.MustParse("1Gi"))},
 						},
 					},
 				},
@@ -17159,15 +17159,15 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
 					},
 					{
 						ResourceClaimName: "my-claim2",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceMemory: resource.MustParse("2Gi"),
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceMemory, Quantity: new(resource.MustParse("2Gi"))},
 						},
 					},
 				},
@@ -17182,15 +17182,15 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							"example.com/foo": resource.MustParse("1"),
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: "example.com/foo", Quantity: new(resource.MustParse("1"))},
 						},
 					},
 				},
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources[example.com/foo]",
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping[0].name",
 			errorMsg:    "must be a node allocatable resource name",
 		},
 		{
@@ -17201,15 +17201,15 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("-1"),
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("-1"))},
 						},
 					},
 				},
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources[cpu]",
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping[0].quantity",
 			errorMsg:    "must be non-negative",
 		},
 		{
@@ -17219,8 +17219,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "my-claim1",
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
 					},
 				},
@@ -17237,8 +17237,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
 					{
 						Containers: []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
@@ -17256,13 +17256,12 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources:         map[core.ResourceName]resource.Quantity{},
 					},
 				},
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeRequired,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources",
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping",
 			errorMsg:    "must not be empty",
 		},
 		{
@@ -17283,8 +17282,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
 					},
 				},
@@ -17309,8 +17308,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "generated-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
 					},
 				},
@@ -17338,8 +17337,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "non-existent-claim",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
 					},
 				},
@@ -30250,9 +30249,10 @@ func TestValidatePodResize(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim-1",
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("100m"),
-						},
+						Mapping: []core.NodeAllocatableMappedResources{{
+							Name:     core.ResourceCPU,
+							Quantity: new(resource.MustParse("100m")),
+						}},
 					},
 				}
 				return p
@@ -30268,9 +30268,10 @@ func TestValidatePodResize(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim-1",
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("100m"),
-						},
+						Mapping: []core.NodeAllocatableMappedResources{{
+							Name:     core.ResourceCPU,
+							Quantity: new(resource.MustParse("100m")),
+						}},
 					},
 				}
 				return p

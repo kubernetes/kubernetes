@@ -139,13 +139,17 @@ func testResourceSliceWithNodeAllocatableResources(name, nodeName, driverName st
 			Name:       fmt.Sprintf("device-%d", d),
 			Attributes: testAttributes(),
 			Capacity:   testNodeAllocatableResourceCapacity(),
-			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 				v1.ResourceCPU: {
-					AllocationMultiplier: ptr.To(resource.MustParse("1")),
-					CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+					Mapping: &resourceapi.NodeAllocatableMapping{
+						CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+					},
 				},
 				"memory": {
-					CapacityKey: ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+					Mapping: &resourceapi.NodeAllocatableMapping{
+						CapacityKey: ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+					},
 				},
 			},
 		}
@@ -1646,83 +1650,155 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"node-allocatable-resource-mappings-both-quantityfrom": {
+		"node-allocatable-resources-both-quantityfrom": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceCPU: {
-						CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
-						AllocationMultiplier: ptr.To(resource.MustParse("1")),
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
 					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"bad-node-allocatable-resource-mappings-no-quantityfrom": {
+		"bad-node-allocatable-resources-capacity-multiplier-without-key": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)), "", "at least one of allocationMultiplier or capacityKey must be set"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityMultiplier"), "1", "must not be set when capacityKey is not set"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {},
-				}
-				return slice
-			}(),
-			enableDRANodeAllocatableResourcesFeatureGate: true,
-		},
-		"bad-node-allocatable-resource-mappings-capacityKey-empty": {
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("capacityKey"), "", "capacityKey must not be an empty string"),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceCPU: {
-						CapacityKey: ptr.To[resourceapi.QualifiedName](""),
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
 					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"bad-node-allocatable-resource-mappings-capacity-key-not-found": {
+		"bad-node-allocatable-resources-device-multiplier-with-key": {
 			wantFailures: field.ErrorList{
-				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("capacityKey"), resourceapi.QualifiedName("nonexistent")),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("deviceMultiplier"), "1", "must not be set when capacityKey is set"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceCPU: {
-						CapacityKey: ptr.To[resourceapi.QualifiedName]("nonexistent"),
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:      ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							DeviceMultiplier: ptr.To(resource.MustParse("1")),
+						},
 					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"bad-node-allocatable-resource-mappings-invalid-allocation-multiplier-negative": {
+		"bad-node-allocatable-resources-capacityKey-empty": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("allocationMultiplier"), "-1", "must be positive"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityKey"), "", "capacityKey must not be an empty string"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey: ptr.To[resourceapi.QualifiedName](""),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-capacity-key-not-found": {
+			wantFailures: field.ErrorList{
+				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityKey"), resourceapi.QualifiedName("nonexistent")),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey: ptr.To[resourceapi.QualifiedName]("nonexistent"),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-invalid-device-multiplier-negative": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("deviceMultiplier"), "-1", "must be positive"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {AllocationMultiplier: ptr.To(resource.MustParse("-1"))},
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							DeviceMultiplier: ptr.To(resource.MustParse("-1")),
+						},
+					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"bad-node-allocatable-resource-mappings-invalid-allocation-multiplier-zero": {
+		"bad-node-allocatable-resources-invalid-capacity-multiplier-negative": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("allocationMultiplier"), "0", "must be positive"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityMultiplier"), "-1", "must be positive"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							CapacityMultiplier: ptr.To(resource.MustParse("-1")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-invalid-device-multiplier-zero": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("deviceMultiplier"), "0", "must be positive"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {AllocationMultiplier: ptr.To(resource.MustParse("0"))},
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							DeviceMultiplier: ptr.To(resource.MustParse("0")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-invalid-capacity-multiplier-zero": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityMultiplier"), "0", "must be positive"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							CapacityMultiplier: ptr.To(resource.MustParse("0")),
+						},
+					},
 				}
 				return slice
 			}(),
@@ -1731,33 +1807,37 @@ func TestValidateResourceSlice(t *testing.T) {
 		"capacity key not in spec.devices[].capacity": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceMemory: {
-						CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/hugepages"),
-						AllocationMultiplier: ptr.To(resource.MustParse("1")),
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/hugepages"),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
 					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 			wantFailures: field.ErrorList{
-				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceMemory)).Child("capacityKey"), resourceapi.QualifiedName("dra.example.com/hugepages")),
+				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceMemory)).Child("mapping").Child("capacityKey"), resourceapi.QualifiedName("dra.example.com/hugepages")),
 			},
 		},
 		"mapped resource is not a node allocatable resource": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceName("dra.example.com/gpu"): {
-						CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
-						AllocationMultiplier: ptr.To(resource.MustParse("1")),
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
 					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key("dra.example.com/gpu"), v1.ResourceName("dra.example.com/gpu"), "must be a node allocatable resource name"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("dra.example.com/gpu"), v1.ResourceName("dra.example.com/gpu"), "must be a node allocatable resource name"),
 			},
 		},
 	}

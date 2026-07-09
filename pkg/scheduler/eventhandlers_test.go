@@ -686,9 +686,10 @@ func TestAdmissionCheck(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim",
-						Resources: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceCPU: resource.MustParse("8"),
-						},
+						Mapping: []v1.NodeAllocatableMappedResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: new(resource.MustParse("8")),
+						}},
 					},
 				}
 				return p
@@ -704,9 +705,10 @@ func TestAdmissionCheck(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim",
-						Resources: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceCPU: resource.MustParse(nodeCPUCapacity[v1.ResourceCPU]), // We should exceed node capacity since we also request 1 CPU in standard request.
-						},
+						Mapping: []v1.NodeAllocatableMappedResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: new(resource.MustParse(nodeCPUCapacity[v1.ResourceCPU])), // We should exceed node capacity since we also request 1 CPU in standard request.
+						}},
 					},
 				}
 				return p
@@ -724,9 +726,10 @@ func TestAdmissionCheck(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim",
-						Resources: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceCPU: cpuQty,
-						},
+						Mapping: []v1.NodeAllocatableMappedResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: new(cpuQty),
+						}},
 					},
 				}
 				return p

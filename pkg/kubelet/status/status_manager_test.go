@@ -534,7 +534,10 @@ func TestStatusEquality(t *testing.T) {
 		{
 			ResourceClaimName: "my-claim",
 			Containers:        []string{"ctr0"},
-			Resources:         map[v1.ResourceName]resource.Quantity{v1.ResourceMemory: resource.MustParse("100Mi")},
+			Mapping: []v1.NodeAllocatableMappedResources{{
+				Name:     v1.ResourceMemory,
+				Quantity: new(resource.MustParse("100Mi")),
+			}},
 		},
 	}
 
