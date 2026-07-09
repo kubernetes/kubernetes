@@ -277,14 +277,22 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		// +k8s:validation-gen-input may direct the generator at types in
 		// a different package than the one where validators will be emitted.
 		inputPath := info.ExternalTypes()
+		pkgToInput[input] = inputPath
 		if inputPath != pkg.Path {
 			klog.V(4).Infof("  input pkg %v", inputPath)
 			inputPkgs = append(inputPkgs, inputPath)
-			pkgToInput[input] = inputPath
+		}
+		// An input's validations may be generated into several packages (a
+		// registered pkg/apis copy + a scheme-free k8s.io/api copy). The
+		// registering one is canonical; at most one may register.
+		_, registers := schemeRegistryTag(pkg)
+		if prev, ok := inputToPkg[inputPath]; !ok {
 			inputToPkg[inputPath] = input
-		} else {
-			pkgToInput[input] = input
-			inputToPkg[input] = input
+		} else if registers {
+			if _, prevRegisters := schemeRegistryTag(context.Universe[prev]); prevRegisters {
+				klog.Fatalf("input %q is generated into two registering packages (%q, %q); mark one +k8s:validation-gen-scheme-registry=nil", inputPath, prev, input)
+			}
+			inputToPkg[inputPath] = input // a registering package displaces a scheme-free one
 		}
 	}
 
@@ -471,7 +479,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					generators = []generator.Generator{
-						NewGenValidations(args.OutputFile, pkg.Path, rootTypes, td, inputToPkg, schemeRegistry, registerThisPkg),
+						NewGenValidations(args.OutputFile, pkg.Path, typesPkg.Path, rootTypes, td, inputToPkg, schemeRegistry, registerThisPkg),
 					}
 					testFixtureTags := testFixtureTag(pkg)
 					if testFixtureTags.Len() > 0 {
@@ -505,7 +513,10 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			})
 
 		// Accumulate per-Kind rules; testTargets emits after the loop.
-		if args.TestOutputRoot != "" {
+		// Skip scheme-free (external) copies: coverage tracks the registered,
+		// apiserver-enforced validation, and an external copy has identical
+		// rules -- collecting it too would double-list the version for the Kind.
+		if args.TestOutputRoot != "" && registerThisPkg {
 			collectReports(typesPkg, rootTypes, td, groupKindReports)
 		}
 	}
