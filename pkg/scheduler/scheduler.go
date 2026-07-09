@@ -110,6 +110,8 @@ type Scheduler struct {
 
 	percentageOfNodesToScore int32
 
+	percentageOfPlacementsToScore int32
+
 	nextStartNodeIndex int
 
 	// logger *must* be initialized when creating a Scheduler,
@@ -136,6 +138,7 @@ type schedulerOptions struct {
 	kubeConfig             *restclient.Config
 	// Overridden by profile level percentageOfNodesToScore if set in v1.
 	percentageOfNodesToScore          int32
+	percentageOfPlacementsToScore     int32
 	podInitialBackoffSeconds          int64
 	podMaxBackoffSeconds              int64
 	podMaxInUnschedulablePodsDuration time.Duration
@@ -208,6 +211,16 @@ func WithPercentageOfNodesToScore(percentageOfNodesToScore *int32) Option {
 	}
 }
 
+// WithPercentageOfPlacementsToScore sets percentageOfPlacementsToScore for Scheduler.
+// The default value of 0 will use an adaptive percentage.
+func WithPercentageOfPlacementsToScore(percentageOfPlacementsToScore *int32) Option {
+	return func(o *schedulerOptions) {
+		if percentageOfPlacementsToScore != nil {
+			o.percentageOfPlacementsToScore = *percentageOfPlacementsToScore
+		}
+	}
+}
+
 // WithFrameworkOutOfTreeRegistry sets the registry for out-of-tree plugins. Those plugins
 // will be appended to the default registry.
 func WithFrameworkOutOfTreeRegistry(registry frameworkruntime.Registry) Option {
@@ -271,6 +284,7 @@ func WithNodeInfoSnapshot(snapshot *internalcache.Snapshot) Option {
 var defaultSchedulerOptions = schedulerOptions{
 	clock:                             clock.RealClock{},
 	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
+	percentageOfPlacementsToScore:     schedulerapi.DefaultPercentageOfPlacementsToScore,
 	podInitialBackoffSeconds:          int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:              int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 	podMaxInUnschedulablePodsDuration: internalqueue.DefaultPodMaxInUnschedulablePodsDuration,
@@ -459,6 +473,7 @@ func New(ctx context.Context,
 		client:                                 client,
 		nodeInfoSnapshot:                       snapshot,
 		percentageOfNodesToScore:               options.percentageOfNodesToScore,
+		percentageOfPlacementsToScore:          options.percentageOfPlacementsToScore,
 		Extenders:                              extenders,
 		StopEverything:                         stopEverything,
 		SchedulingQueue:                        podQueue,

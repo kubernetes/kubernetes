@@ -74,6 +74,17 @@ func (r *revertFns) revert() {
 	*r = nil
 }
 
+const (
+	// minFeasiblePlacementsToFind is the minimum number of placements that would be scored
+	// in each scheduling cycle.
+	minFeasiblePlacementsToFind = 1
+	// minFeasiblePlacementsPercentageToFind is the minimum percentage of placements that
+	// would be scored in each scheduling cycle. This is a semi-arbitrary value
+	// to ensure that a certain minimum of placements are checked for feasibility.
+	// This in turn helps ensure a minimum level of spreading.
+	minFeasiblePlacementsPercentageToFind = 5
+)
+
 // errPodGroupUnschedulable is used to describe that the pod group is unschedulable.
 var errPodGroupUnschedulable = fmt.Errorf("pod group is unschedulable")
 
@@ -992,6 +1003,11 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
 
+	numPlacementsToFind := int32(1)
+	if schedFwk.HasPlacementScorePlugins() {
+		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
+	}
+
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
 	defer func() {
 		sched.nodeInfoSnapshot.ForgetPlacement()
@@ -1033,6 +1049,10 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 			successfulResults[placement] = result
 		}
 		metrics.ObservePlacementEvaluation(evaluationResult, schedFwk.ProfileName(), metrics.SinceInSeconds(evaluationStart))
+
+		if len(successfulResults) >= int(numPlacementsToFind) {
+			break
+		}
 	}
 
 	if len(successfulResults) == 0 {
@@ -1096,6 +1116,11 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 	var anyResultSubtree map[fwk.EntityKey]*podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult)
 
+	numPlacementsToFind := int32(1)
+	if schedFwk.HasPlacementScorePlugins() {
+		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
+	}
+
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
 	defer func() {
 		sched.nodeInfoSnapshot.ForgetPlacement()
@@ -1131,6 +1156,10 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 
 		if result.status.IsSuccess() {
 			successfulResults[placement] = subtreeResult
+		}
+
+		if len(successfulResults) >= int(numPlacementsToFind) {
+			break
 		}
 	}
 
@@ -1168,6 +1197,42 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 	maps.Copy(results, bestResult)
 
 	return bestResult[pgKey(podGroupInfo)], revertFns
+}
+
+// numFeasiblePlacementsToFind returns the number of feasible placements that once found, the scheduler stops
+// its search for more feasible placements.
+func (sched *Scheduler) numFeasiblePlacementsToFind(percentageOfPlacementsToScore *int32, placements []*fwk.Placement) (numPlacements int32) {
+	numAllPlacements := int32(len(placements))
+
+	if numAllPlacements < minFeasiblePlacementsToFind {
+		return numAllPlacements
+	}
+
+	// Use profile percentageOfPlacementsToScore if it's set. Otherwise, use global percentageOfPlacementsToScore.
+	var percentage int32
+	if percentageOfPlacementsToScore != nil {
+		percentage = *percentageOfPlacementsToScore
+	} else {
+		percentage = sched.percentageOfPlacementsToScore
+	}
+
+	// If neither is set or the set value is 0, linearly interpolate the value between (0, 100) and (5000, 10),
+	// that is for small clusters use 100% of the placements, and for large clusters use 10% of the placements,
+	// with a hard cap at 5% placements for even larger clusters.
+	if percentage == 0 {
+		numAllNodes := 0
+		for _, placement := range placements {
+			// We are summing up placement nodes as those can overlap or skip over certain nodes.
+			// For the purpose of this computation we care about the upper bound of computed nodes throughout the scheduling cycle,
+			// which can be different than the number of nodes in the cluster.
+			numAllNodes += len(placement.Nodes)
+		}
+		percentage = max(minFeasiblePlacementsPercentageToFind, int32(100-numAllNodes*9/500))
+	}
+
+	numPlacements = max(minFeasiblePlacementsToFind, numAllPlacements*percentage/100)
+
+	return numPlacements
 }
 
 func (sched *Scheduler) findBestPodGroupPlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState fwk.PodGroupCycleState, podGroupInfo *framework.PodGroupInfo, successfulResults map[*fwk.Placement]*podGroupAlgorithmResult) (*fwk.Placement, *fwk.Status) {
