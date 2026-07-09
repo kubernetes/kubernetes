@@ -195,9 +195,9 @@ var sliceWithConsumableCapacity = func() *resource.ResourceSlice {
 var sliceWithNodeAllocatableResources = func() *resource.ResourceSlice {
 	obj := slice.DeepCopy()
 	instanceQuantity := k8sresource.MustParse("1")
-	obj.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
+	obj.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resource.NodeAllocatableResource{
 		v1.ResourceCPU: {
-			AllocationMultiplier: &instanceQuantity,
+			DeviceMultiplier: &instanceQuantity,
 		},
 	}
 	return obj

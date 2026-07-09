@@ -547,6 +547,16 @@ func (in NodeAffinity) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodeAllocatableMappedResources) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.NodeAllocatableMappedResources"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodeAllocatableOverheadResources) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.NodeAllocatableOverheadResources"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NodeAllocatableResourceClaimStatus) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
 }

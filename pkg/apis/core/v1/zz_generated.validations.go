@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -596,6 +597,321 @@ func Validate_Node(
 	return errs
 }
 
+// Validate_NodeAllocatableMappedResources validates an instance of NodeAllocatableMappedResources according
+// to declarative validation rules in the API schema.
+func Validate_NodeAllocatableMappedResources(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.NodeAllocatableMappedResources) (errs field.ErrorList) {
+
+	{ // field corev1.NodeAllocatableMappedResources.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.ResourceName,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeAllocatableMappedResources) *corev1.ResourceName {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.NodeAllocatableMappedResources.Quantity
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeAllocatableMappedResources) *resource.Quantity {
+				return oldObj.Quantity
+			})
+		errs = append(errs, fn(fldPath.Child("quantity"), obj.Quantity, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_NodeAllocatableOverheadResources validates an instance of NodeAllocatableOverheadResources according
+// to declarative validation rules in the API schema.
+func Validate_NodeAllocatableOverheadResources(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.NodeAllocatableOverheadResources) (errs field.ErrorList) {
+
+	{ // field corev1.NodeAllocatableOverheadResources.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.ResourceName,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeAllocatableOverheadResources) *corev1.ResourceName {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.NodeAllocatableOverheadResources.PerPod
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeAllocatableOverheadResources) *resource.Quantity {
+				return oldObj.PerPod
+			})
+		errs = append(errs, fn(fldPath.Child("perPod"), obj.PerPod, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.NodeAllocatableOverheadResources.PerContainer
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeAllocatableOverheadResources) *resource.Quantity {
+				return oldObj.PerContainer
+			})
+		errs = append(errs, fn(fldPath.Child("perContainer"), obj.PerContainer, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_NodeAllocatableResourceClaimStatus validates an instance of NodeAllocatableResourceClaimStatus according
+// to declarative validation rules in the API schema.
+func Validate_NodeAllocatableResourceClaimStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.NodeAllocatableResourceClaimStatus) (errs field.ErrorList) {
+
+	{ // field corev1.NodeAllocatableResourceClaimStatus.ResourceClaimName
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeAllocatableResourceClaimStatus) *string {
+				return &oldObj.ResourceClaimName
+			})
+		errs = append(errs, fn(fldPath.Child("resourceClaimName"), &obj.ResourceClaimName, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.NodeAllocatableResourceClaimStatus.Containers
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with set semantics require unique values
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeAllocatableResourceClaimStatus) []string {
+				return oldObj.Containers
+			})
+		errs = append(errs, fn(fldPath.Child("containers"), obj.Containers, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.NodeAllocatableResourceClaimStatus.Mapping
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.NodeAllocatableMappedResources,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.NodeAllocatableMappedResources, b *corev1.NodeAllocatableMappedResources) bool {
+					return a.Name == b.Name
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.NodeAllocatableMappedResources, b *corev1.NodeAllocatableMappedResources) bool {
+					return a.Name == b.Name
+				}, validate.SemanticDeepEqual, Validate_NodeAllocatableMappedResources); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeAllocatableResourceClaimStatus) []corev1.NodeAllocatableMappedResources {
+				return oldObj.Mapping
+			})
+		errs = append(errs, fn(fldPath.Child("mapping"), obj.Mapping, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.NodeAllocatableResourceClaimStatus.Overhead
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.NodeAllocatableOverheadResources,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.NodeAllocatableOverheadResources, b *corev1.NodeAllocatableOverheadResources) bool {
+					return a.Name == b.Name
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.NodeAllocatableOverheadResources, b *corev1.NodeAllocatableOverheadResources) bool {
+					return a.Name == b.Name
+				}, validate.SemanticDeepEqual, Validate_NodeAllocatableOverheadResources); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeAllocatableResourceClaimStatus) []corev1.NodeAllocatableOverheadResources {
+				return oldObj.Overhead
+			})
+		errs = append(errs, fn(fldPath.Child("overhead"), obj.Overhead, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_NodePodPreemptionPolicy validates an instance of NodePodPreemptionPolicy according
 // to declarative validation rules in the API schema.
 func Validate_NodePodPreemptionPolicy(
@@ -1115,7 +1431,48 @@ func Validate_PodStatus(
 	// field corev1.PodStatus.ExtendedResourceClaimStatus has no validation
 	// field corev1.PodStatus.AllocatedResources has no validation
 	// field corev1.PodStatus.Resources has no validation
-	// field corev1.PodStatus.NodeAllocatableResourceClaimStatuses has no validation
+
+	{ // field corev1.PodStatus.NodeAllocatableResourceClaimStatuses
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.NodeAllocatableResourceClaimStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.NodeAllocatableResourceClaimStatus, b *corev1.NodeAllocatableResourceClaimStatus) bool {
+					return a.ResourceClaimName == b.ResourceClaimName
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.NodeAllocatableResourceClaimStatus, b *corev1.NodeAllocatableResourceClaimStatus) bool {
+					return a.ResourceClaimName == b.ResourceClaimName
+				}, validate.SemanticDeepEqual, Validate_NodeAllocatableResourceClaimStatus); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodStatus) []corev1.NodeAllocatableResourceClaimStatus {
+				return oldObj.NodeAllocatableResourceClaimStatuses
+			})
+		errs = append(errs, fn(fldPath.Child("nodeAllocatableResourceClaimStatuses"), obj.NodeAllocatableResourceClaimStatuses, oldVal, oldObj != nil)...)
+	}
 
 	{ // field corev1.PodStatus.VolumeHealth
 		fn := func(

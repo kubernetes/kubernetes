@@ -246,6 +246,10 @@ func (m *NodeAddress) Reset() { *m = NodeAddress{} }
 
 func (m *NodeAffinity) Reset() { *m = NodeAffinity{} }
 
+func (m *NodeAllocatableMappedResources) Reset() { *m = NodeAllocatableMappedResources{} }
+
+func (m *NodeAllocatableOverheadResources) Reset() { *m = NodeAllocatableOverheadResources{} }
+
 func (m *NodeAllocatableResourceClaimStatus) Reset() { *m = NodeAllocatableResourceClaimStatus{} }
 
 func (m *NodeCondition) Reset() { *m = NodeCondition{} }
@@ -6410,6 +6414,98 @@ func (m *NodeAffinity) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *NodeAllocatableMappedResources) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NodeAllocatableMappedResources) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *NodeAllocatableMappedResources) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Quantity != nil {
+		{
+			size, err := m.Quantity.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *NodeAllocatableOverheadResources) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NodeAllocatableOverheadResources) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *NodeAllocatableOverheadResources) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.PerContainer != nil {
+		{
+			size, err := m.PerContainer.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.PerPod != nil {
+		{
+			size, err := m.PerPod.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
 func (m *NodeAllocatableResourceClaimStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -6430,17 +6526,10 @@ func (m *NodeAllocatableResourceClaimStatus) MarshalToSizedBuffer(dAtA []byte) (
 	_ = i
 	var l int
 	_ = l
-	if len(m.Resources) > 0 {
-		keysForResources := make([]string, 0, len(m.Resources))
-		for k := range m.Resources {
-			keysForResources = append(keysForResources, string(k))
-		}
-		sort.Strings(keysForResources)
-		for iNdEx := len(keysForResources) - 1; iNdEx >= 0; iNdEx-- {
-			v := m.Resources[ResourceName(keysForResources[iNdEx])]
-			baseI := i
+	if len(m.Overhead) > 0 {
+		for iNdEx := len(m.Overhead) - 1; iNdEx >= 0; iNdEx-- {
 			{
-				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				size, err := m.Overhead[iNdEx].MarshalToSizedBuffer(dAtA[:i])
 				if err != nil {
 					return 0, err
 				}
@@ -6448,15 +6537,21 @@ func (m *NodeAllocatableResourceClaimStatus) MarshalToSizedBuffer(dAtA []byte) (
 				i = encodeVarintGenerated(dAtA, i, uint64(size))
 			}
 			i--
-			dAtA[i] = 0x12
-			i -= len(keysForResources[iNdEx])
-			copy(dAtA[i:], keysForResources[iNdEx])
-			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForResources[iNdEx])))
+			dAtA[i] = 0x2a
+		}
+	}
+	if len(m.Mapping) > 0 {
+		for iNdEx := len(m.Mapping) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Mapping[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
 			i--
-			dAtA[i] = 0xa
-			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
-			i--
-			dAtA[i] = 0x1a
+			dAtA[i] = 0x22
 		}
 	}
 	if len(m.Containers) > 0 {
@@ -17623,6 +17718,40 @@ func (m *NodeAffinity) Size() (n int) {
 	return n
 }
 
+func (m *NodeAllocatableMappedResources) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.Quantity != nil {
+		l = m.Quantity.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *NodeAllocatableOverheadResources) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.PerPod != nil {
+		l = m.PerPod.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.PerContainer != nil {
+		l = m.PerContainer.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
 func (m *NodeAllocatableResourceClaimStatus) Size() (n int) {
 	if m == nil {
 		return 0
@@ -17637,13 +17766,16 @@ func (m *NodeAllocatableResourceClaimStatus) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
-	if len(m.Resources) > 0 {
-		for k, v := range m.Resources {
-			_ = k
-			_ = v
-			l = v.Size()
-			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
-			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+	if len(m.Mapping) > 0 {
+		for _, e := range m.Mapping {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.Overhead) > 0 {
+		for _, e := range m.Overhead {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
 	return n
@@ -22616,24 +22748,48 @@ func (this *NodeAffinity) String() string {
 	}, "")
 	return s
 }
+func (this *NodeAllocatableMappedResources) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NodeAllocatableMappedResources{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Quantity:` + strings.Replace(fmt.Sprintf("%v", this.Quantity), "Quantity", "resource.Quantity", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *NodeAllocatableOverheadResources) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NodeAllocatableOverheadResources{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`PerPod:` + strings.Replace(fmt.Sprintf("%v", this.PerPod), "Quantity", "resource.Quantity", 1) + `,`,
+		`PerContainer:` + strings.Replace(fmt.Sprintf("%v", this.PerContainer), "Quantity", "resource.Quantity", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *NodeAllocatableResourceClaimStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	keysForResources := make([]string, 0, len(this.Resources))
-	for k := range this.Resources {
-		keysForResources = append(keysForResources, string(k))
+	repeatedStringForMapping := "[]NodeAllocatableMappedResources{"
+	for _, f := range this.Mapping {
+		repeatedStringForMapping += strings.Replace(strings.Replace(f.String(), "NodeAllocatableMappedResources", "NodeAllocatableMappedResources", 1), `&`, ``, 1) + ","
 	}
-	sort.Strings(keysForResources)
-	mapStringForResources := "map[ResourceName]resource.Quantity{"
-	for _, k := range keysForResources {
-		mapStringForResources += fmt.Sprintf("%v: %v,", k, this.Resources[ResourceName(k)])
+	repeatedStringForMapping += "}"
+	repeatedStringForOverhead := "[]NodeAllocatableOverheadResources{"
+	for _, f := range this.Overhead {
+		repeatedStringForOverhead += strings.Replace(strings.Replace(f.String(), "NodeAllocatableOverheadResources", "NodeAllocatableOverheadResources", 1), `&`, ``, 1) + ","
 	}
-	mapStringForResources += "}"
+	repeatedStringForOverhead += "}"
 	s := strings.Join([]string{`&NodeAllocatableResourceClaimStatus{`,
 		`ResourceClaimName:` + fmt.Sprintf("%v", this.ResourceClaimName) + `,`,
 		`Containers:` + fmt.Sprintf("%v", this.Containers) + `,`,
-		`Resources:` + mapStringForResources + `,`,
+		`Mapping:` + repeatedStringForMapping + `,`,
+		`Overhead:` + repeatedStringForOverhead + `,`,
 		`}`,
 	}, "")
 	return s
@@ -43877,6 +44033,278 @@ func (m *NodeAffinity) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *NodeAllocatableMappedResources) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NodeAllocatableMappedResources: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NodeAllocatableMappedResources: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = ResourceName(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Quantity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Quantity == nil {
+				m.Quantity = &resource.Quantity{}
+			}
+			if err := m.Quantity.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NodeAllocatableOverheadResources) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NodeAllocatableOverheadResources: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NodeAllocatableOverheadResources: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = ResourceName(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PerPod", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.PerPod == nil {
+				m.PerPod = &resource.Quantity{}
+			}
+			if err := m.PerPod.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PerContainer", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.PerContainer == nil {
+				m.PerContainer = &resource.Quantity{}
+			}
+			if err := m.PerContainer.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *NodeAllocatableResourceClaimStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -43970,9 +44398,9 @@ func (m *NodeAllocatableResourceClaimStatus) Unmarshal(dAtA []byte) error {
 			}
 			m.Containers = append(m.Containers, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
-		case 3:
+		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Resources", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Mapping", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -43999,105 +44427,44 @@ func (m *NodeAllocatableResourceClaimStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Resources == nil {
-				m.Resources = make(map[ResourceName]resource.Quantity)
+			m.Mapping = append(m.Mapping, NodeAllocatableMappedResources{})
+			if err := m.Mapping[len(m.Mapping)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
-			var mapkey ResourceName
-			mapvalue := &resource.Quantity{}
-			for iNdEx < postIndex {
-				entryPreIndex := iNdEx
-				var wire uint64
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowGenerated
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					wire |= uint64(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Overhead", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
 				}
-				fieldNum := int32(wire >> 3)
-				if fieldNum == 1 {
-					var stringLenmapkey uint64
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowGenerated
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						stringLenmapkey |= uint64(b&0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-					intStringLenmapkey := int(stringLenmapkey)
-					if intStringLenmapkey < 0 {
-						return ErrInvalidLengthGenerated
-					}
-					postStringIndexmapkey := iNdEx + intStringLenmapkey
-					if postStringIndexmapkey < 0 {
-						return ErrInvalidLengthGenerated
-					}
-					if postStringIndexmapkey > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapkey = ResourceName(dAtA[iNdEx:postStringIndexmapkey])
-					iNdEx = postStringIndexmapkey
-				} else if fieldNum == 2 {
-					var mapmsglen int
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowGenerated
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						mapmsglen |= int(b&0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-					if mapmsglen < 0 {
-						return ErrInvalidLengthGenerated
-					}
-					postmsgIndex := iNdEx + mapmsglen
-					if postmsgIndex < 0 {
-						return ErrInvalidLengthGenerated
-					}
-					if postmsgIndex > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapvalue = &resource.Quantity{}
-					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
-						return err
-					}
-					iNdEx = postmsgIndex
-				} else {
-					iNdEx = entryPreIndex
-					skippy, err := skipGenerated(dAtA[iNdEx:])
-					if err != nil {
-						return err
-					}
-					if (skippy < 0) || (iNdEx+skippy) < 0 {
-						return ErrInvalidLengthGenerated
-					}
-					if (iNdEx + skippy) > postIndex {
-						return io.ErrUnexpectedEOF
-					}
-					iNdEx += skippy
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
 				}
 			}
-			m.Resources[ResourceName(mapkey)] = *mapvalue
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Overhead = append(m.Overhead, NodeAllocatableOverheadResources{})
+			if err := m.Overhead[len(m.Overhead)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

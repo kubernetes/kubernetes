@@ -339,9 +339,9 @@ func TestConversion(t *testing.T) {
 								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
 									"cpu_per_instance": {IntValue: ptr.To[int64](2)},
 								},
-								NodeAllocatableResourceMappings: map[v1.ResourceName]resourcev1beta1.NodeAllocatableResourceMapping{
+								NodeAllocatableResources: map[v1.ResourceName]resourcev1beta1.NodeAllocatableResource{
 									"cpu": {
-										AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+										DeviceMultiplier: ptr.To(apiresource.MustParse("1")),
 									},
 								},
 							},
@@ -365,9 +365,9 @@ func TestConversion(t *testing.T) {
 							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
 								"cpu_per_instance": {IntValue: ptr.To[int64](2)},
 							},
-							NodeAllocatableResourceMappings: map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
+							NodeAllocatableResources: map[v1.ResourceName]resource.NodeAllocatableResource{
 								"cpu": {
-									AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+									DeviceMultiplier: ptr.To(apiresource.MustParse("1")),
 								},
 							}},
 					},
@@ -391,9 +391,9 @@ func TestConversion(t *testing.T) {
 							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
 								"cpu_per_instance": {IntValue: ptr.To[int64](2)},
 							},
-							NodeAllocatableResourceMappings: map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
+							NodeAllocatableResources: map[v1.ResourceName]resource.NodeAllocatableResource{
 								"cpu": {
-									AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+									DeviceMultiplier: ptr.To(apiresource.MustParse("1")),
 								},
 							}},
 					},
@@ -416,9 +416,9 @@ func TestConversion(t *testing.T) {
 								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
 									"cpu_per_instance": {IntValue: ptr.To[int64](2)},
 								},
-								NodeAllocatableResourceMappings: map[v1.ResourceName]resourcev1beta1.NodeAllocatableResourceMapping{
+								NodeAllocatableResources: map[v1.ResourceName]resourcev1beta1.NodeAllocatableResource{
 									"cpu": {
-										AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+										DeviceMultiplier: ptr.To(apiresource.MustParse("1")),
 									},
 								},
 							},

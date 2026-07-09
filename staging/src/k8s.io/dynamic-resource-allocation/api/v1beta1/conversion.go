@@ -188,17 +188,17 @@ func Convert_v1beta1_Device_To_v1_Device(in *resourcev1beta1.Device, out *resour
 		out.BindingConditions = basic.BindingConditions
 		out.BindingFailureConditions = basic.BindingFailureConditions
 		out.AllowMultipleAllocations = basic.AllowMultipleAllocations
-		if basic.NodeAllocatableResourceMappings != nil {
-			out.NodeAllocatableResourceMappings = make(map[corev1.ResourceName]resourceapi.NodeAllocatableResourceMapping)
-			for key, value := range basic.NodeAllocatableResourceMappings {
-				var outVal resourceapi.NodeAllocatableResourceMapping
-				if err := autoConvert_v1beta1_NodeAllocatableResourceMapping_To_v1_NodeAllocatableResourceMapping(&value, &outVal, s); err != nil {
+		if basic.NodeAllocatableResources != nil {
+			out.NodeAllocatableResources = make(map[corev1.ResourceName]resourceapi.NodeAllocatableResource)
+			for key, value := range basic.NodeAllocatableResources {
+				var outVal resourceapi.NodeAllocatableResource
+				if err := autoConvert_v1beta1_NodeAllocatableResource_To_v1_NodeAllocatableResource(&value, &outVal, s); err != nil {
 					return err
 				}
-				out.NodeAllocatableResourceMappings[key] = outVal
+				out.NodeAllocatableResources[key] = outVal
 			}
 		} else {
-			out.NodeAllocatableResourceMappings = nil
+			out.NodeAllocatableResources = nil
 		}
 	}
 	return nil
@@ -249,17 +249,17 @@ func Convert_v1_Device_To_v1beta1_Device(in *resourceapi.Device, out *resourcev1
 	out.Basic.BindingConditions = in.BindingConditions
 	out.Basic.BindingFailureConditions = in.BindingFailureConditions
 	out.Basic.AllowMultipleAllocations = in.AllowMultipleAllocations
-	if in.NodeAllocatableResourceMappings != nil {
-		out.Basic.NodeAllocatableResourceMappings = make(map[corev1.ResourceName]resourcev1beta1.NodeAllocatableResourceMapping)
-		for key, value := range in.NodeAllocatableResourceMappings {
-			var outVal resourcev1beta1.NodeAllocatableResourceMapping
-			if err := autoConvert_v1_NodeAllocatableResourceMapping_To_v1beta1_NodeAllocatableResourceMapping(&value, &outVal, s); err != nil {
+	if in.NodeAllocatableResources != nil {
+		out.Basic.NodeAllocatableResources = make(map[corev1.ResourceName]resourcev1beta1.NodeAllocatableResource)
+		for key, value := range in.NodeAllocatableResources {
+			var outVal resourcev1beta1.NodeAllocatableResource
+			if err := autoConvert_v1_NodeAllocatableResource_To_v1beta1_NodeAllocatableResource(&value, &outVal, s); err != nil {
 				return err
 			}
-			out.Basic.NodeAllocatableResourceMappings[key] = outVal
+			out.Basic.NodeAllocatableResources[key] = outVal
 		}
 	} else {
-		out.Basic.NodeAllocatableResourceMappings = nil
+		out.Basic.NodeAllocatableResources = nil
 	}
 
 	return nil
