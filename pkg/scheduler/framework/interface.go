@@ -287,6 +287,9 @@ type Framework interface {
 	// HasScorePlugins returns true if at least one Score plugin is defined.
 	HasScorePlugins() bool
 
+	// HasPlacementScorePlugins returns true if at least one PlacementScore plugin is defined.
+	HasPlacementScorePlugins() bool
+
 	// PodGroupPostFilterPlugins returns registered PodGroupPostFilter plugins.
 	PodGroupPostFilterPlugins() []fwk.PodGroupPostFilterPlugin
 
@@ -295,6 +298,9 @@ type Framework interface {
 
 	// PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
 	PercentageOfNodesToScore() *int32
+
+	// PercentageOfPlacementsToScore returns percentageOfPlacementsToScore associated to a profile.
+	PercentageOfPlacementsToScore() *int32
 
 	// SetPodNominator sets the PodNominator
 	SetPodNominator(nominator fwk.PodNominator)
