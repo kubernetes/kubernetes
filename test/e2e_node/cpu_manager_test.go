@@ -1906,7 +1906,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		})
 
 		ginkgo.It("should preserve CPU affinity after restarting all containers", func(ctx context.Context) {
-			cpuCount := 2 // total
+			cpuCount := 4 // total
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
@@ -1953,11 +1953,11 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 							`},
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("1000m"),
+									v1.ResourceCPU:    resource.MustParse("1"),
 									v1.ResourceMemory: resource.MustParse("100Mi"),
 								},
 								Requests: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("1000m"),
+									v1.ResourceCPU:    resource.MustParse("1"),
 									v1.ResourceMemory: resource.MustParse("100Mi"),
 								},
 							},
@@ -1976,12 +1976,12 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 							Command: []string{"/bin/sh", "-c", "sleep 10000"},
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("10m"),
-									v1.ResourceMemory: resource.MustParse("10Mi"),
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
 								},
 								Requests: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("10m"),
-									v1.ResourceMemory: resource.MustParse("10Mi"),
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
 								},
 							},
 						},
