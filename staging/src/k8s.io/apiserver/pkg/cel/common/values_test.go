@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -1011,6 +1012,217 @@ func TestToValue(t *testing.T) {
 				testUnstructuredToVal(t, tt, env)
 			})
 		})
+	}
+}
+
+func TestReflectiveWrapperValueReturnsGoValue(t *testing.T) {
+	list := common.TypedToVal([]int64{1, 2, 3}, &openapi.Schema{Schema: intArraySchema})
+	if _, ok := list.Value().([]int64); !ok {
+		t.Errorf("typedList.Value() returned %T, want []int64", list.Value())
+	}
+	m := common.TypedToVal(map[string]int64{"a": 1}, &openapi.Schema{Schema: intMapSchema})
+	if _, ok := m.Value().(map[string]int64); !ok {
+		t.Errorf("typedMap.Value() returned %T, want map[string]int64", m.Value())
+	}
+	native, err := m.ConvertToNative(reflect.TypeFor[map[string]int64]())
+	if err != nil {
+		t.Fatalf("typedMap.ConvertToNative failed: %v", err)
+	}
+	if _, ok := native.(map[string]int64); !ok {
+		t.Errorf("typedMap.ConvertToNative returned %T, want map[string]int64", native)
+	}
+}
+
+func TestListAdd(t *testing.T) {
+	type AddListsStruct struct {
+		Tags   []string       `json:"tags"`
+		I32s   []int32        `json:"i32s"`
+		Items  []MapListEntry `json:"items"`
+		Nested []Nested       `json:"nested"`
+		Empty  []int64        `json:"empty"`
+	}
+
+	mapListEntrySchema := &spec.Schema{SchemaProps: spec.SchemaProps{
+		Type: []string{"object"},
+		Properties: map[string]spec.Schema{
+			"key1":  *stringSchema,
+			"key2":  *stringSchema,
+			"value": *int64Schema,
+		},
+	}}
+
+	addListsSchema := &spec.Schema{
+		SchemaProps: spec.SchemaProps{
+			Type: []string{"object"},
+			Properties: map[string]spec.Schema{
+				"tags":   *stringArraySchema,
+				"i32s":   *spec.ArrayProperty(int32Schema),
+				"items":  *spec.ArrayProperty(mapListEntrySchema),
+				"nested": *spec.ArrayProperty(nestedSchema),
+				"empty":  *intArraySchema,
+			},
+		},
+	}
+
+	x := typedValue{value: AddListsStruct{
+		Tags:   []string{"a", "b", "c"},
+		I32s:   []int32{1, 2, 3},
+		Items:  []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
+		Nested: []Nested{{Name: "n1", Info: Struct{S: "hello"}}},
+		Empty:  []int64{},
+	}, schema: addListsSchema}
+	y := typedValue{value: AddListsStruct{
+		Tags:   []string{"d", "e"},
+		I32s:   []int32{30},
+		Items:  []MapListEntry{{Key1: "yk1", Key2: "yk2", Value: 7}},
+		Nested: []Nested{},
+		Empty:  []int64{},
+	}, schema: addListsSchema}
+
+	activation := map[string]typedValue{"x": x, "y": y}
+
+	tests := []struct {
+		testCase
+		skipTyped bool
+		// skipSchemaless: SchemalessTypedToVal has no schema, so map/set lists behave atomically.
+		skipSchemaless   bool
+		skipUnstructured bool
+	}{
+		{testCase: testCase{
+			name:       "string list + literal list",
+			expression: "(x.tags + ['d']) == ['a', 'b', 'c', 'd']",
+		}},
+		{testCase: testCase{
+			name:       "string list + string list",
+			expression: "(x.tags + y.tags) == ['a', 'b', 'c', 'd', 'e']",
+		}},
+		{testCase: testCase{
+			name:       "int32 list + literal list",
+			expression: "(x.i32s + [4]) == [1, 2, 3, 4]",
+		}},
+		{testCase: testCase{
+			name:       "int32 list + int32 list",
+			expression: "(x.i32s + y.i32s) == [1, 2, 3, 30]",
+		}},
+		{testCase: testCase{
+			name:       "empty list + literal list",
+			expression: "(x.empty + [1]) == [1]",
+		}},
+		{testCase: testCase{
+			name:       "list + empty literal list",
+			expression: "(x.tags + []) == ['a', 'b', 'c']",
+		}},
+		{testCase: testCase{
+			name:       "chained concatenation",
+			expression: "(x.tags + ['d'] + y.tags) == ['a', 'b', 'c', 'd', 'd', 'e']",
+		}},
+		{testCase: testCase{
+			name:       "struct list + literal list, field access",
+			expression: "(x.items + [{'key1': 'lk1', 'key2': 'lk2', 'value': 100}])[2].value == 100",
+		}, // skipUnstructured: unstructuredList.Add stores raw CEL literal element values that UnstructuredToVal cannot rewrap.
+			skipUnstructured: true},
+		{testCase: testCase{
+			name:       "struct list + literal list, exists",
+			expression: "(x.items + [{'key1': 'lk1', 'key2': 'lk2', 'value': 100}]).exists(e, e.key1 == 'lk1')",
+		}, // skipUnstructured: unstructuredList.Add stores raw CEL literal element values that UnstructuredToVal cannot rewrap.
+			skipUnstructured: true},
+		{testCase: testCase{
+			name:       "literal list + struct list",
+			expression: "([{'key1': 'lk1'}] + x.items)[0].key1 == 'lk1' && ([{'key1': 'lk1'}] + x.items)[1].key1 == 'k1v1'",
+		}},
+		{testCase: testCase{
+			name:       "struct list + struct list",
+			expression: "(x.items + y.items)[2].key1 == 'yk1'",
+		}},
+		{testCase: testCase{
+			name:       "nested field access on appended literal",
+			expression: "(x.nested + [{'name': 'n2', 'info': {'s': 'deep'}}])[1].info.s == 'deep'",
+		}, // skipUnstructured: unstructuredList.Add stores raw CEL literal element values that UnstructuredToVal cannot rewrap.
+			skipUnstructured: true},
+		{testCase: testCase{
+			name:       "size of concatenated list",
+			expression: "size(x.items + [{'key1': 'lk1'}]) == 3",
+		}},
+		{testCase: testCase{
+			name:       "all over concatenated list",
+			expression: "(x.i32s + [4]).all(i, i < 100)",
+		}},
+		{testCase: testCase{
+			name:       "membership in concatenated list",
+			expression: "4 in (x.i32s + [4])",
+		}},
+		{testCase: testCase{
+			name:       "heterogeneous literal elements",
+			expression: "(x.tags + [1])[3] == 1",
+		}, // skipUnstructured: unstructuredList.Add stores raw CEL literal element values that UnstructuredToVal cannot rewrap.
+			skipUnstructured: true},
+		{testCase: testCase{
+			name:       "add non-list",
+			expression: "(x.tags + dyn(1)) == ['a']",
+			wantErr:    "no such overload",
+		}},
+		{testCase: testCase{
+			name:       "index out of bounds on concatenated list",
+			expression: "(x.i32s + [4])[10] == 1",
+			wantErr:    "index out of bounds: 10",
+		}},
+	}
+
+	var opts []cel.EnvOption
+	for k := range activation {
+		opts = append(opts, cel.Variable(k, cel.DynType))
+	}
+	opts = append(opts, cel.StdLib())
+	env, err := cel.NewEnv(opts...)
+	if err != nil {
+		t.Fatalf("Env creation error: %v", err)
+	}
+
+	for _, tt := range tests {
+		tt.testCase.activation = activation
+		t.Run(tt.name, func(t *testing.T) {
+			if !tt.skipTyped {
+				t.Run("TypedToVal", func(t *testing.T) {
+					testTypedToVal(t, env, tt.testCase)
+				})
+			}
+			if !tt.skipSchemaless {
+				t.Run("SchemalessTypedToVal", func(t *testing.T) {
+					testSchemalessTypedToVal(t, env, tt.testCase)
+				})
+			}
+			if !tt.skipUnstructured {
+				t.Run("UnstructuredToVal", func(t *testing.T) {
+					testUnstructuredToVal(t, tt.testCase, env)
+				})
+			}
+		})
+	}
+}
+
+func schemalessTypedToValActivation(vals map[string]typedValue) map[string]interface{} {
+	activation := make(map[string]interface{}, len(vals))
+	for k, tv := range vals {
+		activation[k] = common.SchemalessTypedToVal(tv.value)
+	}
+	return activation
+}
+
+func testSchemalessTypedToVal(t *testing.T, env *cel.Env, tt testCase) {
+	out, err := evalExpression(t, env, tt.expression, schemalessTypedToValActivation(tt.activation))
+	if err != nil && len(tt.wantErr) == 0 {
+		t.Fatalf("Unexpected err with schemaless typed values: %v", err)
+	}
+	if len(tt.wantErr) > 0 {
+		if err == nil {
+			t.Fatalf("Expected error '%s' during evaluation with schemaless typed values, but got none", tt.wantErr)
+		}
+		if err.Error() != tt.wantErr {
+			t.Fatalf("Expected error '%s' during evaluation with schemaless typed values, but got: %v", tt.wantErr, err)
+		}
+	}
+	if len(tt.wantErr) == 0 && out != types.True {
+		t.Errorf("Expected true with schemaless typed values but got %v", out)
 	}
 }
 

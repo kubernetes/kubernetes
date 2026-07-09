@@ -273,7 +273,7 @@ func (t *typedList) Equal(other ref.Val) ref.Val {
 	if sz != oList.Size() {
 		return types.False
 	}
-	for i := types.Int(0); i < sz; i++ {
+	for i := range types.Int(sz) {
 		eq := t.Get(i).Equal(oList.Get(i))
 		if eq != types.True {
 			return eq // either false or error
@@ -287,7 +287,7 @@ func (t *typedList) Type() ref.Type {
 }
 
 func (t *typedList) Value() interface{} {
-	return t.value
+	return t.value.Interface()
 }
 
 func (t *typedList) Add(other ref.Val) ref.Val {
@@ -295,13 +295,16 @@ func (t *typedList) Add(other ref.Val) ref.Val {
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
-	resultValue := t.value
-	for it := oList.Iterator(); it.HasNext() == types.True; {
-		next := it.Next().Value()
-		resultValue = reflect.Append(resultValue, reflect.ValueOf(next))
+	sz := t.value.Len()
+	otherSz, _ := oList.Size().(types.Int)
+	elements := make([]ref.Val, 0, sz+int(otherSz))
+	for i := range sz {
+		elements = append(elements, t.Get(types.Int(i)))
 	}
-
-	return &typedList{value: resultValue, itemsSchema: t.itemsSchema}
+	for it := oList.Iterator(); it.HasNext() == types.True; {
+		elements = append(elements, it.Next())
+	}
+	return types.NewRefValList(types.DefaultTypeAdapter, elements)
 }
 
 func (t *typedList) Contains(val ref.Val) ref.Val {
@@ -310,7 +313,7 @@ func (t *typedList) Contains(val ref.Val) ref.Val {
 	}
 	var err ref.Val
 	sz := t.value.Len()
-	for i := 0; i < sz; i++ {
+	for i := range sz {
 		elem := TypedToVal(t.value.Index(i).Interface(), t.itemsSchema)
 		cmp := elem.Equal(val)
 		b, ok := cmp.(types.Bool)
@@ -342,7 +345,7 @@ func (t *typedList) Get(idx ref.Val) ref.Val {
 func (t *typedList) Iterator() traits.Iterator {
 	elements := make([]ref.Val, t.value.Len())
 	sz := t.value.Len()
-	for i := 0; i < sz; i++ {
+	for i := range sz {
 		elements[i] = TypedToVal(t.value.Index(i).Interface(), t.itemsSchema)
 	}
 	return &sliceIter{typedList: t, elements: elements}
@@ -383,7 +386,7 @@ func (t *typedMapList) getMap() map[interface{}]interface{} {
 	t.Do(func() {
 		sz := t.value.Len()
 		t.mapOfList = make(map[interface{}]interface{}, sz)
-		for i := types.Int(0); i < types.Int(sz); i++ {
+		for i := range types.Int(sz) {
 			v := t.Get(i)
 			e := reflect.ValueOf(v.Value())
 			t.mapOfList[t.toMapKey(e)] = e.Interface()
@@ -401,7 +404,7 @@ func (t *typedMapList) toMapKey(element reflect.Value) interface{} {
 	}
 	cacheEntry := value.TypeReflectEntryOf(element.Type())
 	var fieldEntries []*value.FieldCacheEntry
-	for i := 0; i < len(t.escapedKeyProps); i++ {
+	for i := range len(t.escapedKeyProps) {
 		if ce, ok := cacheEntry.Fields()[t.escapedKeyProps[i]]; !ok {
 			return types.NewErr("unexpected data format for element of array with x-kubernetes-list-type=map: %T", element)
 		} else {
@@ -504,7 +507,7 @@ func (t *typedSetList) getSet() map[interface{}]struct{} {
 	t.Do(func() {
 		sz := t.value.Len()
 		t.set = make(map[interface{}]struct{}, sz)
-		for i := types.Int(0); i < types.Int(sz); i++ {
+		for i := range types.Int(sz) {
 			e := t.Get(i).Value()
 			t.set[e] = struct{}{}
 		}
@@ -572,7 +575,7 @@ type typedMap struct {
 func (t *typedMap) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	switch typeDesc.Kind() {
 	case reflect.Map:
-		return t.value, nil
+		return t.value.Interface(), nil
 	default:
 		return nil, fmt.Errorf("type conversion error from '%s' to '%s'", t.Type(), typeDesc)
 	}
@@ -617,7 +620,7 @@ func (t *typedMap) Type() ref.Type {
 }
 
 func (t *typedMap) Value() interface{} {
-	return t.value
+	return t.value.Interface()
 }
 
 func (t *typedMap) Contains(key ref.Val) ref.Val {
