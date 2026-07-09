@@ -404,6 +404,320 @@ func TestJSONPatch(t *testing.T) {
 			expectedErr: "JSON Patch: replace operation does not apply: doc is missing key: /spec/template/spec/containers/-: missing value",
 		},
 		{
+			name: "jsonPatch with complex struct as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/1", value: object.spec.template.spec.containers[0]},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "a"}},
+			}}}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "a"}, {Name: "a"}},
+			}}}},
+		},
+		{
+			name: "jsonPatch with large complex struct as value",
+			expression: `[
+					JSONPatch{op: "replace", path: "/spec/template/spec", value: object.spec.template.spec},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "a", Image: "nginx"}},
+			}}}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "a", Image: "nginx"}},
+			}}}},
+		},
+		{
+			name: "jsonPatch with slice of complex struct as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers", value: object.spec.template.spec.containers},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "a"}},
+			}}}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "a"}},
+			}}}},
+		},
+		{
+			name: "jsonPatch with list concatenation operator",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers", value: object.spec.template.spec.containers + [object.spec.template.spec.containers[0]]},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "a"}},
+			}}}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "a"}, {Name: "a"}},
+			}}}},
+		},
+		{
+			name: "jsonPatch with map key comprehension all predicate",
+			expression: `[
+					JSONPatch{op: "add", path: "/metadata/labels/added", value: object.metadata.labels.all(k, k != "invalid") ? "true" : "false"},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"env": "prod", "app": "demo"}},
+				Spec:       appsv1.DeploymentSpec{},
+			},
+			expectedResult: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"env": "prod", "app": "demo", "added": "true"}},
+				Spec:       appsv1.DeploymentSpec{},
+			},
+		},
+		{
+			name: "jsonPatch with scalar int and bool as values",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/progressDeadlineSeconds", value: object.spec.replicas},
+					JSONPatch{op: "add", path: "/spec/template/spec/hostNetwork", value: object.spec.paused},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](3), Paused: true},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas:                ptr.To[int32](3),
+					ProgressDeadlineSeconds: ptr.To[int32](3),
+					Paused:                  true,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{HostNetwork: true},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with quantity and duration as values",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/resources/limits", value: {"cpu": object.spec.template.spec.containers[0].resources.requests["cpu"], "memory": object.spec.template.spec.containers[0].resources.requests["memory"]}},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "c1",
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "c1",
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with slice of scalars as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/args", value: object.spec.template.spec.containers[0].command},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    "c1",
+									Command: []string{"sh", "-c", "echo hello"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    "c1",
+									Command: []string{"sh", "-c", "echo hello"},
+									Args:    []string{"sh", "-c", "echo hello"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with map of scalars as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/metadata/annotations", value: object.metadata.labels},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"env": "prod", "tier": "frontend"},
+				},
+				Spec: appsv1.DeploymentSpec{},
+			},
+			expectedResult: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{"env": "prod", "tier": "frontend"},
+					Annotations: map[string]string{"env": "prod", "tier": "frontend"},
+				},
+				Spec: appsv1.DeploymentSpec{},
+			},
+		},
+		{
+			name: "jsonPatch with map of struct as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/resources/limits", value: object.spec.template.spec.containers[0].resources.requests},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "c1",
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("250m"),
+											corev1.ResourceMemory: resource.MustParse("512Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "c1",
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("250m"),
+											corev1.ResourceMemory: resource.MustParse("512Mi"),
+										},
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("250m"),
+											corev1.ResourceMemory: resource.MustParse("512Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with list concatenation using constant value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/args", value: object.spec.template.spec.containers[0].command + ["--debug", "-v"]},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    "c1",
+									Command: []string{"server", "start"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    "c1",
+									Command: []string{"server", "start"},
+									Args:    []string{"server", "start", "--debug", "-v"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with list concatenation reading from other fields",
+			expression: `[
+					JSONPatch{op: "replace", path: "/spec/template/spec/containers", value: object.spec.template.spec.initContainers + object.spec.template.spec.containers},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							InitContainers: []corev1.Container{
+								{Name: "init-setup", Image: "busybox:1.36"},
+							},
+							Containers: []corev1.Container{
+								{Name: "main-app", Image: "nginx:1.24"},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							InitContainers: []corev1.Container{
+								{Name: "init-setup", Image: "busybox:1.36"},
+							},
+							Containers: []corev1.Container{
+								{Name: "init-setup", Image: "busybox:1.36"},
+								{Name: "main-app", Image: "nginx:1.24"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "jsonPatch with constant complex struct object as value",
 			expression: `[
 					JSONPatch{op: "add", path: "/spec/template/spec/containers/1", value: Object.spec.template.spec.containers{name: "sidecar", image: "busybox:1.36", command: ["sh", "-c", "sleep 3600"], resources: Object.spec.template.spec.containers.resources{limits: {"cpu": "200m", "memory": "256Mi"}}}},

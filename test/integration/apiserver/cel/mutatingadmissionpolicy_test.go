@@ -170,6 +170,324 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			},
 		},
 		{
+			name: "jsonPatch with complex struct as value",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-complex-struct", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: [object.subsets[0].notReadyAddresses[0]]}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-complex-struct", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-complex-struct-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-complex-struct-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with slice of complex struct as value",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-slice-complex-struct", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: object.subsets[0].notReadyAddresses}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-slice-complex-struct", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-slice-complex-struct-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-slice-complex-struct-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with list concatenation operator",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-list-concat", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: object.subsets[0].notReadyAddresses + [object.subsets[0].notReadyAddresses[0]]}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-list-concat", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-list-concat-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-list-concat-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+							{IP: "1.2.3.4"},
+						},
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with list concatenation between structured object and typed type (structured + typed)",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-concat-struct-typed", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: object.subsets[0].notReadyAddresses + [Object.subsets.addresses{ip: "10.0.0.1"}, Object.subsets.addresses{ip: "10.0.0.2"}]}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-concat-struct-typed", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-concat-struct-typed-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-concat-struct-typed-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+							{IP: "10.0.0.1"},
+							{IP: "10.0.0.2"},
+						},
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with list concatenation between typed type and structured object (typed + structured)",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-concat-typed-struct", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: [Object.subsets.addresses{ip: "10.0.0.1"}, Object.subsets.addresses{ip: "10.0.0.2"}] + object.subsets[0].notReadyAddresses}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-concat-typed-struct", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-concat-typed-struct-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-concat-typed-struct-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{IP: "10.0.0.1"},
+							{IP: "10.0.0.2"},
+							{IP: "1.2.3.4"},
+						},
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "applyConfiguration with list concatenation between structured object and typed type",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("apply-config-concat-struct-typed", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1.ApplyConfiguration{
+						Expression: `Object{
+							metadata: Object.metadata{
+								finalizers: object.metadata.finalizers + Object.metadata{finalizers: ["finalizer.k8s.io/new"]}.finalizers
+							}
+						}`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("apply-config-concat-struct-typed", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "apply-config-concat-struct-typed-object",
+					Namespace: "default",
+					Finalizers: []string{
+						"finalizer.k8s.io/original",
+					},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "apply-config-concat-struct-typed-object",
+					Namespace: "default",
+					Finalizers: []string{
+						"finalizer.k8s.io/original",
+						"finalizer.k8s.io/new",
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with map key comprehension all predicate",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-map-comprehension", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/metadata/labels/added", value: object.metadata.labels.all(k, k != "invalid") ? "true" : "false"}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-map-comprehension", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-map-comprehension-object",
+					Namespace: "default",
+					Labels: map[string]string{
+						"env": "prod",
+						"app": "demo",
+					},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-map-comprehension-object",
+					Namespace: "default",
+					Labels: map[string]string{
+						"env":   "prod",
+						"app":   "demo",
+						"added": "true",
+					},
+				},
+			},
+		},
+		{
 			name: "multiple policies",
 			policies: []*v1.MutatingAdmissionPolicy{
 				mutatingPolicy("multi-policy-1", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
