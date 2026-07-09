@@ -52,6 +52,11 @@ func testNodeAllocatableResources(tCtx ktesting.TContext, enabled bool) {
 	tCtx.Run("InsufficientNodeResources", testInsufficientNodeResources)
 	tCtx.Run("ClaimTemplateBasedAllocation", testNodeAllocatableResourcesWithClaimTemplate)
 	tCtx.Run("UnreferencedClaimInPod", testNodeAllocatableUnreferencedClaimInPod)
+	tCtx.Run("OverheadMappingsPerPod", testNodeAllocatableResourcesWithOverheadPerPod)
+	tCtx.Run("OverheadMappingsPerContainer", testNodeAllocatableResourcesWithOverheadPerContainer)
+	tCtx.Run("OverheadMappingsBoth", testNodeAllocatableResourcesWithOverheadBoth)
+	tCtx.Run("OverheadMappingsInsufficient", testNodeAllocatableResourcesWithOverheadInsufficient)
+	tCtx.Run("ClaimSharingOverhead", testNodeAllocatableResourceClaimSharingOverhead)
 }
 
 func setupTestEnv(tCtx ktesting.TContext, nodeNum int) *testEnv {
@@ -114,6 +119,7 @@ func verifyPodNodeAllocatableStatus(tCtx ktesting.TContext, namespace, podName s
 			"ResourceClaimName": gomega.ContainSubstring(expected.ResourceClaimName),
 			"Containers":        gomega.Equal(expected.Containers),
 			"Mapping":           gomega.Equal(expected.Mapping),
+			"Overhead":          gomega.Equal(expected.Overhead),
 		}))
 	}
 	tCtx.Eventually(func(tCtx ktesting.TContext) []v1.NodeAllocatableResourceClaimStatus {
@@ -175,8 +181,8 @@ func testNodeAllocatableResourcesConsumablePool(tCtx ktesting.TContext) {
 				memCapacityKey: {Value: resource.MustParse(nodeMemoryCapacity)},
 			},
 			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
-				v1.ResourceCPU:    {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey}},
-				v1.ResourceMemory: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &memCapacityKey}},
+				v1.ResourceCPU:    {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
+				v1.ResourceMemory: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &memCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
 			},
 		},
 	}
@@ -308,7 +314,13 @@ func testNodeAllocatableResourceClaimSharing(tCtx ktesting.TContext) {
 		{
 			Name: "dev-sharetest",
 			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
-				v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: &cpuMultiplier}},
+				v1.ResourceCPU: {
+					// both mapping and overhead specified for the same resource.
+					Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: &cpuMultiplier},
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod: new(resource.MustParse("1")),
+					},
+				},
 			},
 		},
 	}
@@ -318,7 +330,7 @@ func testNodeAllocatableResourceClaimSharing(tCtx ktesting.TContext) {
 	waitForPodScheduled(tCtx, env.namespace, pod1.Name)
 	_ = waitForClaimAllocatedToDevice(tCtx, env.namespace, claim.Name, schedulingTimeout)
 
-	// Pod 2 - Should NOT schedule as the claim is already used on this node
+	// Pod 2 - Should NOT schedule as the claim is already used on this node and cannot be shared
 	pod2 := st.MakePod().Name("pod2").Namespace(env.namespace).Obj()
 	container1 := v1.Container{
 		Name:  "c1",
@@ -332,7 +344,7 @@ func testNodeAllocatableResourceClaimSharing(tCtx ktesting.TContext) {
 	pod2.Spec.Containers = []v1.Container{container1}
 	pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
 	pod2 = createPod(tCtx, env.namespace, "", pod2, claim) // Pass the existing claim
-	expectPodUnschedulable(tCtx, pod2, "is already used by another pod")
+	expectPodUnschedulable(tCtx, pod2, "has a mapped device and cannot be shared across pods")
 }
 
 func testPodLevelResourceValidation(tCtx ktesting.TContext) {
@@ -461,7 +473,7 @@ func testInsufficientNodeResources(tCtx ktesting.TContext) {
 					cpuCapacityKey: {Value: exceedCPU},
 				},
 				NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
-					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey}},
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
 				},
 				AllowMultipleAllocations: ptr.To(true),
 			},
@@ -541,7 +553,7 @@ func testInsufficientNodeResources(tCtx ktesting.TContext) {
 
 func testNodeAllocatableResourcesWithClaimTemplate(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	env := setupTestEnv(tCtx, 6) // Use a different node index
+	env := setupTestEnv(tCtx, 5) // Use a different node index
 
 	cpuCapacityKey := resourceapi.QualifiedName("dra.example.com/cpu")
 	memCapacityKey := resourceapi.QualifiedName("dra.example.com/memory")
@@ -555,8 +567,8 @@ func testNodeAllocatableResourcesWithClaimTemplate(tCtx ktesting.TContext) {
 				memCapacityKey: {Value: resource.MustParse(nodeMemoryCapacity)},
 			},
 			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
-				v1.ResourceCPU:    {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey}},
-				v1.ResourceMemory: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &memCapacityKey}},
+				v1.ResourceCPU:    {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
+				v1.ResourceMemory: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &memCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
 			},
 		},
 	}
@@ -625,7 +637,7 @@ func testNodeAllocatableResourcesWithClaimTemplate(tCtx ktesting.TContext) {
 
 func testNodeAllocatableUnreferencedClaimInPod(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	env := setupTestEnv(tCtx, 7) // Use a different node index
+	env := setupTestEnv(tCtx, 6) // Use a different node index
 
 	cpuCapacityKey := resourceapi.QualifiedName("dra.example.com/cpu")
 	devices := []resourceapi.Device{
@@ -636,7 +648,7 @@ func testNodeAllocatableUnreferencedClaimInPod(tCtx ktesting.TContext) {
 				cpuCapacityKey: {Value: resource.MustParse(nodeCPUCapacity)},
 			},
 			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
-				v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey}},
+				v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{CapacityKey: &cpuCapacityKey, CapacityMultiplier: new(resource.MustParse("1"))}},
 			},
 		},
 	}
@@ -674,8 +686,261 @@ func testNodeAllocatableUnreferencedClaimInPod(tCtx ktesting.TContext) {
 		Containers:        nil,
 		Mapping: []v1.NodeAllocatableMappedResources{{
 			Name:     v1.ResourceCPU,
-			Quantity: resource.MustParse(nodeCPUCapacity),
+			Quantity: new(resource.MustParse(nodeCPUCapacity)),
 		}},
 	}}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+}
+
+func testNodeAllocatableResourcesWithOverheadPerPod(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 7) // Use a different node index
+
+	devices := []resourceapi.Device{
+		{
+			Name: "overhead-device-perpod",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceMemory: {
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod: new(resource.MustParse("100")),
+					},
+				},
+			},
+		},
+	}
+	slice := makeSlice(env, devices)
+	env.poolName = env.namespace + "-pool-overhead-perpod"
+	slice.Spec.Pool.Name = env.poolName
+	createSliceAndStartScheduler(tCtx, slice)
+
+	podName := "pod-with-overhead-perpod"
+	claimName := "claim-with-overhead-perpod"
+
+	// Create a Pod that has the node allocatable claim used by 2 containers
+	pod, claim := createPodWithNodeAllocatableClaim(tCtx, env, claimName, podName, 2)
+
+	waitForPodScheduled(tCtx, env.namespace, pod.Name)
+	allocatedClaim := waitForClaimAllocatedToDevice(tCtx, env.namespace, claim.Name, schedulingTimeout)
+
+	gomega.NewWithT(tCtx).Expect(allocatedClaim).To(
+		gomega.HaveField("Status.Allocation", gstruct.PointTo(
+			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Devices": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Results": gomega.ConsistOf(
+						gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Request": gomega.Equal(claim.Spec.Devices.Requests[0].Name),
+							"Driver":  gomega.Equal(env.driverName),
+							"Pool":    gomega.Equal(env.poolName),
+							"Device":  gomega.Equal("overhead-device-perpod"),
+						}),
+					),
+				}),
+			}),
+		)),
+		"node allocatable claim allocation",
+	)
+
+	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
+		ResourceClaimName: claimName,
+		Containers:        []string{"my-container-1", "my-container-2"},
+		Overhead: []v1.NodeAllocatableOverheadResources{
+			{
+				Name:   v1.ResourceMemory,
+				PerPod: new(resource.MustParse("100")),
+			},
+		},
+	}}
+	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+}
+
+func testNodeAllocatableResourcesWithOverheadPerContainer(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 7) // Use a different node index
+
+	devices := []resourceapi.Device{
+		{
+			Name: "overhead-device-percontainer",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceMemory: {
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerContainer: new(resource.MustParse("50")),
+					},
+				},
+			},
+		},
+	}
+	slice := makeSlice(env, devices)
+	env.poolName = env.namespace + "-pool-overhead-percontainer"
+	slice.Spec.Pool.Name = env.poolName
+	createSliceAndStartScheduler(tCtx, slice)
+
+	podName := "pod-with-overhead-percontainer"
+	claimName := "claim-with-overhead-percontainer"
+
+	// Create a Pod that has the node allocatable claim used by 2 containers
+	pod, claim := createPodWithNodeAllocatableClaim(tCtx, env, claimName, podName, 2)
+
+	waitForPodScheduled(tCtx, env.namespace, pod.Name)
+	allocatedClaim := waitForClaimAllocatedToDevice(tCtx, env.namespace, claim.Name, schedulingTimeout)
+
+	gomega.NewWithT(tCtx).Expect(allocatedClaim).To(
+		gomega.HaveField("Status.Allocation", gstruct.PointTo(
+			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Devices": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Results": gomega.ConsistOf(
+						gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Request": gomega.Equal(claim.Spec.Devices.Requests[0].Name),
+							"Driver":  gomega.Equal(env.driverName),
+							"Pool":    gomega.Equal(env.poolName),
+							"Device":  gomega.Equal("overhead-device-percontainer"),
+						}),
+					),
+				}),
+			}),
+		)),
+		"node allocatable claim allocation",
+	)
+
+	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
+		ResourceClaimName: claimName,
+		Containers:        []string{"my-container-1", "my-container-2"},
+		Overhead: []v1.NodeAllocatableOverheadResources{
+			{
+				Name:         v1.ResourceMemory,
+				PerContainer: new(resource.MustParse("50")),
+			},
+		},
+	}}
+	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+}
+
+func testNodeAllocatableResourcesWithOverheadBoth(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 7) // Use a different node index
+
+	devices := []resourceapi.Device{
+		{
+			Name: "overhead-device-both",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceMemory: {
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod:       new(resource.MustParse("100")),
+						PerContainer: new(resource.MustParse("50")),
+					},
+				},
+			},
+		},
+	}
+	slice := makeSlice(env, devices)
+	env.poolName = env.namespace + "-pool-overhead-both"
+	slice.Spec.Pool.Name = env.poolName
+	createSliceAndStartScheduler(tCtx, slice)
+
+	podName := "pod-with-overhead-both"
+	claimName := "claim-with-overhead-both"
+
+	// Create a Pod that has the node allocatable claim used by 2 containers
+	pod, claim := createPodWithNodeAllocatableClaim(tCtx, env, claimName, podName, 2)
+
+	waitForPodScheduled(tCtx, env.namespace, pod.Name)
+	allocatedClaim := waitForClaimAllocatedToDevice(tCtx, env.namespace, claim.Name, schedulingTimeout)
+
+	gomega.NewWithT(tCtx).Expect(allocatedClaim).To(
+		gomega.HaveField("Status.Allocation", gstruct.PointTo(
+			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Devices": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Results": gomega.ConsistOf(
+						gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Request": gomega.Equal(claim.Spec.Devices.Requests[0].Name),
+							"Driver":  gomega.Equal(env.driverName),
+							"Pool":    gomega.Equal(env.poolName),
+							"Device":  gomega.Equal("overhead-device-both"),
+						}),
+					),
+				}),
+			}),
+		)),
+		"node allocatable claim allocation",
+	)
+
+	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
+		ResourceClaimName: claimName,
+		Containers:        []string{"my-container-1", "my-container-2"},
+		Overhead: []v1.NodeAllocatableOverheadResources{
+			{
+				Name:         v1.ResourceMemory,
+				PerPod:       new(resource.MustParse("100")),
+				PerContainer: new(resource.MustParse("50")),
+			},
+		},
+	}}
+	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+}
+
+func testNodeAllocatableResourcesWithOverheadInsufficient(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 7) // Use a different node index
+
+	devices := []resourceapi.Device{
+		{
+			Name: "insufficient-overhead-device",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceMemory: {
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod: new(resource.MustParse("2000")), // Exceeds nodeMemoryCapacity (1k / 1024)
+					},
+				},
+			},
+		},
+	}
+	slice := makeSlice(env, devices)
+	env.poolName = env.namespace + "-pool-overhead-insufficient"
+	slice.Spec.Pool.Name = env.poolName
+	createSliceAndStartScheduler(tCtx, slice)
+
+	podName := "pod-with-insufficient-overhead"
+	claimName := "claim-with-insufficient-overhead"
+
+	pod, _ := createPodWithNodeAllocatableClaim(tCtx, env, claimName, podName, 1)
+
+	expectPodUnschedulable(tCtx, pod, "Insufficient memory")
+}
+
+func testNodeAllocatableResourceClaimSharingOverhead(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 7) // Use a different node index
+
+	devices := []resourceapi.Device{
+		{
+			Name: "overhead-device-sharing",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceMemory: {
+					Overhead: &resourceapi.NodeAllocatableOverhead{
+						PerPod: new(resource.MustParse("100")),
+					},
+				},
+			},
+		},
+	}
+	createSliceAndStartScheduler(tCtx, makeSlice(env, devices))
+
+	pod1, claim := createPodWithNodeAllocatableClaim(tCtx, env, "node-allocatable-claim-overhead-sharing", "pod1", 1)
+	waitForPodScheduled(tCtx, env.namespace, pod1.Name)
+	_ = waitForClaimAllocatedToDevice(tCtx, env.namespace, claim.Name, schedulingTimeout)
+
+	// Pod 2 - Should schedule successfully as the claim is overhead-only (allowed to be shared)
+	pod2 := st.MakePod().Name("pod2").Namespace(env.namespace).Obj()
+	container1 := v1.Container{
+		Name:  "c1",
+		Image: "test-image",
+		Resources: v1.ResourceRequirements{
+			Claims: []v1.ResourceClaim{
+				{Name: claim.Name},
+			},
+		},
+	}
+	pod2.Spec.Containers = []v1.Container{container1}
+	pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
+	pod2 = createPod(tCtx, env.namespace, "", pod2, claim) // Pass the existing claim
+	waitForPodScheduled(tCtx, env.namespace, pod2.Name)
 }
