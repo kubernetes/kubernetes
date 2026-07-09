@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
@@ -91,7 +92,7 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodG
 }
 
 type selectVictimsResult struct {
-	nominatedNodeNames map[*v1.Pod]*fwk.NominatingInfo
+	nominatedNodeNames map[types.NamespacedName]*fwk.NominatingInfo
 	victims            *extenderv1.Victims
 }
 
@@ -255,10 +256,12 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	v := &extenderv1.Victims{
 		Pods: podsToPreempt,
 	}
-	n := make(map[*v1.Pod]*fwk.NominatingInfo)
+	n := make(map[types.NamespacedName]*fwk.NominatingInfo)
 	for _, p := range podGroupAssignments.ProposedAssignments {
 		if p.GetNodeName() != "" {
-			n[p.GetPod()] = &fwk.NominatingInfo{
+			pod := p.GetPod()
+			podKey := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+			n[podKey] = &fwk.NominatingInfo{
 				NominatingMode:    fwk.ModeOverride,
 				NominatedNodeName: p.GetNodeName(),
 			}

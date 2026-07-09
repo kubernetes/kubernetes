@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
@@ -230,7 +231,9 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 		pgPostFilterResult, status := schedFwk.RunPodGroupPostFilterPlugins(ctx, podGroupCycleState, podGroupInfo.PodGroupInfo, pgSchedulingFunc)
 		if status.IsSuccess() {
 			for i := range result.podResults {
-				if nodeNameInfo, ok := pgPostFilterResult.NominatingInfos[result.podResults[i].pod]; ok {
+				pod := result.podResults[i].pod
+				namespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+				if nodeNameInfo, ok := pgPostFilterResult.NominatingInfos[namespacedName]; ok {
 					result.podResults[i].scheduleResult.nominatingInfo = nodeNameInfo
 					result.waitingOnPreemption = true
 				}

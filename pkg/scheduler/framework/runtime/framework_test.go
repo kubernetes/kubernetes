@@ -988,8 +988,8 @@ func TestRunPodGroupPostFilterPlugins(t *testing.T) {
 					inj: injectedResult{
 						PodGroupPostFilterStatus: int(fwk.Success),
 						PodGroupPostFilterResult: &fwk.PodGroupPostFilterResult{
-							NominatingInfos: map[*v1.Pod]*fwk.NominatingInfo{
-								pod1: {NominatedNodeName: "node1"},
+							NominatingInfos: map[types.NamespacedName]*fwk.NominatingInfo{
+								{Namespace: pod1.Namespace, Name: pod1.Name}: {NominatedNodeName: "node1"},
 							},
 						},
 					},
@@ -1004,8 +1004,8 @@ func TestRunPodGroupPostFilterPlugins(t *testing.T) {
 			featureFlagEnabeled: true,
 			expectedStatus:      fwk.NewStatus(fwk.Success, injectReason),
 			expectedResult: &fwk.PodGroupPostFilterResult{
-				NominatingInfos: map[*v1.Pod]*fwk.NominatingInfo{
-					pod1: {NominatedNodeName: "node1"},
+				NominatingInfos: map[types.NamespacedName]*fwk.NominatingInfo{
+					{Namespace: pod1.Namespace, Name: pod1.Name}: {NominatedNodeName: "node1"},
 				},
 			},
 		},
@@ -1048,8 +1048,8 @@ func TestRunPodGroupPostFilterPlugins(t *testing.T) {
 					inj: injectedResult{
 						PodGroupPostFilterStatus: int(fwk.Success),
 						PodGroupPostFilterResult: &fwk.PodGroupPostFilterResult{
-							NominatingInfos: map[*v1.Pod]*fwk.NominatingInfo{
-								pod1: {NominatedNodeName: "node2"},
+							NominatingInfos: map[types.NamespacedName]*fwk.NominatingInfo{
+								{Namespace: pod1.Namespace, Name: pod1.Name}: {NominatedNodeName: "node2"},
 							},
 						},
 					},
@@ -1058,8 +1058,8 @@ func TestRunPodGroupPostFilterPlugins(t *testing.T) {
 			featureFlagEnabeled: true,
 			expectedStatus:      fwk.NewStatus(fwk.Success, injectReason),
 			expectedResult: &fwk.PodGroupPostFilterResult{
-				NominatingInfos: map[*v1.Pod]*fwk.NominatingInfo{
-					pod1: {NominatedNodeName: "node2"},
+				NominatingInfos: map[types.NamespacedName]*fwk.NominatingInfo{
+					{Namespace: pod1.Namespace, Name: pod1.Name}: {NominatedNodeName: "node2"},
 				},
 			},
 		},
