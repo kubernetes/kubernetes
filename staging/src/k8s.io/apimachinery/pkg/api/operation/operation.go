@@ -17,7 +17,7 @@ limitations under the License.
 package operation
 
 import (
-	"slices"
+	"fmt"
 	"strings"
 )
 
@@ -31,28 +31,28 @@ type Operation struct {
 	// those into a single "Update" category.
 	Type Type
 
-	// Options declare the options enabled for validation.
+	// Options are the validation options in effect for this operation, mapping option
+	// name to whether it is enabled. Option names typically match feature gates. Set by
+	// the resource strategy and read-only during validation.
 	//
-	// Options should be set according to a resource validation strategy before validation
-	// is performed, and must be treated as read-only during validation.
-	//
-	// Options are identified by string names. Option string names may match the name of a feature
-	// gate, in which case the presence of the name in the set indicates that the feature is
-	// considered enabled for the resource being validated.  Note that a resource may have a
-	// feature enabled even when the feature gate is disabled. This can happen when feature is
-	// already in-use by a resource, often because the feature gate was enabled when the
-	// resource first began using the feature.
-	//
-	// Unset options are disabled/false.
-	Options []string
+	// Every option referenced by a validation tag must be declared here. Referencing an
+	// undeclared option is a programming error (see HasOption).
+	Options map[string]bool
 
 	// Request provides information about the request being validated.
 	Request Request
 }
 
-// HasOption returns true if the given string is in the Options slice.
-func (o Operation) HasOption(option string) bool {
-	return slices.Contains(o.Options, option)
+// HasOption returns whether the named option is enabled. Every option referenced by a
+// validation tag must be declared by the strategy; referencing an undeclared option
+// returns an error rather than silently treating it as disabled, so declarative
+// validation can surface the mistake as an internal error.
+func (o Operation) HasOption(option string) (bool, error) {
+	enabled, declared := o.Options[option]
+	if !declared {
+		return false, fmt.Errorf("undeclared validation option %q", option)
+	}
+	return enabled, nil
 }
 
 // Request provides information about the request being validated.

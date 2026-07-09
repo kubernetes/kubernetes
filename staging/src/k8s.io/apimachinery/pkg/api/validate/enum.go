@@ -32,24 +32,36 @@ func Enum[T ~string](_ context.Context, op operation.Operation, fldPath *field.P
 	if value == nil {
 		return nil
 	}
-	if !validValues.Has(*value) || isExcluded(op, exclusions, *value) {
-		return field.ErrorList{field.NotSupported[T](fldPath, *value, supportedValues(op, validValues, exclusions))}
+	excluded, err := isExcluded(op, exclusions, *value)
+	if err != nil {
+		return field.ErrorList{field.InternalError(fldPath, err)}
+	}
+	if !validValues.Has(*value) || excluded {
+		supported, err := supportedValues(op, validValues, exclusions)
+		if err != nil {
+			return field.ErrorList{field.InternalError(fldPath, err)}
+		}
+		return field.ErrorList{field.NotSupported[T](fldPath, *value, supported)}
 	}
 	return nil
 }
 
 // supportedValues returns a sorted list of supported values.
 // Excluded enum values are not included in the list.
-func supportedValues[T ~string](op operation.Operation, values sets.Set[T], exclusions []EnumExclusion[T]) []T {
+func supportedValues[T ~string](op operation.Operation, values sets.Set[T], exclusions []EnumExclusion[T]) ([]T, error) {
 	res := make([]T, 0, len(values))
 	for key := range values {
-		if isExcluded(op, exclusions, key) {
+		excluded, err := isExcluded(op, exclusions, key)
+		if err != nil {
+			return nil, err
+		}
+		if excluded {
 			continue
 		}
 		res = append(res, key)
 	}
 	slices.Sort(res)
-	return res
+	return res, nil
 }
 
 // EnumExclusion represents a single enum exclusion rule.
@@ -64,11 +76,18 @@ type EnumExclusion[T ~string] struct {
 	Option string
 }
 
-func isExcluded[T ~string](op operation.Operation, exclusions []EnumExclusion[T], value T) bool {
+func isExcluded[T ~string](op operation.Operation, exclusions []EnumExclusion[T], value T) (bool, error) {
 	for _, rule := range exclusions {
-		if rule.Value == value && rule.ExcludeWhen == op.HasOption(rule.Option) {
-			return true
+		if rule.Value != value {
+			continue
+		}
+		has, err := op.HasOption(rule.Option)
+		if err != nil {
+			return false, err
+		}
+		if rule.ExcludeWhen == has {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }

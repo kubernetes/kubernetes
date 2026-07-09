@@ -28,7 +28,11 @@ import (
 func IfOption[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue T,
 	optionName string, enabled bool, validator func(context.Context, operation.Operation, *field.Path, T, T) field.ErrorList,
 ) field.ErrorList {
-	if op.HasOption(optionName) == enabled {
+	has, err := op.HasOption(optionName)
+	if err != nil {
+		return field.ErrorList{field.InternalError(fldPath, err)}
+	}
+	if has == enabled {
 		return validator(ctx, op, fldPath, value, oldValue)
 	}
 	return nil
