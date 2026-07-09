@@ -402,7 +402,7 @@ var (
 			Name:              PLEGDiscardEventsKey,
 			Help:              "The number of discard events in PLEG. Deprecated in favor of kubelet_pleg_discard_events_total",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 	)
 
@@ -457,7 +457,7 @@ var (
 			Name:              EventedPLEGConnErrKey,
 			Help:              "The number of errors encountered during the establishment of streaming connection with the CRI runtime. Deprecated in favor of kubelet_evented_pleg_connection_error_total.",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 	)
 
@@ -480,7 +480,7 @@ var (
 			Name:              EventedPLEGConnKey,
 			Help:              "The number of times a streaming client was obtained to receive CRI Events. Deprecated in favor of kubelet_evented_pleg_connection_success_total.",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 	)
 
@@ -549,7 +549,7 @@ var (
 			Name:              EvictionsKey,
 			Help:              "Cumulative number of pod evictions by eviction signal. Deprecated in favor of kubelet_evictions_total",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 		[]string{"eviction_signal"},
 	)
@@ -587,7 +587,7 @@ var (
 			Name:              PreemptionsKey,
 			Help:              "Cumulative number of pod preemptions by preemption resource. Deprecated in favor of kubelet_preemptions_total",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 		[]string{"preemption_signal"},
 	)
@@ -649,7 +649,7 @@ var (
 			Name:              PodResourcesEndpointRequestsListKey,
 			Help:              "Number of requests to the PodResource List endpoint. Broken down by server api version. Deprecated in favor of kubelet_pod_resources_endpoint_requests_list_total",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 		[]string{"server_api_version"},
 	)
@@ -674,7 +674,7 @@ var (
 			Name:              PodResourcesEndpointRequestsGetAllocatableKey,
 			Help:              "Number of requests to the PodResource GetAllocatableResources endpoint. Broken down by server api version. Deprecated in favor of kubelet_pod_resources_endpoint_requests_get_allocatable_total",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 		[]string{"server_api_version"},
 	)
@@ -699,7 +699,7 @@ var (
 			Name:              PodResourcesEndpointErrorsListKey,
 			Help:              "Number of requests to the PodResource List endpoint which returned error. Broken down by server api version. Deprecated in favor of kubelet_pod_resources_endpoint_errors_list_total",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 		[]string{"server_api_version"},
 	)
@@ -724,7 +724,7 @@ var (
 			Name:              PodResourcesEndpointErrorsGetAllocatableKey,
 			Help:              "Number of requests to the PodResource GetAllocatableResources endpoint which returned error. Broken down by server api version. Deprecated in favor of kubelet_pod_resources_endpoint_errors_get_allocatable_total",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 		[]string{"server_api_version"},
 	)
@@ -749,7 +749,7 @@ var (
 			Name:              PodResourcesEndpointRequestsGetKey,
 			Help:              "Number of requests to the PodResource Get endpoint. Broken down by server api version. Deprecated in favor of kubelet_pod_resources_endpoint_requests_get_total",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 		[]string{"server_api_version"},
 	)
@@ -774,7 +774,7 @@ var (
 			Name:              PodResourcesEndpointErrorsGetKey,
 			Help:              "Number of requests to the PodResource Get endpoint which returned error. Broken down by server api version. Deprecated in favor of kubelet_pod_resources_endpoint_errors_get_total",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 		[]string{"server_api_version"},
 	)
@@ -1066,7 +1066,7 @@ var (
 			Name:              CPUManagerExclusiveCPUsAllocationCountKey,
 			Help:              "The total number of CPUs exclusively allocated to containers running on this node. Deprecated in favor of kubelet_cpu_manager_exclusive_cpu_allocated.",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 	)
 
@@ -1099,7 +1099,7 @@ var (
 			Name:              ContainerAlignedComputeResourcesFailureNameKey,
 			Help:              "Cumulative number of failures to allocate aligned compute resources to containers by alignment type. Deprecated in favor of kubelet_container_aligned_compute_resources_failure_total.",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 		[]string{ContainerAlignedComputeResourcesScopeLabelKey, ContainerAlignedComputeResourcesBoundaryLabelKey},
 	)
@@ -1181,7 +1181,7 @@ var (
 			Help:              "Duration in milliseconds to serve a pod admission request. Deprecated in favor of kubelet_topology_manager_admission_duration_seconds",
 			Buckets:           metrics.ExponentialBuckets(.05, 2, 15),
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.38.0",
+			DeprecatedVersion: "1.40.0",
 		},
 	)
 
