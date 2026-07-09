@@ -238,32 +238,10 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 	return nil, 0
 }
 
-const placementFeasibleStateKey = "PlacementFeasible" + Name
-
-type placementFeasibleState struct {
-	evaluated, succeeded int
-}
-
-func (s *placementFeasibleState) Clone() fwk.StateData {
-	return &placementFeasibleState{
-		evaluated: s.evaluated,
-		succeeded: s.succeeded,
-	}
-}
-
-func getPlacementFeasibleState(placementCycleState fwk.PlacementCycleState) *placementFeasibleState {
-	state, err := placementCycleState.Read(placementFeasibleStateKey)
-	if err != nil {
-		state = &placementFeasibleState{}
-		placementCycleState.Write(placementFeasibleStateKey, state)
-	}
-	return state.(*placementFeasibleState)
-}
-
 // PlacementFeasible is responsible for enforcing the gang's MinCount constraint in the pod group scheduling cycle.
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
 // In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
-func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
+func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args framework.PlacementFeasibleArgs) *fwk.Status {
 	pg := podGroupInfo.GetPodGroup()
 
 	gangPolicy := pg.Spec.SchedulingPolicy.Gang
@@ -277,12 +255,8 @@ func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleS
 		return fwk.AsStatus(fmt.Errorf("failed to get podGroup state for podGroup %s to compute gang feasibility: %w", klog.KObj(pg), err))
 	}
 
-	// We need to keep track of how many pods have already been evaluated in the current PodGroup scheduling cycle.
-	pgState := getPlacementFeasibleState(placementCycleState)
-	pgState.evaluated++
-
 	// remaining is the number of unscheduled pods that haven't been evaluated yet in the current PodGroup scheduling cycle.
-	remaining := len(podGroupInfo.GetUnscheduledPods()) - pgState.evaluated
+	remaining := len(podGroupInfo.GetUnscheduledPods()) - args.Evaluated
 
 	// scheduled includes the pods that are assigned or assumed in the current PodGroup scheduling cycle.
 	scheduled := podGroupState.ScheduledPodsCount()

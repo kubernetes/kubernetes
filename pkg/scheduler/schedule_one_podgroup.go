@@ -331,6 +331,26 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Running a pod group scheduling algorithm", "podGroup", klog.KObj(podGroupInfo), "unscheduledPodsCount", len(podGroupInfo.QueuedPodInfos))
 
+	// Run PlacementFeasible plugins to check if the pod group can meet its constraints
+	// before even attempting to schedule any pods.
+	placementFeasibleArgs := framework.PlacementFeasibleArgs{
+		Evaluated: 0,
+	}
+	placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementFeasibleArgs)
+	result.status = placementFeasibleStatus
+	if placementFeasibleStatus.IsError() {
+		// Do not evaluate any pods if PlacementFeasible plugins return error or unexpected status.
+		result.status = fwk.AsStatus(fmt.Errorf("failed to evaluate placement feasibility: %w", placementFeasibleStatus.AsError()))
+		return result
+	}
+	if placementFeasibleStatus.Code() == fwk.Unschedulable {
+		// Unschedulable from PlacementFeasible plugins indicates that the pod group
+		// cannot meet its constraints, even if we succeed in scheduling all the pods.
+		// Exit early from the pod group algorithm.
+		result.status = fwk.NewStatus(fwk.Unschedulable, result.status.Reasons()...)
+		return result
+	}
+
 	requiresPreemption := false
 	anyScheduled := false
 	for _, podInfo := range podGroupInfo.QueuedPodInfos {
@@ -348,12 +368,11 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 			break
 		}
 
-		// PlacementFeasible plugins check if the pod group can meet its constraints.
-		// Those plugins need to be run after each pod is scheduled.
-		placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo)
-
+		// Check if the pod group can still meet its constraints after scheduling the current pod.
+		placementFeasibleArgs.Evaluated++
+		placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementFeasibleArgs)
 		if placementFeasibleStatus.IsError() {
-			// When the algorithm returns error or unexpected status, stop evaluating the rest of the pods.
+			// Stop evaluating the rest of the pods if PlacementFeasible plugins return error or unexpected status.
 			result.status = fwk.AsStatus(fmt.Errorf("failed to evaluate placement feasibility: %w", placementFeasibleStatus.AsError()))
 			break
 		}

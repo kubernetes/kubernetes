@@ -735,7 +735,7 @@ func TestPlacementFeasible(t *testing.T) {
 					mockState.scheduledPodsCount++
 				}
 
-				gotStatus := pl.PlacementFeasible(ctx, cycleState, pgInfo)
+				gotStatus := pl.PlacementFeasible(ctx, cycleState, pgInfo, schedulerframework.PlacementFeasibleArgs{Evaluated: i + 1})
 
 				if gotCode := gotStatus.Code(); gotCode != tc.expectedStatuses[i] {
 					t.Errorf("Step %d: expected status %v, got %v", i, tc.expectedStatuses[i], gotCode)
