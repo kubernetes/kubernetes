@@ -115,10 +115,12 @@ func (g *genValidations) Filter(_ *generator.Context, t *types.Type) bool {
 	if slices.Contains(g.rootTypes, t) {
 		return true
 	}
-	// We want to emit for any other type that is transitively part of a root
-	// type and has validations.
+	// We want to emit for any other type that is referenced by a root type's
+	// graph and has validations. Types that were only discovered as another
+	// package's root (selected there, referenced by nothing) are skipped so a
+	// generator does not emit validators it never calls.
 	n := g.discovered.typeNodes[t]
-	return n != nil && g.hasValidations(n)
+	return n != nil && n.referenced && g.hasValidations(n)
 }
 
 func (g *genValidations) Imports(_ *generator.Context) (imports []string) {
@@ -250,8 +252,9 @@ type childNode struct {
 // with the type, and not any specific instance of that type (e.g. when used as
 // a field in a struct.
 type typeNode struct {
-	valueType *types.Type // never a pointer, but may be a map, slice, struct, etc.
-	funcName  types.Name  // populated when this type is has a validation function
+	valueType  *types.Type // never a pointer, but may be a map, slice, struct, etc.
+	funcName   types.Name  // populated when this type is has a validation function
+	referenced bool        // true if used as a field/element/key/underlying of another type (set by discoverChild)
 
 	fields     []*childNode // populated when this type is a struct
 	key        *childNode   // populated when this type is a map
@@ -381,7 +384,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		//    3) In the case of a type definition whose RHS is a struct which
 		//       has fields with validation tags, the validation for those fields
 		//       WILL be called from the generated for for the new type.
-		if node, err := td.discoverType(t.Underlying, fldPath); err != nil {
+		if node, err := td.discoverChild(t.Underlying, fldPath); err != nil {
 			return nil, err
 		} else {
 			thisNode.underlying = &childNode{
@@ -396,7 +399,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		}
 	case types.Slice:
 		// Discover the element type.
-		if node, err := td.discoverType(t.Elem, fldPath.Key("vals")); err != nil {
+		if node, err := td.discoverChild(t.Elem, fldPath.Key("vals")); err != nil {
 			return nil, err
 		} else {
 			thisNode.elem = &childNode{
@@ -406,7 +409,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		}
 	case types.Map:
 		// Discover the key type.
-		if node, err := td.discoverType(t.Key, fldPath.Key("keys")); err != nil {
+		if node, err := td.discoverChild(t.Key, fldPath.Key("keys")); err != nil {
 			return nil, err
 		} else {
 			thisNode.key = &childNode{
@@ -416,7 +419,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		}
 
 		// Discover the element type.
-		if node, err := td.discoverType(t.Elem, fldPath.Key("vals")); err != nil {
+		if node, err := td.discoverChild(t.Elem, fldPath.Key("vals")); err != nil {
 			return nil, err
 		} else {
 			thisNode.elem = &childNode{
@@ -613,6 +616,17 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	return thisNode, nil
 }
 
+// discoverChild is discoverType for a type reached as a child (a field,
+// element, key, or underlying type) of another type. It additionally marks the
+// discovered node as referenced. See typeNode.referenced.
+func (td *typeDiscoverer) discoverChild(t *types.Type, fldPath *field.Path) (*typeNode, error) {
+	node, err := td.discoverType(t, fldPath)
+	if node != nil {
+		node.referenced = true
+	}
+	return node, err
+}
+
 // verifySupportedType checks whether the given type is supported.
 func (td *typeDiscoverer) verifySupportedType(t *types.Type) error {
 	switch t.Kind {
@@ -717,7 +731,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		klog.V(5).InfoS("field", "name", name, "jsonName", jsonName, "type", memb.Type, "path", childPath)
 		childType := memb.Type
 		var child *childNode
-		if node, err := td.discoverType(childType, childPath); err != nil {
+		if node, err := td.discoverChild(childType, childPath); err != nil {
 			return err
 		} else {
 			child = &childNode{
