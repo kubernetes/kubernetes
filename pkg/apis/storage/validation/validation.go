@@ -401,7 +401,7 @@ func ValidateCSIDriverUpdate(new, old *storage.CSIDriver) field.ErrorList {
 
 	// immutable fields should not be mutated.
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.AttachRequired, old.Spec.AttachRequired, field.NewPath("spec", "attachedRequired"))...)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.VolumeLifecycleModes, old.Spec.VolumeLifecycleModes, field.NewPath("spec", "volumeLifecycleModes"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.VolumeLifecycleModes, old.Spec.VolumeLifecycleModes, field.NewPath("spec", "volumeLifecycleModes")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 
 	return allErrs
 }
