@@ -1502,12 +1502,8 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 		features.NodeDeclaredFeatures:                 true,
 		features.RestartAllContainersOnContainerExits: true,
 	})
-	TestComputePodActions(t)
-	TestComputePodActionsWithInitContainers(t)
-
-	tCtx := ktesting.Init(t)
-	_, _, m, err := createTestRuntimeManager(tCtx)
-	require.NoError(t, err)
+	t.Run("TestComputePodActions", TestComputePodActions)
+	t.Run("TestComputePodActionsWithInitContainers", TestComputePodActionsWithInitContainers)
 
 	allContainersRestartingTrue := []v1.PodCondition{
 		{
@@ -1798,41 +1794,49 @@ func TestComputePodActionsForRestartAllContainers(t *testing.T) {
 			containersToStart: []int{0, 1, 2},
 		},
 	} {
-		pod := test.podFunc()
-		status := test.podStatusFunc()
-		tCtx := ktesting.Init(t)
-		actions := m.computePodActions(tCtx, pod, status, test.restartAllContainers)
+		t.Run(desc, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
 
-		expected := &podActions{
-			CreateSandbox:     false,
-			KillPod:           false,
-			SandboxID:         status.SandboxStatuses[0].Id,
-			ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
-			ContainersToStart: []int{},
-		}
-		if test.containersToStart != nil {
-			expected.ContainersToStart = test.containersToStart
-		}
-		if test.initContainersToStart != nil {
-			expected.InitContainersToStart = test.initContainersToStart
-		}
+			pod := test.podFunc()
+			status := test.podStatusFunc()
 
-		containerSpecByName := make(map[string]*v1.Container)
-		for idx, c := range pod.Spec.Containers {
-			containerSpecByName[c.Name] = &pod.Spec.Containers[idx]
-		}
-		for idx, c := range pod.Spec.InitContainers {
-			containerSpecByName[c.Name] = &pod.Spec.InitContainers[idx]
-		}
-		for _, info := range test.containersToRemove {
-			cName := info.container.Name
-			info.container = containerSpecByName[cName]
-			expected.ContainersToReset = append(expected.ContainersToReset, info)
-		}
+			// Initialize the actuated resources.
+			require.NoError(t, m.UpdateActuatedPodLevelResources(tCtx.Logger(), pod))
 
-		verifyActions(t, expected, &actions, desc)
+			actions := m.computePodActions(tCtx, pod, status, test.restartAllContainers)
+
+			expected := &podActions{
+				CreateSandbox:     false,
+				KillPod:           false,
+				SandboxID:         status.SandboxStatuses[0].Id,
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+				ContainersToStart: []int{},
+			}
+			if test.containersToStart != nil {
+				expected.ContainersToStart = test.containersToStart
+			}
+			if test.initContainersToStart != nil {
+				expected.InitContainersToStart = test.initContainersToStart
+			}
+
+			containerSpecByName := make(map[string]*v1.Container)
+			for idx, c := range pod.Spec.Containers {
+				containerSpecByName[c.Name] = &pod.Spec.Containers[idx]
+			}
+			for idx, c := range pod.Spec.InitContainers {
+				containerSpecByName[c.Name] = &pod.Spec.InitContainers[idx]
+			}
+			for _, info := range test.containersToRemove {
+				cName := info.container.Name
+				info.container = containerSpecByName[cName]
+				expected.ContainersToReset = append(expected.ContainersToReset, info)
+			}
+
+			verifyActions(t, expected, &actions, desc)
+		})
 	}
-
 }
 
 func getKillMap(pod *v1.Pod, status *kubecontainer.PodStatus, cIndexes []int) map[kubecontainer.ContainerID]containerToKillInfo {
@@ -1887,7 +1891,7 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 }
 
 func TestComputePodActionsWithInitContainers(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
@@ -2112,6 +2116,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				InitContainersToStart: []int{0},
 				ContainersToStart:     []int{},
 				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				UpdatePodResources:    true,
 			},
 		},
 		"resize of a running non-sidecar init container": {
@@ -2189,10 +2194,16 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 			if test.skipWindows && goruntime.GOOS == "windows" {
 				t.Skip("Skipping test since Windows does not support resize")
 			}
+			tCtx := ktesting.Init(t)
+
 			if test.disableIPPRInitCtrFG {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingInitContainers, false)
 			}
 			pod, status := makeBasePodAndStatusWithInitContainers()
+
+			// Sync the actuated state with the base values before any resize
+			require.NoError(t, m.UpdateActuatedPodLevelResources(tCtx.Logger(), pod))
+
 			if test.actions.ContainersToUpdate != nil {
 				for res := range test.actions.ContainersToUpdate {
 					for i := range test.actions.ContainersToUpdate[res] {
@@ -2200,9 +2211,6 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 						test.actions.ContainersToUpdate[res][i].container = &pod.Spec.InitContainers[0]
 					}
 				}
-				// Sync the state manager with the base (old) values before the resize
-				resources := pod.Spec.InitContainers[0].Resources
-				require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, pod.Spec.InitContainers[0].Name, resources))
 			}
 
 			if test.mutatePodFn != nil {
@@ -2211,7 +2219,6 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 			if test.mutateStatusFn != nil {
 				test.mutateStatusFn(status)
 			}
-			tCtx := ktesting.Init(t)
 			actions := m.computePodActions(tCtx, pod, status, false)
 			verifyActions(t, &test.actions, &actions, desc)
 		})
@@ -3945,6 +3952,188 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			verifyActions(t, expectedActions, &actions, desc)
 		})
 	}
+}
+
+func TestComputePodResizeActionForOOMKilledContainer(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
+	require.NoError(t, err)
+
+	mem100M := resource.MustParse("100Mi")
+	mem200M := resource.MustParse("200Mi")
+	cpu100m := resource.MustParse("100m")
+
+	pod, status := makeBasePodAndStatus()
+	pod.Spec.Containers = pod.Spec.Containers[:1]
+	status.ContainerStatuses = status.ContainerStatuses[:1]
+
+	pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+		Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+		Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+	}
+	pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+		{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+		{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+	}
+	// record the pre-resize resource limits as what was last actuated.
+	require.NoError(t, m.UpdateActuatedPodLevelResources(logger, pod))
+
+	// Pod Resized
+	resize := pod.Spec.Containers[0].Resources.DeepCopy()
+	resize.Requests[v1.ResourceMemory] = mem200M
+	resize.Limits[v1.ResourceMemory] = mem200M
+	pod.Spec.Containers[0].Resources = *resize
+
+	// simulate OOMKilled
+	status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+	status.ContainerStatuses[0].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[0])
+
+	actions := m.computePodActions(tCtx, pod, status, false)
+
+	// the container is OOMKilled and must not be added to ContainersToUpdate (no live CRI call).
+	assert.Empty(t, actions.ContainersToUpdate, "OOMKilled container must not be in ContainersToUpdate")
+	// UpdatePodResources must be true so doPodResizeAction updates the pod-level cgroup.
+	assert.True(t, actions.UpdatePodResources, "UpdatePodResources must be true for OOMKilled container with pending resize")
+}
+
+func TestComputePodResizeActionForOOMKilledInitContainer(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingInitContainers, true)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
+	require.NoError(t, err)
+
+	mem100M := resource.MustParse("100Mi")
+	mem200M := resource.MustParse("200Mi")
+	cpu100m := resource.MustParse("100m")
+
+	pod, status := makeBasePodAndStatus()
+	// a single init container.
+	pod.Spec.InitContainers = []v1.Container{
+		{
+			Name:  "init1",
+			Image: "bar-image",
+			Resources: v1.ResourceRequirements{
+				Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+			},
+			ResizePolicy: []v1.ContainerResizePolicy{
+				{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+				{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+			},
+		},
+	}
+	// no regular containers running so pod is not yet initialized.
+	status.ContainerStatuses = []*kubecontainer.Status{
+		{
+			ID:       kubecontainer.ContainerID{ID: "initid1"},
+			Name:     "init1",
+			State:    kubecontainer.ContainerStateExited,
+			Reason:   "OOMKilled",
+			ExitCode: 137,
+			Hash:     kubecontainer.HashContainer(&pod.Spec.InitContainers[0]),
+		},
+	}
+	pod.Spec.Containers = nil
+	pod.Status.ContainerStatuses = nil
+
+	// record pre-resize resource limits as what was last actuated.
+	require.NoError(t, m.UpdateActuatedPodLevelResources(logger, pod))
+
+	// Pod Resized
+	resize := pod.Spec.InitContainers[0].Resources.DeepCopy()
+	resize.Requests[v1.ResourceMemory] = mem200M
+	resize.Limits[v1.ResourceMemory] = mem200M
+	pod.Spec.InitContainers[0].Resources = *resize
+
+	actions := m.computePodActions(tCtx, pod, status, false)
+
+	// the init container is OOMKilled and must not be in ContainersToUpdate.
+	assert.Empty(t, actions.ContainersToUpdate, "OOMKilled init container must not be in ContainersToUpdate")
+	// UpdatePodResources must be true so doPodResizeAction updates the pod-level cgroup.
+	assert.True(t, actions.UpdatePodResources, "UpdatePodResources must be true for OOMKilled init container with pending resize")
+}
+
+func TestComputePodResizeActionForOOMKilledSidecarContainer(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
+	require.NoError(t, err)
+
+	mem100M := resource.MustParse("100Mi")
+	mem200M := resource.MustParse("200Mi")
+	cpu100m := resource.MustParse("100m")
+
+	pod, status := makeBasePodAndStatus()
+	pod.Spec.Containers = nil
+	pod.Status.ContainerStatuses = nil
+	status.ContainerStatuses = nil
+
+	// one running regular container so the pod is considered initialized.
+	regularContainer := v1.Container{
+		Name:  "app",
+		Image: "busybox",
+	}
+	pod.Spec.Containers = []v1.Container{regularContainer}
+	status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+		ID:    kubecontainer.ContainerID{ID: "appid"},
+		Name:  "app",
+		State: kubecontainer.ContainerStateRunning,
+		Hash:  kubecontainer.HashContainer(&pod.Spec.Containers[0]),
+	})
+
+	// one sidecar that has been OOMKilled.
+	sidecar := v1.Container{
+		Name:          "sidecar",
+		Image:         "bar-image",
+		RestartPolicy: &containerRestartPolicyAlways,
+		Resources: v1.ResourceRequirements{
+			Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+			Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+		},
+		ResizePolicy: []v1.ContainerResizePolicy{
+			{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+			{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+		},
+	}
+	pod.Spec.InitContainers = []v1.Container{sidecar}
+	status.ContainerStatuses = append(status.ContainerStatuses, &kubecontainer.Status{
+		ID:       kubecontainer.ContainerID{ID: "sidecarid"},
+		Name:     "sidecar",
+		State:    kubecontainer.ContainerStateExited,
+		Reason:   "OOMKilled",
+		ExitCode: 137,
+		Hash:     kubecontainer.HashContainer(&pod.Spec.InitContainers[0]),
+	})
+
+	// record pre-resize resource limits as what was last actuated.
+	require.NoError(t, m.UpdateActuatedPodLevelResources(logger, pod))
+
+	// Pod Resized
+	resize := pod.Spec.InitContainers[0].Resources.DeepCopy()
+	resize.Requests[v1.ResourceMemory] = mem200M
+	resize.Limits[v1.ResourceMemory] = mem200M
+	pod.Spec.InitContainers[0].Resources = *resize
+
+	actions := m.computePodActions(tCtx, pod, status, false)
+
+	// the sidecar is OOMKilled and must not be in ContainersToUpdate.
+	assert.Empty(t, actions.ContainersToUpdate, "OOMKilled sidecar must not be in ContainersToUpdate")
+	// UpdatePodResources must be true so doPodResizeAction updates the pod-level cgroup.
+	assert.True(t, actions.UpdatePodResources, "UpdatePodResources must be true for OOMKilled sidecar with pending resize")
 }
 
 func TestUpdatePodContainerResources(t *testing.T) {
