@@ -204,8 +204,22 @@ func TestApplyCRDuringCRDFinalization(t *testing.T) {
 	name := "foo123"
 	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
-	instance := fixtures.NewNoxuInstance(ns, name)
-	_, err = noxuResourceClient.Apply(t.Context(), name, instance, metav1.ApplyOptions{DryRun: []string{"All"}, FieldManager: "manager"})
 	wantErr := `create not allowed while custom resource definition is terminating`
-	require.ErrorContains(t, err, wantErr)
+	var applyErr error
+	instance := fixtures.NewNoxuInstance(ns, name)
+	// The CRD handler uses its informer cache to decide whether creates are blocked.
+	// The CRD GET above can observe deletion before that cache does, so wait
+	// through the same dry-run apply path that this test is validating.
+	err = wait.PollUntilContextTimeout(t.Context(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		_, applyErr = noxuResourceClient.Apply(ctx, name, instance, metav1.ApplyOptions{DryRun: []string{"All"}, FieldManager: "manager"})
+		if applyErr == nil {
+			return false, nil
+		}
+		if !errors.IsForbidden(applyErr) {
+			return false, applyErr
+		}
+		return true, nil
+	})
+	require.NoError(t, err, "timed out waiting for CR apply to be rejected while CRD is deleting")
+	require.ErrorContains(t, applyErr, wantErr)
 }
