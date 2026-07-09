@@ -2347,6 +2347,62 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Non0Mem: mem500M.Value() + mem200M.Value() + mem200M.Value(),
 			},
 		},
+		{
+			name:                               "DRA gate enabled, with node allocatable resource claim specifying both Mapping and Overhead",
+			nodeAllocatableResourcesDRAEnabled: true,
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+						Claims: []v1.ResourceClaim{
+							{
+								Name: "node-allocatable-claim",
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim",
+					Containers:        []string{"c1"},
+					Mapping: []v1.NodeAllocatableMappedResources{
+						{
+							Name:     v1.ResourceCPU,
+							Quantity: new(cpu100m),
+						},
+						{
+							Name:     v1.ResourceMemory,
+							Quantity: new(mem200M),
+						},
+					},
+					Overhead: []v1.NodeAllocatableOverheadResources{
+						{
+							Name:         v1.ResourceCPU,
+							PerPod:       &cpu100m,
+							PerContainer: &cpu100m,
+						},
+						{
+							Name:         v1.ResourceMemory,
+							PerPod:       &mem200M,
+							PerContainer: &mem200M,
+						},
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(), // spec (500) + mapping (100) + perPod (100) + perContainer (100) = 800m
+					Memory:   mem500M.Value() + mem200M.Value() + mem200M.Value() + mem200M.Value(),                     // spec (500) + mapping (200) + perPod (200) + perContainer (200) = 1100M
+				},
+				Non0CPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem200M.Value() + mem200M.Value() + mem200M.Value(),
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

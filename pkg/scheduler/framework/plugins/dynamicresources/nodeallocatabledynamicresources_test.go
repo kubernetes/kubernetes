@@ -908,6 +908,70 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			}},
 		},
 		{
+			name: "Unreferenced Claims with Overhead",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{Name: "c1"}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("unref-claim", "unref-claim-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod:       new(resource.MustParse("1Gi")),
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "unref-claim", UID: "unref-claim-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "unref-claim",
+				Containers:        []string{},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "Unreferenced Claims with Overhead Per Container Only",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{Name: "c1"}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("unref-claim", "unref-claim-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "unref-claim", UID: "unref-claim-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "unref-claim",
+				Containers:        []string{},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
 			name: "Combined Capacity and PerAllocatedUnitQuantity",
 			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
 				Containers([]v1.Container{{
