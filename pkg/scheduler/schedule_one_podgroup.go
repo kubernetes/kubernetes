@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -129,6 +130,11 @@ func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupI
 	schedulerName := podGroupInfo.QueuedPodInfos[0].Pod.Spec.SchedulerName
 	podGroupPriority := util.PodGroupPriority(podGroupInfo.PodGroup)
 
+	var pgPreemptionPolicy v1.PreemptionPolicy
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
+		pgPreemptionPolicy = podGroupPreemptionPolicy(podGroupInfo.PodGroup)
+	}
+
 	validatePod := func(pod *v1.Pod) error {
 		if pod.Spec.SchedulerName != schedulerName {
 			return fmt.Errorf("all pods in a single pod group should have the same .spec.schedulerName set, got: %q and %q", pod.Spec.SchedulerName, schedulerName)
@@ -136,6 +142,23 @@ func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupI
 		podPriority := corev1helpers.PodPriority(pod)
 		if podPriority != podGroupPriority {
 			return fmt.Errorf("all pods in a single pod group should have the same priority as the pod group's priority, got %d and %d", podPriority, podGroupPriority)
+		}
+
+		pPreemptionPolicy := podPreemptionPolicy(pod)
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
+			// If the PodGroupPreemptionPolicy feature is enabled, validate that the pod's preemption policy
+			// matches the pod group's preemption policy.
+			if pPreemptionPolicy != pgPreemptionPolicy {
+				return fmt.Errorf("all pods in a single pod group should have the same preemption policy as the pod group's preemption policy, got %v and %v", pPreemptionPolicy, pgPreemptionPolicy)
+			}
+		} else {
+			// If the PodGroupPreemptionPolicy feature is disabled, the preemption policy is determined by the first pod in the group.
+			// Validate that preemption policy is the same across all pods in the pod group.
+			if pgPreemptionPolicy == "" {
+				pgPreemptionPolicy = pPreemptionPolicy
+			} else if pPreemptionPolicy != pgPreemptionPolicy {
+				return fmt.Errorf("all pods in a single pod group should have the same preemption policy, got %v and %v", pPreemptionPolicy, pgPreemptionPolicy)
+			}
 		}
 		return nil
 	}
@@ -156,6 +179,24 @@ func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupI
 	}
 
 	return nil
+}
+
+// podGroupPreemptionPolicy returns the PreemptionPolicy set in the pod group, or the default policy
+// (PreemptLowerPriority) if not set.
+func podGroupPreemptionPolicy(pg *schedulingv1alpha3.PodGroup) v1.PreemptionPolicy {
+	if pg != nil && pg.Spec.PreemptionPolicy != nil {
+		return v1.PreemptionPolicy(*pg.Spec.PreemptionPolicy)
+	}
+	return v1.PreemptLowerPriority
+}
+
+// podPreemptionPolicy returns the PreemptionPolicy set in the pod, or the default policy
+// (PreemptLowerPriority) if not set.
+func podPreemptionPolicy(pod *v1.Pod) v1.PreemptionPolicy {
+	if pod != nil && pod.Spec.PreemptionPolicy != nil {
+		return *pod.Spec.PreemptionPolicy
+	}
+	return v1.PreemptLowerPriority
 }
 
 // frameworkForPodGroup obtains the concrete scheduler framework for the entire pod group.
