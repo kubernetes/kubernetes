@@ -5733,8 +5733,14 @@ type PodStatus struct {
 	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
 	// +featureGate=DRANodeAllocatableResources
 	// +optional
-	// +listType=atomic
-	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus `json:"nodeAllocatableResourceClaimStatuses,omitempty" protobuf:"bytes,21,rep,name=nodeAllocatableResourceClaimStatuses"`
+	// +patchStrategy=merge
+	// +patchMergeKey=resourceClaimName
+	// +listType=map
+	// +listMapKey=resourceClaimName
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=resourceClaimName
+	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus `json:"nodeAllocatableResourceClaimStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"resourceClaimName" protobuf:"bytes,21,rep,name=nodeAllocatableResourceClaimStatuses"`
 
 	// volumeHealth contains node-reported health for each volume the pod is using.
 	// Populated by the kubelet on the pod's node.
@@ -8858,12 +8864,78 @@ type ImageVolumeSource struct {
 type NodeAllocatableResourceClaimStatus struct {
 	// ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
 	// +required
+	// +k8s:required
 	ResourceClaimName string `json:"resourceClaimName" protobuf:"bytes,1,opt,name=resourceClaimName"`
 	// Containers lists the names of all containers in this pod that reference the claim.
 	// +optional
 	// +listType=set
+	// +k8s:optional
+	// +k8s:listType=set
 	Containers []string `json:"containers,omitempty" protobuf:"bytes,2,rep,name=containers"`
-	// Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
+
+	// Resources is tombstoned since it got replaced with more granular Mapping and Overhead fields.
+	// Resources map[ResourceName]resource.Quantity `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
+
+	// Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
+	// This is used by kubelet for pod level and container-level cgroup enforcement.
+	// +optional
+	// +patchStrategy=merge
+	// +patchMergeKey=name
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	Mapping []NodeAllocatableMappedResources `json:"mapping,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,4,rep,name=mapping"`
+	// Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
+	// This is used by kubelet for pod level and container-level cgroup enforcement.
+	// +optional
+	// +patchStrategy=merge
+	// +patchMergeKey=name
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	Overhead []NodeAllocatableOverheadResources `json:"overhead,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,5,rep,name=overhead"`
+}
+
+// NodeAllocatableMappedResources describes mapped node allocatable resource allocations.
+type NodeAllocatableMappedResources struct {
+	// Name is the name of the resource (e.g., cpu, memory).
 	// +required
-	Resources map[ResourceName]resource.Quantity `json:"resources" protobuf:"bytes,3,rep,name=resources"`
+	// +k8s:required
+	Name ResourceName `json:"name" protobuf:"bytes,1,opt,name=name,casttype=ResourceName"`
+	// Quantity is the total node allocatable resource capacity allocated for the claim.
+	// This claim's allocated devices is shared by all the containers referencing the claim.
+	// Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
+	// +required
+	// +k8s:required
+	Quantity *resource.Quantity `json:"quantity" protobuf:"bytes,2,opt,name=quantity"`
+}
+
+// NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.
+type NodeAllocatableOverheadResources struct {
+	// Name is the name of the resource (e.g., cpu, memory).
+	// +required
+	// +k8s:required
+	Name ResourceName `json:"name" protobuf:"bytes,1,opt,name=name,casttype=ResourceName"`
+	// PerPod is the flat overhead quantity allocated per pod.
+	// Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once.
+	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
+	// +optional
+	// +k8s:optional
+	PerPod *resource.Quantity `json:"perPod,omitempty" protobuf:"bytes,2,opt,name=perPod"`
+	// PerContainer is the variable overhead quantity applied for each container referencing the claim.
+	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
+	// The total overhead quantity allocated for the claim is computed as:
+	// Quantity = PerPod + (PerContainer * NumReferences)
+	// Kubelet accounts for this overhead in cgroups:
+	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
+	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
+	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
+	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
+	// +optional
+	// +k8s:optional
+	PerContainer *resource.Quantity `json:"perContainer,omitempty" protobuf:"bytes,3,opt,name=perContainer"`
 }

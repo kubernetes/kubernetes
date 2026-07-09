@@ -467,7 +467,10 @@ type Device struct {
 	// +featureGate=DRAConsumableCapacity
 	AllowMultipleAllocations *bool `json:"allowMultipleAllocations,omitempty" protobuf:"bytes,12,opt,name=allowMultipleAllocations"`
 
-	// NodeAllocatableResourceMappings defines the mapping of node resources
+	// NodeAllocatableResourceMappings is tombstoned as it got replaced with NodeAllocatableResources.
+	// NodeAllocatableResourceMappings map[v1.ResourceName]NodeAllocatableResourceMapping `json:"nodeAllocatableResourceMappings,omitempty" protobuf:"bytes,13,opt,name=nodeAllocatableResourceMappings"`
+
+	// NodeAllocatableResources defines the mapping of node resources
 	// that are managed by the DRA driver exposing this device. This includes resources currently
 	// reported in v1.Node `status.allocatable` that are not extended resources
 	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
@@ -479,46 +482,104 @@ type Device struct {
 	// The keys of this map are the node-allocatable resource names (e.g., "cpu", "memory").
 	// Extended resource names are not permitted as keys.
 	// +optional
+	// +k8s:optional
 	// +featureGate=DRANodeAllocatableResources
-	NodeAllocatableResourceMappings map[v1.ResourceName]NodeAllocatableResourceMapping `json:"nodeAllocatableResourceMappings,omitempty" protobuf:"bytes,13,opt,name=nodeAllocatableResourceMappings"`
+	NodeAllocatableResources map[v1.ResourceName]NodeAllocatableResource `json:"nodeAllocatableResources,omitempty" protobuf:"bytes,14,opt,name=nodeAllocatableResources"`
 }
 
-// NodeAllocatableResourceMapping defines the translation between the DRA device/capacity
+// NodeAllocatableResource defines the translation between the DRA device/capacity
 // units requested to the corresponding quantity of the node allocatable resource.
-type NodeAllocatableResourceMapping struct {
+// At least one of Mapping or Overhead must be specified. Not specifying either is an invalid configuration.
+type NodeAllocatableResource struct {
+	// Mapping is used when the device directly models a node allocatable resource like standard CPU or memory
+	// (e.g., with a CPU DRA driver). The calculated quantity is accounted for exactly once per claim instance
+	// on the node. To prevent node cgroup isolation friction, the scheduler explicitly
+	// blocks sharing mapped device claims across multiple pods.
+	// +optional
+	// +k8s:optional
+	Mapping *NodeAllocatableMapping `json:"mapping,omitempty" protobuf:"bytes,3,opt,name=mapping"`
+
+	// Overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources
+	// when allocating devices that are not themselves modeling a node allocatable resource (e.g., host memory overhead for GPUs).
+	// Sharing overhead-mapped claims across multiple pods is allowed. The node allocatable overhead is accounted
+	// for individually for each pod referencing the claim.
+	// Overhead is always subtracted from the node's allocatable capacity for the resource, even when mapping
+	// is specified for the same resource.
+	// Eg: If a device models memory capacity per socket as a consumable capacity pool via Mapping (with CapacityKey),
+	// any overhead specified for the same resource will be subtracted from the node's general allocatable capacity
+	// and not from the per-socket capacity pool in Mapping.
+	// +optional
+	// +k8s:optional
+	Overhead *NodeAllocatableOverhead `json:"overhead,omitempty" protobuf:"bytes,4,opt,name=overhead"`
+}
+
+// NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity.
+// The mapping can be derived from either the count of allocated devices (via deviceMultiplier) or the specific capacity consumed (via capacityKey and capacityMultiplier). These options are mutually exclusive.
+// Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
+type NodeAllocatableMapping struct {
 	// CapacityKey references a capacity name defined as a key in the
 	// `spec.devices[*].capacity` map. When this field is set, the value associated with
 	// this key in the `status.allocation.devices.results[*].consumedCapacity` map
 	// (for a specific claim allocation) determines the base quantity for
-	// the node allocatable resource. If `allocationMultiplier` is also set, it is
+	// the node allocatable resource. `capacityMultiplier` must also be set and is
 	// multiplied with the base quantity.
 	// For example, if `spec.devices[*].capacity` has an entry "dra.example.com/memory": "128Gi",
 	// and this field is set to "dra.example.com/memory", then for a claim allocation
 	// that consumes { "dra.example.com/memory": "4Gi" } the base quantity for the
-	// node allocatable resource mapping will be "4Gi", and `allocationMultiplier` should
-	// be omitted or set to "1".
+	// node allocatable resource mapping will be "4Gi".
+	// The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.
 	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("capacityMultiplier")
 	CapacityKey *QualifiedName `json:"capacityKey,omitempty" protobuf:"bytes,1,opt,name=capacityKey"`
 
-	// AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim.
-	// It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set.
-	// 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.
-	// 	   a. A DRA driver representing each CPU core as a device would have
-	//        {ResourceName: "cpu", allocationMultiplier: "2"} in its
-	//        `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,
-	// 		  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.
-	//     b. A GPU device that needs additional node memory per GPU allocation would
-	//        have {ResourceName: "memory", allocationMultiplier: "2Gi"}.  Each allocated
-	// 		  GPU device instance of this type will account for 2Gi of memory.
-	//
-	// 2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.
-	// 	   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.
-	//     For example, if a Device's capacity "dra.example.com/cores" is consumed,
-	//     and each "core" provides 2 "cpu"s, the mapping would be:
-	//     {ResourceName: "cpu", capacityKey: "dra.example.com/cores", allocationMultiplier: "2"}.
-	//     If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
+	// CapacityMultiplier is used as a multiplier for the allocated capacity consumed.
+	// It is only valid if `capacityKey` is set.
+	// The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.
+	// For example, if a Device's capacity "dra.example.com/cores" is consumed,
+	// and each "core" provides 2 "cpu"s, the mapping would be:
+	// {ResourceName: "cpu", capacityKey: "dra.example.com/cores", capacityMultiplier: "2"}.
+	// If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
 	// +optional
-	AllocationMultiplier *resource.Quantity `json:"allocationMultiplier,omitempty" protobuf:"bytes,2,opt,name=allocationMultiplier"`
+	// +k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("capacityKey")
+	CapacityMultiplier *resource.Quantity `json:"capacityMultiplier,omitempty" protobuf:"bytes,2,opt,name=capacityMultiplier"`
+
+	// DeviceMultiplier is used as a multiplier for the allocated device count in the claim.
+	// The final node allocatable resource amount is `deviceCount` * `deviceMultiplier`.
+	// For example, a DRA driver representing each cache complex (CCX) as a device would have
+	// {ResourceName: "cpu", deviceMultiplier: "8"} in its `nodeAllocatableResources`.
+	// If 2 devices (CCX) are allocated to the claim, 2 * 8 = 16 CPUs would be considered as allocated.
+	// It is only valid when `capacityKey` and `capacityMultiplier` are not set.
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	DeviceMultiplier *resource.Quantity `json:"deviceMultiplier,omitempty" protobuf:"bytes,3,opt,name=deviceMultiplier"`
+}
+
+// NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device.
+// Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both.
+// Kubelet accounts for this overhead by adding it to both the pod-level and container-level cgroups of referencing containers.
+type NodeAllocatableOverhead struct {
+	// PerPod is overhead applied once per pod referencing the claim on this node.
+	// This is a flat overhead incurred for every pod referencing the claim.
+	// +optional
+	// +k8s:optional
+	PerPod *resource.Quantity `json:"perPod,omitempty" protobuf:"bytes,1,opt,name=perPod"`
+
+	// PerContainer is applied per container reference to the claim.
+	// This models overhead scaling linearly with the number of containers actively using the device.
+	// When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing
+	// the claim is computed as:
+	// Quantity = PerPod + (PerContainer * NumReferences)
+	// Kubelet accounts for this overhead in cgroups:
+	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
+	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
+	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
+	// +optional
+	// +k8s:optional
+	PerContainer *resource.Quantity `json:"perContainer,omitempty" protobuf:"bytes,2,opt,name=perContainer"`
 }
 
 // DeviceCounterConsumption defines a set of counters that
