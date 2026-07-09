@@ -262,7 +262,9 @@ func getPlacementFeasibleState(placementCycleState fwk.PlacementCycleState) *pla
 
 // PlacementFeasible is responsible for enforcing the gang's MinCount constraint in the pod group scheduling cycle.
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
-// In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
+// If the total number of pods in the gang is less than minCount, it returns UnschedulableAndUnresolvable.
+// In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable.
+// Both of these terminate the pod group scheduling cycle early.
 func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
 	pg := podGroupInfo.GetPodGroup()
 
@@ -288,6 +290,15 @@ func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleS
 	scheduled := podGroupState.ScheduledPodsCount()
 
 	minCount := int(gangPolicy.MinCount)
+
+	// TODO: AllPodsCount is not necessarily equal to podsConsideredInThisCycle + podsScheduledInPreviousCycles
+	// as the pod count may change between creating the PodGroupInfo and updating the snapshot.
+	totalPods := podGroupState.AllPodsCount()
+	if totalPods < minCount {
+		// The total number of pods in the gang is less than minCount.
+		// It can never be scheduled even if all pods were schedulable.
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("total pods (%d) is less than minCount (%d)", totalPods, minCount))
+	}
 
 	if remaining+scheduled < minCount {
 		// minCount can't be satisfied because there are not enough remaining pods.

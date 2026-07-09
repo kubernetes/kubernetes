@@ -188,6 +188,7 @@ type PlacementFeasiblePlugin interface {
 	// Use placementCycleState to accumulate the results from the evaluated pods in current cycle.
 	// Return Wait status if the pod group cannot be scheduled in the current partially evaluated placement, but may become schedulable once more pods are evaluated.
 	// Return Unschedulable status if the pod group cannot be scheduled in the current placement.
+	// Return UnschedulableAndUnresolvable status if the pod group cannot be scheduled even if all pods were schedulable.
 	// The scheduler will give up this placement and won't even evaluate remaining pods. The placement will remain eligible for preemption.
 	// Return Success status if the pod group can be scheduled in the current partially evaluated placement.
 	// After returning Success, the plugin should keep returning Success for the remaining pods.
@@ -278,9 +279,9 @@ type Framework interface {
 
 	// RunPlacementFeasiblePlugins runs the set of configured Permit plugins that implement PlacementFeasible interface.
 	// The result will be Success if all plugins return Success.
-	// The only other valid statuses are Wait and Unschedulable.
+	// The only other valid statuses are Wait, Unschedulable, and UnschedulableAndUnresolvable.
 	// If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
-	// Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins won't be invoked and the result will be Unschedulable. The placement will remain eligible for preemption.
+	// Otherwise, if at least 1 plugin returns Unschedulable or UnschedulableAndUnresolvable, the remaining plugins won't be invoked and the result will be Unschedulable or UnschedulableAndUnresolvable.
 	// Otherwise, if at least 1 plugin returns Wait, the remaining plugins will be invoked and the result will be Wait.
 	RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status
 

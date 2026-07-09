@@ -360,10 +360,10 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 
 		result.status = placementFeasibleStatus
 
-		// Unschedulable from PlacementFeasible plugins indicates that the pod group
-		// cannot meet its constraints regardless of how many more pods we check.
+		// Unschedulable or UnschedulableAndUnresolvable from PlacementFeasible plugins indicates
+		// that the pod group cannot meet its constraints regardless of how many more pods we check.
 		// We can stop the scheduling loop early.
-		if placementFeasibleStatus.Code() == fwk.Unschedulable {
+		if placementFeasibleStatus.Code() == fwk.Unschedulable || placementFeasibleStatus.Code() == fwk.UnschedulableAndUnresolvable {
 			break
 		}
 
@@ -534,7 +534,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 				} else {
 					// Pod group is unschedulable, so the pod has to be marked as unschedulable.
 					// Its rejection status is set to the pod group's status message.
-					status := fwk.NewStatus(fwk.Unschedulable, podGroupResult.status.Message()).WithError(errPodGroupUnschedulable)
+					status := fwk.NewStatus(podGroupResult.status.Code(), podGroupResult.status.Message()).WithError(errPodGroupUnschedulable)
 					sched.FailureHandler(ctx, schedFwk, pInfo, status, clearNominatedNode, podSchedulingStart)
 				}
 				unschedulablePods++
@@ -549,7 +549,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			if podResult.requiresPreemption && !podGroupResult.waitingOnPreemption {
 				// Pod group is unschedulable, so the pod has to be marked as unschedulable, even if it just required preemption.
 				// Its rejection status is set to the pod group's status message, as the preemption message is no longer relevant.
-				status := fwk.NewStatus(fwk.Unschedulable, podGroupResult.status.Message()).WithError(errPodGroupUnschedulable)
+				status := fwk.NewStatus(podGroupResult.status.Code(), podGroupResult.status.Message()).WithError(errPodGroupUnschedulable)
 				sched.FailureHandler(ctx, schedFwk, pInfo, status, clearNominatedNode, podSchedulingStart)
 			} else {
 				// When a pod is unschedulable or preemption is required, just call the FailureHandler.
@@ -682,7 +682,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	if len(successfulResults) == 0 {
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// The selection of which simulation we report is arbitrary for now, but may change in the future.
-		anyResult.status = fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("0/%d placements are available, first placement status: %v", len(placements), anyResult.status.AsError()))
+		anyResult.status = fwk.NewStatus(anyResult.status.Code(), fmt.Sprintf("0/%d placements are available, first placement status: %v", len(placements), anyResult.status.AsError()))
 		return *anyResult
 	}
 

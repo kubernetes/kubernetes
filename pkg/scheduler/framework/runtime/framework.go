@@ -2069,9 +2069,9 @@ func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin
 
 // RunPlacementFeasiblePlugins runs the set of configured Permit plugins that implement PlacementFeasible interface.
 // The result will be Success if all plugins return Success.
-// The only other valid statuses are Wait and Unschedulable.
+// The only other valid statuses are Wait, Unschedulable, and UnschedulableAndUnresolvable.
 // If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
-// Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins won't be invoked and the result will be Unschedulable.
+// Otherwise, if at least 1 plugin returns Unschedulable or UnschedulableAndUnresolvable, the remaining plugins won't be invoked and the result will be Unschedulable or UnschedulableAndUnresolvable.
 // Otherwise, if at least 1 plugin returns Wait, the remaining plugins will be invoked and the result will be Wait.
 func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) (status *fwk.Status) {
 	startTime := time.Now()
@@ -2088,7 +2088,7 @@ func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placeme
 			status = plStatus.WithPlugin(pl.Name())
 			continue
 		}
-		if plStatus.Code() == fwk.Unschedulable {
+		if plStatus.Code() == fwk.Unschedulable || plStatus.Code() == fwk.UnschedulableAndUnresolvable {
 			return plStatus.WithPlugin(pl.Name())
 		}
 		if plStatus.IsError() {
