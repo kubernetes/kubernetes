@@ -30667,6 +30667,50 @@ func TestValidatePodResize(t *testing.T) {
 			enableMemoryBackedVolumesResize: true,
 			err:                             "spec.volumes[0].emptyDir.sizeLimit: Forbidden: adding or removing sizeLimit on an existing volume is not allowed",
 		},
+		{
+			test: "pod with container resources claims is valid after resize",
+			old: podtest.MakePod("pod",
+				podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("claim-1-claim")}),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("500m", "500Mi", "", ""),
+						Limits:   getResources("1000m", "1000Mi", "", ""),
+						Claims:   []core.ResourceClaim{{Name: "claim-1"}},
+					}))),
+			),
+			new: podtest.MakePod("pod",
+				podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("claim-1-claim")}),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("500m", "500Mi", "", ""),
+						Limits:   getResources("1500m", "1000Mi", "", ""),
+						Claims:   []core.ResourceClaim{{Name: "claim-1"}},
+					}))),
+			),
+			err: "",
+		},
+		{
+			test: "pod with container resources claims fails if claims are mutated",
+			old: podtest.MakePod("pod",
+				podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("claim-1-claim")}),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("500m", "500Mi", "", ""),
+						Limits:   getResources("1000m", "1000Mi", "", ""),
+						Claims:   []core.ResourceClaim{{Name: "claim-1"}},
+					}))),
+			),
+			new: podtest.MakePod("pod",
+				podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-2", ResourceClaimName: new("claim-2-claim")}),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("500m", "500Mi", "", ""),
+						Limits:   getResources("1000m", "1000Mi", "", ""),
+						Claims:   []core.ResourceClaim{{Name: "claim-2"}},
+					}))),
+			),
+			err: "only cpu and memory resources are mutable",
+		},
 	}
 
 	for _, test := range tests {

@@ -6736,7 +6736,8 @@ func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.
 func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
 	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
 	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
-	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
+	// Resource claims are immutable during pod resize and the original configuration must be preserved.
+	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req, Claims: container.Resources.Claims}
 }
 
 // dropCPUMemoryResourceRequirementsUpdates deletes the cpu and memory resources
