@@ -519,6 +519,11 @@ func TestAsyncPreemption(t *testing.T) {
 		// completePreemption completes the preemption that is currently on-going.
 		// You should give a Pod name.
 		completePreemption string
+		// waitForAsyncPreemptionToFinish waits until the async preemption executor no longer tracks
+		// the preemptor after completePreemption. Only use this for scenarios that assert
+		// post-preemption queue state; scenarios that intentionally observe intermediate async
+		// state should not wait.
+		waitForAsyncPreemptionToFinish bool
 		// podGatedInQueue checks if the given Pod is in the scheduling queue and gated by the preemption.
 		// You should give a Pod name.
 		podGatedInQueue string
@@ -760,12 +765,18 @@ func TestAsyncPreemption(t *testing.T) {
 					podGatedInQueue: "preemptor-super-high-priority",
 				},
 				{
-					name:               "complete the preemption API calls of super-high-priority",
-					completePreemption: "preemptor-super-high-priority",
+					name:                           "complete the preemption API calls of super-high-priority",
+					completePreemption:             "preemptor-super-high-priority",
+					waitForAsyncPreemptionToFinish: true,
 				},
 				{
-					name:               "complete the preemption API calls of high-priority",
-					completePreemption: "preemptor-high-priority",
+					name:                           "complete the preemption API calls of high-priority",
+					completePreemption:             "preemptor-high-priority",
+					waitForAsyncPreemptionToFinish: true,
+				},
+				{
+					name:               "flush scheduling queue after preemption completes",
+					flushUnschedulable: true,
 				},
 				{
 					name: "schedule the super-high-priority Pod",
@@ -840,12 +851,18 @@ func TestAsyncPreemption(t *testing.T) {
 					podRunningPreemption: ptr.To(5),
 				},
 				{
-					name:               "complete the preemption API calls",
-					completePreemption: "preemptor-mid-priority",
+					name:                           "complete the preemption API calls",
+					completePreemption:             "preemptor-mid-priority",
+					waitForAsyncPreemptionToFinish: true,
 				},
 				{
-					name:               "complete the preemption API calls",
-					completePreemption: "preemptor-high-priority",
+					name:                           "complete the preemption API calls",
+					completePreemption:             "preemptor-high-priority",
+					waitForAsyncPreemptionToFinish: true,
+				},
+				{
+					name:               "flush scheduling queue after preemption completes",
+					flushUnschedulable: true,
 				},
 				{
 					// the preemptor pod should be popped from the queue before the mid-priority pod.
@@ -1514,6 +1531,24 @@ func TestAsyncPreemption(t *testing.T) {
 						close(preemptionDoneChannels[scenario.completePreemption])
 						delete(preemptionDoneChannels, scenario.completePreemption)
 						lock.Unlock()
+
+						if scenario.waitForAsyncPreemptionToFinish {
+							var preemptorPod *v1.Pod
+							for _, pod := range createdPods {
+								if pod.Name == scenario.completePreemption {
+									preemptorPod = pod
+									break
+								}
+							}
+							if preemptorPod == nil {
+								t.Fatalf("Failed to find created preemptor Pod %q", scenario.completePreemption)
+							}
+							if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+								return !preemptionPlugin.Executor.IsPodRunningPreemption(preemptorPod.GetUID()), nil
+							}); err != nil {
+								t.Fatalf("Timed out waiting for Pod %q to finish preemption", scenario.completePreemption)
+							}
+						}
 					case scenario.podGatedInQueue != "":
 						// make sure the Pod is in the queue in the first place.
 						if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.podGatedInQueue) {
