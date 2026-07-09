@@ -2383,52 +2383,6 @@ func TestStatefulSetControlRecreateUpdate(t *testing.T) {
 		validate   func(set *apps.StatefulSet, pods []*v1.Pod) error
 	}
 
-	testFn := func(test *testcase, t *testing.T) {
-		set := test.initial()
-		set.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
-		set.Spec.UpdateStrategy.RollingUpdate = nil
-
-		client := fake.NewSimpleClientset(set)
-
-		om, _, ssc := setupController(client)
-		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants, nil); err != nil {
-			t.Fatalf("%s: %s", test.name, err)
-		}
-		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
-		if err != nil {
-			t.Fatalf("%s: %s", test.name, err)
-		}
-
-		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-		if err != nil {
-			t.Fatalf("%s: %s", test.name, err)
-		}
-
-		if test.preUpdate != nil {
-			if err := test.preUpdate(set, om, t); err != nil {
-				t.Fatalf("%s: %s", test.name, err)
-			}
-		}
-
-		set = test.update(set)
-
-		if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
-			t.Fatalf("%s: %s", test.name, err)
-		}
-
-		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
-		if err != nil {
-			t.Fatalf("%s: %s", test.name, err)
-		}
-		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
-		if err != nil {
-			t.Fatalf("%s: %s", test.name, err)
-		}
-		if err := test.validate(set, pods); err != nil {
-			t.Fatalf("%s: %s", test.name, err)
-		}
-	}
-
 	tests := []testcase{
 		{
 			name:       "monotonic image update",
@@ -2659,8 +2613,53 @@ func TestStatefulSetControlRecreateUpdate(t *testing.T) {
 			},
 		},
 	}
-	for i := range tests {
-		testFn(&tests[i], t)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			set := test.initial()
+			set.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
+			set.Spec.UpdateStrategy.RollingUpdate = nil
+
+			client := fake.NewSimpleClientset(set)
+
+			om, _, ssc := setupController(client)
+			if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants, nil); err != nil {
+				t.Fatalf("%s: %s", test.name, err)
+			}
+			set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatalf("%s: %s", test.name, err)
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+			if err != nil {
+				t.Fatalf("%s: %s", test.name, err)
+			}
+
+			if test.preUpdate != nil {
+				if err := test.preUpdate(set, om, t); err != nil {
+					t.Fatalf("%s: %s", test.name, err)
+				}
+			}
+
+			set = test.update(set)
+
+			if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
+				t.Fatalf("%s: %s", test.name, err)
+			}
+
+			pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Fatalf("%s: %s", test.name, err)
+			}
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatalf("%s: %s", test.name, err)
+			}
+			if err := test.validate(set, pods); err != nil {
+				t.Fatalf("%s: %s", test.name, err)
+			}
+
+		})
 	}
 }
 

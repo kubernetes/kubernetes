@@ -22,6 +22,7 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -572,6 +573,13 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 		return nil, err
 	}
 
+	// emit a warning and return if Recreate strategy is used and the feature gate is off
+	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType && !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
+		errMsg := fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+		ssc.podControl.recorder.Event(set, v1.EventTypeWarning, "UnknownStrategy", errMsg.Error())
+		return nil, errMsg
+	}
+
 	// set the generation, and revisions in the returned status
 	status := apps.StatefulSetStatus{}
 	status.ObservedGeneration = set.Generation
@@ -716,18 +724,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 
 	updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
 
-	// For the Recreate strategy we return before rolling update deletion process
-	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
-			errMsg := fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
-			ssc.podControl.recorder.Event(set, v1.EventTypeWarning, "UnknownStrategy", errMsg.Error())
-			return &status, errMsg
-		}
-		return &status, nil
-	}
-
-	// for the OnDelete strategy we short circuit. Pods will be updated when they are manually deleted.
-	if set.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
+	// for the OnDelete or Recreate strategy we short circuit.
+	if set.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType || set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
 		return &status, nil
 	}
 
@@ -783,7 +781,7 @@ func (ssc *defaultStatefulSetControl) recreateDeleteAndWait(ctx context.Context,
 
 	allPods := slices.Concat(replicas, condemned)
 
-	recreateInProgress := make([]bool, len(allPods))
+	var recreateInProgress atomic.Bool
 	// process pods in non monotonic mode
 	processRecreateFn := func(i int) (bool, error) {
 		if allPods[i] == nil || !isCreated(allPods[i]) {
@@ -791,12 +789,12 @@ func (ssc *defaultStatefulSetControl) recreateDeleteAndWait(ctx context.Context,
 		}
 		if getPodRevision(allPods[i]) != updateRevision.Name {
 			// as long as there are pods still with old updateRevision then recreate has not yet completed
-			recreateInProgress[i] = true
+			recreateInProgress.Store(true)
 
 			if isTerminating(allPods[i]) {
 				return false, nil
 			}
-			logger.V(2).Info("Recreate: deleting old revision pod", "statefulSet", klog.KObj(set), "pod", klog.KObj(allPods[i]))
+			logger.V(4).Info("Recreate: deleting old revision pod", "statefulSet", klog.KObj(set), "pod", klog.KObj(allPods[i]))
 			if err := ssc.podControl.DeleteStatefulPod(set, allPods[i]); err != nil {
 				if !apierrors.IsNotFound(err) {
 					return false, err
@@ -810,11 +808,9 @@ func (ssc *defaultStatefulSetControl) recreateDeleteAndWait(ctx context.Context,
 		return false, err
 	}
 
-	for _, inProgress := range recreateInProgress {
-		if inProgress {
-			setProgressingCondition(status, v1.ConditionTrue, RecreateInProgressReason, "Deleting old revision pods")
-			return false, nil
-		}
+	if recreateInProgress.Load() {
+		setProgressingCondition(status, v1.ConditionTrue, RecreateInProgressReason, "Deleting old revision pods")
+		return false, nil
 	}
 
 	return true, nil
