@@ -1027,7 +1027,7 @@ func TestRegisterValidate(t *testing.T) {
 		object      runtime.Object
 		oldObject   runtime.Object
 		subresource []string
-		options     []string
+		options     map[string]bool
 		expected    field.ErrorList
 	}{
 		{
@@ -1049,7 +1049,7 @@ func TestRegisterValidate(t *testing.T) {
 		{
 			name:     "options error",
 			object:   &TestType1{},
-			options:  []string{"option1"},
+			options:  map[string]bool{"option1": true},
 			expected: field.ErrorList{invalidIfOptionErr},
 		},
 		{
@@ -1065,7 +1065,7 @@ func TestRegisterValidate(t *testing.T) {
 
 	// register multiple types for testing to ensure registration is working as expected
 	s.AddValidationFunc(&TestType1{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
-		if op.HasOption("option1") {
+		if enabled, _ := op.HasOption("option1"); enabled {
 			return field.ErrorList{invalidIfOptionErr}
 		}
 		if slices.Equal(op.Request.Subresources, []string{"status"}) {
