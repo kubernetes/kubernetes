@@ -40,7 +40,7 @@ var (
 		This command describes the fields associated with each supported API resource.
 		Fields are identified via a simple JSONPath identifier:
 
-			<type>.<fieldName>[.<fieldName>]
+			TYPE.FIELDNAME[.FIELDNAME]
 
 		Information about each field is retrieved from the server in OpenAPI format.`))
 
