@@ -3610,19 +3610,9 @@ func (in *PersistentVolumeSource) DeepCopyInto(out *PersistentVolumeSource) {
 		*out = new(RBDPersistentVolumeSource)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Quobyte != nil {
-		in, out := &in.Quobyte, &out.Quobyte
-		*out = new(QuobyteVolumeSource)
-		**out = **in
-	}
 	if in.ISCSI != nil {
 		in, out := &in.ISCSI, &out.ISCSI
 		*out = new(ISCSIPersistentVolumeSource)
-		(*in).DeepCopyInto(*out)
-	}
-	if in.FlexVolume != nil {
-		in, out := &in.FlexVolume, &out.FlexVolume
-		*out = new(FlexPersistentVolumeSource)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Cinder != nil {
@@ -3645,6 +3635,11 @@ func (in *PersistentVolumeSource) DeepCopyInto(out *PersistentVolumeSource) {
 		*out = new(FlockerVolumeSource)
 		**out = **in
 	}
+	if in.FlexVolume != nil {
+		in, out := &in.FlexVolume, &out.FlexVolume
+		*out = new(FlexPersistentVolumeSource)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.AzureFile != nil {
 		in, out := &in.AzureFile, &out.AzureFile
 		*out = new(AzureFilePersistentVolumeSource)
@@ -3653,6 +3648,11 @@ func (in *PersistentVolumeSource) DeepCopyInto(out *PersistentVolumeSource) {
 	if in.VsphereVolume != nil {
 		in, out := &in.VsphereVolume, &out.VsphereVolume
 		*out = new(VsphereVirtualDiskVolumeSource)
+		**out = **in
+	}
+	if in.Quobyte != nil {
+		in, out := &in.Quobyte, &out.Quobyte
+		*out = new(QuobyteVolumeSource)
 		**out = **in
 	}
 	if in.AzureDisk != nil {
@@ -6143,6 +6143,21 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExternalIPs != nil {
+		in, out := &in.ExternalIPs, &out.ExternalIPs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.LoadBalancerSourceRanges != nil {
+		in, out := &in.LoadBalancerSourceRanges, &out.LoadBalancerSourceRanges
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.SessionAffinityConfig != nil {
+		in, out := &in.SessionAffinityConfig, &out.SessionAffinityConfig
+		*out = new(SessionAffinityConfig)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.IPFamilies != nil {
 		in, out := &in.IPFamilies, &out.IPFamilies
 		*out = make([]IPFamily, len(*in))
@@ -6152,21 +6167,6 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		in, out := &in.IPFamilyPolicy, &out.IPFamilyPolicy
 		*out = new(IPFamilyPolicy)
 		**out = **in
-	}
-	if in.ExternalIPs != nil {
-		in, out := &in.ExternalIPs, &out.ExternalIPs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
-	if in.SessionAffinityConfig != nil {
-		in, out := &in.SessionAffinityConfig, &out.SessionAffinityConfig
-		*out = new(SessionAffinityConfig)
-		(*in).DeepCopyInto(*out)
-	}
-	if in.LoadBalancerSourceRanges != nil {
-		in, out := &in.LoadBalancerSourceRanges, &out.LoadBalancerSourceRanges
-		*out = make([]string, len(*in))
-		copy(*out, *in)
 	}
 	if in.AllocateLoadBalancerNodePorts != nil {
 		in, out := &in.AllocateLoadBalancerNodePorts, &out.AllocateLoadBalancerNodePorts

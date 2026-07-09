@@ -1810,6 +1810,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*corev1.ReplicationControllerSpec)(nil), (*core.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(a.(*corev1.ReplicationControllerSpec), b.(*core.ReplicationControllerSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.ReplicationControllerSpec)(nil), (*corev1.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(a.(*core.ReplicationControllerSpec), b.(*corev1.ReplicationControllerSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*corev1.ReplicationControllerStatus)(nil), (*core.ReplicationControllerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ReplicationControllerStatus_To_core_ReplicationControllerStatus(a.(*corev1.ReplicationControllerStatus), b.(*core.ReplicationControllerStatus), scope)
 	}); err != nil {
@@ -2465,11 +2475,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*core.ReplicationControllerSpec)(nil), (*corev1.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(a.(*core.ReplicationControllerSpec), b.(*corev1.ReplicationControllerSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*corev1.NodeSpec)(nil), (*core.NodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_NodeSpec_To_core_NodeSpec(a.(*corev1.NodeSpec), b.(*core.NodeSpec), scope)
 	}); err != nil {
@@ -2487,11 +2492,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*corev1.ReplicationControllerSpec)(nil), (*apps.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ReplicationControllerSpec_To_apps_ReplicaSetSpec(a.(*corev1.ReplicationControllerSpec), b.(*apps.ReplicaSetSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*corev1.ReplicationControllerSpec)(nil), (*core.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(a.(*corev1.ReplicationControllerSpec), b.(*core.ReplicationControllerSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -5323,17 +5323,7 @@ func Convert_core_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimV
 
 func autoConvert_v1_PersistentVolumeList_To_core_PersistentVolumeList(in *corev1.PersistentVolumeList, out *core.PersistentVolumeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]core.PersistentVolume, len(*in))
-		for i := range *in {
-			if err := Convert_v1_PersistentVolume_To_core_PersistentVolume(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]core.PersistentVolume)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -5344,17 +5334,7 @@ func Convert_v1_PersistentVolumeList_To_core_PersistentVolumeList(in *corev1.Per
 
 func autoConvert_core_PersistentVolumeList_To_v1_PersistentVolumeList(in *core.PersistentVolumeList, out *corev1.PersistentVolumeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]corev1.PersistentVolume, len(*in))
-		for i := range *in {
-			if err := Convert_core_PersistentVolume_To_v1_PersistentVolume(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]corev1.PersistentVolume)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -5364,28 +5344,7 @@ func Convert_core_PersistentVolumeList_To_v1_PersistentVolumeList(in *core.Persi
 }
 
 func autoConvert_v1_PersistentVolumeSource_To_core_PersistentVolumeSource(in *corev1.PersistentVolumeSource, out *core.PersistentVolumeSource, s conversion.Scope) error {
-	out.GCEPersistentDisk = (*core.GCEPersistentDiskVolumeSource)(unsafe.Pointer(in.GCEPersistentDisk))
-	out.AWSElasticBlockStore = (*core.AWSElasticBlockStoreVolumeSource)(unsafe.Pointer(in.AWSElasticBlockStore))
-	out.HostPath = (*core.HostPathVolumeSource)(unsafe.Pointer(in.HostPath))
-	out.Glusterfs = (*core.GlusterfsPersistentVolumeSource)(unsafe.Pointer(in.Glusterfs))
-	out.NFS = (*core.NFSVolumeSource)(unsafe.Pointer(in.NFS))
-	out.RBD = (*core.RBDPersistentVolumeSource)(unsafe.Pointer(in.RBD))
-	out.ISCSI = (*core.ISCSIPersistentVolumeSource)(unsafe.Pointer(in.ISCSI))
-	out.Cinder = (*core.CinderPersistentVolumeSource)(unsafe.Pointer(in.Cinder))
-	out.CephFS = (*core.CephFSPersistentVolumeSource)(unsafe.Pointer(in.CephFS))
-	out.FC = (*core.FCVolumeSource)(unsafe.Pointer(in.FC))
-	out.Flocker = (*core.FlockerVolumeSource)(unsafe.Pointer(in.Flocker))
-	out.FlexVolume = (*core.FlexPersistentVolumeSource)(unsafe.Pointer(in.FlexVolume))
-	out.AzureFile = (*core.AzureFilePersistentVolumeSource)(unsafe.Pointer(in.AzureFile))
-	out.VsphereVolume = (*core.VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
-	out.Quobyte = (*core.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
-	out.AzureDisk = (*core.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
-	out.PhotonPersistentDisk = (*core.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
-	out.PortworxVolume = (*core.PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
-	out.ScaleIO = (*core.ScaleIOPersistentVolumeSource)(unsafe.Pointer(in.ScaleIO))
-	out.Local = (*core.LocalVolumeSource)(unsafe.Pointer(in.Local))
-	out.StorageOS = (*core.StorageOSPersistentVolumeSource)(unsafe.Pointer(in.StorageOS))
-	out.CSI = (*core.CSIPersistentVolumeSource)(unsafe.Pointer(in.CSI))
+	*out = *(*core.PersistentVolumeSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -5395,28 +5354,7 @@ func Convert_v1_PersistentVolumeSource_To_core_PersistentVolumeSource(in *corev1
 }
 
 func autoConvert_core_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *core.PersistentVolumeSource, out *corev1.PersistentVolumeSource, s conversion.Scope) error {
-	out.GCEPersistentDisk = (*corev1.GCEPersistentDiskVolumeSource)(unsafe.Pointer(in.GCEPersistentDisk))
-	out.AWSElasticBlockStore = (*corev1.AWSElasticBlockStoreVolumeSource)(unsafe.Pointer(in.AWSElasticBlockStore))
-	out.HostPath = (*corev1.HostPathVolumeSource)(unsafe.Pointer(in.HostPath))
-	out.Glusterfs = (*corev1.GlusterfsPersistentVolumeSource)(unsafe.Pointer(in.Glusterfs))
-	out.NFS = (*corev1.NFSVolumeSource)(unsafe.Pointer(in.NFS))
-	out.RBD = (*corev1.RBDPersistentVolumeSource)(unsafe.Pointer(in.RBD))
-	out.Quobyte = (*corev1.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
-	out.ISCSI = (*corev1.ISCSIPersistentVolumeSource)(unsafe.Pointer(in.ISCSI))
-	out.FlexVolume = (*corev1.FlexPersistentVolumeSource)(unsafe.Pointer(in.FlexVolume))
-	out.Cinder = (*corev1.CinderPersistentVolumeSource)(unsafe.Pointer(in.Cinder))
-	out.CephFS = (*corev1.CephFSPersistentVolumeSource)(unsafe.Pointer(in.CephFS))
-	out.FC = (*corev1.FCVolumeSource)(unsafe.Pointer(in.FC))
-	out.Flocker = (*corev1.FlockerVolumeSource)(unsafe.Pointer(in.Flocker))
-	out.AzureFile = (*corev1.AzureFilePersistentVolumeSource)(unsafe.Pointer(in.AzureFile))
-	out.VsphereVolume = (*corev1.VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
-	out.AzureDisk = (*corev1.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
-	out.PhotonPersistentDisk = (*corev1.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
-	out.PortworxVolume = (*corev1.PortworxVolumeSource)(unsafe.Pointer(in.PortworxVolume))
-	out.ScaleIO = (*corev1.ScaleIOPersistentVolumeSource)(unsafe.Pointer(in.ScaleIO))
-	out.Local = (*corev1.LocalVolumeSource)(unsafe.Pointer(in.Local))
-	out.StorageOS = (*corev1.StorageOSPersistentVolumeSource)(unsafe.Pointer(in.StorageOS))
-	out.CSI = (*corev1.CSIPersistentVolumeSource)(unsafe.Pointer(in.CSI))
+	*out = *(*corev1.PersistentVolumeSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -5426,34 +5364,12 @@ func Convert_core_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *core.P
 }
 
 func autoConvert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in *corev1.PersistentVolumeSpec, out *core.PersistentVolumeSpec, s conversion.Scope) error {
-	out.Capacity = *(*core.ResourceList)(unsafe.Pointer(&in.Capacity))
-	if err := Convert_v1_PersistentVolumeSource_To_core_PersistentVolumeSource(&in.PersistentVolumeSource, &out.PersistentVolumeSource, s); err != nil {
-		return err
-	}
-	out.AccessModes = *(*[]core.PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
-	out.ClaimRef = (*core.ObjectReference)(unsafe.Pointer(in.ClaimRef))
-	out.PersistentVolumeReclaimPolicy = core.PersistentVolumeReclaimPolicy(in.PersistentVolumeReclaimPolicy)
-	out.StorageClassName = in.StorageClassName
-	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
-	out.VolumeMode = (*core.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
-	out.NodeAffinity = (*core.VolumeNodeAffinity)(unsafe.Pointer(in.NodeAffinity))
-	out.VolumeAttributesClassName = (*string)(unsafe.Pointer(in.VolumeAttributesClassName))
+	*out = *(*core.PersistentVolumeSpec)(unsafe.Pointer(in))
 	return nil
 }
 
 func autoConvert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *core.PersistentVolumeSpec, out *corev1.PersistentVolumeSpec, s conversion.Scope) error {
-	out.Capacity = *(*corev1.ResourceList)(unsafe.Pointer(&in.Capacity))
-	if err := Convert_core_PersistentVolumeSource_To_v1_PersistentVolumeSource(&in.PersistentVolumeSource, &out.PersistentVolumeSource, s); err != nil {
-		return err
-	}
-	out.AccessModes = *(*[]corev1.PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
-	out.ClaimRef = (*corev1.ObjectReference)(unsafe.Pointer(in.ClaimRef))
-	out.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimPolicy(in.PersistentVolumeReclaimPolicy)
-	out.StorageClassName = in.StorageClassName
-	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
-	out.VolumeMode = (*corev1.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
-	out.NodeAffinity = (*corev1.VolumeNodeAffinity)(unsafe.Pointer(in.NodeAffinity))
-	out.VolumeAttributesClassName = (*string)(unsafe.Pointer(in.VolumeAttributesClassName))
+	*out = *(*corev1.PersistentVolumeSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -6309,17 +6225,7 @@ func Convert_core_PodTemplate_To_v1_PodTemplate(in *core.PodTemplate, out *corev
 
 func autoConvert_v1_PodTemplateList_To_core_PodTemplateList(in *corev1.PodTemplateList, out *core.PodTemplateList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]core.PodTemplate, len(*in))
-		for i := range *in {
-			if err := Convert_v1_PodTemplate_To_core_PodTemplate(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]core.PodTemplate)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -6330,17 +6236,7 @@ func Convert_v1_PodTemplateList_To_core_PodTemplateList(in *corev1.PodTemplateLi
 
 func autoConvert_core_PodTemplateList_To_v1_PodTemplateList(in *core.PodTemplateList, out *corev1.PodTemplateList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]corev1.PodTemplate, len(*in))
-		for i := range *in {
-			if err := Convert_core_PodTemplate_To_v1_PodTemplate(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]corev1.PodTemplate)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -6350,18 +6246,12 @@ func Convert_core_PodTemplateList_To_v1_PodTemplateList(in *core.PodTemplateList
 }
 
 func autoConvert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in *corev1.PodTemplateSpec, out *core.PodTemplateSpec, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1_PodSpec_To_core_PodSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
+	*out = *(*core.PodTemplateSpec)(unsafe.Pointer(in))
 	return nil
 }
 
 func autoConvert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in *core.PodTemplateSpec, out *corev1.PodTemplateSpec, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_core_PodSpec_To_v1_PodSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
+	*out = *(*corev1.PodTemplateSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -6663,17 +6553,7 @@ func Convert_core_ReplicationControllerCondition_To_v1_ReplicationControllerCond
 
 func autoConvert_v1_ReplicationControllerList_To_core_ReplicationControllerList(in *corev1.ReplicationControllerList, out *core.ReplicationControllerList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]core.ReplicationController, len(*in))
-		for i := range *in {
-			if err := Convert_v1_ReplicationController_To_core_ReplicationController(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]core.ReplicationController)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -6684,17 +6564,7 @@ func Convert_v1_ReplicationControllerList_To_core_ReplicationControllerList(in *
 
 func autoConvert_core_ReplicationControllerList_To_v1_ReplicationControllerList(in *core.ReplicationControllerList, out *corev1.ReplicationControllerList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]corev1.ReplicationController, len(*in))
-		for i := range *in {
-			if err := Convert_core_ReplicationController_To_v1_ReplicationController(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]corev1.ReplicationController)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -6704,35 +6574,23 @@ func Convert_core_ReplicationControllerList_To_v1_ReplicationControllerList(in *
 }
 
 func autoConvert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(in *corev1.ReplicationControllerSpec, out *core.ReplicationControllerSpec, s conversion.Scope) error {
-	out.Replicas = (*int32)(unsafe.Pointer(in.Replicas))
-	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = *(*map[string]string)(unsafe.Pointer(&in.Selector))
-	if in.Template != nil {
-		in, out := &in.Template, &out.Template
-		*out = new(core.PodTemplateSpec)
-		if err := Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
-	}
+	*out = *(*core.ReplicationControllerSpec)(unsafe.Pointer(in))
 	return nil
 }
 
+// Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec is an autogenerated conversion function.
+func Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(in *corev1.ReplicationControllerSpec, out *core.ReplicationControllerSpec, s conversion.Scope) error {
+	return autoConvert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(in, out, s)
+}
+
 func autoConvert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *core.ReplicationControllerSpec, out *corev1.ReplicationControllerSpec, s conversion.Scope) error {
-	out.Replicas = (*int32)(unsafe.Pointer(in.Replicas))
-	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = *(*map[string]string)(unsafe.Pointer(&in.Selector))
-	if in.Template != nil {
-		in, out := &in.Template, &out.Template
-		*out = new(corev1.PodTemplateSpec)
-		if err := Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
-	}
+	*out = *(*corev1.ReplicationControllerSpec)(unsafe.Pointer(in))
 	return nil
+}
+
+// Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec is an autogenerated conversion function.
+func Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *core.ReplicationControllerSpec, out *corev1.ReplicationControllerSpec, s conversion.Scope) error {
+	return autoConvert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in, out, s)
 }
 
 func autoConvert_v1_ReplicationControllerStatus_To_core_ReplicationControllerStatus(in *corev1.ReplicationControllerStatus, out *core.ReplicationControllerStatus, s conversion.Scope) error {
@@ -7379,17 +7237,7 @@ func Convert_core_ServiceAccountTokenProjection_To_v1_ServiceAccountTokenProject
 
 func autoConvert_v1_ServiceList_To_core_ServiceList(in *corev1.ServiceList, out *core.ServiceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]core.Service, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Service_To_core_Service(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]core.Service)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -7400,17 +7248,7 @@ func Convert_v1_ServiceList_To_core_ServiceList(in *corev1.ServiceList, out *cor
 
 func autoConvert_core_ServiceList_To_v1_ServiceList(in *core.ServiceList, out *corev1.ServiceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]corev1.Service, len(*in))
-		for i := range *in {
-			if err := Convert_core_Service_To_v1_Service(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]corev1.Service)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -7478,26 +7316,7 @@ func Convert_url_Values_To_v1_ServiceProxyOptions(in *url.Values, out *corev1.Se
 }
 
 func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *corev1.ServiceSpec, out *core.ServiceSpec, s conversion.Scope) error {
-	out.Ports = *(*[]core.ServicePort)(unsafe.Pointer(&in.Ports))
-	out.Selector = *(*map[string]string)(unsafe.Pointer(&in.Selector))
-	out.ClusterIP = in.ClusterIP
-	out.ClusterIPs = *(*[]string)(unsafe.Pointer(&in.ClusterIPs))
-	out.Type = core.ServiceType(in.Type)
-	out.ExternalIPs = *(*[]string)(unsafe.Pointer(&in.ExternalIPs))
-	out.SessionAffinity = core.ServiceAffinity(in.SessionAffinity)
-	out.LoadBalancerIP = in.LoadBalancerIP
-	out.LoadBalancerSourceRanges = *(*[]string)(unsafe.Pointer(&in.LoadBalancerSourceRanges))
-	out.ExternalName = in.ExternalName
-	out.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicy(in.ExternalTrafficPolicy)
-	out.HealthCheckNodePort = in.HealthCheckNodePort
-	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
-	out.SessionAffinityConfig = (*core.SessionAffinityConfig)(unsafe.Pointer(in.SessionAffinityConfig))
-	out.IPFamilies = *(*[]core.IPFamily)(unsafe.Pointer(&in.IPFamilies))
-	out.IPFamilyPolicy = (*core.IPFamilyPolicy)(unsafe.Pointer(in.IPFamilyPolicy))
-	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
-	out.LoadBalancerClass = (*string)(unsafe.Pointer(in.LoadBalancerClass))
-	out.InternalTrafficPolicy = (*core.ServiceInternalTrafficPolicy)(unsafe.Pointer(in.InternalTrafficPolicy))
-	out.TrafficDistribution = (*string)(unsafe.Pointer(in.TrafficDistribution))
+	*out = *(*core.ServiceSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -7507,26 +7326,7 @@ func Convert_v1_ServiceSpec_To_core_ServiceSpec(in *corev1.ServiceSpec, out *cor
 }
 
 func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *corev1.ServiceSpec, s conversion.Scope) error {
-	out.Type = corev1.ServiceType(in.Type)
-	out.Ports = *(*[]corev1.ServicePort)(unsafe.Pointer(&in.Ports))
-	out.Selector = *(*map[string]string)(unsafe.Pointer(&in.Selector))
-	out.ClusterIP = in.ClusterIP
-	out.ClusterIPs = *(*[]string)(unsafe.Pointer(&in.ClusterIPs))
-	out.IPFamilies = *(*[]corev1.IPFamily)(unsafe.Pointer(&in.IPFamilies))
-	out.IPFamilyPolicy = (*corev1.IPFamilyPolicy)(unsafe.Pointer(in.IPFamilyPolicy))
-	out.ExternalName = in.ExternalName
-	out.ExternalIPs = *(*[]string)(unsafe.Pointer(&in.ExternalIPs))
-	out.LoadBalancerIP = in.LoadBalancerIP
-	out.SessionAffinity = corev1.ServiceAffinity(in.SessionAffinity)
-	out.SessionAffinityConfig = (*corev1.SessionAffinityConfig)(unsafe.Pointer(in.SessionAffinityConfig))
-	out.LoadBalancerSourceRanges = *(*[]string)(unsafe.Pointer(&in.LoadBalancerSourceRanges))
-	out.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicy(in.ExternalTrafficPolicy)
-	out.HealthCheckNodePort = in.HealthCheckNodePort
-	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
-	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
-	out.LoadBalancerClass = (*string)(unsafe.Pointer(in.LoadBalancerClass))
-	out.InternalTrafficPolicy = (*corev1.ServiceInternalTrafficPolicy)(unsafe.Pointer(in.InternalTrafficPolicy))
-	out.TrafficDistribution = (*string)(unsafe.Pointer(in.TrafficDistribution))
+	*out = *(*corev1.ServiceSpec)(unsafe.Pointer(in))
 	return nil
 }
 
