@@ -464,6 +464,35 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			},
 		},
 		{
+			Name: "update: generation: valid zero",
+			Modify: func(old, new metav1.Object) {
+				old.SetGeneration(0)
+				new.SetGeneration(0)
+			},
+			ExpectedErrs: field.ErrorList{},
+		},
+		{
+			Name: "update: generation: decremented to zero",
+			Modify: func(old, new metav1.Object) {
+				old.SetGeneration(1)
+				new.SetGeneration(0)
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").MarkFromImperative(),
+			},
+		},
+		{
+			Name: "update: generation: negative",
+			Modify: func(old, new metav1.Object) {
+				old.SetGeneration(0)
+				new.SetGeneration(-1)
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").MarkFromImperative(),
+			},
+		},
+		{
 			Name: "update: resourceVersion: missing",
 			Modify: func(old, new metav1.Object) {
 				new.SetResourceVersion("")

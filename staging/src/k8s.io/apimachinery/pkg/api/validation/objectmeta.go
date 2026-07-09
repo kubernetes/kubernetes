@@ -345,6 +345,7 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	}
 
 	// Generation shouldn't be decremented
+	allErrs = append(allErrs, ValidateNonnegativeField(newMeta.GetGeneration(), fldPath.Child("generation")).MarkCoveredByDeclarative()...)
 	if newMeta.GetGeneration() < oldMeta.GetGeneration() {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.GetGeneration(), "must not be decremented"))
 	}

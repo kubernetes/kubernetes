@@ -742,6 +742,32 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			expectedErrs:      nil,
 		},
 		{
+			name:              "valid generation zero on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakGeneration(0)),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakGeneration(0)),
+			requiresNamespace: true,
+			expectedErrs:      nil,
+		},
+		{
+			name:              "decremented generation to zero on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakGeneration(0)),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakGeneration(1)),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("generation"), int64(0), "must not be decremented").MarkFromImperative(),
+			},
+		},
+		{
+			name:              "negative generation on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakGeneration(-1)),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakGeneration(0)),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("generation"), int64(-1), "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(fldPath.Child("generation"), int64(-1), "must not be decremented").MarkFromImperative(),
+			},
+		},
+		{
 			name:              "immutable namespace",
 			obj:               mkMeta(tweakNamespace("new-ns"), tweakResourceVersion("2")),
 			oldObj:            mkMeta(tweakNamespace("old-ns"), tweakResourceVersion("1")),
