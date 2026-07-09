@@ -34,13 +34,13 @@ import (
 
 // newActivation creates an activation for CEL admission plugins from the given request, admission chain and
 // variable binding information.
-func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace) (*evaluationActivation, error) {
-	celOldObjVal, err := versionedAttr.VersionedOldObject.CELValue()
+func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace, options ...admission.CELValueOption) (*evaluationActivation, error) {
+	celOldObjVal, err := versionedAttr.VersionedOldObject.CELValue(options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare oldObject variable for evaluation: %w", err)
 	}
 
-	celObjVal, err := versionedAttr.VersionedObject.CELValue()
+	celObjVal, err := versionedAttr.VersionedObject.CELValue(options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare object variable for evaluation: %w", err)
 	}
