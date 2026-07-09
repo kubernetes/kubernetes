@@ -18,7 +18,6 @@ package v1
 
 import (
 	"k8s.io/api/policy/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/pkg/apis/policy"
 )
@@ -28,15 +27,5 @@ func Convert_v1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *v1.PodDisr
 		return err
 	}
 
-	switch {
-	case apiequality.Semantic.DeepEqual(in.Spec.Selector, policy.NonV1beta1MatchNoneSelector):
-		// no-op, preserve
-	case apiequality.Semantic.DeepEqual(in.Spec.Selector, policy.NonV1beta1MatchAllSelector):
-		// no-op, preserve
-	default:
-		// otherwise, make sure the label intended to be used in a match-all or match-none selector
-		// never gets combined with user-specified fields
-		policy.StripPDBV1beta1Label(out.Spec.Selector)
-	}
 	return nil
 }
