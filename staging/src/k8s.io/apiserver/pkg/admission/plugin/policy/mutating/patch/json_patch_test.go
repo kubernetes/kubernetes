@@ -91,13 +91,9 @@ func TestJSONPatch(t *testing.T) {
 			expression: `[
 					JSONPatch{op: "remove", path: "/spec/template/spec/containers/1"}, 
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "c"}},
-			}}}},
+			gvr:            deploymentGVR,
+			object:         makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "c"}}),
 		},
 		{
 			name: "jsonPatch copy map entry by key",
@@ -113,13 +109,9 @@ func TestJSONPatch(t *testing.T) {
 			expression: `[
 					JSONPatch{op: "copy", from: "/spec/template/spec/containers/0", path: "/spec/template/spec/containers/-"}, 
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}, {Name: "a"}},
-			}}}},
+			gvr:            deploymentGVR,
+			object:         makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}, {Name: "a"}}),
 		},
 		{
 			name: "jsonPatch move map entry by key",
@@ -135,13 +127,9 @@ func TestJSONPatch(t *testing.T) {
 			expression: `[
 					JSONPatch{op: "move", from: "/spec/template/spec/containers/0", path: "/spec/template/spec/containers/-"}, 
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "b"}, {Name: "c"}, {Name: "a"}},
-			}}}},
+			gvr:            deploymentGVR,
+			object:         makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "b"}, {Name: "c"}, {Name: "a"}}),
 		},
 		{
 			name: "jsonPatch add map entry by key and value",
@@ -175,26 +163,18 @@ func TestJSONPatch(t *testing.T) {
 			expression: `[
 					JSONPatch{op: "add", path: "/spec/template/spec/containers/0", value: {"name": "x"}}, 
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "x"}, {Name: "a"}},
-			}}}},
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "x"}, {Name: "a"}}),
 		},
 		{
 			name: "jsonPatch add to end of list",
 			expression: `[
 					JSONPatch{op: "add", path: "/spec/template/spec/containers/-", value: {"name": "x"}}, 
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "x"}},
-			}}}},
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "x"}}),
 		},
 		{
 			name: "jsonPatch replace key in map",
@@ -228,13 +208,9 @@ func TestJSONPatch(t *testing.T) {
 			expression: `[
 					JSONPatch{op: "replace", path: "/spec/template/spec/containers/0", value: {"name": "x"}}, 
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "x"}},
-			}}}},
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "x"}}),
 		},
 		{
 			name: "jsonPatch add map entry by key and value",
@@ -350,13 +326,9 @@ func TestJSONPatch(t *testing.T) {
 						}
 					}, 
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "x", Ports: []corev1.ContainerPort{{ContainerPort: 8080}}}},
-			}}}},
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "x", Ports: []corev1.ContainerPort{{ContainerPort: 8080}}}}),
 		},
 		{
 			name: "jsonPatch invalid CEL initializer field",
@@ -369,10 +341,8 @@ func TestJSONPatch(t *testing.T) {
 						}
 					}
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
+			gvr:         deploymentGVR,
+			object:      makeDeployment(),
 			expectedErr: "strict decoding error: unknown field \"spec.template.spec.containers[1].ports[0].containerPortZ\"",
 		},
 		{
@@ -386,10 +356,8 @@ func TestJSONPatch(t *testing.T) {
 						}
 					}
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
+			gvr:         deploymentGVR,
+			object:      makeDeployment(),
 			expectedErr: " mismatch: unexpected type name \"Object.spec.template.spec.containers.portsZ\", expected \"Object.spec.template.spec.containers.ports\", which matches field name path from root Object type",
 		},
 		{
@@ -397,10 +365,8 @@ func TestJSONPatch(t *testing.T) {
 			expression: `[
 					JSONPatch{op: "replace", path: "/spec/template/spec/containers/-", value: {"name": "x"}}, 
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
+			gvr:         deploymentGVR,
+			object:      makeDeployment(),
 			expectedErr: "JSON Patch: replace operation does not apply: doc is missing key: /spec/template/spec/containers/-: missing value",
 		},
 		{
@@ -408,52 +374,171 @@ func TestJSONPatch(t *testing.T) {
 			expression: `[
 					JSONPatch{op: "add", path: "/spec/template/spec/containers/1", value: object.spec.template.spec.containers[0]},
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "a"}},
-			}}}},
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "a"}}),
 		},
 		{
 			name: "jsonPatch with large complex struct as value",
 			expression: `[
 					JSONPatch{op: "replace", path: "/spec/template/spec", value: object.spec.template.spec},
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a", Image: "nginx"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a", Image: "nginx"}},
-			}}}},
+			gvr:            deploymentGVR,
+			object:         makeDeploymentWithComplexPodSpec(),
+			expectedResult: makeDeploymentWithComplexPodSpec(),
 		},
 		{
 			name: "jsonPatch with slice of complex struct as value",
 			expression: `[
-					JSONPatch{op: "add", path: "/spec/template/spec/containers", value: object.spec.template.spec.containers},
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: object.spec.template.spec.containers},
 				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
+			gvr:            deploymentGVR,
+			object:         makeDeploymentWithContainers([]corev1.Container{{Name: "a", Image: "nginx"}}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{{Name: "a", Image: "nginx"}}, []corev1.Container{{Name: "a", Image: "nginx"}}),
 		},
 		{
 			name: "jsonPatch with list concatenation operator",
 			expression: `[
 					JSONPatch{op: "add", path: "/spec/template/spec/containers", value: object.spec.template.spec.containers + [object.spec.template.spec.containers[0]]},
 				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "a"}}),
+		},
+		{
+			name: "jsonPatch with list concatenation using constant value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/args", value: object.spec.template.spec.containers[0].command + ["--debug", "-v"]},
+				]`,
 			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "a"}},
-			}}}},
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"server", "start"},
+				},
+			}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"server", "start"},
+					Args:    []string{"server", "start", "--debug", "-v"},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation reading from other fields",
+			expression: `[
+					JSONPatch{op: "replace", path: "/spec/template/spec/containers", value: object.spec.template.spec.initContainers + object.spec.template.spec.containers},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithInit([]corev1.Container{
+				{Name: "init-setup", Image: "busybox:1.36"},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "init-setup", Image: "busybox:1.36"},
+			}, []corev1.Container{
+				{Name: "init-setup", Image: "busybox:1.36"},
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between typed type and unstructured object (typed + unstructured)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: object.spec.template.spec.containers + [{"name": "unstructured-init", "image": "alpine:3.18"}]},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+				{Name: "unstructured-init", Image: "alpine:3.18"},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between unstructured object and typed type (unstructured + typed)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: [{"name": "unstructured-init", "image": "alpine:3.18"}] + object.spec.template.spec.containers},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "unstructured-init", Image: "alpine:3.18"},
+				{Name: "main-app", Image: "nginx:1.24"},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between two unstructured objects (unstructured + unstructured)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: [{"name": "unstructured-init1", "image": "alpine:3.18"}] + [{"name": "unstructured-init2", "image": "alpine:3.18"}]},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "unstructured-init1", Image: "alpine:3.18"},
+				{Name: "unstructured-init2", Image: "alpine:3.18"},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+
+		{
+			name: "jsonPatch with list concatenation between typed type and structured object (typed + structured)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: object.spec.template.spec.containers + [Object.spec.template.spec.initContainers{name: "init-1", image: "alpine:3.18", command: ["echo", "init1"]}]},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+				{Name: "init-1", Image: "alpine:3.18", Command: []string{"echo", "init1"}},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between structured object and typed type (structured + typed)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: [Object.spec.template.spec.initContainers{name: "init-1", image: "alpine:3.18", command: ["echo", "init1"]}] + object.spec.template.spec.containers},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "init-1", Image: "alpine:3.18", Command: []string{"echo", "init1"}},
+				{Name: "main-app", Image: "nginx:1.24"},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between two structured objects (structured + structured)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: [Object.spec.template.spec.initContainers{name: "init-1", image: "alpine:3.18", command: ["echo", "init1"]}] + [Object.spec.template.spec.initContainers{name: "init-2", image: "alpine:3.18", command: ["echo", "init2"]}]},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "init-1", Image: "alpine:3.18", Command: []string{"echo", "init1"}},
+				{Name: "init-2", Image: "alpine:3.18", Command: []string{"echo", "init2"}},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
 		},
 		{
 			name: "jsonPatch with map key comprehension all predicate",
@@ -492,53 +577,37 @@ func TestJSONPatch(t *testing.T) {
 			},
 		},
 		{
-			name: "jsonPatch with quantity and duration as values",
+			name: "jsonPatch with map of resource quantities as value",
 			expression: `[
 					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/resources/limits", value: {"cpu": object.spec.template.spec.containers[0].resources.requests["cpu"], "memory": object.spec.template.spec.containers[0].resources.requests["memory"]}},
 				]`,
 			gvr: deploymentGVR,
-			object: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name: "c1",
-									Resources: corev1.ResourceRequirements{
-										Requests: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("100m"),
-											corev1.ResourceMemory: resource.MustParse("128Mi"),
-										},
-									},
-								},
-							},
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name: "c1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
 						},
 					},
 				},
-			},
-			expectedResult: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name: "c1",
-									Resources: corev1.ResourceRequirements{
-										Requests: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("100m"),
-											corev1.ResourceMemory: resource.MustParse("128Mi"),
-										},
-										Limits: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("100m"),
-											corev1.ResourceMemory: resource.MustParse("128Mi"),
-										},
-									},
-								},
-							},
+			}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name: "c1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
 						},
 					},
 				},
-			},
+			}),
 		},
 		{
 			name: "jsonPatch with slice of scalars as value",
@@ -546,35 +615,19 @@ func TestJSONPatch(t *testing.T) {
 					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/args", value: object.spec.template.spec.containers[0].command},
 				]`,
 			gvr: deploymentGVR,
-			object: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:    "c1",
-									Command: []string{"sh", "-c", "echo hello"},
-								},
-							},
-						},
-					},
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"sh", "-c", "echo hello"},
 				},
-			},
-			expectedResult: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:    "c1",
-									Command: []string{"sh", "-c", "echo hello"},
-									Args:    []string{"sh", "-c", "echo hello"},
-								},
-							},
-						},
-					},
+			}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"sh", "-c", "echo hello"},
+					Args:    []string{"sh", "-c", "echo hello"},
 				},
-			},
+			}),
 		},
 		{
 			name: "jsonPatch with map of scalars as value",
@@ -602,120 +655,32 @@ func TestJSONPatch(t *testing.T) {
 					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/resources/limits", value: object.spec.template.spec.containers[0].resources.requests},
 				]`,
 			gvr: deploymentGVR,
-			object: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name: "c1",
-									Resources: corev1.ResourceRequirements{
-										Requests: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("250m"),
-											corev1.ResourceMemory: resource.MustParse("512Mi"),
-										},
-									},
-								},
-							},
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name: "c1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("250m"),
+							corev1.ResourceMemory: resource.MustParse("512Mi"),
 						},
 					},
 				},
-			},
-			expectedResult: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name: "c1",
-									Resources: corev1.ResourceRequirements{
-										Requests: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("250m"),
-											corev1.ResourceMemory: resource.MustParse("512Mi"),
-										},
-										Limits: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("250m"),
-											corev1.ResourceMemory: resource.MustParse("512Mi"),
-										},
-									},
-								},
-							},
+			}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name: "c1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("250m"),
+							corev1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("250m"),
+							corev1.ResourceMemory: resource.MustParse("512Mi"),
 						},
 					},
 				},
-			},
-		},
-		{
-			name: "jsonPatch with list concatenation using constant value",
-			expression: `[
-					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/args", value: object.spec.template.spec.containers[0].command + ["--debug", "-v"]},
-				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:    "c1",
-									Command: []string{"server", "start"},
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedResult: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:    "c1",
-									Command: []string{"server", "start"},
-									Args:    []string{"server", "start", "--debug", "-v"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "jsonPatch with list concatenation reading from other fields",
-			expression: `[
-					JSONPatch{op: "replace", path: "/spec/template/spec/containers", value: object.spec.template.spec.initContainers + object.spec.template.spec.containers},
-				]`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{
-								{Name: "init-setup", Image: "busybox:1.36"},
-							},
-							Containers: []corev1.Container{
-								{Name: "main-app", Image: "nginx:1.24"},
-							},
-						},
-					},
-				},
-			},
-			expectedResult: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{
-								{Name: "init-setup", Image: "busybox:1.36"},
-							},
-							Containers: []corev1.Container{
-								{Name: "init-setup", Image: "busybox:1.36"},
-								{Name: "main-app", Image: "nginx:1.24"},
-							},
-						},
-					},
-				},
-			},
+			}),
 		},
 		{
 			name: "jsonPatch with constant complex struct object as value",
@@ -723,39 +688,23 @@ func TestJSONPatch(t *testing.T) {
 					JSONPatch{op: "add", path: "/spec/template/spec/containers/1", value: Object.spec.template.spec.containers{name: "sidecar", image: "busybox:1.36", command: ["sh", "-c", "sleep 3600"], resources: Object.spec.template.spec.containers.resources{limits: {"cpu": "200m", "memory": "256Mi"}}}},
 				]`,
 			gvr: deploymentGVR,
-			object: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{Name: "main-app", Image: "nginx:1.24"},
-							},
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+				{
+					Name:    "sidecar",
+					Image:   "busybox:1.36",
+					Command: []string{"sh", "-c", "sleep 3600"},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("200m"),
+							corev1.ResourceMemory: resource.MustParse("256Mi"),
 						},
 					},
 				},
-			},
-			expectedResult: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{Name: "main-app", Image: "nginx:1.24"},
-								{
-									Name:    "sidecar",
-									Image:   "busybox:1.36",
-									Command: []string{"sh", "-c", "sleep 3600"},
-									Resources: corev1.ResourceRequirements{
-										Limits: corev1.ResourceList{
-											corev1.ResourceCPU:    resource.MustParse("200m"),
-											corev1.ResourceMemory: resource.MustParse("256Mi"),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			}),
 		},
 		{
 			name: "jsonPatch with constant complex list of struct objects as value",
@@ -766,32 +715,15 @@ func TestJSONPatch(t *testing.T) {
 					]},
 				]`,
 			gvr: deploymentGVR,
-			object: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{Name: "main-app", Image: "nginx:1.24"},
-							},
-						},
-					},
-				},
-			},
-			expectedResult: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{
-								{Name: "init-1", Image: "alpine:3.18", Command: []string{"echo", "init1"}},
-								{Name: "init-2", Image: "alpine:3.18", Command: []string{"echo", "init2"}},
-							},
-							Containers: []corev1.Container{
-								{Name: "main-app", Image: "nginx:1.24"},
-							},
-						},
-					},
-				},
-			},
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "init-1", Image: "alpine:3.18", Command: []string{"echo", "init1"}},
+				{Name: "init-2", Image: "alpine:3.18", Command: []string{"echo", "init2"}},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
 		},
 	}
 
@@ -864,5 +796,60 @@ func TestJSONPatch(t *testing.T) {
 				t.Errorf("unexpected result, got diff:\n%s\n", cmp.Diff(tc.expectedResult, got))
 			}
 		})
+	}
+}
+
+func makeDeployment() *appsv1.Deployment {
+	return makeDeploymentWithContainers([]corev1.Container{{Name: "a"}})
+}
+
+func makeDeploymentWithContainers(containers []corev1.Container) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: containers,
+				},
+			},
+		},
+	}
+}
+
+func makeDeploymentWithInit(initContainers []corev1.Container, containers []corev1.Container) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					InitContainers: initContainers,
+					Containers:     containers,
+				},
+			},
+		},
+	}
+}
+
+func makeDeploymentWithComplexPodSpec() *appsv1.Deployment {
+	return &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "a", Image: "nginx"}},
+					Affinity: &corev1.Affinity{
+						NodeAffinity: &corev1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+								NodeSelectorTerms: []corev1.NodeSelectorTerm{
+									{
+										MatchExpressions: []corev1.NodeSelectorRequirement{
+											{Key: "foo", Operator: corev1.NodeSelectorOpIn, Values: []string{"bar", "baz"}},
+										},
+									},
+								},
+							},
+						},
+					},
+					Tolerations: []corev1.Toleration{{Key: "taint", Operator: corev1.TolerationOpExists}},
+				},
+			},
+		},
 	}
 }
