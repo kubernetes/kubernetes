@@ -258,19 +258,10 @@ type PersistentVolumeSource struct {
 	// Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported.
 	// +optional
 	RBD *RBDPersistentVolumeSource
-	// quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
-	// Deprecated: Quobyte is deprecated and the in-tree quobyte type is no longer supported.
-	// +optional
-	Quobyte *QuobyteVolumeSource
 	// iscsi represents an ISCSI resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	// +optional
 	ISCSI *ISCSIPersistentVolumeSource
-	// flexVolume represents a generic volume resource that is
-	// provisioned/attached using an exec based plugin.
-	// Deprecated: FlexVolume is deprecated. Consider using a CSIDriver instead.
-	// +optional
-	FlexVolume *FlexPersistentVolumeSource
 	// cinder represents a cinder volume attached and mounted on kubelets host machine.
 	// Deprecated: Cinder is deprecated. All operations for the in-tree cinder type
 	// are redirected to the cinder.csi.openstack.org CSI driver.
@@ -284,19 +275,33 @@ type PersistentVolumeSource struct {
 	// +optional
 	FC *FCVolumeSource
 	// flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running.
+	//
 	// Deprecated: Flocker is deprecated and the in-tree flocker type is no longer supported.
 	// +optional
 	Flocker *FlockerVolumeSource
+	// flexVolume represents a generic volume resource that is
+	// provisioned/attached using an exec based plugin.
+	//
+	// Deprecated: FlexVolume is deprecated. Consider using a CSIDriver instead.
+	// +optional
+	FlexVolume *FlexPersistentVolumeSource
 	// azureFile represents an Azure File Service mount on the host and bind mount to the pod.
+	//
 	// Deprecated: AzureFile is deprecated. All operations for the in-tree azureFile type
 	// are redirected to the file.csi.azure.com CSI driver.
 	// +optional
 	AzureFile *AzureFilePersistentVolumeSource
 	// vsphereVolume represents a vSphere volume attached and mounted on kubelets host machine.
+	//
 	// Deprecated: VsphereVolume is deprecated. All operations for the in-tree vsphereVolume type
 	// are redirected to the csi.vsphere.vmware.com CSI driver.
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource
+	// quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
+	//
+	// Deprecated: Quobyte is deprecated and the in-tree quobyte type is no longer supported.
+	// +optional
+	Quobyte *QuobyteVolumeSource
 	// azureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// Deprecated: AzureDisk is deprecated. All operations for the in-tree azureDisk type
 	// are redirected to the disk.csi.azure.com CSI driver.
@@ -5081,22 +5086,6 @@ const (
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
-	// Type determines how the Service is exposed. Defaults to ClusterIP. Valid
-	// options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
-	// "ExternalName" maps to the specified externalName.
-	// "ClusterIP" allocates a cluster-internal IP address for load-balancing to
-	// endpoints. Endpoints are determined by the selector or if that is not
-	// specified, by manual construction of an Endpoints object. If clusterIP is
-	// "None", no virtual IP is allocated and the endpoints are published as a
-	// set of endpoints rather than a stable IP.
-	// "NodePort" builds on ClusterIP and allocates a port on every node which
-	// routes to the clusterIP.
-	// "LoadBalancer" builds on NodePort and creates an
-	// external load-balancer (if supported in the current cloud) which routes
-	// to the clusterIP.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/
-	// +optional
-	Type ServiceType
 
 	// Required: The list of ports that are exposed by this service.
 	Ports []ServicePort
@@ -5130,32 +5119,22 @@ type ServiceSpec struct {
 	// first element of ClusterIPs.
 	// +optional
 	ClusterIPs []string
-
-	// IPFamilies identifies all the IPFamilies assigned for this Service. If a value
-	// was not provided for IPFamilies it will be defaulted based on the cluster
-	// configuration and the value of service.spec.ipFamilyPolicy. A maximum of two
-	// values (dual-stack IPFamilies) are allowed in IPFamilies. IPFamilies field is
-	// conditionally mutable: it allows for adding or removing a secondary IPFamily,
-	// but it does not allow changing the primary IPFamily of the service.
+	// Type determines how the Service is exposed. Defaults to ClusterIP. Valid
+	// options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+	// "ExternalName" maps to the specified externalName.
+	// "ClusterIP" allocates a cluster-internal IP address for load-balancing to
+	// endpoints. Endpoints are determined by the selector or if that is not
+	// specified, by manual construction of an Endpoints object. If clusterIP is
+	// "None", no virtual IP is allocated and the endpoints are published as a
+	// set of endpoints rather than a stable IP.
+	// "NodePort" builds on ClusterIP and allocates a port on every node which
+	// routes to the clusterIP.
+	// "LoadBalancer" builds on NodePort and creates an
+	// external load-balancer (if supported in the current cloud) which routes
+	// to the clusterIP.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/
 	// +optional
-	IPFamilies []IPFamily
-
-	// IPFamilyPolicy represents the dual-stack-ness requested or required by this
-	// Service. If there is no value provided, then this Service will be considered
-	// SingleStack (single IPFamily). Services can be SingleStack (single IPFamily),
-	// PreferDualStack (two dual-stack IPFamilies on dual-stack clusters or single
-	// IPFamily on single-stack clusters), or RequireDualStack (two dual-stack IPFamilies
-	// on dual-stack configured clusters, otherwise fail). The IPFamilies and ClusterIPs assigned
-	// to this service can be controlled by service.spec.ipFamilies and service.spec.clusterIPs
-	// respectively.
-	// +optional
-	IPFamilyPolicy *IPFamilyPolicy
-
-	// ExternalName is the external reference that kubedns or equivalent will
-	// return as a CNAME record for this service. No proxying will be involved.
-	// Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
-	// and requires Type to be ExternalName.
-	ExternalName string
+	Type ServiceType
 
 	// ExternalIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
@@ -5163,6 +5142,10 @@ type ServiceSpec struct {
 	// Deprecated: ExternalIPs is deprecated and may be removed in a future version.
 	// +optional
 	ExternalIPs []string
+
+	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
+	// +optional
+	SessionAffinity ServiceAffinity
 
 	// Only applies to Service Type: LoadBalancer
 	// LoadBalancer will get created with the IP specified in this field.
@@ -5175,19 +5158,17 @@ type ServiceSpec struct {
 	// +optional
 	LoadBalancerIP string
 
-	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
-	// +optional
-	SessionAffinity ServiceAffinity
-
-	// sessionAffinityConfig contains the configurations of session affinity.
-	// +optional
-	SessionAffinityConfig *SessionAffinityConfig
-
 	// Optional: If specified and supported by the platform, this will restrict traffic through the cloud-provider
 	// load-balancer will be restricted to the specified client IPs. This field will be ignored if the
 	// cloud-provider does not support the feature."
 	// +optional
 	LoadBalancerSourceRanges []string
+
+	// ExternalName is the external reference that kubedns or equivalent will
+	// return as a CNAME record for this service. No proxying will be involved.
+	// Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
+	// and requires Type to be ExternalName.
+	ExternalName string
 
 	// externalTrafficPolicy describes how nodes distribute service traffic they
 	// receive on one of the Service's "externally-facing" addresses (NodePorts,
@@ -5223,6 +5204,30 @@ type ServiceSpec struct {
 	// through the Endpoints or EndpointSlice resources can safely assume this behavior.
 	// +optional
 	PublishNotReadyAddresses bool
+
+	// sessionAffinityConfig contains the configurations of session affinity.
+	// +optional
+	SessionAffinityConfig *SessionAffinityConfig
+
+	// IPFamilies identifies all the IPFamilies assigned for this Service. If a value
+	// was not provided for IPFamilies it will be defaulted based on the cluster
+	// configuration and the value of service.spec.ipFamilyPolicy. A maximum of two
+	// values (dual-stack IPFamilies) are allowed in IPFamilies. IPFamilies field is
+	// conditionally mutable: it allows for adding or removing a secondary IPFamily,
+	// but it does not allow changing the primary IPFamily of the service.
+	// +optional
+	IPFamilies []IPFamily
+
+	// IPFamilyPolicy represents the dual-stack-ness requested or required by this
+	// Service. If there is no value provided, then this Service will be considered
+	// SingleStack (single IPFamily). Services can be SingleStack (single IPFamily),
+	// PreferDualStack (two dual-stack IPFamilies on dual-stack clusters or single
+	// IPFamily on single-stack clusters), or RequireDualStack (two dual-stack IPFamilies
+	// on dual-stack configured clusters, otherwise fail). The IPFamilies and ClusterIPs assigned
+	// to this service can be controlled by service.spec.ipFamilies and service.spec.clusterIPs
+	// respectively.
+	// +optional
+	IPFamilyPolicy *IPFamilyPolicy
 
 	// allocateLoadBalancerNodePorts defines if NodePorts will be automatically
 	// allocated for services with type LoadBalancer.  Default is "true". It

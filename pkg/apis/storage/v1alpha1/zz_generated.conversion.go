@@ -24,14 +24,11 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	apicorev1 "k8s.io/api/core/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	core "k8s.io/kubernetes/pkg/apis/core"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
@@ -229,17 +226,7 @@ func Convert_storage_VolumeAttachment_To_v1alpha1_VolumeAttachment(in *storage.V
 
 func autoConvert_v1alpha1_VolumeAttachmentList_To_storage_VolumeAttachmentList(in *storagev1alpha1.VolumeAttachmentList, out *storage.VolumeAttachmentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]storage.VolumeAttachment, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_VolumeAttachment_To_storage_VolumeAttachment(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]storage.VolumeAttachment)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -250,17 +237,7 @@ func Convert_v1alpha1_VolumeAttachmentList_To_storage_VolumeAttachmentList(in *s
 
 func autoConvert_storage_VolumeAttachmentList_To_v1alpha1_VolumeAttachmentList(in *storage.VolumeAttachmentList, out *storagev1alpha1.VolumeAttachmentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]storagev1alpha1.VolumeAttachment, len(*in))
-		for i := range *in {
-			if err := Convert_storage_VolumeAttachment_To_v1alpha1_VolumeAttachment(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]storagev1alpha1.VolumeAttachment)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -270,16 +247,7 @@ func Convert_storage_VolumeAttachmentList_To_v1alpha1_VolumeAttachmentList(in *s
 }
 
 func autoConvert_v1alpha1_VolumeAttachmentSource_To_storage_VolumeAttachmentSource(in *storagev1alpha1.VolumeAttachmentSource, out *storage.VolumeAttachmentSource, s conversion.Scope) error {
-	out.PersistentVolumeName = (*string)(unsafe.Pointer(in.PersistentVolumeName))
-	if in.InlineVolumeSpec != nil {
-		in, out := &in.InlineVolumeSpec, &out.InlineVolumeSpec
-		*out = new(core.PersistentVolumeSpec)
-		if err := corev1.Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.InlineVolumeSpec = nil
-	}
+	*out = *(*storage.VolumeAttachmentSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -289,16 +257,7 @@ func Convert_v1alpha1_VolumeAttachmentSource_To_storage_VolumeAttachmentSource(i
 }
 
 func autoConvert_storage_VolumeAttachmentSource_To_v1alpha1_VolumeAttachmentSource(in *storage.VolumeAttachmentSource, out *storagev1alpha1.VolumeAttachmentSource, s conversion.Scope) error {
-	out.PersistentVolumeName = (*string)(unsafe.Pointer(in.PersistentVolumeName))
-	if in.InlineVolumeSpec != nil {
-		in, out := &in.InlineVolumeSpec, &out.InlineVolumeSpec
-		*out = new(apicorev1.PersistentVolumeSpec)
-		if err := corev1.Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.InlineVolumeSpec = nil
-	}
+	*out = *(*storagev1alpha1.VolumeAttachmentSource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -308,11 +267,7 @@ func Convert_storage_VolumeAttachmentSource_To_v1alpha1_VolumeAttachmentSource(i
 }
 
 func autoConvert_v1alpha1_VolumeAttachmentSpec_To_storage_VolumeAttachmentSpec(in *storagev1alpha1.VolumeAttachmentSpec, out *storage.VolumeAttachmentSpec, s conversion.Scope) error {
-	out.Attacher = in.Attacher
-	if err := Convert_v1alpha1_VolumeAttachmentSource_To_storage_VolumeAttachmentSource(&in.Source, &out.Source, s); err != nil {
-		return err
-	}
-	out.NodeName = in.NodeName
+	*out = *(*storage.VolumeAttachmentSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -322,11 +277,7 @@ func Convert_v1alpha1_VolumeAttachmentSpec_To_storage_VolumeAttachmentSpec(in *s
 }
 
 func autoConvert_storage_VolumeAttachmentSpec_To_v1alpha1_VolumeAttachmentSpec(in *storage.VolumeAttachmentSpec, out *storagev1alpha1.VolumeAttachmentSpec, s conversion.Scope) error {
-	out.Attacher = in.Attacher
-	if err := Convert_storage_VolumeAttachmentSource_To_v1alpha1_VolumeAttachmentSource(&in.Source, &out.Source, s); err != nil {
-		return err
-	}
-	out.NodeName = in.NodeName
+	*out = *(*storagev1alpha1.VolumeAttachmentSpec)(unsafe.Pointer(in))
 	return nil
 }
 

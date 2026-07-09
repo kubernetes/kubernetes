@@ -907,6 +907,74 @@ func TestPodMemoryIdenticalConversion(t *testing.T) {
 	})
 }
 
+// TestPodTemplateSpecMemoryIdenticalConversion ensures the internal and v1 PodTemplateSpec types are identical
+func TestPodTemplateSpecMemoryIdenticalConversion(t *testing.T) {
+	scheme := legacyscheme.Scheme
+	out := &core.PodTemplateSpec{}
+	in := &v1.PodTemplateSpec{}
+	if err := scheme.Convert(in, out, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertMemoryIdentical(t, "PodTemplateSpec", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
+
+	out2 := &v1.PodTemplateSpec{}
+	if err := scheme.Convert(out, out2, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertMemoryIdentical(t, "PodTemplateSpec", reflect.ValueOf(in).Elem(), reflect.ValueOf(out2).Elem())
+}
+
+// TestServiceSpecMemoryIdenticalConversion ensures the internal and v1 ServiceSpec types are identical
+func TestServiceSpecMemoryIdenticalConversion(t *testing.T) {
+	scheme := legacyscheme.Scheme
+	out := &core.ServiceSpec{}
+	in := &v1.ServiceSpec{}
+	if err := scheme.Convert(in, out, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertMemoryIdentical(t, "ServiceSpec", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
+
+	out2 := &v1.ServiceSpec{}
+	if err := scheme.Convert(out, out2, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertMemoryIdentical(t, "ServiceSpec", reflect.ValueOf(in).Elem(), reflect.ValueOf(out2).Elem())
+}
+
+// TestPersistentVolumeSourceMemoryIdenticalConversion ensures the internal and v1 PersistentVolumeSource types are identical
+func TestPersistentVolumeSourceMemoryIdenticalConversion(t *testing.T) {
+	scheme := legacyscheme.Scheme
+	out := &core.PersistentVolumeSource{}
+	in := &v1.PersistentVolumeSource{}
+	if err := scheme.Convert(in, out, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertMemoryIdentical(t, "PersistentVolumeSource", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
+
+	out2 := &v1.PersistentVolumeSource{}
+	if err := scheme.Convert(out, out2, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertMemoryIdentical(t, "PersistentVolumeSource", reflect.ValueOf(in).Elem(), reflect.ValueOf(out2).Elem())
+}
+
+// TestReplicationControllerMemoryIdenticalConversion ensures the internal and v1 ReplicationController types are identical
+func TestReplicationControllerMemoryIdenticalConversion(t *testing.T) {
+	scheme := legacyscheme.Scheme
+	out := &core.ReplicationController{}
+	in := &v1.ReplicationController{}
+	if err := scheme.Convert(in, out, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertMemoryIdentical(t, "ReplicationController", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
+
+	out2 := &v1.ReplicationController{}
+	if err := scheme.Convert(out, out2, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertMemoryIdentical(t, "ReplicationController", reflect.ValueOf(in).Elem(), reflect.ValueOf(out2).Elem())
+}
+
 func assertMemoryIdentical(t *testing.T, path string, a, b reflect.Value) {
 	t.Helper()
 	if a.Kind() != b.Kind() {
