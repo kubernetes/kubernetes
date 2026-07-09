@@ -286,10 +286,8 @@ func (s *podStorage) merge(ctx context.Context, source string, update sourceUpda
 		if _, found := pods[uid]; !found {
 			// this is a delete
 			removePods = append(removePods, existing)
-			// Remove from podSources map to prevent memory leak (if map still exists)
-			if s.podSources != nil {
-				delete(s.podSources, uid)
-			}
+			// Don't remove from podSources here - we need it for SourceForPodReady during deletion.
+			// The map will be cleared when all sources are ready (podSources set to nil).
 		}
 	}
 

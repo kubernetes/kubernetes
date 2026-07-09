@@ -3491,7 +3491,7 @@ func TestPodDeferredResizeDurationSeconds(t *testing.T) {
 			case "delete":
 				manager.deletePodStatus(tc.podUID)
 			case "orphan":
-				manager.RemoveOrphanedStatuses(klog.Background(), map[types.UID]bool{})
+				manager.RemoveOrphanedStatuses(klog.Background(), map[types.UID]bool{}, func(types.UID) bool { return true })
 			}
 
 			count, err := testutil.GetHistogramMetricCount(

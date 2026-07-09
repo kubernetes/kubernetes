@@ -510,14 +510,19 @@ func TestSourceForPodReadyPodDeletion(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	config.pods.podLock.RLock()
-	_, exists := config.pods.podSources[pod.UID]
+	source, exists := config.pods.podSources[pod.UID]
 	config.pods.podLock.RUnlock()
-	if exists {
-		t.Error("Expected UID to be removed from podSources after deletion")
+	if !exists {
+		t.Error("Expected UID to remain in podSources after deletion (until all sources ready)")
+	}
+	if source != kubetypes.FileSource {
+		t.Errorf("Expected pod source to be %q, got %q", kubetypes.FileSource, source)
 	}
 
-	if config.SourceForPodReady(pod.UID) {
-		t.Error("Expected deleted pod to return false")
+	// SourceForPodReady should still return true because the file source is ready,
+	// even though the pod was deleted. This allows deletion to proceed.
+	if !config.SourceForPodReady(pod.UID) {
+		t.Error("Expected deleted pod's source to still be ready for deletion")
 	}
 }
 
