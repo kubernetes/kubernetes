@@ -234,7 +234,6 @@ func TestPodDisruptionBudgetStatusValidationByApiVersion(t *testing.T) {
 	}
 }
 
-
 func TestDropDisabledFields(t *testing.T) {
 	testcases := []struct {
 		name      string
