@@ -143,7 +143,7 @@ func NewCmdCanI(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If true, check the specified action in all namespaces.")
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "If true, suppress output and just return the exit code.")
-	cmd.Flags().StringVar(&o.Subresource, "subresource", o.Subresource, "SubResource such as pod/log or deployment/scale")
+	cmd.Flags().StringVar(&o.Subresource, "subresource", o.Subresource, "SubResource such as pod/log or deployment/scale.")
 	cmd.Flags().BoolVar(&o.List, "list", o.List, "If true, prints all allowed actions.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If true, prints allowed actions without headers.")
 	return cmd
