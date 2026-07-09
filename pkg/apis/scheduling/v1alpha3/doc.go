@@ -19,10 +19,7 @@ limitations under the License.
 // +groupName=scheduling.k8s.io
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/api/scheduling/v1alpha3
-// +k8s:validation-gen=false
-
-// Declarative validation for this group is generated into
-// k8s.io/api/scheduling/v1alpha3/validation so it is importable by
-// out-of-tree controllers.
+// +k8s:validation-gen=TypesWithField=TypeMeta
+// +k8s:validation-gen-input=k8s.io/api/scheduling/v1alpha3
 
 package v1alpha3

@@ -21,7 +21,6 @@ import (
 	"slices"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingvalidation "k8s.io/api/scheduling/v1alpha3/validation"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -95,7 +94,7 @@ func validateSchedulingPolicy(
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("gang"), "gang scheduling policy is not supported by this controller"))
 	}
 
-	allErrs = append(allErrs, schedulingvalidation.Validate_WorkloadPodGroupSchedulingPolicy(ctx, op, fldPath, policy, oldPolicy)...)
+	allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupSchedulingPolicy(ctx, op, fldPath, policy, oldPolicy)...)
 
 	return allErrs
 }
@@ -147,7 +146,7 @@ func validateDisruptionMode(
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("all"), "all disruption mode is not supported by this controller"))
 	}
 
-	allErrs = append(allErrs, schedulingvalidation.Validate_WorkloadPodGroupDisruptionMode(ctx, op, fldPath, mode, oldMode)...)
+	allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupDisruptionMode(ctx, op, fldPath, mode, oldMode)...)
 
 	return allErrs
 }
