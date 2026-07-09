@@ -200,11 +200,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 	m.configureContainerSwapResources(ctx, lcr, pod, container)
 
 	// Set memory.min and memory.high to enforce MemoryQoS
-	// TODO(pravk03) - We need to consider DRA allocations with MemoryQOS.
 	if enforceMemoryQoS {
 		unified := map[string]string{}
 		memoryRequest := container.Resources.Requests.Memory().Value()
-		memoryLimitValue := container.Resources.Limits.Memory().Value()
+		memoryLimitSpec := container.Resources.Limits.Memory().Value()
 		if memoryRequest != 0 && m.memoryReservationPolicy == kubeletconfiginternal.TieredReservationMemoryReservationPolicy {
 			// Guaranteed pods get memory.min (hard protection).
 			// Burstable pods get memory.low (soft protection).
@@ -217,24 +216,34 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			unified[cm.Cgroup2MemoryMin] = "0"
 			unified[cm.Cgroup2MemoryLow] = "0"
 		}
-
 		// When PodLevelResources is active and the container has no memory limit,
 		// skip container-level memory.high — the pod cgroup's memory.high handles
 		// throttling hierarchically (kernel walks ancestors in try_charge_memcg).
-		skipContainerMemoryHigh := memoryLimitValue == 0 &&
+		skipContainerMemoryHigh := memoryLimitSpec == 0 &&
 			utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) &&
 			resourcehelper.IsPodLevelResourcesSet(pod) &&
 			!pod.Spec.Resources.Limits.Memory().IsZero()
-		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh && (memoryRequest != memoryLimitValue || memoryRequest == 0) {
+		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh && (memoryRequest != memoryLimitSpec || memoryRequest == 0) {
+			memoryLimitVal := memoryLimitSpec
+			if _, exists := draAllocations[v1.ResourceMemory]; exists && memoryLimit != nil && memoryLimitSpec != 0 {
+				// memoryLimit computed above should include DRA already.
+				// We use the DRA-inflated memory limit to calculate the throttling threshold (memory.high)
+				// so that Burstable pods are not throttled early at their standard Spec limit.
+				// However, the QoS classification remains strictly based on the pure spec requests and limits
+				// and does not consider DRA. With DRA node allocatable claims, we continue to
+				// 1. Skip setting memory.high for guaranteed pods.
+				// 2. Set memory.high based on node memory capacity for besteffort pods.
+				memoryLimitVal = memoryLimit.Value()
+			}
 			// The formula for memory.high for container cgroup is modified in Alpha stage of the feature in K8s v1.27.
 			// It will be set based on formula:
 			// `memory.high=floor[(requests.memory + memory throttling factor * (limits.memory or node allocatable memory - requests.memory))/pageSize] * pageSize`
 			// More info: https://git.k8s.io/enhancements/keps/sig-node/2570-memory-qos
 			memoryHigh := int64(0)
-			if memoryLimitValue != 0 {
+			if memoryLimitVal != 0 {
 				memoryHigh = int64(math.Floor(
 					float64(memoryRequest)+
-						(float64(memoryLimitValue)-float64(memoryRequest))*(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+						(float64(memoryLimitVal)-float64(memoryRequest))*float64(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
 			} else {
 				allocatable := m.getNodeAllocatable()
 				allocatableMemory, ok := allocatable[v1.ResourceMemory]
@@ -341,7 +350,6 @@ func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(san
 		Resources:    convertResourceConfigToLinuxContainerResources(podResourcesWithoutOverhead),
 	}
 }
-
 
 // calculateLinuxResources will create the linuxContainerResources type based on the provided CPU and memory resource requests, limits
 func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit *resource.Quantity, disableCPUQuota bool) *runtimeapi.LinuxContainerResources {

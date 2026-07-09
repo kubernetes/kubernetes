@@ -540,6 +540,14 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	m.memoryReservationPolicy = kubeletconfiginternal.TieredReservationMemoryReservationPolicy
 	m.memoryThrottlingFactor = new(float64(0.9))
 
+	pageSize := int64(os.Getpagesize())
+	memoryNodeAllocatable := resource.MustParse(fakeNodeAllocatableMemory)
+
+	calculateMemoryHigh := func(reqVal, limVal int64) int64 {
+		return int64(math.Floor(float64(reqVal)+
+			(float64(limVal)-float64(reqVal))*float64(*m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
+	}
+
 	podRequestMemory := resource.MustParse("128Mi")
 	pod1LimitMemory := resource.MustParse("256Mi")
 	pod1 := &v1.Pod{
@@ -571,8 +579,8 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 
 	pod2 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
+			UID:       "12345678-nolimit",
+			Name:      "bar-nolimit",
 			Namespace: "new",
 		},
 		Spec: v1.PodSpec{
@@ -612,65 +620,198 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			},
 		},
 	}
-	pageSize := int64(os.Getpagesize())
-	memoryNodeAllocatable := resource.MustParse(fakeNodeAllocatableMemory)
-	pod1MemoryHigh := int64(math.Floor(
-		float64(podRequestMemory.Value())+
-			(float64(pod1LimitMemory.Value())-float64(podRequestMemory.Value()))*(*m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
-	pod2MemoryHigh := int64(math.Floor(
-		float64(podRequestMemory.Value())+
-			(float64(memoryNodeAllocatable.Value())-float64(podRequestMemory.Value()))*(*m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
-	pod3MemoryHigh := int64(math.Floor(
-		float64(memoryNodeAllocatable.Value())*(*m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
+
+	// Guaranteed pod (256Mi requests, 256Mi limits) - Non-DRA
+	pod4 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678-guaranteed",
+			Name:      "bar-guaranteed",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         []string{"testCommand"},
+					WorkingDir:      "testWorkingDir",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("256Mi"),
+							v1.ResourceCPU:    resource.MustParse("1"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("256Mi"),
+							v1.ResourceCPU:    resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Burstable + 256Mi DRA Memory (DRA version of pod1)
+	pod5 := pod1.DeepCopy()
+	pod5.Status = v1.PodStatus{
+		NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			{
+				ResourceClaimName: "memory-claim",
+				Containers:        []string{"foo"},
+				Mapping: []v1.NodeAllocatableMappedResources{
+					{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("256Mi"))},
+				},
+			},
+		},
+	}
+
+	// BestEffort + 256Mi DRA Memory (DRA version of pod3)
+	pod6 := pod3.DeepCopy()
+	pod6.Status = v1.PodStatus{
+		NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			{
+				ResourceClaimName: "memory-claim",
+				Containers:        []string{"foo"},
+				Mapping: []v1.NodeAllocatableMappedResources{
+					{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("256Mi"))},
+				},
+			},
+		},
+	}
+
+	// Guaranteed + 256Mi DRA Memory (DRA version of pod4)
+	pod7 := pod4.DeepCopy()
+	pod7.Status = v1.PodStatus{
+		NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			{
+				ResourceClaimName: "memory-claim",
+				Containers:        []string{"foo"},
+				Mapping: []v1.NodeAllocatableMappedResources{
+					{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("256Mi"))},
+				},
+			},
+		},
+	}
+
+	// Burstable with DRA and missing limits in spec (DRA version of pod2)
+	pod8 := pod2.DeepCopy()
+	pod8.Status = v1.PodStatus{
+		NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			{
+				ResourceClaimName: "memory-claim",
+				Containers:        []string{"foo"},
+				Mapping: []v1.NodeAllocatableMappedResources{
+					{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("256Mi"))},
+				},
+			},
+		},
+	}
 
 	type expectedResult struct {
-		containerConfig *runtimeapi.LinuxContainerConfig
-		memoryLow       int64
-		memoryHigh      int64
+		memoryLow  int64 // set to -1 if skipped for the pod
+		memoryHigh int64 // set to -1 if skipped for the pod
 	}
-	l1, _ := m.generateLinuxContainerConfig(tCtx, &pod1.Spec.Containers[0], pod1, new(int64), "", nil, true)
-	l2, _ := m.generateLinuxContainerConfig(tCtx, &pod2.Spec.Containers[0], pod2, new(int64), "", nil, true)
-	l3, _ := m.generateLinuxContainerConfig(tCtx, &pod3.Spec.Containers[0], pod3, new(int64), "", nil, true)
+
 	tests := []struct {
-		name     string
-		pod      *v1.Pod
-		expected *expectedResult
+		name               string
+		pod                *v1.Pod
+		draNodeAllocatable bool
+		expected           *expectedResult
 	}{
 		{
-			name: "Request128MBLimit256MB",
-			pod:  pod1,
+			name:               "Burstable pod (128Mi requests, 256Mi limits) - set memory.high based on limits",
+			pod:                pod1,
+			draNodeAllocatable: false,
 			expected: &expectedResult{
-				l1,
-				128 * 1024 * 1024,
-				int64(pod1MemoryHigh),
+				memoryLow:  128 * 1024 * 1024,
+				memoryHigh: calculateMemoryHigh(128*1024*1024, 256*1024*1024),
 			},
 		},
 		{
-			name: "Request128MBWithoutLimit",
-			pod:  pod2,
+			name:               "Burstable pod (128Mi requests, no limits) - set memory.high based on node capacity",
+			pod:                pod2,
+			draNodeAllocatable: false,
 			expected: &expectedResult{
-				l2,
-				128 * 1024 * 1024,
-				int64(pod2MemoryHigh),
+				memoryLow:  128 * 1024 * 1024,
+				memoryHigh: calculateMemoryHigh(128*1024*1024, memoryNodeAllocatable.Value()),
 			},
 		},
 		{
-			name: "BestEffortUsesNodeAllocatableForMemoryHigh",
-			pod:  pod3,
+			name:               "BestEffort pod - set memory.high based on node capacity",
+			pod:                pod3,
+			draNodeAllocatable: false,
 			expected: &expectedResult{
-				l3,
-				0,
-				int64(pod3MemoryHigh),
+				memoryLow:  0,
+				memoryHigh: calculateMemoryHigh(0, memoryNodeAllocatable.Value()),
+			},
+		},
+		{
+			name:               "Guaranteed pod (256Mi requests, 256Mi limits) - skip setting memory.high",
+			pod:                pod4,
+			draNodeAllocatable: false,
+			expected: &expectedResult{
+				memoryLow:  -1, // -1 is used to indicate that the setting is omitted
+				memoryHigh: -1, // -1 is used to indicate that the setting is omitted
+			},
+		},
+		{
+			name:               "Burstable pod with DRA (128Mi requests, 256Mi limits + 256Mi DRA) - set memory.high based on DRA-inflated limits",
+			pod:                pod5,
+			draNodeAllocatable: true,
+			expected: &expectedResult{
+				memoryLow:  128 * 1024 * 1024,
+				memoryHigh: calculateMemoryHigh(128*1024*1024, 512*1024*1024),
+			},
+		},
+		{
+			name:               "BestEffort pod with DRA (no requests, no limits + 256Mi DRA) - set memory.high based on node capacity",
+			pod:                pod6,
+			draNodeAllocatable: true,
+			expected: &expectedResult{
+				memoryLow:  0,
+				memoryHigh: calculateMemoryHigh(0, memoryNodeAllocatable.Value()),
+			},
+		},
+		{
+			name:               "Guaranteed pod with DRA (256Mi requests, 256Mi limits + 256Mi DRA) - skip setting memory.high",
+			pod:                pod7,
+			draNodeAllocatable: true,
+			expected: &expectedResult{
+				memoryLow:  -1, // -1 is used to indicate that the setting is omitted
+				memoryHigh: -1, // -1 is used to indicate that the setting is omitted
+			},
+		},
+		{
+			name:               "Burstable pod with DRA (128Mi requests, no limits + 256Mi DRA) - set memory.high based on node capacity",
+			pod:                pod8,
+			draNodeAllocatable: true,
+			expected: &expectedResult{
+				memoryLow:  128 * 1024 * 1024,
+				memoryHigh: calculateMemoryHigh(128*1024*1024, memoryNodeAllocatable.Value()),
 			},
 		},
 	}
 
 	for _, test := range tests {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.draNodeAllocatable)
 		linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
 		assert.NoError(t, err)
-		assert.Equal(t, test.expected.containerConfig, linuxConfig, test.name)
-		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.low"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
-		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.high"], strconv.FormatInt(test.expected.memoryHigh, 10), test.name)
+
+		unified := linuxConfig.GetResources().GetUnified()
+
+		if test.expected.memoryLow == -1 {
+			_, exists := unified["memory.low"]
+			assert.False(t, exists, test.name)
+		} else {
+			assert.Equal(t, strconv.FormatInt(test.expected.memoryLow, 10), unified["memory.low"], test.name)
+		}
+
+		if test.expected.memoryHigh == -1 {
+			_, exists := unified["memory.high"]
+			assert.False(t, exists, test.name)
+		} else {
+			assert.Equal(t, strconv.FormatInt(test.expected.memoryHigh, 10), unified["memory.high"], test.name)
+		}
 	}
 }
 
