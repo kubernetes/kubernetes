@@ -397,13 +397,6 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				allocationResult.Devices.Results[i].BindingConditions = internal.BindingConditions
 				allocationResult.Devices.Results[i].BindingFailureConditions = internal.BindingFailureConditions
 			}
-			// Performance optimization: skip the for loop if the feature is off.
-			// Not needed for correctness because if the feature is off, the selected
-			// device should not have binding conditions.
-			if a.features.DeviceBindingAndStatus {
-				allocationResult.Devices.Results[i].BindingConditions = internal.BindingConditions
-				allocationResult.Devices.Results[i].BindingFailureConditions = internal.BindingFailureConditions
-			}
 		}
 
 		// Populate configs.
