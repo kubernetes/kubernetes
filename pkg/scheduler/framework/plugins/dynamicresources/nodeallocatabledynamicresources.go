@@ -379,30 +379,94 @@ func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, 
 	return nil
 }
 
-// validatePodLevelRequestsCoverDRA checks if the pod-level requests, if specified, are sufficient to cover
-// the container level and DRA claim requests.
-func (pl *DynamicResources) validatePodLevelRequestsCoverDRA(logger klog.Logger, pod *v1.Pod, requestWithPodLevel v1.ResourceList) *fwk.Status {
-	if !pl.fts.EnablePodLevelResources || pod.Spec.Resources == nil || pod.Spec.Resources.Requests == nil {
+// validatePodLevelResourcesCoverDRA checks if
+// 1. pod-level requests is not less than the AGGREGATE container level requests including DRA
+// 2. pod-level limits is not less than the INDIVIDUAL container level limits including DRA
+// This follows the same pattern as in validatePodResourceConsistency() in pkg/apis/core/validation/validation.go
+func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.Status {
+	if !pl.fts.EnablePodLevelResources || pod.Spec.Resources == nil {
+		return nil
+	}
+	if len(pod.Status.NodeAllocatableResourceClaimStatuses) == 0 {
 		return nil
 	}
 
-	// Calculate Sum(Containers) + DRA + overhead resources.. Skip pod level resources for this sum
-	optsSum := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources:                    true,
-		UseDRANodeAllocatableResourceClaimStatus: true,
-	}
-	requestWithoutPodLevel := resourcehelper.PodRequests(pod, optsSum)
+	if pod.Spec.Resources.Requests != nil {
+		// Calculate Sum(Containers) + DRA + overhead resources. Skip pod level resources for this sum
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    true,
+			UseDRANodeAllocatableResourceClaimStatus: true,
+		}
+		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
 
-	// For resources specified at pod level, check if container and DRA aggregates does not exceed pod level budget.
-	for resName, podLevelReq := range requestWithPodLevel {
-		val, ok := requestWithoutPodLevel[resName]
-		if !ok {
-			continue
-		}
-		if val.Cmp(podLevelReq) > 0 {
-			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level request for %s is insufficient to cover the aggregated container and node-allocatable DRA requests", resName))
+		// For resources specified at pod level, check if container and DRA aggregates do not exceed pod level budget.
+		for resName, podLevelReq := range pod.Spec.Resources.Requests {
+			if !resourcehelper.IsSupportedPodLevelResource(resName) {
+				continue
+			}
+			val, ok := requestWithoutPodLevel[resName]
+			if !ok {
+				continue
+			}
+			if val.Cmp(podLevelReq) > 0 {
+				return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level request for %s is insufficient to cover the aggregated container and node-allocatable DRA requests", resName))
+			}
 		}
 	}
+
+	if pod.Spec.Resources.Limits != nil {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    true,
+			UseDRANodeAllocatableResourceClaimStatus: true,
+		}
+		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
+
+		// Pod level hugepage limits must be always equal or greater than the aggregated
+		// container level hugepage limits + DRA limits
+		for resourceName, ctrLims := range limitsWithoutPodLevel {
+			if !v1helper.IsHugePageResourceName(resourceName) {
+				continue
+			}
+
+			podLevelResLimit, hasLimit := pod.Spec.Resources.Limits[resourceName]
+			if !hasLimit {
+				continue
+			}
+
+			if ctrLims.Cmp(podLevelResLimit) > 0 {
+				return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level limit for %s is insufficient to cover the aggregated container and node-allocatable DRA limits", resourceName))
+			}
+		}
+
+		// Individual Container limits + DRA overheads must be <= Pod-level limits.
+		containerDRAAllocations := make(map[string]v1.ResourceList, len(pod.Spec.Containers))
+		for _, ctr := range pod.Spec.Containers {
+			containerDRAAllocations[ctr.Name] = resourcehelper.GetContainerDRAAllocations(pod, ctr.Name)
+		}
+
+		for _, ctr := range pod.Spec.Containers {
+			for resourceName, ctrLimit := range ctr.Resources.Limits {
+				if v1helper.IsHugePageResourceName(resourceName) {
+					continue
+				}
+
+				// Skip if the pod-level limit of the resource is not set.
+				podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
+				if !exists {
+					continue
+				}
+
+				draResAllocation := containerDRAAllocations[ctr.Name][resourceName]
+				effectiveLimit := ctrLimit.DeepCopy()
+				effectiveLimit.Add(draResAllocation)
+
+				if effectiveLimit.Cmp(podLevelResLimit) > 0 {
+					return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for container %s", resourceName, ctr.Name))
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -441,14 +505,14 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 		SkipPodLevelResources:                    !pl.fts.EnablePodLevelResources,
 		UseDRANodeAllocatableResourceClaimStatus: true,
 	}
-	podCopy := pod.DeepCopy()
+	// Perform shallow copy - we only use the resource information from container and pod spec to calculatate the resource foot print.
+	podCopy := *pod
 	podCopy.Status.NodeAllocatableResourceClaimStatuses = nodeAllocatableStatus
-	totalPodDemandRes := resourcehelper.PodRequests(podCopy, optsTotal)
+	totalPodDemandRes := resourcehelper.PodRequests(&podCopy, optsTotal)
 
-	// Validate that pod-level requests, if specified, cover the aggregated container + DRA requests.
 	// The API validation in pkg/apis/core/validation/validation.go only checks pod.Spec.Resources against container
 	// requests within the Spec. It cannot account for DRA-derived resources, which are determined after device allocation.
-	if status := pl.validatePodLevelRequestsCoverDRA(logger, podCopy, totalPodDemandRes); status != nil {
+	if status := pl.validatePodLevelResourcesCoverDRA(&podCopy); status != nil {
 		return nil, nil, status
 	}
 

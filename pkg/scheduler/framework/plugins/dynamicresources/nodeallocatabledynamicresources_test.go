@@ -1733,14 +1733,14 @@ func TestNodeFitsNativeResources(t *testing.T) {
 	}
 }
 
-func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
+func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 	tests := []struct {
 		name                  string
 		pod                   *v1.Pod
 		nodeAllocatableStatus []v1.NodeAllocatableResourceClaimStatus
-		requestWithPodLevel   v1.ResourceList
-		wantStatusCode        fwk.Code
-		wantErrorMessage      string
+
+		wantStatusCode   fwk.Code
+		wantErrorMessage string
 	}{
 		{
 			name: "PodLevelResources enabled, no pod resources set",
@@ -1765,8 +1765,7 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					Quantity: new(resource.MustParse("512Mi")),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{},
-			wantStatusCode:      fwk.Success,
+			wantStatusCode: fwk.Success,
 		},
 		{
 			name: "PodLevel resources sufficient",
@@ -1797,10 +1796,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					Quantity: new(resource.MustParse("512Mi")),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -1832,10 +1827,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					Quantity: new(resource.MustParse("512Mi")),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("1"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "pod level request for cpu is insufficient to cover the aggregated container and node-allocatable DRA requests",
 		},
@@ -1868,10 +1859,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					Quantity: new(resource.MustParse("100Mi")),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("1"),
-				v1.ResourceMemory: resource.MustParse("1Gi"),
-			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "insufficient to cover the aggregated container and node-allocatable DRA requests",
 		},
@@ -1913,10 +1900,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					Quantity: new(resource.MustParse("1Gi")),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("4"),
-				v1.ResourceMemory: resource.MustParse("3Gi"),
-			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -1948,10 +1931,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					PerContainer: new(resource.MustParse("1Gi")),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("3Gi"),
-			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -1983,12 +1962,94 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					PerContainer: new(resource.MustParse("1Gi")),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "pod level request for memory is insufficient to cover the aggregated container and node-allocatable DRA requests",
+		},
+		{
+			name: "PodLevel limits cover DRA",
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+				}).
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+					},
+				}}).
+				Obj(),
+			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "dra-claim",
+				Containers:        []string{"c1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: new(resource.MustParse("512Mi")),
+				}},
+			}},
+			wantStatusCode: fwk.Success,
+		},
+		{
+			name: "PodLevel limits does not cover DRA",
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+				}).
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1.5Gi"),
+						},
+						Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+					},
+				}}).
+				Obj(),
+			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "dra-claim",
+				Containers:        []string{"c1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: new(resource.MustParse("1Gi")),
+				}},
+			}},
+			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
+			wantErrorMessage: "pod level limit for memory is insufficient to cover the limit and DRA overhead for container c1",
+		},
+		{
+			name: "PodLevel limits overcommitted but individual container limits with DRA covered by pod level limits",
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}).
+				Containers([]v1.Container{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("3Gi"),
+							},
+						},
+					},
+					{
+						Name: "c2",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("3Gi"),
+							},
+						},
+					},
+				}).
+				Obj(),
+			wantStatusCode: fwk.Success,
 		},
 	}
 
@@ -1998,13 +2059,13 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 				fts: feature.Features{EnablePodLevelResources: true},
 			}
 			tt.pod.Status.NodeAllocatableResourceClaimStatuses = tt.nodeAllocatableStatus
-			gotStatus := pl.validatePodLevelRequestsCoverDRA(klog.TODO(), tt.pod, tt.requestWithPodLevel)
+			gotStatus := pl.validatePodLevelResourcesCoverDRA(tt.pod)
 			if diff := cmp.Diff(tt.wantStatusCode, gotStatus.Code()); diff != "" {
-				t.Errorf("validatePodLevelRequestsCoverDRA() returned diff (-want +got):\n%s", diff)
+				t.Errorf("validatePodLevelResourcesCoverDRA() returned diff (-want +got):\n%s", diff)
 			}
 			if tt.wantStatusCode != fwk.Success && tt.wantErrorMessage != "" {
 				if !strings.Contains(gotStatus.Message(), tt.wantErrorMessage) {
-					t.Errorf("validatePodLevelRequestsCoverDRA() returned error %q, want it to contain %q", gotStatus.Message(), tt.wantErrorMessage)
+					t.Errorf("validatePodLevelResourcesCoverDRA() returned error %q, want it to contain %q", gotStatus.Message(), tt.wantErrorMessage)
 				}
 			}
 		})
