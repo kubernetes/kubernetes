@@ -160,25 +160,6 @@ type SortedScoredNodes interface {
 	Len() int
 }
 
-// PodGroupSchedulingFunc is a function that will be run to check feasibility of a pod group
-// scheduling during workload-aware preemption algorithm.
-type PodGroupSchedulingFunc func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status)
-
-// PodGroupPostFilterResult stores information about nominated nodes for a pod group.
-type PodGroupPostFilterResult struct {
-	NominatedNodeNames map[*v1.Pod]*fwk.NominatingInfo
-}
-
-// PodGroupPostFilterPlugin is an interface for plugins that are called
-// after a PodGroup cannot be scheduled.
-// It should not be used by any other plugin but DefaultPreemption.
-type PodGroupPostFilterPlugin interface {
-	fwk.Plugin
-
-	// PodGroupPostFilter is called after a PodGroup cannot be scheduled.
-	PodGroupPostFilter(ctx context.Context, pgInfo fwk.PodGroupInfo, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *fwk.Status)
-}
-
 // PlacementFeasiblePlugin is an interface for plugins that are called after each pod in a pod group is evaluated.
 // It is used to determine if a pod group is schedulable, may become schedulable or will not become schedulable regardless of the scheduling result of the remaining pods in the pod group.
 type PlacementFeasiblePlugin interface {
@@ -319,7 +300,7 @@ type Framework interface {
 	RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, placements []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (ns []fwk.PlacementPluginScores, status *fwk.Status)
 
 	// RunPodGroupPostFilterPlugins runs the set of configured PodGroupPostFilter plugins.
-	RunPodGroupPostFilterPlugins(ctx context.Context, state *CycleState, podGroupInfo fwk.PodGroupInfo, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *fwk.Status)
+	RunPodGroupPostFilterPlugins(ctx context.Context, state *CycleState, podGroupInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
 
 	// HasFilterPlugins returns true if at least one Filter plugin is defined.
 	HasFilterPlugins() bool
@@ -331,7 +312,7 @@ type Framework interface {
 	HasScorePlugins() bool
 
 	// PodGroupPostFilterPlugins returns registered PodGroupPostFilter plugins.
-	PodGroupPostFilterPlugins() []PodGroupPostFilterPlugin
+	PodGroupPostFilterPlugins() []fwk.PodGroupPostFilterPlugin
 
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() *config.Plugins

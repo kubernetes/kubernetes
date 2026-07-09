@@ -2634,7 +2634,7 @@ func TestPreEnqueue(t *testing.T) {
 					UnscheduledPods: []*v1.Pod{tt.podToTriggerPreemption},
 					PodGroup:        pg,
 				}
-				var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 					nodeInfo, _ := f.SnapshotSharedLister().NodeInfos().Get("node1")
 					if len(nodeInfo.GetPods()) == 0 {
 						return &fwk.PodGroupAssignments{
@@ -2652,7 +2652,7 @@ func TestPreEnqueue(t *testing.T) {
 					}
 					return nil, fwk.NewStatus(fwk.Unschedulable, "need to preempt")
 				}
-				p.PodGroupPostFilter(ctx, pgInfo, pgSchedulingFunc)
+				p.PodGroupPostFilter(ctx, state, pgInfo, pgSchedulingFunc)
 			} else {
 				p.PostFilter(ctx, state, tt.podToTriggerPreemption, filteredNodesStatuses)
 			}
@@ -2722,7 +2722,8 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 		PodGroup:        preemptorPG,
 	}
 
-	_, gotStatus := pl.PodGroupPostFilter(ctx, pgInfo, mockSchedulingFunc)
+	state := framework.NewCycleState()
+	_, gotStatus := pl.PodGroupPostFilter(ctx, state, pgInfo, mockSchedulingFunc)
 
 	if gotStatus.Code() != fwk.Error {
 		t.Fatalf("Expected status code %v, got status: %v", fwk.Error, gotStatus)
@@ -2789,7 +2790,8 @@ func TestDefaultPreemption_PodGroupPostFilter_SchedulingConstraints(t *testing.T
 		PodGroup:        pgWithConstraints,
 	}
 
-	_, gotStatus := pl.PodGroupPostFilter(ctx, pgInfo, mockSchedulingFunc)
+	state := framework.NewCycleState()
+	_, gotStatus := pl.PodGroupPostFilter(ctx, state, pgInfo, mockSchedulingFunc)
 	if gotStatus.Code() != fwk.Unschedulable {
 		t.Fatalf("Expected status code %v, got status: %v", fwk.Unschedulable, gotStatus)
 	}
@@ -2872,7 +2874,8 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 				UnscheduledPods: preemptorPods,
 				PodGroup:        pgOk,
 			}
-			_, gotStatus := pl.PodGroupPostFilter(ctx, pgInfo, mockSchedulingFunc)
+			state := framework.NewCycleState()
+			_, gotStatus := pl.PodGroupPostFilter(ctx, state, pgInfo, mockSchedulingFunc)
 			if gotStatus.Code() != fwk.Error {
 				t.Fatalf("Expected status code %v, got status: %v", fwk.Error, gotStatus)
 			}

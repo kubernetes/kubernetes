@@ -590,6 +590,33 @@ type PostFilterPlugin interface {
 	PostFilter(ctx context.Context, state CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusReader) (*PostFilterResult, *Status)
 }
 
+// PodGroupSchedulingFunc is a function that will be run to check feasibility of a pod group scheduling.
+type PodGroupSchedulingFunc func(ctx context.Context) (*PodGroupAssignments, *Status)
+
+// PodGroupPostFilterResult stores information about nominated nodes for a pod group.
+type PodGroupPostFilterResult struct {
+	// NominatingInfos maps pods in the pod group to their nominated node info. It only contains pods that have a nominated node.
+	NominatingInfos map[types.NamespacedName]*NominatingInfo
+}
+
+// PodGroupPostFilterPlugin is an interface for "PodGroupPostFilter" plugins. These plugins are called
+// after a PodGroup cannot be scheduled.
+type PodGroupPostFilterPlugin interface {
+	Plugin
+
+	// PodGroupPostFilter is called by the scheduling framework
+	// when the pod group scheduling cycle failed.
+	//
+	//
+	// A PodGroupPostFilter plugin should return one of the following statuses:
+	// - Unschedulable: the plugin gets executed successfully but the PodGroup cannot be made schedulable.
+	// - UnschedulableAndUnresolvable: the plugin gets executed successfully but the PodGroup cannot be made schedulable,
+	//   and other PodGroupPostFilter plugins cannot make the group schedulable so evaluation of subsequent plugins is skipped.
+	// - Success: the plugin gets executed successfully, the PodGroup can be made schedulable and evaluation of subsequent plugins is skipped.
+	// - Error: the plugin aborts due to some internal error.
+	PodGroupPostFilter(ctx context.Context, state PodGroupCycleState, pgInfo PodGroupInfo, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *Status)
+}
+
 // PreScorePlugin is an interface for "PreScore" plugin. PreScore is an
 // informational extension point. Plugins will be called with a list of nodes
 // that passed the filtering phase. A plugin may use this data to update internal

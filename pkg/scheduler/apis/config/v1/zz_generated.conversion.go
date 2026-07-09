@@ -767,6 +767,9 @@ func autoConvert_v1_Plugins_To_config_Plugins(in *configv1.Plugins, out *config.
 	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.PlacementScore, &out.PlacementScore, s); err != nil {
 		return err
 	}
+	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.PodGroupPostFilter, &out.PodGroupPostFilter, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -819,6 +822,9 @@ func autoConvert_config_Plugins_To_v1_Plugins(in *config.Plugins, out *configv1.
 		return err
 	}
 	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.PlacementScore, &out.PlacementScore, s); err != nil {
+		return err
+	}
+	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.PodGroupPostFilter, &out.PodGroupPostFilter, s); err != nil {
 		return err
 	}
 	return nil

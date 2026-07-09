@@ -25,10 +25,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 
@@ -68,7 +68,7 @@ func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor, enablePodGroupPreem
 // scheduling after modifying the node state.
 // The caller is expected to backup the NodeInfo before calling this function
 // And rollback the state to the backup after function is finished.
-func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
+func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	// In case of workload-aware preemption, the domain is whole cluster.
 	// We do not make a snapshot of node info. Those nodes will be shared
 	// with the PodGroup scheduling algorithm passed as podGroupSchedulingFunc.
@@ -88,11 +88,11 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodG
 		return nil, status
 	}
 	status = ev.Executor.actuatePodGroupPreemption(ctx, res.victims, preemptor.pods, preemptor.podGroup, names.DefaultPreemption)
-	return &framework.PodGroupPostFilterResult{NominatedNodeNames: res.nominatedNodeNames}, status
+	return &fwk.PodGroupPostFilterResult{NominatingInfos: res.nominatedNodeNames}, status
 }
 
 type selectVictimsResult struct {
-	nominatedNodeNames map[*v1.Pod]*fwk.NominatingInfo
+	nominatedNodeNames map[types.NamespacedName]*fwk.NominatingInfo
 	victims            *extenderv1.Victims
 }
 
@@ -104,7 +104,7 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	preemptor *podGroupPreemptor,
 	domain *domain,
 	pdbs []*policy.PodDisruptionBudget,
-	podGroupSchedulingFunc framework.PodGroupSchedulingFunc) (*selectVictimsResult, *fwk.Status) {
+	podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*selectVictimsResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
 	nameToNode := make(map[string]fwk.NodeInfo)
@@ -256,10 +256,12 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	v := &extenderv1.Victims{
 		Pods: podsToPreempt,
 	}
-	n := make(map[*v1.Pod]*fwk.NominatingInfo)
+	n := make(map[types.NamespacedName]*fwk.NominatingInfo)
 	for _, p := range podGroupAssignments.ProposedAssignments {
 		if p.GetNodeName() != "" {
-			n[p.GetPod()] = &fwk.NominatingInfo{
+			pod := p.GetPod()
+			podKey := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+			n[podKey] = &fwk.NominatingInfo{
 				NominatingMode:    fwk.ModeOverride,
 				NominatedNodeName: p.GetNodeName(),
 			}

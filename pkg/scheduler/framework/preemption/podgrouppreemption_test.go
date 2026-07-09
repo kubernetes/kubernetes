@@ -27,6 +27,7 @@ import (
 	policy "k8s.io/api/policy/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -1212,7 +1213,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			// Create a mock podGroupSchedulingFunc.
 			// This simulates whether the preempting PodGroup can schedule given the current
 			// hypothetical state of the cluster (where some candidate victims might be removed).
-			var mockSchedulingFunc framework.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+			var mockSchedulingFunc fwk.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 				if tt.customMockSchedulingFunc != nil {
 					return tt.customMockSchedulingFunc(ctx, domainNodes)
 				}
@@ -1498,7 +1499,8 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 		t.Errorf("Expected 1 nominated node name, got %d", len(result.nominatedNodeNames))
 	}
 
-	if info, ok := result.nominatedNodeNames[p1]; !ok || info.NominatedNodeName != "node1" {
+	namespacedName := types.NamespacedName{Namespace: p1.Namespace, Name: p1.Name}
+	if info, ok := result.nominatedNodeNames[namespacedName]; !ok || info.NominatedNodeName != "node1" {
 		t.Errorf("Expected p1 to be nominated for node1, got %v", info)
 	}
 }
