@@ -743,6 +743,32 @@
             }
           ],
           "version": "v1beta1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "clustertrustbundles",
+              "responseKind": {
+                "group": "",
+                "kind": "ClusterTrustBundle",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "clustertrustbundle",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
         }
       ]
     },
@@ -895,6 +921,70 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "ipaddresses",
+              "responseKind": {
+                "group": "",
+                "kind": "IPAddress",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "shortNames": [
+                "ip"
+              ],
+              "singularResource": "ipaddress",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "servicecidrs",
+              "responseKind": {
+                "group": "",
+                "kind": "ServiceCIDR",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "servicecidr",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "ServiceCIDR",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
         }
       ]
     },
@@ -1193,6 +1283,35 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "volumeattributesclasses",
+              "responseKind": {
+                "group": "",
+                "kind": "VolumeAttributesClass",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "shortNames": [
+                "vac"
+              ],
+              "singularResource": "volumeattributesclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
         }
       ]
     },
@@ -1798,41 +1917,6 @@
               ]
             },
             {
-              "resource": "devicetaintrules",
-              "responseKind": {
-                "group": "",
-                "kind": "DeviceTaintRule",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "devicetaintrule",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "DeviceTaintRule",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
               "resource": "resourceclaims",
               "responseKind": {
                 "group": "",
@@ -2361,47 +2445,6 @@
         "name": "storagemigration.k8s.io"
       },
       "versions": [
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "storageversionmigrations",
-              "responseKind": {
-                "group": "",
-                "kind": "StorageVersionMigration",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "storageversionmigration",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "StorageVersionMigration",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1"
-        },
         {
           "freshness": "Current",
           "resources": [

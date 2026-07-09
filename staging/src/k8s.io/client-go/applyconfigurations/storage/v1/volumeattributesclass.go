@@ -35,10 +35,10 @@ import (
 // of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.
 type VolumeAttributesClassApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Name of the CSI driver
+	// driverName is the name of the CSI driver
 	// This field is immutable.
 	DriverName *string `json:"driverName,omitempty"`
 	// parameters hold volume attributes defined by the CSI driver. These values
