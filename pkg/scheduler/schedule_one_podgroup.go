@@ -120,17 +120,33 @@ func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupI
 	if len(podGroupInfo.QueuedPodInfos) == 0 {
 		return fmt.Errorf("pod group has no pods to schedule")
 	}
+	podGroupState, err := sched.nodeInfoSnapshot.PodGroupStates().Get(podGroupInfo.Namespace, podGroupInfo.Name)
+	if err != nil {
+		return fmt.Errorf("failed to get pod group state: %w", err)
+	}
 
 	schedulerName := podGroupInfo.QueuedPodInfos[0].Pod.Spec.SchedulerName
 	podGroupPriority := util.PodGroupPriority(podGroupInfo.PodGroup)
 
-	for _, pInfo := range podGroupInfo.QueuedPodInfos {
-		if pInfo.Pod.Spec.SchedulerName != schedulerName {
-			return fmt.Errorf("all pods in a single pod group should have the same .spec.schedulerName set, got: %q and %q", pInfo.Pod.Spec.SchedulerName, schedulerName)
+	validatePod := func(pod *v1.Pod) error {
+		if pod.Spec.SchedulerName != schedulerName {
+			return fmt.Errorf("all pods in a single pod group should have the same .spec.schedulerName set, got: %q and %q", pod.Spec.SchedulerName, schedulerName)
 		}
-		podPriority := corev1helpers.PodPriority(pInfo.Pod)
+		podPriority := corev1helpers.PodPriority(pod)
 		if podPriority != podGroupPriority {
 			return fmt.Errorf("all pods in a single pod group should have the same priority as the pod group's priority, got %d and %d", podPriority, podGroupPriority)
+		}
+		return nil
+	}
+
+	for _, pInfo := range podGroupInfo.QueuedPodInfos {
+		if err := validatePod(pInfo.Pod); err != nil {
+			return err
+		}
+	}
+	for _, pod := range podGroupState.ScheduledPods() {
+		if err := validatePod(pod); err != nil {
+			return err
 		}
 	}
 

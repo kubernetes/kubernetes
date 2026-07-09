@@ -163,11 +163,12 @@ func (mp *fakePlacementFeasiblePlugin) Permit(ctx context.Context, state fwk.Cyc
 
 func TestValidatePodGroup(t *testing.T) {
 	tests := []struct {
-		name        string
-		podGroup    *schedulingv1alpha3.PodGroup
-		pods        []*v1.Pod
-		profiles    profile.Map
-		expectError bool
+		name          string
+		podGroup      *schedulingv1alpha3.PodGroup
+		scheduledPods []*v1.Pod
+		pods          []*v1.Pod
+		profiles      profile.Map
+		expectError   bool
 	}{
 		{
 			name:     "failure when no pods to evaluate",
@@ -251,6 +252,48 @@ func TestValidatePodGroup(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name:     "success when new pods match scheduled pods scheduler name and priority",
+			podGroup: st.MakePodGroup().Name("pg").Priority(10).Obj(),
+			scheduledPods: []*v1.Pod{
+				st.MakePod().Name("p2").UID("p2").PodGroupName("pg").Priority(10).SchedulerName("sched1").Node("node1").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").PodGroupName("pg").Priority(10).SchedulerName("sched1").Obj(),
+			},
+			profiles: profile.Map{
+				"sched1": nil,
+			},
+			expectError: false,
+		},
+		{
+			name:     "failure when new pod has different scheduler name than scheduled pod",
+			podGroup: st.MakePodGroup().Name("pg").Priority(10).Obj(),
+			scheduledPods: []*v1.Pod{
+				st.MakePod().Name("p2").UID("p2").PodGroupName("pg").Priority(10).SchedulerName("sched2").Node("node1").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").PodGroupName("pg").Priority(10).SchedulerName("sched1").Obj(),
+			},
+			profiles: profile.Map{
+				"sched1": nil,
+			},
+			expectError: true,
+		},
+		{
+			name:     "failure when new pod has different priority than scheduled pod",
+			podGroup: st.MakePodGroup().Name("pg").Priority(10).Obj(),
+			scheduledPods: []*v1.Pod{
+				st.MakePod().Name("p2").UID("p2").PodGroupName("pg").Priority(9).SchedulerName("sched1").Node("node1").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").PodGroupName("pg").Priority(10).SchedulerName("sched1").Obj(),
+			},
+			profiles: profile.Map{
+				"sched1": nil,
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -258,7 +301,11 @@ func TestValidatePodGroup(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
 			})
-			sched := &Scheduler{Profiles: tt.profiles}
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.scheduledPods, nil, []*schedulingv1alpha3.PodGroup{tt.podGroup})
+			sched := &Scheduler{
+				Profiles:         tt.profiles,
+				nodeInfoSnapshot: snapshot,
+			}
 
 			podGroupInfo := &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
