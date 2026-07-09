@@ -2317,6 +2317,52 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Non0Mem: mem500M.Value() + mem200M.Value() + mem200M.Value(),
 			},
 		},
+		{
+			name:                               "DRA gate enabled, with node allocatable resource claim specifying Overhead",
+			nodeAllocatableResourcesDRAEnabled: true,
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+						Claims: []v1.ResourceClaim{
+							{
+								Name: "node-allocatable-claim",
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim",
+					Containers:        []string{"c1"},
+					Overhead: []v1.NodeAllocatableOverheadResources{
+						{
+							Name:         v1.ResourceCPU,
+							PerPod:       &cpu100m,
+							PerContainer: &cpu100m,
+						},
+						{
+							Name:         v1.ResourceMemory,
+							PerPod:       &mem200M,
+							PerContainer: &mem200M,
+						},
+					},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(), // container (500m) + DRA flat pod overhead (100m) + DRA container overhead (100m) = 700m
+					Memory:   mem500M.Value() + mem200M.Value() + mem200M.Value(),                // container (500M) + DRA flat pod overhead (200M) + DRA container overhead (200M) = 900M
+				},
+				Non0CPU: cpu500m.MilliValue() + cpu100m.MilliValue() + cpu100m.MilliValue(),
+				Non0Mem: mem500M.Value() + mem200M.Value() + mem200M.Value(),
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

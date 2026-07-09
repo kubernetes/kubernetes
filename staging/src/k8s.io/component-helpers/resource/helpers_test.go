@@ -2471,6 +2471,123 @@ func TestPodResourceRequestsWithDRANodeAllocatableClaims(t *testing.T) {
 				v1.ResourceMemory: resource.MustParse("1Gi"), // Container level resource should be included
 			},
 		},
+		{
+			description: "Pod with DRA claim specifying Overhead mapping",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"c1", "c2"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{
+									Name:         v1.ResourceMemory,
+									PerPod:       new(resource.MustParse("1Gi")),
+									PerContainer: new(resource.MustParse("500Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("4072Mi"), // 1Gi (c1) + 1Gi (c2) + 1Gi (flat pod overhead) + 2 * 500Mi (container overhead) = 4072Mi
+			},
+		},
+		{
+			description: "Pod with DRA claim specifying Overhead mapping, PerPod only",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"c1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{
+									Name:   v1.ResourceMemory,
+									PerPod: new(resource.MustParse("1Gi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"), // 1Gi (c1) + 1Gi (flat pod overhead) = 2Gi
+			},
+		},
+		{
+			description: "Pod with DRA claim specifying Overhead mapping, PerContainer only",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"c1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{
+									Name:         v1.ResourceMemory,
+									PerContainer: new(resource.MustParse("500Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("1524Mi"), // 1Gi (c1) + 500Mi (container overhead) = 1524Mi
+			},
+		},
 	}
 
 	for _, tc := range testCases {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
@@ -270,6 +271,21 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 		},
 	}
 
+	combinedDevice := resourceapi.Device{
+		Name: "combined-device",
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+			v1.ResourceCPU: {
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					DeviceMultiplier: new(resource.MustParse("2")),
+				},
+				Overhead: &resourceapi.NodeAllocatableOverhead{
+					PerPod:       new(resource.MustParse("1")),
+					PerContainer: new(resource.MustParse("500m")),
+				},
+			},
+		},
+	}
+
 	makeSlice := func(name string, devices ...resourceapi.Device) *resourceapi.ResourceSlice {
 		return &resourceapi.ResourceSlice{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test-ns"},
@@ -290,6 +306,7 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 
 	allocResult := func(pool, device string, consumed ...map[resourceapi.QualifiedName]resource.Quantity) *resourceapi.AllocationResult {
 		res := resourceapi.DeviceRequestAllocationResult{
+			Driver: "dra.example.com",
 			Pool:   pool,
 			Device: device,
 		}
@@ -605,6 +622,291 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			want: []v1.NodeAllocatableResourceClaimStatus{},
 		},
 		{
+			name: "Overhead Mappings",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+				}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod:       new(resource.MustParse("1Gi")),
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "Overhead Mappings - Only PerPod",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+				}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod: new(resource.MustParse("1Gi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:   v1.ResourceMemory,
+					PerPod: new(resource.MustParse("1Gi")),
+				}},
+			}},
+		},
+		{
+			name: "Overhead Mappings - Only PerContainer",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+				}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "Overhead Mappings - Multiple Containers",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{
+					{
+						Name:      "c1",
+						Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+					},
+					{
+						Name:      "c2",
+						Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+					},
+				}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod:       new(resource.MustParse("1Gi")),
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1", "c2"},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "Combined direct mapped and overhead mappings for the same resource",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+				}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Mapping: &resourceapi.NodeAllocatableMapping{
+								DeviceMultiplier: new(resource.MustParse("2Gi")),
+							},
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod:       new(resource.MustParse("1Gi")),
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceMemory,
+					Quantity: new(resource.MustParse("2Gi")),
+				}},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "device with both mapped and overhead",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+				}}).
+				Obj(),
+			claims:         []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{makeSlice("slice1", combinedDevice)},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "combined-device"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("2")),
+				}},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceCPU,
+					PerPod:       new(resource.MustParse("1")),
+					PerContainer: new(resource.MustParse("500m")),
+				}},
+			}},
+		},
+		{
+			name: "Driver name collision with same pool and device name",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{{Name: "claim1"}},
+					},
+				}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "slice-a", Namespace: "test-ns"},
+					Spec: resourceapi.ResourceSliceSpec{
+						Pool:     resourceapi.ResourcePool{Name: "pool1"},
+						NodeName: new("test-node"),
+						Driver:   "driver-a.example.com",
+						Devices: []resourceapi.Device{{
+							Name: "cpu0",
+							NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+								v1.ResourceCPU: {
+									Mapping: &resourceapi.NodeAllocatableMapping{
+										DeviceMultiplier: new(resource.MustParse("1")),
+									},
+								},
+							},
+						}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "slice-b", Namespace: "test-ns"},
+					Spec: resourceapi.ResourceSliceSpec{
+						Pool:     resourceapi.ResourcePool{Name: "pool1"},
+						NodeName: new("test-node"),
+						Driver:   "driver-b.example.com",
+						Devices: []resourceapi.Device{{
+							Name: "cpu0",
+							NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+								v1.ResourceCPU: {
+									Mapping: &resourceapi.NodeAllocatableMapping{
+										DeviceMultiplier: new(resource.MustParse("8")),
+									},
+								},
+							},
+						}},
+					},
+				},
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: {
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{{
+							Driver: "driver-b.example.com",
+							Pool:   "pool1",
+							Device: "cpu0",
+						}},
+					},
+				},
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name: v1.ResourceCPU,
+					// Extract quantity correctly from "driver-b.example.com",
+					Quantity: new(resource.MustParse("8")),
+				}},
+			}},
+		},
+		{
 			name:           "Invalid -  Device Not Found",
 			pod:            st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").Containers([]v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}}}}).Obj(),
 			claims:         []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
@@ -631,7 +933,8 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 				claimNametoUID[claim.Name] = claim.UID
 			}
 
-			got, err := pl.buildNodeAllocatableDRAInfo(tt.pod, tt.nodeAllocatableClaimAllocations, claimNametoUID)
+			slices, _ := draManager.ResourceSlices().ListWithDeviceTaintRules()
+			got, err := pl.buildNodeAllocatableDRAInfo(tt.pod, tt.nodeAllocatableClaimAllocations, claimNametoUID, slices, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("buildNodeAllocatableDRAInfo() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -639,6 +942,18 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			if err != nil {
 				return
 			}
+			normalizeSlices := func(claimStatuses []v1.NodeAllocatableResourceClaimStatus) {
+				for i := range claimStatuses {
+					if claimStatuses[i].Mapping == nil {
+						claimStatuses[i].Mapping = []v1.NodeAllocatableMappedResources{}
+					}
+					if claimStatuses[i].Overhead == nil {
+						claimStatuses[i].Overhead = []v1.NodeAllocatableOverheadResources{}
+					}
+				}
+			}
+			normalizeSlices(got)
+			normalizeSlices(tt.want)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf(`buildNodeAllocatableDRAInfo() diff (-want +got):
 %s`, diff)
@@ -1210,6 +1525,77 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 			},
 			wantStatusCode: fwk.Success,
 		},
+		{
+			name: "PodLevel resources sufficient with DRA Overhead",
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2"),
+						v1.ResourceMemory: resource.MustParse("3Gi"), // Container (1Gi) + DRA flat pod overhead (1Gi) + DRA container overhead (1Gi) = 3Gi
+					},
+				}).
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+					},
+				}}).
+				Obj(),
+			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "dra-claim",
+				Containers:        []string{"c1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("1Gi")),
+				}},
+			}},
+			requestWithPodLevel: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("3Gi"),
+			},
+			wantStatusCode: fwk.Success,
+		},
+		{
+			name: "PodLevel resources insufficient with DRA Overhead",
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2"),
+						v1.ResourceMemory: resource.MustParse("2Gi"), // Container (1Gi) + DRA flat pod overhead (1Gi) + DRA container overhead (1Gi) = 3Gi > 2Gi
+					},
+				}).
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+					},
+				}}).
+				Obj(),
+			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "dra-claim",
+				Containers:        []string{"c1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("1Gi")),
+				}},
+			}},
+			requestWithPodLevel: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
+			wantErrorMessage: "pod level request for memory is insufficient to cover the aggregated container and node-allocatable DRA requests",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1226,6 +1612,91 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 				if !strings.Contains(gotStatus.Message(), tt.wantErrorMessage) {
 					t.Errorf("validatePodLevelRequestsCoverDRA() returned error %q, want it to contain %q", gotStatus.Message(), tt.wantErrorMessage)
 				}
+			}
+		})
+	}
+}
+
+func TestFilterSlicesForNode(t *testing.T) {
+	nodeName := "node1"
+	otherNodeName := "node2"
+	allNodes := true
+
+	tests := []struct {
+		name      string
+		node      *v1.Node
+		slices    []*resourceapi.ResourceSlice
+		wantNames []string
+	}{
+		{
+			name: "matches NodeName exactly",
+			node: st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj(),
+			slices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodename"},
+					Spec: resourceapi.ResourceSliceSpec{
+						NodeName: &nodeName,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "othernode"},
+					Spec: resourceapi.ResourceSliceSpec{
+						NodeName: &otherNodeName,
+					},
+				},
+			},
+			wantNames: []string{"nodename"},
+		},
+		{
+			name: "matches AllNodes",
+			node: st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj(),
+			slices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "allnodes"},
+					Spec: resourceapi.ResourceSliceSpec{
+						AllNodes: &allNodes,
+					},
+				},
+			},
+			wantNames: []string{"allnodes"},
+		},
+		{
+			name: "matches NodeSelector",
+			node: st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj(),
+			slices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeselector"},
+					Spec: resourceapi.ResourceSliceSpec{
+						NodeSelector: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{nodeName}, st.NodeSelectorTypeMatchExpressions).Obj(),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "othernodeselector"},
+					Spec: resourceapi.ResourceSliceSpec{
+						NodeSelector: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{otherNodeName}, st.NodeSelectorTypeMatchExpressions).Obj(),
+					},
+				},
+			},
+			wantNames: []string{"nodeselector"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			draManager := &mockDRAManager{resourceSlices: tt.slices}
+			got, _ := filterSlicesForNode(draManager, tt.node)
+
+			var gotNames []string
+			for _, slice := range got {
+				gotNames = append(gotNames, slice.Name)
+			}
+
+			// Sort slices to make comparison stable.
+			sort.Strings(gotNames)
+			sort.Strings(tt.wantNames)
+
+			if diff := cmp.Diff(tt.wantNames, gotNames); diff != "" {
+				t.Errorf("filterSlicesForNode() diff (-want +got):\n%s", diff)
 			}
 		})
 	}

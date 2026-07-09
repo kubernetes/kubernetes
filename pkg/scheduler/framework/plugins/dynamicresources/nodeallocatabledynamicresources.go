@@ -27,8 +27,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	resourcehelper "k8s.io/component-helpers/resource"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -65,21 +65,29 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 	logger := klog.FromContext(ctx)
 
 	nodeAllocatableClaims := []*resourceapi.ResourceClaim{}
-	nodeAllocatableClaimUIDs := sets.New[types.UID]()
+
+	var err error
+
+	nodeSlices, err := filterSlicesForNode(pl.draManager, nodeInfo.Node())
+	if err != nil {
+		logger.Error(err, "Failed to list resource slices")
+		return nil, statusError(logger, err)
+	}
 
 	for _, claim := range state.claims.all() {
-		if alloc, ok := allocations[claim.UID]; ok {
+		alloc := claim.Status.Allocation
+		if a, ok := allocations[claim.UID]; ok {
+			alloc = a
+		}
+		if alloc != nil && len(alloc.Devices.Results) > 0 {
 			for _, result := range alloc.Devices.Results {
-				device, err := getDeviceFromManager(pl.draManager, result.Pool, result.Device)
+				device, err := getDeviceFromSlices(nodeSlices, &result, nodeInfo.Node())
 				if err != nil {
-					logger.Error(err, "Failed to get device from manager", "claim", klog.KObj(claim), "device", result.Device, "pool", result.Pool)
+					logger.Error(err, "Failed to get device from manager", "claim", klog.KObj(claim), "device", result.Device, "pool", result.Pool, "driver", result.Driver)
 					continue
 				}
 				if device != nil && len(device.NodeAllocatableResources) > 0 {
-					if !nodeAllocatableClaimUIDs.Has(claim.UID) {
-						nodeAllocatableClaims = append(nodeAllocatableClaims, claim)
-						nodeAllocatableClaimUIDs.Insert(claim.UID)
-					}
+					nodeAllocatableClaims = append(nodeAllocatableClaims, claim)
 					break
 				}
 			}
@@ -90,7 +98,7 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 		return nil, nil // No nodeAllocatable resources to check
 	}
 
-	totalPodDemand, nodeAllocatableClaimStatus, status := pl.getPodNodeAllocatableResourceFootprint(logger, nodeInfo, pod, state, allocations, nodeAllocatableClaims)
+	totalPodDemand, nodeAllocatableClaimStatus, status := pl.getPodNodeAllocatableResourceFootprint(logger, pod, allocations, nodeAllocatableClaims, nodeSlices, nodeInfo.Node())
 	if status != nil {
 		logger.V(5).Info("calculateAndCheckNodeAllocatableResources: getPodNodeAllocatableResourceFootprint failed", "status", status)
 		return nil, status
@@ -103,110 +111,225 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 	return nodeAllocatableClaimStatus, nil
 }
 
-// getDeviceFromManager retrieves a specific Device object from the DRA manager's cache and
-// looks for the device matching the given poolName and deviceName.
-func getDeviceFromManager(draManager fwk.SharedDRAManager, poolName, deviceName string) (*resourceapi.Device, error) {
+func getDeviceFromManager(draManager fwk.SharedDRAManager, result *resourceapi.DeviceRequestAllocationResult) (*resourceapi.Device, error) {
 	slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
 	if err != nil {
 		return nil, fmt.Errorf("listing resource slices: %w", err)
 	}
+	return getDeviceFromSlices(slices, result, nil)
+}
+
+func filterSlicesForNode(draManager fwk.SharedDRAManager, node *v1.Node) ([]*resourceapi.ResourceSlice, error) {
+	slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
+	if err != nil {
+		return nil, fmt.Errorf("listing resource slices: %w", err)
+	}
+
+	if node == nil {
+		return slices, nil
+	}
+	var nodeSlices []*resourceapi.ResourceSlice
 	for _, slice := range slices {
-		if slice.Spec.Pool.Name == poolName {
+		if slice.Spec.NodeName != nil && *slice.Spec.NodeName == node.Name {
+			nodeSlices = append(nodeSlices, slice)
+		} else if slice.Spec.AllNodes != nil && *slice.Spec.AllNodes {
+			nodeSlices = append(nodeSlices, slice)
+		} else if slice.Spec.NodeSelector != nil {
+			selector, err := nodeaffinity.NewNodeSelector(slice.Spec.NodeSelector)
+			if err == nil && selector.Match(node) {
+				nodeSlices = append(nodeSlices, slice)
+			}
+		} else if slice.Spec.PerDeviceNodeSelection != nil && *slice.Spec.PerDeviceNodeSelection {
+			nodeSlices = append(nodeSlices, slice)
+		}
+	}
+	return nodeSlices, nil
+}
+
+func deviceMatchesNode(device *resourceapi.Device, node *v1.Node) bool {
+	if node == nil {
+		return true
+	}
+	if device.NodeName != nil && *device.NodeName == node.Name {
+		return true
+	}
+	if device.AllNodes != nil && *device.AllNodes {
+		return true
+	}
+	if device.NodeSelector != nil {
+		selector, err := nodeaffinity.NewNodeSelector(device.NodeSelector)
+		if err == nil && selector.Match(node) {
+			return true
+		}
+	}
+	return false
+}
+
+func getDeviceFromSlices(slices []*resourceapi.ResourceSlice, result *resourceapi.DeviceRequestAllocationResult, node *v1.Node) (*resourceapi.Device, error) {
+	for _, slice := range slices {
+		if slice.Spec.Driver == result.Driver && slice.Spec.Pool.Name == result.Pool {
 			for i := range slice.Spec.Devices {
-				if slice.Spec.Devices[i].Name == deviceName {
-					return &slice.Spec.Devices[i], nil
+				if slice.Spec.Devices[i].Name == result.Device {
+					device := &slice.Spec.Devices[i]
+					if slice.Spec.PerDeviceNodeSelection != nil && *slice.Spec.PerDeviceNodeSelection {
+						if !deviceMatchesNode(device, node) {
+							return nil, fmt.Errorf("device %s does not match node", result.Device)
+						}
+					}
+					return device, nil
 				}
 			}
 		}
 	}
-	return nil, fmt.Errorf("device %s not found in pool %s", deviceName, poolName)
+	return nil, fmt.Errorf("device %s not found in pool %s for driver %s", result.Device, result.Pool, result.Driver)
+}
+
+// addDeviceMapping calculates the mapping quantity for a device and adds it to the totals map.
+func addDeviceMapping(
+	resourceName v1.ResourceName,
+	mappingMap *resourceapi.NodeAllocatableMapping,
+	result *resourceapi.DeviceRequestAllocationResult,
+	key v1.ObjectReference,
+	totalResources map[v1.ResourceName]resource.Quantity,
+) error {
+	if mappingMap.CapacityKey != nil && *mappingMap.CapacityKey != "" {
+		capacityKey := *mappingMap.CapacityKey
+		if result.ConsumedCapacity == nil {
+			return fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity is nil, but Capacity key '%s' is set in NodeAllocatableResources for resource %s", key.Namespace, key.Name, result.Device, capacityKey, resourceName)
+		}
+		if consumed, exists := result.ConsumedCapacity[capacityKey]; exists {
+			// If !exists - the capacityKey is not in ConsumedCapacity, this mapping is not relevant for this allocation
+			consumedQuantity := consumed.DeepCopy()
+			quantityOne := resource.MustParse("1")
+			if mappingMap.CapacityMultiplier != nil && !mappingMap.CapacityMultiplier.Equal(quantityOne) {
+				multiplier := mappingMap.CapacityMultiplier.DeepCopy()
+				qDec := consumedQuantity.AsDec()
+				qDec.Mul(qDec, multiplier.AsDec())
+				consumedQuantity = *resource.NewDecimalQuantity(*qDec, consumedQuantity.Format)
+			}
+			current := totalResources[resourceName]
+			current.Add(consumedQuantity)
+			totalResources[resourceName] = current
+		}
+		return nil
+	}
+
+	// Note: For the same device, we cannot have both DeviceMultiplier and CapacityKey set (enforced during API validation).
+	// Therefore, it is safe to treat these code paths as mutually exclusive here.
+	if mappingMap.DeviceMultiplier != nil {
+		current := totalResources[resourceName]
+		current.Add(mappingMap.DeviceMultiplier.DeepCopy())
+		totalResources[resourceName] = current
+	}
+	return nil
+}
+
+// addDeviceOverhead calculates the overhead resources for a device and adds them to the totals map.
+func addDeviceOverhead(
+	resourceName v1.ResourceName,
+	newOverhead *resourceapi.NodeAllocatableOverhead,
+	totalResources map[v1.ResourceName]v1.NodeAllocatableOverheadResources,
+) {
+	if newOverhead.PerPod == nil && newOverhead.PerContainer == nil {
+		return
+	}
+
+	current, exists := totalResources[resourceName]
+	if !exists {
+		current = v1.NodeAllocatableOverheadResources{Name: resourceName}
+	}
+
+	if newOverhead.PerPod != nil {
+		if current.PerPod == nil {
+			q := newOverhead.PerPod.DeepCopy()
+			current.PerPod = &q
+		} else {
+			current.PerPod.Add(*newOverhead.PerPod)
+		}
+	}
+	if newOverhead.PerContainer != nil {
+		if current.PerContainer == nil {
+			q := newOverhead.PerContainer.DeepCopy()
+			current.PerContainer = &q
+		} else {
+			current.PerContainer.Add(*newOverhead.PerContainer)
+		}
+	}
+
+	totalResources[resourceName] = current
 }
 
 // buildNodeAllocatableDRAInfo processes the node allocatable resource allocations for a pod.
 // It translates the allocated devices and quantities from DRA claims into a list of v1.NodeAllocatableResourceClaimStatus.
-func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocatableClaimAllocations map[v1.ObjectReference]*resourceapi.AllocationResult, claimNametoUID map[string]types.UID) ([]v1.NodeAllocatableResourceClaimStatus, error) {
-	allContainers := make([]v1.Container, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
-	allContainers = append(allContainers, pod.Spec.InitContainers...)
-	allContainers = append(allContainers, pod.Spec.Containers...)
+func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocatableClaimAllocations map[v1.ObjectReference]*resourceapi.AllocationResult, claimNametoUID map[string]types.UID, slices []*resourceapi.ResourceSlice, node *v1.Node) ([]v1.NodeAllocatableResourceClaimStatus, error) {
+	if len(nodeAllocatableClaimAllocations) == 0 {
+		return []v1.NodeAllocatableResourceClaimStatus{}, nil
+	}
+
 	claimToStatus := make(map[types.UID]v1.NodeAllocatableResourceClaimStatus)
 
 	for key, alloc := range nodeAllocatableClaimAllocations {
-		currentClaimStatus := v1.NodeAllocatableResourceClaimStatus{
-			ResourceClaimName: key.Name,
-			Containers:        []string{},
-			Mapping:           []v1.NodeAllocatableMappedResources{},
-		}
+		totalDirectMappedResourcesPerClaim := make(map[v1.ResourceName]resource.Quantity)
+		totalOverheadResourcesPerClaim := make(map[v1.ResourceName]v1.NodeAllocatableOverheadResources)
 
-		hasNodeAllocatableClaims := false
 		for _, result := range alloc.Devices.Results {
-			device, err := getDeviceFromManager(pl.draManager, result.Pool, result.Device)
+			device, err := getDeviceFromSlices(slices, &result, node)
 			if err != nil {
-				return nil, fmt.Errorf("claim %s/%s, device %s: %w", key.Namespace, key.Name, result.Device, err)
+				return nil, fmt.Errorf("claim %s/%s, device %s, driver %s: %w", key.Namespace, key.Name, result.Device, result.Driver, err)
 			}
 			if device == nil || device.NodeAllocatableResources == nil {
 				continue
 			}
 
 			for resourceName, resourceMap := range device.NodeAllocatableResources {
-				if resourceMap.Mapping == nil {
-					continue
-				}
-				mappingMap := resourceMap.Mapping
-				quantity := resource.Quantity{}
-				if mappingMap.CapacityKey != nil && *mappingMap.CapacityKey != "" {
-					capacityKey := *mappingMap.CapacityKey
-					if result.ConsumedCapacity == nil {
-						return nil, fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity is nil, but Capacity key '%s' is set in NodeAllocatableResources for resource %s", key.Namespace, key.Name, result.Device, capacityKey, resourceName)
-					}
-					if consumed, exists := result.ConsumedCapacity[capacityKey]; exists {
-						quantity = consumed.DeepCopy()
-						if mappingMap.CapacityMultiplier != nil {
-							qDec := quantity.AsDec()
-							multiplier := mappingMap.CapacityMultiplier.DeepCopy()
-							qDec.Mul(qDec, multiplier.AsDec())
-							quantity = *resource.NewDecimalQuantity(*qDec, quantity.Format)
-						}
-					} else {
-						// If the capacityKey is not in ConsumedCapacity, this mapping is not relevant for this allocation
-						continue
-					}
-				} else if mappingMap.DeviceMultiplier != nil {
-					quantity = mappingMap.DeviceMultiplier.DeepCopy()
-				}
-
-				found := false
-				for idx := range currentClaimStatus.Mapping {
-					if currentClaimStatus.Mapping[idx].Name == resourceName {
-						currentClaimStatus.Mapping[idx].Quantity.Add(quantity)
-						found = true
-						break
+				if resourceMap.Mapping != nil {
+					if err := addDeviceMapping(resourceName, resourceMap.Mapping, &result, key, totalDirectMappedResourcesPerClaim); err != nil {
+						return nil, err
 					}
 				}
-				if !found {
-					currentClaimStatus.Mapping = append(currentClaimStatus.Mapping, v1.NodeAllocatableMappedResources{
-						Name:     resourceName,
-						Quantity: new(quantity),
-					})
+				if resourceMap.Overhead != nil {
+					addDeviceOverhead(resourceName, resourceMap.Overhead, totalOverheadResourcesPerClaim)
 				}
-				hasNodeAllocatableClaims = true
-
 			}
 		}
 
-		if hasNodeAllocatableClaims {
-			sort.Slice(currentClaimStatus.Mapping, func(i, j int) bool {
-				return currentClaimStatus.Mapping[i].Name < currentClaimStatus.Mapping[j].Name
+		if len(totalDirectMappedResourcesPerClaim) > 0 || len(totalOverheadResourcesPerClaim) > 0 {
+			status := v1.NodeAllocatableResourceClaimStatus{
+				ResourceClaimName: key.Name,
+				Containers:        []string{},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead:          []v1.NodeAllocatableOverheadResources{},
+			}
+
+			for name, quantity := range totalDirectMappedResourcesPerClaim {
+				q := quantity.DeepCopy()
+				status.Mapping = append(status.Mapping, v1.NodeAllocatableMappedResources{
+					Name:     name,
+					Quantity: &q,
+				})
+			}
+			for _, overhead := range totalOverheadResourcesPerClaim {
+				status.Overhead = append(status.Overhead, overhead)
+			}
+
+			sort.Slice(status.Mapping, func(i, j int) bool {
+				return status.Mapping[i].Name < status.Mapping[j].Name
 			})
-			claimToStatus[key.UID] = currentClaimStatus
+			sort.Slice(status.Overhead, func(i, j int) bool {
+				return status.Overhead[i].Name < status.Overhead[j].Name
+			})
+			claimToStatus[key.UID] = status
 		}
 	}
 
-	for _, container := range allContainers {
-		for _, podClaim := range container.Resources.Claims {
-			if claimUID, ok := claimNametoUID[podClaim.Name]; ok {
-				if nodeAllocatableClaimStatus, ok := claimToStatus[claimUID]; ok {
-					nodeAllocatableClaimStatus.Containers = append(nodeAllocatableClaimStatus.Containers, container.Name)
-					claimToStatus[claimUID] = nodeAllocatableClaimStatus
+	for _, containers := range [][]v1.Container{pod.Spec.InitContainers, pod.Spec.Containers} {
+		for _, container := range containers {
+			for _, podClaim := range container.Resources.Claims {
+				if claimUID, ok := claimNametoUID[podClaim.Name]; ok {
+					if nodeAllocatableClaimStatus, ok := claimToStatus[claimUID]; ok {
+						nodeAllocatableClaimStatus.Containers = append(nodeAllocatableClaimStatus.Containers, container.Name)
+						claimToStatus[claimUID] = nodeAllocatableClaimStatus
+					}
 				}
 			}
 		}
@@ -271,12 +394,12 @@ func (pl *DynamicResources) validatePodLevelRequestsCoverDRA(logger klog.Logger,
 }
 
 // getPodNodeAllocatableResourceFootprint determines the total nodeAllocatable resource demand of a pod.
-func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.Logger, nodeInfo fwk.NodeInfo, pod *v1.Pod, state *stateData, allocations map[types.UID]*resourceapi.AllocationResult, nodeAllocatableClaims []*resourceapi.ResourceClaim) (*framework.Resource, []v1.NodeAllocatableResourceClaimStatus, *fwk.Status) {
+func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.Logger, pod *v1.Pod, allocations map[types.UID]*resourceapi.AllocationResult, nodeAllocatableClaims []*resourceapi.ResourceClaim, slices []*resourceapi.ResourceSlice, node *v1.Node) (*framework.Resource, []v1.NodeAllocatableResourceClaimStatus, *fwk.Status) {
 	nodeAllocatableDRAAllocations := make(map[v1.ObjectReference]*resourceapi.AllocationResult)
 	// Add pre-allocated claims
 	for _, claim := range nodeAllocatableClaims {
 		key := v1.ObjectReference{
-			Namespace: pod.Namespace,
+			Namespace: claim.Namespace,
 			Name:      claim.Name,
 			UID:       claim.UID,
 		}
@@ -295,7 +418,7 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 		return nil, nil, statusError(logger, fmt.Errorf("processing pod resource claims: %w", err))
 	}
 
-	nodeAllocatableStatus, err := pl.buildNodeAllocatableDRAInfo(pod, nodeAllocatableDRAAllocations, claimNametoUID)
+	nodeAllocatableStatus, err := pl.buildNodeAllocatableDRAInfo(pod, nodeAllocatableDRAAllocations, claimNametoUID, slices, node)
 	if err != nil {
 		return nil, nil, statusError(logger, err)
 	}
