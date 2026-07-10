@@ -54,6 +54,8 @@ const (
 
 var defaultSleepDuration = 10 * time.Second
 
+var maxConcurrentRecording = 100
+
 // TODO: validate impact of copying and investigate hashing
 type eventKey struct {
 	eventType           string
@@ -71,6 +73,7 @@ type eventBroadcasterImpl struct {
 	eventCache    map[eventKey]*eventsv1.Event
 	sleepDuration time.Duration
 	sink          EventSink
+	sem           chan struct{}
 }
 
 // EventSinkImpl wraps EventsV1Interface to implement EventSink.
@@ -116,6 +119,7 @@ func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[
 		eventCache:    eventCache,
 		sleepDuration: sleepDuration,
 		sink:          sink,
+		sem:           make(chan struct{}, maxConcurrentRecording),
 	}
 }
 
@@ -170,7 +174,19 @@ func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, reportingCont
 func (e *eventBroadcasterImpl) recordToSink(ctx context.Context, event *eventsv1.Event, clock clock.Clock) {
 	// Make a copy before modification, because there could be multiple listeners.
 	eventCopy := event.DeepCopy()
+
+	// Acquire semaphore slot under context. If context is done, we return early.
+	select {
+	case <-ctx.Done():
+		return
+	case e.sem <- struct{}{}:
+	}
+
 	go func() {
+		defer func() {
+			<-e.sem
+		}()
+		defer utilruntime.HandleCrash()
 		evToRecord := func() *eventsv1.Event {
 			e.mu.Lock()
 			defer e.mu.Unlock()

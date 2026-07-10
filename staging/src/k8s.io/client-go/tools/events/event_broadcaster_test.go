@@ -18,13 +18,18 @@ package events
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
+	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2/ktesting"
 )
 
@@ -102,4 +107,96 @@ func TestRecordEventToSink(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEventBroadcasterConcurrencyLimit(t *testing.T) {
+	// Configure maxConcurrentRecording to 2 for testing
+	oldMax := maxConcurrentRecording
+	maxConcurrentRecording = 2
+	defer func() { maxConcurrentRecording = oldMax }()
+
+	// Create a mock EventSink that blocks on writes and tracks active concurrent calls
+	var mu sync.Mutex
+	activeCalls := 0
+	maxActiveCalls := 0
+	releaseCh := make(chan struct{})
+
+	mockSink := &mockBlockingSink{
+		createFunc: func(ctx context.Context, event *eventsv1.Event) (*eventsv1.Event, error) {
+			mu.Lock()
+			activeCalls++
+			if activeCalls > maxActiveCalls {
+				maxActiveCalls = activeCalls
+			}
+			mu.Unlock()
+
+			defer func() {
+				mu.Lock()
+				activeCalls--
+				mu.Unlock()
+			}()
+
+			// Block until signaled to release
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-releaseCh:
+				return event, nil
+			}
+		},
+	}
+
+	broadcaster := newBroadcaster(mockSink, defaultSleepDuration, map[eventKey]*eventsv1.Event{})
+	defer broadcaster.Shutdown()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := broadcaster.StartRecordingToSinkWithContext(ctx); err != nil {
+		t.Fatalf("unexpected error starting recording: %v", err)
+	}
+
+	recorder := broadcaster.NewRecorder(scheme.Scheme, "test-controller")
+
+	// Emit 5 distinct events. Since maxConcurrentRecording is 2, only 2 events
+	// should be processed concurrently by the sink. The rest should block in recordToSink.
+	for i := 0; i < 5; i++ {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("pod-%d", i),
+				Namespace: "default",
+			},
+		}
+		recorder.Eventf(pod, nil, corev1.EventTypeNormal, "Reason", "Action", "Message %d", i)
+	}
+
+	// Give it a little time to spawn goroutines and execute them up to the concurrency limit
+	time.Sleep(100 * time.Millisecond)
+
+	mu.Lock()
+	currentMaxActive := maxActiveCalls
+	mu.Unlock()
+
+	if currentMaxActive != 2 {
+		t.Errorf("Expected exactly 2 concurrent active calls to the sink, got %d", currentMaxActive)
+	}
+
+	// Signal the blocking sink to release
+	close(releaseCh)
+}
+
+type mockBlockingSink struct {
+	createFunc func(context.Context, *eventsv1.Event) (*eventsv1.Event, error)
+}
+
+func (m *mockBlockingSink) Create(ctx context.Context, event *eventsv1.Event) (*eventsv1.Event, error) {
+	return m.createFunc(ctx, event)
+}
+
+func (m *mockBlockingSink) Update(ctx context.Context, event *eventsv1.Event) (*eventsv1.Event, error) {
+	return event, nil
+}
+
+func (m *mockBlockingSink) Patch(ctx context.Context, event *eventsv1.Event, data []byte) (*eventsv1.Event, error) {
+	return event, nil
 }
