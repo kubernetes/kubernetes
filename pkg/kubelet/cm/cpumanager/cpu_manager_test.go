@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -783,7 +784,9 @@ func TestCPUManagerGenerate(t *testing.T) {
 			if err != nil {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}
-			defer os.RemoveAll(sDir)
+			t.Cleanup(func() {
+				require.NoErrorf(t, os.RemoveAll(sDir), "unable to remove dir %s", sDir)
+			})
 
 			logger, _ := ktesting.NewTestContext(t)
 			mgr, err := NewManager(logger, testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger))
@@ -1519,7 +1522,9 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			if err != nil {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}
-			defer os.RemoveAll(sDir)
+			t.Cleanup(func() {
+				require.NoErrorf(t, os.RemoveAll(sDir), "unable to remove dir %s", sDir)
+			})
 
 			logger, _ := ktesting.NewTestContext(t)
 			_, err = NewManager(logger, testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(logger))

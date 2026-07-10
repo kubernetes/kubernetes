@@ -27,6 +27,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -2009,7 +2010,9 @@ func TestNewManager(t *testing.T) {
 			if err != nil {
 				t.Errorf("Cannot create state file: %s", err.Error())
 			}
-			defer os.RemoveAll(stateFileDirectory)
+			t.Cleanup(func() {
+				require.NoErrorf(t, os.RemoveAll(stateFileDirectory), "unable to remove dir %s", stateFileDirectory)
+			})
 
 			mgr, err := NewManager(logger, string(testCase.policyName), &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity)
 
