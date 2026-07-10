@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/klog/v2"
 )
@@ -331,6 +332,7 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 
 	ctrl.initializeCaches(logger, ctrl.volumeLister, ctrl.claimLister)
 	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.volumePluginMgr)
+	volumeutil.RegisterMetrics()
 
 	wg.Go(func() {
 		wait.Until(func() { ctrl.resync(ctx) }, ctrl.resyncPeriod, ctx.Done())

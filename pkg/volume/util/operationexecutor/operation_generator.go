@@ -89,6 +89,7 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 	recorder record.EventRecorder,
 	blkUtil volumepathhandler.BlockVolumePathHandler) OperationGenerator {
 
+	util.RegisterMetrics()
 	return &operationGenerator{
 		kubeClient:      kubeClient,
 		volumePluginMgr: volumePluginMgr,
