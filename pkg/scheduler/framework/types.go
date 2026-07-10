@@ -906,7 +906,8 @@ func (pgqi *QueuedPodGroupInfo) HasQueuedPodInfos() bool {
 }
 
 // PodGroupMemberPodsOrderingFunc orders pod group member pods by priority (descending),
-// attempts (descending), and then by timestamp (ascending).
+// attempts (descending), timestamp (ascending), and then by pod name (ascending) as a
+// deterministic tie-breaker.
 func PodGroupMemberPodsOrderingFunc(a, b *QueuedPodInfo) int {
 	if a.GetPriority() > b.GetPriority() {
 		return -1
@@ -927,8 +928,14 @@ func PodGroupMemberPodsOrderingFunc(a, b *QueuedPodInfo) int {
 	} else if a.Timestamp.After(b.Timestamp) {
 		return 1
 	}
-	// Return 0 when priority, attempts and timestamp are equal.
-	// This relies on slices.SortStableFunc to preserve consistent order for the same set of pods.
+	// On platforms with low-resolution clocks (e.g. Windows), pods added in quick
+	// succession may share the same timestamp. Fall back to pod name to guarantee
+	// a deterministic, stable order.
+	if a.Pod.Name < b.Pod.Name {
+		return -1
+	} else if a.Pod.Name > b.Pod.Name {
+		return 1
+	}
 	return 0
 }
 

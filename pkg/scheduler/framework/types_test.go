@@ -98,7 +98,7 @@ func TestPodGroupMemberPodsOrderingFunc(t *testing.T) {
 	timestamp := time.Now()
 	timestampNewer := timestamp.Add(time.Second)
 
-	// Desired order: pod3 > pod5 > (pod1 = pod4) > pod2.
+	// Desired order: pod3 > pod5 > pod1 > pod4 > pod2.
 	pInfo1 := &QueuedPodInfo{
 		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod1").UID("uid1").Priority(midPriority).Obj()},
 		QueueingParams: QueueingParams{
@@ -178,10 +178,16 @@ func TestPodGroupMemberPodsOrderingFunc(t *testing.T) {
 			expected: 1,
 		},
 		{
-			name:     "same priority, same attempts, same timestamp",
+			name:     "same priority, same attempts, same timestamp, lower name comes first",
 			a:        pInfo1,
 			b:        pInfo4,
-			expected: 0,
+			expected: -1,
+		},
+		{
+			name:     "same priority, same attempts, same timestamp, higher name comes second",
+			a:        pInfo4,
+			b:        pInfo1,
+			expected: 1,
 		},
 	}
 
@@ -203,7 +209,7 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 		cmp.AllowUnexported(QueuedPodInfo{}, PodInfo{}, fwk.PodResource{}),
 	}
 
-	// Desired order: pod3 > pod5 > (pod1 = pod4) > pod2.
+	// Desired order: pod3 > pod5 > pod1 > pod4 > pod2.
 	pInfo1 := &QueuedPodInfo{
 		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod1").UID("uid1").Priority(midPriority).PodGroupName("pg1").Obj()},
 		QueueingParams: QueueingParams{
@@ -282,14 +288,14 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1, pInfo2},
 		},
 		{
-			name:          "Add pod with same priority and timestamp, inserts before existing",
+			name:          "Add pod with same priority and timestamp, ordered by name",
 			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2, pInfo4},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo4, pInfo1, pInfo2},
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo4, pInfo2},
 		},
 		{
 			name:          "Add pods out of order, gets sorted",
 			podsToAdd:     []*QueuedPodInfo{pInfo1, pInfo2, pInfo3, pInfo4, pInfo5},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo4, pInfo1, pInfo2},
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo4, pInfo2},
 		},
 		{
 			name:          "Remove pod from middle",
