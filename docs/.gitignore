@@ -1,4 +1,7 @@
+# Generated documentation output
 .generated_docs
+
+# Legacy documentation directories
 admin/
 man/
 user-guide/
