@@ -124,7 +124,7 @@ export GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 # is set to empty then we do not override the version(s) and just
 # use whatever is in the default installation of containerd package
 export UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-v2.1.4}
-export UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-v1.3.2}
+export UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-0079bee17f125565af67b213cb2b5622b090930e}
 
 # Ability to inject custom versions (COS images ONLY)
 # if KUBE_COS_INSTALL_CONTAINERD_VERSION or KUBE_COS_INSTALL_RUNC_VERSION

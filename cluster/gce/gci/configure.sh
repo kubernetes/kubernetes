@@ -508,6 +508,38 @@ function install-runc-binary {
   rm -rf "${temp_dir}"; return 1
 }
 
+# Build a runc commit when there is no corresponding release binary.
+function install-runc-source {
+  local -r version="$1" temp_dir="$(mktemp -d)"
+  if ! apt-get update ||
+     ! DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+       gcc git golang-go libseccomp-dev make pkg-config; then
+    rm -rf "${temp_dir}"
+    return 1
+  fi
+
+  if git clone https://github.com/opencontainers/runc.git "${temp_dir}/runc" &&
+     git -C "${temp_dir}/runc" checkout "${version}" &&
+     env -u VERSION make -C "${temp_dir}/runc" BUILDTAGS='seccomp' runc; then
+    install -m 755 "${temp_dir}/runc/runc" /usr/sbin/runc
+    /usr/sbin/runc --version
+    rm -rf "${temp_dir}"
+    return 0
+  fi
+
+  rm -rf "${temp_dir}"
+  return 1
+}
+
+function install-runc {
+  local -r version="$1"
+  if [[ "${version}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    install-runc-source "${version}"
+  else
+    install-runc-binary "${version}"
+  fi
+}
+
 # Install containerd on Ubuntu. When both UBUNTU_INSTALL_CONTAINERD_VERSION and
 # UBUNTU_INSTALL_RUNC_VERSION are set, skips apt and downloads binaries directly.
 function install-containerd-ubuntu {
@@ -518,12 +550,12 @@ function install-containerd-ubuntu {
   local -r custom_containerd="${UBUNTU_INSTALL_CONTAINERD_VERSION:-}"
   local -r custom_runc="${UBUNTU_INSTALL_RUNC_VERSION:-}"
 
-  # Both versions specified: skip apt, install binaries directly
+  # Both versions specified: install the selected versions instead of containerd.io
   if [[ -n "${custom_containerd}" && -n "${custom_runc}" ]]; then
-    echo "Installing containerd ${custom_containerd} and runc ${custom_runc} (skipping apt)"
+    echo "Installing containerd ${custom_containerd} and runc ${custom_runc} without the containerd apt package"
     ensure-containerd-systemd-service
     install-containerd-binary "${custom_containerd}" || { echo "ERROR: containerd download failed"; exit 1; }
-    install-runc-binary "${custom_runc}" || { echo "ERROR: runc download failed"; exit 1; }
+    install-runc "${custom_runc}" || { echo "ERROR: runc installation failed"; exit 1; }
     systemctl start containerd
     return
   fi
@@ -544,7 +576,7 @@ function install-containerd-ubuntu {
 
   systemctl stop containerd
   [[ -n "${custom_containerd}" ]] && install-containerd-binary "${custom_containerd}"
-  [[ -n "${custom_runc}" ]] && install-runc-binary "${custom_runc}"
+  [[ -n "${custom_runc}" ]] && install-runc "${custom_runc}"
   systemctl start containerd
 }
 
