@@ -104,27 +104,28 @@ func NewVersionedAttributes(attr Attributes, gvk schema.GroupVersionKind, o Obje
 	return versionedAttr, nil
 }
 
-// CELValueOptions holds options for CELValue conversion.
-type CELValueOptions struct {
+// celValueOptions holds options for CELValue conversion.
+type celValueOptions struct {
 	// UseSchemalessTypeRef indicates whether to use SchemalessTypedToVal (reflection-based lazy ref.Val)
 	// instead of converting to an unstructured representation with DefaultTypeAdapter.
 	UseSchemalessTypeRef bool
 }
 
 // CELValueOption defines a functional option for CELValue.
-type CELValueOption func(*CELValueOptions)
+type CELValueOption func(*celValueOptions)
 
 // UseSchemalessTypeRef returns a CELValueOption that configures CELValue to use SchemalessTypedToVal.
 func UseSchemalessTypeRef() CELValueOption {
-	return func(o *CELValueOptions) {
+	return func(o *celValueOptions) {
 		o.UseSchemalessTypeRef = true
 	}
 }
 
 // LazyObject encapsulates a versioned runtime.Object and its lazily-evaluated Common Expression Language (CEL) representation.
 type LazyObject struct {
-	object runtime.Object
-	celVal ref.Val
+	object               runtime.Object
+	useSchemalessTypeRef bool
+	celVal               ref.Val
 }
 
 // NewLazyObject returns a new LazyObject wrapping the provided runtime.Object.
@@ -143,17 +144,18 @@ func (l *LazyObject) Set(obj runtime.Object) {
 }
 
 func (l *LazyObject) CELValue(options ...CELValueOption) (ref.Val, error) {
-	if l.celVal != nil {
+	opts := &celValueOptions{}
+	for _, o := range options {
+		o(opts)
+	}
+	if l.celVal != nil && l.useSchemalessTypeRef == opts.UseSchemalessTypeRef {
 		return l.celVal, nil
 	}
 	if l.object == nil {
 		return nil, nil
 	}
-	opts := &CELValueOptions{}
-	for _, o := range options {
-		o(opts)
-	}
 
+	l.useSchemalessTypeRef = opts.UseSchemalessTypeRef
 	if u, ok := l.object.(*unstructured.Unstructured); ok {
 		l.celVal = types.DefaultTypeAdapter.NativeToValue(u.Object)
 		return l.celVal, nil

@@ -511,6 +511,32 @@ func TestLazyObjectCELValue(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "pod-2", getMetaName(val2))
 	})
+
+	t.Run("cache invalidation when options change between calls", func(t *testing.T) {
+		typedObj := &examplev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"},
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-cache-test"},
+		}
+		l := NewLazyObject(typedObj)
+
+		// 1. Initial call without UseSchemalessTypeRef()
+		val1, err := l.CELValue()
+		require.NoError(t, err)
+		require.Equal(t, "pod-cache-test", getMetaName(val1))
+		require.Equal(t, "map[string]interface {}", reflect.TypeOf(val1.Value()).String())
+
+		// 2. Call with UseSchemalessTypeRef() should recompute and return schemaless ref.Val
+		val2, err := l.CELValue(UseSchemalessTypeRef())
+		require.NoError(t, err)
+		require.Equal(t, "pod-cache-test", getMetaName(val2))
+		require.Equal(t, "v1.Pod", reflect.TypeOf(val2.Value()).String())
+
+		// 3. Calling again without UseSchemalessTypeRef() should recompute back to default map[string]interface{}
+		val3, err := l.CELValue()
+		require.NoError(t, err)
+		require.Equal(t, "pod-cache-test", getMetaName(val3))
+		require.Equal(t, "map[string]interface {}", reflect.TypeOf(val3.Value()).String())
+	})
 }
 
 func getMetaName(val ref.Val) string {
