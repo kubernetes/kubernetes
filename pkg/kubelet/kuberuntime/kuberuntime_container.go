@@ -1179,7 +1179,6 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 								message:   fmt.Sprintf("Init container %s failed startup probe", container.Name),
 								reason:    reasonStartupProbe,
 							}
-							m.markInitContainerForRestart(ctx, pod, i, container, status, changes)
 						}
 						break
 					}
