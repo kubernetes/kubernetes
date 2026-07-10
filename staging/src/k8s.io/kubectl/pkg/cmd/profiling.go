@@ -48,7 +48,7 @@ func initProfiling() (func() error, error) {
 	case "none":
 		return nil, nil
 	case "cpu":
-		f, err = os.Create(profileOutput)
+		f, err = os.OpenFile(profileOutput, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +65,7 @@ func initProfiling() (func() error, error) {
 	case "mutex":
 		runtime.SetMutexProfileFraction(1)
 	case "trace":
-		f, err = os.Create(profileOutput)
+		f, err = os.OpenFile(profileOutput, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +120,7 @@ func flushProfiling(output io.Closer) error {
 			return nil
 		}
 
-		f, err := os.Create(profileOutput)
+		f, err := os.OpenFile(profileOutput, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 		if err != nil {
 			return err
 		}
