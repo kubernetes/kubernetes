@@ -422,7 +422,7 @@ func (t *typedMapList) toMapKey(element reflect.Value) interface{} {
 		return [2]interface{}{fieldEntries[0].GetFrom(element).Interface(), fieldEntries[1].GetFrom(element).Interface()}
 	}
 	if len(fieldEntries) == 3 {
-		return [3]interface{}{fieldEntries[0].GetFrom(element).Interface(), fieldEntries[1].GetFrom(element).Interface(), fieldEntries[3].GetFrom(element).Interface()}
+		return [3]interface{}{fieldEntries[0].GetFrom(element).Interface(), fieldEntries[1].GetFrom(element).Interface(), fieldEntries[2].GetFrom(element).Interface()}
 	}
 
 	key := make([]interface{}, len(fieldEntries))

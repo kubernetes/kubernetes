@@ -1033,6 +1033,61 @@ func TestReflectiveWrapperValueReturnsGoValue(t *testing.T) {
 	}
 }
 
+func TestReflectiveMapListWithThreeKeysEqual(t *testing.T) {
+	type ThreeKeyMapListEntry struct {
+		Key1  string `json:"key1"`
+		Key2  string `json:"key2"`
+		Key3  string `json:"key3"`
+		Value int64  `json:"value"`
+	}
+	type ThreeKeyMapListStruct struct {
+		Items []ThreeKeyMapListEntry `json:"items"`
+	}
+
+	entrySchema := &spec.Schema{SchemaProps: spec.SchemaProps{
+		Type: []string{"object"},
+		Properties: map[string]spec.Schema{
+			"key1":  *stringSchema,
+			"key2":  *stringSchema,
+			"key3":  *stringSchema,
+			"value": *int64Schema,
+		},
+	}}
+	objectSchema := &spec.Schema{SchemaProps: spec.SchemaProps{
+		Type: []string{"object"},
+		Properties: map[string]spec.Schema{
+			"items": {
+				VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+					"x-kubernetes-list-type":     "map",
+					"x-kubernetes-list-map-keys": []any{"key1", "key2", "key3"},
+				}},
+				SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: entrySchema}},
+			},
+		},
+	}}
+
+	activation := map[string]typedValue{
+		"x": {value: ThreeKeyMapListStruct{Items: []ThreeKeyMapListEntry{
+			{Key1: "a", Key2: "b", Key3: "c", Value: 1},
+			{Key1: "d", Key2: "e", Key3: "f", Value: 2},
+		}}, schema: objectSchema},
+		"y": {value: ThreeKeyMapListStruct{Items: []ThreeKeyMapListEntry{
+			{Key1: "d", Key2: "e", Key3: "f", Value: 2},
+			{Key1: "a", Key2: "b", Key3: "c", Value: 1},
+		}}, schema: objectSchema},
+	}
+
+	env, err := cel.NewEnv(cel.Variable("x", cel.DynType), cel.Variable("y", cel.DynType), cel.StdLib())
+	if err != nil {
+		t.Fatalf("Env creation error: %v", err)
+	}
+	testTypedToVal(t, env, testCase{
+		name:       "three key map list equality",
+		expression: "x.items == y.items",
+		activation: activation,
+	})
+}
+
 func TestListAdd(t *testing.T) {
 	type AddListsStruct struct {
 		Tags   []string       `json:"tags"`
