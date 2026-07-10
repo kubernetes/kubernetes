@@ -700,6 +700,15 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedError:   "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
 		},
 		{
+			name:                "create-conflict-admin-access",
+			featureCombinations: adminAccessEnabled,
+			pods:                []*v1.Pod{testPodWithResource},
+			templates:           []*resourceapi.ResourceClaimTemplate{templateWithAdminAccess},
+			key:                 podKey(testPodWithResource),
+			expectedMetrics:     expectedMetrics{0, 0, 0, 1},
+			expectedError:       "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
+		},
+		{
 			name:                "create-conflict-podgroup",
 			featureCombinations: workloadResourceClaimsEnabled,
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
@@ -993,7 +1002,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			}
 
 			fakeKubeClient := createTestClient(objects...)
-			if tc.expectedMetrics.numFailures > 0 {
+			if tc.expectedMetrics.numFailures > 0 || tc.expectedMetrics.numFailureWithAdmin > 0 {
 				fakeKubeClient.PrependReactor("create", "resourceclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, nil, apierrors.NewConflict(action.GetResource().GroupResource(), "fake name", errors.New("fake conflict"))
 				})
