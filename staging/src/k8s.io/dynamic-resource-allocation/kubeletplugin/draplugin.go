@@ -647,7 +647,7 @@ type MetadataFileOperations struct {
 
 func defaultMetadataFileOperations(ops MetadataFileOperations) MetadataFileOperations {
 	if ops.WriteFile == nil {
-		ops.WriteFile = os.WriteFile
+		ops.WriteFile = writeFileAtomically
 	}
 	if ops.ReadFile == nil {
 		ops.ReadFile = os.ReadFile
@@ -665,6 +665,57 @@ func defaultMetadataFileOperations(ops MetadataFileOperations) MetadataFileOpera
 		ops.Glob = filepath.Glob
 	}
 	return ops
+}
+
+func writeFileAtomically(name string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(name)
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(name)+".*.tmp")
+	if err != nil {
+		return err
+	}
+
+	tmpName := tmp.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tmpName)
+		}
+	}()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, name); err != nil {
+		return err
+	}
+	if err := syncDir(dir); err != nil {
+		return err
+	}
+	cleanup = false
+	return nil
+}
+
+func syncDir(dir string) error {
+	f, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		return errors.Join(err, f.Close())
+	}
+	return f.Close()
 }
 
 // MetadataFileOps overrides the filesystem operations used by the metadata

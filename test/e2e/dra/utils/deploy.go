@@ -29,7 +29,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -723,10 +722,12 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		if d.EnableDeviceMetadata {
 			pluginOpts = append(pluginOpts,
 				kubeletplugin.MetadataVersions(metadatav1alpha1.SchemeGroupVersion),
-				kubeletplugin.MetadataFileOps(d.buildMetadataFileOps(tCtx, &pod)),
 			)
 			if !d.IsLocal {
-				pluginOpts = append(pluginOpts, kubeletplugin.CDIDirectory("/cdi"))
+				pluginOpts = append(pluginOpts,
+					kubeletplugin.MetadataFileOps(d.buildRemoteMetadataFileOps(tCtx, &pod)),
+					kubeletplugin.CDIDirectory("/cdi"),
+				)
 			}
 		}
 
@@ -869,18 +870,7 @@ func (d *Driver) podIO(tCtx ktesting.TContext, pod *v1.Pod) proxy.PodDirIO {
 	}
 }
 
-func (d *Driver) buildMetadataFileOps(tCtx ktesting.TContext, pod *v1.Pod) kubeletplugin.MetadataFileOperations {
-	if d.IsLocal {
-		return kubeletplugin.MetadataFileOperations{
-			WriteFile: os.WriteFile,
-			ReadFile:  os.ReadFile,
-			MkdirAll:  os.MkdirAll,
-			RemoveAll: os.RemoveAll,
-			Remove:    os.Remove,
-			Glob:      filepath.Glob,
-		}
-	}
-
+func (d *Driver) buildRemoteMetadataFileOps(tCtx ktesting.TContext, pod *v1.Pod) kubeletplugin.MetadataFileOperations {
 	execInPod := func(command []string) (string, error) {
 		stdout, stderr, err := e2epod.Exec(tCtx, e2epod.ExecOptions{
 			Command:       command,
