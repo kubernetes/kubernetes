@@ -821,7 +821,7 @@ func (m *mockPostFilterPlugin) getCount() int {
 	return m.count
 }
 
-func TestPostFilterInvocationCount(t *testing.T) {
+func TestPostFilterNotCalled(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.GenericWorkload: true,
 	})
@@ -917,18 +917,17 @@ func TestPostFilterInvocationCount(t *testing.T) {
 		}
 	}
 
-	// 5. Verify that MockPostFilter was called exactly once
-	// It should be called for each evaluated pod from pod group in pod group cycle
-	// but should not be called in WAP.
-	// Only one pod is evaluated for pod group because minCount=3 can't be satisfied with the remaining 2 pods.
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-		if mockPlugin.getCount() == 1 {
-			return true, nil
+	// 5. Wait for high priority pod to be marked as unschedulable
+	for _, p := range highPods {
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			testutils.PodUnschedulable(cs, ns, p.Name))
+		if err != nil {
+			t.Fatalf("failed to wait for pod %s to be unschedulable: %v", p.Name, err)
 		}
-		return false, nil
-	})
-	if err != nil {
-		t.Errorf("MockPostFilter was called %d times, expected exactly 3", mockPlugin.getCount())
+	}
+
+	if mockPlugin.getCount() != 0 {
+		t.Fatalf("MockPostFilter was called %d times, expected 0", mockPlugin.getCount())
 	}
 }
 

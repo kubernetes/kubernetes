@@ -274,6 +274,14 @@ func (sched *Scheduler) schedulingAlgorithm(
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, fwk.AsStatus(err)
 		}
 
+		// We do not want to run PostFilters for single pods in PodGroup cycle.
+		// Instead we will run PodGroupPostFilter at the end of PodGroup cycle.
+		if state.IsPodGroupSchedulingCycle() {
+			// Return nil as NominatingInfo. It can be overridden by the PodGroupPostFilter later
+			// and the final decision whether to clear NominatingInfo will be done in submitPodGroupAlgorithmResult.
+			return ScheduleResult{nominatingInfo: nil}, fwk.NewStatus(fwk.Unschedulable).WithError(err)
+		}
+
 		// SchedulePod() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
 		// will fit due to the preemption. It is also possible that a different pod will schedule

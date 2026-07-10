@@ -144,12 +144,6 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleStat
 		metrics.PreemptionAttempts.Inc()
 	}()
 
-	if pod.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload {
-		// When GenericWorkload is enabled, the default preemption logic needs to be disabled for pod group scheduling to avoid performing preemption in pod by pod cycle
-		// of pod group scheduling. Instead the WAP will be called to perform preemption for the entire pod group.
-		return nil, fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to workload aware preemption enabled")
-	}
-
 	result, status := pl.Evaluator.Preempt(ctx, state, pod, m)
 	msg := status.Message()
 	if len(msg) > 0 {
