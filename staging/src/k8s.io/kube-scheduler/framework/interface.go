@@ -984,4 +984,12 @@ type PluginsRunner interface {
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
 	RunPreFilterExtensionRemovePod(ctx context.Context, state CycleState, podToSchedule *v1.Pod, podInfoToRemove PodInfo, nodeInfo NodeInfo) *Status
+	// RunReservePluginsReserve runs the Reserve method of the set of
+	// configured Reserve plugins. If any of these calls returns an error, it
+	// does not continue running the remaining ones and returns the error. In
+	// such case, pod will not be scheduled.
+	RunReservePluginsReserve(ctx context.Context, state CycleState, pod *v1.Pod, nodeName string) *Status
+	// RunReservePluginsUnreserve runs the Unreserve method of the set of
+	// configured Reserve plugins.
+	RunReservePluginsUnreserve(ctx context.Context, state CycleState, pod *v1.Pod, nodeName string)
 }

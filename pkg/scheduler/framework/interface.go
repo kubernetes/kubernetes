@@ -248,16 +248,6 @@ type Framework interface {
 	// RunPostBindPlugins runs the set of configured PostBind plugins.
 	RunPostBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
 
-	// RunReservePluginsReserve runs the Reserve method of the set of
-	// configured Reserve plugins. If any of these calls returns an error, it
-	// does not continue running the remaining ones and returns the error. In
-	// such case, pod will not be scheduled.
-	RunReservePluginsReserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
-
-	// RunReservePluginsUnreserve runs the Unreserve method of the set of
-	// configured Reserve plugins.
-	RunReservePluginsUnreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
-
 	// RunPermitPlugins runs the set of configured Permit plugins. If any of these
 	// plugins returns a status other than "Success" or "Wait", it does not continue
 	// running the remaining plugins and returns an error. Otherwise, if any of the
