@@ -520,7 +520,10 @@ function install-runc-source {
 
   if git clone https://github.com/opencontainers/runc.git "${temp_dir}/runc" &&
      git -C "${temp_dir}/runc" checkout "${version}" &&
-     env -u VERSION make -C "${temp_dir}/runc" BUILDTAGS='seccomp' runc; then
+     env -u VERSION \
+       GOMODCACHE="${temp_dir}/gomodcache" \
+       GOCACHE="${temp_dir}/gocache" \
+       make -C "${temp_dir}/runc" BUILDTAGS='seccomp' runc; then
     install -m 755 "${temp_dir}/runc/runc" /usr/sbin/runc
     /usr/sbin/runc --version
     rm -rf "${temp_dir}"
