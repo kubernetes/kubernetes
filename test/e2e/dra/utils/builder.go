@@ -837,7 +837,7 @@ func ShareableResources(count int) driverResourcesGenFunc {
 		for i := range count {
 			devices[i] = resourceapi.Device{
 				Name:                     fmt.Sprintf("shared-%d", i),
-				AllowMultipleAllocations: ptr.To(true),
+				AllowMultipleAllocations: new(true),
 				Capacity:                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("16")}},
 			}
 		}

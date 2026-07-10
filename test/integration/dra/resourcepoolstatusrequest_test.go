@@ -281,7 +281,7 @@ func testPartitionSummary(tCtx ktesting.TContext) {
 	partitionDevice := func(name, profile, cost string) resourceapi.Device {
 		return resourceapi.Device{
 			Name:       name,
-			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"profile": {StringValue: ptr.To(profile)}},
+			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"profile": {StringValue: new(profile)}},
 			ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 				CounterSet: "gpu-0",
 				Counters:   map[string]resourceapi.Counter{"memory": {Value: resource.MustParse(cost)}},
@@ -371,7 +371,7 @@ func testShareableSummary(tCtx ktesting.TContext) {
 	shareableDevice := func(name string) resourceapi.Device {
 		return resourceapi.Device{
 			Name:                     name,
-			AllowMultipleAllocations: ptr.To(true),
+			AllowMultipleAllocations: new(true),
 			Capacity:                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("40Gi")}},
 		}
 	}
