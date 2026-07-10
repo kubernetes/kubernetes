@@ -77,27 +77,147 @@ func clearMetrics() {
 	ImagePullDuration.Reset()
 }
 
-func TestEvictionsDeprecatedAndReplacementMetrics(t *testing.T) {
+func TestPrometheusCompliantCounterVecMetrics(t *testing.T) {
 	Register()
-	defer Evictions.Reset()
+
+	defer ContainerAlignedComputeResourcesFailureTotal.Reset()
+	defer EventedPLEGConnErrTotal.Reset()
+	defer EventedPLEGConnTotal.Reset()
 	defer EvictionsTotal.Reset()
+	defer PLEGDiscardEventsTotal.Reset()
+	defer PodResourcesEndpointErrorsGetCountTotal.Reset()
+	defer PodResourcesEndpointErrorsGetAllocatableCountTotal.Reset()
+	defer PodResourcesEndpointErrorsListCountTotal.Reset()
+	defer PodResourcesEndpointRequestsGetCountTotal.Reset()
+	defer PodResourcesEndpointRequestsGetAllocatableCountTotal.Reset()
+	defer PodResourcesEndpointRequestsListCountTotal.Reset()
+	defer PreemptionsTotal.Reset()
 
-	Evictions.WithLabelValues("memory").Inc()
+	ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(AlignScopeContainer, AlignedPhysicalCPU).Inc()
+	EventedPLEGConnErrTotal.Inc()
+	EventedPLEGConnTotal.Inc()
 	EvictionsTotal.WithLabelValues("memory").Inc()
+	PLEGDiscardEventsTotal.Inc()
+	PodResourcesEndpointErrorsGetCountTotal.WithLabelValues("v1").Inc()
+	PodResourcesEndpointErrorsGetAllocatableCountTotal.WithLabelValues("v1").Inc()
+	PodResourcesEndpointErrorsListCountTotal.WithLabelValues("v1").Inc()
+	PodResourcesEndpointRequestsGetCountTotal.WithLabelValues("v1").Inc()
+	PodResourcesEndpointRequestsGetAllocatableCountTotal.WithLabelValues("v1").Inc()
+	PodResourcesEndpointRequestsListCountTotal.WithLabelValues("v1").Inc()
+	PreemptionsTotal.WithLabelValues("memory").Inc()
 
-	expected := `# HELP kubelet_evictions [ALPHA] Cumulative number of pod evictions by eviction signal. Deprecated in favor of kubelet_evictions_total
-# TYPE kubelet_evictions counter
-kubelet_evictions{eviction_signal="memory"} 1
+	expected := `# HELP kubelet_container_aligned_compute_resources_failure_total [ALPHA] Cumulative number of failures to allocate aligned compute resources to containers by alignment type.
+# TYPE kubelet_container_aligned_compute_resources_failure_total counter
+kubelet_container_aligned_compute_resources_failure_total{boundary="physical_cpu",scope="container"} 1
+# HELP kubelet_evented_pleg_connection_error_total [ALPHA] The number of errors encountered during the establishment of streaming connection with the CRI runtime.
+# TYPE kubelet_evented_pleg_connection_error_total counter
+kubelet_evented_pleg_connection_error_total 1
+# HELP kubelet_evented_pleg_connection_success_total [ALPHA] The number of times a streaming client was obtained to receive CRI Events.
+# TYPE kubelet_evented_pleg_connection_success_total counter
+kubelet_evented_pleg_connection_success_total 1
 # HELP kubelet_evictions_total [ALPHA] Cumulative number of pod evictions by eviction signal
 # TYPE kubelet_evictions_total counter
 kubelet_evictions_total{eviction_signal="memory"} 1
+# HELP kubelet_pleg_discard_events_total [ALPHA] The number of discard events in PLEG.
+# TYPE kubelet_pleg_discard_events_total counter
+kubelet_pleg_discard_events_total 1
+# HELP kubelet_pod_resources_endpoint_errors_get_allocatable_total [ALPHA] Number of requests to the PodResource GetAllocatableResources endpoint which returned error. Broken down by server api version.
+# TYPE kubelet_pod_resources_endpoint_errors_get_allocatable_total counter
+kubelet_pod_resources_endpoint_errors_get_allocatable_total{server_api_version="v1"} 1
+# HELP kubelet_pod_resources_endpoint_errors_get_total [ALPHA] Number of requests to the PodResource Get endpoint which returned error. Broken down by server api version.
+# TYPE kubelet_pod_resources_endpoint_errors_get_total counter
+kubelet_pod_resources_endpoint_errors_get_total{server_api_version="v1"} 1
+# HELP kubelet_pod_resources_endpoint_errors_list_total [ALPHA] Number of requests to the PodResource List endpoint which returned error. Broken down by server api version.
+# TYPE kubelet_pod_resources_endpoint_errors_list_total counter
+kubelet_pod_resources_endpoint_errors_list_total{server_api_version="v1"} 1
+# HELP kubelet_pod_resources_endpoint_requests_get_allocatable_total [ALPHA] Number of requests to the PodResource GetAllocatableResources endpoint. Broken down by server api version.
+# TYPE kubelet_pod_resources_endpoint_requests_get_allocatable_total counter
+kubelet_pod_resources_endpoint_requests_get_allocatable_total{server_api_version="v1"} 1
+# HELP kubelet_pod_resources_endpoint_requests_get_total [ALPHA] Number of requests to the PodResource Get endpoint. Broken down by server api version.
+# TYPE kubelet_pod_resources_endpoint_requests_get_total counter
+kubelet_pod_resources_endpoint_requests_get_total{server_api_version="v1"} 1
+# HELP kubelet_pod_resources_endpoint_requests_list_total [ALPHA] Number of requests to the PodResource List endpoint. Broken down by server api version.
+# TYPE kubelet_pod_resources_endpoint_requests_list_total counter
+kubelet_pod_resources_endpoint_requests_list_total{server_api_version="v1"} 1
+# HELP kubelet_preemptions_total [ALPHA] Cumulative number of pod preemptions by preemption resource
+# TYPE kubelet_preemptions_total counter
+kubelet_preemptions_total{preemption_signal="memory"} 1
+`
+
+	metricNames := []string{
+		"kubelet_container_aligned_compute_resources_failure_total",
+		"kubelet_evented_pleg_connection_error_total",
+		"kubelet_evented_pleg_connection_success_total",
+		"kubelet_evictions_total",
+		"kubelet_pleg_discard_events_total",
+		"kubelet_pod_resources_endpoint_errors_get_total",
+		"kubelet_pod_resources_endpoint_errors_get_allocatable_total",
+		"kubelet_pod_resources_endpoint_errors_list_total",
+		"kubelet_pod_resources_endpoint_requests_get_total",
+		"kubelet_pod_resources_endpoint_requests_get_allocatable_total",
+		"kubelet_pod_resources_endpoint_requests_list_total",
+		"kubelet_preemptions_total",
+	}
+
+	if err := testutil.GatherAndCompare(
+		GetGather(),
+		strings.NewReader(expected),
+		metricNames...,
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCPUManagerExclusiveCPUsAllocationMetric(t *testing.T) {
+	Register()
+
+	CPUManagerExclusiveCPUsAllocation.Set(2)
+
+	expected := `# HELP kubelet_cpu_manager_exclusive_cpu_allocated [ALPHA] The total number of CPUs exclusively allocated to containers running on this node
+# TYPE kubelet_cpu_manager_exclusive_cpu_allocated gauge
+kubelet_cpu_manager_exclusive_cpu_allocated 2
 `
 
 	if err := testutil.GatherAndCompare(
 		GetGather(),
 		strings.NewReader(expected),
-		"kubelet_evictions",
-		"kubelet_evictions_total",
+		"kubelet_cpu_manager_exclusive_cpu_allocated",
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPrometheusCompliantTopologyManagerAdmissionDurationMetric(t *testing.T) {
+	Register()
+
+	TopologyManagerAdmissionDurationSecond.Observe(0.1)
+
+	expected := `# HELP kubelet_topology_manager_admission_duration_seconds [ALPHA] Duration in seconds to serve a pod admission request.
+# TYPE kubelet_topology_manager_admission_duration_seconds histogram
+kubelet_topology_manager_admission_duration_seconds_bucket{le="5e-05"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.0001"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.0002"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.0004"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.0008"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.0016"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.0032"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.0064"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.0128"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.0256"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.0512"} 0
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.1024"} 1
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.2048"} 1
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.4096"} 1
+kubelet_topology_manager_admission_duration_seconds_bucket{le="0.8192"} 1
+kubelet_topology_manager_admission_duration_seconds_bucket{le="+Inf"} 1
+kubelet_topology_manager_admission_duration_seconds_sum 0.1
+kubelet_topology_manager_admission_duration_seconds_count 1
+`
+
+	if err := testutil.GatherAndCompare(
+		GetGather(),
+		strings.NewReader(expected),
+		"kubelet_topology_manager_admission_duration_seconds",
 	); err != nil {
 		t.Fatal(err)
 	}
