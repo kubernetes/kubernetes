@@ -309,7 +309,7 @@ function find-tar() {
     "${KUBE_ROOT}/node/${tarball}"
     "${KUBE_ROOT}/server/${tarball}"
     "${KUBE_ROOT}/kubernetes/node/${tarball}"
-    "${KUBE_ROOT}/kubernetes/server/${tarball}"    
+    "${KUBE_ROOT}/kubernetes/server/${tarball}"
     "${KUBE_ROOT}/_output/release-tars/${tarball}"
   )
   location=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
