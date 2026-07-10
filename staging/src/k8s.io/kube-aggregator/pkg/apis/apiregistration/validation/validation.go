@@ -51,6 +51,14 @@ func ValidateAPIService(ctx context.Context, apiService *apiregistration.APIServ
 		field.NewPath("metadata"),
 		utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta))
 
+	allErrs = append(allErrs, validateAPIServiceSpec(apiService)...)
+
+	return allErrs
+}
+
+func validateAPIServiceSpec(apiService *apiregistration.APIService) field.ErrorList {
+	allErrs := field.ErrorList{}
+
 	// in this case we allow empty group
 	if len(apiService.Spec.Group) == 0 && apiService.Spec.Version != "v1" {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "group"), "only v1 may have an empty group and it better be legacy kube"))
@@ -101,7 +109,7 @@ func ValidateAPIService(ctx context.Context, apiService *apiregistration.APIServ
 // ValidateAPIServiceUpdate validates an update of APIService.
 func ValidateAPIServiceUpdate(ctx context.Context, newAPIService *apiregistration.APIService, oldAPIService *apiregistration.APIService) field.ErrorList {
 	allErrs := validation.ValidateObjectMetaDeclaratively(ctx, operation.Update, &newAPIService.ObjectMeta, &oldAPIService.ObjectMeta, false, nil, field.NewPath("metadata"), utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta))
-	allErrs = append(allErrs, ValidateAPIService(ctx, newAPIService)...)
+	allErrs = append(allErrs, validateAPIServiceSpec(newAPIService)...)
 
 	return allErrs
 }
