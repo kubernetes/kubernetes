@@ -1257,9 +1257,9 @@ func (f *frameworkImpl) runPodGroupPostFilterPlugin(ctx context.Context, pl fwk.
 		return pl.PodGroupPostFilter(ctx, state, podGroupInfo, pgSchedulingFunc)
 	}
 	startTime := time.Now()
-	r, s := pl.PodGroupPostFilter(ctx, state, podGroupInfo, pgSchedulingFunc)
-	f.metricsRecorder.ObservePluginDurationAsync(metrics.PodGroupPostFilter, pl.Name(), s.Code().String(), metrics.SinceInSeconds(startTime))
-	return r, s
+	res, status := pl.PodGroupPostFilter(ctx, state, podGroupInfo, pgSchedulingFunc)
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.PodGroupPostFilter, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+	return res, status
 }
 
 // RunFilterPluginsWithNominatedPods runs the set of configured filter plugins
