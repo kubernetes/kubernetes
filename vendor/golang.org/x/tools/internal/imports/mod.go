@@ -679,11 +679,11 @@ func modRelevance(mod *gocommand.ModuleJSON) float64 {
 
 	_, versionString, ok := module.SplitPathVersion(mod.Path)
 	if ok {
-		index := strings.Index(versionString, "v")
-		if index == -1 {
+		_, after, ok := strings.Cut(versionString, "v")
+		if !ok {
 			return relevance
 		}
-		if versionNumber, err := strconv.ParseFloat(versionString[index+1:], 64); err == nil {
+		if versionNumber, err := strconv.ParseFloat(after, 64); err == nil {
 			relevance += versionNumber / 1000
 		}
 	}

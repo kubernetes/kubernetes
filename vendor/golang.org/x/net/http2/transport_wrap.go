@@ -55,7 +55,7 @@ type transportConfig struct {
 // Registered is called by net/http.Transport.RegisterProtocol,
 // to let us know that it understands the registration mechanism we're using.
 func (t transportConfig) Registered(t1 *http.Transport) {
-	t.t.t1 = t1
+	t.t.lazyt1 = t1
 }
 
 func (t transportConfig) DisableCompression() bool {
@@ -145,29 +145,30 @@ func (t transportConfig) DialFromContext(ctx context.Context, network, address s
 
 type transportInternal struct {
 	initOnce sync.Once
-	t1       *http.Transport
+	lazyt1   *http.Transport
 }
 
-func (t *Transport) init() {
+func (t *Transport) init() *http.Transport {
 	t.initOnce.Do(func() {
-		if t.t1 != nil {
+		if t.lazyt1 != nil {
 			return
 		}
 		t1 := &http.Transport{}
 		t.configure(t1)
 	})
+	return t.lazyt1
 }
 
 func (t *Transport) configure(t1 *http.Transport) {
 	t1.RegisterProtocol("http/2", transportConfig{t})
-	// tr2.t1 is set by transportConfig.Registered.
-	if t.t1 != t1 {
+	// tr2.lazyt1 is set by transportConfig.Registered.
+	if t.lazyt1 != t1 {
 		panic("http2: net/http does not support this version of x/net/http2")
 	}
 }
 
 func (t *Transport) roundTripOpt(req *http.Request, opt RoundTripOpt) (*http.Response, error) {
-	t.init()
+	t1 := t.init()
 
 	if req.URL.Scheme == "http" && !t.AllowHTTP {
 		return nil, errors.New("http2: unencrypted HTTP/2 not enabled")
@@ -188,22 +189,23 @@ func (t *Transport) roundTripOpt(req *http.Request, opt RoundTripOpt) (*http.Res
 	ctx := context.WithValue(req.Context(), http2TransportContextKey{}, t)
 	req = req.WithContext(ctx)
 
-	return t.t1.RoundTrip(req)
+	return t1.RoundTrip(req)
 }
 
 func (t *Transport) closeIdleConnections() {
-	t.init()
-	t.t1.CloseIdleConnections()
+	t1 := t.init()
+	t1.CloseIdleConnections()
 }
 
 func (t *Transport) newUserClientConn(c net.Conn) (*ClientConn, error) {
+	t1 := t.init()
 	// http.Transport's NewClientConn doesn't provide a supported way to create
 	// a connection from a net.Conn. (This might be useful to add in the future?)
 	// We're going to craftily sneak one in via the context key, with the
 	// scheme of "http/2" telling NewClientConn to look for it.
 	ctx := context.WithValue(context.Background(), netConnContextKey{}, c)
 
-	nhcc, err := t.t1.NewClientConn(ctx, "http/2", "")
+	nhcc, err := t1.NewClientConn(ctx, "http/2", "")
 	if err != nil {
 		return nil, err
 	}

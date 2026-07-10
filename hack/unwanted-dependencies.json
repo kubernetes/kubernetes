@@ -149,7 +149,6 @@
       ],
       "github.com/gogo/protobuf": [
         "github.com/containerd/containerd/api",
-        "github.com/google/cadvisor/lib",
         "k8s.io/code-generator"
       ],
       "github.com/golang/protobuf": [

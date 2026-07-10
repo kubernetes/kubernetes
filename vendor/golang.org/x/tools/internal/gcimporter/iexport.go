@@ -823,6 +823,9 @@ func (p *iexporter) doDecl(obj types.Object) {
 			w.pos(m.Pos())
 			w.string(m.Name())
 			sig, _ := m.Type().(*types.Signature)
+			if w.p.version >= iexportVersionGenericMethods && w.bool(sig.TypeParams().Len() > 0) {
+				w.tparamList(obj.Name()+"."+m.Name(), sig.TypeParams(), obj.Pkg())
+			}
 
 			// Receiver type parameters are type arguments of the receiver type, so
 			// their name must be qualified before exporting recv.
