@@ -103,7 +103,9 @@ func TestNewManagerImpl(t *testing.T) {
 	socketDir, socketName, _, err := tmpSocketDir()
 	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
-	defer os.RemoveAll(socketDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
 	_, err = newManagerImpl(logger, socketName, nil, topologyStore)
 	require.NoError(t, err)
 	os.RemoveAll(socketDir)
@@ -113,7 +115,9 @@ func TestNewManagerImplStart(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
-	defer os.RemoveAll(socketDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
 	m, _, p := setup(tCtx, t, []*pluginapi.Device{}, func(_ klog.Logger, n string, d []*pluginapi.Device) {}, socketName, pluginSocketName)
 	err = cleanup(logger, m, p)
 	require.NoError(t, err)
@@ -126,7 +130,9 @@ func TestNewManagerImplStartProbeMode(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
-	defer os.RemoveAll(socketDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
 	m, _, p, _ := setupInProbeMode(tCtx, t, []*pluginapi.Device{}, func(_ klog.Logger, n string, d []*pluginapi.Device) {}, socketName, pluginSocketName)
 	err = cleanup(logger, m, p)
 	require.NoError(t, err)
@@ -143,7 +149,9 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	}
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
-	defer os.RemoveAll(socketDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
 	devs := []*pluginapi.Device{
 		{ID: "Dev1", Health: pluginapi.Healthy},
 		{ID: "Dev2", Health: pluginapi.Healthy},
@@ -225,7 +233,9 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	}
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
-	defer os.RemoveAll(socketDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
 	devs := []*pluginapi.Device{
 		{ID: "Dev1", Health: pluginapi.Healthy},
 		{ID: "Dev2", Health: pluginapi.Healthy},
@@ -369,7 +379,9 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	socketDir, socketName, _, err := tmpSocketDir()
 	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
-	defer os.RemoveAll(socketDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
 	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
 	as := assert.New(t)
 	as.NotNil(testManager)
@@ -515,7 +527,9 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	socketDir, socketName, _, err := tmpSocketDir()
 	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
-	defer os.RemoveAll(socketDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
 	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
 	as := assert.New(t)
 	as.NotNil(testManager)
@@ -557,7 +571,9 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 	socketDir, socketName, _, err := tmpSocketDir()
 	topologyStore := topologymanager.NewFakeManager(logger)
 	require.NoError(t, err)
-	defer os.RemoveAll(socketDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
 	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
 	as := assert.New(t)
 	as.NotNil(testManager)
@@ -705,7 +721,9 @@ func TestCheckpoint(t *testing.T) {
 	as := assert.New(t)
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.NoError(err)
 	testManager := &ManagerImpl{
@@ -1046,7 +1064,9 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	}
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
 	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
 	as.NoError(err)
 
@@ -1128,7 +1148,9 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 	as := require.New(t)
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
 
 	testManager := &ManagerImpl{
 		endpoints:        make(map[string]endpointInfo),
@@ -1315,7 +1337,9 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
 
 	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
 	as.NoError(err)
@@ -1378,7 +1402,9 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	}
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
 
 	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
 	as.NoError(err)
@@ -1480,7 +1506,9 @@ func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
 	}
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
 
 	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
 	as.NoError(err)
@@ -1597,7 +1625,9 @@ func TestUpdatePluginResources(t *testing.T) {
 	monitorCallback := func(logger klog.Logger, resourceName string, devices []*pluginapi.Device) {}
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
 
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.NoError(err)
@@ -1656,7 +1686,9 @@ func TestDevicePreStartContainer(t *testing.T) {
 	}
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
 
 	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, []TestResource{res1})
 	as.NoError(err)
@@ -1719,7 +1751,9 @@ func TestResetExtendedResource(t *testing.T) {
 	as := assert.New(t)
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.NoError(err)
 	testManager := &ManagerImpl{
@@ -1824,7 +1858,9 @@ func makeDevice(devOnNUMA checkpoint.DevicesPerNUMA, topology bool) map[string]*
 func TestGetTopologyHintsWithUpdates(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	socketDir, socketName, _, err := tmpSocketDir()
-	defer os.RemoveAll(socketDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
 	require.NoError(t, err)
 
 	devs := []*pluginapi.Device{}
