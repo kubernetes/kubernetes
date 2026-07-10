@@ -416,14 +416,6 @@ var (
 	// Tests validating the behavior of kubelet when running without the API server.
 	StandaloneMode = framework.WithFeature(framework.ValidFeatures.Add("StandaloneMode"))
 
-	// Owner: sig-apps
-	// TODO: document the feature (when to use this feature for a test)
-	StatefulSet = framework.WithFeature(framework.ValidFeatures.Add("StatefulSet"))
-
-	// Owner: sig-apps
-	// TODO: document the feature (when to use this feature for a test)
-	StatefulUpgrade = framework.WithFeature(framework.ValidFeatures.Add("StatefulUpgrade"))
-
 	// Owner: sig-storage
 	// Tests marked with this feature exercise scheduling behavior that scores nodes based on CSI storage capacity.
 	StorageCapacityScoring = framework.WithFeature(framework.ValidFeatures.Add("StorageCapacityScoring"))

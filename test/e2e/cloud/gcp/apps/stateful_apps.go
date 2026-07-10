@@ -37,7 +37,7 @@ var upgradeTests = []upgrades.Test{
 	&apps.CassandraUpgradeTest{},
 }
 
-var _ = SIGDescribe("stateful Upgrade", feature.StatefulUpgrade, func() {
+var _ = SIGDescribe("stateful Upgrade", feature.Upgrade, func() {
 	f := framework.NewDefaultFramework("stateful-upgrade")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
