@@ -348,6 +348,7 @@ func TestNewManagerImpl(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			defer manager.Stop()
 			assert.NotNil(t, manager.cache)
 			assert.NotNil(t, manager.kubeClient)
 		})
@@ -847,6 +848,7 @@ func TestGetResources(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			manager, err := NewManager(tCtx.Logger(), kubeClient, t.TempDir())
 			require.NoError(t, err)
+			defer manager.Stop()
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -1216,6 +1218,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
+			defer manager.Stop()
 			manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			if test.claim != nil {
@@ -1302,6 +1305,7 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 
 	manager, err := NewManager(logger, fakeKubeClient, t.TempDir())
 	require.NoError(t, err)
+	defer manager.Stop()
 	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
 
 	secondClaimName := fmt.Sprintf("%s-second", claimName)
@@ -1591,6 +1595,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
+			defer manager.Stop()
 			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			plg := manager.GetWatcherHandler()
@@ -1657,6 +1662,7 @@ func TestPodMightNeedToUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 	require.NoError(t, err, "create DRA manager")
+	defer manager.Stop()
 
 	claimInfo := &ClaimInfo{
 		ClaimInfoState: state.ClaimInfoState{PodUIDs: sets.New(podUID), ClaimName: claimName, Namespace: namespace},
@@ -1738,6 +1744,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
+			defer manager.Stop()
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -1777,6 +1784,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 	require.NoError(t, err, "create DRA manager")
+	defer manager.Stop()
 	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 	plg := manager.GetWatcherHandler()
@@ -1880,6 +1888,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		// Fresh manager for each sub-test
 		manager, err := NewManager(tCtx.Logger(), nil, st.TempDir())
 		require.NoError(st, err)
+		defer manager.Stop()
 
 		for _, ci := range initialClaimInfos {
 			manager.cache.add(ci)
@@ -2537,6 +2546,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 			logger := tCtx.Logger()
 			manager, err := NewManager(logger, nil, t.TempDir())
 			require.NoError(t, err)
+			defer manager.Stop()
 
 			for _, ci := range tc.claimInfos {
 				manager.cache.add(ci)
@@ -2619,6 +2629,7 @@ func TestUpdateAllocatedResourcesStatus_Subrequest(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
 			require.NoError(t, err)
+			defer manager.Stop()
 
 			// Setup claim info with device
 			claimInfo := &ClaimInfo{
