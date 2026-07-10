@@ -3481,6 +3481,16 @@ func (kl *Kubelet) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.Pod
 	return kl.containerRuntime.ListPodSandboxMetrics(ctx)
 }
 
+// ListPodSandbox returns a list of pod sandboxes matching the filter.
+func (kl *Kubelet) ListPodSandbox(ctx context.Context, filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
+	return kl.runtimeService.ListPodSandbox(ctx, filter)
+}
+
+// ListContainers lists all containers matching the filter.
+func (kl *Kubelet) ListContainers(ctx context.Context, filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+	return kl.runtimeService.ListContainers(ctx, filter)
+}
+
 func (kl *Kubelet) supportLocalStorageCapacityIsolation() bool {
 	return kl.GetConfiguration().LocalStorageCapacityIsolation
 }

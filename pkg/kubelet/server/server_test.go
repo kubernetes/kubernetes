@@ -167,6 +167,14 @@ func (fk *fakeKubelet) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi
 	return nil, nil
 }
 
+func (fk *fakeKubelet) ListPodSandbox(ctx context.Context, filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
+	return nil, nil
+}
+
+func (fk *fakeKubelet) ListContainers(ctx context.Context, filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+	return nil, nil
+}
+
 func (fk *fakeKubelet) SyncLoopHealthCheck(req *http.Request) error {
 	duration := fk.resyncInterval * 2
 	minDuration := time.Minute * 5

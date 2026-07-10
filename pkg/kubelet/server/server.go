@@ -323,6 +323,8 @@ type HostInterface interface {
 	GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
 	ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error)
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
+	ListPodSandbox(ctx context.Context, filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error)
+	ListContainers(ctx context.Context, filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -523,7 +525,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	r := compbasemetrics.NewKubeRegistry()
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) {
-		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
+		r.CustomMustRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors, s.host.ListPodSandbox, s.host.ListContainers))
 		servermetrics.SetMetricsProvider(servermetrics.CRIMetricsProvider)
 	} else {
 		cadvisorOpts := cadvisorapi.RequestOptions{
