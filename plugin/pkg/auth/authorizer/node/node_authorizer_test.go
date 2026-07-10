@@ -103,6 +103,18 @@ func TestNodeAuthorizer(t *testing.T) {
 		return f
 	}
 
+	csiVolumeHealthEnabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.CSIVolumeHealth, true)
+		return f
+	}
+
+	csiVolumeHealthDisabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.CSIVolumeHealth, false)
+		return f
+	}
+
 	tests := []struct {
 		name         string
 		attrs        authorizer.AttributesRecord
@@ -433,7 +445,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		},
 		// CSINode
 		{
-			name:   "disallowed CSINode with subresource - feature enabled",
+			name:   "disallowed CSINode with unknown subresource",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "csiDrivers", APIGroup: "storage.k8s.io", Name: "node0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
@@ -491,6 +503,73 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:   "allowed delete CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
 			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:     "allowed get CSINode status",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:   authorizer.DecisionAllow,
+			features: csiVolumeHealthEnabled,
+		},
+		{
+			name:     "allowed update CSINode status",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:   authorizer.DecisionAllow,
+			features: csiVolumeHealthEnabled,
+		},
+		{
+			name:     "allowed patch CSINode status",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:   authorizer.DecisionAllow,
+			features: csiVolumeHealthEnabled,
+		},
+		{
+			name:         "disallowed get CSINode status - feature disabled",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthDisabled,
+			expectReason: "CSINode status access requires CSIVolumeHealth feature",
+		},
+		{
+			name:         "disallowed update CSINode status - feature disabled",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthDisabled,
+			expectReason: "CSINode status access requires CSIVolumeHealth feature",
+		},
+		{
+			name:         "disallowed patch CSINode status - feature disabled",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthDisabled,
+			expectReason: "CSINode status access requires CSIVolumeHealth feature",
+		},
+		{
+			name:         "disallowed get another node's CSINode status",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node1"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthEnabled,
+			expectReason: "can only access CSINode with the same name as the requesting node",
+		},
+		{
+			name:         "disallowed update another node's CSINode status",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node1"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthEnabled,
+			expectReason: "can only access CSINode with the same name as the requesting node",
+		},
+		{
+			name:         "disallowed patch another node's CSINode status",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node1"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthEnabled,
+			expectReason: "can only access CSINode with the same name as the requesting node",
+		},
+		{
+			name:         "disallowed delete CSINode status",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthEnabled,
+			expectReason: "can only get, update, or patch CSINode status",
 		},
 		// ResourceSlice
 		{

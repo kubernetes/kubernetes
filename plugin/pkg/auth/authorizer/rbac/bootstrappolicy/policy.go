@@ -270,6 +270,12 @@ func NodeRules() []rbacv1.PolicyRule {
 	nodePolicyRules = append(nodePolicyRules, csiDriverRule)
 	csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
 	nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
+	// Use the Node authorization mode to limit a node to update status of its own CSINode.
+	// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		csiNodeStatusRule := rbacv1helpers.NewRule("get", "update", "patch").Groups("storage.k8s.io").Resources("csinodes/status").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, csiNodeStatusRule)
+	}
 
 	// RuntimeClass
 	nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())

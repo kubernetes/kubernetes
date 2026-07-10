@@ -31,6 +31,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -92,10 +93,28 @@ type csiClient interface {
 		volID string,
 		targetPath string,
 	) (*volume.Metrics, error)
+	// NodeGetVolumeHealth returns adverse health conditions for a volume.
+	// An empty slice means the volume is healthy. stagingTargetPath and
+	// volumePublishPath are optional and may be empty when the volume was
+	// never successfully staged/published.
+	NodeGetVolumeHealth(
+		ctx context.Context,
+		volID string,
+		stagingTargetPath string,
+		volumePublishPath string,
+	) ([]api.VolumeHealthCondition, error)
+	// NodeGetStorageHealth returns adverse health conditions for the driver's
+	// storage backend on this node. An empty slice means the backend is healthy.
+	NodeGetStorageHealth(
+		ctx context.Context,
+		secrets map[string]string,
+	) ([]storagev1.StorageHealthCondition, error)
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
 	NodeSupportsVolumeStats(ctx context.Context) (bool, error)
+	NodeSupportsVolumeHealth(ctx context.Context) (bool, error)
+	NodeSupportsStorageHealth(ctx context.Context) (bool, error)
 	NodeSupportsSingleNodeMultiWriterAccessMode(ctx context.Context) (bool, error)
 	NodeSupportsVolumeMountGroup(ctx context.Context) (bool, error)
 }
@@ -625,29 +644,29 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 
 	var isSupportNodeVolumeCondition bool
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
-		isSupportNodeVolumeCondition, err = c.nodeSupportsVolumeHealth(ctx)
+		isSupportNodeVolumeCondition, err = c.NodeSupportsVolumeHealth(ctx)
 		if err != nil {
 			return nil, err
 		}
 
 		if isSupportNodeVolumeCondition {
-			healthRequest := &csipbv1.NodeGetVolumeHealthRequest{
-				VolumeId: volID,
-			}
-			resp, err := nodeClient.NodeGetVolumeHealth(ctx, healthRequest)
+			// Keep the legacy Abnormal/Message path for volume stats / events
+			// until callers migrate to the dedicated NodeGetVolumeHealth API.
+			conditions, err := c.NodeGetVolumeHealth(ctx, volID, "", targetPath)
 			if err != nil {
 				return nil, err
 			}
-			if len(resp.VolumeHealth.GetHealthStatuses()) > 0 {
-				healthStatus := resp.VolumeHealth.GetHealthStatuses()[0]
-				message := healthStatus.GetMessage()
+			if len(conditions) > 0 {
+				message := conditions[0].Message
 				metrics.Abnormal, metrics.Message = ptr.To(true), &message
+			} else {
+				metrics.Abnormal = ptr.To(false)
 			}
 		}
 	}
 
 	usages := resp.GetUsage()
-	// If the driver does not support volume condition and usages is nil, return an error
+	// If the driver does not support volume health and usages is nil, return an error
 	if !isSupportNodeVolumeCondition && usages == nil {
 		return nil, fmt.Errorf("failed to get usage from response. usage is nil")
 	}
@@ -674,8 +693,133 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 	return metrics, nil
 }
 
-func (c *csiDriverClient) nodeSupportsVolumeHealth(ctx context.Context) (bool, error) {
+func (c *csiDriverClient) NodeSupportsVolumeHealth(ctx context.Context) (bool, error) {
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_GET_VOLUME_HEALTH)
+}
+
+func (c *csiDriverClient) NodeSupportsStorageHealth(ctx context.Context) (bool, error) {
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_GET_STORAGE_HEALTH)
+}
+
+func (c *csiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) ([]api.VolumeHealthCondition, error) {
+	klog.V(4).InfoS(log("calling NodeGetVolumeHealth rpc"), "volID", volID, "stagingTargetPath", stagingTargetPath, "volumePublishPath", volumePublishPath)
+	if volID == "" {
+		return nil, errors.New("missing volume id")
+	}
+	if c.nodeV1ClientCreator == nil {
+		return nil, errors.New("nodeV1ClientCreate is nil")
+	}
+
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	req := &csipbv1.NodeGetVolumeHealthRequest{
+		VolumeId:          volID,
+		StagingTargetPath: stagingTargetPath,
+		VolumePublishPath: volumePublishPath,
+	}
+	resp, err := nodeClient.NodeGetVolumeHealth(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return mapVolumeHealthConditions(resp.GetVolumeHealth()), nil
+}
+
+func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
+	klog.V(4).InfoS(log("calling NodeGetStorageHealth rpc"))
+	if c.nodeV1ClientCreator == nil {
+		return nil, errors.New("nodeV1ClientCreate is nil")
+	}
+
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	req := &csipbv1.NodeGetStorageHealthRequest{
+		Secrets: secrets,
+	}
+	resp, err := nodeClient.NodeGetStorageHealth(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return mapStorageBackendHealth(resp.GetBackendHealth()), nil
+}
+
+func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondition {
+	if vh == nil {
+		return nil
+	}
+	entries := vh.GetHealthStatuses()
+	if len(entries) == 0 {
+		return nil
+	}
+	out := make([]api.VolumeHealthCondition, 0, len(entries))
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		status, ok := mapVolumeHealthStatus(entry.GetStatus())
+		if !ok {
+			continue
+		}
+		out = append(out, api.VolumeHealthCondition{
+			Status:  status,
+			Reason:  entry.GetReason(),
+			Message: entry.GetMessage(),
+		})
+	}
+	return out
+}
+
+func mapVolumeHealthStatus(status csipbv1.VolumeHealthErrorType) (api.VolumeHealthStatusType, bool) {
+	switch status {
+	case csipbv1.VolumeHealthErrorType_INACCESSIBLE:
+		return api.VolumeHealthInaccessible, true
+	case csipbv1.VolumeHealthErrorType_DATA_LOSS:
+		return api.VolumeHealthDataLoss, true
+	case csipbv1.VolumeHealthErrorType_DEGRADED:
+		return api.VolumeHealthDegraded, true
+	default:
+		return "", false
+	}
+}
+
+func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth) []storagev1.StorageHealthCondition {
+	if len(entries) == 0 {
+		return nil
+	}
+	out := make([]storagev1.StorageHealthCondition, 0, len(entries))
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		status, ok := mapStorageHealthStatus(entry.GetStatus())
+		if !ok {
+			continue
+		}
+		out = append(out, storagev1.StorageHealthCondition{
+			Status:  status,
+			Reason:  entry.GetReason(),
+			Message: entry.GetMessage(),
+		})
+	}
+	return out
+}
+
+func mapStorageHealthStatus(status csipbv1.StorageHealthErrorType) (storagev1.StorageHealthStatusType, bool) {
+	switch status {
+	case csipbv1.StorageHealthErrorType_STORAGE_UNREACHABLE:
+		return storagev1.StorageUnreachable, true
+	case csipbv1.StorageHealthErrorType_STORAGE_DEGRADED:
+		return storagev1.StorageDegraded, true
+	default:
+		return "", false
+	}
 }
 
 func (c *csiDriverClient) NodeSupportsVolumeMountGroup(ctx context.Context) (bool, error) {

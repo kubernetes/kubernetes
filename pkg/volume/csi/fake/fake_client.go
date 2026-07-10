@@ -81,8 +81,10 @@ type NodeClient struct {
 	expansionSet             bool
 	volumeStatsSet           bool
 	volumeHealthSet          bool
+	storageHealthSet         bool
 	SetVolumeStats           bool
 	SetVolumeHealth          bool
+	SetStorageHealth         bool
 	singleNodeMultiWriterSet bool
 	volumeMountGroupSet      bool
 	nodeGetInfoResp          *csipb.NodeGetInfoResponse
@@ -402,6 +404,16 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 		})
 	}
 
+	if f.storageHealthSet {
+		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
+			Type: &csipb.NodeServiceCapability_Rpc{
+				Rpc: &csipb.NodeServiceCapability_RPC{
+					Type: csipb.NodeServiceCapability_RPC_GET_STORAGE_HEALTH,
+				},
+			},
+		})
+	}
+
 	if f.singleNodeMultiWriterSet {
 		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
 			Type: &csipb.NodeServiceCapability_Rpc{
@@ -474,7 +486,25 @@ func (f *NodeClient) NodeGetStorageHealth(ctx context.Context, req *csipb.NodeGe
 	if f.nextErr != nil {
 		return nil, f.nextErr
 	}
-	return &csipb.NodeGetStorageHealthResponse{}, nil
+	resp := &csipb.NodeGetStorageHealthResponse{}
+	if f.SetStorageHealth {
+		resp.BackendHealth = []*csipb.NodeGetStorageHealthResponse_StorageBackendHealth{
+			{
+				Status:  csipb.StorageHealthErrorType_STORAGE_DEGRADED,
+				Reason:  "FakeStorageHealthIssue",
+				Message: "fake storage backend health issue",
+			},
+		}
+	}
+	return resp, nil
+}
+
+// NewNodeClientWithStorageHealth returns a fake node client with storage health capability.
+func NewNodeClientWithStorageHealth(storageHealth, setStorageHealth bool) *NodeClient {
+	return &NodeClient{
+		storageHealthSet: storageHealth,
+		SetStorageHealth: setStorageHealth,
+	}
 }
 
 // ControllerClient represents a CSI Controller client

@@ -94,6 +94,7 @@ type Plugin struct {
 	allowInsecureKubeletCertificateSigningRequests bool
 	serviceAccountNodeAudienceRestriction          bool
 	podCertificateRequestsEnabled                  bool
+	csiVolumeHealthEnabled                         bool
 }
 
 var (
@@ -110,6 +111,7 @@ func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.allowInsecureKubeletCertificateSigningRequests = featureGates.Enabled(features.AllowInsecureKubeletCertificateSigningRequests)
 	p.serviceAccountNodeAudienceRestriction = featureGates.Enabled(features.ServiceAccountNodeAudienceRestriction)
 	p.podCertificateRequestsEnabled = featureGates.Enabled(features.PodCertificateRequest)
+	p.csiVolumeHealthEnabled = featureGates.Enabled(features.CSIVolumeHealth)
 	p.inspectedFeatureGates = true
 }
 
@@ -1034,7 +1036,35 @@ func (p *Plugin) admitCSINode(nodeName string, a admission.Attributes) error {
 		}
 	}
 
+	if a.GetSubresource() == "status" {
+		if !p.csiVolumeHealthEnabled {
+			return admission.NewForbidden(a, fmt.Errorf("CSIVolumeHealth feature gate is disabled"))
+		}
+		return p.admitCSINodeStatus(nodeName, a)
+	}
+
 	return nil
+}
+
+// admitCSINodeStatus ensures a node cannot modify CSINode Spec via the status subresource.
+func (p *Plugin) admitCSINodeStatus(nodeName string, a admission.Attributes) error {
+	switch a.GetOperation() {
+	case admission.Update:
+		oldCSINode, ok := a.GetOldObject().(*storage.CSINode)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
+		}
+		newCSINode, ok := a.GetObject().(*storage.CSINode)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		if !apiequality.Semantic.DeepEqual(oldCSINode.Spec, newCSINode.Spec) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify CSINode spec via status", nodeName))
+		}
+		return nil
+	default:
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q", a.GetOperation()))
+	}
 }
 
 func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) error {

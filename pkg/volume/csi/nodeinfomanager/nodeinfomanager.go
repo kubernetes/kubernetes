@@ -37,9 +37,11 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -91,6 +93,11 @@ type Interface interface {
 	// Concurrent calls to UninstallCSIDriver() is allowed, but they should not be intertwined with calls
 	// to other methods in this interface.
 	UninstallCSIDriver(driverName string) error
+
+	// UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
+	// driver with the provided conditions. Other drivers' entries are preserved.
+	// No-ops if the (name,status,reason) set for this driver is unchanged.
+	UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error
 }
 
 // NewNodeInfoManager initializes nodeInfoManager
@@ -709,4 +716,87 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 
 	return err // do not wrap error
 
+}
+
+// UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
+// driver with the provided conditions. Other drivers' entries are preserved.
+// No-ops if the (name,status,reason) set for this driver is unchanged.
+func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		return nil
+	}
+
+	csiKubeClient := nim.volumeHost.GetKubeClient()
+	if csiKubeClient == nil {
+		return goerrors.New("error getting CSI client")
+	}
+
+	var updateErrs []error
+	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
+		if err := nim.tryUpdateCSINodeStorageHealth(csiKubeClient, driverName, conditions); err != nil {
+			updateErrs = append(updateErrs, err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("error updating CSINode status: %v; caused by: %v", err, utilerrors.NewAggregate(updateErrs))
+	}
+	return nil
+}
+
+func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
+	csiKubeClient clientset.Interface,
+	driverName string,
+	conditions []storagev1.StorageHealthCondition) error {
+
+	nim.lock.Lock()
+	defer nim.lock.Unlock()
+
+	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if err = nim.ensureNodeOwnsCSINode(nodeInfo); err != nil {
+		return err
+	}
+
+	existingDriverConds := make([]storagev1.StorageHealthCondition, 0)
+	otherDriversConds := make([]storagev1.StorageHealthCondition, 0, len(nodeInfo.Status.StorageHealth))
+	for _, cond := range nodeInfo.Status.StorageHealth {
+		if cond.Name == driverName {
+			existingDriverConds = append(existingDriverConds, cond)
+		} else {
+			otherDriversConds = append(otherDriversConds, cond)
+		}
+	}
+
+	if storageHealthIdentityEqual(existingDriverConds, conditions) {
+		return nil
+	}
+
+	nodeInfo.Status.StorageHealth = append(otherDriversConds, conditions...)
+	_, err = csiKubeClient.StorageV1().CSINodes().UpdateStatus(context.TODO(), nodeInfo, metav1.UpdateOptions{})
+	return err
+}
+
+// storageHealthIdentityEqual reports whether two condition slices have the same
+// (name,status,reason) identity set. Other fields (message, accessModes, etc.) are ignored.
+func storageHealthIdentityEqual(a, b []storagev1.StorageHealthCondition) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	type identity struct {
+		name, status, reason string
+	}
+	setA := sets.New[identity]()
+	for _, c := range a {
+		setA.Insert(identity{c.Name, string(c.Status), c.Reason})
+	}
+	setB := sets.New[identity]()
+	for _, c := range b {
+		setB.Insert(identity{c.Name, string(c.Status), c.Reason})
+	}
+	return setA.Equal(setB)
 }

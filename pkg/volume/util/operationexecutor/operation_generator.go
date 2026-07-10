@@ -542,6 +542,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			}
 
 			// Mount device to global mount path
+			og.markVolumeMountAsAttempted(actualStateOfWorld, volumeToMount.PodName, volumeToMount.VolumeName)
 			err = volumeDeviceMounter.MountDevice(
 				volumeToMount.VolumeSpec,
 				devicePath,
@@ -581,6 +582,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		// Execute mount
+		og.markVolumeMountAsAttempted(actualStateOfWorld, volumeToMount.PodName, volumeToMount.VolumeName)
 		mountErr := volumeMounter.SetUp(volume.MounterArgs{
 			FsUser:              util.FsUserFrom(volumeToMount.Pod),
 			FsGroup:             fsGroup,
@@ -671,6 +673,12 @@ func (og *operationGenerator) checkForFailedMount(volumeToMount VolumeToMount, m
 	if volumetypes.IsFilesystemMismatchError(mountError) {
 		simpleMsg, _ := volumeToMount.GenerateMsg("MountVolume failed", mountError.Error())
 		og.recorder.Eventf(pv, v1.EventTypeWarning, kevents.FailedMountOnFilesystemMismatch, "%s", simpleMsg)
+	}
+}
+
+func (og *operationGenerator) markVolumeMountAsAttempted(actualStateOfWorld ActualStateOfWorldMounterUpdater, podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		actualStateOfWorld.MarkVolumeAsMountAttempted(podName, volumeName)
 	}
 }
 
@@ -1006,6 +1014,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		// Call SetUpDevice if blockVolumeMapper implements CustomBlockVolumeMapper
 		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok && actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) != DeviceGloballyMounted {
 			var mapErr error
+			og.markVolumeMountAsAttempted(actualStateOfWorld, volumeToMount.PodName, volumeToMount.VolumeName)
 			stagingPath, mapErr = customBlockVolumeMapper.SetUpDevice()
 			if mapErr != nil {
 				og.markDeviceErrorState(volumeToMount, devicePath, globalMapPath, mapErr, actualStateOfWorld)

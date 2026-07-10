@@ -35,10 +35,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/features"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/utils/ptr"
 )
@@ -1222,4 +1225,168 @@ func hasPatchAction(actions []clienttesting.Action) clienttesting.Action {
 		}
 	}
 	return nil
+}
+
+func TestUpdateCSINodeStorageHealth(t *testing.T) {
+	driver1 := "com.example.csi.driver1"
+	driver2 := "com.example.csi.driver2"
+	cond1 := storage.StorageHealthCondition{
+		Name:    driver1,
+		Status:  storage.StorageDegraded,
+		Reason:  "DiskSlow",
+		Message: "disk is slow",
+	}
+	cond1UpdatedMsg := storage.StorageHealthCondition{
+		Name:    driver1,
+		Status:  storage.StorageDegraded,
+		Reason:  "DiskSlow",
+		Message: "disk is still slow",
+	}
+	cond1New := storage.StorageHealthCondition{
+		Name:   driver1,
+		Status: storage.StorageUnreachable,
+		Reason: "NetworkDown",
+	}
+	cond2 := storage.StorageHealthCondition{
+		Name:   driver2,
+		Status: storage.StorageDegraded,
+		Reason: "OtherIssue",
+	}
+
+	testcases := []struct {
+		name            string
+		featureEnabled  bool
+		existingCSINode *storage.CSINode
+		driverName      string
+		conditions      []storage.StorageHealthCondition
+		expectStatus    []storage.StorageHealthCondition
+		expectUpdate    bool
+	}{
+		{
+			name:           "feature gate disabled - no-op",
+			featureEnabled: false,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{cond1},
+			expectStatus: nil,
+			expectUpdate: false,
+		},
+		{
+			name:           "set health for driver with empty status",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{cond1},
+			expectStatus: []storage.StorageHealthCondition{cond1},
+			expectUpdate: true,
+		},
+		{
+			name:           "preserve other drivers' health",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{
+					{Name: driver1, NodeID: "n1"},
+					{Name: driver2, NodeID: "n2"},
+				}},
+				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealthCondition{cond2}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{cond1},
+			expectStatus: []storage.StorageHealthCondition{cond2, cond1},
+			expectUpdate: true,
+		},
+		{
+			name:           "replace existing driver conditions",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
+				Status:     storage.CSINodeStatus{StorageHealth: []storage.StorageHealthCondition{cond1}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{cond1New},
+			expectStatus: []storage.StorageHealthCondition{cond1New},
+			expectUpdate: true,
+		},
+		{
+			name:           "no-op when identity unchanged",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
+				Status:     storage.CSINodeStatus{StorageHealth: []storage.StorageHealthCondition{cond1}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{cond1UpdatedMsg},
+			expectStatus: []storage.StorageHealthCondition{cond1},
+			expectUpdate: false,
+		},
+		{
+			name:           "clear driver conditions",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{
+					{Name: driver1, NodeID: "n1"},
+					{Name: driver2, NodeID: "n2"},
+				}},
+				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealthCondition{cond1, cond2}},
+			},
+			driverName:   driver1,
+			conditions:   nil,
+			expectStatus: []storage.StorageHealthCondition{cond2},
+			expectUpdate: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, tc.featureEnabled)
+
+			existingNode := generateNode(nil, nil, nil)
+			client := getClientSet(existingNode, tc.existingCSINode)
+
+			tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-health-test")
+			if err != nil {
+				t.Fatalf("can't create temp dir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, tmpDir, client, nil, existingNode.Name, nil, nil)
+			nim := NewNodeInfoManager(types.NodeName(existingNode.Name), host, nil).(*nodeInfoManager)
+			nim.nodeID = existingNode.UID
+
+			actionsBefore := len(client.Actions())
+			err = nim.UpdateCSINodeStorageHealth(tc.driverName, tc.conditions)
+			if err != nil {
+				t.Fatalf("UpdateCSINodeStorageHealth returned error: %v", err)
+			}
+
+			gotUpdate := false
+			for _, action := range client.Actions()[actionsBefore:] {
+				if action.GetVerb() == "update" && action.GetSubresource() == "status" {
+					gotUpdate = true
+					break
+				}
+			}
+			if gotUpdate != tc.expectUpdate {
+				t.Errorf("expected status update=%v, got %v", tc.expectUpdate, gotUpdate)
+			}
+
+			got, err := client.StorageV1().CSINodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("error getting CSINode: %v", err)
+			}
+			if !reflect.DeepEqual(got.Status.StorageHealth, tc.expectStatus) {
+				t.Errorf("StorageHealth mismatch:\n got: %#v\nwant: %#v", got.Status.StorageHealth, tc.expectStatus)
+			}
+		})
+	}
 }

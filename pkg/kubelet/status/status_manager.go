@@ -45,6 +45,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // A wrapper around v1.PodStatus that includes a version to enforce that stale pod statuses are
@@ -160,6 +161,11 @@ type Manager interface {
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
 	SetContainerReadiness(logger klog.Logger, podUID types.UID, containerID kubecontainer.ContainerID, ready bool)
+
+	// SetPodVolumeHealth updates the cached VolumeHealth entry for the given
+	// volume name on the pod. conditions is the full desired condition set for
+	// that volume (empty means healthy). Returns true if the cached status changed.
+	SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volumeName string, conditions []v1.VolumeHealthCondition) bool
 
 	// SetContainerStartup updates the cached container status with the given startup, and
 	// triggers a status update.
@@ -570,6 +576,69 @@ func (m *manager) SetContainerReadiness(logger klog.Logger, podUID types.UID, co
 	updateConditionFunc(v1.PodReady, GeneratePodReadyCondition(pod, &oldStatus.status, status.Conditions, allContainerStatuses, status.Phase))
 	updateConditionFunc(v1.ContainersReady, GenerateContainersReadyCondition(pod, &oldStatus.status, allContainerStatuses, status.Phase))
 	_, notification = m.updateStatusInternal(logger, pod, status, false, false)
+}
+
+func (m *manager) SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volumeName string, conditions []v1.VolumeHealthCondition) bool {
+	var notification *podStatusNotification
+	defer func() {
+		if notification != nil {
+			m.sendNotification(logger, notification)
+		}
+	}()
+
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	pod, ok := m.podManager.GetPodByUID(podUID)
+	if !ok {
+		logger.V(4).Info("Pod has been deleted, no need to update volume health", "podUID", podUID)
+		return false
+	}
+
+	oldStatus, found := m.podStatuses[pod.UID]
+	if !found {
+		logger.Info("Volume health changed before pod has synced",
+			"pod", klog.KObj(pod),
+			"volumeName", volumeName)
+		return false
+	}
+
+	entryIndex := -1
+	var existingConditions []v1.VolumeHealthCondition
+	for i := range oldStatus.status.VolumeHealth {
+		if oldStatus.status.VolumeHealth[i].Name == volumeName {
+			entryIndex = i
+			existingConditions = oldStatus.status.VolumeHealth[i].HealthConditions
+			break
+		}
+	}
+
+	// PATCH only when the (status, reason) set differs; message-only changes are suppressed.
+	if volumeutil.VolumeHealthConditionSetsEqual(existingConditions, conditions) {
+		logger.V(4).Info("Volume health unchanged",
+			"pod", klog.KObj(pod),
+			"volumeName", volumeName)
+		return false
+	}
+
+	// Make sure we're not updating the cached version.
+	status := *oldStatus.status.DeepCopy()
+	newConditions := append([]v1.VolumeHealthCondition(nil), conditions...)
+	now := metav1.Now()
+	if entryIndex >= 0 {
+		status.VolumeHealth[entryIndex].HealthConditions = newConditions
+		status.VolumeHealth[entryIndex].LastTransitionTime = now
+	} else {
+		status.VolumeHealth = append(status.VolumeHealth, v1.PodVolumeHealth{
+			Name:               volumeName,
+			HealthConditions:   newConditions,
+			LastTransitionTime: now,
+		})
+	}
+
+	changed, notif := m.updateStatusInternal(logger, pod, status, false, false)
+	notification = notif
+	return changed
 }
 
 func (m *manager) SetContainerStartup(logger klog.Logger, podUID types.UID, containerID kubecontainer.ContainerID, started bool) {

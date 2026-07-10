@@ -18,6 +18,7 @@ package csimock
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -46,6 +48,8 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 	m := newMockDriverSetup(f)
 
 	f.Context("CSI Mock Node Volume Health", f.WithSlow(), func() {
+		// NodeGetVolumeHealth is probed by the volumehealth manager independently of
+		// NodeGetVolumeStats, so call order is not guaranteed.
 		trackedCalls := []string{
 			"NodeGetVolumeStats",
 			"NodeGetVolumeHealth",
@@ -53,6 +57,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 		tests := []struct {
 			name                     string
 			expectedCalls            []csiCall
+			forbiddenCalls           []string
 			nodeVolumeHealthRequired bool
 			nodeAbnormalVolumeHealth bool
 		}{
@@ -79,6 +84,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 						expectedError:  codes.OK,
 					},
 				},
+				forbiddenCalls:           []string{"NodeGetVolumeHealth"},
 				nodeVolumeHealthRequired: false,
 				nodeAbnormalVolumeHealth: false,
 			},
@@ -119,20 +125,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 				framework.ExpectNoError(err, "wait for running pod")
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.PollUntilContextTimeout(ctx, time.Second, csiNodeVolumeStatWaitPeriod, true, func(c context.Context) (done bool, err error) {
-					var index int
-					_, index, err = compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
-					if err != nil {
-						return true, err
-					}
-					if index == 0 {
-						// No CSI call received yet
-						return false, nil
-					}
-					if len(test.expectedCalls) == index {
-						// all calls received
-						return true, nil
-					}
-					return false, nil
+					return expectedCSICallsSeen(ctx, trackedCalls, test.expectedCalls, test.forbiddenCalls, m.driver.GetCalls)
 				})
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
 				// try to use ```csi.NewMetricsCsi(pv.handler).GetMetrics()``` to get metrics from csimock driver but failed.
@@ -156,12 +149,86 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 						return true, nil
 					})
 					framework.ExpectNoError(waitErr, "call metrics should not have any error")
+
+					// Also verify kubelet wrote pod.status.volumeHealth from NodeGetVolumeHealth.
+					waitErr = wait.PollUntilContextTimeout(ctx, 5*time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
+						updated, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+						if err != nil {
+							return false, err
+						}
+						return podVolumeHealthMatches(updated, test.nodeAbnormalVolumeHealth), nil
+					})
+					framework.ExpectNoError(waitErr, "pod.status.volumeHealth should reflect NodeGetVolumeHealth")
 				}
 			})
 		}
 
 	})
 })
+
+// expectedCSICallsSeen reports whether every expected CSI method has been observed
+// (order-independent) and that no forbidden methods appear. Health and stats are
+// probed on independent kubelet paths, so ordered matching is not reliable.
+func expectedCSICallsSeen(
+	ctx context.Context,
+	trackedCalls []string,
+	expectedCalls []csiCall,
+	forbiddenCalls []string,
+	getCalls func(ctx context.Context) ([]drivers.MockCSICall, error),
+) (bool, error) {
+	allCalls, err := getCalls(ctx)
+	if err != nil {
+		framework.Logf("intermittent (?) log retrieval error, proceeding without output: %v", err)
+		return false, nil
+	}
+
+	tracked := sets.NewString(trackedCalls...)
+	forbidden := sets.NewString(forbiddenCalls...)
+	seenOK := sets.NewString()
+	for _, c := range allCalls {
+		if !tracked.Has(c.Method) {
+			continue
+		}
+		if forbidden.Has(c.Method) {
+			return true, fmt.Errorf("unexpected CSI call %s (%d)", c.Method, c.FullError.Code)
+		}
+		for _, expected := range expectedCalls {
+			if c.Method == expected.expectedMethod && c.FullError.Code == expected.expectedError {
+				seenOK.Insert(expected.expectedMethod)
+			}
+		}
+	}
+	for _, expected := range expectedCalls {
+		if !seenOK.Has(expected.expectedMethod) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func podVolumeHealthMatches(pod *v1.Pod, abnormal bool) bool {
+	var entry *v1.PodVolumeHealth
+	for i := range pod.Status.VolumeHealth {
+		vh := &pod.Status.VolumeHealth[i]
+		if vh.Name != "" {
+			entry = vh
+			break
+		}
+	}
+	if !abnormal {
+		// Healthy: either no VolumeHealth entry, or an entry with empty conditions.
+		return entry == nil || len(entry.HealthConditions) == 0
+	}
+	if entry == nil || len(entry.HealthConditions) == 0 {
+		return false
+	}
+	for _, c := range entry.HealthConditions {
+		if c.Status == v1.VolumeHealthInaccessible && c.Reason == "AbnormalVolumeHealth" {
+			return true
+		}
+	}
+	return false
+}
 
 func findVolumeHealthMetrics(pvcNamespace, pvcName string, kubeMetrics e2emetrics.KubeletMetrics, nodeAbnormalVolumeHealth bool) bool {
 	found := false
