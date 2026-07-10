@@ -106,6 +106,19 @@ And that's just Ginkgo!  [Gomega](https://onsi.github.io/gomega/) brings a rich,
 
 Happy Testing!
 
+## Using Ginkgo with Claude Code
+
+Ginkgo ships a set of [Claude Code](https://claude.com/claude-code) skills as a plugin, with this repo doubling as the marketplace, so an agent writing specs in *your* project has Ginkgo's idioms, decorators, and gotchas on hand. From inside Claude Code:
+
+```
+/plugin marketplace add onsi/ginkgo
+/plugin install ginkgo@ginkgo
+```
+
+(or non-interactively: `claude plugin marketplace add onsi/ginkgo` then `claude plugin install ginkgo@ginkgo`)
+
+This installs a family of `ginkgo:*` skills that activate automatically while you write and run specs. Start with `ginkgo:overview`; see the [plugin README](plugins/ginkgo/README.md) for the full list.
+
 ## License
 
 Ginkgo is MIT-Licensed
