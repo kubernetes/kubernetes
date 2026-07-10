@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/utils/cpuset"
 )
 
 // AttributeForm selects whether the numaNode attribute is published as a
@@ -43,7 +44,10 @@ const (
 	ListAttribute
 )
 
-// maxNUMANodes is the upper bound for valid NUMA node IDs (Linux kernel maximum).
+// maxNUMANodes is the upper bound for valid NUMA node IDs.
+// Linux defines MAX_NUMNODES = (1 << CONFIG_NODES_SHIFT) in
+// include/linux/nodemask_types.h, with CONFIG_NODES_SHIFT capped at 10
+// across all architectures (x86, arm64, riscv).
 const maxNUMANodes = 1024
 
 // GetNUMANodeAttributeByPCIBusID returns the numaNode attribute for a PCI
@@ -279,44 +283,16 @@ func getSocketForNUMANode(mc machine, node int) (int, bool) {
 		return -1, false
 	}
 
-	cpus := parseCPUList(strings.TrimSpace(string(data)))
-	if len(cpus) == 0 {
+	cpus, err := cpuset.Parse(strings.TrimSpace(string(data)))
+	if err != nil || cpus.Size() == 0 {
 		return -1, false
 	}
 
-	pkgPath := filepath.Join("devices", "system", "cpu", fmt.Sprintf("cpu%d", cpus[0]), "topology", "physical_package_id")
+	pkgPath := filepath.Join("devices", "system", "cpu", fmt.Sprintf("cpu%d", cpus.List()[0]), "topology", "physical_package_id")
 	socketID, err := readSysfsInt(mc, pkgPath)
 	if err != nil {
 		return -1, false
 	}
 
 	return socketID, true
-}
-
-// parseCPUList parses a Linux CPU list string like "0-3,8-11" into individual
-// CPU IDs.
-func parseCPUList(cpulist string) []int {
-	if cpulist == "" {
-		return nil
-	}
-	var cpus []int
-	for part := range strings.SplitSeq(cpulist, ",") {
-		bounds := strings.SplitN(part, "-", 2)
-		start, err := strconv.Atoi(strings.TrimSpace(bounds[0]))
-		if err != nil {
-			continue
-		}
-		if len(bounds) == 1 {
-			cpus = append(cpus, start)
-		} else {
-			end, err := strconv.Atoi(strings.TrimSpace(bounds[1]))
-			if err != nil {
-				continue
-			}
-			for i := start; i <= end; i++ {
-				cpus = append(cpus, i)
-			}
-		}
-	}
-	return cpus
 }
