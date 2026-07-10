@@ -151,6 +151,12 @@ func schemeRegistryTag(pkg *types.Package) (types.Name, bool) {
 	return types.ParseFullyQualifiedName(val), true
 }
 
+// registerScheme reports whether pkg registers its validations with a scheme.
+func registerScheme(pkg *types.Package) bool {
+	_, ok := schemeRegistryTag(pkg)
+	return ok
+}
+
 func isSubresourceTag(t *types.Type) (string, bool) {
 	var comments []string
 	comments = append(comments, t.SecondClosestCommentLines...)
@@ -261,7 +267,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	// it is MUCH faster.
 	inputPkgs := make([]string, 0, len(context.Inputs))
 	pkgToInput := map[string]string{}
-	inputToPkg := map[string]string{} // reverse of pkgToInput
+	inputToCanonicalPkg := map[string]string{} // types package -> the output package cross-package references resolve to
 	for _, input := range context.Inputs {
 		klog.V(4).Infof("considering pkg %q", input)
 		pkg := context.Universe[input]
@@ -277,14 +283,22 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		// +k8s:validation-gen-input may direct the generator at types in
 		// a different package than the one where validators will be emitted.
 		inputPath := info.ExternalTypes()
+		pkgToInput[input] = inputPath
 		if inputPath != pkg.Path {
 			klog.V(4).Infof("  input pkg %v", inputPath)
 			inputPkgs = append(inputPkgs, inputPath)
-			pkgToInput[input] = inputPath
-			inputToPkg[inputPath] = input
-		} else {
-			pkgToInput[input] = input
-			inputToPkg[input] = input
+		}
+		// An input's validation may be generated into more than one package. One
+		// is canonical -- the package cross-package references resolve to. The
+		// registering package is canonical; if none registers, the first one seen
+		// wins. At most one package may register.
+		if prev, ok := inputToCanonicalPkg[inputPath]; !ok {
+			inputToCanonicalPkg[inputPath] = input
+		} else if registerScheme(pkg) {
+			if registerScheme(context.Universe[prev]) {
+				klog.Fatalf("input %q is generated into two registering packages (%q, %q); mark one +k8s:validation-gen-scheme-registry=nil", inputPath, prev, input)
+			}
+			inputToCanonicalPkg[inputPath] = input // a registering package displaces a non-registering one
 		}
 	}
 
@@ -307,8 +321,8 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		inputPkgs = append(inputPkgs, extra)
 		pkgToInput[extra] = extra
 		// Don't let a read-only package override a generation mapping.
-		if _, ok := inputToPkg[extra]; !ok {
-			inputToPkg[extra] = extra
+		if _, ok := inputToCanonicalPkg[extra]; !ok {
+			inputToCanonicalPkg[extra] = extra
 		}
 	}
 
@@ -322,10 +336,10 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	context.Order = orderer.OrderUniverse(context.Universe)
 
 	// Initialize all validator plugins exactly once.
-	validator := validators.InitGlobalValidator(context, inputToPkg)
+	validator := validators.InitGlobalValidator(context, inputToCanonicalPkg)
 
 	// Create a type discoverer for all types of all inputs.
-	td := NewTypeDiscoverer(validator, inputToPkg)
+	td := NewTypeDiscoverer(validator, inputToCanonicalPkg)
 	if err := td.Init(context); err != nil {
 		klog.Fatalf("Error discovering constants: %v", err)
 	}
@@ -471,7 +485,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					generators = []generator.Generator{
-						NewGenValidations(args.OutputFile, pkg.Path, rootTypes, td, inputToPkg, schemeRegistry, registerThisPkg),
+						NewGenValidations(args.OutputFile, pkg.Path, typesPkg.Path, rootTypes, td, inputToCanonicalPkg, schemeRegistry, registerThisPkg),
 					}
 					testFixtureTags := testFixtureTag(pkg)
 					if testFixtureTags.Len() > 0 {
@@ -505,7 +519,10 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			})
 
 		// Accumulate per-Kind rules; testTargets emits after the loop.
-		if args.TestOutputRoot != "" {
+		// Only the registering package contributes coverage; a non-registering
+		// package generated from the same input has identical rules, so counting
+		// it too would double-list the version for the Kind.
+		if args.TestOutputRoot != "" && registerThisPkg {
 			collectReports(typesPkg, rootTypes, td, groupKindReports)
 		}
 	}
