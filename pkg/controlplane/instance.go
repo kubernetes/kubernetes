@@ -119,8 +119,13 @@ const (
 	//   2. which component owns this lease
 	// TODO(sttts): remove this indirection
 	IdentityLeaseComponentLabelKey = controlplaneapiserver.IdentityLeaseComponentLabelKey
-	// repairLoopInterval defines the interval used to run the Services ClusterIP and NodePort repair loops
-	repairLoopInterval = 3 * time.Minute
+	// repairLoopInterval defines the interval used to run the Services ClusterIP and NodePort repair loops.
+	// Each run lists every Service from quorum storage; at very large Service
+	// counts (10^6+) a 3-minute cadence keeps a full-keyspace scan almost
+	// permanently in flight against the storage backend, crowding out write
+	// traffic. Repairs are a safety net for leaked allocations, not a
+	// correctness-critical loop — a longer cadence is safe.
+	repairLoopInterval = 30 * time.Minute
 )
 
 var (

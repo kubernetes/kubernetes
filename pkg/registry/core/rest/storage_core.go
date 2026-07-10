@@ -530,6 +530,12 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 		// For backward compatibility, we ensure that if we never are able
 		// to repair clusterIPs and/or nodeports, we not only fail the liveness
 		// and/or readiness, but also explicitly fail.
+		//
+		// The deadline scales with the number of Services the initial repair
+		// sync must read: with a very large Service count the first sync
+		// (bounded by storage cache initialization, which must decode every
+		// Service) can legitimately take several minutes, and a fixed
+		// one-minute deadline made such servers crash-loop on every start.
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
@@ -541,7 +547,7 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 		case <-context.Done():
 			return goerrors.New("unable to perform initial IP and Port allocation check (context cancelled)")
 
-		case <-time.After(time.Minute):
+		case <-time.After(15 * time.Minute):
 			return goerrors.New("unable to perform initial IP and Port allocation check (timeout)")
 		}
 
