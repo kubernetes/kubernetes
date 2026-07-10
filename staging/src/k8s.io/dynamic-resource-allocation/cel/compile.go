@@ -221,8 +221,7 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 }
 
 func (c *compiler) newCostEstimator(typesFromEnv typesFromEnv) checker.CostEstimator {
-	base := &library.CostEstimator{SizeEstimator: &sizeEstimator{typesFromEnv}}
-	return &draCostEstimator{base: base}
+	return &library.CostEstimator{SizeEstimator: &sizeEstimator{typesFromEnv}}
 }
 
 type typesFromEnv struct {
@@ -586,19 +585,6 @@ func (m mapper) Find(key ref.Val) (ref.Val, bool) {
 	}
 
 	return m.defaultValue, true
-}
-
-// draCostEstimator is a wrapper around the base CEL CostEstimator to provide custom cost estimates for DRA-specific functions and types.
-type draCostEstimator struct {
-	base *library.CostEstimator
-}
-
-func (e *draCostEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstimate {
-	return e.base.EstimateSize(element)
-}
-
-func (e *draCostEstimator) EstimateCallCost(function, overloadID string, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
-	return e.base.EstimateCallCost(function, overloadID, target, args)
 }
 
 // sizeEstimator tells the cost estimator the maximum size of maps, strings, or lists accessible through the `device` variable.
