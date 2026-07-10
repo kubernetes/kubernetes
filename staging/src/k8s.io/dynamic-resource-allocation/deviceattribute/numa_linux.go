@@ -46,8 +46,8 @@ const (
 
 // maxNUMANodes is the upper bound for valid NUMA node IDs.
 // Linux defines MAX_NUMNODES = (1 << CONFIG_NODES_SHIFT) in
-// include/linux/nodemask_types.h, with CONFIG_NODES_SHIFT capped at 10
-// across all architectures (x86, arm64, riscv).
+// include/linux/nodemask_types.h (as of v7.2), with CONFIG_NODES_SHIFT
+// capped at 10 across all architectures (x86, arm64, riscv).
 const maxNUMANodes = 1024
 
 // GetNUMANodeAttributeByPCIBusID returns the numaNode attribute for a PCI
@@ -288,7 +288,7 @@ func getSocketForNUMANode(mc machine, node int) (int, bool) {
 		return -1, false
 	}
 
-	pkgPath := filepath.Join("devices", "system", "cpu", fmt.Sprintf("cpu%d", cpus.List()[0]), "topology", "physical_package_id")
+	pkgPath := filepath.Join("devices", "system", "cpu", fmt.Sprintf("cpu%d", cpus.UnsortedList()[0]), "topology", "physical_package_id")
 	socketID, err := readSysfsInt(mc, pkgPath)
 	if err != nil {
 		return -1, false
