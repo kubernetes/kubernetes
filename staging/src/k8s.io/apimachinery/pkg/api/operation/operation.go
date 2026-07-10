@@ -17,7 +17,6 @@ limitations under the License.
 package operation
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -35,24 +34,21 @@ type Operation struct {
 	// name to whether it is enabled. Option names typically match feature gates. Set by
 	// the resource strategy and read-only during validation.
 	//
-	// Every option referenced by a validation tag must be declared here. Referencing an
-	// undeclared option is a programming error (see HasOption).
+	// Every option a validation tag references must be defined here by the strategy; an
+	// option that is not defined is a programming error (see HasOption).
 	Options map[string]bool
 
 	// Request provides information about the request being validated.
 	Request Request
 }
 
-// HasOption returns whether the named option is enabled. Every option referenced by a
-// validation tag must be declared by the strategy; referencing an undeclared option
-// returns an error rather than silently treating it as disabled, so declarative
-// validation can surface the mistake as an internal error.
-func (o Operation) HasOption(option string) (bool, error) {
-	enabled, declared := o.Options[option]
-	if !declared {
-		return false, fmt.Errorf("undeclared validation option %q", option)
-	}
-	return enabled, nil
+// HasOption returns whether the named option is enabled and whether it was defined by
+// the strategy. Every option a validation tag references must be defined; callers treat
+// an undefined option as an internal error (see validate.IfOption) rather than silently
+// as disabled.
+func (o Operation) HasOption(option string) (enabled, defined bool) {
+	enabled, defined = o.Options[option]
+	return
 }
 
 // Request provides information about the request being validated.

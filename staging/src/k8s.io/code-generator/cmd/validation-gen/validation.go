@@ -1518,6 +1518,7 @@ func (g *genValidations) emitCallsToValidators(c *generator.Context, validations
 			targs := generator.Args{
 				"funcName": c.Universe.Type(g.resolveFunc(v.Function)),
 				"field":    mkSymbolArgs(c, fieldPkgSymbols),
+				"fmt":      mkSymbolArgs(c, fmtPkgSymbols),
 			}
 
 			emitCall := func() {
@@ -1553,12 +1554,13 @@ func (g *genValidations) emitCallsToValidators(c *generator.Context, validations
 			if !v.Conditions.Empty() {
 				emitBaseFunction := emitCall
 				emitCall = func() {
-					// emitOptionLookup emits "<var>, err := op.HasOption(<option>)" and
-					// surfaces an undeclared option as an internal error.
+					// emitOptionLookup emits "<var>, defined := op.HasOption(<option>)" and
+					// surfaces an undefined option as an internal error.
 					emitOptionLookup := func(varName, option string) {
-						sw.Do("  "+varName+", err := op.HasOption($.$)\n", strconv.Quote(option))
-						sw.Do("  if err != nil {\n", nil)
-						sw.Do("    return $.field.ErrorList|raw${$.field.InternalError|raw$(fldPath, err)}\n", targs)
+						la := generator.Args{"field": targs["field"], "fmt": targs["fmt"], "opt": strconv.Quote(option)}
+						sw.Do("  "+varName+", defined := op.HasOption($.opt$)\n", la)
+						sw.Do("  if !defined {\n", nil)
+						sw.Do("    return $.field.ErrorList|raw${$.field.InternalError|raw$(fldPath, $.fmt.Errorf|raw$(\"undefined validation option %q\", $.opt$))}\n", la)
 						sw.Do("  }\n", nil)
 					}
 					sw.Do("func() $.field.ErrorList|raw$ {\n", targs)

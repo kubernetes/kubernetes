@@ -83,10 +83,10 @@ func (d DeclarativeValidation) DeclarativeValidationConfig(ctx context.Context, 
 // DeclarativeValidationConfigurer and return this struct.
 type DeclarativeValidationConfig struct {
 	// Options contains the validation options that declarative validation tags expect,
-	// mapping option name to whether it is enabled. Every option referenced by the
-	// resource's validation tags must be declared here; a referenced option that is not
-	// declared is reported as an internal error rather than treated as disabled. Option
-	// names often correspond to feature gates.
+	// mapping option name to whether it is enabled. Every option a resource's validation
+	// tags reference must be defined here; an option that is not defined is reported as an
+	// internal error rather than treated as disabled. Option names often correspond to
+	// feature gates.
 	Options map[string]bool
 
 	// NormalizationRules are applied to field paths when comparing

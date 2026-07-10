@@ -18,6 +18,7 @@ package validate
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -81,11 +82,11 @@ func isExcluded[T ~string](op operation.Operation, exclusions []EnumExclusion[T]
 		if rule.Value != value {
 			continue
 		}
-		has, err := op.HasOption(rule.Option)
-		if err != nil {
-			return false, err
+		on, defined := op.HasOption(rule.Option)
+		if !defined {
+			return false, fmt.Errorf("undefined validation option %q", rule.Option)
 		}
-		if rule.ExcludeWhen == has {
+		if rule.ExcludeWhen == on {
 			return true, nil
 		}
 	}
