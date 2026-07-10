@@ -114,8 +114,9 @@ func New(logger klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath s
 
 	duration := maxHousekeepingInterval
 	housekeepingConfig := manager.HousekeepingConfig{
-		Interval:     &duration,
-		AllowDynamic: ptr.To(allowDynamicHousekeeping),
+		Interval:                  &duration,
+		AllowDynamic:              ptr.To(allowDynamicHousekeeping),
+		DisableContainerDiscovery: utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI),
 	}
 
 	// Create the cAdvisor container manager.
