@@ -30,12 +30,24 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1beta1", Kind: "ResourceSlice"},
 		coverage.FieldRules{
+			"metadata.creationTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionGracePeriodSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"metadata.managedFields[*].operation": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.uid": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"spec.devices[*].basic.attributes[*]": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},

@@ -811,6 +811,8 @@ message ObjectMeta {
   // Read-only.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional string uid = 5;
 
   // An opaque value that represents the internal version of this object that can
@@ -842,6 +844,7 @@ message ObjectMeta {
   // Null for lists.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional Time creationTimestamp = 8;
 
   // DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
@@ -863,6 +866,8 @@ message ObjectMeta {
   // Read-only.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional Time deletionTimestamp = 9;
 
   // Number of seconds allowed for this object to gracefully terminate before
@@ -870,6 +875,8 @@ message ObjectMeta {
   // May only be shortened.
   // Read-only.
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional int64 deletionGracePeriodSeconds = 10;
 
   // Map of string keys and values that can be used to organize and categorize

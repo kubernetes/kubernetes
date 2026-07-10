@@ -30,12 +30,24 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"},
 		coverage.FieldRules{
+			"metadata.creationTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionGracePeriodSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"metadata.managedFields[*].operation": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.uid": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"spec.backoffLimitPerIndex": {
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},

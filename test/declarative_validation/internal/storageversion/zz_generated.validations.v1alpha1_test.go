@@ -30,12 +30,24 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "internal.apiserver.k8s.io", Version: "v1alpha1", Kind: "StorageVersion"},
 		coverage.FieldRules{
+			"metadata.creationTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionGracePeriodSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"metadata.deletionTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"metadata.managedFields[*].operation": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.uid": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 		},
 	)
