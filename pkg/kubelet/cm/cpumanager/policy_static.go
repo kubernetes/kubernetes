@@ -35,6 +35,7 @@ import (
 	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/cpuset"
 )
@@ -379,11 +380,22 @@ func (p *staticPolicy) validatePodScopeResources(logger klog.Logger, pod *v1.Pod
 // It's called once per pod by the Topology Manager's pod-scope admit handler.
 // The logic here allocates a single "bubble" of CPUs for the entire pod
 // and then partitions that bubble among the containers.
-func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod) (rerr error) {
-	podUID := string(pod.UID)
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) (rerr error) {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "operation", operation)
 	logger.V(4).Info("AllocatePod called for pod-level managed pod")
 
+	// Static policy supports only Add pod-level resource allocation operation.
+	switch operation {
+	case lifecycle.AddOperation:
+		return p.allocatePodForAdd(logger, s, pod)
+	default:
+		logger.V(2).Info("CPU Manager pod-level resource allocation skipped, operation not supported by the static CPU manager policy")
+		return nil
+	}
+}
+
+func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod *v1.Pod) (rerr error) {
+	podUID := string(pod.UID)
 	// 1. Calculate the total number of CPUs required for the pod, considering init container reuse.
 	totalPodCPUs := p.podGuaranteedCPUs(logger, pod)
 	if totalPodCPUs == 0 {
@@ -551,11 +563,21 @@ func (p *staticPolicy) enforceSMTAlignment(s state.State, numCPUs int) error {
 	return nil
 }
 
-func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "operation", operation)
 	logger.Info("Allocate start") // V=0 for backward compatibility
 	defer logger.V(2).Info("Allocate end")
 
+	switch operation {
+	case lifecycle.AddOperation:
+		return p.allocateForAdd(logger, s, pod, container)
+	default:
+		logger.V(2).Info("CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy")
+		return nil
+	}
+}
+
+func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	numCPUs := p.guaranteedCPUs(logger, pod, container)
 	if numCPUs == 0 {
 		// container belongs in the shared pool (nothing to do; use default cpuset)
@@ -667,7 +689,7 @@ func (p *staticPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID
 	updatedCPUs := s.GetDefaultCPUSet().Union(toRelease)
 	s.SetDefaultCPUSet(updatedCPUs)
 	p.updateMetricsOnRelease(logger, s, toRelease)
-	logger.Info(" RemoveContainer end", "defaultCPUSet", updatedCPUs)
+	logger.Info("RemoveContainer end", "defaultCPUSet", updatedCPUs)
 	return nil
 }
 
@@ -810,8 +832,18 @@ func (p *staticPolicy) takeByTopology(logger klog.Logger, availableCPUs cpuset.C
 	return takeByTopologyNUMAPacked(logger, p.topology, availableCPUs, numCPUs, cpuSortingStrategy, p.options.PreferAlignByUncoreCacheOption)
 }
 
-func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "operation", operation)
+	switch operation {
+	case lifecycle.AddOperation:
+		return p.getTopologyHintsForAdd(logger, s, pod, container)
+	default:
+		logger.V(2).Info("CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy")
+		return nil
+	}
+}
+
+func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 
 	// Get a count of how many guaranteed CPUs have been requested.
 	requested := p.guaranteedCPUs(logger, pod, container)
@@ -866,7 +898,18 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 	}
 }
 
-func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID, "operation", operation)
+	switch operation {
+	case lifecycle.AddOperation:
+		return p.getPodTopologyHintsForAdd(logger, s, pod)
+	default:
+		logger.V(2).Info("CPU Manager pod hint generation skipped, operation not supported by the static CPU manager policy")
+		return nil
+	}
+}
+
+func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	// Get a count of how many guaranteed CPUs have been requested by Pod.

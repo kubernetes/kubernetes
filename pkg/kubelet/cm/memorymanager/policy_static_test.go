@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -2117,7 +2118,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[0], lifecycle.AddOperation)
 			if (err == nil) != (testCase.expectedError == nil) || (err != nil && testCase.expectedError != nil && err.Error() != testCase.expectedError.Error()) {
 				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 			}
@@ -2842,14 +2843,14 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.InitContainers {
-				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i], lifecycle.AddOperation)
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
 			}
 
 			for i := range testCase.pod.Spec.Containers {
-				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[i], lifecycle.AddOperation)
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -3176,7 +3177,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.InitContainers {
-				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i], lifecycle.AddOperation)
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -3187,7 +3188,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.Containers {
-				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[i], lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}
@@ -3979,7 +3980,7 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			topologyHints := p.GetTopologyHints(logger, s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			topologyHints := p.GetTopologyHints(logger, s, testCase.pod, &testCase.pod.Spec.Containers[0], lifecycle.AddOperation)
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
 			}
@@ -4298,7 +4299,7 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			topologyHints := p.GetPodTopologyHints(logger, s, testCase.pod)
+			topologyHints := p.GetPodTopologyHints(logger, s, testCase.pod, lifecycle.AddOperation)
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
 			}
@@ -5669,7 +5670,7 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			err = p.AllocatePod(logger, s, testCase.pod)
+			err = p.AllocatePod(logger, s, testCase.pod, lifecycle.AddOperation)
 			if testCase.expectedError != nil {
 				require.Error(t, err)
 				require.Equal(t, testCase.expectedError.Error(), err.Error())

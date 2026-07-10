@@ -23,6 +23,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/utils/cpuset"
 )
 
@@ -51,7 +52,7 @@ func (p *nonePolicy) Start(logger klog.Logger, s state.State) error {
 	return nil
 }
 
-func (p *nonePolicy) Allocate(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *nonePolicy) Allocate(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) error {
 	return nil
 }
 
@@ -59,15 +60,15 @@ func (p *nonePolicy) RemoveContainer(_ klog.Logger, s state.State, podUID string
 	return nil
 }
 
-func (p *nonePolicy) GetTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *nonePolicy) GetTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *nonePolicy) GetPodTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *nonePolicy) GetPodTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *nonePolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod) error {
+func (p *nonePolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod, _ lifecycle.Operation) error {
 	return nil
 }
 
