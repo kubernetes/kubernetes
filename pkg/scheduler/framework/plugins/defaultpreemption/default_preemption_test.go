@@ -592,6 +592,7 @@ func TestDryRunPreemption(t *testing.T) {
 		testPods                []*v1.Pod
 		initPods                []*v1.Pod
 		registerPlugins         []tf.RegisterPluginFunc
+		extenders               []*tf.FakeExtender
 		pdbs                    []*policy.PodDisruptionBudget
 		fakeFilterRC            fwk.Code // return code for fake filter plugin
 		disableParallelism      bool
@@ -679,6 +680,27 @@ func TestDryRunPreemption(t *testing.T) {
 				},
 			},
 			expectedNumFilterCalled: []int32{4},
+		},
+		{
+			name: "extender filter is checked during preemption dry run",
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			},
+			extenders: []*tf.FakeExtender{
+				{
+					ExtenderName: "FakeExtender1",
+					Predicates:   []tf.FitPredicate{tf.FalsePredicateExtender},
+				},
+			},
+			nodeNames: []string{"node1"},
+			testPods: []*v1.Pod{
+				st.MakePod().Name("p").UID("p").Priority(highPriority).Req(largeRes).Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Req(largeRes).Obj(),
+			},
+			expected:                [][]candidate{{}},
+			expectedNumFilterCalled: []int32{1},
 		},
 		{
 			name: "a pod that would fit on the nodes, but other pods running are higher priority, no preemption would happen",
@@ -1254,6 +1276,10 @@ func TestDryRunPreemption(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
 			registeredPlugins = append(registeredPlugins, tt.registerPlugins...)
+			var extenders []fwk.Extender
+			for _, extender := range tt.extenders {
+				extenders = append(extenders, extender)
+			}
 			var objs []runtime.Object
 			for _, p := range append(tt.testPods, tt.initPods...) {
 				objs = append(objs, p)
@@ -1280,6 +1306,7 @@ func TestDryRunPreemption(t *testing.T) {
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithParallelism(parallelism),
 				frameworkruntime.WithLogger(logger),
 			)
@@ -2105,7 +2132,7 @@ func TestPreempt(t *testing.T) {
 				},
 			},
 			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-			want:           nil,
+			want:           framework.NewPostFilterResultWithNominatedNode(""),
 			expectedPods:   []string{},
 		},
 		{
