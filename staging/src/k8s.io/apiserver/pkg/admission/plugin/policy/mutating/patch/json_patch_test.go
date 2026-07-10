@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -401,6 +402,82 @@ func TestJSONPatch(t *testing.T) {
 				Containers: []corev1.Container{{Name: "a"}},
 			}}}},
 			expectedErr: "JSON Patch: replace operation does not apply: doc is missing key: /spec/template/spec/containers/-: missing value",
+		},
+		{
+			name: "jsonPatch with constant complex struct object as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/1", value: Object.spec.template.spec.containers{name: "sidecar", image: "busybox:1.36", command: ["sh", "-c", "sleep 3600"], resources: Object.spec.template.spec.containers.resources{limits: {"cpu": "200m", "memory": "256Mi"}}}},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Name: "main-app", Image: "nginx:1.24"},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Name: "main-app", Image: "nginx:1.24"},
+								{
+									Name:    "sidecar",
+									Image:   "busybox:1.36",
+									Command: []string{"sh", "-c", "sleep 3600"},
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("200m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with constant complex list of struct objects as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: [
+						Object.spec.template.spec.initContainers{name: "init-1", image: "alpine:3.18", command: ["echo", "init1"]},
+						Object.spec.template.spec.initContainers{name: "init-2", image: "alpine:3.18", command: ["echo", "init2"]},
+					]},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Name: "main-app", Image: "nginx:1.24"},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							InitContainers: []corev1.Container{
+								{Name: "init-1", Image: "alpine:3.18", Command: []string{"echo", "init1"}},
+								{Name: "init-2", Image: "alpine:3.18", Command: []string{"echo", "init2"}},
+							},
+							Containers: []corev1.Container{
+								{Name: "main-app", Image: "nginx:1.24"},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 
