@@ -75,7 +75,7 @@ func (c *condition) ForInput(ctx context.Context, versionedAttr *admission.Versi
 	// if this activation supports composition, we will need the compositionCtx. It may be nil.
 	compositionCtx, _ := ctx.(CompositionContext)
 
-	activation, err := newActivation(compositionCtx, versionedAttr, request, inputs, namespace)
+	activation, err := newActivation(compositionCtx, versionedAttr, request, inputs, namespace, admission.UseSchemalessTypeRef())
 	if err != nil {
 		return nil, -1, err
 	}
