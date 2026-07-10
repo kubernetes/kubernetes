@@ -701,6 +701,15 @@ func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj in
 	if claim == nil {
 		claim = oldClaim
 	}
+
+	// Inform the mutation cache before triggering sync operations (via enqueue
+	// below) so that syncs observe a current view of the claim.
+	if deleted {
+		ec.claimCache.OnDelete(claim)
+	} else {
+		ec.claimCache.OnAddOrUpdate(claim)
+	}
+
 	if !deleted {
 		// When starting up, we have to check all claims to find those with
 		// stale pods in ReservedFor. During an update, a pod might get added

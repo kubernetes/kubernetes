@@ -575,6 +575,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				return
 			}
 			logger.V(5).Info("ResourceSlice add", "slice", klog.KObj(slice))
+			c.sliceStore.OnAddOrUpdate(slice)
 			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
 			logger.V(5).Info("Scheduled sync", "poolName", slice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
 		},
@@ -592,6 +593,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			} else {
 				logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
 			}
+			c.sliceStore.OnAddOrUpdate(newSlice)
 			c.queue.AddAfter(oldSlice.Spec.Pool.Name, c.syncDelay)
 			logger.V(5).Info("Scheduled sync", "pool", oldSlice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
 			if oldSlice.Spec.Pool.Name != newSlice.Spec.Pool.Name {
@@ -608,6 +610,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				return
 			}
 			logger.V(5).Info("ResourceSlice delete", "slice", klog.KObj(slice))
+			c.sliceStore.OnDelete(slice)
 			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
 			logger.V(5).Info("Scheduled sync", "poolName", slice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
 		},

@@ -293,64 +293,67 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		}
 		disabledFeaturesBySlice[i] = disabledFeaturesForSlice
 	}
-	var expectedSlices []any
-	for _, spec := range expectedSliceSpecs {
-		// The matcher is precise and matches all fields, except for those few which are known to
-		// be not exactly as sent by the client. New fields have to be added when extending the API.
-		expectedSlices = append(expectedSlices, gomega.HaveField("Spec", gstruct.MatchAllFields(gstruct.Fields{
-			"Driver": gomega.Equal(driverName),
-			"Pool": gstruct.MatchAllFields(gstruct.Fields{
-				"Name":               gomega.Equal(poolName),
-				"Generation":         gomega.BeNumerically(">=", int64(1)),
-				"ResourceSliceCount": gomega.Equal(int64(len(expectedResources.Pools[poolName].Slices))),
-			}),
-			"NodeName":     matchPointer(spec.NodeName),
-			"NodeSelector": matchPointer(spec.NodeSelector),
-			"AllNodes":     gstruct.PointTo(gomega.BeTrue()),
-			"Devices": gomega.HaveExactElements(func() []any {
-				var expected []any
-				for _, device := range spec.Devices {
-					expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
-						"Name":                     gomega.Equal(device.Name),
-						"AllowMultipleAllocations": gomega.Equal(device.AllowMultipleAllocations),
-						"Attributes":               gomega.Equal(device.Attributes),
-						"Capacity":                 gomega.Equal(device.Capacity),
-						"ConsumesCounters":         gomega.Equal(device.ConsumesCounters),
-						"NodeName":                 matchPointer(device.NodeName),
-						"NodeSelector":             matchPointer(device.NodeSelector),
-						"AllNodes":                 matchPointer(device.AllNodes),
-						"Taints": gomega.HaveExactElements(func() []any {
-							var expected []any
-							for _, taint := range device.Taints {
-								if taint.TimeAdded != nil {
-									// Can do exact match.
-									expected = append(expected, gomega.Equal(taint))
-								} else {
-									// Ignore TimeAdded value.
-									expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
-										"Key":       gomega.Equal(taint.Key),
-										"Value":     gomega.Equal(taint.Value),
-										"Effect":    gomega.Equal(taint.Effect),
-										"TimeAdded": gomega.Not(gomega.BeNil()),
-									}))
+	expectedSlices := func(expectedSliceSpecs []resourceapi.ResourceSliceSpec) []any {
+		var expectedSlices []any
+		for _, spec := range expectedSliceSpecs {
+			// The matcher is precise and matches all fields, except for those few which are known to
+			// be not exactly as sent by the client. New fields have to be added when extending the API.
+			expectedSlices = append(expectedSlices, gomega.HaveField("Spec", gstruct.MatchAllFields(gstruct.Fields{
+				"Driver": gomega.Equal(driverName),
+				"Pool": gstruct.MatchAllFields(gstruct.Fields{
+					"Name":               gomega.Equal(poolName),
+					"Generation":         gomega.BeNumerically(">=", int64(1)),
+					"ResourceSliceCount": gomega.Equal(int64(len(expectedSliceSpecs))),
+				}),
+				"NodeName":     matchPointer(spec.NodeName),
+				"NodeSelector": matchPointer(spec.NodeSelector),
+				"AllNodes":     gstruct.PointTo(gomega.BeTrue()), //nolint:forbidigo // Here BeTrue is okay.
+				"Devices": gomega.HaveExactElements(func() []any {
+					var expected []any
+					for _, device := range spec.Devices {
+						expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
+							"Name":                     gomega.Equal(device.Name),
+							"AllowMultipleAllocations": gomega.Equal(device.AllowMultipleAllocations),
+							"Attributes":               gomega.Equal(device.Attributes),
+							"Capacity":                 gomega.Equal(device.Capacity),
+							"ConsumesCounters":         gomega.Equal(device.ConsumesCounters),
+							"NodeName":                 matchPointer(device.NodeName),
+							"NodeSelector":             matchPointer(device.NodeSelector),
+							"AllNodes":                 matchPointer(device.AllNodes),
+							"Taints": gomega.HaveExactElements(func() []any {
+								var expected []any
+								for _, taint := range device.Taints {
+									if taint.TimeAdded != nil {
+										// Can do exact match.
+										expected = append(expected, gomega.Equal(taint))
+									} else {
+										// Ignore TimeAdded value.
+										expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
+											"Key":       gomega.Equal(taint.Key),
+											"Value":     gomega.Equal(taint.Value),
+											"Effect":    gomega.Equal(taint.Effect),
+											"TimeAdded": gomega.Not(gomega.BeNil()),
+										}))
+									}
 								}
-							}
-							return expected
-						}()...),
-						"BindingConditions":               gomega.Equal(device.BindingConditions),
-						"BindingFailureConditions":        gomega.Equal(device.BindingFailureConditions),
-						"BindsToNode":                     gomega.Equal(device.BindsToNode),
-						"NodeAllocatableResourceMappings": gomega.Equal(device.NodeAllocatableResourceMappings),
-					}))
-				}
-				return expected
-			}()...),
-			"PerDeviceNodeSelection": matchPointer(spec.PerDeviceNodeSelection),
-			"SharedCounters":         gomega.Equal(spec.SharedCounters),
-		})))
+								return expected
+							}()...),
+							"BindingConditions":               gomega.Equal(device.BindingConditions),
+							"BindingFailureConditions":        gomega.Equal(device.BindingFailureConditions),
+							"BindsToNode":                     gomega.Equal(device.BindsToNode),
+							"NodeAllocatableResourceMappings": gomega.Equal(device.NodeAllocatableResourceMappings),
+						}))
+					}
+					return expected
+				}()...),
+				"PerDeviceNodeSelection": matchPointer(spec.PerDeviceNodeSelection),
+				"SharedCounters":         gomega.Equal(spec.SharedCounters),
+			})))
+		}
+		return expectedSlices
 	}
 
-	expectSlices := func(tCtx ktesting.TContext) {
+	expectSlices := func(tCtx ktesting.TContext, expectedSliceSpecs []resourceapi.ResourceSliceSpec) {
 		tCtx.Helper()
 
 		if !haveLatestAPI {
@@ -358,7 +361,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		}
 		slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listDriverSlices)
 		tCtx.ExpectNoError(err, "list slices")
-		gomega.NewGomegaWithT(tCtx).Expect(slices.Items).Should(gomega.ConsistOf(expectedSlices...))
+		gomega.NewGomegaWithT(tCtx).Expect(slices.Items).Should(gomega.ConsistOf(expectedSlices(expectedSliceSpecs)...))
 	}
 
 	deleteSlices := func(tCtx ktesting.TContext) {
@@ -379,7 +382,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 	var gotValidationError atomic.Bool
 	var validationErrorsOkay atomic.Bool
 
-	setup := func(tCtx ktesting.TContext) (*resourceslice.Controller, func(tCtx ktesting.TContext) resourceslice.Stats, resourceslice.Stats) {
+	setup := func(tCtx ktesting.TContext, resources *resourceslice.DriverResources) (*resourceslice.Controller, func(tCtx ktesting.TContext) resourceslice.Stats, resourceslice.Stats) {
 		tCtx.Helper()
 
 		tCtx.CleanupCtx(deleteSlices)
@@ -424,22 +427,26 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		tCtx.ExpectNoError(err, "start controller")
 		tCtx.Cleanup(controller.Stop)
 
+		numSlices := 0
+		for _, pool := range resources.Pools {
+			numSlices += len(pool.Slices)
+		}
 		expectedStats := resourceslice.Stats{
-			NumCreates: int64(len(expectedSlices)),
+			NumCreates: int64(numSlices),
 		}
 		getStats := func(tCtx ktesting.TContext) resourceslice.Stats {
 			return controller.GetStats()
 		}
-		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
-		expectSlices(tCtx)
-
 		return controller, getStats, expectedStats
 	}
 
 	// Each sub-test starts with no slices and must clean up after itself.
 
 	runSubTest(tCtx, "create", func(tCtx ktesting.TContext) {
-		controller, getStats, expectedStats := setup(tCtx)
+		controller, getStats, expectedStats := setup(tCtx, resources)
+		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx, expectedSliceSpecs)
+		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
 
 		// No further changes necessary.
 		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
@@ -467,7 +474,9 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 	}
 
 	runSubTest(tCtx, "recreate-after-delete", func(tCtx ktesting.TContext) {
-		_, getStats, expectedStats := setup(tCtx)
+		_, getStats, expectedStats := setup(tCtx, resources)
+		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx, expectedSliceSpecs)
 		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
 
 		// Stress the controller by repeatedly deleting the slices.
@@ -476,16 +485,19 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		for range 2 {
 			tCtx.Log("deleting ResourceSlices")
 			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceSlices().DeleteCollection(tCtx, metav1.DeleteOptions{}, listDriverSlices), "delete driver slices")
-			expectedStats.NumCreates += int64(len(expectedSlices))
+			expectedStats.NumCreates += int64(len(expectedSliceSpecs))
 			tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
-			expectSlices(tCtx)
+			expectSlices(tCtx, expectedSliceSpecs)
 		}
 	})
 
 	runSubTest(tCtx, "fix-after-update", func(tCtx ktesting.TContext) {
-		_, getStats, expectedStats := setup(tCtx)
+		_, getStats, expectedStats := setup(tCtx, resources)
+		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx, expectedSliceSpecs)
+		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
 
-		// Stress the controller by repeatedly updatings the slices.
+		// Stress the controller by repeatedly updating the slices.
 		for range 2 {
 			slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listDriverSlices)
 			tCtx.ExpectNoError(err, "list slices")
@@ -500,10 +512,63 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				_, err := tCtx.Client().ResourceV1().ResourceSlices().Update(tCtx, &slice, metav1.UpdateOptions{})
 				tCtx.ExpectNoError(err, "update slice")
 			}
-			expectedStats.NumUpdates += int64(len(expectedSlices))
+			expectedStats.NumUpdates += int64(len(expectedSliceSpecs))
 			tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
-			expectSlices(tCtx)
+			expectSlices(tCtx, expectedSliceSpecs)
 		}
+	})
+
+	runSubTest(tCtx, "recreate-after-update-delete", func(tCtx ktesting.TContext) {
+		// Simplify the test data: just one slice with a basic device.
+		resources := resources.DeepCopy()
+		pool := resources.Pools[poolName]
+		pool.Slices = pool.Slices[:1]
+		resources.Pools[poolName] = pool
+		expectedSliceSpecs := expectedSliceSpecs[:1]
+
+		// Create an incomplete ResourceSlice that the controller needs to update once it starts.
+		// This attribute is obsolete and needs to be removed.
+		device := expectedSliceSpecs[0].Devices[0].DeepCopy()
+		device.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+			"foo": {
+				StringValue: new("bar"),
+			},
+		}
+		slice := &resourceapi.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "00000-" + namespace + "-slice",
+			},
+			Spec: resourceapi.ResourceSliceSpec{
+				Driver: driverName,
+				Pool: resourceapi.ResourcePool{
+					Name:               poolName,
+					Generation:         1,
+					ResourceSliceCount: 1,
+				},
+				AllNodes: new(true),
+				Devices:  []resourceapi.Device{*device},
+			},
+		}
+		slice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create slice")
+		_, getStats, expectedStats := setup(tCtx, resources)
+		expectedStats.NumCreates = 0
+		expectedStats.NumUpdates = 1
+		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx, expectedSliceSpecs)
+		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
+
+		// Verify that the existing slice got updated, then delete it.
+		slice, err = tCtx.Client().ResourceV1().ResourceSlices().Get(tCtx, slice.Name, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get slice")
+		tCtx.Log("Deleting slice...")
+		err = tCtx.Client().ResourceV1().ResourceSlices().Delete(tCtx, slice.Name, metav1.DeleteOptions{})
+		tCtx.ExpectNoError(err, "delete slice")
+
+		// The controller must react to the deletion and recreate it.
+		expectedStats.NumCreates = 1
+		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx, expectedSliceSpecs)
 	})
 }
 

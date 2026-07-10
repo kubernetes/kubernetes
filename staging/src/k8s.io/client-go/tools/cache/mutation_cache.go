@@ -25,7 +25,10 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilcache "k8s.io/apimachinery/pkg/util/cache"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,11 +38,19 @@ import (
 // that can be used to provide a more current view of a requested object.  It requires interpreting
 // resourceVersions for comparisons.
 // Implementations must be thread-safe.
-// TODO find a way to layer this into an informer/lister
+// OnAddOrupdate and OnDelete should be called from informer event handlers to increase
+// the accuracy of the cache.
 type MutationCache interface {
 	GetByKey(key string) (interface{}, bool, error)
 	ByIndex(indexName, indexKey string) ([]interface{}, error)
 	Mutation(interface{})
+	OnAddOrUpdate(obj runtime.Object)
+	OnDelete(obj runtime.Object)
+
+	// This interface is not meant to be implemented elsewhere.
+	// Marking it as internal enables future changes without
+	// triggering apidiff.
+	internal()
 }
 
 // ResourceVersionComparator is able to compare object versions.
@@ -60,6 +71,21 @@ type ResourceVersionComparator interface {
 // If includeAdds is true, objects in the mutation cache will be returned even if they don't exist
 // in the underlying store. This is only safe if your use of the cache can handle mutation entries
 // remaining in the cache for up to ttl when mutations and deletes occur very closely in time.
+//
+// Note that this also applies to objects updated by the caller, not just
+// objects added by it.  That's because the MutationCache may hold an updated
+// object at a time when the underlying store already removed it because it was
+// deleted in the apiserver after the update. To address this, the caller
+// can call OnAddOrUpdate and OnDelete from informer event handlers.
+//
+// This informs the MutationCache about all changes observed by the store
+// and enables it to remove a locally added or updated object immediately once
+// it appears in the store, which prevents the "stale updated object" problem.
+//
+// This does not solve the "stale added object" problem reliably because
+// the informer might never see the added object when the add is followed
+// quickly by a delete. The caller has to handle stale added objects by
+// checking whether they still exist once the TTL is over.
 func NewIntegerResourceVersionMutationCache(logger klog.Logger, backingCache Store, indexer Indexer, ttl time.Duration, includeAdds bool) MutationCache {
 	return &mutationCache{
 		backingCache:  backingCache,
@@ -108,11 +134,24 @@ func (c *mutationCache) GetByKey(key string) (interface{}, bool, error) {
 		if !exists {
 			return nil, false, nil
 		}
+		// Don't return the tombstone.
+		if _, ok := obj.(*tombstone); ok {
+			return nil, false, nil
+		}
 	}
 	objRuntime, ok := obj.(runtime.Object)
 	if !ok {
 		return obj, true, nil
 	}
+	// If the object is from the store,
+	// then this will remove the obsolete tombstone.
+	//
+	// The newer object can never be the tombstone
+	// because a) we don't get here if only the tombstone
+	// exists (early return above) and b) the store's
+	// object must be more recent than the tombstone
+	// (the tombstone was created by an earlier store
+	// deletion).
 	return c.newerObject(key, objRuntime), true, nil
 }
 
@@ -155,6 +194,9 @@ func (c *mutationCache) ByIndex(name string, indexKey string) ([]interface{}, er
 				continue
 			}
 			if keySet.Has(key.(string)) {
+				continue
+			}
+			if _, ok := updated.(*tombstone); ok {
 				continue
 			}
 			elements, err := fn(updated)
@@ -213,14 +255,113 @@ func (c *mutationCache) Mutation(obj interface{}) {
 	if objRuntime, ok := obj.(runtime.Object); ok {
 		if mutatedObj, exists := c.mutationCache.Get(key); exists {
 			if mutatedObjRuntime, ok := mutatedObj.(runtime.Object); ok {
-				if c.comparator.CompareResourceVersion(objRuntime, mutatedObjRuntime) < 0 {
+				cmp := c.comparator.CompareResourceVersion(objRuntime, mutatedObjRuntime)
+				if cmp < 0 {
 					return
+				}
+				if t, ok := mutatedObj.(*tombstone); ok {
+					if cmp == 0 {
+						// Exactly this object instance is known to be deleted.
+						// Don't store it, keep the tombstone.
+						return
+					}
+					objMeta, err := meta.Accessor(obj)
+					if err == nil && t.GetUID() == objMeta.GetUID() {
+						// Some other revision of this object instance
+						// is known to be deleted. Also don't store it.
+						return
+					}
 				}
 			}
 		}
 	}
 	c.mutationCache.Add(key, obj, c.ttl)
 }
+
+// OnAddOrUpdate can be called to informer the cache about an object added to
+// the store or updated in in. If the object is as recent as the cached object
+// or newer, the cached object gets removed because it is no longer
+// needed. This keeps the cache smaller.
+func (c *mutationCache) OnAddOrUpdate(obj runtime.Object) {
+	key, err := DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if err != nil {
+		// this is a "nice to have", so failures shouldn't do anything weird
+		utilruntime.HandleErrorWithLogger(c.logger, err, "DeletionHandlingMetaNamespaceKeyFunc")
+		return
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if mutatedObj, exists := c.mutationCache.Get(key); exists {
+		if mutatedObj, ok := mutatedObj.(runtime.Object); ok {
+			// No need to compare the UID here: resource versions can be compared
+			// between different instances. If it's newer or equal, then the mutation
+			// cache is out-dated.
+			if c.comparator.CompareResourceVersion(obj, mutatedObj) >= 0 {
+				c.mutationCache.Remove(key)
+			}
+		}
+	}
+}
+
+// OnDelete can be called to informer the cache about an object deleted in the store.
+// If there is a cached object with the same UID or an older RV, it gets removed.
+func (c *mutationCache) OnDelete(obj runtime.Object) {
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return
+	}
+
+	key, err := DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if err != nil {
+		// this is a "nice to have", so failures shouldn't do anything weird
+		utilruntime.HandleErrorWithLogger(c.logger, err, "DeletionHandlingMetaNamespaceKeyFunc")
+		return
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if mutatedObj, exists := c.mutationCache.Get(key); exists {
+		if mutatedObj, ok := mutatedObj.(runtime.Object); ok {
+			mutatedObjMeta, err := meta.Accessor(mutatedObj)
+			if err != nil {
+				return
+			}
+			// If the deleted object is known to be more recent than the
+			// mutated one, then the mutated one must have been removed
+			// because resource versions are incremented by type, not by
+			// object instance.
+			//
+			// If the UID matches, then we can also be sure that it got
+			// removed.
+			//
+			// If neither of this is true, then the caller has added
+			// a mutated object that may or may not still exist. They
+			// have to check after the TTL.
+			if c.comparator.CompareResourceVersion(obj, mutatedObj) >= 0 ||
+				mutatedObjMeta.GetUID() == objMeta.GetUID() {
+				c.mutationCache.Remove(key)
+			} else {
+				return
+			}
+		}
+	}
+
+	// Store a tombstone object in the mutation cache.
+	// A future Mutation call is outdated if it has a RV
+	// which is lower or equal or has the same UID.
+	t := &tombstone{
+		namespace: objMeta.GetNamespace(),
+		name:      objMeta.GetName(),
+		uid:       objMeta.GetUID(),
+		rv:        objMeta.GetResourceVersion(),
+	}
+	c.mutationCache.Add(key, t, c.ttl)
+}
+
+func (c *mutationCache) internal() {}
 
 // etcdObjectVersioner implements versioning and extracting etcd node information
 // for objects that have an embedded ObjectMeta or ListMeta field.
@@ -261,4 +402,58 @@ func (a etcdObjectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int
 	}
 
 	return 1
+}
+
+// tombstone is a replacement for a deleted object. It has the same key as it
+// and the ResourceVersion at which the deletion was detected.
+//
+// It implements GetName, GetNamespace, GetResourceVersion and GetUID and thus
+// the code above can compare it against other, normal objects. The difference
+// is that it never gets returned by ByIndex or GetByKey.
+type tombstone struct {
+	namespace, name, rv string
+	uid                 types.UID
+}
+
+var _ metav1.Object = &tombstone{}
+var _ runtime.Object = &tombstone{}
+
+func (t *tombstone) DeepCopyObject() runtime.Object {
+	clone := *t
+	return &clone
+}
+
+func (t *tombstone) GetObjectKind() schema.ObjectKind { panic("not implemented") }
+
+func (t *tombstone) GetNamespace() string                          { return t.namespace }
+func (t *tombstone) SetNamespace(namespace string)                 { panic("not implemented") }
+func (t *tombstone) GetName() string                               { return t.name }
+func (t *tombstone) SetName(name string)                           { panic("not implemented") }
+func (t *tombstone) GetGenerateName() string                       { panic("not implemented") }
+func (t *tombstone) SetGenerateName(name string)                   { panic("not implemented") }
+func (t *tombstone) GetUID() types.UID                             { return t.uid }
+func (t *tombstone) SetUID(uid types.UID)                          { panic("not implemented") }
+func (t *tombstone) GetResourceVersion() string                    { return t.rv }
+func (t *tombstone) SetResourceVersion(version string)             { panic("not implemented") }
+func (t *tombstone) GetGeneration() int64                          { panic("not implemented") }
+func (t *tombstone) SetGeneration(generation int64)                { panic("not implemented") }
+func (t *tombstone) GetSelfLink() string                           { panic("not implemented") }
+func (t *tombstone) SetSelfLink(selfLink string)                   { panic("not implemented") }
+func (t *tombstone) GetCreationTimestamp() metav1.Time             { panic("not implemented") }
+func (t *tombstone) SetCreationTimestamp(timestamp metav1.Time)    { panic("not implemented") }
+func (t *tombstone) GetDeletionTimestamp() *metav1.Time            { panic("not implemented") }
+func (t *tombstone) SetDeletionTimestamp(timestamp *metav1.Time)   { panic("not implemented") }
+func (t *tombstone) GetDeletionGracePeriodSeconds() *int64         { panic("not implemented") }
+func (t *tombstone) SetDeletionGracePeriodSeconds(*int64)          { panic("not implemented") }
+func (t *tombstone) GetLabels() map[string]string                  { panic("not implemented") }
+func (t *tombstone) SetLabels(labels map[string]string)            { panic("not implemented") }
+func (t *tombstone) GetAnnotations() map[string]string             { panic("not implemented") }
+func (t *tombstone) SetAnnotations(annotations map[string]string)  { panic("not implemented") }
+func (t *tombstone) GetFinalizers() []string                       { panic("not implemented") }
+func (t *tombstone) SetFinalizers(finalizers []string)             { panic("not implemented") }
+func (t *tombstone) GetOwnerReferences() []metav1.OwnerReference   { panic("not implemented") }
+func (t *tombstone) SetOwnerReferences([]metav1.OwnerReference)    { panic("not implemented") }
+func (t *tombstone) GetManagedFields() []metav1.ManagedFieldsEntry { panic("not implemented") }
+func (t *tombstone) SetManagedFields(managedFields []metav1.ManagedFieldsEntry) {
+	panic("not implemented")
 }
