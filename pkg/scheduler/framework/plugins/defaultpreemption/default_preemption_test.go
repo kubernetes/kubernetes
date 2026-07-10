@@ -2104,9 +2104,26 @@ func TestPreempt(t *testing.T) {
 					Predicates:   []tf.FitPredicate{tf.FalsePredicateExtender},
 				},
 			},
-			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-			want:           nil,
-			expectedPods:   []string{},
+			registerPlugin:          tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			want:                    nil,
+			expectedPods:            []string{},
+		},
+		{
+			name: "Scheduler extenders do not allow any preemption but plugins allow",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(smallRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1.1").UID("p1.1").Namespace(v1.NamespaceDefault).Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+			},
+			nodeNames: []string{"node1"},
+			extenders: []*tf.FakeExtender{
+				{
+					ExtenderName: "FakeExtender1",
+					Predicates:   []tf.FitPredicate{tf.FalsePredicateExtender},
+				},
+			},
+			registerPlugin:          tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			want:                    nil,
+			expectedPods:            []string{},
 		},
 		{
 			name: "One scheduler extender allows only node1, the other returns error but ignorable. Only node1 would be chosen",
