@@ -17,11 +17,17 @@ limitations under the License.
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	k8stesting "k8s.io/client-go/testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -384,5 +390,44 @@ func expectMetrics(t *testing.T, em testMetrics) {
 	}
 	if m != em {
 		t.Fatalf("metrics error: expected %v, received %v", em, m)
+	}
+}
+
+// TestRunUntilRetriesInitialSyncQuickly verifies that RunUntil retries a
+// failing initial sync with backoff instead of waiting a full repair interval:
+// the start-service-ip-repair-controllers post-start hook waits for the first
+// success under a hard one-minute deadline, and on servers with a large
+// keyspace the first attempts can transiently fail while storage caches warm
+// up. A three-minute first retry would fail the whole server.
+func TestRunUntilRetriesInitialSyncQuickly(t *testing.T) {
+	fakeClient := fake.NewSimpleClientset()
+	// Fail the first two service LISTs (as the warming-up apiserver would,
+	// e.g. with 429s), then succeed.
+	var calls atomic.Int32
+	fakeClient.PrependReactor("list", "services", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if calls.Add(1) <= 2 {
+			return true, nil, errors.New("storage is (re)initializing")
+		}
+		return false, nil, nil
+	})
+	pr, _ := net.ParsePortRange("100-200")
+	r := NewRepair(10*time.Minute, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, &mockRangeRegistry{
+		item: &api.RangeAllocation{Range: pr.String()},
+	})
+
+	firstSuccess := make(chan struct{})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go r.RunUntil(func() { close(firstSuccess) }, stopCh)
+
+	select {
+	case <-firstSuccess:
+		// Initial sync succeeded after quick retries — well under the
+		// one-minute post-start-hook deadline despite a 10m repair interval.
+	case <-time.After(30 * time.Second):
+		t.Fatalf("initial sync did not succeed within 30s (calls=%d); first-attempt failures must be retried with backoff, not after the full repair interval", calls.Load())
+	}
+	if calls.Load() < 3 {
+		t.Fatalf("expected at least 3 list attempts, got %d", calls.Load())
 	}
 }

@@ -80,6 +80,30 @@ func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
 	defer c.broadcaster.Shutdown()
 
 	var once sync.Once
+	// Retry the initial sync quickly with exponential backoff (rather than
+	// waiting a full repair interval between attempts) until it succeeds once.
+	// On servers with a large keyspace the very first attempts can race
+	// storage cache initialization and transiently fail (e.g. with 429s while
+	// the watch cache warms up), and the "start-service-ip-repair-controllers"
+	// post-start hook that waits for the first success fails the whole server
+	// after a hard-coded one minute. Once the initial sync has succeeded, the
+	// regular repair interval takes over.
+	ctx := wait.ContextForChannel(stopCh)
+	_ = wait.ExponentialBackoffWithContext(ctx, wait.Backoff{
+		Duration: time.Second,
+		Factor:   2.0,
+		Jitter:   0.1,
+		Steps:    10,
+		Cap:      c.interval,
+	}, func(_ context.Context) (bool, error) {
+		if err := c.runOnce(); err != nil {
+			runtime.HandleError(err)
+			return false, nil
+		}
+		once.Do(onFirstSuccess)
+		return true, nil
+	})
+
 	wait.Until(func() {
 		if err := c.runOnce(); err != nil {
 			runtime.HandleError(err)

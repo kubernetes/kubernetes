@@ -231,7 +231,25 @@ func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh chan struct{}) 
 	// First sync goes through all the Services and IPAddresses in the cache,
 	// once synced, it signals the main loop and works using the handlers, since
 	// it's less expensive and more optimal.
-	if err := r.runOnce(); err != nil {
+	// Retry the initial sync with exponential backoff instead of giving up:
+	// on servers with a large keyspace the first attempts can race storage
+	// cache initialization and transiently fail, and bailing out here starves
+	// the "start-service-ip-repair-controllers" post-start hook, which fails
+	// the whole server after a hard-coded one minute.
+	err = wait.ExponentialBackoffWithContext(ctx, wait.Backoff{
+		Duration: time.Second,
+		Factor:   2.0,
+		Jitter:   0.1,
+		Steps:    10,
+		Cap:      time.Minute,
+	}, func(_ context.Context) (bool, error) {
+		if err := r.runOnce(); err != nil {
+			runtime.HandleError(err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
 		runtime.HandleError(err)
 		return
 	}
