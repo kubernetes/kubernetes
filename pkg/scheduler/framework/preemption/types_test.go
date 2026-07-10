@@ -19,12 +19,20 @@ package preemption
 import (
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -54,6 +62,12 @@ func TestGetPodGroup(t *testing.T) {
 				"pg1": st.MakePodGroup().Name("pg1").Namespace("default").Obj(),
 			},
 			wantPodGroup: st.MakePodGroup().Name("pg1").Namespace("default").Obj(),
+		},
+		{
+			name:         "pod group found in pod spec but nil podGroupSnapshot (simulates disabled GenericWorkload)",
+			pod:          st.MakePod().Name("p1").Namespace("default").PodGroupName("pg1").Obj(),
+			podGroups:    nil, // nil snapshot when feature gate is disabled
+			wantPodGroup: nil,
 		},
 	}
 
@@ -259,10 +273,32 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				{pods: sets.New("p4"), affectedNodes: sets.New("node2"), priority: 30},
 			},
 		},
+		{
+			name: "pods with pod group (DisruptionModeAll) but missing pod group state in cache falls back to local pod preemption",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+				st.MakeNode().Name("node2").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(10).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(10).Obj(),
+			},
+			domainName: "test-domain",
+			wantVictims: []expectedVictim{
+				{pods: sets.New("p1"), affectedNodes: sets.New("node1"), priority: 10},
+				{pods: sets.New("p2"), affectedNodes: sets.New("node2"), priority: 10},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GenericWorkload, true)
+
+			logger, ctx := ktesting.NewTestContext(t)
+			snapshot := internalcache.NewSnapshot(tt.pods, tt.nodes)
+			cache := internalcache.New(ctx, nil, true)
+
 			nodeInfos := make(map[string]fwk.NodeInfo)
 			for _, node := range tt.nodes {
 				ni := framework.NewNodeInfo()
@@ -276,18 +312,42 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				}
 			}
 
-			var domainNodes []fwk.NodeInfo
 			for _, node := range tt.nodes {
-				if ni, ok := nodeInfos[node.Name]; ok {
-					domainNodes = append(domainNodes, ni)
+				cache.AddNode(logger, node)
+			}
+
+			for _, p := range tt.pods {
+				if err := cache.AddPod(logger, p); err != nil {
+					t.Fatalf("Failed to add pod: %v", err)
+				}
+				if p.Spec.SchedulingGroup != nil && p.Spec.SchedulingGroup.PodGroupName != nil {
+					cache.AddPodGroupMember(p)
 				}
 			}
 
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
 			pgLister := &mockPodGroupLister{podGroups: tt.podGroups}
-			domain := newDomainForWorkloadPreemption(domainNodes, pgLister, tt.domainName)
+			domain, err := newDomainForWorkloadPreemption(snapshot, pgLister, tt.domainName)
+			if err != nil {
+				t.Fatalf("Failed to create domain: %v", err)
+			}
 
 			if domain.GetName() != tt.domainName {
 				t.Errorf("expected domain name %q, got %q", tt.domainName, domain.GetName())
+			}
+
+			gotNodeNames := sets.New[string]()
+			for _, ni := range domain.Nodes() {
+				gotNodeNames.Insert(ni.Node().Name)
+			}
+			wantNodeNames := sets.New[string]()
+			for _, n := range tt.nodes {
+				wantNodeNames.Insert(n.Name)
+			}
+			if diff := cmp.Diff(wantNodeNames, gotNodeNames); diff != "" {
+				t.Errorf("Nodes() mismatch (-want +got):\n%s", diff)
 			}
 
 			victims := domain.GetAllPossibleVictims()
@@ -321,6 +381,165 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 
 			if diff := cmp.Diff(tt.wantVictims, gotVictims, cmp.AllowUnexported(expectedVictim{})); diff != "" {
 				t.Errorf("victims mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNewVictim(t *testing.T) {
+	now := metav1.Now()
+	earlier := metav1.NewTime(now.Add(-10 * time.Minute))
+	later := metav1.NewTime(now.Add(10 * time.Minute))
+
+	p1 := st.MakePod().Name("p1").StartTime(now).Obj()
+	p2 := st.MakePod().Name("p2").StartTime(later).Obj()
+	p3 := st.MakePod().Name("p3").StartTime(earlier).Obj()
+	p4 := st.MakePod().Name("p4").Obj() // nil start time
+	p5 := st.MakePod().Name("p5").StartTime(now).PodGroupName("pg1").Obj()
+
+	pi1, _ := framework.NewPodInfo(p1)
+	pi2, _ := framework.NewPodInfo(p2)
+	pi3, _ := framework.NewPodInfo(p3)
+	pi4, _ := framework.NewPodInfo(p4)
+	pi5, _ := framework.NewPodInfo(p5)
+
+	tests := []struct {
+		name       string
+		podInfos   []fwk.PodInfo
+		priority   int32
+		wantErr    bool
+		wantVictim *victim
+	}{
+		{
+			name:       "empty pods slice returns error",
+			podInfos:   nil,
+			priority:   10,
+			wantErr:    true,
+			wantVictim: nil,
+		},
+		{
+			name:     "single pod without scheduling group",
+			podInfos: []fwk.PodInfo{pi1},
+			priority: 20,
+			wantErr:  false,
+			wantVictim: &victim{
+				priority:          20,
+				earliestStartTime: &now,
+				pods:              []fwk.PodInfo{pi1},
+			},
+		},
+		{
+			name:     "multiple pods with mixed start times (including nil)",
+			podInfos: []fwk.PodInfo{pi4, pi2, pi3},
+			priority: 30,
+			wantErr:  false,
+			wantVictim: &victim{
+				priority:          30,
+				earliestStartTime: &earlier,
+				pods:              []fwk.PodInfo{pi4, pi2, pi3},
+			},
+		},
+		{
+			name:     "pod with scheduling group is identified as pod group",
+			podInfos: []fwk.PodInfo{pi5},
+			priority: 40,
+			wantErr:  false,
+			wantVictim: &victim{
+				priority:          40,
+				earliestStartTime: &now,
+				pods:              []fwk.PodInfo{pi5},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotVictim, err := NewVictim(tt.podInfos, tt.priority)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewVictim() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil {
+				return
+			}
+
+			if diff := cmp.Diff(tt.wantVictim, gotVictim, cmp.AllowUnexported(victim{}, framework.PodInfo{})); diff != "" {
+				t.Errorf("Victim mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNewDomainVictim(t *testing.T) {
+	tests := []struct {
+		name              string
+		nodes             []*v1.Node
+		pods              []*v1.Pod
+		priority          int32
+		wantErr           bool
+		wantAffectedNodes sets.Set[string]
+	}{
+		{
+			name: "pod on missing node returns error",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Node("missing-node").Obj(),
+			},
+			priority:          10,
+			wantErr:           true,
+			wantAffectedNodes: nil,
+		},
+		{
+			name: "multiple pods on same and different nodes deduplicates affectedNodes",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+				st.MakeNode().Name("node2").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Node("node1").Obj(),
+				st.MakePod().Name("p2").Node("node1").Obj(), // same node
+				st.MakePod().Name("p3").Node("node2").Obj(), // different node
+			},
+			priority:          20,
+			wantErr:           false,
+			wantAffectedNodes: sets.New("node1", "node2"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			snapshot := internalcache.NewSnapshot(nil, tt.nodes)
+			cache := internalcache.New(ctx, nil, true)
+			for _, node := range tt.nodes {
+				cache.AddNode(logger, node)
+			}
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
+
+			var podInfos []fwk.PodInfo
+			for _, p := range tt.pods {
+				pi, _ := framework.NewPodInfo(p)
+				podInfos = append(podInfos, pi)
+			}
+
+			dv, err := newDomainVictim(snapshot, podInfos, tt.priority)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("newDomainVictim() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil {
+				return
+			}
+
+			gotNodes := sets.New[string]()
+			for nName := range dv.AffectedNodes() {
+				gotNodes.Insert(nName)
+			}
+
+			if diff := cmp.Diff(tt.wantAffectedNodes, gotNodes); diff != "" {
+				t.Errorf("AffectedNodes() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

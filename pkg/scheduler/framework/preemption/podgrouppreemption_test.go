@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
@@ -31,10 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -1304,6 +1307,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 			logger, ctx := ktesting.NewTestContext(t)
 
 			mockFilterFactory := func(ctx context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
@@ -1328,7 +1332,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			parallelism := parallelize.DefaultParallelism
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			snapshot := internalcache.NewSnapshot(tt.initPods, tt.nodes)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups)
 			f, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
@@ -1404,6 +1408,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			for _, pg := range tt.initPodGroups {
 				podGroups[pg.Name] = pg
 			}
+
 			pgLister := &mockPodGroupLister{podGroups: podGroups}
 			pl := &PodGroupEvaluator{
 				Handle:           f,
@@ -1413,8 +1418,10 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			domainNodes, _ := snapshot.NodeInfos().List()
-			domain := newDomainForWorkloadPreemption(domainNodes, pgLister, "test-domain")
+			domain, err := newDomainForWorkloadPreemption(snapshot, pgLister, "test-domain")
+			if err != nil {
+				t.Fatalf("Failed to create domain: %v", err)
+			}
 			res, gotStatus := pl.selectVictimsOnDomain(ctx, tt.preemptor, domain, tt.pdbs, mockSchedulingFunc)
 			if !gotStatus.IsSuccess() {
 				t.Logf("SelectVictimsOnDomain failed: %v", gotStatus.Message())
@@ -1447,144 +1454,8 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 	}
 }
 
-func TestMoreImportantVictim(t *testing.T) {
-	newPodInfo := func(p *v1.Pod) fwk.PodInfo {
-		pi, _ := framework.NewPodInfo(p)
-		return pi
-	}
-
-	now := &metav1.Time{Time: time.Unix(1000, 0)}
-	before := &metav1.Time{Time: time.Unix(500, 0)}
-
-	tests := []struct {
-		name string
-		vi1  *victim
-		vi2  *victim
-		want bool
-	}{
-		{
-			name: "vi1 has higher priority",
-			vi1:  &victim{priority: 20},
-			vi2:  &victim{priority: 10},
-			want: true,
-		},
-		{
-			name: "vi2 has higher priority",
-			vi1:  &victim{priority: 10},
-			vi2:  &victim{priority: 20},
-			want: false,
-		},
-		{
-			name: "vi1 is PG, vi2 is Pod, same priority",
-			vi1:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().PodGroupName("pg").Obj())}},
-			vi2:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().Obj())}},
-			want: true,
-		},
-		{
-			name: "vi1 is Pod, vi2 is PG, same priority",
-			vi1:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().Obj())}},
-			vi2:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().PodGroupName("pg").Obj())}},
-			want: false,
-		},
-		{
-			name: "both Pods, vi1 older",
-			vi1:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().Obj())}, earliestStartTime: before},
-			vi2:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().Obj())}, earliestStartTime: now},
-			want: true,
-		},
-		{
-			name: "both Pods, vi2 older",
-			vi1:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().Obj())}, earliestStartTime: now},
-			vi2:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().Obj())}, earliestStartTime: before},
-			want: false,
-		},
-		{
-			name: "both PGs, vi1 larger",
-			vi1: &victim{
-				priority: 10,
-				pods: []fwk.PodInfo{
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-				},
-			},
-			vi2: &victim{
-				priority: 10,
-				pods: []fwk.PodInfo{
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-				},
-			},
-			want: true,
-		},
-		{
-			name: "both PGs, vi2 larger",
-			vi1: &victim{
-				priority: 10,
-				pods: []fwk.PodInfo{
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-				},
-			},
-			vi2: &victim{
-				priority: 10,
-				pods: []fwk.PodInfo{
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-				},
-			},
-			want: false,
-		},
-		{
-			name: "both PGs, same size, vi1 older",
-			vi1: &victim{
-				priority: 10,
-				pods: []fwk.PodInfo{
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-				},
-				earliestStartTime: before,
-			},
-			vi2: &victim{
-				priority: 10,
-				pods: []fwk.PodInfo{
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-				},
-				earliestStartTime: now,
-			},
-			want: true,
-		},
-		{
-			name: "both PGs, same size, vi2 older",
-			vi1: &victim{
-				priority: 10,
-				pods: []fwk.PodInfo{
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-				},
-				earliestStartTime: now,
-			},
-			vi2: &victim{
-				priority: 10,
-				pods: []fwk.PodInfo{
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-					newPodInfo(st.MakePod().PodGroupName("pg").Obj()),
-				},
-				earliestStartTime: before,
-			},
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := moreImportantVictim(tt.vi1, tt.vi2)
-			if got != tt.want {
-				t.Errorf("MoreImportantVictim() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 	logger, ctx := ktesting.NewTestContext(t)
 
 	p1 := st.MakePod().Name("p1").UID("p1").Obj()
@@ -1629,7 +1500,10 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	pgLister := &mockPodGroupLister{podGroups: make(map[string]*schedulingapi.PodGroup)}
-	domain := newDomainForWorkloadPreemption(domainNodes, pgLister, "test-domain")
+	domain, err := newDomainForWorkloadPreemption(snapshot, pgLister, "test-domain")
+	if err != nil {
+		t.Fatalf("Failed to create domain: %v", err)
+	}
 
 	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 		cs1 := framework.NewCycleState()
