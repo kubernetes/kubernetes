@@ -1145,6 +1145,7 @@ func (m *ManagerImpl) GetAllocatableDevices(logger klog.Logger) ResourceDeviceIn
 // AllocatePod is called to trigger the allocation of resources to a pod.
 func (m *ManagerImpl) AllocatePod(logger klog.Logger, pod *v1.Pod, _ lifecycle.Operation) error {
 	// Device Manager does not support pod level resource allocation.
+	logger.V(2).Info("Device Manager does not support pod level resource allocation")
 	return nil
 }
 

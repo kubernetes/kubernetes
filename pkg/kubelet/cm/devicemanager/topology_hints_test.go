@@ -22,6 +22,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2048,5 +2049,232 @@ func getPodScopeTestCases() []topologyHintTestCase {
 				},
 			},
 		},
+	}
+}
+
+// The following lifecycle tests verify that the device manager processes or
+// skips operations based on the given lifecycle.Operation.
+// Since GetTopologyHints* does not return an error when an operation is
+// unsupported (it silently returns empty hints to avoid aborting the entire
+// operation across all hint providers), the tests check log output to confirm
+// whether an operation was processed or skipped.
+//
+// The test values used (e.g. device IDs, pod resource requests) are arbitrary
+// but correct values that let the code run the happy path; the exact values
+// have no special meaning. These tests do not validate the correctness of the
+// hint results, only whether the operation is processed or skipped for a given
+// lifecycle operation.
+
+func TestLifecycleGetTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "DeviceManager ignores AddOperation and runs",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "DeviceManager ignores ResizeOperation and runs",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     false,
+		},
+		{
+			description: "DeviceManager ignores empty operation and runs",
+			operation:   "",
+			skipped:     false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Name: "fakeContainer2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice2"): resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Name: "fakeContainer3",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("notRegistered"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			}
+			devices := map[string][]*pluginapi.Device{
+				"testdevice1": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+				"testdevice2": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			}
+
+			m := ManagerImpl{
+				allDevices:       NewResourceDeviceInstances(),
+				healthyDevices:   make(map[string]sets.Set[string]),
+				allocatedDevices: make(map[string]sets.Set[string]),
+				podDevices:       newPodDevices(),
+				sourcesReady:     &sourcesReadyStub{},
+				activePods: func() []*v1.Pod {
+					return []*v1.Pod{pod, {ObjectMeta: metav1.ObjectMeta{UID: "fakeOtherPod"}}}
+				},
+				numaNodes: []int{0, 1},
+			}
+
+			for r := range devices {
+				m.allDevices[r] = make(DeviceInstances)
+				m.healthyDevices[r] = sets.New[string]()
+
+				for _, d := range devices[r] {
+					m.allDevices[r][d.ID] = d
+					m.healthyDevices[r].Insert(d.ID)
+				}
+			}
+
+			hints := m.GetTopologyHints(logger, pod, &pod.Spec.Containers[0], testCase.operation)
+			if testCase.skipped {
+				require.Empty(t, hints)
+			} else {
+				require.NotEmpty(t, hints)
+			}
+		})
+	}
+}
+
+func TestLifecycleGetPodTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "DeviceManager ignores AddOperation and runs",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "DeviceManager ignores ResizeOperation and runs",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     false,
+		},
+		{
+			description: "DeviceManager ignores empty operation and runs",
+			operation:   "",
+			skipped:     false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Name: "fakeContainer2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice2"): resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Name: "fakeContainer3",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("notRegistered"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			}
+			devices := map[string][]*pluginapi.Device{
+				"testdevice1": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+				"testdevice2": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			}
+
+			m := ManagerImpl{
+				allDevices:       NewResourceDeviceInstances(),
+				healthyDevices:   make(map[string]sets.Set[string]),
+				allocatedDevices: make(map[string]sets.Set[string]),
+				podDevices:       newPodDevices(),
+				sourcesReady:     &sourcesReadyStub{},
+				activePods: func() []*v1.Pod {
+					return []*v1.Pod{pod, {ObjectMeta: metav1.ObjectMeta{UID: "fakeOtherPod"}}}
+				},
+				numaNodes: []int{0, 1},
+			}
+
+			for r := range devices {
+				m.allDevices[r] = make(DeviceInstances)
+				m.healthyDevices[r] = sets.New[string]()
+
+				for _, d := range devices[r] {
+					m.allDevices[r][d.ID] = d
+					m.healthyDevices[r].Insert(d.ID)
+				}
+			}
+
+			hints := m.GetPodTopologyHints(logger, pod, testCase.operation)
+			if testCase.skipped {
+				require.Empty(t, hints)
+			} else {
+				require.NotEmpty(t, hints)
+			}
+		})
 	}
 }
