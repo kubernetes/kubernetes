@@ -44,7 +44,16 @@ type disconnectMsg struct {
 }
 
 func (d *disconnectMsg) Error() string {
-	return fmt.Sprintf("ssh: disconnect, reason %d: %s", d.Reason, d.Message)
+	return fmt.Sprintf("ssh: disconnect, reason %d: %q", d.Reason, sanitizeString(d.Message))
+}
+
+func sanitizeString(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\t' || (r >= ' ' && r < 0x7f) {
+			return r
+		}
+		return -1
+	}, s)
 }
 
 // See RFC 4253, section 7.1.

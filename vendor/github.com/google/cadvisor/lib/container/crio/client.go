@@ -17,6 +17,7 @@ package crio
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -26,6 +27,11 @@ import (
 	"syscall"
 	"time"
 )
+
+// ErrContainerNotFound indicates that CRI-O does not yet know about the
+// requested container. This is expected during a short window after the
+// container cgroup is created but before CRI-O finishes registration.
+var ErrContainerNotFound = errors.New("container not found")
 
 var crioClientTimeout = flag.Duration("crio_client_timeout", time.Duration(0), "CRI-O client timeout. Default is no timeout.")
 
@@ -151,6 +157,9 @@ func (c *crioClientImpl) ContainerInfo(id string) (*ContainerInfo, error) {
 		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("error finding container %s: status %d", id, resp.StatusCode)
+		}
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("error finding container %s: %s: %w", id, string(respBody), ErrContainerNotFound)
 		}
 		return nil, fmt.Errorf("error finding container %s: status %d returned error %s", id, resp.StatusCode, string(respBody))
 	}

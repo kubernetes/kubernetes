@@ -18,10 +18,12 @@
 package crio
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/opencontainers/cgroups"
 
@@ -30,6 +32,8 @@ import (
 	containerlibcontainer "github.com/google/cadvisor/lib/container/libcontainer"
 	"github.com/google/cadvisor/lib/fs"
 	info "github.com/google/cadvisor/lib/model"
+
+	"k8s.io/klog/v2"
 )
 
 type crioContainerHandler struct {
@@ -108,9 +112,27 @@ func newCrioContainerHandler(
 	id := ContainerNameToCrioId(name)
 	pidKnown := true
 
-	cInfo, err := client.ContainerInfo(id)
-	if err != nil {
-		return nil, err
+	// Cgroup is created during container setup. When cadvisor sees the cgroup
+	// via inotify, the container may not be fully registered in CRI-O yet.
+	// Use retry+backoff to tolerate the race condition, mirroring the
+	// containerd handler's approach for the same issue.
+	var cInfo *ContainerInfo
+	backoff := 100 * time.Millisecond
+	retry := 5
+	for {
+		cInfo, err = client.ContainerInfo(id)
+		if err == nil && cInfo != nil {
+			break
+		}
+
+		if !errors.Is(err, ErrContainerNotFound) || retry == 0 {
+			return nil, err
+		}
+
+		klog.V(4).Infof("Container %s not yet registered in CRI-O, retrying (%d retries left): %v", id, retry, err)
+		retry--
+		time.Sleep(backoff)
+		backoff *= 2
 	}
 	if cInfo.Pid == 0 {
 		// If pid is not known yet, network related stats can not be retrieved by the

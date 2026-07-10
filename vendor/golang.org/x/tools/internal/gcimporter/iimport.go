@@ -48,13 +48,14 @@ func (r *intReader) uint64() uint64 {
 
 // Keep this in sync with constants in iexport.go.
 const (
-	iexportVersionGo1_11   = 0
-	iexportVersionPosCol   = 1
-	iexportVersionGo1_18   = 2
-	iexportVersionGenerics = 2
-	iexportVersion         = iexportVersionGenerics
+	iexportVersionGo1_11         = 0
+	iexportVersionPosCol         = 1
+	iexportVersionGo1_18         = 2
+	iexportVersionGenerics       = 2
+	iexportVersionGenericMethods = 3
+	iexportVersion               = iexportVersionGenericMethods
 
-	iexportVersionCurrent = 2
+	iexportVersionCurrent = 3
 )
 
 type ident struct {
@@ -179,9 +180,9 @@ func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte
 
 	version = int64(r.uint64())
 	switch version {
-	case iexportVersionGo1_18, iexportVersionPosCol, iexportVersionGo1_11:
+	case iexportVersionGenericMethods, iexportVersionGo1_18, iexportVersionPosCol, iexportVersionGo1_11:
 	default:
-		if version > iexportVersionGo1_18 {
+		if version > iexportVersionGenericMethods {
 			errorf("unstable iexport format version %d, just rebuild compiler and std library", version)
 		} else {
 			errorf("unknown iexport format version %d", version)
@@ -614,6 +615,10 @@ func (r *importReader) obj(pkg *types.Package, name string) {
 			for n := r.uint64(); n > 0; n-- {
 				mpos := r.pos()
 				mname := r.ident()
+				var tpars []*types.TypeParam
+				if r.p.version >= iexportVersionGenericMethods && r.bool() {
+					tpars = r.tparamList()
+				}
 				recv := r.param(pkg)
 
 				// If the receiver has any targs, set those as the
@@ -628,8 +633,7 @@ func (r *importReader) obj(pkg *types.Package, name string) {
 						rparams[i] = types.Unalias(targs.At(i)).(*types.TypeParam)
 					}
 				}
-				msig := r.signature(pkg, recv, rparams, nil)
-
+				msig := r.signature(pkg, recv, rparams, tpars)
 				named.AddMethod(types.NewFunc(mpos, pkg, mname, msig))
 			}
 		}

@@ -23,7 +23,7 @@ func adjustForeignAttributes(aa []Attribute) {
 		}
 		switch a.Key {
 		case "xlink:actuate", "xlink:arcrole", "xlink:href", "xlink:role", "xlink:show",
-			"xlink:title", "xlink:type", "xml:base", "xml:lang", "xml:space", "xmlns:xlink":
+			"xlink:title", "xlink:type", "xml:lang", "xml:space", "xmlns:xlink":
 			j := strings.Index(a.Key, ":")
 			aa[i].Namespace = a.Key[:j]
 			aa[i].Key = a.Key[j+1:]
