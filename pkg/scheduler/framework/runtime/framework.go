@@ -1209,10 +1209,15 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl fwk.PostFilt
 }
 
 // RunPodGroupPostFilterPlugins runs the set of configured PodGroupPostFilter plugins.
-func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state *framework.CycleState, podGroupInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state *framework.CycleState, podGroupInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (_ *fwk.PodGroupPostFilterResult, status *fwk.Status) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		return nil, fwk.NewStatus(fwk.Unschedulable, "generic workload feature is disabled, cannot perform PodGroupPostFilter")
 	}
+
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PodGroupPostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
 
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -1228,7 +1233,7 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		res, status := pl.PodGroupPostFilter(ctx, state, podGroupInfo, pgSchedulingFunc)
+		res, status := f.runPodGroupPostFilterPlugin(ctx, pl, state, podGroupInfo, pgSchedulingFunc)
 		if status.IsSuccess() {
 			return res, status
 		} else if status.Code() == fwk.UnschedulableAndUnresolvable {
@@ -1245,6 +1250,16 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 	}
 
 	return nil, fwk.NewStatus(fwk.Unschedulable, reasons...).WithPlugin(rejectorPlugin)
+}
+
+func (f *frameworkImpl) runPodGroupPostFilterPlugin(ctx context.Context, pl fwk.PodGroupPostFilterPlugin, state *framework.CycleState, podGroupInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	if !state.ShouldRecordPluginMetrics() {
+		return pl.PodGroupPostFilter(ctx, state, podGroupInfo, pgSchedulingFunc)
+	}
+	startTime := time.Now()
+	res, status := pl.PodGroupPostFilter(ctx, state, podGroupInfo, pgSchedulingFunc)
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.PodGroupPostFilter, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+	return res, status
 }
 
 // RunFilterPluginsWithNominatedPods runs the set of configured filter plugins
