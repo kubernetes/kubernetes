@@ -3961,6 +3961,14 @@ func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 	}
 }
 
+type testPodGroupPostFilterPlugin struct {
+	*TestPlugin
+}
+
+func (pl testPodGroupPostFilterPlugin) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	return pl.inj.PodGroupPostFilterResult, fwk.NewStatus(fwk.Code(pl.inj.PodGroupPostFilterStatus), injectReason)
+}
+
 func TestRecordingMetrics(t *testing.T) {
 	state.SetRecordPluginMetrics(true)
 	tests := []struct {
@@ -4051,6 +4059,18 @@ func TestRecordingMetrics(t *testing.T) {
 			wantExtensionPoint: "PlacementFeasible",
 			wantStatus:         fwk.Success,
 		},
+		{
+			name: "PodGroupPostFilter - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+					return &fwk.PodGroupAssignments{}, nil
+				}
+				f.RunPodGroupPostFilterPlugins(ctx, state, &framework.QueuedPodGroupInfo{PodGroupInfo: &framework.PodGroupInfo{}}, pgSchedulingFunc)
+			},
+			inject:             injectedResult{PodGroupPostFilterStatus: int(fwk.Success)},
+			wantExtensionPoint: "PodGroupPostFilter",
+			wantStatus:         fwk.Success,
+		},
 
 		{
 			name:               "PreFilter - Error",
@@ -4137,10 +4157,25 @@ func TestRecordingMetrics(t *testing.T) {
 			wantExtensionPoint: "PlacementFeasible",
 			wantStatus:         fwk.Error,
 		},
+		{
+			name: "PodGroupPostFilter - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+					return &fwk.PodGroupAssignments{}, nil
+				}
+				f.RunPodGroupPostFilterPlugins(ctx, state, &framework.QueuedPodGroupInfo{PodGroupInfo: &framework.PodGroupInfo{}}, pgSchedulingFunc)
+			},
+			inject:             injectedResult{PodGroupPostFilterStatus: int(fwk.Error)},
+			wantExtensionPoint: "PodGroupPostFilter",
+			wantStatus:         fwk.Error,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: true,
+			})
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			metrics.FrameworkExtensionPointDuration.Reset()
@@ -4188,6 +4223,9 @@ func TestRecordingMetrics(t *testing.T) {
 
 			if tt.wantExtensionPoint == "PlacementFeasible" {
 				f.(*frameworkImpl).placementFeasiblePlugins = []framework.PlacementFeasiblePlugin{plugin}
+			}
+			if tt.wantExtensionPoint == "PodGroupPostFilter" {
+				f.(*frameworkImpl).podGroupPostFilterPlugins = []fwk.PodGroupPostFilterPlugin{testPodGroupPostFilterPlugin{plugin}}
 			}
 
 			tt.action(ctx, f)
