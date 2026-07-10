@@ -16,89 +16,55 @@ limitations under the License.
 
 package verify
 
-import (
-	"encoding/json"
-	"time"
-)
+// VerifiedClaims is the signature- and standard-claim-verified view of a token
+// that a TokenAuthenticator returns. The authenticator has already checked the
+// signature and the standard iss/aud/exp claims (for example via OIDC discovery
+// and go-oidc); the policy layer applies only the KEP-6060 checks on top.
+//
+// It is the single value that crosses the boundary from the (dependency-heavy)
+// authenticator into this pure-stdlib policy package, so all JOSE/OIDC types
+// stay out of the core verifier. The webhook-specific private claims are decoded
+// under the standard "kubernetes.io" key.
+type VerifiedClaims struct {
+	// Issuer, Subject and Audience are the verified standard claims. The
+	// authenticator populates them from its validated token, so they carry the
+	// values the signature and standard-claim checks actually vouched for.
+	Issuer   string
+	Subject  string
+	Audience []string
 
-// ObjectRef identifies a bound Kubernetes object by name and UID, mirroring the
-// { "name": ..., "uid": ... } refs the issuer places under the kubernetes.io
-// private claims for the validating- or mutating-webhook configuration.
-type ObjectRef struct {
-	Name string `json:"name"`
-	UID  string `json:"uid"`
+	// Kubernetes holds the decoded "kubernetes.io" private claims relevant to
+	// webhook authentication. Its type is unexported: the only fields the policy
+	// consults are reached within this package, and an authenticator populates
+	// it by JSON-decoding the token payload, so it never needs to name the type.
+	//
+	// A bring-your-own TokenAuthenticator populates this field by JSON-decoding
+	// the verified token payload into a VerifiedClaims value — for example
+	// idToken.Claims(&VerifiedClaims{}) with go-oidc, or json.Unmarshal of the
+	// payload — since the "kubernetes.io" JSON key routes into it automatically.
+	// The unexported field type cannot be constructed by name from outside this
+	// package, which is deliberate: JSON decoding is the only supported way in.
+	Kubernetes kubernetesClaims `json:"kubernetes.io"`
 }
 
 // kubernetesClaims mirrors the subset of the standard "kubernetes.io" private
 // claims object relevant to webhook authentication. Both webhook references use
 // omitempty so the bound-object rule (exactly one) can be enforced by presence.
 type kubernetesClaims struct {
-	ValidatingWebhookConfiguration *ObjectRef `json:"validatingWebhookConfiguration,omitempty"`
-	MutatingWebhookConfiguration   *ObjectRef `json:"mutatingWebhookConfiguration,omitempty"`
+	ValidatingWebhookConfiguration *objectRef `json:"validatingWebhookConfiguration,omitempty"`
+	MutatingWebhookConfiguration   *objectRef `json:"mutatingWebhookConfiguration,omitempty"`
 
 	// AttestationClaims carries the attestation values keyed by their
 	// fully-namespaced claim key. For webhook authentication the only key we
-	// consult is AllowedAPIGroupClaimKey. The JSON wire shape is a plain
+	// consult is allowedAPIGroupClaimKey. The JSON wire shape is a plain
 	// map[string][]string, matching the server-side map[string]AttestationClaimValue.
 	AttestationClaims map[string][]string `json:"attestationClaims,omitempty"`
 }
 
-// tokenClaims is the parsed, verified JWT payload. Only the fields this verifier
-// needs are modeled; unknown claims are ignored.
-type tokenClaims struct {
-	Issuer    string       `json:"iss,omitempty"`
-	Subject   string       `json:"sub,omitempty"`
-	Audience  audience     `json:"aud,omitempty"`
-	Expiry    *numericDate `json:"exp,omitempty"`
-	NotBefore *numericDate `json:"nbf,omitempty"`
-	IssuedAt  *numericDate `json:"iat,omitempty"`
-
-	Kubernetes *kubernetesClaims `json:"kubernetes.io,omitempty"`
-}
-
-// audience models the JWT "aud" claim, which per RFC 7519 may be encoded either
-// as a single string or as an array of strings. Both forms decode to a slice.
-type audience []string
-
-func (a *audience) UnmarshalJSON(b []byte) error {
-	// Try the array form first.
-	var list []string
-	if err := json.Unmarshal(b, &list); err == nil {
-		*a = list
-		return nil
-	}
-	// Fall back to the single-string form.
-	var single string
-	if err := json.Unmarshal(b, &single); err != nil {
-		return err
-	}
-	*a = audience{single}
-	return nil
-}
-
-// contains reports whether the audience list includes want.
-func (a audience) contains(want string) bool {
-	for _, aud := range a {
-		if aud == want {
-			return true
-		}
-	}
-	return false
-}
-
-// numericDate models a JWT NumericDate (RFC 7519 §2): seconds since the Unix
-// epoch, potentially fractional. Fractions are truncated to whole seconds.
-type numericDate int64
-
-func (n *numericDate) UnmarshalJSON(b []byte) error {
-	var f float64
-	if err := json.Unmarshal(b, &f); err != nil {
-		return err
-	}
-	*n = numericDate(int64(f))
-	return nil
-}
-
-func (n numericDate) time() time.Time {
-	return time.Unix(int64(n), 0)
+// objectRef identifies a bound Kubernetes object by name and UID, mirroring the
+// { "name": ..., "uid": ... } refs the issuer places under the kubernetes.io
+// private claims for the validating- or mutating-webhook configuration.
+type objectRef struct {
+	Name string `json:"name"`
+	UID  string `json:"uid"`
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admissionhttp
+package admissionhttp_test
 
 import (
 	"bytes"
@@ -30,6 +30,8 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/webhook-auth/verify"
+	"k8s.io/webhook-auth/verify/admissionhttp"
+	"k8s.io/webhook-auth/verify/oidc"
 )
 
 func TestDeriveExpectedAudience(t *testing.T) {
@@ -47,7 +49,7 @@ func TestDeriveExpectedAudience(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPost, "http://"+tc.host+tc.path, nil)
 			r.Host = tc.host
-			if got := DeriveExpectedAudience(r); got != tc.want {
+			if got := admissionhttp.DeriveExpectedAudience(r); got != tc.want {
 				t.Errorf("DeriveExpectedAudience() = %q, want %q", got, tc.want)
 			}
 		})
@@ -67,7 +69,7 @@ func TestAudienceFromServiceURL(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := AudienceFromServiceURL(tc.url)
+			got, err := admissionhttp.AudienceFromServiceURL(tc.url)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got %q", got)
@@ -84,20 +86,10 @@ func TestAudienceFromServiceURL(t *testing.T) {
 	}
 }
 
-// audienceTestKeySet treats the raw token as its own verified JSON payload,
-// matching the fake used elsewhere in this package's tests.
-type audienceTestKeySet struct{}
-
-func (audienceTestKeySet) VerifySignature(_ context.Context, raw string) ([]byte, error) {
-	return []byte(raw), nil
-}
-
 func TestWithTokenVerificationDerivedAudience(t *testing.T) {
-	const issuer = "https://issuer.test"
-
-	t.Run("factory error fails closed with a generic 401", func(t *testing.T) {
+	t.Run("constructor error fails closed with a generic 401", func(t *testing.T) {
 		downstreamReached := false
-		h := WithTokenVerificationDerivedAudience(
+		h := admissionhttp.WithTokenVerificationDerivedAudience(
 			func([]string) (*verify.Verifier, error) { return nil, errors.New("boom") },
 			func(http.ResponseWriter, *http.Request, *admissionv1.AdmissionReview) { downstreamReached = true },
 		)
@@ -113,17 +105,21 @@ func TestWithTokenVerificationDerivedAudience(t *testing.T) {
 			t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
 		}
 		if downstreamReached {
-			t.Error("downstream must not be reached on factory error")
+			t.Error("downstream must not be reached on constructor error")
 		}
 	})
 
 	t.Run("request-derived audience is used to build the verifier", func(t *testing.T) {
+		// The issuer is a real TLS OIDC endpoint; the verifier for the derived
+		// audience is built through oidc.NewRemoteVerifier. No insecure path.
+		ts := newOIDCTestServer(t)
+
 		downstreamReached := false
-		factory := func(auds []string) (*verify.Verifier, error) {
-			return verify.NewVerifier(audienceTestKeySet{}, issuer, auds)
+		newVerifier := func(auds []string) (*verify.Verifier, error) {
+			return oidc.NewRemoteVerifier(context.Background(), ts.issuer, auds[0], oidc.WithHTTPClient(ts.client()))
 		}
-		h := WithTokenVerificationDerivedAudience(
-			factory,
+		h := admissionhttp.WithTokenVerificationDerivedAudience(
+			newVerifier,
 			func(w http.ResponseWriter, _ *http.Request, _ *admissionv1.AdmissionReview) {
 				downstreamReached = true
 				w.WriteHeader(http.StatusOK)
@@ -136,18 +132,16 @@ func TestWithTokenVerificationDerivedAudience(t *testing.T) {
 		expectedAud := "https://" + host + "/validate"
 
 		claims := map[string]any{
-			"iss": issuer,
+			"iss": ts.issuer,
 			"aud": []string{expectedAud},
 			"exp": time.Now().Add(time.Hour).Unix(),
+			"nbf": time.Now().Add(-time.Minute).Unix(),
 			"kubernetes.io": map[string]any{
 				"validatingWebhookConfiguration": map[string]any{"name": "w", "uid": "u"},
-				"attestationClaims":              map[string]any{verify.AllowedAPIGroupClaimKey: []string{"*"}},
+				"attestationClaims":              map[string]any{allowedAPIGroupClaimKey: []string{wildcardAPIGroup}},
 			},
 		}
-		rawToken, err := json.Marshal(claims)
-		if err != nil {
-			t.Fatalf("marshaling claims: %v", err)
-		}
+		rawToken := ts.sign(t, claims)
 
 		review := &admissionv1.AdmissionReview{
 			Request: &admissionv1.AdmissionRequest{
@@ -163,7 +157,7 @@ func TestWithTokenVerificationDerivedAudience(t *testing.T) {
 		if err != nil {
 			t.Fatalf("building request: %v", err)
 		}
-		req.Header.Set("Authorization", "Bearer "+string(rawToken))
+		req.Header.Set("Authorization", "Bearer "+rawToken)
 		resp, err := server.Client().Do(req)
 		if err != nil {
 			t.Fatalf("POST: %v", err)

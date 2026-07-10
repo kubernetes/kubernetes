@@ -34,10 +34,18 @@ import (
 //
 // PROVISIONAL — the exact audience-derivation format is an OPEN QUESTION on the
 // issuer (kube-apiserver) side and is NOT finalized in KEP-6060. This
-// "https://<host><path>" shape is a reasonable default so a webhook works with
-// zero explicit audience configuration; it MUST be reconciled with, and match,
-// the kube-apiserver-side derivation once the KEP finalizes it. Until then,
-// deployments that know their audience should override it explicitly.
+// "https://<host><path>" shape is an intentional, overridable default so a
+// webhook works with zero explicit audience configuration; it MUST be
+// reconciled with, and match, the kube-apiserver-side derivation once the KEP
+// finalizes it. Until then, deployments that know their audience should override
+// it explicitly.
+//
+// This request/URL-derived value is one of two independent, opt-in provisional
+// audience sources in this module. The other is the in-cluster token-derived
+// aud[0] default in InCluster (verify/oidc/incluster.go). They are separate
+// entry points, not alternative spellings of one another, and both must
+// ultimately reconcile to the same apiserver-side audience derivation once
+// KEP-6060 finalizes it.
 func deriveAudience(host, path string) string {
 	if path == "" {
 		path = "/"
@@ -60,9 +68,8 @@ func DeriveExpectedAudience(r *http.Request) string {
 // webhook's own service URL (for example the URL registered in the
 // ValidatingWebhookConfiguration clientConfig). It is the construction-time
 // counterpart of DeriveExpectedAudience: feed its result into
-// verify.NewVerifier (or oidckeyset.NewInClusterVerifier via WithServiceURL) so
-// the strict verifier path is configured with the same value a request would
-// derive.
+// oidc.NewRemoteVerifier as the audience argument so the strict verifier
+// path is configured with the same value a request would derive.
 //
 // PROVISIONAL — must match the issuer-side (kube-apiserver) audience derivation
 // once KEP-6060 finalizes it.
@@ -77,23 +84,16 @@ func AudienceFromServiceURL(rawURL string) (string, error) {
 	return deriveAudience(u.Host, u.Path), nil
 }
 
-// VerifierFactory builds a Verifier bound to expectedAudiences. It exists so a
-// handler can defer audience selection to request time (see
-// WithTokenVerificationDerivedAudience) while still going through the strict
-// verify.NewVerifier path: a factory typically closes over the KeySet and issuer
-// and returns verify.NewVerifier(keySet, issuer, expectedAudiences, opts...).
-type VerifierFactory func(expectedAudiences []string) (*verify.Verifier, error)
-
 // derivedAudienceHandler builds and caches a per-endpoint Verifier on first use,
 // deriving the expected audience from the request. It wraps the standard
 // WithTokenVerification handler for each distinct derived audience, so all
 // enforcement (single decode, generic denial, fail-closed) is unchanged — only
 // the audience the Verifier is constructed with is chosen at request time.
 type derivedAudienceHandler struct {
-	factory VerifierFactory
-	derive  func(*http.Request) []string
-	next    ReviewHandler
-	opts    []Option
+	newVerifier func(expectedAudiences []string) (*verify.Verifier, error)
+	derive      func(*http.Request) []string
+	next        ReviewHandler
+	opts        []Option
 
 	mu    sync.Mutex
 	cache map[string]http.Handler
@@ -101,23 +101,27 @@ type derivedAudienceHandler struct {
 
 // WithTokenVerificationDerivedAudience returns an http.Handler that derives the
 // expected audience from each request (via DeriveExpectedAudience, PROVISIONAL),
-// builds a Verifier for that audience through factory the first time it is seen,
-// caches it per derived audience, and then enforces exactly like
+// builds a Verifier for that audience through newVerifier the first time it is
+// seen, caches it per derived audience, and then enforces exactly like
 // WithTokenVerification.
 //
+// newVerifier is a plain function the caller supplies; it typically closes over
+// an oidc constructor and returns
+// oidc.NewRemoteVerifier(ctx, issuer, expectedAudiences[0], opts...).
+//
 // This is the "use it at request time" path for the provisional audience
-// derivation. It does NOT weaken core validation: the factory goes through the
-// strict verify.NewVerifier, and a factory error fails the request closed with
-// the same generic denial. The explicit WithTokenVerification path (fixed,
+// derivation. It does NOT weaken core validation: newVerifier goes through the
+// strict verifier constructor, and a construction error fails the request closed
+// with the same generic denial. The explicit WithTokenVerification path (fixed,
 // caller-supplied audiences) remains the recommended choice wherever the
 // expected audience is known ahead of time.
-func WithTokenVerificationDerivedAudience(factory VerifierFactory, next ReviewHandler, opts ...Option) http.Handler {
+func WithTokenVerificationDerivedAudience(newVerifier func(expectedAudiences []string) (*verify.Verifier, error), next ReviewHandler, opts ...Option) http.Handler {
 	return &derivedAudienceHandler{
-		factory: factory,
-		derive:  func(r *http.Request) []string { return []string{DeriveExpectedAudience(r)} },
-		next:    next,
-		opts:    opts,
-		cache:   make(map[string]http.Handler),
+		newVerifier: newVerifier,
+		derive:      func(r *http.Request) []string { return []string{DeriveExpectedAudience(r)} },
+		next:        next,
+		opts:        opts,
+		cache:       make(map[string]http.Handler),
 	}
 }
 
@@ -129,11 +133,11 @@ func (d *derivedAudienceHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	d.mu.Lock()
 	h := d.cache[key]
 	if h == nil {
-		v, err := d.factory(auds)
+		v, err := d.newVerifier(auds)
 		if err != nil {
 			d.mu.Unlock()
 			// Fail closed with the uniform generic denial: a misconfigured
-			// factory must never fall through to the downstream handler.
+			// constructor must never fall through to the downstream handler.
 			writeDenied(w)
 			return
 		}

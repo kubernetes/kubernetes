@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package oidckeyset_test
+package oidc_test
 
 import (
 	"context"
@@ -30,7 +30,7 @@ import (
 	jose "gopkg.in/go-jose/go-jose.v2"
 
 	"k8s.io/webhook-auth/verify"
-	"k8s.io/webhook-auth/verify/oidckeyset"
+	"k8s.io/webhook-auth/verify/oidc"
 )
 
 const (
@@ -40,6 +40,11 @@ const (
 	testSubject   = "system:serviceaccount:kube-system:issuer"
 	testWebhookNm = "example-validating-webhook"
 	testWebhookID = "11111111-2222-3333-4444-555555555555"
+
+	// allowedAPIGroupClaimKey is the fully-namespaced attestation claim key from
+	// KEP-6060. The core package's constant is unexported, so the test hard-codes
+	// the wire string it must match.
+	allowedAPIGroupClaimKey = "webhook-authentication.k8s.io/allowedAPIGroup"
 )
 
 // oidcTestServer is an httptest TLS server that serves an OIDC discovery
@@ -53,7 +58,8 @@ type oidcTestServer struct {
 
 // newOIDCTestServer stands up a TLS server serving discovery + JWKS for a fresh
 // RSA key. The returned server's issuer equals the server URL, so go-oidc's
-// discovery issuer-match check passes without any skip.
+// discovery issuer-match check passes without any skip. TLS is exercised for
+// real: callers reach it only through the server's own cert pool.
 func newOIDCTestServer(t *testing.T) *oidcTestServer {
 	t.Helper()
 
@@ -100,8 +106,8 @@ func newOIDCTestServer(t *testing.T) *oidcTestServer {
 }
 
 // client returns an *http.Client whose transport trusts the test server's TLS
-// cert. Injected via oidckeyset.WithHTTPClient so discovery and JWKS fetches
-// succeed against the httptest TLS endpoint.
+// cert. Injected via oidc.WithHTTPClient so discovery and JWKS fetches
+// succeed against the httptest TLS endpoint without disabling verification.
 func (ts *oidcTestServer) client() *http.Client { return ts.server.Client() }
 
 // signWith mints a compact JWS over claims using the given signer.
@@ -143,32 +149,31 @@ func (ts *oidcTestServer) baseClaims() map[string]any {
 				"uid":  testWebhookID,
 			},
 			"attestationClaims": map[string]any{
-				verify.AllowedAPIGroupClaimKey: []string{testAPIGroup},
+				allowedAPIGroupClaimKey: []string{testAPIGroup},
 			},
 		},
 	}
 }
 
-// newVerifier builds a Verifier whose signatures are checked by an
-// oidckeyset.NewRemoteKeySet pointed at the test server (full OIDC discovery).
+// newVerifier builds a Verifier via full OIDC discovery against the test server.
 func (ts *oidcTestServer) newVerifier(t *testing.T) *verify.Verifier {
 	t.Helper()
-	ks, err := oidckeyset.NewRemoteKeySet(context.Background(), ts.issuer, oidckeyset.WithHTTPClient(ts.client()))
+	v, err := oidc.NewRemoteVerifier(context.Background(), ts.issuer, testAudience, oidc.WithHTTPClient(ts.client()))
 	if err != nil {
-		t.Fatalf("NewRemoteKeySet: %v", err)
-	}
-	v, err := verify.NewVerifier(ks, ts.issuer, []string{testAudience})
-	if err != nil {
-		t.Fatalf("NewVerifier: %v", err)
+		t.Fatalf("NewRemoteVerifier: %v", err)
 	}
 	return v
 }
 
-// TestRemoteKeySet_EndToEnd exercises the full round trip: OIDC discovery over
-// TLS, JWKS fetch, real RS256 signature verification, and the KEP-6060 claim
-// policy layered on top by the core Verifier. This restores the end-to-end
-// signature coverage the deleted hand-rolled josekeyset had.
-func TestRemoteKeySet_EndToEnd(t *testing.T) {
+// TestRemoteVerifier_EndToEnd exercises the full round trip: OIDC discovery over
+// TLS, JWKS fetch, real RS256 signature verification and go-oidc's iss/aud/exp
+// checks, and the KEP-6060 claim policy layered on top by the core Verifier.
+//
+// Every sad path is asserted to collapse into the single generic
+// ErrVerificationFailed (anti-enumeration): go-oidc's descriptive typed errors
+// (expired, wrong key, wrong issuer, wrong audience) must never surface a
+// distinguishable error to the caller.
+func TestRemoteVerifier_EndToEnd(t *testing.T) {
 	ts := newOIDCTestServer(t)
 
 	// A second key NOT published in the JWKS, used to forge a signature.
@@ -197,10 +202,8 @@ func TestRemoteKeySet_EndToEnd(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "token signed by a key absent from the JWKS is rejected",
-			token: func() string {
-				return signWith(t, wrongSigner, ts.baseClaims())
-			},
+			name:    "token signed by a key absent from the JWKS is rejected",
+			token:   func() string { return signWith(t, wrongSigner, ts.baseClaims()) },
 			wantErr: true,
 		},
 		{
@@ -221,6 +224,20 @@ func TestRemoteKeySet_EndToEnd(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "token with a mismatched audience is rejected",
+			token: func() string {
+				c := ts.baseClaims()
+				c["aud"] = []string{"https://someone.else.example/validate"}
+				return ts.sign(t, c)
+			},
+			wantErr: true,
+		},
+		{
+			name:    "malformed token is rejected",
+			token:   func() string { return "not-a-jwt" },
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -231,7 +248,7 @@ func TestRemoteKeySet_EndToEnd(t *testing.T) {
 					t.Fatalf("expected verification failure, got result %+v", res)
 				}
 				if !errors.Is(err, verify.ErrVerificationFailed) {
-					t.Fatalf("expected ErrVerificationFailed, got %v", err)
+					t.Fatalf("expected generic ErrVerificationFailed, got %v", err)
 				}
 				return
 			}
@@ -247,45 +264,27 @@ func TestRemoteKeySet_EndToEnd(t *testing.T) {
 			if res.AllowedAPIGroup != testAPIGroup {
 				t.Errorf("allowedAPIGroup = %q, want %q", res.AllowedAPIGroup, testAPIGroup)
 			}
+			if res.Subject != testSubject {
+				t.Errorf("subject = %q, want %q", res.Subject, testSubject)
+			}
 		})
 	}
 }
 
-// TestRemoteKeySet_VerifySignature tests the KeySet seam directly: a validly
-// signed token yields its payload bytes; a token signed by an unknown key errors.
-func TestRemoteKeySet_VerifySignature(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	ks, err := oidckeyset.NewRemoteKeySet(context.Background(), ts.issuer, oidckeyset.WithHTTPClient(ts.client()))
-	if err != nil {
-		t.Fatalf("NewRemoteKeySet: %v", err)
+// TestRemoteVerifier_Validation checks fail-fast construction errors.
+func TestRemoteVerifier_Validation(t *testing.T) {
+	if _, err := oidc.NewRemoteVerifier(context.Background(), "", testAudience); err == nil {
+		t.Error("expected error for empty issuer")
 	}
-
-	t.Run("valid signature returns the payload", func(t *testing.T) {
-		token := ts.sign(t, ts.baseClaims())
-		payload, err := ks.VerifySignature(context.Background(), token)
-		if err != nil {
-			t.Fatalf("VerifySignature: %v", err)
-		}
-		var claims map[string]any
-		if err := json.Unmarshal(payload, &claims); err != nil {
-			t.Fatalf("payload is not the signed JSON: %v", err)
-		}
-		if claims["iss"] != ts.issuer {
-			t.Errorf("payload iss = %v, want %q", claims["iss"], ts.issuer)
-		}
-	})
-
-	t.Run("malformed token is rejected", func(t *testing.T) {
-		if _, err := ks.VerifySignature(context.Background(), "not-a-jwt"); err == nil {
-			t.Fatal("expected error for malformed token")
-		}
-	})
+	if _, err := oidc.NewRemoteVerifier(context.Background(), "https://issuer.example", ""); err == nil {
+		t.Error("expected error for empty audience")
+	}
 }
 
-// TestRemoteKeySet_DiscoveryIssuerMismatch confirms go-oidc's issuer-confusion
+// TestRemoteVerifier_DiscoveryIssuerMismatch confirms go-oidc's issuer-confusion
 // guard: if the discovery document advertises a different issuer than requested,
-// construction fails.
-func TestRemoteKeySet_DiscoveryIssuerMismatch(t *testing.T) {
+// construction fails before any token is ever verified.
+func TestRemoteVerifier_DiscoveryIssuerMismatch(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -297,27 +296,8 @@ func TestRemoteKeySet_DiscoveryIssuerMismatch(t *testing.T) {
 	server := httptest.NewTLSServer(mux)
 	defer server.Close()
 
-	_, err := oidckeyset.NewRemoteKeySet(context.Background(), server.URL, oidckeyset.WithHTTPClient(server.Client()))
+	_, err := oidc.NewRemoteVerifier(context.Background(), server.URL, testAudience, oidc.WithHTTPClient(server.Client()))
 	if err == nil {
 		t.Fatal("expected discovery issuer mismatch to fail construction")
-	}
-}
-
-// TestRemoteKeySet_SkipDiscovery exercises the TEST-ONLY discovery-skip path:
-// keys are fetched directly from a JWKS URL, bypassing the well-known document.
-func TestRemoteKeySet_SkipDiscovery(t *testing.T) {
-	ts := newOIDCTestServer(t)
-
-	ks, err := oidckeyset.NewRemoteKeySet(
-		context.Background(),
-		ts.issuer,
-		oidckeyset.WithHTTPClient(ts.client()),
-		oidckeyset.WithInsecureSkipDiscovery(ts.issuer+"/keys"),
-	)
-	if err != nil {
-		t.Fatalf("NewRemoteKeySet(skip discovery): %v", err)
-	}
-	if _, err := ks.VerifySignature(context.Background(), ts.sign(t, ts.baseClaims())); err != nil {
-		t.Fatalf("VerifySignature over skip-discovery key set: %v", err)
 	}
 }

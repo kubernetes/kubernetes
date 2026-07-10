@@ -15,16 +15,19 @@ limitations under the License.
 */
 
 // The tests below exercise the admissionhttp adapter's BEHAVIOR — HTTP status
-// codes, whether the downstream handler is reached, deny reasons, body limits,
-// and fail-closed decoding — using a stdlib fake KeySet. Real end-to-end
-// SIGNATURE verification is not exercised here; it is covered against the
-// go-oidc-backed KeySet in a later step. A token here is simply the JSON claims
-// payload the fake KeySet returns verbatim as "already verified".
+// codes, whether the downstream handler is reached, body limits, and
+// fail-closed decoding — against REAL token verification. Verifiers are built
+// with oidc.NewRemoteVerifier over a httptest.NewTLSServer that serves an
+// OIDC discovery document and JWKS; tokens are real RS256 JWTs signed by that
+// server's key. There is no insecure path: the client reaches the server only
+// through its own cert pool. The secure production wiring is exercised verbatim.
 package admissionhttp_test
 
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"io"
@@ -35,70 +38,164 @@ import (
 	"testing"
 	"time"
 
+	jose "gopkg.in/go-jose/go-jose.v2"
+
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/webhook-auth/verify"
 	"k8s.io/webhook-auth/verify/admissionhttp"
+	"k8s.io/webhook-auth/verify/oidc"
 )
 
 const (
+	testKeyID    = "test-signing-key"
 	testAudience = "webhook.example.com"
 	testGroup    = "apps"
-	testIssuer   = "https://issuer.example.com"
+	testSubject  = "system:serviceaccount:kube-system:webhook-auth"
 	reviewUID    = "req-uid-1"
+
+	// allowedAPIGroupClaimKey is the fully-namespaced KEP-6060 attestation claim
+	// key. The core package's constant is unexported, so the tests hard-code the
+	// wire string a spec-compliant issuer must emit; the bare "allowedAPIGroup"
+	// form is a known issuer bug and MUST NOT be used.
+	allowedAPIGroupClaimKey = "webhook-authentication.k8s.io/allowedAPIGroup"
+	wildcardAPIGroup        = "*"
 )
 
-// fakeKeySet is a stand-in verify.KeySet that performs no real crypto: it treats
-// the raw token string as the already-verified JSON claims payload. This mirrors
-// the fake used by the core verify package tests and keeps the adapter tests
-// dependency-minimal — signing is just JSON marshaling and the module needs only
-// k8s.io/api. Real signature verification is covered separately (see the
-// file-level comment above).
-type fakeKeySet struct{}
+// oidcTestServer is a httptest TLS server that serves an OIDC discovery document
+// and a JWKS holding a single locally generated RSA signing key. It lets the
+// adapter tests exercise the real production path (oidc.NewRemoteVerifier
+// → go-oidc discovery + signature/iss/aud/exp checks) with no insecure or
+// skip-verify option: callers reach it only through the server's own cert pool.
+type oidcTestServer struct {
+	server *httptest.Server
+	issuer string
+	signer jose.Signer
+}
 
-func (fakeKeySet) VerifySignature(_ context.Context, rawToken string) ([]byte, error) {
-	return []byte(rawToken), nil
+// startOIDCServer stands up the TLS discovery + JWKS endpoint for a fresh RSA
+// key. It returns an error rather than taking a *testing.T so both the tests
+// (via newOIDCTestServer) and the runnable examples can share one implementation.
+func startOIDCServer() (*oidcTestServer, error) {
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+	signer, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: jose.JSONWebKey{Key: priv, KeyID: testKeyID}},
+		(&jose.SignerOptions{}).WithType("JWT"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{
+		Key:       priv.Public(),
+		KeyID:     testKeyID,
+		Algorithm: string(jose.RS256),
+		Use:       "sig",
+	}}}
+
+	ts := &oidcTestServer{signer: signer}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                                ts.issuer,
+			"jwks_uri":                              ts.issuer + "/keys",
+			"id_token_signing_alg_values_supported": []string{string(jose.RS256)},
+		})
+	})
+	mux.HandleFunc("/keys", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(jwks)
+	})
+	ts.server = httptest.NewTLSServer(mux)
+	ts.issuer = ts.server.URL
+	return ts, nil
+}
+
+// newOIDCTestServer is the *testing.T wrapper around startOIDCServer, wiring
+// cleanup so the server is closed at the end of the test.
+func newOIDCTestServer(t *testing.T) *oidcTestServer {
+	t.Helper()
+	ts, err := startOIDCServer()
+	if err != nil {
+		t.Fatalf("starting OIDC test server: %v", err)
+	}
+	t.Cleanup(ts.server.Close)
+	return ts
+}
+
+func (ts *oidcTestServer) close()               { ts.server.Close() }
+func (ts *oidcTestServer) client() *http.Client { return ts.server.Client() }
+
+// verifier builds a fixed-audience Verifier via full OIDC discovery over TLS.
+func (ts *oidcTestServer) verifier(t *testing.T) *verify.Verifier {
+	t.Helper()
+	v, err := oidc.NewRemoteVerifier(context.Background(), ts.issuer, testAudience, oidc.WithHTTPClient(ts.client()))
+	if err != nil {
+		t.Fatalf("NewRemoteVerifier: %v", err)
+	}
+	return v
+}
+
+// signClaims mints a compact RS256 JWS over claims using the server's advertised
+// key. It returns an error so the runnable examples can reuse it.
+func (ts *oidcTestServer) signClaims(claims map[string]any) (string, error) {
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		return "", err
+	}
+	jws, err := ts.signer.Sign(payload)
+	if err != nil {
+		return "", err
+	}
+	return jws.CompactSerialize()
+}
+
+// sign is the *testing.T wrapper around signClaims.
+func (ts *oidcTestServer) sign(t *testing.T, claims map[string]any) string {
+	t.Helper()
+	tok, err := ts.signClaims(claims)
+	if err != nil {
+		t.Fatalf("signing claims: %v", err)
+	}
+	return tok
 }
 
 // baseClaims returns a valid validating-webhook-bound token claim set for
-// testGroup with a comfortably future expiry. Tests mutate the returned map to
-// build sad-path variants.
-func baseClaims() map[string]interface{} {
-	return map[string]interface{}{
-		"iss": "https://issuer.example.com",
-		"sub": "system:serviceaccount:kube-system:webhook-auth",
+// testGroup with a comfortably future expiry and this server's issuer. Tests
+// mutate the returned map to build sad-path variants.
+func (ts *oidcTestServer) baseClaims() map[string]any {
+	now := time.Now()
+	return map[string]any{
+		"iss": ts.issuer,
+		"sub": testSubject,
 		"aud": []string{testAudience},
-		"exp": time.Now().Add(5 * time.Minute).Unix(),
-		"kubernetes.io": map[string]interface{}{
-			"validatingWebhookConfiguration": map[string]string{"name": "vwc", "uid": "vwc-uid"},
-			"attestationClaims": map[string][]string{
-				verify.AllowedAPIGroupClaimKey: {testGroup},
+		"exp": now.Add(5 * time.Minute).Unix(),
+		"nbf": now.Add(-1 * time.Minute).Unix(),
+		"iat": now.Unix(),
+		"kubernetes.io": map[string]any{
+			"validatingWebhookConfiguration": map[string]any{"name": "vwc", "uid": "vwc-uid"},
+			"attestationClaims": map[string]any{
+				allowedAPIGroupClaimKey: []string{testGroup},
 			},
 		},
 	}
 }
 
-// mintToken serializes claims into the token string the fake KeySet returns
-// verbatim as the verified payload. It replaces real JWS signing: because the
-// fake KeySet passes the raw token through untouched, "signing" is just JSON
-// marshaling of the claim set.
-func mintToken(t *testing.T, claims map[string]interface{}) string {
-	t.Helper()
-	payload, err := json.Marshal(claims)
-	if err != nil {
-		t.Fatalf("marshal claims: %v", err)
+// coreGroupClaims returns an otherwise-valid token claim set authorized for the
+// core API group (""). Before the fail-closed behavior, an undecodable
+// AdmissionReview body defaulted the review group to "", which such a token
+// would match.
+func (ts *oidcTestServer) coreGroupClaims() map[string]any {
+	c := ts.baseClaims()
+	k8s := c["kubernetes.io"].(map[string]any)
+	k8s["attestationClaims"] = map[string]any{
+		allowedAPIGroupClaimKey: []string{""},
 	}
-	return string(payload)
-}
-
-func newVerifier(t *testing.T) *verify.Verifier {
-	t.Helper()
-	v, err := verify.NewVerifier(fakeKeySet{}, testIssuer, []string{testAudience})
-	if err != nil {
-		t.Fatalf("NewVerifier: %v", err)
-	}
-	return v
+	return c
 }
 
 // admissionReview builds an AdmissionReview whose resource belongs to apiGroup.
@@ -191,30 +288,31 @@ func newRequest(t *testing.T, body []byte, token string) *http.Request {
 }
 
 // TestWithTokenVerification_EndToEnd exercises the adapter's full behavior: a
-// fake-KeySet-backed verifier, the enforce-only adapter, and a spy downstream
-// ReviewHandler. Each case asserts the HTTP status, whether the downstream was
-// reached, the observed reason string, and that no response leaks claim
+// verifier built over a real TLS OIDC discovery/JWKS endpoint, the enforce-only
+// adapter, and a spy downstream ReviewHandler. Each case asserts the HTTP
+// status, whether the downstream was reached, and that no response leaks claim
 // identifiers. There is no permissive mode: every failure is a uniform 401 and
-// the downstream is never reached. Signature verification itself is faked here
-// (see the file-level comment); these cases cover the contract and adapter
-// checks layered on top of it.
+// the downstream is never reached. Signatures are real RS256 JWTs verified by
+// go-oidc; the deny reason is intentionally NOT observable at the HTTP boundary
+// (anti-enumeration), so it is asserted via the log-reason path elsewhere.
 func TestWithTokenVerification_EndToEnd(t *testing.T) {
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
+
 	tests := []struct {
 		name string
 		// token builds the presented token; nil omits the header.
-		token func(t *testing.T) string
+		token func() string
 		// reviewGroup is the API group of the AdmissionReview resource.
 		reviewGroup string
 		// wantStatus is the expected HTTP status code.
 		wantStatus int
 		// wantNextReached asserts whether the downstream handler ran.
 		wantNextReached bool
-		// wantReason, when non-empty, is a substring the observed deny reason must contain.
-		wantReason string
 	}{
 		{
 			name:            "valid token, group matches -> next reached, 200 allow",
-			token:           func(t *testing.T) string { return mintToken(t, baseClaims()) },
+			token:           func() string { return ts.sign(t, ts.baseClaims()) },
 			reviewGroup:     testGroup,
 			wantStatus:      http.StatusOK,
 			wantNextReached: true,
@@ -225,52 +323,48 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 			reviewGroup:     testGroup,
 			wantStatus:      http.StatusUnauthorized,
 			wantNextReached: false,
-			wantReason:      "bearer",
 		},
 		{
 			name: "expired token -> 401, next not reached",
-			token: func(t *testing.T) string {
-				c := baseClaims()
+			token: func() string {
+				c := ts.baseClaims()
 				c["exp"] = time.Now().Add(-1 * time.Minute).Unix()
-				return mintToken(t, c)
+				return ts.sign(t, c)
 			},
 			reviewGroup:     testGroup,
 			wantStatus:      http.StatusUnauthorized,
 			wantNextReached: false,
-			wantReason:      "expired",
 		},
 		{
 			name: "wrong audience -> 401, next not reached",
-			token: func(t *testing.T) string {
-				c := baseClaims()
+			token: func() string {
+				c := ts.baseClaims()
 				c["aud"] = []string{"someone.else.example.com"}
-				return mintToken(t, c)
+				return ts.sign(t, c)
 			},
 			reviewGroup:     testGroup,
 			wantStatus:      http.StatusUnauthorized,
 			wantNextReached: false,
-			wantReason:      "audience",
 		},
 		{
 			name: "allowedAPIGroup mismatch vs review group -> 401, next not reached",
-			token: func(t *testing.T) string {
+			token: func() string {
 				// Token authorizes testGroup, but the review is for another group.
-				return mintToken(t, baseClaims())
+				return ts.sign(t, ts.baseClaims())
 			},
 			reviewGroup:     "batch",
 			wantStatus:      http.StatusUnauthorized,
 			wantNextReached: false,
-			wantReason:      "authorize",
 		},
 		{
 			name: "wildcard allowedAPIGroup -> allowed for any review group",
-			token: func(t *testing.T) string {
-				c := baseClaims()
-				k8s := c["kubernetes.io"].(map[string]interface{})
-				k8s["attestationClaims"] = map[string][]string{
-					verify.AllowedAPIGroupClaimKey: {verify.WildcardAPIGroup},
+			token: func() string {
+				c := ts.baseClaims()
+				k8s := c["kubernetes.io"].(map[string]any)
+				k8s["attestationClaims"] = map[string]any{
+					allowedAPIGroupClaimKey: []string{wildcardAPIGroup},
 				}
-				return mintToken(t, c)
+				return ts.sign(t, c)
 			},
 			reviewGroup:     "any.group.example.com",
 			wantStatus:      http.StatusOK,
@@ -280,25 +374,12 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			v := newVerifier(t)
 			spy := newSpyHandler()
-
-			var (
-				hookCalled bool
-				hookRes    *verify.Result
-				hookReason string
-			)
-			adapter := admissionhttp.WithTokenVerification(v, spy.serve,
-				admissionhttp.WithObserver(func(res *verify.Result, reason string) {
-					hookCalled = true
-					hookRes = res
-					hookReason = reason
-				}),
-			)
+			adapter := admissionhttp.WithTokenVerification(v, spy.serve)
 
 			var token string
 			if tc.token != nil {
-				token = tc.token(t)
+				token = tc.token()
 			}
 			body := admissionReviewBody(t, tc.reviewGroup)
 			req := newRequest(t, body, token)
@@ -311,26 +392,6 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 			}
 			if got := spy.wasReached(); got != tc.wantNextReached {
 				t.Errorf("next reached = %v, want %v", got, tc.wantNextReached)
-			}
-			if !hookCalled {
-				t.Error("observer was not called")
-			}
-			if tc.wantNextReached {
-				// Success: observer sees the identity and no reason.
-				if hookRes == nil {
-					t.Error("expected observer to see a verified result, got nil")
-				}
-				if hookReason != "" {
-					t.Errorf("expected empty reason on success, got %q", hookReason)
-				}
-			} else {
-				// Denial: observer sees no result and the expected reason.
-				if hookRes != nil {
-					t.Errorf("expected nil result on denial, got %+v", hookRes)
-				}
-				if !strings.Contains(hookReason, tc.wantReason) {
-					t.Errorf("deny reason = %q, want it to contain %q", hookReason, tc.wantReason)
-				}
 			}
 
 			// No response must leak webhook identifiers regardless of outcome.
@@ -345,12 +406,13 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 // the downstream both receives the correct decoded review and finds the body
 // already fully consumed (nothing left for a second decode).
 func TestWithTokenVerification_DecodesOnce(t *testing.T) {
-	v := newVerifier(t)
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
 	spy := newSpyHandler()
 	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
 
 	body := admissionReviewBody(t, testGroup)
-	token := mintToken(t, baseClaims())
+	token := ts.sign(t, ts.baseClaims())
 	req := newRequest(t, body, token)
 	rec := httptest.NewRecorder()
 
@@ -378,13 +440,14 @@ func TestWithTokenVerification_DecodesOnce(t *testing.T) {
 // httptest.Server to demonstrate the end-to-end wire path, including the
 // Authorization header travelling over an actual HTTP round trip.
 func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
-	v := newVerifier(t)
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
 	spy := newSpyHandler()
 	srv := httptest.NewServer(admissionhttp.WithTokenVerification(v, spy.serve))
 	defer srv.Close()
 
 	body := admissionReviewBody(t, testGroup)
-	token := mintToken(t, baseClaims())
+	token := ts.sign(t, ts.baseClaims())
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, srv.URL, bytes.NewReader(body))
 	if err != nil {
@@ -416,29 +479,17 @@ func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
 	}
 }
 
-// coreGroupClaims returns an otherwise-valid token claim set authorized for the
-// core API group (""). Before the fail-closed behavior, an undecodable
-// AdmissionReview body defaulted the review group to "", which such a token
-// would match.
-func coreGroupClaims() map[string]interface{} {
-	c := baseClaims()
-	k8s := c["kubernetes.io"].(map[string]interface{})
-	k8s["attestationClaims"] = map[string][]string{
-		verify.AllowedAPIGroupClaimKey: {""},
-	}
-	return c
-}
-
 // TestWithTokenVerification_UndecodableBodyFailsClosed proves the adapter fails
 // closed: an undecodable AdmissionReview body does not default the review group
 // to the core group (""). The request is denied with a generic 401 and the
 // downstream handler is never reached, even when the presented token is
 // otherwise valid and authorized for the core group.
 func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
-	token := mintToken(t, coreGroupClaims())
+	ts := newOIDCTestServer(t)
+	token := ts.sign(t, ts.coreGroupClaims())
 	undecodable := []byte("{ this is not a valid AdmissionReview")
 
-	v := newVerifier(t)
+	v := ts.verifier(t)
 	spy := newSpyHandler()
 	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
 
@@ -459,7 +510,8 @@ func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
 // with a generic 401 instead of decoding truncated bytes or reaching the
 // downstream handler.
 func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
-	v := newVerifier(t)
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
 	spy := newSpyHandler()
 	// A tiny limit guarantees the AdmissionReview body exceeds it.
 	adapter := admissionhttp.WithTokenVerification(v, spy.serve, admissionhttp.WithMaxBodyBytes(16))
@@ -468,7 +520,7 @@ func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 	if int64(len(body)) <= 16 {
 		t.Fatalf("test body must exceed the limit, got %d bytes", len(body))
 	}
-	token := mintToken(t, baseClaims())
+	token := ts.sign(t, ts.baseClaims())
 
 	rec := httptest.NewRecorder()
 	adapter.ServeHTTP(rec, newRequest(t, body, token))
@@ -488,17 +540,18 @@ func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 // generic failure with a useful log reason, and a review with no Request fails
 // closed.
 func TestVerifyAdmissionReview(t *testing.T) {
-	v := newVerifier(t)
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
 
 	t.Run("valid token and matching group -> nil", func(t *testing.T) {
-		token := mintToken(t, baseClaims())
+		token := ts.sign(t, ts.baseClaims())
 		if err := admissionhttp.VerifyAdmissionReview(context.Background(), v, admissionReview(testGroup), token); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
 
 	t.Run("group not authorized -> generic failure", func(t *testing.T) {
-		token := mintToken(t, baseClaims())
+		token := ts.sign(t, ts.baseClaims())
 		err := admissionhttp.VerifyAdmissionReview(context.Background(), v, admissionReview("batch"), token)
 		if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
 			t.Fatalf("want generic verification failure, got %v", err)
@@ -509,7 +562,7 @@ func TestVerifyAdmissionReview(t *testing.T) {
 	})
 
 	t.Run("nil request -> fails closed", func(t *testing.T) {
-		token := mintToken(t, baseClaims())
+		token := ts.sign(t, ts.baseClaims())
 		err := admissionhttp.VerifyAdmissionReview(context.Background(), v, &admissionv1.AdmissionReview{}, token)
 		if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
 			t.Fatalf("want generic verification failure for a review with no Request, got %v", err)

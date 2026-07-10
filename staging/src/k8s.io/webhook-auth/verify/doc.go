@@ -21,27 +21,34 @@ limitations under the License.
 // A webhook uses this package to validate a presented token WITHOUT calling
 // TokenReview. The verifier enforces the KEP-6060 token contract:
 //
-//  1. The JWS signature is valid against the cluster issuer's keys. Signature
-//     verification is delegated to a [KeySet] so that the core logic carries no
-//     third-party crypto dependency and can be backed by a static key set (for
-//     tests) or an OIDC/JWKS-fetching implementation (a follow-up).
-//  2. The token audience contains the webhook's expected audience.
-//  3. The token is bound to exactly one of the validating- or
+//  1. The JWS signature is valid against the cluster issuer's keys, and the
+//     standard issuer / audience / expiry claims check out. This verification
+//     is delegated to a [TokenAuthenticator] so the core policy logic carries
+//     no JOSE/OIDC dependency; the oidc package provides an
+//     implementation built on OIDC discovery and go-oidc.
+//  2. The token is bound to exactly one of the validating- or
 //     mutating-webhook configuration references (never both, never neither).
-//  4. The attestation claim keyed by the fully-namespaced string
-//     [AllowedAPIGroupClaimKey] carries exactly one API group.
-//  5. That API group is either [WildcardAPIGroup] (matches all) or exactly
-//     equals the API group of the resource in the incoming AdmissionReview.
-//  6. The token is within its exp / nbf validity window.
+//  3. The attestation claim keyed by the fully-namespaced allowedAPIGroup
+//     string carries exactly one API group.
+//  4. That API group is either "*" (matches all) or exactly equals the API
+//     group of the resource in the incoming AdmissionReview.
+//
+// This package is pure stdlib: signature and standard-claim verification live
+// behind the [TokenAuthenticator] seam, so importing verify pulls in no
+// third-party crypto. The policy this package owns is exactly the part go-oidc
+// has no concept of — the bound-object exactly-one rule and the namespaced
+// allowedAPIGroup match.
 //
 // Anti-enumeration: all verification failures surface the single generic
 // [ErrVerificationFailed] and never echo webhook names, UIDs, subjects, or
 // API-group values, so a caller cannot probe for the existence of a specific
-// webhook, group, or object. Callers must not branch on why verification
-// failed; the specific reason is available only as a non-sensitive log string
-// via [Reason] for operators and debugging.
+// webhook, group, or object. Descriptive errors reported by the authenticator
+// (for example go-oidc's "token is expired" or audience-mismatch messages) are
+// likewise collapsed into the generic failure. Callers must not branch on why
+// verification failed; the specific reason is available only as a
+// non-sensitive log string via [Reason] for operators and debugging.
 //
-// This first cut deliberately omits the http.Handler adapter and the
+// This package deliberately omits the http.Handler adapter and the
 // controller-runtime decorator; callers wire [Verifier.Verify] into their own
 // admission entry point. See the package README / KEP-6060 §9 for the intended
 // integration points.

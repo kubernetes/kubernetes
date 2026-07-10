@@ -33,22 +33,39 @@ import (
 // specific webhook, group, or object exists.
 var ErrVerificationFailed = errors.New("webhook token verification failed")
 
+// errNilAuthenticator is returned by NewVerifier when constructed without a
+// TokenAuthenticator. It is a plain construction error, not a verification
+// failure, so it does NOT satisfy errors.Is(err, ErrVerificationFailed).
+var errNilAuthenticator = errors.New("verify: TokenAuthenticator must not be nil")
+
 // reason strings describe which check failed. They are surfaced ONLY through
 // [Reason] for logging; they are never returned as distinct error values and
 // never embed claim values.
 const (
-	reasonInvalidSignature       = "signature verification failed"
-	reasonMalformedToken         = "token payload is not valid JSON"
-	reasonAudienceMismatch       = "token audience does not match the expected audience"
-	reasonIssuerMismatch         = "token issuer does not match the expected issuer"
-	reasonExpired                = "token is expired"
-	reasonMissingExpiry          = "token is missing the exp claim"
-	reasonNotYetValid            = "token is not yet valid (nbf is in the future)"
 	reasonBothBoundObjects       = "token is bound to both a validating and a mutating webhook configuration"
 	reasonNoBoundObject          = "token is not bound to any webhook configuration"
 	reasonMissingAllowedAPIGroup = "token is missing a single allowedAPIGroup attestation claim"
 	reasonAPIGroupNotAuthorized  = "token allowedAPIGroup does not authorize the review's API group"
+
+	// reasonTokenAuthenticationFailed prefixes the log reason for a failure the
+	// TokenAuthenticator reported (signature, issuer, audience, or expiry). The
+	// authenticator's own descriptive text is appended for logging only; see
+	// [authenticationFailedReason].
+	reasonTokenAuthenticationFailed = "token signature or standard claim verification failed"
 )
+
+// authenticationFailedReason builds the log-only reason for a TokenAuthenticator
+// failure. The authenticator's descriptive message (for example go-oidc's
+// "oidc: token is expired" or an audience-mismatch message) is appended so
+// operators can diagnose the failure from logs. This text is surfaced ONLY via
+// [Reason]; it is never returned to the caller or written over the wire, so
+// even a message that names an audience or issuer cannot be used to enumerate.
+func authenticationFailedReason(err error) string {
+	if err == nil {
+		return reasonTokenAuthenticationFailed
+	}
+	return reasonTokenAuthenticationFailed + ": " + err.Error()
+}
 
 // verificationError is the internal error every failure returns. Its Error()
 // yields only the generic message, so stringifying it never leaks the reason or

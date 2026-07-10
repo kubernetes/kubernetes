@@ -28,7 +28,9 @@ limitations under the License.
 //     token in HTTP middleware, then call VerifyAdmissionReview on the review the
 //     framework already decoded).
 //
-// The ONLY production swap is the KeySet: see exampleKeySet below.
+// The ONLY production change is pointing oidc.NewRemoteVerifier at the
+// cluster's real OIDC issuer instead of the throwaway TLS issuer these examples
+// stand up. Signatures are verified for real; there is no insecure path.
 package admissionhttp_test
 
 import (
@@ -43,67 +45,47 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/webhook-auth/verify"
 	"k8s.io/webhook-auth/verify/admissionhttp"
+	"k8s.io/webhook-auth/verify/oidc"
 )
 
-// The verifier's config surface is exactly three values. A real deployment sets
-// these to its trusted issuer, the audience minted for this webhook, and a
-// KeySet that fetches signing keys. Zero-config defaults for issuer/audience are
-// still pending (KEP-6060 review-1 §6); until then they are supplied explicitly.
+// The verifier's config surface is the issuer, the audience minted for this
+// webhook, and (in-cluster) an *http.Client that trusts the issuer's serving CA.
 const (
-	exampleIssuer   = "https://issuer.example.com"
 	exampleAudience = "webhook.example.com"
 	exampleAPIGroup = "apps" // the API group this webhook's token is authorized for
 )
 
-// exampleKeySet is the ONE piece a real deployment replaces.
-//
-// PRODUCTION: replace exampleKeySet with the go-oidc-backed KeySet (OIDC
-// discovery + JWKS); it is the ONLY piece a real deployment swaps in. Everything
-// else in these examples — the Verifier, the handler, the wiring — stays as-is.
-//
-// For the POC it performs no crypto: it treats the raw token string as the
-// already-signature-verified JSON claims payload and hands it back verbatim.
-// That lets this example compile and run with stdlib only (no JOSE/JWT
-// dependency), matching the fake used by the adapter's behavior tests.
-type exampleKeySet struct{}
-
-func (exampleKeySet) VerifySignature(_ context.Context, rawToken string) ([]byte, error) {
-	// The raw token IS the verified claims payload in the POC. In production the
-	// go-oidc KeySet parses the JWS, checks the signature against the JWKS, and
-	// returns the decoded claim bytes.
-	return []byte(rawToken), nil
-}
-
-// exampleToken mints the token string the POC KeySet returns verbatim as the
-// verified payload. In production this is a real signed JWT the API server issues
-// to the webhook's service account; here "signing" is just JSON marshaling.
-//
-// The claim shape is the KEP-6060 contract: standard iss/aud/exp plus a
-// kubernetes.io block carrying the bound webhook configuration and the
-// fully-namespaced allowedAPIGroup attestation claim.
-func exampleToken(group string) string {
-	claims := map[string]interface{}{
-		"iss": exampleIssuer,
+// exampleSignedToken mints a real RS256 JWT signed by the throwaway issuer,
+// carrying the KEP-6060 claim shape: standard iss/aud/exp plus a kubernetes.io
+// block with the bound webhook configuration and the fully-namespaced
+// allowedAPIGroup attestation claim. In production the API server issues this
+// token to the webhook's service account.
+func exampleSignedToken(issuer *oidcTestServer, group string) string {
+	claims := map[string]any{
+		"iss": issuer.issuer,
 		"aud": []string{exampleAudience},
 		"exp": time.Now().Add(5 * time.Minute).Unix(),
-		"kubernetes.io": map[string]interface{}{
+		"nbf": time.Now().Add(-1 * time.Minute).Unix(),
+		"kubernetes.io": map[string]any{
 			// Exactly one bound object (validating XOR mutating) identifies the
 			// webhook configuration the token was minted for.
-			"validatingWebhookConfiguration": map[string]string{
+			"validatingWebhookConfiguration": map[string]any{
 				"name": "my-webhook",
 				"uid":  "webhook-uid",
 			},
 			// The namespaced key is required; the bare "allowedAPIGroup" form is a
 			// known issuer bug and is rejected.
-			"attestationClaims": map[string][]string{
-				verify.AllowedAPIGroupClaimKey: {group},
+			"attestationClaims": map[string]any{
+				allowedAPIGroupClaimKey: []string{group},
 			},
 		},
 	}
-	payload, _ := json.Marshal(claims)
-	return string(payload)
+	token, err := issuer.signClaims(claims)
+	if err != nil {
+		panic(err)
+	}
+	return token
 }
 
 // exampleReview builds a minimal AdmissionReview for a resource in group. A real
@@ -123,10 +105,20 @@ func exampleReview(group string) *admissionv1.AdmissionReview {
 // admission logic. The handler decodes the body once, enforces the token, and —
 // only on success — calls the downstream ReviewHandler with the decoded review.
 func Example_rawHTTPWebhook() {
-	// 1. Build the verifier from the three-value config surface.
-	v, err := verify.NewVerifier(exampleKeySet{}, exampleIssuer, []string{exampleAudience})
+	// PRODUCTION: point NewRemoteVerifier at the cluster's OIDC issuer. The
+	// example stands up a throwaway TLS issuer so it verifies REAL signatures.
+	issuer, err := startOIDCServer()
 	if err != nil {
-		panic(err) // misconfiguration (nil KeySet / empty issuer / empty audience)
+		panic(err)
+	}
+	defer issuer.close()
+
+	// 1. Build the verifier from the trusted issuer and the audience minted for
+	//    this webhook. WithHTTPClient supplies a client that trusts the issuer's
+	//    serving CA (in-cluster: the mounted apiserver CA bundle).
+	v, err := oidc.NewRemoteVerifier(context.Background(), issuer.issuer, exampleAudience, oidc.WithHTTPClient(issuer.client()))
+	if err != nil {
+		panic(err) // misconfiguration (empty issuer/audience) or discovery failure
 	}
 
 	// 2. Your existing admission logic, unchanged, as a ReviewHandler. It runs
@@ -148,7 +140,7 @@ func Example_rawHTTPWebhook() {
 	body, _ := json.Marshal(exampleReview(exampleAPIGroup))
 	req, _ := http.NewRequest(http.MethodPost, srv.URL, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+exampleToken(exampleAPIGroup))
+	req.Header.Set("Authorization", "Bearer "+exampleSignedToken(issuer, exampleAPIGroup))
 
 	resp, err := srv.Client().Do(req)
 	if err != nil {
@@ -170,7 +162,13 @@ func Example_rawHTTPWebhook() {
 // you the review, and an HTTP middleware you install captures the bearer token
 // into the request context. You then call VerifyAdmissionReview and branch.
 func Example_controllerRuntimeStyle() {
-	v, err := verify.NewVerifier(exampleKeySet{}, exampleIssuer, []string{exampleAudience})
+	issuer, err := startOIDCServer()
+	if err != nil {
+		panic(err)
+	}
+	defer issuer.close()
+
+	v, err := oidc.NewRemoteVerifier(context.Background(), issuer.issuer, exampleAudience, oidc.WithHTTPClient(issuer.client()))
 	if err != nil {
 		panic(err)
 	}
@@ -181,7 +179,7 @@ func Example_controllerRuntimeStyle() {
 	//            back out of the request context here.
 	ctx := context.Background()
 	review := exampleReview(exampleAPIGroup)
-	token := exampleToken(exampleAPIGroup)
+	token := exampleSignedToken(issuer, exampleAPIGroup)
 
 	// One call gates your admission logic. nil == verified; any error is a single
 	// generic failure (use verify.Reason(err) for a non-sensitive log line).
@@ -199,9 +197,10 @@ func Example_controllerRuntimeStyle() {
 // 401 and the downstream handler is never reached. This is the end-to-end proof
 // behind Example_rawHTTPWebhook.
 func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
-	v, err := verify.NewVerifier(exampleKeySet{}, exampleIssuer, []string{exampleAudience})
+	ts := newOIDCTestServer(t)
+	v, err := oidc.NewRemoteVerifier(context.Background(), ts.issuer, exampleAudience, oidc.WithHTTPClient(ts.client()))
 	if err != nil {
-		t.Fatalf("NewVerifier: %v", err)
+		t.Fatalf("NewRemoteVerifier: %v", err)
 	}
 
 	var reached bool
@@ -212,6 +211,8 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 	srv := httptest.NewServer(admissionhttp.WithTokenVerification(v, admit))
 	defer srv.Close()
 
+	validToken := exampleSignedToken(ts, exampleAPIGroup)
+
 	tests := []struct {
 		name            string
 		bearer          string // empty means no Authorization header
@@ -220,7 +221,7 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 	}{
 		{
 			name:            "valid bearer token -> 200, downstream reached",
-			bearer:          exampleToken(exampleAPIGroup),
+			bearer:          validToken,
 			wantStatus:      http.StatusOK,
 			wantNextReached: true,
 		},

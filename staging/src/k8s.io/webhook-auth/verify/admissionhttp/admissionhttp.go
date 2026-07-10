@@ -32,10 +32,10 @@ limitations under the License.
 // is never decoded twice.
 //
 // The adapter imports only the core verify package, so JOSE/JWT dependencies
-// stay confined to the caller that constructs the KeySet. Decoding the
-// AdmissionReview to extract the resource API group pulls in
-// k8s.io/api/admission/v1 and k8s.io/apimachinery, the module's only
-// Kubernetes dependencies.
+// stay confined to the authenticator the caller supplies to the verifier (for
+// example the oidc package). Decoding the AdmissionReview to extract the
+// resource API group pulls in k8s.io/api/admission/v1 and k8s.io/apimachinery,
+// the module's only Kubernetes dependencies.
 package admissionhttp // import "k8s.io/webhook-auth/verify/admissionhttp"
 
 import (
@@ -46,6 +46,7 @@ import (
 	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/webhook-auth/verify"
 )
 
@@ -79,26 +80,8 @@ const (
 // re-decodes the AdmissionReview.
 type ReviewHandler func(w http.ResponseWriter, r *http.Request, review *admissionv1.AdmissionReview)
 
-// Observer is an optional observability hook invoked once per request after the
-// verification decision. On a verified request res is the identity and reason
-// is empty; on a denied request res is nil and reason is a non-sensitive log
-// string naming which check failed. It is for logging and metrics only: it must
-// not write to the ResponseWriter, and it can never enable fail-open — a denial
-// is always enforced regardless of what the hook does.
-type Observer func(res *verify.Result, reason string)
-
 // Option configures the handler.
 type Option func(*handler)
-
-// WithObserver registers an observability hook (see [Observer]). A nil hook is
-// ignored.
-func WithObserver(fn Observer) Option {
-	return func(h *handler) {
-		if fn != nil {
-			h.observe = fn
-		}
-	}
-}
 
 // WithMaxBodyBytes overrides the limit applied when reading the request body. A
 // non-positive value is ignored and the default is retained.
@@ -114,7 +97,6 @@ func WithMaxBodyBytes(n int64) Option {
 type handler struct {
 	verifier *verify.Verifier
 	next     ReviewHandler
-	observe  Observer
 	maxBody  int64
 }
 
@@ -135,7 +117,6 @@ func WithTokenVerification(v *verify.Verifier, next ReviewHandler, opts ...Optio
 	h := &handler{
 		verifier: v,
 		next:     next,
-		observe:  func(*verify.Result, string) {},
 		maxBody:  defaultMaxBodyBytes,
 	}
 	for _, opt := range opts {
@@ -146,29 +127,39 @@ func WithTokenVerification(v *verify.Verifier, next ReviewHandler, opts ...Optio
 
 // ServeHTTP implements http.Handler.
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	// Decode the AdmissionReview once. The body is read a single time and never
 	// reset; downstream consumes the decoded review, not r.Body.
 	review, reason, ok := h.decodeReview(r)
 	if !ok {
-		h.deny(w, reason)
+		h.deny(ctx, w, reason)
 		return
 	}
 
 	token, ok := BearerToken(r)
 	if !ok {
-		h.deny(w, reasonNoBearerToken)
+		h.deny(ctx, w, reasonNoBearerToken)
 		return
 	}
 
 	// decodeReview guarantees review.Request is non-nil, so the resource API
 	// group is well-defined here.
-	res, err := h.verifier.Verify(r.Context(), token, review.Request.Resource.Group)
+	res, err := h.verifier.Verify(ctx, token, review.Request.Resource.Group)
 	if err != nil {
-		h.deny(w, verify.Reason(err))
+		h.deny(ctx, w, verify.Reason(err))
 		return
 	}
 
-	h.observe(res, "")
+	// Never log the token. The bound identity is logged at high verbosity for
+	// operators; it is never written to the HTTP response (anti-enumeration).
+	klog.FromContext(ctx).V(4).Info("Admission webhook token verified",
+		"boundObjectKind", res.BoundObjectKind,
+		"boundObjectName", res.BoundObjectName,
+		"allowedAPIGroup", res.AllowedAPIGroup,
+		"subject", res.Subject,
+	)
+
 	if h.next != nil {
 		h.next(w, r, review)
 		return
@@ -176,11 +167,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// deny reports reason to the observer and writes a uniform generic denial. It
-// is the single enforcement point: there is no path that forwards a failed
-// request downstream.
-func (h *handler) deny(w http.ResponseWriter, reason string) {
-	h.observe(nil, reason)
+// deny logs the non-sensitive reason via contextual logging and writes a
+// uniform generic denial. It is the single enforcement point: there is no path
+// that forwards a failed request downstream, and reason (which never contains
+// claim values) is logged for operators but never written to the response.
+func (h *handler) deny(ctx context.Context, w http.ResponseWriter, reason string) {
+	klog.FromContext(ctx).V(2).Info("Admission webhook token verification denied", "reason", reason)
 	writeDenied(w)
 }
 
