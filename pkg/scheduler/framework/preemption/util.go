@@ -64,6 +64,12 @@ func PodTerminatingByPreemption(p *v1.Pod) bool {
 //  5. Start Time (Tie-breaker for group types):
 //     If group types and sizes are equal, the group that started earlier (has the oldest pod)
 //     is more important.
+//
+//  6. UID (Final tie-breaker):
+//     If all other criteria are equal (including equal StartTimes), the unit
+//     with the lexicographically smaller first pod UID is considered more important.
+//     This ensures deterministic ordering across platforms regardless of clock
+//     resolution.
 func MoreImportantVictim(vi1, vi2 Victim) bool {
 	if vi1.Priority() != vi2.Priority() {
 		return vi1.Priority() > vi2.Priority()
@@ -80,7 +86,15 @@ func MoreImportantVictim(vi1, vi2 Victim) bool {
 		return len(vi1.Pods()) > len(vi2.Pods())
 	}
 
-	return vi1.EarliestStartTime().Before(vi2.EarliestStartTime())
+	t1 := vi1.EarliestStartTime()
+	t2 := vi2.EarliestStartTime()
+	if !t1.Equal(t2) {
+		return t1.Before(t2)
+	}
+
+	pods1 := vi1.Pods()
+	pods2 := vi2.Pods()
+	return string(pods1[0].GetPod().UID) < string(pods2[0].GetPod().UID)
 }
 
 func victimRank(vi Victim) int {
