@@ -2971,6 +2971,85 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
+		"partitionable-devices-counter-cache-scoped-by-pool-ID": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+				claimWithRequests(claim1, nil, request(req1, classB, 1)),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				// driverA / pool "pool-1": counterSet1 c:1, device1 consumes c:1.
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+				),
+				// driverB / pool "pool-1": same pool name, different driver. Its capacity and
+				// consumption differ (c:2) on purpose, so that leaving *either* cache keyed by
+				// pool name alone fails this case: device2 would be checked against driverA's
+				// cached c:1 and wrongly rejected.
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 2), driverB,
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("2")}),
+					),
+				),
+				sliceWithCounterSets(slice4, node1, resourcePool(pool1, 2), driverB,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("2")}),
+				),
+			),
+			node: node(node1, region1),
+			// driver-a/pool-1 and driver-b/pool-1 are distinct pools with independent counter
+			// sets, so both devices allocate. The differing capacities make this guard both
+			// caches: keying availableCounters or consumedCounters by pool name alone lets
+			// driver A's cache leak into driver B's pool and fails the case.
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req1, driverB, pool1, device2, false)),
+			},
+		},
+		"partitionable-devices-counter-cache-not-crossed-between-driver-schemas": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+				claimWithRequests(claim1, nil, request(req1, classB, 1)),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				// driverA / pool "pool-1": counterSet1 with c:1, device1 consumes c:1 (valid).
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+				),
+				// driverB / pool "pool-1": same pool name but a different counter set
+				// (counterSet2 with d:1). device2 over-consumes it (d:2) and must be rejected.
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 2), driverB,
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet2, map[string]resource.Quantity{"d": resource.MustParse("2")}),
+					),
+				),
+				sliceWithCounterSets(slice4, node1, resourcePool(pool1, 2), driverB,
+					counterSet(counterSet2, map[string]resource.Quantity{"d": resource.MustParse("1")}),
+				),
+			),
+			node: node(node1, region1),
+			// device2 over-consumes its own counter (d:2 > d:1), so it must be rejected and
+			// the allocation cannot be satisfied. If the caches are keyed by pool name,
+			// device2 reuses driver A's cached counterSet1 and its own counterSet2 is never
+			// compared, so it is wrongly accepted (over-allocation).
+			expectResults: []any{},
+		},
 		"partitionable-devices-prioritized-list": {
 			features: Features{
 				PrioritizedList:      true,
