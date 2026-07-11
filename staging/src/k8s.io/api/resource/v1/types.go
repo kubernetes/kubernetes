@@ -1232,6 +1232,13 @@ type ExactDeviceRequest struct {
 	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
 	// If AllocationMode is ExactCount and this field is not specified, the default is one.
 	//
+	// The field is intentionally not upper-bounded by API validation and may be as
+	// large as math.MaxInt64. Consumers (for example out-of-tree schedulers and quota
+	// or fair-share accounting) must treat it as untrusted input and aggregate or
+	// multiply it using checked or saturating arithmetic: a single request can already
+	// exceed any real cluster, so unschedulability must not be relied upon to protect
+	// accounting code from overflow.
+	//
 	// +optional
 	// +oneOf=AllocationMode
 	Count int64 `json:"count,omitempty" protobuf:"bytes,4,opt,name=count"`
@@ -1361,6 +1368,13 @@ type DeviceSubRequest struct {
 
 	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
 	// If AllocationMode is ExactCount and this field is not specified, the default is one.
+	//
+	// The field is intentionally not upper-bounded by API validation and may be as
+	// large as math.MaxInt64. Consumers (for example out-of-tree schedulers and quota
+	// or fair-share accounting) must treat it as untrusted input and aggregate or
+	// multiply it using checked or saturating arithmetic: a single request can already
+	// exceed any real cluster, so unschedulability must not be relied upon to protect
+	// accounting code from overflow.
 	//
 	// +optional
 	// +oneOf=AllocationMode
