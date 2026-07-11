@@ -2006,6 +2006,51 @@ func TestAllocator(t *testing.T,
 
 			expectError: gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: cannot add device driver-a/pool-1/device-2 because a claim constraint would not be satisfied")),
 		},
+		"partitionable-all-mode-constraint-must-error-with-reserved-counter": {
+			// Covers allocateDevice's must=true error path when the rejected device
+			// has already reserved a shared counter. An all-mode request over two
+			// devices with mismatched constraint attributes fails on the second
+			// device, which consumes the counter, so rollbackDevice runs with a
+			// reserved counter before the must-error is returned. The error aborts the
+			// whole allocation, so this asserts the error contract and exercises the
+			// counter-release branch; the released counter is not separately
+			// observable through the allocation result.
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				func() wrapResourceClaim {
+					claim := claimWithRequests(
+						claim0,
+						[]resourceapi.DeviceConstraint{{MatchAttribute: &intAttribute}},
+						request(req0, classA, 0),
+					)
+					claim.Spec.Devices.Requests[0].Exactly.AllocationMode = resourceapi.DeviceAllocationModeAll
+					return claim
+				}(),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: ptr.To(int64(1))},
+					}),
+					// device2 mismatches the constraint and consumes the single
+					// counter, so it reserves the counter first and then fails the
+					// constraint, reaching the must-error path with state to undo.
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: ptr.To(int64(2))},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: cannot add device driver-a/pool-1/device-2 because a claim constraint would not be satisfied")),
+		},
 		"with-constraint-not-matching-string-attribute": {
 			claimsToAllocate: objects(claimWithRequests(
 				claim0,
