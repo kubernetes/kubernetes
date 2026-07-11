@@ -4931,6 +4931,55 @@ func TestAllocator(t *testing.T,
 			node:          node(node1, region1),
 			expectResults: []any{},
 		},
+		"partitionable-consumable-capacity-shared-device-counter-not-recharged": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			// device1 already has a persisted shared allocation. It is represented
+			// only by a share ID, with no AggregatedCapacity entry.
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).
+						withAllowMultipleAllocations().
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(
+								counterSet1,
+								map[string]resource.Quantity{
+									"c": resource.MustParse("1"),
+								},
+							),
+						),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(
+						counterSet1,
+						map[string]resource.Quantity{
+							"c": resource.MustParse("1"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceRequestAllocationResult(
+						req0,
+						driverA,
+						pool1,
+						device1,
+					).withConsumedCapacity(&fixedShareID, nil),
+				),
+			},
+		},
 		"consumable-capacity-multi-allocatable-device-with-zero-request-policy": {
 			features: Features{
 				ConsumableCapacity: true,

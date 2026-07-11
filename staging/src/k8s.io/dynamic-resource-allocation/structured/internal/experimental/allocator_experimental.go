@@ -330,6 +330,17 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 	// We can estimate the size based on what we need to allocate.
 	alloc.allocatingDevices = make(map[DeviceID]sets.Set[int], minDevicesTotal)
 
+	// Precompute the set of devices that have a persisted shared allocation
+	// (recorded only by share ID, without an AggregatedCapacity entry). Such a
+	// device's shared counters are already accounted for, so a further
+	// allocation must skip the counter availability check to avoid
+	// double-charging them. See deviceCapacityInUse.
+	sharedDeviceIDs := sets.New[DeviceID]()
+	for sharedID := range alloc.allocatedState.AllocatedSharedDeviceIDs {
+		sharedDeviceIDs.Insert(sharedID.GetDeviceID())
+	}
+	alloc.sharedDeviceIDs = sharedDeviceIDs
+
 	alloc.logger.V(6).Info("Gathered information about devices", "numAllocatedDevices", len(alloc.allocatedState.AllocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
 
 	// In practice, there aren't going to be many different CEL
@@ -658,7 +669,13 @@ type allocator struct {
 	// The map is indexed by device ID, and each value represents the accumulated capacity
 	// requested by all allocations targeting that device.
 	allocatingCapacity ConsumedCapacityCollection
-	result             []internalAllocationResult
+	// sharedDeviceIDs is the set of devices that have a persisted shared
+	// allocation, recorded only by share ID without an AggregatedCapacity
+	// entry. Such a device's shared counters are already accounted for, so a
+	// further allocation must skip the counter availability check to avoid
+	// double-charging them. Precomputed once from the allocated state.
+	sharedDeviceIDs sets.Set[DeviceID]
+	result           []internalAllocationResult
 }
 
 // counterSets is a map with the name of counter sets to the counters in
@@ -1752,8 +1769,17 @@ func (alloc *allocator) deviceInUse(deviceID DeviceID) bool {
 }
 
 func (alloc *allocator) deviceCapacityInUse(deviceID DeviceID) bool {
-	_, found := alloc.allocatedState.AggregatedCapacity[deviceID]
-	return found || alloc.allocatingCapacityForAnyClaim(deviceID)
+	if _, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
+		return true
+	}
+	if alloc.allocatingCapacityForAnyClaim(deviceID) {
+		return true
+	}
+	// A persisted shared allocation (recorded only by share ID, with no
+	// AggregatedCapacity entry) already accounts for the device's shared
+	// counters. Recognize it so a further allocation of the same device
+	// skips the counter check instead of double-charging the counters.
+	return alloc.sharedDeviceIDs.Has(deviceID)
 }
 
 func (alloc *allocator) allocatingDeviceForAnyClaim(deviceID DeviceID) bool {
