@@ -30,6 +30,7 @@ func TestLess(t *testing.T) {
 	var lowPriority, highPriority = int32(10), int32(100)
 	t1 := time.Now()
 	t2 := t1.Add(time.Second)
+	t3 := t2.Add(time.Second)
 	for _, tt := range []struct {
 		name     string
 		p1       *framework.QueuedPodInfo
@@ -57,7 +58,77 @@ func TestLess(t *testing.T) {
 			expected: true, // p1 should be ahead of p2 in the queue
 		},
 		{
-			name: "equal priority. p1 is added to schedulingQ earlier than p2",
+			name: "equal priority. p1 entered activeQ before p2",
+			p1: &framework.QueuedPodInfo{
+				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
+				QueueingParams: framework.QueueingParams{
+					Timestamp:               t3,
+					InitialAttemptTimestamp: &t1,
+				},
+			},
+			p2: &framework.QueuedPodInfo{
+				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
+				QueueingParams: framework.QueueingParams{
+					Timestamp:               t2,
+					InitialAttemptTimestamp: &t2,
+				},
+			},
+			expected: true, // p1 should be ahead of p2 in the queue
+		},
+		{
+			name: "equal priority. p2 entered activeQ before p1",
+			p1: &framework.QueuedPodInfo{
+				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
+				QueueingParams: framework.QueueingParams{
+					Timestamp:               t2,
+					InitialAttemptTimestamp: &t2,
+				},
+			},
+			p2: &framework.QueuedPodInfo{
+				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
+				QueueingParams: framework.QueueingParams{
+					Timestamp:               t3,
+					InitialAttemptTimestamp: &t1,
+				},
+			},
+			expected: false, // p2 should be ahead of p1 in the queue
+		},
+		{
+			name: "equal priority. p1 falls back to an earlier queue timestamp",
+			p1: &framework.QueuedPodInfo{
+				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
+				QueueingParams: framework.QueueingParams{
+					Timestamp: t1,
+				},
+			},
+			p2: &framework.QueuedPodInfo{
+				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
+				QueueingParams: framework.QueueingParams{
+					Timestamp:               t3,
+					InitialAttemptTimestamp: &t2,
+				},
+			},
+			expected: true, // p1 should be ahead of p2 in the queue
+		},
+		{
+			name: "equal priority. p2 falls back to an earlier queue timestamp",
+			p1: &framework.QueuedPodInfo{
+				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
+				QueueingParams: framework.QueueingParams{
+					Timestamp:               t3,
+					InitialAttemptTimestamp: &t2,
+				},
+			},
+			p2: &framework.QueuedPodInfo{
+				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
+				QueueingParams: framework.QueueingParams{
+					Timestamp: t1,
+				},
+			},
+			expected: false, // p2 should be ahead of p1 in the queue
+		},
+		{
+			name: "equal priority. both pods fall back to queue timestamps",
 			p1: &framework.QueuedPodInfo{
 				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
 				QueueingParams: framework.QueueingParams{
@@ -71,22 +142,6 @@ func TestLess(t *testing.T) {
 				},
 			},
 			expected: true, // p1 should be ahead of p2 in the queue
-		},
-		{
-			name: "equal priority. p2 is added to schedulingQ earlier than p1",
-			p1: &framework.QueuedPodInfo{
-				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
-				QueueingParams: framework.QueueingParams{
-					Timestamp: t2,
-				},
-			},
-			p2: &framework.QueuedPodInfo{
-				PodInfo: mustNewPodInfo(t, st.MakePod().Priority(highPriority).Obj()),
-				QueueingParams: framework.QueueingParams{
-					Timestamp: t1,
-				},
-			},
-			expected: false, // p2 should be ahead of p1 in the queue
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
