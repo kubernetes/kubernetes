@@ -1217,8 +1217,16 @@ type ExactDeviceRequest struct {
 	// +k8s:beta(since: "1.37")=+k8s:optional
 	AllocationMode DeviceAllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,3,opt,name=allocationMode"`
 
-	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
-	// If AllocationMode is ExactCount and this field is not specified, the default is one.
+	// Count is used only when the allocation mode is "ExactCount".
+	// Must be greater than zero.
+	//
+	// Consumers must treat this field as untrusted input and use
+	// overflow-safe arithmetic when aggregating or multiplying Count
+	// values. Consumers must not rely on unschedulability to protect
+	// accounting code.
+	//
+	// If AllocationMode is ExactCount and this field is not specified,
+	// the default is one.
 	//
 	// +optional
 	// +oneOf=AllocationMode
@@ -1348,8 +1356,16 @@ type DeviceSubRequest struct {
 	// +k8s:beta(since: "1.37")=+k8s:optional
 	AllocationMode DeviceAllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,4,opt,name=allocationMode"`
 
-	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
-	// If AllocationMode is ExactCount and this field is not specified, the default is one.
+	// Count is used only when the allocation mode is "ExactCount".
+	// Must be greater than zero.
+	//
+	// Consumers must treat this field as untrusted input and use
+	// overflow-safe arithmetic when aggregating or multiplying Count
+	// values. Consumers must not rely on unschedulability to protect
+	// accounting code.
+	//
+	// If AllocationMode is ExactCount and this field is not specified,
+	// the default is one.
 	//
 	// +optional
 	// +oneOf=AllocationMode
