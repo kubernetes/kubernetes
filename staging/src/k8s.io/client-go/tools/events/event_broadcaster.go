@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,6 +51,7 @@ const (
 	finishTime       = 6 * time.Minute
 	refreshTime      = 30 * time.Minute
 	maxQueuedEvents  = 1000
+	recordWorkers    = 8
 )
 
 var defaultSleepDuration = 10 * time.Second
@@ -71,6 +73,8 @@ type eventBroadcasterImpl struct {
 	eventCache    map[eventKey]*eventsv1.Event
 	sleepDuration time.Duration
 	sink          EventSink
+	eventQueue    chan *eventsv1.Event
+	cancel        func()
 }
 
 // EventSinkImpl wraps EventsV1Interface to implement EventSink.
@@ -116,26 +120,50 @@ func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[
 		eventCache:    eventCache,
 		sleepDuration: sleepDuration,
 		sink:          sink,
+		eventQueue:    make(chan *eventsv1.Event, maxQueuedEvents),
 	}
 }
 
 func (e *eventBroadcasterImpl) Shutdown() {
+	e.mu.Lock()
+	if e.cancel != nil {
+		e.cancel()
+		e.cancel = nil
+	}
+	e.mu.Unlock()
 	e.Broadcaster.Shutdown()
 }
 
 // refreshExistingEventSeries refresh events TTL
 func (e *eventBroadcasterImpl) refreshExistingEventSeries(ctx context.Context) {
-	// TODO: Investigate whether lock contention won't be a problem
+	type eventSnapshot struct {
+		key   eventKey
+		event *eventsv1.Event
+	}
+
+	var snapshots []eventSnapshot
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	for isomorphicKey, event := range e.eventCache {
 		if event.Series != nil {
-			if recordedEvent, retry := recordEvent(ctx, e.sink, event); !retry {
-				if recordedEvent != nil {
-					e.eventCache[isomorphicKey] = recordedEvent
-				}
-			}
+			snapshots = append(snapshots, eventSnapshot{key: isomorphicKey, event: event.DeepCopy()})
 		}
+	}
+	e.mu.Unlock()
+
+	for _, snapshot := range snapshots {
+		recordedEvent, retry := recordEvent(ctx, e.sink, snapshot.event.DeepCopy())
+		if retry || recordedEvent == nil {
+			continue
+		}
+
+		e.mu.Lock()
+		cachedEvent, exists := e.eventCache[snapshot.key]
+		// The sink call ran without the lock. Do not overwrite counts or
+		// timestamps which were aggregated while it was in flight.
+		if exists && apiequality.Semantic.DeepEqual(cachedEvent, snapshot.event) {
+			e.eventCache[snapshot.key] = recordedEvent
+		}
+		e.mu.Unlock()
 	}
 }
 
@@ -143,20 +171,42 @@ func (e *eventBroadcasterImpl) refreshExistingEventSeries(ctx context.Context) {
 // - write final count to the apiserver
 // - delete a singleton event (i.e. series field is nil) from the cache
 func (e *eventBroadcasterImpl) finishSeries(ctx context.Context) {
-	// TODO: Investigate whether lock contention won't be a problem
+	type eventSnapshot struct {
+		key          eventKey
+		event        *eventsv1.Event
+		shouldRecord bool
+	}
+
+	now := time.Now()
+	var snapshots []eventSnapshot
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	for isomorphicKey, event := range e.eventCache {
 		eventSerie := event.Series
 		if eventSerie != nil {
-			if eventSerie.LastObservedTime.Time.Before(time.Now().Add(-finishTime)) {
-				if _, retry := recordEvent(ctx, e.sink, event); !retry {
-					delete(e.eventCache, isomorphicKey)
-				}
+			if eventSerie.LastObservedTime.Time.Before(now.Add(-finishTime)) {
+				snapshots = append(snapshots, eventSnapshot{key: isomorphicKey, event: event.DeepCopy(), shouldRecord: true})
 			}
-		} else if event.EventTime.Time.Before(time.Now().Add(-finishTime)) {
-			delete(e.eventCache, isomorphicKey)
+		} else if event.EventTime.Time.Before(now.Add(-finishTime)) {
+			snapshots = append(snapshots, eventSnapshot{key: isomorphicKey, event: event.DeepCopy()})
 		}
+	}
+	e.mu.Unlock()
+
+	for _, snapshot := range snapshots {
+		if snapshot.shouldRecord {
+			if _, retry := recordEvent(ctx, e.sink, snapshot.event.DeepCopy()); retry {
+				continue
+			}
+		}
+
+		e.mu.Lock()
+		cachedEvent, exists := e.eventCache[snapshot.key]
+		// An event observed while the sink call was in flight means the series
+		// is active again and must remain in the cache.
+		if exists && apiequality.Semantic.DeepEqual(cachedEvent, snapshot.event) {
+			delete(e.eventCache, snapshot.key)
+		}
+		e.mu.Unlock()
 	}
 }
 
@@ -170,39 +220,52 @@ func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, reportingCont
 func (e *eventBroadcasterImpl) recordToSink(ctx context.Context, event *eventsv1.Event, clock clock.Clock) {
 	// Make a copy before modification, because there could be multiple listeners.
 	eventCopy := event.DeepCopy()
-	go func() {
-		evToRecord := func() *eventsv1.Event {
-			e.mu.Lock()
-			defer e.mu.Unlock()
-			eventKey := getKey(eventCopy)
-			isomorphicEvent, isIsomorphic := e.eventCache[eventKey]
-			if isIsomorphic {
-				if isomorphicEvent.Series != nil {
-					isomorphicEvent.Series.Count++
-					isomorphicEvent.Series.LastObservedTime = metav1.MicroTime{Time: clock.Now()}
-					return nil
-				}
-				isomorphicEvent.Series = &eventsv1.EventSeries{
-					Count:            2,
-					LastObservedTime: metav1.MicroTime{Time: clock.Now()},
-				}
-				// Make a copy of the Event to make sure that recording it
-				// doesn't mess with the object stored in cache.
-				return isomorphicEvent.DeepCopy()
+	record := func() *eventsv1.Event {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		eventKey := getKey(eventCopy)
+		isomorphicEvent, isIsomorphic := e.eventCache[eventKey]
+		if isIsomorphic {
+			if isomorphicEvent.Series != nil {
+				isomorphicEvent.Series.Count++
+				isomorphicEvent.Series.LastObservedTime = metav1.MicroTime{Time: clock.Now()}
+				return nil
 			}
-			e.eventCache[eventKey] = eventCopy
-			// Make a copy of the Event to make sure that recording it doesn't
-			// mess with the object stored in cache.
-			return eventCopy.DeepCopy()
-		}()
-		if evToRecord != nil {
-			// TODO: Add a metric counting the number of recording attempts
-			e.attemptRecording(ctx, evToRecord)
-			// We don't want the new recorded Event to be reflected in the
-			// client's cache because server-side mutations could mess with the
-			// aggregation mechanism used by the client.
+			isomorphicEvent.Series = &eventsv1.EventSeries{
+				Count:            2,
+				LastObservedTime: metav1.MicroTime{Time: clock.Now()},
+			}
+			// Make a copy of the Event to make sure that recording it
+			// doesn't mess with the object stored in cache.
+			return isomorphicEvent.DeepCopy()
 		}
+		e.eventCache[eventKey] = eventCopy
+		// Make a copy of the Event to make sure that recording it doesn't
+		// mess with the object stored in cache.
+		return eventCopy.DeepCopy()
 	}()
+	if record != nil {
+		select {
+		case e.eventQueue <- record:
+		default:
+			klog.FromContext(ctx).Error(nil, "Unable to record event: too many queued events, dropped event", "event", record)
+		}
+	}
+}
+
+// recordingWorker delivers queued events to the sink until the context is
+// canceled.
+func (e *eventBroadcasterImpl) recordingWorker(ctx context.Context) {
+	defer utilruntime.HandleCrash()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case record := <-e.eventQueue:
+			// TODO: Add a metric counting the number of recording attempts
+			e.attemptRecording(ctx, record)
+		}
+	}
 }
 
 func (e *eventBroadcasterImpl) attemptRecording(ctx context.Context, event *eventsv1.Event) {
@@ -372,6 +435,9 @@ func (e *eventBroadcasterImpl) startRecordingEvents(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	for range recordWorkers {
+		go e.recordingWorker(ctx)
+	}
 	go func() {
 		<-ctx.Done()
 		stopWatcher()
@@ -390,9 +456,20 @@ func (e *eventBroadcasterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
 
 // StartRecordingToSinkWithContext starts sending events received from the specified eventBroadcaster to the given sink.
 func (e *eventBroadcasterImpl) StartRecordingToSinkWithContext(ctx context.Context) error {
-	go wait.UntilWithContext(ctx, e.refreshExistingEventSeries, refreshTime)
-	go wait.UntilWithContext(ctx, e.finishSeries, finishTime)
-	return e.startRecordingEvents(ctx)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.cancel != nil {
+		return fmt.Errorf("broadcaster is already recording to a sink")
+	}
+	cctx, cancel := context.WithCancel(ctx)
+	if err := e.startRecordingEvents(cctx); err != nil {
+		cancel()
+		return err
+	}
+	go wait.UntilWithContext(cctx, e.refreshExistingEventSeries, refreshTime)
+	go wait.UntilWithContext(cctx, e.finishSeries, finishTime)
+	e.cancel = cancel
+	return nil
 }
 
 type eventBroadcasterAdapterImpl struct {
