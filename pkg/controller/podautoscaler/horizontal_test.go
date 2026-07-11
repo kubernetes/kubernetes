@@ -3249,230 +3249,370 @@ func TestScaleDownCM(t *testing.T) {
 	}
 }
 
-func TestScaleUpFromZeroWithoutCondition(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
+// TestScaleToZeroBehavior consolidates tests for HPA scale-to-zero handling:
+//   - Without ScaledToZero condition, scaling from zero is disabled regardless of feature gate.
+//   - When minReplicas is increased above zero with ScaledToZero condition present, behavior
+//     differs based on feature gate: FG on → scale up to minReplicas; FG off → scaling disabled.
+//   - On normal rescale with stale ScaledToZero condition: FG on → condition set to False;
+//     FG off → condition removed entirely.
+//   - Manual scale to zero (minReplicas >= 1, no ScaledToZero condition) pauses HPA regardless of FG.
+//   - With feature gate disabled, no ScaledToZero condition is recorded on a normal rescale.
+func TestScaleToZeroBehavior(t *testing.T) {
+	targetValue := resource.MustParse("15.0")
+
+	tests := []struct {
+		name                    string
+		hpaScaleToZero          bool
+		fixture                 horizontalScenario
+		expectedDesiredReplicas int32
+		expectedScaleUpdated    bool
+		expectedActionLabel     monitor.ActionLabel
+		expectedErrorLabel      monitor.ErrorLabel
+		expectedConditions      []autoscalingv2.HorizontalPodAutoscalerCondition
+	}{
+		{
 			// Without ScaledToZero condition, scaling from zero is disabled regardless of feature gate
-			targetValue := resource.MustParse("15.0")
-			tc := testCase{
-				minReplicas:             0,
-				maxReplicas:             6,
-				specReplicas:            0,
-				statusReplicas:          0,
-				expectedDesiredReplicas: 0,
-				CPUTarget:               0,
-				metricsTarget: []autoscalingv2.MetricSpec{
-					{
-						Type: autoscalingv2.ObjectMetricSourceType,
-						Object: &autoscalingv2.ObjectMetricSource{
-							DescribedObject: autoscalingv2.CrossVersionObjectReference{
-								APIVersion: "apps/v1",
-								Kind:       "Deployment",
-								Name:       "some-deployment",
-							},
-							Metric: autoscalingv2.MetricIdentifier{
-								Name: "qps",
-							},
-							Target: autoscalingv2.MetricTarget{
-								Type:  autoscalingv2.ValueMetricType,
-								Value: &targetValue,
-							},
-						},
+			name:           "from zero without condition, FG on",
+			hpaScaleToZero: true,
+			fixture: horizontalScenario{
+				minReplicas:    0,
+				maxReplicas:    6,
+				specReplicas:   0,
+				statusReplicas: 0,
+				metricsTarget: []autoscalingv2.MetricSpec{{
+					Type: autoscalingv2.ObjectMetricSourceType,
+					Object: &autoscalingv2.ObjectMetricSource{
+						DescribedObject: autoscalingv2.CrossVersionObjectReference{APIVersion: "apps/v1", Kind: "Deployment", Name: "some-deployment"},
+						Metric:          autoscalingv2.MetricIdentifier{Name: "qps"},
+						Target:          autoscalingv2.MetricTarget{Type: autoscalingv2.ValueMetricType, Value: &targetValue},
 					},
+				}},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
 				},
 				reportedLevels: []uint64{20000},
-				expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
+			},
+			expectedDesiredReplicas: 0,
+			expectedScaleUpdated:    false,
+			expectedActionLabel:     monitor.ActionLabelNone,
+			expectedErrorLabel:      monitor.ErrorLabelNone,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
+			},
+		},
+		{
+			name:           "from zero without condition, FG off",
+			hpaScaleToZero: false,
+			fixture: horizontalScenario{
+				minReplicas:    0,
+				maxReplicas:    6,
+				specReplicas:   0,
+				statusReplicas: 0,
+				metricsTarget: []autoscalingv2.MetricSpec{{
+					Type: autoscalingv2.ObjectMetricSourceType,
+					Object: &autoscalingv2.ObjectMetricSource{
+						DescribedObject: autoscalingv2.CrossVersionObjectReference{APIVersion: "apps/v1", Kind: "Deployment", Name: "some-deployment"},
+						Metric:          autoscalingv2.MetricIdentifier{Name: "qps"},
+						Target:          autoscalingv2.MetricTarget{Type: autoscalingv2.ValueMetricType, Value: &targetValue},
+					},
+				}},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
 				},
-				expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
-				expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelNone,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
-				expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
-			}
-			tc.runTest(t)
-		})
-	}
-}
-
-func TestScaleUpFromZeroWhenMinReplicasIncreased(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			tc := testCase{
+				reportedLevels: []uint64{20000},
+			},
+			expectedDesiredReplicas: 0,
+			expectedScaleUpdated:    false,
+			expectedActionLabel:     monitor.ActionLabelNone,
+			expectedErrorLabel:      monitor.ErrorLabelNone,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
+			},
+		},
+		{
+			// HPA previously scaled to zero, minReplicas increased to 2 → scale up to minReplicas
+			name:           "minReplicas increased with ScaledToZero condition, FG on",
+			hpaScaleToZero: true,
+			fixture: horizontalScenario{
 				minReplicas:    2,
 				maxReplicas:    6,
 				specReplicas:   0,
 				statusReplicas: 0,
-				CPUTarget:      0,
-				metricsTarget: []autoscalingv2.MetricSpec{
-					{
-						Type: autoscalingv2.ObjectMetricSourceType,
-						Object: &autoscalingv2.ObjectMetricSource{
-							DescribedObject: autoscalingv2.CrossVersionObjectReference{
-								APIVersion: "apps/v1",
-								Kind:       "Deployment",
-								Name:       "some-deployment",
-							},
-							Metric: autoscalingv2.MetricIdentifier{
-								Name: "qps",
-							},
-							Target: autoscalingv2.MetricTarget{
-								Type:  autoscalingv2.ValueMetricType,
-								Value: resource.NewMilliQuantity(15000, resource.DecimalSI),
-							},
-						},
+				metricsTarget: []autoscalingv2.MetricSpec{{
+					Type: autoscalingv2.ObjectMetricSourceType,
+					Object: &autoscalingv2.ObjectMetricSource{
+						DescribedObject: autoscalingv2.CrossVersionObjectReference{APIVersion: "apps/v1", Kind: "Deployment", Name: "some-deployment"},
+						Metric:          autoscalingv2.MetricIdentifier{Name: "qps"},
+						Target:          autoscalingv2.MetricTarget{Type: autoscalingv2.ValueMetricType, Value: resource.NewMilliQuantity(15000, resource.DecimalSI)},
 					},
+				}},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
 				},
 				reportedLevels: []uint64{10000},
 				initialConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{
-						Type:   autoscalingv2.ScaledToZero,
-						Status: v1.ConditionTrue,
-						Reason: "ScaledToZero",
-					},
+					{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionTrue, Reason: "ScaledToZero"},
 				},
-			}
-			if fgEnabled {
-				// HPA previously scaled to zero, minReplicas increased to 2 → scale up to minReplicas
-				tc.expectedDesiredReplicas = 2
-				tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionFalse, Reason: "NotScaledToZero"},
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
-					{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionTrue, Reason: "TooFewReplicas"},
-				}
-				tc.expectedReportedReconciliationActionLabel = monitor.ActionLabelScaleUp
-				tc.expectedReportedReconciliationErrorLabel = monitor.ErrorLabelNone
-				tc.expectedReportedMetricComputationActionLabels = map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-					autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleUp,
-				}
-				tc.expectedReportedMetricComputationErrorLabels = map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-					autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
-				}
-			} else {
-				// FG off: scaledToZeroCondition=false → treated as manual scale-down, scaling disabled
-				tc.expectedDesiredReplicas = 0
-				tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
-				}
-				tc.expectedReportedReconciliationActionLabel = monitor.ActionLabelNone
-				tc.expectedReportedReconciliationErrorLabel = monitor.ErrorLabelNone
-				tc.expectedReportedMetricComputationActionLabels = map[autoscalingv2.MetricSourceType]monitor.ActionLabel{}
-				tc.expectedReportedMetricComputationErrorLabels = map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{}
-			}
-			tc.runTest(t)
-		})
-	}
-}
-
-func TestScaledToZeroConditionHandledOnNormalRescale(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			tc := testCase{
-				minReplicas:             1,
-				maxReplicas:             6,
-				specReplicas:            3,
-				statusReplicas:          3,
-				expectedDesiredReplicas: 5,
-				CPUTarget:               30,
-				reportedLevels:          []uint64{300, 500, 700},
-				reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-				useMetricsAPI:           true,
+			},
+			expectedDesiredReplicas: 2,
+			expectedScaleUpdated:    true,
+			expectedActionLabel:     monitor.ActionLabelScaleUp,
+			expectedErrorLabel:      monitor.ErrorLabelNone,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionFalse, Reason: "NotScaledToZero"},
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
+				{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionTrue, Reason: "TooFewReplicas"},
+			},
+		},
+		{
+			// FG off: scaledToZeroCondition=false → treated as manual scale-down, scaling disabled
+			name:           "minReplicas increased with ScaledToZero condition, FG off",
+			hpaScaleToZero: false,
+			fixture: horizontalScenario{
+				minReplicas:    2,
+				maxReplicas:    6,
+				specReplicas:   0,
+				statusReplicas: 0,
+				metricsTarget: []autoscalingv2.MetricSpec{{
+					Type: autoscalingv2.ObjectMetricSourceType,
+					Object: &autoscalingv2.ObjectMetricSource{
+						DescribedObject: autoscalingv2.CrossVersionObjectReference{APIVersion: "apps/v1", Kind: "Deployment", Name: "some-deployment"},
+						Metric:          autoscalingv2.MetricIdentifier{Name: "qps"},
+						Target:          autoscalingv2.MetricTarget{Type: autoscalingv2.ValueMetricType, Value: resource.NewMilliQuantity(15000, resource.DecimalSI)},
+					},
+				}},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
+				},
+				reportedLevels: []uint64{10000},
 				initialConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{
-						Type:   autoscalingv2.ScaledToZero,
-						Status: v1.ConditionTrue,
-						Reason: "ScaledToZero",
-					},
+					{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionTrue, Reason: "ScaledToZero"},
 				},
-				expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-				expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-					autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
-				},
-				expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-					autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-				},
-			}
-			if fgEnabled {
-				// FG on: ScaledToZero condition set to False on rescale
-				tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionFalse, Reason: "NotScaledToZero"},
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
-					{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionFalse, Reason: "DesiredWithinRange"},
-				}
-			} else {
-				// FG off: stale ScaledToZero condition removed on rescale
-				tc.expectedConditions = statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-					Type: autoscalingv2.ScalingLimited, Status: v1.ConditionFalse,
-					Reason: "DesiredWithinRange",
-				})
-			}
-			tc.runTest(t)
-		})
-	}
-}
-
-// TestNoScaledToZeroConditionWhenFeatureGateDisabled verifies that while the
-// HPAScaleToZero feature gate is disabled, the controller does not record a
-// ScaledToZero condition when it rescales a workload.
-func TestNoScaledToZeroConditionWhenFeatureGateDisabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, false)
-	tc := testCase{
-		minReplicas:             1,
-		maxReplicas:             6,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 5,
-		CPUTarget:               30,
-		reportedLevels:          []uint64{300, 500, 700},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:           true,
-		// With the feature gate disabled, no ScaledToZero condition is recorded.
-		expectedConditions:                        statusOkWithOverrides(),
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+			},
+			expectedDesiredReplicas: 0,
+			expectedScaleUpdated:    false,
+			expectedActionLabel:     monitor.ActionLabelNone,
+			expectedErrorLabel:      monitor.ErrorLabelNone,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
+			},
 		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		{
+			// FG on: ScaledToZero condition set to False on normal rescale
+			name:           "stale ScaledToZero condition cleared on normal rescale, FG on",
+			hpaScaleToZero: true,
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         6,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           30,
+				reportedLevels:      []uint64{300, 500, 700},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
+				},
+				initialConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+					{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionTrue, Reason: "ScaledToZero"},
+				},
+			},
+			expectedDesiredReplicas: 5,
+			expectedScaleUpdated:    true,
+			expectedActionLabel:     monitor.ActionLabelScaleUp,
+			expectedErrorLabel:      monitor.ErrorLabelNone,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionFalse, Reason: "NotScaledToZero"},
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
+				{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionFalse, Reason: "DesiredWithinRange"},
+			},
 		},
-	}
-	tc.runTest(t)
-}
-
-func TestManualScaleToZeroDisablesHPA(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
+		{
+			// FG off: stale ScaledToZero condition removed on rescale
+			name:           "stale ScaledToZero condition removed on normal rescale, FG off",
+			hpaScaleToZero: false,
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         6,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           30,
+				reportedLevels:      []uint64{300, 500, 700},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
+				},
+				initialConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+					{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionTrue, Reason: "ScaledToZero"},
+				},
+			},
+			expectedDesiredReplicas: 5,
+			expectedScaleUpdated:    true,
+			expectedActionLabel:     monitor.ActionLabelScaleUp,
+			expectedErrorLabel:      monitor.ErrorLabelNone,
+			expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+				Type: autoscalingv2.ScalingLimited, Status: v1.ConditionFalse, Reason: "DesiredWithinRange",
+			}),
+		},
+		{
 			// With minReplicas >= 1, a workload manually scaled to zero (no ScaledToZero condition)
 			// should cause HPA to pause (ScalingDisabled), regardless of feature gate
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			tc := testCase{
-				minReplicas:             1,
-				maxReplicas:             6,
-				specReplicas:            0,
-				statusReplicas:          0,
-				expectedDesiredReplicas: 0,
-				CPUTarget:               50,
-				reportedLevels:          []uint64{},
-				reportedCPURequests:     []resource.Quantity{},
-				useMetricsAPI:           true,
-				expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
+			name:           "manual scale to zero disables HPA, FG on",
+			hpaScaleToZero: true,
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         6,
+				specReplicas:        0,
+				statusReplicas:      0,
+				CPUTarget:           50,
+				reportedLevels:      []uint64{},
+				reportedCPURequests: []resource.Quantity{},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
 				},
-				expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
-				expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelNone,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
-				expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
+			},
+			expectedDesiredReplicas: 0,
+			expectedScaleUpdated:    false,
+			expectedActionLabel:     monitor.ActionLabelNone,
+			expectedErrorLabel:      monitor.ErrorLabelNone,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
+			},
+		},
+		{
+			name:           "manual scale to zero disables HPA, FG off",
+			hpaScaleToZero: false,
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         6,
+				specReplicas:        0,
+				statusReplicas:      0,
+				CPUTarget:           50,
+				reportedLevels:      []uint64{},
+				reportedCPURequests: []resource.Quantity{},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
+				},
+			},
+			expectedDesiredReplicas: 0,
+			expectedScaleUpdated:    false,
+			expectedActionLabel:     monitor.ActionLabelNone,
+			expectedErrorLabel:      monitor.ErrorLabelNone,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
+			},
+		},
+		{
+			// With the feature gate disabled, no ScaledToZero condition is recorded.
+			name:           "no ScaledToZero condition when feature gate disabled",
+			hpaScaleToZero: false,
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         6,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           30,
+				reportedLevels:      []uint64{300, 500, 700},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
+				},
+			},
+			expectedDesiredReplicas: 5,
+			expectedScaleUpdated:    true,
+			expectedActionLabel:     monitor.ActionLabelScaleUp,
+			expectedErrorLabel:      monitor.ErrorLabelNone,
+			expectedConditions:      statusOkWithOverrides(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, tt.hpaScaleToZero)
+
+			logger, _ := ktesting.NewTestContext(t)
+			fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+
+			testClient := &fake.Clientset{}
+			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+			AddListPodsReactor(testClient, &tt.fixture)
+
+			fakeScaleClient := &scalefake.FakeScaleClient{}
+			AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &tt.fixture)
+			AddUpdateScaleReactor(fakeScaleClient, "replicationcontrollers")
+
+			fakeMetricsClient := &metricsfake.Clientset{}
+			AddListPodMetricsReactor(fakeMetricsClient, &tt.fixture)
+
+			eventClient := &fake.Clientset{}
+			fakeCmClient := &cmfake.FakeCustomMetricsClient{}
+			AddGetCustomMetricsReactor(fakeCmClient, &tt.fixture)
+			fakeEMClient := &emfake.FakeExternalMetricsClient{}
+
+			setup := newHorizontalSetup(t, &tt.fixture, testClient, eventClient, fakeMetricsClient, fakeCmClient, fakeEMClient, fakeScaleClient)
+
+			hpa := buildHPA(t, &tt.fixture)
+			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
+
+			hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+			setup.controller.selectorTracker.PutIfAbsent(hpa.Namespace, hpaKey, labels.Nothing())
+			beforeReconciliationsTotal, err := metricstestutil.GetCounterMetricValue(
+				monitor.ReconciliationsTotal.WithLabelValues(string(tt.expectedActionLabel), string(tt.expectedErrorLabel)))
+			require.NoError(t, err)
+
+			err = setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
+			require.NoError(t, err)
+
+			scaleUpdated := false
+			for _, action := range setup.scaleClient.Actions() {
+				if action.GetVerb() == "update" {
+					scaleUpdated = true
+					scale := action.(core.UpdateAction).GetObject().(*autoscalingv1.Scale)
+					assert.Equal(t, tt.expectedDesiredReplicas, scale.Spec.Replicas, "desired replicas should match")
+				}
 			}
-			tc.runTest(t)
+			assert.Equal(t, tt.expectedScaleUpdated, scaleUpdated, "scale update expectation mismatch")
+
+			afterReconciliationsTotal, err := metricstestutil.GetCounterMetricValue(
+				monitor.ReconciliationsTotal.WithLabelValues(string(tt.expectedActionLabel), string(tt.expectedErrorLabel)))
+			require.NoError(t, err)
+			assert.Equal(t, 1, int(afterReconciliationsTotal-beforeReconciliationsTotal), "reconciliation metric should be recorded for action=%s error=%s", tt.expectedActionLabel, tt.expectedErrorLabel)
+
+			for _, action := range setup.testClient.Actions() {
+				if action.GetVerb() == "update" && action.GetResource().Resource == "horizontalpodautoscalers" {
+					updatedHPA := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+					actualConditions := updatedHPA.Status.Conditions
+					for i := range actualConditions {
+						actualConditions[i].Message = ""
+						actualConditions[i].LastTransitionTime = metav1.Time{}
+					}
+					assert.Equal(t, tt.expectedConditions, actualConditions, "status conditions should match")
+				}
+			}
 		})
 	}
 }
