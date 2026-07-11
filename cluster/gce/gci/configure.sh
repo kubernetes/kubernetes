@@ -513,7 +513,7 @@ function install-runc-source {
   local -r version="$1" temp_dir="$(mktemp -d)"
   if ! apt-get update ||
      ! DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-       gcc git golang-go libseccomp-dev make pkg-config; then
+       gcc git golang-go libc6-dev libseccomp-dev make pkg-config; then
     rm -rf "${temp_dir}"
     return 1
   fi
