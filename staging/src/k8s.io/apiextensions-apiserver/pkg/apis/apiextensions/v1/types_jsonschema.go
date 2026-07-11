@@ -36,7 +36,8 @@ const (
 	FieldValueForbidden FieldValueErrorReason = "FieldValueForbidden"
 )
 
-// JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).
+// JSONSchemaProps is a JSON-Schema following Specification Draft 4.
+// See: https://json-schema.org/
 type JSONSchemaProps struct {
 	ID          string        `json:"id,omitempty" protobuf:"bytes,1,opt,name=id"`
 	Schema      JSONSchemaURL `json:"$schema,omitempty" protobuf:"bytes,2,opt,name=schema"`
