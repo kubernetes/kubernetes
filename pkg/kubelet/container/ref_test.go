@@ -25,23 +25,66 @@ import (
 )
 
 func TestFieldPath(t *testing.T) {
-	pod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{
-		{Name: "foo"},
-		{Name: "bar"},
-		{Name: ""},
-		{Name: "baz"},
-	}}}
+	pod := &v1.Pod{Spec: v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "foo"},
+			{Name: "bar"},
+			{Name: ""},
+			{Name: "baz"},
+		},
+		InitContainers: []v1.Container{
+			{Name: "init"},
+		},
+		EphemeralContainers: []v1.EphemeralContainer{
+			{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debugger"}},
+		},
+	}}
+	podWithEmptyInitContainer := &v1.Pod{Spec: v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "foo"},
+		},
+		InitContainers: []v1.Container{
+			{Name: "init"},
+			{Name: ""},
+		},
+	}}
+	podWithEmptyEphemeralContainer := &v1.Pod{Spec: v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "foo"},
+		},
+		InitContainers: []v1.Container{
+			{Name: "init"},
+		},
+		EphemeralContainers: []v1.EphemeralContainer{
+			{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debugger"}},
+			{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: ""}},
+		},
+	}}
+	podWithDuplicateNames := &v1.Pod{Spec: v1.PodSpec{
+		Containers:     []v1.Container{{Name: "shared-with-init"}},
+		InitContainers: []v1.Container{{Name: "shared-with-init"}, {Name: "shared-with-ephemeral"}},
+		EphemeralContainers: []v1.EphemeralContainer{
+			{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "shared-with-ephemeral"}},
+		},
+	}}
 	table := map[string]struct {
 		pod       *v1.Pod
 		container *v1.Container
 		path      string
 		success   bool
 	}{
-		"basic":            {pod, &v1.Container{Name: "foo"}, "spec.containers{foo}", true},
-		"basic2":           {pod, &v1.Container{Name: "baz"}, "spec.containers{baz}", true},
-		"emptyName":        {pod, &v1.Container{Name: ""}, "spec.containers[2]", true},
-		"basicSamePointer": {pod, &pod.Spec.Containers[0], "spec.containers{foo}", true},
-		"missing":          {pod, &v1.Container{Name: "qux"}, "", false},
+		"basic":                       {pod, &v1.Container{Name: "foo"}, "spec.containers{foo}", true},
+		"basic2":                      {pod, &v1.Container{Name: "baz"}, "spec.containers{baz}", true},
+		"emptyName":                   {pod, &v1.Container{Name: ""}, "spec.containers[2]", true},
+		"basicSamePointer":            {pod, &pod.Spec.Containers[0], "spec.containers{foo}", true},
+		"init":                        {pod, &v1.Container{Name: "init"}, "spec.initContainers{init}", true},
+		"initSamePointer":             {pod, &pod.Spec.InitContainers[0], "spec.initContainers{init}", true},
+		"emptyInit":                   {podWithEmptyInitContainer, &v1.Container{Name: ""}, "spec.initContainers[1]", true},
+		"ephemeral":                   {pod, &v1.Container{Name: "debugger"}, "spec.ephemeralContainers{debugger}", true},
+		"emptyEphemeral":              {podWithEmptyEphemeralContainer, &v1.Container{Name: ""}, "spec.ephemeralContainers[1]", true},
+		"precedenceContainerOverInit": {podWithDuplicateNames, &v1.Container{Name: "shared-with-init"}, "spec.containers{shared-with-init}", true},
+		"precedenceInitOverEphemeral": {podWithDuplicateNames, &v1.Container{Name: "shared-with-ephemeral"}, "spec.initContainers{shared-with-ephemeral}", true},
+		"missing":                     {pod, &v1.Container{Name: "qux"}, "", false},
 	}
 
 	for name, item := range table {
@@ -82,6 +125,18 @@ func TestGenerateContainerRef(t *testing.T) {
 					},
 					{},
 				},
+				InitContainers: []v1.Container{
+					{
+						Name: "init",
+					},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{
+						EphemeralContainerCommon: v1.EphemeralContainerCommon{
+							Name: "debugger",
+						},
+					},
+				},
 			},
 		}
 	)
@@ -106,7 +161,7 @@ func TestGenerateContainerRef(t *testing.T) {
 				Namespace:       "test-ns",
 				UID:             "bar",
 				ResourceVersion: "42",
-				FieldPath:       ".spec.containers{by-name}",
+				FieldPath:       "spec.containers{by-name}",
 			},
 			success: true,
 		},
@@ -121,7 +176,7 @@ func TestGenerateContainerRef(t *testing.T) {
 				Namespace:       "test-ns",
 				UID:             "bar",
 				ResourceVersion: "42",
-				FieldPath:       ".spec.containers[1]",
+				FieldPath:       "spec.containers[1]",
 			},
 			success: true,
 		},
@@ -139,6 +194,40 @@ func TestGenerateContainerRef(t *testing.T) {
 				UID:             "bar",
 				ResourceVersion: "42",
 				FieldPath:       "implicitly required container net",
+			},
+			success: true,
+		},
+		{
+			name: "init",
+			pod:  &okPod,
+			container: &v1.Container{
+				Name: "init",
+			},
+			expected: &v1.ObjectReference{
+				Kind:            "Pod",
+				APIVersion:      "v1",
+				Name:            "ok",
+				Namespace:       "test-ns",
+				UID:             "bar",
+				ResourceVersion: "42",
+				FieldPath:       "spec.initContainers{init}",
+			},
+			success: true,
+		},
+		{
+			name: "ephemeral",
+			pod:  &okPod,
+			container: &v1.Container{
+				Name: "debugger",
+			},
+			expected: &v1.ObjectReference{
+				Kind:            "Pod",
+				APIVersion:      "v1",
+				Name:            "ok",
+				Namespace:       "test-ns",
+				UID:             "bar",
+				ResourceVersion: "42",
+				FieldPath:       "spec.ephemeralContainers{debugger}",
 			},
 			success: true,
 		},
@@ -175,7 +264,10 @@ func TestGenerateContainerRef(t *testing.T) {
 			t.Errorf("%v: uid: expected %v, got %v", tc.name, e, a)
 		}
 		if e, a := tc.expected.ResourceVersion, actual.ResourceVersion; e != a {
-			t.Errorf("%v: kind: expected %v, got %v", tc.name, e, a)
+			t.Errorf("%v: resourceVersion: expected %v, got %v", tc.name, e, a)
+		}
+		if e, a := tc.expected.FieldPath, actual.FieldPath; e != a {
+			t.Errorf("%v: fieldPath: expected %v, got %v", tc.name, e, a)
 		}
 	}
 }
