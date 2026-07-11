@@ -880,14 +880,17 @@ func PodGroupMemberPodsOrderingFunc(a, b *QueuedPodInfo) int {
 	} else if a.Timestamp.After(b.Timestamp) {
 		return 1
 	}
-	// On platforms with low-resolution clocks (e.g. Windows), pods added in quick
-	// succession may share the same timestamp. Fall back to pod name to guarantee
-	// a deterministic, stable order.
-	if a.Pod.Name < b.Pod.Name {
+	// Priorities, attempts and timestamps are equal. Use a deterministic,
+	// stable tie-breaker based on pod identity instead of returning 0, so the
+	// resulting order does not depend on the iteration order of the underlying
+	// pod map (which varies across platforms, e.g. on Windows) when pods share
+	// priority, attempts and timestamp.
+	if an, bn := a.Pod.Namespace+"/"+a.Pod.Name, b.Pod.Namespace+"/"+b.Pod.Name; an < bn {
 		return -1
-	} else if a.Pod.Name > b.Pod.Name {
+	} else if an > bn {
 		return 1
 	}
+
 	return 0
 }
 
