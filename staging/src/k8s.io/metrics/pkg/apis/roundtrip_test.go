@@ -33,6 +33,7 @@ import (
 	externalmetrics "k8s.io/metrics/pkg/apis/external_metrics"
 	externalmetricsv1beta1 "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
+	metricsv1 "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
@@ -44,6 +45,7 @@ var groups = []runtime.SchemeBuilder{
 	externalmetrics.SchemeBuilder,
 	externalmetricsv1beta1.SchemeBuilder,
 	metrics.SchemeBuilder,
+	metricsv1.SchemeBuilder,
 	metricsv1alpha1.SchemeBuilder,
 	metricsv1beta1.SchemeBuilder,
 }

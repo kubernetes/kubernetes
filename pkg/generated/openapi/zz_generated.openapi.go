@@ -120,6 +120,7 @@ import (
 	custommetricsv1beta1 "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 	custommetricsv1beta2 "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	externalmetricsv1beta1 "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
+	metricsv1 "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
@@ -1507,6 +1508,11 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		custommetricsv1beta2.MetricValueList{}.OpenAPIModelName():                                                       schema_pkg_apis_custom_metrics_v1beta2_MetricValueList(ref),
 		externalmetricsv1beta1.ExternalMetricValue{}.OpenAPIModelName():                                                 schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValue(ref),
 		externalmetricsv1beta1.ExternalMetricValueList{}.OpenAPIModelName():                                             schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValueList(ref),
+		metricsv1.ContainerMetrics{}.OpenAPIModelName():                                                                 schema_pkg_apis_metrics_v1_ContainerMetrics(ref),
+		metricsv1.NodeMetrics{}.OpenAPIModelName():                                                                      schema_pkg_apis_metrics_v1_NodeMetrics(ref),
+		metricsv1.NodeMetricsList{}.OpenAPIModelName():                                                                  schema_pkg_apis_metrics_v1_NodeMetricsList(ref),
+		metricsv1.PodMetrics{}.OpenAPIModelName():                                                                       schema_pkg_apis_metrics_v1_PodMetrics(ref),
+		metricsv1.PodMetricsList{}.OpenAPIModelName():                                                                   schema_pkg_apis_metrics_v1_PodMetricsList(ref),
 		metricsv1alpha1.ContainerMetrics{}.OpenAPIModelName():                                                           schema_pkg_apis_metrics_v1alpha1_ContainerMetrics(ref),
 		metricsv1alpha1.NodeMetrics{}.OpenAPIModelName():                                                                schema_pkg_apis_metrics_v1alpha1_NodeMetrics(ref),
 		metricsv1alpha1.NodeMetricsList{}.OpenAPIModelName():                                                            schema_pkg_apis_metrics_v1alpha1_NodeMetricsList(ref),
@@ -73281,6 +73287,272 @@ func schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValueList(ref common
 		},
 		Dependencies: []string{
 			metav1.ListMeta{}.OpenAPIModelName(), externalmetricsv1beta1.ExternalMetricValue{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_metrics_v1_ContainerMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ContainerMetrics sets resource usage metrics of a container.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Container name corresponding to the one from pod.spec.containers.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"usage": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The memory usage is the memory working set.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "usage"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_metrics_v1_NodeMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeMetrics sets resource usage metrics of a node.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"timestamp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The following fields define time interval from which metrics were collected from the interval [Timestamp-Window, Timestamp].",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"window": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
+					"usage": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The memory usage is the memory working set.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"timestamp", "window", "usage"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName(), metav1.Duration{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_metrics_v1_NodeMetricsList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeMetricsList is a list of NodeMetrics.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of node metrics.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(metricsv1.NodeMetrics{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			metav1.ListMeta{}.OpenAPIModelName(), metricsv1.NodeMetrics{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_metrics_v1_PodMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodMetrics sets resource usage metrics of a pod.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"timestamp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The following fields define time interval from which metrics were collected from the interval [Timestamp-Window, Timestamp].",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"window": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
+					"containers": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Metrics for all containers are collected within the same time window.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(metricsv1.ContainerMetrics{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"timestamp", "window", "containers"},
+			},
+		},
+		Dependencies: []string{
+			metav1.Duration{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName(), metricsv1.ContainerMetrics{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_metrics_v1_PodMetricsList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodMetricsList is a list of PodMetrics.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of pod metrics.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(metricsv1.PodMetrics{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			metav1.ListMeta{}.OpenAPIModelName(), metricsv1.PodMetrics{}.OpenAPIModelName()},
 	}
 }
 
