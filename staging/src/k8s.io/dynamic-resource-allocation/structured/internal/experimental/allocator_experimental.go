@@ -1637,8 +1637,9 @@ type deviceRollbackState struct {
 // they were applied. It is called synchronously on the rejection paths and, via
 // the closure returned on success, during backtracking. Keeping the state in a
 // value passed by argument (rather than variables captured by a closure built
-// before the rejection checks) keeps the rejection hot path free of heap
-// allocations.
+// before the rejection checks) avoids a heap allocation for the rollback
+// bookkeeping on the rejection paths, since a closure built up front and
+// returned would escape.
 func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, baseRequestName, subRequestName string, state deviceRollbackState) {
 	if state.resultAdded {
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:state.previousNumResults]
