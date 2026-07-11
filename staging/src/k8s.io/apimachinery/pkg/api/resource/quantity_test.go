@@ -718,6 +718,13 @@ func TestQuantityString(t *testing.T) {
 		{decQuantity(10800, -4, DecimalSI), "1080m", ""},
 		{decQuantity(300, 6, DecimalSI), "300M", ""},
 		{decQuantity(1, 12, DecimalSI), "1T", ""},
+		// DecimalSI has no suffix beyond "E" (10^18). Larger exponents must fall
+		// back to exponent notation instead of dropping the magnitude, otherwise
+		// e.g. "1000E" would serialize to "1" (a 10^21 corruption).
+		{decQuantity(1, 18, DecimalSI), "1E", ""},
+		{decQuantity(1, 21, DecimalSI), "1e21", "1000E"},
+		{decQuantity(5, 21, DecimalSI), "5e21", "5000E"},
+		{decQuantity(1, 24, DecimalSI), "1e24", "1000000E"},
 		{decQuantity(1234567, 6, DecimalSI), "1234567M", ""},
 		{decQuantity(1234567, -3, BinarySI), "1234567m", ""},
 		{decQuantity(3, 3, DecimalSI), "3k", ""},
