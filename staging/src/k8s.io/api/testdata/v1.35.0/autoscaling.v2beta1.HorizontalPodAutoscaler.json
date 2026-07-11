@@ -1,0 +1,224 @@
+{
+  "kind": "HorizontalPodAutoscaler",
+  "apiVersion": "autoscaling/v2beta1",
+  "metadata": {
+    "name": "nameValue",
+    "generateName": "generateNameValue",
+    "namespace": "namespaceValue",
+    "selfLink": "selfLinkValue",
+    "uid": "uidValue",
+    "resourceVersion": "resourceVersionValue",
+    "generation": 7,
+    "creationTimestamp": "2008-01-01T01:01:01Z",
+    "deletionTimestamp": "2009-01-01T01:01:01Z",
+    "deletionGracePeriodSeconds": 10,
+    "labels": {
+      "labelsKey": "labelsValue"
+    },
+    "annotations": {
+      "annotationsKey": "annotationsValue"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "apiVersionValue",
+        "kind": "kindValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "controller": true,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "finalizersValue"
+    ],
+    "managedFields": [
+      {
+        "manager": "managerValue",
+        "operation": "operationValue",
+        "apiVersion": "apiVersionValue",
+        "time": "2004-01-01T01:01:01Z",
+        "fieldsType": "fieldsTypeValue",
+        "fieldsV1": {},
+        "subresource": "subresourceValue"
+      }
+    ]
+  },
+  "spec": {
+    "scaleTargetRef": {
+      "kind": "kindValue",
+      "name": "nameValue",
+      "apiVersion": "apiVersionValue"
+    },
+    "minReplicas": 2,
+    "maxReplicas": 3,
+    "metrics": [
+      {
+        "type": "typeValue",
+        "object": {
+          "target": {
+            "kind": "kindValue",
+            "name": "nameValue",
+            "apiVersion": "apiVersionValue"
+          },
+          "metricName": "metricNameValue",
+          "targetValue": "0",
+          "selector": {
+            "matchLabels": {
+              "matchLabelsKey": "matchLabelsValue"
+            },
+            "matchExpressions": [
+              {
+                "key": "keyValue",
+                "operator": "operatorValue",
+                "values": [
+                  "valuesValue"
+                ]
+              }
+            ]
+          },
+          "averageValue": "0"
+        },
+        "pods": {
+          "metricName": "metricNameValue",
+          "targetAverageValue": "0",
+          "selector": {
+            "matchLabels": {
+              "matchLabelsKey": "matchLabelsValue"
+            },
+            "matchExpressions": [
+              {
+                "key": "keyValue",
+                "operator": "operatorValue",
+                "values": [
+                  "valuesValue"
+                ]
+              }
+            ]
+          }
+        },
+        "resource": {
+          "name": "nameValue",
+          "targetAverageUtilization": 2,
+          "targetAverageValue": "0"
+        },
+        "containerResource": {
+          "name": "nameValue",
+          "targetAverageUtilization": 2,
+          "targetAverageValue": "0",
+          "container": "containerValue"
+        },
+        "external": {
+          "metricName": "metricNameValue",
+          "metricSelector": {
+            "matchLabels": {
+              "matchLabelsKey": "matchLabelsValue"
+            },
+            "matchExpressions": [
+              {
+                "key": "keyValue",
+                "operator": "operatorValue",
+                "values": [
+                  "valuesValue"
+                ]
+              }
+            ]
+          },
+          "targetValue": "0",
+          "targetAverageValue": "0"
+        }
+      }
+    ]
+  },
+  "status": {
+    "observedGeneration": 1,
+    "lastScaleTime": "2002-01-01T01:01:01Z",
+    "currentReplicas": 3,
+    "desiredReplicas": 4,
+    "currentMetrics": [
+      {
+        "type": "typeValue",
+        "object": {
+          "target": {
+            "kind": "kindValue",
+            "name": "nameValue",
+            "apiVersion": "apiVersionValue"
+          },
+          "metricName": "metricNameValue",
+          "currentValue": "0",
+          "selector": {
+            "matchLabels": {
+              "matchLabelsKey": "matchLabelsValue"
+            },
+            "matchExpressions": [
+              {
+                "key": "keyValue",
+                "operator": "operatorValue",
+                "values": [
+                  "valuesValue"
+                ]
+              }
+            ]
+          },
+          "averageValue": "0"
+        },
+        "pods": {
+          "metricName": "metricNameValue",
+          "currentAverageValue": "0",
+          "selector": {
+            "matchLabels": {
+              "matchLabelsKey": "matchLabelsValue"
+            },
+            "matchExpressions": [
+              {
+                "key": "keyValue",
+                "operator": "operatorValue",
+                "values": [
+                  "valuesValue"
+                ]
+              }
+            ]
+          }
+        },
+        "resource": {
+          "name": "nameValue",
+          "currentAverageUtilization": 2,
+          "currentAverageValue": "0"
+        },
+        "containerResource": {
+          "name": "nameValue",
+          "currentAverageUtilization": 2,
+          "currentAverageValue": "0",
+          "container": "containerValue"
+        },
+        "external": {
+          "metricName": "metricNameValue",
+          "metricSelector": {
+            "matchLabels": {
+              "matchLabelsKey": "matchLabelsValue"
+            },
+            "matchExpressions": [
+              {
+                "key": "keyValue",
+                "operator": "operatorValue",
+                "values": [
+                  "valuesValue"
+                ]
+              }
+            ]
+          },
+          "currentValue": "0",
+          "currentAverageValue": "0"
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "type": "typeValue",
+        "status": "statusValue",
+        "lastTransitionTime": "2003-01-01T01:01:01Z",
+        "reason": "reasonValue",
+        "message": "messageValue"
+      }
+    ]
+  }
+}

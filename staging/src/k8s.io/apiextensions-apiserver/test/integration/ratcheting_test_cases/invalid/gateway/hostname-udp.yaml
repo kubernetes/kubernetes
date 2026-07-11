@@ -1,0 +1,11 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: hostname-udp
+spec:
+  gatewayClassName: acme-lb
+  listeners:
+  - name: example
+    hostname: example.com
+    protocol: UDP
+    port: 80

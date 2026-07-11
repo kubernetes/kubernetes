@@ -1,0 +1,5 @@
+rules:
+  # Allow only the lean cAdvisor library github.com/google/cadvisor/lib.
+  - selectorRegexp: github[.]com/google/cadvisor
+    allowedPrefixes:
+      - github.com/google/cadvisor/lib

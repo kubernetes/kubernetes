@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-low-capacity-{{ .Index }}
+spec:
+  taints:
+  - key: allow-noderesources
+    effect: NoSchedule
+status:
+  capacity:
+    pods: "3000"
+    cpu: "4"
+    memory: 32Gi
+  conditions:
+    - status: "True"
+      type: Ready
+  phase: Running

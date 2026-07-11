@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Currently assigned this directory to sig-cli since the main use of
+# term seems to be for getting terminal size when printing help text.
+
+approvers:
+  - sig-cli-maintainers
+reviewers:
+  - sig-cli-reviewers
+labels:
+  - sig/cli

@@ -1,0 +1,5 @@
+*.out
+*.cov
+.idea
+.env
+.mcp.json

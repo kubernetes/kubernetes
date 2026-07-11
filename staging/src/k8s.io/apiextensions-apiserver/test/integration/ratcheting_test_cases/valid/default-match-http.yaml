@@ -1,0 +1,51 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: GatewayClass
+metadata:
+  name: default-match-example
+spec:
+  controllerName: acme.io/gateway-controller
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: default-match-gw
+spec:
+  gatewayClassName: default-match-example
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+---
+# This HTTPRoute demonstrates patch match defaulting. If no path match is
+# specified, CRD defaults adds a default PathPrefix match on the path "/". This
+# matches every HTTP request and ensures that route rules always have at
+# least one valid match.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: default-match-route
+  labels:
+    app: default-match
+spec:
+  parentRefs:
+  - name: default-match-gw
+  hostnames:
+  - default-match.com
+  rules:
+  - matches:
+    - headers:
+      - type: Exact
+        name: magic
+        value: default-match
+    backendRefs:
+    - group: acme.io
+      kind: CustomBackend
+      name: my-custom-resource
+      port: 8080
+  - matches:
+    - path:
+        type: Exact
+        value: /example/exact
+    backendRefs:
+    - name: my-service-2
+      port: 8080

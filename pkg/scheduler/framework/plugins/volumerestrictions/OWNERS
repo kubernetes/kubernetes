@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - sig-storage-approvers
+  - cofyc
+reviewers:
+  - sig-storage-reviewers
+  - cofyc
+labels:
+  - sig/storage

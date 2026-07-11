@@ -1,0 +1,16 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Currently assigned this directory to sig-api-machinery since this is
+# an interface to the version definition in "k8s.io/apimachinery/pkg/version",
+# and also to sig-release since this version information is set up for
+# each release.
+
+approvers:
+  - sig-api-machinery-api-approvers
+  - release-engineering-approvers
+reviewers:
+  - sig-api-machinery-api-reviewers
+  - release-managers
+labels:
+  - sig/api-machinery
+  - sig/release

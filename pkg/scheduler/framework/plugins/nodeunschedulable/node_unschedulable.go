@@ -1,0 +1,170 @@
+/*
+Copyright 2019 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package nodeunschedulable
+
+import (
+	"context"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/component-helpers/resource"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
+)
+
+// NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
+// the pod tolerates {key=node.kubernetes.io/unschedulable, effect:NoSchedule} taint.
+type NodeUnschedulable struct {
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	enableTaintTolerationComparisonOperators           bool
+}
+
+var _ fwk.PreFilterPlugin = &NodeUnschedulable{}
+var _ fwk.FilterPlugin = &NodeUnschedulable{}
+var _ fwk.EnqueueExtensions = &NodeUnschedulable{}
+var _ fwk.SignPlugin = &NodeUnschedulable{}
+
+// Name is the name of the plugin used in the plugin registry and configurations.
+const Name = names.NodeUnschedulable
+
+const (
+	// ErrReasonUnknownCondition is used for NodeUnknownCondition predicate error.
+	ErrReasonUnknownCondition = "node(s) had unknown conditions"
+	// ErrReasonUnschedulable is used for NodeUnschedulable predicate error.
+	ErrReasonUnschedulable = "node(s) were unschedulable"
+)
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *NodeUnschedulable) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		// When QueueingHint is enabled, we don't use preCheck and we don't need to register UpdateNodeLabel event.
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		// When the QueueingHint feature is enabled,
+		// the scheduling queue uses Pod/Update Queueing Hint
+		// to determine whether a Pod's update makes the Pod schedulable or not.
+		// https://github.com/kubernetes/kubernetes/pull/122234
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterTargetPodTolerationChange},
+	}, nil
+}
+
+// isSchedulableAfterTargetPodTolerationChange is invoked whenever a pod's toleration changed.
+func (pl *NodeUnschedulable) isSchedulableAfterTargetPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	_, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+
+	// Note: we don't need to check oldPod tolerations the taint because:
+	// - Taint can be added, but can't be modified nor removed.
+	// - If the Pod already has the toleration, it shouldn't have rejected by this plugin in the first place.
+	//   Meaning, here this Pod has been rejected by this plugin, and hence it shouldn't have the toleration yet.
+	if v1helper.TolerationsTolerateTaint(logger, modifiedPod.Spec.Tolerations, &v1.Taint{
+		Key:    v1.TaintNodeUnschedulable,
+		Effect: v1.TaintEffectNoSchedule,
+	}, pl.enableTaintTolerationComparisonOperators) {
+		// This update makes the pod tolerate the unschedulable taint.
+		logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
+		return fwk.Queue, nil
+	}
+
+	logger.V(5).Info("a new toleration is added for the unschedulable Pod, but it's an unrelated toleration", "pod", klog.KObj(modifiedPod))
+	return fwk.QueueSkip, nil
+}
+
+// isSchedulableAfterNodeChange is invoked for all node events reported by
+// an informer. It checks whether that change made a previously unschedulable
+// pod schedulable.
+func (pl *NodeUnschedulable) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+
+	// We queue this Pod when -
+	// 1. the node is updated from unschedulable to schedulable.
+	// 2. the node is added and is schedulable.
+	if (originalNode != nil && originalNode.Spec.Unschedulable && !modifiedNode.Spec.Unschedulable) ||
+		(originalNode == nil && !modifiedNode.Spec.Unschedulable) {
+		logger.V(5).Info("node was created or updated, pod may be schedulable now", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return fwk.Queue, nil
+	}
+
+	logger.V(5).Info("node was created or updated, but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	return fwk.QueueSkip, nil
+}
+
+// Name returns name of the plugin. It is used in logs, etc.
+func (pl *NodeUnschedulable) Name() string {
+	return Name
+}
+
+// Feasibility and scoring based on the pod's tolerations.
+func (pl *NodeUnschedulable) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return []fwk.SignFragment{
+		{Key: fwk.TolerationsSignerName, Value: fwk.TolerationsSigner(pod)},
+	}, nil
+}
+
+// PreFilter invoked at the prefilter extension point.
+func (pl *NodeUnschedulable) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
+	return nil, nil
+}
+
+// PreFilterExtensions do not exist for this plugin.
+func (pl *NodeUnschedulable) PreFilterExtensions() fwk.PreFilterExtensions {
+	return nil
+}
+
+// Filter invoked at the filter extension point.
+func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil
+	}
+	node := nodeInfo.Node()
+
+	if !node.Spec.Unschedulable {
+		return nil
+	}
+
+	logger := klog.FromContext(ctx)
+	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
+	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &v1.Taint{
+		Key:    v1.TaintNodeUnschedulable,
+		Effect: v1.TaintEffectNoSchedule,
+	}, pl.enableTaintTolerationComparisonOperators)
+	if !podToleratesUnschedulable {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonUnschedulable)
+	}
+
+	return nil
+}
+
+// New initializes a new plugin and returns it.
+func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+	return &NodeUnschedulable{
+		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+		enableTaintTolerationComparisonOperators:           fts.EnableTaintTolerationComparisonOperators,
+	}, nil
+}

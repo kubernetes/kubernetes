@@ -1,0 +1,15 @@
+# This is the role binding for the node-problem-detector.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-problem-detector-binding
+  labels:
+    kubernetes.io/cluster-service: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:node-problem-detector
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: system:node-problem-detector

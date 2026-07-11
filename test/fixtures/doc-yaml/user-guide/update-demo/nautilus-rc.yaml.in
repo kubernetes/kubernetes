@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: update-demo-nautilus
+spec:
+  replicas: 2
+  selector:
+    name: update-demo
+    version: nautilus
+  template:
+    metadata:
+      labels:
+        name: update-demo
+        version: nautilus
+    spec:
+      containers:
+      - image: {{.NautilusImage}}
+        name: update-demo
+        ports:
+        - containerPort: 80
+          protocol: TCP

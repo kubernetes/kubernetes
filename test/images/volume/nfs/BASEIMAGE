@@ -1,0 +1,4 @@
+linux/amd64=quay.io/centos/centos:stream9
+linux/arm64=quay.io/centos/centos:stream9
+linux/ppc64le=quay.io/centos/centos:stream9
+linux/s390x=quay.io/centos/centos:stream9

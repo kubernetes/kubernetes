@@ -1,0 +1,6 @@
+linters:
+  disable-all: true
+  enable: # sorted alphabetical
+    - gofmt
+    - misspell
+    - revive

@@ -1,0 +1,855 @@
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package patch
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/utils/ptr"
+)
+
+func TestJSONPatch(t *testing.T) {
+	deploymentGVR := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	tests := []struct {
+		name              string
+		expression        string
+		gvr               schema.GroupVersionResource
+		object, oldObject runtime.Object
+		expectedResult    runtime.Object
+		expectedErr       string
+	}{
+		{
+			name: "jsonPatch with false test operation",
+			expression: `[
+						JSONPatch{op: "test", path: "/spec/replicas", value: 100}, 
+						JSONPatch{op: "replace", path: "/spec/replicas", value: 3},
+					]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+		},
+		{
+			name: "jsonPatch with true test operation",
+			expression: `[
+						JSONPatch{op: "test", path: "/spec/replicas", value: 1}, 
+						JSONPatch{op: "replace", path: "/spec/replicas", value: 3},
+					]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](3)}},
+		},
+		{
+			name: "jsonPatch remove to unset field",
+			expression: `[
+					JSONPatch{op: "remove", path: "/spec/replicas"}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{}},
+		},
+		{
+			name: "jsonPatch remove map entry by key",
+			expression: `[
+					JSONPatch{op: "remove", path: "/metadata/labels/y"}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1", "y": "1"}}, Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1"}}, Spec: appsv1.DeploymentSpec{}},
+		},
+		{
+			name: "jsonPatch remove element in list",
+			expression: `[
+					JSONPatch{op: "remove", path: "/spec/template/spec/containers/1"}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "c"}}),
+		},
+		{
+			name: "jsonPatch copy map entry by key",
+			expression: `[
+					JSONPatch{op: "copy", from: "/metadata/labels/x", path: "/metadata/labels/y"}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1"}}, Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1", "y": "1"}}, Spec: appsv1.DeploymentSpec{}},
+		},
+		{
+			name: "jsonPatch copy first element to end of list",
+			expression: `[
+					JSONPatch{op: "copy", from: "/spec/template/spec/containers/0", path: "/spec/template/spec/containers/-"}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}, {Name: "a"}}),
+		},
+		{
+			name: "jsonPatch move map entry by key",
+			expression: `[
+					JSONPatch{op: "move", from: "/metadata/labels/x", path: "/metadata/labels/y"}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1"}}, Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "1"}}, Spec: appsv1.DeploymentSpec{}},
+		},
+		{
+			name: "jsonPatch move first element to end of list",
+			expression: `[
+					JSONPatch{op: "move", from: "/spec/template/spec/containers/0", path: "/spec/template/spec/containers/-"}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "b"}, {Name: "c"}, {Name: "a"}}),
+		},
+		{
+			name: "jsonPatch add map entry by key and value",
+			expression: `[
+					JSONPatch{op: "add", path: "/metadata/labels/x", value: "2"}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "1"}}, Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "1", "x": "2"}}, Spec: appsv1.DeploymentSpec{}},
+		},
+		{
+			name: "jsonPatch add map value to field",
+			expression: `[
+					JSONPatch{op: "add", path: "/metadata/labels", value: {"y": "2"}}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "2"}}, Spec: appsv1.DeploymentSpec{}},
+		},
+		{
+			name: "jsonPatch add map to existing map", // performs a replacement
+			expression: `[
+					JSONPatch{op: "add", path: "/metadata/labels", value: {"y": "2"}}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1"}}, Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "2"}}, Spec: appsv1.DeploymentSpec{}},
+		},
+		{
+			name: "jsonPatch add to start of list",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0", value: {"name": "x"}}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "x"}, {Name: "a"}}),
+		},
+		{
+			name: "jsonPatch add to end of list",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/-", value: {"name": "x"}}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "x"}}),
+		},
+		{
+			name: "jsonPatch replace key in map",
+			expression: `[
+					JSONPatch{op: "replace", path: "/metadata/labels/x", value: "2"}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "1"}}, Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "1", "x": "2"}}, Spec: appsv1.DeploymentSpec{}},
+		},
+		{
+			name: "jsonPatch replace map value of unset field", // adds the field value
+			expression: `[
+					JSONPatch{op: "replace", path: "/metadata/labels", value: {"y": "2"}}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "2"}}, Spec: appsv1.DeploymentSpec{}},
+		},
+		{
+			name: "jsonPatch replace map value of set field",
+			expression: `[
+					JSONPatch{op: "replace", path: "/metadata/labels", value: {"y": "2"}}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1"}}, Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "2"}}, Spec: appsv1.DeploymentSpec{}},
+		},
+		{
+			name: "jsonPatch replace first element in list",
+			expression: `[
+					JSONPatch{op: "replace", path: "/spec/template/spec/containers/0", value: {"name": "x"}}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "x"}}),
+		},
+		{
+			name: "jsonPatch add map entry by key and value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec", value: Object.spec{selector: Object.spec.selector{}, replicas: 10}}
+				]`,
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{}, Replicas: ptr.To[int32](10)}},
+		},
+		{
+			name: "JSONPatch patch type has field access",
+			expression: `[
+					JSONPatch{
+						op: "add", path: "/metadata/labels",
+						value: {
+							"op": JSONPatch{op: "opValue"}.op,
+							"path": JSONPatch{path: "pathValue"}.path,
+							"from": JSONPatch{from: "fromValue"}.from,
+							"value": string(JSONPatch{value: "valueValue"}.value),
+						}
+					}
+				]`,
+			gvr:    deploymentGVR,
+			object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
+				"op":    "opValue",
+				"path":  "pathValue",
+				"from":  "fromValue",
+				"value": "valueValue",
+			}}},
+		},
+		{
+			name: "JSONPatch patch type has field testing",
+			expression: `[
+					JSONPatch{
+						op: "add", path: "/metadata/labels",
+						value: {
+							"op": string(has(JSONPatch{op: "opValue"}.op)),
+							"path": string(has(JSONPatch{path: "pathValue"}.path)),
+							"from": string(has(JSONPatch{from: "fromValue"}.from)),
+							"value": string(has(JSONPatch{value: "valueValue"}.value)),
+							"op-unset": string(has(JSONPatch{}.op)),
+							"path-unset": string(has(JSONPatch{}.path)),
+							"from-unset": string(has(JSONPatch{}.from)),
+							"value-unset": string(has(JSONPatch{}.value)),
+						}
+					}
+				]`,
+			gvr:    deploymentGVR,
+			object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
+				"op":          "true",
+				"path":        "true",
+				"from":        "true",
+				"value":       "true",
+				"op-unset":    "false",
+				"path-unset":  "false",
+				"from-unset":  "false",
+				"value-unset": "false",
+			}}},
+		},
+		{
+			name: "JSONPatch patch type equality",
+			expression: `[
+					JSONPatch{
+						op: "add", path: "/metadata/labels",
+						value: {
+							"empty": string(JSONPatch{} == JSONPatch{}),
+							"partial": string(JSONPatch{op: "add"} == JSONPatch{op: "add"}),
+							"same-all": string(JSONPatch{op: "add", path: "path", from: "from", value: 1} == JSONPatch{op: "add", path: "path", from: "from", value: 1}),
+							"different-op": string(JSONPatch{op: "add"} == JSONPatch{op: "remove"}),
+							"different-path": string(JSONPatch{op: "add", path: "x", from: "from", value: 1} == JSONPatch{op: "add", path: "path", from: "from", value: 1}),
+							"different-from": string(JSONPatch{op: "add", path: "path", from: "x", value: 1} == JSONPatch{op: "add", path: "path", from: "from", value: 1}),
+							"different-value": string(JSONPatch{op: "add", path: "path", from: "from", value: "1"} == JSONPatch{op: "add", path: "path", from: "from", value: 1}),
+						}
+					}
+				]`,
+			gvr:    deploymentGVR,
+			object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
+				"empty":           "true",
+				"partial":         "true",
+				"same-all":        "true",
+				"different-op":    "false",
+				"different-path":  "false",
+				"different-from":  "false",
+				"different-value": "false",
+			}}},
+		},
+		{
+			name: "JSONPatch key escaping",
+			expression: `[
+					JSONPatch{
+						op: "add", path: "/metadata/labels", value: {}
+					},
+					JSONPatch{
+						op: "add", path: "/metadata/labels/" + jsonpatch.escapeKey("k8s.io/x~y"), value: "true"
+					}
+				]`,
+			gvr:    deploymentGVR,
+			object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
+			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
+				"k8s.io/x~y": "true",
+			}}},
+		},
+		{
+			name: "jsonPatch with CEL initializer",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/-", value: Object.spec.template.spec.containers{
+							name: "x",
+							ports: [Object.spec.template.spec.containers.ports{containerPort: 8080}],
+						}
+					}, 
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "x", Ports: []corev1.ContainerPort{{ContainerPort: 8080}}}}),
+		},
+		{
+			name: "jsonPatch invalid CEL initializer field",
+			expression: `[
+					JSONPatch{
+						op: "add", path: "/spec/template/spec/containers/-", 
+						value: Object.spec.template.spec.containers{
+							name: "x",
+							ports: [Object.spec.template.spec.containers.ports{containerPortZ: 8080}]
+						}
+					}
+				]`,
+			gvr:         deploymentGVR,
+			object:      makeDeployment(),
+			expectedErr: "strict decoding error: unknown field \"spec.template.spec.containers[1].ports[0].containerPortZ\"",
+		},
+		{
+			name: "jsonPatch invalid CEL initializer type",
+			expression: `[
+					JSONPatch{
+						op: "add", path: "/spec/template/spec/containers/-", 
+						value: Object.spec.template.spec.containers{
+							name: "x",
+							ports: [Object.spec.template.spec.containers.portsZ{containerPort: 8080}]
+						}
+					}
+				]`,
+			gvr:         deploymentGVR,
+			object:      makeDeployment(),
+			expectedErr: " mismatch: unexpected type name \"Object.spec.template.spec.containers.portsZ\", expected \"Object.spec.template.spec.containers.ports\", which matches field name path from root Object type",
+		},
+		{
+			name: "jsonPatch replace end of list with - not allowed",
+			expression: `[
+					JSONPatch{op: "replace", path: "/spec/template/spec/containers/-", value: {"name": "x"}}, 
+				]`,
+			gvr:         deploymentGVR,
+			object:      makeDeployment(),
+			expectedErr: "JSON Patch: replace operation does not apply: doc is missing key: /spec/template/spec/containers/-: missing value",
+		},
+		{
+			name: "jsonPatch with complex struct as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/1", value: object.spec.template.spec.containers[0]},
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "a"}}),
+		},
+		{
+			name: "jsonPatch with large complex struct as value",
+			expression: `[
+					JSONPatch{op: "replace", path: "/spec/template/spec", value: object.spec.template.spec},
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeploymentWithComplexPodSpec(),
+			expectedResult: makeDeploymentWithComplexPodSpec(),
+		},
+		{
+			name: "jsonPatch with slice of complex struct as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: object.spec.template.spec.containers},
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeploymentWithContainers([]corev1.Container{{Name: "a", Image: "nginx"}}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{{Name: "a", Image: "nginx"}}, []corev1.Container{{Name: "a", Image: "nginx"}}),
+		},
+		{
+			name: "jsonPatch with list concatenation operator",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers", value: object.spec.template.spec.containers + [object.spec.template.spec.containers[0]]},
+				]`,
+			gvr:            deploymentGVR,
+			object:         makeDeployment(),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{{Name: "a"}, {Name: "a"}}),
+		},
+		{
+			name: "jsonPatch with list concatenation using constant value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/args", value: object.spec.template.spec.containers[0].command + ["--debug", "-v"]},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"server", "start"},
+				},
+			}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"server", "start"},
+					Args:    []string{"server", "start", "--debug", "-v"},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation reading from other fields",
+			expression: `[
+					JSONPatch{op: "replace", path: "/spec/template/spec/containers", value: object.spec.template.spec.initContainers + object.spec.template.spec.containers},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithInit([]corev1.Container{
+				{Name: "init-setup", Image: "busybox:1.36"},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "init-setup", Image: "busybox:1.36"},
+			}, []corev1.Container{
+				{Name: "init-setup", Image: "busybox:1.36"},
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between typed type and unstructured object (typed + unstructured)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: object.spec.template.spec.containers + [{"name": "unstructured-init", "image": "alpine:3.18"}]},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+				{Name: "unstructured-init", Image: "alpine:3.18"},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between unstructured object and typed type (unstructured + typed)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: [{"name": "unstructured-init", "image": "alpine:3.18"}] + object.spec.template.spec.containers},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "unstructured-init", Image: "alpine:3.18"},
+				{Name: "main-app", Image: "nginx:1.24"},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between two unstructured objects (unstructured + unstructured)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: [{"name": "unstructured-init1", "image": "alpine:3.18"}] + [{"name": "unstructured-init2", "image": "alpine:3.18"}]},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "unstructured-init1", Image: "alpine:3.18"},
+				{Name: "unstructured-init2", Image: "alpine:3.18"},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+
+		{
+			name: "jsonPatch with list concatenation between typed type and structured object (typed + structured)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: object.spec.template.spec.containers + [Object.spec.template.spec.initContainers{name: "init-1", image: "alpine:3.18", command: ["echo", "init1"]}]},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+				{Name: "init-1", Image: "alpine:3.18", Command: []string{"echo", "init1"}},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between structured object and typed type (structured + typed)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: [Object.spec.template.spec.initContainers{name: "init-1", image: "alpine:3.18", command: ["echo", "init1"]}] + object.spec.template.spec.containers},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "init-1", Image: "alpine:3.18", Command: []string{"echo", "init1"}},
+				{Name: "main-app", Image: "nginx:1.24"},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between two structured objects (structured + structured)",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: [Object.spec.template.spec.initContainers{name: "init-1", image: "alpine:3.18", command: ["echo", "init1"]}] + [Object.spec.template.spec.initContainers{name: "init-2", image: "alpine:3.18", command: ["echo", "init2"]}]},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "init-1", Image: "alpine:3.18", Command: []string{"echo", "init1"}},
+				{Name: "init-2", Image: "alpine:3.18", Command: []string{"echo", "init2"}},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+		{
+			name: "jsonPatch with map key comprehension all predicate",
+			expression: `[
+					JSONPatch{op: "add", path: "/metadata/labels/added", value: object.metadata.labels.all(k, k != "invalid") ? "true" : "false"},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"env": "prod", "app": "demo"}},
+				Spec:       appsv1.DeploymentSpec{},
+			},
+			expectedResult: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"env": "prod", "app": "demo", "added": "true"}},
+				Spec:       appsv1.DeploymentSpec{},
+			},
+		},
+		{
+			name: "jsonPatch with scalar int and bool as values",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/progressDeadlineSeconds", value: object.spec.replicas},
+					JSONPatch{op: "add", path: "/spec/template/spec/hostNetwork", value: object.spec.paused},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](3), Paused: true},
+			},
+			expectedResult: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas:                ptr.To[int32](3),
+					ProgressDeadlineSeconds: ptr.To[int32](3),
+					Paused:                  true,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{HostNetwork: true},
+					},
+				},
+			},
+		},
+		{
+			name: "jsonPatch with map of resource quantities as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/resources/limits", value: {"cpu": object.spec.template.spec.containers[0].resources.requests["cpu"], "memory": object.spec.template.spec.containers[0].resources.requests["memory"]}},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name: "c1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+					},
+				},
+			}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name: "c1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with slice of scalars as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/args", value: object.spec.template.spec.containers[0].command},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"sh", "-c", "echo hello"},
+				},
+			}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"sh", "-c", "echo hello"},
+					Args:    []string{"sh", "-c", "echo hello"},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with map of scalars as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/metadata/annotations", value: object.metadata.labels},
+				]`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"env": "prod", "tier": "frontend"},
+				},
+				Spec: appsv1.DeploymentSpec{},
+			},
+			expectedResult: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{"env": "prod", "tier": "frontend"},
+					Annotations: map[string]string{"env": "prod", "tier": "frontend"},
+				},
+				Spec: appsv1.DeploymentSpec{},
+			},
+		},
+		{
+			name: "jsonPatch with map of struct as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/0/resources/limits", value: object.spec.template.spec.containers[0].resources.requests},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name: "c1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("250m"),
+							corev1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+					},
+				},
+			}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{
+				{
+					Name: "c1",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("250m"),
+							corev1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("250m"),
+							corev1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with constant complex struct object as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers/1", value: Object.spec.template.spec.containers{name: "sidecar", image: "busybox:1.36", command: ["sh", "-c", "sleep 3600"], resources: Object.spec.template.spec.containers.resources{limits: {"cpu": "200m", "memory": "256Mi"}}}},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+				{
+					Name:    "sidecar",
+					Image:   "busybox:1.36",
+					Command: []string{"sh", "-c", "sleep 3600"},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("200m"),
+							corev1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with constant complex list of struct objects as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/initContainers", value: [
+						Object.spec.template.spec.initContainers{name: "init-1", image: "alpine:3.18", command: ["echo", "init1"]},
+						Object.spec.template.spec.initContainers{name: "init-2", image: "alpine:3.18", command: ["echo", "init2"]},
+					]},
+				]`,
+			gvr: deploymentGVR,
+			object: makeDeploymentWithContainers([]corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+			expectedResult: makeDeploymentWithInit([]corev1.Container{
+				{Name: "init-1", Image: "alpine:3.18", Command: []string{"echo", "init1"}},
+				{Name: "init-2", Image: "alpine:3.18", Command: []string{"echo", "init2"}},
+			}, []corev1.Container{
+				{Name: "main-app", Image: "nginx:1.24"},
+			}),
+		},
+	}
+
+	compiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			accessor := &JSONPatchCondition{Expression: tc.expression}
+			compileResult := compiler.CompileMutatingEvaluator(accessor, cel.OptionalVariableDeclarations{HasPatchTypes: true}, environment.StoredExpressions)
+
+			patcher := jsonPatcher{PatchEvaluator: compileResult}
+
+			scheme := runtime.NewScheme()
+			err := appsv1.AddToScheme(scheme)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var gvk schema.GroupVersionKind
+			gvks, _, err := scheme.ObjectKinds(tc.object)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(gvks) == 1 {
+				gvk = gvks[0]
+			} else {
+				t.Fatalf("Failed to find gvk for type: %T", tc.object)
+			}
+
+			metaAccessor, err := meta.Accessor(tc.object)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			attrs := admission.NewAttributesRecord(tc.object, tc.oldObject, gvk,
+				metaAccessor.GetNamespace(), metaAccessor.GetName(), tc.gvr,
+				"", admission.Create, &metav1.CreateOptions{}, false, nil)
+			vAttrs := &admission.VersionedAttributes{
+				Attributes:         attrs,
+				VersionedKind:      gvk,
+				VersionedObject:    admission.NewLazyObject(tc.object),
+				VersionedOldObject: admission.NewLazyObject(tc.oldObject),
+			}
+
+			r := Request{
+				MatchedResource:     tc.gvr,
+				VersionedAttributes: vAttrs,
+				ObjectInterfaces:    admission.NewObjectInterfacesFromScheme(scheme),
+				OptionalVariables:   cel.OptionalVariableBindings{},
+			}
+
+			got, err := patcher.Patch(context.Background(), r, celconfig.RuntimeCELCostBudget)
+			if len(tc.expectedErr) > 0 {
+				if err == nil {
+					t.Fatalf("expected error: %s", tc.expectedErr)
+				} else {
+					if !strings.Contains(err.Error(), tc.expectedErr) {
+						t.Fatalf("expected error: %s, got: %s", tc.expectedErr, err.Error())
+					}
+					return
+				}
+			}
+			if err != nil && len(tc.expectedErr) == 0 {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !equality.Semantic.DeepEqual(tc.expectedResult, got) {
+				t.Errorf("unexpected result, got diff:\n%s\n", cmp.Diff(tc.expectedResult, got))
+			}
+		})
+	}
+}
+
+func makeDeployment() *appsv1.Deployment {
+	return makeDeploymentWithContainers([]corev1.Container{{Name: "a"}})
+}
+
+func makeDeploymentWithContainers(containers []corev1.Container) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: containers,
+				},
+			},
+		},
+	}
+}
+
+func makeDeploymentWithInit(initContainers []corev1.Container, containers []corev1.Container) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					InitContainers: initContainers,
+					Containers:     containers,
+				},
+			},
+		},
+	}
+}
+
+func makeDeploymentWithComplexPodSpec() *appsv1.Deployment {
+	return &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "a", Image: "nginx"}},
+					Affinity: &corev1.Affinity{
+						NodeAffinity: &corev1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+								NodeSelectorTerms: []corev1.NodeSelectorTerm{
+									{
+										MatchExpressions: []corev1.NodeSelectorRequirement{
+											{Key: "foo", Operator: corev1.NodeSelectorOpIn, Values: []string{"bar", "baz"}},
+										},
+									},
+								},
+							},
+						},
+					},
+					Tolerations: []corev1.Toleration{{Key: "taint", Operator: corev1.TolerationOpExists}},
+				},
+			},
+		},
+	}
+}

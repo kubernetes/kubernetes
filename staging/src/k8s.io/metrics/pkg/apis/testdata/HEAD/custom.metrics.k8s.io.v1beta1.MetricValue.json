@@ -1,0 +1,31 @@
+{
+  "kind": "MetricValue",
+  "apiVersion": "custom.metrics.k8s.io/v1beta1",
+  "describedObject": {
+    "kind": "kindValue",
+    "namespace": "namespaceValue",
+    "name": "nameValue",
+    "uid": "uidValue",
+    "apiVersion": "apiVersionValue",
+    "resourceVersion": "resourceVersionValue",
+    "fieldPath": "fieldPathValue"
+  },
+  "metricName": "metricNameValue",
+  "timestamp": "2003-01-01T01:01:01Z",
+  "window": 4,
+  "value": "0",
+  "selector": {
+    "matchLabels": {
+      "matchLabelsKey": "matchLabelsValue"
+    },
+    "matchExpressions": [
+      {
+        "key": "keyValue",
+        "operator": "operatorValue",
+        "values": [
+          "valuesValue"
+        ]
+      }
+    ]
+  }
+}

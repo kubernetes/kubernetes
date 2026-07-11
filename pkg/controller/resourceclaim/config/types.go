@@ -1,0 +1,26 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package config
+
+// ResourceClaimControllerConfiguration contains elements configuring the resource claim controller.
+type ResourceClaimControllerConfiguration struct {
+	// ConcurrentSyncs is the number of operations (deleting a pod, updating a ResourcClaim status, etc.)
+	// that will be done concurrently. Larger number = processing, but more CPU (and network) load.
+	//
+	// The default is 50.
+	ConcurrentSyncs int32
+}
