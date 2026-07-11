@@ -1582,6 +1582,11 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 			shareID = GenerateNewShareID()
 			alloc.logger.V(7).Info("Device capacity allocated", "device", device.id,
 				"consumed capacity", klog.Format(consumedCapacity))
+			// A prior share of this device may already hold the capacity entry.
+			// That entry doubles as the "already shared" marker that lets a later
+			// share skip the counter check, so record whether it predated this
+			// share; rollback must not delete it while another share still needs it.
+			_, state.capacityEntryExisted = alloc.allocatingCapacity[device.id]
 			alloc.allocatingCapacity.Insert(NewDeviceConsumedCapacity(device.id, consumedCapacity))
 			state.capacityInserted = true
 			state.consumedCapacity = consumedCapacity
@@ -1618,13 +1623,14 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 // candidate so rollbackDevice can undo them, both when the candidate is rejected
 // and when the backtracking search abandons a previously successful candidate.
 type deviceRollbackState struct {
-	countersReserved   bool
-	constraintsAdded   int
-	deviceMarked       bool
-	capacityInserted   bool
-	resultAdded        bool
-	previousNumResults int
-	consumedCapacity   map[resourceapi.QualifiedName]resource.Quantity
+	countersReserved     bool
+	constraintsAdded     int
+	deviceMarked         bool
+	capacityInserted     bool
+	capacityEntryExisted bool
+	resultAdded          bool
+	previousNumResults   int
+	consumedCapacity     map[resourceapi.QualifiedName]resource.Quantity
 }
 
 // rollbackDevice reverses the mutations recorded in state, in the opposite order
@@ -1639,6 +1645,14 @@ func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, bas
 	}
 	if state.capacityInserted {
 		alloc.allocatingCapacity.Remove(NewDeviceConsumedCapacity(device.id, state.consumedCapacity))
+		if state.capacityEntryExisted {
+			// Remove drops the entry once it becomes empty, which also erases the
+			// shared marker that the earlier share still relies on. Restore an empty
+			// entry in that case so the earlier share stays accounted as shared.
+			if _, found := alloc.allocatingCapacity[device.id]; !found {
+				alloc.allocatingCapacity[device.id] = NewConsumedCapacity()
+			}
+		}
 	}
 	if state.deviceMarked {
 		alloc.allocatingDevices[device.id].Delete(r.claimIndex)
