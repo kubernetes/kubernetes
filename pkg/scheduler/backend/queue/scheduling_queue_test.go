@@ -3166,11 +3166,9 @@ func TestSchedulingQueue_Close(t *testing.T) {
 	wg.Wait()
 }
 
-// TestRecentlyTriedPodsGoBack tests that pods which are recently tried and are
-// unschedulable go behind other pods with the same priority. This behavior
-// ensures that an unschedulable pod does not block head of the queue when there
-// are frequent events that move pods to the active queue.
-func TestRecentlyTriedPodsGoBack(t *testing.T) {
+// TestRecentlyTriedPodsPreserveInitialOrder tests that same-priority pods retain
+// their initial active queue order after a scheduling failure and requeue.
+func TestRecentlyTriedPodsPreserveInitialOrder(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
@@ -3180,13 +3178,13 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		p := st.MakePod().Name(fmt.Sprintf("test-pod-%v", i)).Namespace("ns1").UID(fmt.Sprintf("tp00%v", i)).Priority(highPriority).Node("node1").NominatedNodeName("node1").Obj()
 		q.Add(ctx, p)
+		c.Step(time.Microsecond)
 	}
-	c.Step(time.Microsecond)
 	// Simulate a pod being popped by the scheduler, determined unschedulable, and
 	// then moved back to the active queue.
 	entity, err := q.Pop(logger)
 	if err != nil {
-		t.Errorf("Error while popping the head of the queue: %v", err)
+		t.Fatalf("Error while popping the head of the queue: %v", err)
 	}
 	p1 := entity.(*framework.QueuedPodInfo)
 	// Update pod condition to unschedulable.
@@ -3197,34 +3195,46 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 		Message:       "fake scheduling failure",
 		LastProbeTime: metav1.Now(),
 	})
+	initialAttemptTimestamp := p1.GetInitialAttemptTimestamp()
+	if initialAttemptTimestamp == nil {
+		t.Fatal("Expected InitialAttemptTimestamp to be set")
+	}
+	wantInitialAttemptTimestamp := *initialAttemptTimestamp
+	timestamp := p1.GetTimestamp()
 	p1.UnschedulablePlugins = sets.New("plugin")
 	// Put in the unschedulable queue.
 	err = q.AddUnschedulablePodIfNotPresent(logger, p1, q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
+	if !p1.GetTimestamp().After(timestamp) {
+		t.Errorf("Expected Timestamp to be refreshed after a scheduling failure")
+	}
+	if got := p1.GetInitialAttemptTimestamp(); got == nil || !got.Equal(wantInitialAttemptTimestamp) {
+		t.Errorf("Expected InitialAttemptTimestamp to remain %v, got %v", wantInitialAttemptTimestamp, got)
+	}
 	c.Step(q.backoffQ.podMaxBackoffDuration())
 	// Move all unschedulable pods to the active queue.
 	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
-	// Simulation is over. Now let's pop all pods. The pod popped first should be
-	// the last one we pop here.
+	// Simulation is over. Now pop all pods and verify their initial order.
+	var gotPods []string
 	for i := 0; i < 5; i++ {
 		entity, err := q.Pop(logger)
 		if err != nil {
-			t.Errorf("Error while popping pods from the queue: %v", err)
+			t.Fatalf("Error while popping pods from the queue: %v", err)
 		}
 		p := entity.(*framework.QueuedPodInfo)
-		if (i == 4) != (p1 == p) {
-			t.Errorf("A pod tried before is not the last pod popped: i: %v, pod name: %v", i, p.PodInfo.Pod.Name)
-		}
+		gotPods = append(gotPods, p.PodInfo.Pod.Name)
+	}
+	wantPods := []string{"test-pod-0", "test-pod-1", "test-pod-2", "test-pod-3", "test-pod-4"}
+	if diff := cmp.Diff(wantPods, gotPods); diff != "" {
+		t.Errorf("Unexpected pod order (-want, +got):\n%s", diff)
 	}
 }
 
-// TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod tests
-// that a pod determined as unschedulable multiple times doesn't block any newer pod.
-// This behavior ensures that an unschedulable pod does not block head of the queue when there
-// are frequent events that move pods to the active queue.
-func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
+// TestPodFailedSchedulingMultipleTimesPreservesInitialOrder tests that an older
+// same-priority pod remains ahead of a newer pod across repeated failures.
+func TestPodFailedSchedulingMultipleTimesPreservesInitialOrder(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
@@ -3246,13 +3256,17 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 
 	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulablePodIfNotPresent() below.
 	q.Add(ctx, unschedulablePod)
-	if p, err := q.Pop(logger); err != nil {
-		t.Errorf("Pop failed: %v", err)
-	} else if diff := cmp.Diff(unschedulablePod, p.(*framework.QueuedPodInfo).Pod); diff != "" {
+	entity, err := q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	p1 := entity.(*framework.QueuedPodInfo)
+	if diff := cmp.Diff(unschedulablePod, p1.Pod); diff != "" {
 		t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
 	}
 	// Put in the unschedulable queue
-	err := q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(unschedulablePod, "plugin"), q.SchedulingCycle())
+	p1.UnschedulablePlugins = sets.New("plugin")
+	err = q.AddUnschedulablePodIfNotPresent(logger, p1, q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -3263,11 +3277,11 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 
 	// Simulate a pod being popped by the scheduler,
 	// At this time, unschedulable pod should be popped.
-	entity, err := q.Pop(logger)
+	entity, err = q.Pop(logger)
 	if err != nil {
-		t.Errorf("Error while popping the head of the queue: %v", err)
+		t.Fatalf("Error while popping the head of the queue: %v", err)
 	}
-	p1 := entity.(*framework.QueuedPodInfo)
+	p1 = entity.(*framework.QueuedPodInfo)
 	if diff := cmp.Diff(unschedulablePod, p1.Pod); diff != "" {
 		t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
 	}
@@ -3276,6 +3290,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	// being popped and before being pushed back to the queue.
 	newerPod := st.MakePod().Name("test-newer-pod").Namespace("ns1").UID("tp002").CreationTimestamp(metav1.Now()).Priority(highPriority).NominatedNodeName("node1").Obj()
 	q.Add(ctx, newerPod)
+	c.Step(time.Microsecond)
 
 	// And then unschedulablePodInfo was determined as unschedulable AGAIN.
 	podutil.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
@@ -3286,25 +3301,39 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	})
 
 	// And then, put unschedulable pod to the unschedulable queue
-	err = q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(unschedulablePod, "plugin"), q.SchedulingCycle())
+	p1.UnschedulablePlugins = sets.New("plugin")
+	err = q.AddUnschedulablePodIfNotPresent(logger, p1, q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
-	// Move clock to make the unschedulable pods complete backoff.
-	c.Step(DefaultPodInitialBackoffDuration + time.Second)
-	// Move all unschedulable pods to the active queue.
+	// Move the failed pod into backoff before it becomes eligible again.
 	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+	if !q.backoffQ.has(p1) {
+		t.Fatal("Expected the failed pod to enter backoffQ")
+	}
+	c.Step(q.backoffQ.podMaxBackoffDuration())
+	q.flushBackoffQCompleted(logger)
+	if q.backoffQ.has(p1) {
+		t.Fatal("Expected the failed pod to leave backoffQ after backoff completed")
+	}
+	if !q.activeQ.has(p1) {
+		t.Fatal("Expected the failed pod to return to activeQ after backoff completed")
+	}
 
-	// At this time, newerPod should be popped
-	// because it is the oldest tried pod.
-	item2, err2 := q.Pop(logger)
-	if err2 != nil {
-		t.Errorf("Error while popping the head of the queue: %v", err2)
-	} else {
-		p2 := item2.(*framework.QueuedPodInfo)
-		if diff := cmp.Diff(newerPod, p2.Pod); diff != "" {
-			t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
-		}
+	// The older pod should retain its place ahead of the newer pod.
+	item, err := q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Error while popping the older pod: %v", err)
+	}
+	if diff := cmp.Diff(unschedulablePod, item.(*framework.QueuedPodInfo).Pod); diff != "" {
+		t.Errorf("Unexpected first pod after Pop (-want, +got):\n%s", diff)
+	}
+	item, err = q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Error while popping the newer pod: %v", err)
+	}
+	if diff := cmp.Diff(newerPod, item.(*framework.QueuedPodInfo).Pod); diff != "" {
+		t.Errorf("Unexpected second pod after Pop (-want, +got):\n%s", diff)
 	}
 }
 
@@ -3942,16 +3971,20 @@ func TestPriorityQueue_initPodMaxInUnschedulablePodsDuration(t *testing.T) {
 	pod2 := st.MakePod().Name("test-pod-2").Namespace("ns2").UID("tp-2").NominatedNodeName("node2").Obj()
 
 	var timestamp = time.Now()
+	initialAttemptTimestamp1 := timestamp.Add(-time.Second)
+	initialAttemptTimestamp2 := timestamp.Add(-2 * time.Second)
 	pInfo1 := &framework.QueuedPodInfo{
 		PodInfo: mustNewTestPodInfo(t, pod1),
 		QueueingParams: framework.QueueingParams{
-			Timestamp: timestamp.Add(-time.Second),
+			Timestamp:               initialAttemptTimestamp1,
+			InitialAttemptTimestamp: &initialAttemptTimestamp1,
 		},
 	}
 	pInfo2 := &framework.QueuedPodInfo{
 		PodInfo: mustNewTestPodInfo(t, pod2),
 		QueueingParams: framework.QueueingParams{
-			Timestamp: timestamp.Add(-2 * time.Second),
+			Timestamp:               initialAttemptTimestamp2,
+			InitialAttemptTimestamp: &initialAttemptTimestamp2,
 		},
 	}
 
@@ -4141,16 +4174,20 @@ func TestPodTimestamp(t *testing.T) {
 	pod2 := st.MakePod().Name("test-pod-2").Namespace("ns2").UID("tp-2").NominatedNodeName("node2").Obj()
 
 	var timestamp = time.Now()
+	initialAttemptTimestamp1 := timestamp
+	initialAttemptTimestamp2 := timestamp.Add(time.Second)
 	pInfo1 := &framework.QueuedPodInfo{
 		PodInfo: mustNewTestPodInfo(t, pod1),
 		QueueingParams: framework.QueueingParams{
-			Timestamp: timestamp,
+			Timestamp:               initialAttemptTimestamp1,
+			InitialAttemptTimestamp: &initialAttemptTimestamp1,
 		},
 	}
 	pInfo2 := &framework.QueuedPodInfo{
 		PodInfo: mustNewTestPodInfo(t, pod2),
 		QueueingParams: framework.QueueingParams{
-			Timestamp: timestamp.Add(time.Second),
+			Timestamp:               initialAttemptTimestamp2,
+			InitialAttemptTimestamp: &initialAttemptTimestamp2,
 		},
 	}
 
@@ -4161,7 +4198,7 @@ func TestPodTimestamp(t *testing.T) {
 		expected   []*framework.QueuedPodInfo
 	}{
 		{
-			name: "add two pod to activeQ and sort them by the timestamp",
+			name: "add two pods to activeQ and sort them by the initial attempt timestamp",
 			operations: []operation{
 				// Need to add the pods directly to the activeQ to override the timestamps.
 				addPodActiveQDirectly,
@@ -4171,7 +4208,7 @@ func TestPodTimestamp(t *testing.T) {
 			expected: []*framework.QueuedPodInfo{pInfo1, pInfo2},
 		},
 		{
-			name: "add two pod to unschedulableEntities then move them to activeQ and sort them by the timestamp",
+			name: "move two pods from unschedulableEntities to activeQ and preserve their initial order",
 			operations: []operation{
 				addPodUnschedulablePods,
 				addPodUnschedulablePods,
@@ -4182,7 +4219,7 @@ func TestPodTimestamp(t *testing.T) {
 			expected: []*framework.QueuedPodInfo{pInfo1, pInfo2},
 		},
 		{
-			name: "add one pod to BackoffQ and move it to activeQ",
+			name: "move one pod from backoffQ to activeQ and preserve its initial order",
 			operations: []operation{
 				// Need to add the pods directly to activeQ to override the timestamps.
 				addPodActiveQDirectly,
