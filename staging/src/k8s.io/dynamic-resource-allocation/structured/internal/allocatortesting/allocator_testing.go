@@ -1270,6 +1270,84 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
+		"partitionable-devices-counter-sets-scoped-per-driver": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+				claimWithRequests(claim1, nil, request(req1, classB, 1)),
+			),
+			classes: objects(
+				class(classA, driverA),
+				class(classB, driverB),
+			),
+			slices: unwrapResourceSlices(
+				// driverA / pool-1 has its own counterSet1 (c:1) and device1.
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(
+							counterSet1,
+							map[string]resource.Quantity{
+								"c": resource.MustParse("1"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(
+						counterSet1,
+						map[string]resource.Quantity{
+							"c": resource.MustParse("1"),
+						},
+					),
+				),
+
+				// driverB / pool-1 has the same pool and counter-set names, but is an
+				// independent pool because it belongs to a different driver.
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 2), driverB,
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(
+							counterSet1,
+							map[string]resource.Quantity{
+								"c": resource.MustParse("1"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice4, node1, resourcePool(pool1, 2), driverB,
+					counterSet(
+						counterSet1,
+						map[string]resource.Quantity{
+							"c": resource.MustParse("1"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(
+						req0,
+						driverA,
+						pool1,
+						device1,
+						false,
+					),
+				),
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(
+						req1,
+						driverB,
+						pool1,
+						device2,
+						false,
+					),
+				),
+			},
+		},
 		"all-devices-many": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
 				Name: req0,
