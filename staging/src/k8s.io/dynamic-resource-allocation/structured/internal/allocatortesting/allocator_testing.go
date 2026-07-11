@@ -4915,6 +4915,22 @@ func TestAllocator(t *testing.T,
 				),
 			},
 		},
+		"consumable-capacity-range-policy-step-request-overflow": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(resource.NewQuantity(9223372036854775807, resource.BinarySI))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{},
+		},
 		"consumable-capacity-multi-allocatable-device-with-zero-request-policy": {
 			features: Features{
 				ConsumableCapacity: true,

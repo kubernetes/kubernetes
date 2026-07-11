@@ -18,6 +18,8 @@ package incubating
 
 import (
 	"errors"
+	"math"
+	"math/bits"
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -111,6 +113,11 @@ func fillEmptyRequest(capacity resourceapi.DeviceCapacity) resource.Quantity {
 //   - If Step is specified, it rounds requestedVal up to the nearest multiple of Step
 //     starting from Min.
 //   - If no Step is specified and requestedVal >= Min, it returns requestedVal as is.
+//
+// The computation uses saturating int64 arithmetic so that a request far larger
+// than the device capacity cannot wrap to a negative value. Such a request can
+// never be satisfied by a real device, so a saturated (still positive) value is
+// correct and will be rejected by the policy/capacity checks downstream.
 func roundUpRange(requestedVal *resource.Quantity, validRange *resourceapi.CapacityRequestPolicyRange) resource.Quantity {
 	if requestedVal.Cmp(*validRange.Min) < 0 {
 		return validRange.Min.DeepCopy()
@@ -121,14 +128,55 @@ func roundUpRange(requestedVal *resource.Quantity, validRange *resourceapi.Capac
 	requestedInt64 := requestedVal.Value()
 	step := validRange.Step.Value()
 	min := validRange.Min.Value()
-	added := (requestedInt64 - min)
+
+	added := requestedInt64 - min
 	n := added / step
 	mod := added % step
 	if mod != 0 {
 		n += 1
 	}
-	val := min + step*n
+
+	val := saturatingAdd(min, saturatingMul(step, n))
 	return *resource.NewQuantity(val, resource.BinarySI)
+}
+
+// saturatingMul returns a*b, saturating at the int64 minimum/maximum on overflow.
+func saturatingMul(a, b int64) int64 {
+	if a == 0 || b == 0 {
+		return 0
+	}
+	neg := (a < 0) != (b < 0)
+	ua, ub := a, b
+	if a < 0 {
+		ua = -a
+	}
+	if b < 0 {
+		ub = -b
+	}
+	hi, lo := bits.Mul64(uint64(ua), uint64(ub))
+	if hi != 0 || lo > math.MaxInt64 {
+		if neg {
+			return math.MinInt64
+		}
+		return math.MaxInt64
+	}
+	res := int64(lo)
+	if neg {
+		res = -res
+	}
+	return res
+}
+
+// saturatingAdd returns a+b, saturating at the int64 minimum/maximum on overflow.
+func saturatingAdd(a, b int64) int64 {
+	s := a + b
+	if (b > 0 && s < a) || (b < 0 && s > a) {
+		if b > 0 {
+			return math.MaxInt64
+		}
+		return math.MinInt64
+	}
+	return s
 }
 
 // roundUpValidValues returns the first value in validValues that is greater than or equal to requestedVal.
