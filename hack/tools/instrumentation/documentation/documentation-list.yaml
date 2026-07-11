@@ -2671,16 +2671,6 @@
     endpoint: /metrics
   - component: kube-scheduler
     endpoint: /metrics
-- name: changes
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlice changes
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - operation
-  componentEndpoints:
-  - component: kube-controller-manager
-    endpoint: /metrics
 - name: endpointslices_changed_per_sync
   subsystem: endpoint_slice_controller
   help: Number of EndpointSlices changed on each Service sync
@@ -7306,6 +7296,16 @@
   - component: kube-scheduler
     endpoint: /metrics
   - component: kubelet
+    endpoint: /metrics
+- name: changes
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlice changes
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - operation
+  componentEndpoints:
+  - component: kube-controller-manager
     endpoint: /metrics
 - name: desired_endpoint_slices
   subsystem: endpoint_slice_controller
