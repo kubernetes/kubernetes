@@ -21,18 +21,93 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	"k8s.io/kubernetes/pkg/registry/apps/controllerrevision"
+	registry "k8s.io/kubernetes/pkg/registry/apps/controllerrevision"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-// Helper function to create a baseline valid ControllerRevision with optional tweaks
-func mkControllerRevision(tweaks ...func(*apps.ControllerRevision)) apps.ControllerRevision {
+func TestDeclarativeValidate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		testDeclarativeValidate(t, apiVersion)
+	}
+}
+
+func testDeclarativeValidate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "apps",
+		APIVersion:        apiVersion,
+		IsResourceRequest: true,
+		Verb:              "create",
+	})
+	testCases := map[string]struct {
+		input        apps.ControllerRevision
+		expectedErrs field.ErrorList
+	}{
+		"valid": {
+			input: mkValidControllerRevision(),
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
+	obj := mkValidControllerRevision()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		testDeclarativeValidateUpdate(t, apiVersion)
+	}
+}
+
+func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "apps",
+		APIVersion:        apiVersion,
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
+	testCases := map[string]struct {
+		old          apps.ControllerRevision
+		update       apps.ControllerRevision
+		expectedErrs field.ErrorList
+	}{
+		"valid update": {
+			old:    mkValidControllerRevision(),
+			update: mkValidControllerRevision(),
+		},
+		"changed data": {
+			old:    mkValidControllerRevision(),
+			update: mkValidControllerRevision(tweakData(runtime.RawExtension{})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("data"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "2"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
+	updateObj := mkValidControllerRevision()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
+}
+
+func mkValidControllerRevision(tweaks ...func(*apps.ControllerRevision)) apps.ControllerRevision {
 	obj := apps.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "valid-resource-name",
+			Name:      "valid-resource-name",
+			Namespace: metav1.NamespaceDefault,
 		},
 		Data:     runtime.RawExtension{Raw: []byte(`{"kind":"Foo"}`)},
 		Revision: 1,
@@ -43,53 +118,8 @@ func mkControllerRevision(tweaks ...func(*apps.ControllerRevision)) apps.Control
 	return obj
 }
 
-func TestDeclarativeValidate(t *testing.T) {
-	for _, apiVersion := range apiVersions {
-		t.Run(apiVersion, func(t *testing.T) {
-			strategy := controllerrevision.Strategy
-			var namespace string
-			if strategy.NamespaceScoped() {
-				namespace = metav1.NamespaceDefault
-			}
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "apps",
-				APIVersion:        apiVersion,
-				Resource:          "controllerrevisions",
-				Namespace:         namespace,
-				IsResourceRequest: true,
-				Verb:              "create",
-			})
-			obj := mkControllerRevision(func(o *apps.ControllerRevision) {
-				o.Namespace = namespace
-			})
-			meta.RunObjectMetaTestCases(t, ctx, &obj, strategy, meta.WithStringentFinalizerValidation())
-		})
-	}
-}
-
-func TestDeclarativeValidateUpdate(t *testing.T) {
-	for _, apiVersion := range apiVersions {
-		t.Run(apiVersion, func(t *testing.T) {
-			strategy := controllerrevision.Strategy
-			var namespace string
-			if strategy.NamespaceScoped() {
-				namespace = metav1.NamespaceDefault
-			}
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "apps",
-				APIVersion:        apiVersion,
-				Resource:          "controllerrevisions",
-				Namespace:         namespace,
-				Name:              "valid-obj",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
-			obj := mkControllerRevision(func(o *apps.ControllerRevision) {
-				o.Namespace = namespace
-			})
-			meta.RunObjectMetaUpdateTestCases(t, ctx, &obj, strategy, meta.WithStringentFinalizerValidation())
-		})
+func tweakData(data runtime.RawExtension) func(*apps.ControllerRevision) {
+	return func(o *apps.ControllerRevision) {
+		o.Data = data
 	}
 }

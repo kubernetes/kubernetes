@@ -1082,6 +1082,7 @@ type ControllerRevision struct {
 
 	// Data is the serialized representation of the state.
 	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	Data runtime.RawExtension `json:"data" protobuf:"bytes,2,opt,name=data"`
 
 	// Revision indicates the revision of the state represented by Data.
