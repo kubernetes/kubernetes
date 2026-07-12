@@ -169,11 +169,15 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 		for resourceName, quantity := range pod.Spec.Resources.Requests {
 			if IsSupportedPodLevelResource(resourceName) {
-				reqs[resourceName] = quantity
-				if effectiveReqs != nil {
-					reqs[resourceName] = effectiveReqs[resourceName]
+				if effectiveReqs == nil {
+					reqs[resourceName] = quantity
+				} else if effectiveReq, ok := effectiveReqs[resourceName]; ok {
+					reqs[resourceName] = effectiveReq
 				}
-
+				// If the resource is absent from the effective requests (for example an
+				// infeasible resize that adds a pod-level resource not yet actuated), omit
+				// it instead of inserting a zero-valued quantity, matching the behavior of
+				// the container-level aggregation.
 			}
 		}
 	}
@@ -366,10 +370,15 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		}
 		for resourceName, quantity := range pod.Spec.Resources.Limits {
 			if IsSupportedPodLevelResource(resourceName) {
-				limits[resourceName] = quantity
-				if effectiveLims != nil {
-					limits[resourceName] = effectiveLims[resourceName]
+				if effectiveLims == nil {
+					limits[resourceName] = quantity
+				} else if effectiveLim, ok := effectiveLims[resourceName]; ok {
+					limits[resourceName] = effectiveLim
 				}
+				// If the resource is absent from the effective limits (for example an
+				// infeasible resize that adds a pod-level resource not yet actuated), omit
+				// it instead of inserting a zero-valued quantity, matching the behavior of
+				// the container-level aggregation.
 			}
 		}
 	}

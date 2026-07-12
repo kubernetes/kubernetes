@@ -1976,6 +1976,143 @@ func TestPodLevelResourceRequests(t *testing.T) {
 	}
 }
 
+func TestPodLevelResourceRequestsWithPodStatus(t *testing.T) {
+	testCases := []struct {
+		name                  string
+		opts                  PodResourcesOptions
+		podResources          v1.ResourceRequirements
+		podStatusResources    *v1.ResourceRequirements
+		podAllocatedResources v1.ResourceList
+		podResizeStatus       []v1.PodCondition
+		containers            []v1.Container
+		expectedRequests      v1.ResourceList
+	}{
+		{
+			name: "infeasible pod-level resize adding a request must omit the not-yet-actuated resource",
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+			podStatusResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			podAllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			containers: []v1.Container{{Name: "c1"}},
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			// The added memory request is not actuated yet (resize is infeasible), so it
+			// must be omitted rather than reported as memory=0.
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+		},
+		{
+			name: "feasible pod-level resize adding a request uses the max of spec and actuated",
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+			podStatusResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			podAllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			containers:            []v1.Container{{Name: "c1"}},
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  &tc.podResources,
+					Containers: tc.containers,
+				},
+				Status: v1.PodStatus{
+					Resources:          tc.podStatusResources,
+					AllocatedResources: tc.podAllocatedResources,
+					Conditions:         tc.podResizeStatus,
+				},
+			}
+			got := PodRequests(p, tc.opts)
+			if !equality.Semantic.DeepEqual(got, tc.expectedRequests) {
+				t.Errorf("got=%v, want=%v, diff=%s", got, tc.expectedRequests, diff.Diff(got, tc.expectedRequests))
+			}
+		})
+	}
+}
+
+func TestPodLevelResourceLimitsWithPodStatus(t *testing.T) {
+	testCases := []struct {
+		name               string
+		opts               PodResourcesOptions
+		podResources       v1.ResourceRequirements
+		podStatusResources *v1.ResourceRequirements
+		podResizeStatus    []v1.PodCondition
+		containers         []v1.Container
+		expectedLimits     v1.ResourceList
+	}{
+		{
+			name: "infeasible pod-level resize adding a limit must omit the not-yet-actuated resource",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+			podStatusResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			containers: []v1.Container{{Name: "c1"}},
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			// A zero-valued limit is not the same as "no limit"; the not-yet-actuated
+			// memory limit must be omitted rather than reported as memory=0.
+			expectedLimits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  &tc.podResources,
+					Containers: tc.containers,
+				},
+				Status: v1.PodStatus{
+					Resources:  tc.podStatusResources,
+					Conditions: tc.podResizeStatus,
+				},
+			}
+			got := PodLimits(p, tc.opts)
+			if !equality.Semantic.DeepEqual(got, tc.expectedLimits) {
+				t.Errorf("got=%v, want=%v, diff=%s", got, tc.expectedLimits, diff.Diff(got, tc.expectedLimits))
+			}
+		})
+	}
+}
+
 func TestIsSupportedPodLevelResource(t *testing.T) {
 	testCases := []struct {
 		name     string
