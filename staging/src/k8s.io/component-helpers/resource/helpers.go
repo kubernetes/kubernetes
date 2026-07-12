@@ -169,11 +169,19 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 		for resourceName, quantity := range pod.Spec.Resources.Requests {
 			if IsSupportedPodLevelResource(resourceName) {
-				reqs[resourceName] = quantity
-				if effectiveReqs != nil {
-					reqs[resourceName] = effectiveReqs[resourceName]
+				if effectiveReqs == nil {
+					reqs[resourceName] = quantity
+					continue
 				}
-
+				// Only propagate keys that are present in the effective (actuated)
+				// requests. A key present in the spec but absent from the effective
+				// map (e.g. a request added by a not-yet-actuated resize) is omitted,
+				// matching container-level aggregation, which iterates the effective
+				// map and never inserts unactuated keys. Assigning effectiveReqs[name]
+				// unconditionally would insert an explicit zero instead.
+				if effVal, ok := effectiveReqs[resourceName]; ok {
+					reqs[resourceName] = effVal
+				}
 			}
 		}
 	}
@@ -366,9 +374,18 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		}
 		for resourceName, quantity := range pod.Spec.Resources.Limits {
 			if IsSupportedPodLevelResource(resourceName) {
-				limits[resourceName] = quantity
-				if effectiveLims != nil {
-					limits[resourceName] = effectiveLims[resourceName]
+				if effectiveLims == nil {
+					limits[resourceName] = quantity
+					continue
+				}
+				// Only propagate keys that are present in the effective (actuated)
+				// limits. A key present in the spec but absent from the effective
+				// map (e.g. a limit added by a not-yet-actuated resize) is omitted,
+				// matching container-level aggregation, which iterates the effective
+				// map and never inserts unactuated keys. Assigning effectiveLims[name]
+				// unconditionally would insert an explicit zero instead.
+				if effVal, ok := effectiveLims[resourceName]; ok {
+					limits[resourceName] = effVal
 				}
 			}
 		}

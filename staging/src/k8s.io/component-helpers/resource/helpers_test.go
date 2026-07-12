@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 )
 
@@ -2714,4 +2715,103 @@ func getPod(cname string, resources podResources) *v1.Pod {
 			Overhead: overhead,
 		},
 	}
+}
+
+// TestPodLevelResourcesOmitUnactuatedResizeKey covers the case where a pod-level
+// resource key is present in the spec but absent from the actuated (status)
+// resources, as happens for a resize that adds a new request/limit and is marked
+// infeasible. determineEffective{Requests,Limits} returns an effective map that
+// omits the not-yet-actuated key; PodRequests/PodLimits must omit it too rather
+// than inserting an explicit zero, so that the pod-level result stays consistent
+// with container-level aggregation (which iterates the effective map and never
+// inserts unactuated keys).
+func TestPodLevelResourcesOmitUnactuatedResizeKey(t *testing.T) {
+	opts := PodResourcesOptions{
+		UseStatusResources:                             true,
+		InPlacePodLevelResourcesVerticalScalingEnabled: true,
+	}
+
+	// Spec asks for cpu+memory at the pod level (and on the container, mirroring
+	// it), but only cpu has been actuated. The memory limit/request was added by
+	// a resize that is pending as infeasible.
+	specList := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("100m"),
+		v1.ResourceMemory: resource.MustParse("1Gi"),
+	}
+	actuatedList := v1.ResourceList{
+		v1.ResourceCPU: resource.MustParse("100m"),
+	}
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: specList.DeepCopy(),
+				Limits:   specList.DeepCopy(),
+			},
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: specList.DeepCopy(),
+						Limits:   specList.DeepCopy(),
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Resources: &v1.ResourceRequirements{
+				Requests: actuatedList.DeepCopy(),
+				Limits:   actuatedList.DeepCopy(),
+			},
+			AllocatedResources: actuatedList.DeepCopy(),
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "c1",
+					Resources: &v1.ResourceRequirements{
+						Requests: actuatedList.DeepCopy(),
+						Limits:   actuatedList.DeepCopy(),
+					},
+				},
+			},
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonInfeasible,
+				},
+			},
+		},
+	}
+
+	keys := func(rl v1.ResourceList) sets.Set[v1.ResourceName] {
+		s := sets.New[v1.ResourceName]()
+		for name := range rl {
+			s.Insert(name)
+		}
+		return s
+	}
+
+	t.Run("requests", func(t *testing.T) {
+		podReqs := PodRequests(pod, opts)
+		// Property 1 (regression): the unactuated key is omitted, not zero-filled.
+		if _, found := podReqs[v1.ResourceMemory]; found {
+			t.Errorf("pod-level requests should omit the unactuated memory key, got %v", podReqs)
+		}
+		// Property 2 (invariant): pod-level and container-level aggregation agree
+		// on the set of keys for the same input.
+		containerReqs := AggregateContainerRequests(pod, opts)
+		if podKeys, ctrKeys := keys(podReqs), keys(containerReqs); !podKeys.Equal(ctrKeys) {
+			t.Errorf("pod-level vs container-level request key mismatch: pod=%v container=%v", sets.List(podKeys), sets.List(ctrKeys))
+		}
+	})
+
+	t.Run("limits", func(t *testing.T) {
+		podLims := PodLimits(pod, opts)
+		if _, found := podLims[v1.ResourceMemory]; found {
+			t.Errorf("pod-level limits should omit the unactuated memory key, got %v", podLims)
+		}
+		containerLims := AggregateContainerLimits(pod, opts)
+		if podKeys, ctrKeys := keys(podLims), keys(containerLims); !podKeys.Equal(ctrKeys) {
+			t.Errorf("pod-level vs container-level limit key mismatch: pod=%v container=%v", sets.List(podKeys), sets.List(ctrKeys))
+		}
+	})
 }
