@@ -80,6 +80,11 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	// Pod group constraints will be re-evaluated on a PlacementFeasible phase.
 	// Now, verify if it has any pods left.
 	if len(podGroupInfo.QueuedPodInfos) == 0 {
+		// Finish the in-flight attempt so members that arrived while these pods were
+		// being skipped can be requeued instead of remaining pending indefinitely.
+		if err := sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle(), fwk.NewStatus(fwk.Success)); err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "Failed to finish skipped pod group scheduling attempt", "podGroup", klog.KObj(podGroupInfo))
+		}
 		return
 	}
 
