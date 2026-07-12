@@ -25,9 +25,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -42,7 +42,7 @@ var (
 	cmd = e2epod.InfiniteSleepCommand
 )
 
-var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
+var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLevelResources, func() {
 	f := framework.NewDefaultFramework("pod-level-resources-tests")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -60,6 +60,76 @@ var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLe
 		}
 	})
 	podLevelResourcesTests(f)
+})
+
+var _ = SIGDescribe("Pod Level Resources Conformance", func() {
+	f := framework.NewDefaultFramework("pod-level-resources-conformance")
+
+	/*
+		Release: v1.37
+		Testname: Pod Level Resources, Guaranteed QoS pod API validation
+		Description: Creating a Pod with pod-level CPU and memory requests/limits in PodSpec.Resources MUST result in the Pod being created with the specified resources in Spec.Resources and Guaranteed QoS class in status.
+	*/
+	framework.ConformanceIt("pod-level resources set for Guaranteed QoS pod [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "plr-guaranteed"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  "c1",
+					Image: imageutils.GetE2EImage(imageutils.Pause),
+				}},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
+			},
+		}
+		e2epod.MustMixinRestrictedPodSecurity(pod)
+
+		createdPod := podClient.CreateSync(ctx, pod)
+		gomega.Expect(createdPod.Spec.Resources).To(gomega.Equal(pod.Spec.Resources))
+		gomega.Expect(createdPod.Status.QOSClass).To(gomega.Equal(v1.PodQOSGuaranteed))
+	})
+
+	/*
+		Release: v1.37
+		Testname: Pod Level Resources, Burstable QoS pod API validation
+		Description: Creating a Pod with pod-level CPU and memory requests/limits in PodSpec.Resources MUST result in the Pod being created with the specified resources in Spec.Resources and Burstable QoS class in status.
+	*/
+	framework.ConformanceIt("pod-level resources set for Burstable QoS pod [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "plr-burstable"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  "c1",
+					Image: imageutils.GetE2EImage(imageutils.Pause),
+				}},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+			},
+		}
+		e2epod.MustMixinRestrictedPodSecurity(pod)
+
+		createdPod := podClient.CreateSync(ctx, pod)
+		gomega.Expect(createdPod.Spec.Resources).To(gomega.Equal(pod.Spec.Resources))
+		gomega.Expect(createdPod.Status.QOSClass).To(gomega.Equal(v1.PodQOSBurstable))
+	})
 })
 
 // isCgroupv2Node creates a small pod and check if it is running on a node
