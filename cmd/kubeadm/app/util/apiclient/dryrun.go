@@ -796,7 +796,7 @@ func getDeploymentList() *appsv1.DeploymentList {
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Image: "registry.k8s.io/coredns/coredns:" + constants.DefaultCoreDNSVersion,
+									Image: "registry.k8s.io/coredns/coredns:" + constants.CoreDNSVersion,
 								},
 							},
 						},

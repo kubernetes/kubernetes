@@ -162,7 +162,7 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 		return nil
 	}
 
-	targetCoreDNSVersion := strings.TrimLeft(images.GetDNSImageTag(cfg, kubeadmconstants.SupportedCoreDNSVersion), "v")
+	targetCoreDNSVersion := strings.TrimLeft(images.GetDNSImageTag(cfg), "v")
 	if err := createCoreDNSAddon(coreDNSDeploymentBytes, coreDNSServiceBytes, coreDNSConfigMapBytes, client, targetCoreDNSVersion); err != nil {
 		return err
 	}

@@ -204,7 +204,7 @@ func TestGetAllImages(t *testing.T) {
 				"test.repo/kube-controller-manager:",
 				"test.repo/kube-scheduler:",
 				"test.repo/kube-proxy:",
-				"/coredns:" + constants.DefaultCoreDNSVersion,
+				"/coredns:" + constants.CoreDNSVersion,
 				"/pause:" + constants.PauseVersion,
 			},
 		},
@@ -218,7 +218,7 @@ func TestGetAllImages(t *testing.T) {
 				"real.repo/kube-controller-manager:",
 				"real.repo/kube-scheduler:",
 				"real.repo/kube-proxy:",
-				"real.repo/coredns:" + constants.DefaultCoreDNSVersion,
+				"real.repo/coredns:" + constants.CoreDNSVersion,
 				"real.repo/pause:" + constants.PauseVersion,
 			},
 		},
@@ -234,7 +234,7 @@ func TestGetAllImages(t *testing.T) {
 				"/kube-controller-manager:",
 				"/kube-scheduler:",
 				"/kube-proxy:",
-				"/coredns:" + constants.DefaultCoreDNSVersion,
+				"/coredns:" + constants.CoreDNSVersion,
 				"/pause:" + constants.PauseVersion,
 				"/etcd:" + constants.DefaultEtcdVersion,
 			},
@@ -247,7 +247,7 @@ func TestGetAllImages(t *testing.T) {
 				"/kube-controller-manager:",
 				"/kube-scheduler:",
 				"/kube-proxy:",
-				"/coredns:" + constants.DefaultCoreDNSVersion,
+				"/coredns:" + constants.CoreDNSVersion,
 				"/pause:" + constants.PauseVersion,
 			},
 		},
@@ -277,7 +277,7 @@ func TestGetAllImages(t *testing.T) {
 				"/kube-apiserver:",
 				"/kube-controller-manager:",
 				"/kube-scheduler:",
-				"/coredns:" + constants.DefaultCoreDNSVersion,
+				"/coredns:" + constants.CoreDNSVersion,
 				"/pause:" + constants.PauseVersion,
 			},
 		},
@@ -296,7 +296,7 @@ func TestGetAllImages(t *testing.T) {
 				"/kube-controller-manager:",
 				"/kube-scheduler:",
 				"/kube-proxy:",
-				"/coredns:" + constants.DefaultCoreDNSVersion,
+				"/coredns:" + constants.CoreDNSVersion,
 				"/pause:" + constants.PauseVersion,
 			},
 		},
@@ -315,21 +315,21 @@ func TestGetDNSImage(t *testing.T) {
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
-			expected: "foo.io/coredns:" + constants.DefaultCoreDNSVersion,
+			expected: "foo.io/coredns:" + constants.CoreDNSVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io",
 				DNS:             kubeadmapi.DNS{},
 			},
 		},
 		{
-			expected: kubeadmapiv1.DefaultImageRepository + "/coredns/coredns:" + constants.DefaultCoreDNSVersion,
+			expected: kubeadmapiv1.DefaultImageRepository + "/coredns/coredns:" + constants.CoreDNSVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: kubeadmapiv1.DefaultImageRepository,
 				DNS:             kubeadmapi.DNS{},
 			},
 		},
 		{
-			expected: "foo.io/coredns/coredns:" + constants.DefaultCoreDNSVersion,
+			expected: "foo.io/coredns/coredns:" + constants.CoreDNSVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io",
 				DNS: kubeadmapi.DNS{
@@ -340,12 +340,12 @@ func TestGetDNSImage(t *testing.T) {
 			},
 		},
 		{
-			expected: "foo.io/coredns/coredns:" + constants.DefaultCoreDNSVersion,
+			expected: "foo.io/coredns/coredns:" + constants.CoreDNSVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io/coredns",
 				DNS: kubeadmapi.DNS{
 					ImageMeta: kubeadmapi.ImageMeta{
-						ImageTag: constants.DefaultCoreDNSVersion,
+						ImageTag: constants.CoreDNSVersion,
 					},
 				},
 			},
@@ -376,27 +376,18 @@ func TestGetDNSImage(t *testing.T) {
 }
 
 func TestGetDNSImageTag(t *testing.T) {
-	supportedCoreDNSVersion := map[uint8]string{
-		17: "v1.6.7",
-		18: "v1.7.0",
-	}
 	var tests = []struct {
 		name     string
 		expected string
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
-			name:     "resolves the version matching the Kubernetes minor",
-			expected: "v1.6.7",
+			name:     "falls back to the default CoreDNS version when no override is set",
+			expected: constants.CoreDNSVersion,
 			cfg:      &kubeadmapi.ClusterConfiguration{KubernetesVersion: "1.17.0"},
 		},
 		{
-			name:     "falls back to the nearest version when the Kubernetes minor is out of range",
-			expected: "v1.7.0",
-			cfg:      &kubeadmapi.ClusterConfiguration{KubernetesVersion: "1.99.0"},
-		},
-		{
-			name:     "user override wins over the resolved version",
+			name:     "user override wins over the default version",
 			expected: "v9.9.9",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "1.17.0",
@@ -409,7 +400,7 @@ func TestGetDNSImageTag(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := GetDNSImageTag(test.cfg, supportedCoreDNSVersion)
+			actual := GetDNSImageTag(test.cfg)
 			if actual != test.expected {
 				t.Errorf("failed to GetDNSImageTag:\n\texpected: %s\n\tactual: %s", test.expected, actual)
 			}

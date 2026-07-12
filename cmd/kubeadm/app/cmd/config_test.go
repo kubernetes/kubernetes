@@ -212,7 +212,7 @@ func TestConfigImagesListOutput(t *testing.T) {
 		EtcdVersion:    etcdVersion.String(),
 		KubeVersion:    "v" + dummyKubernetesVersionStr,
 		PauseVersion:   constants.PauseVersion,
-		CoreDNSVersion: constants.DefaultCoreDNSVersion,
+		CoreDNSVersion: constants.CoreDNSVersion,
 	}
 
 	testcases := []struct {

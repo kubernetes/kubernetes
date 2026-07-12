@@ -364,9 +364,8 @@ const (
 	// CoreDNSImageName specifies the name of the image for CoreDNS add-on
 	CoreDNSImageName = "coredns"
 
-	// DefaultCoreDNSVersion is the version of CoreDNS to be deployed if it is used and if
-	// SupportedCoreDNSVersion does not have an entry for the current Kubernetes version.
-	DefaultCoreDNSVersion = "v1.14.4"
+	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
+	CoreDNSVersion = "v1.14.4"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -515,15 +514,6 @@ var (
 		36: "3.7.0-rc.0-0",
 	}
 
-	// SupportedCoreDNSVersion lists officially supported CoreDNS versions with corresponding
-	// Kubernetes releases. It follows the same conventions as SupportedEtcdVersion above and
-	// should be used via CoreDNSSupportedVersion() instead of directly.
-	SupportedCoreDNSVersion = map[uint8]string{
-		34: "v1.14.4",
-		35: "v1.14.4",
-		36: "v1.14.4",
-	}
-
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
 	// the bootstrap tokens to access the kubeadm-certs Secret during the join of a new control-plane
 	KubeadmCertsClusterRoleName = fmt.Sprintf("kubeadm:%s", KubeadmCertsSecret)
@@ -561,29 +551,16 @@ func getSkewedKubernetesVersionImpl(versionInfo *apimachineryversion.Info, n int
 // EtcdSupportedVersion returns officially supported version of etcd for a specific Kubernetes release
 // If passed version is not in the given list, the function returns the nearest version with a warning
 func EtcdSupportedVersion(supportedEtcdVersion map[uint8]string, versionString string) (etcdVersion *version.Version, warning, err error) {
-	return resolveSupportedVersion(supportedEtcdVersion, versionString, "etcd")
-}
-
-// CoreDNSSupportedVersion returns officially supported version of CoreDNS for a specific Kubernetes release
-// If passed version is not in the given list, the function returns the nearest version with a warning
-func CoreDNSSupportedVersion(supportedCoreDNSVersion map[uint8]string, versionString string) (coreDNSVersion *version.Version, warning, err error) {
-	return resolveSupportedVersion(supportedCoreDNSVersion, versionString, "CoreDNS")
-}
-
-// resolveSupportedVersion returns the officially supported version of "component" for a specific
-// Kubernetes release, based on the given map of Kubernetes minor version to component version.
-// If passed version is not in the given list, the function returns the nearest version with a warning.
-func resolveSupportedVersion(supportedVersion map[uint8]string, versionString, component string) (resolvedVersion *version.Version, warning, err error) {
 	kubernetesVersion, err := version.ParseSemantic(versionString)
 	if err != nil {
 		return nil, nil, err
 	}
-	desiredVersion, componentStringVersion := uint8(kubernetesVersion.Minor()), ""
+	desiredVersion, etcdStringVersion := uint8(kubernetesVersion.Minor()), ""
 
 	min, max := ^uint8(0), uint8(0)
-	for k, v := range supportedVersion {
+	for k, v := range supportedEtcdVersion {
 		if desiredVersion == k {
-			componentStringVersion = v
+			etcdStringVersion = v
 			break
 		}
 		if k < min {
@@ -594,23 +571,23 @@ func resolveSupportedVersion(supportedVersion map[uint8]string, versionString, c
 		}
 	}
 
-	if len(componentStringVersion) == 0 {
+	if len(etcdStringVersion) == 0 {
 		if desiredVersion < min {
-			componentStringVersion = supportedVersion[min]
+			etcdStringVersion = supportedEtcdVersion[min]
 		}
 		if desiredVersion > max {
-			componentStringVersion = supportedVersion[max]
+			etcdStringVersion = supportedEtcdVersion[max]
 		}
-		warning = errors.Errorf("could not find officially supported version of %s for Kubernetes %s, falling back to the nearest %s version (%s)",
-			component, versionString, component, componentStringVersion)
+		warning = errors.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
+			versionString, etcdStringVersion)
 	}
 
-	resolvedVersion, err = version.ParseSemantic(componentStringVersion)
+	etcdVersion, err = version.ParseSemantic(etcdStringVersion)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return resolvedVersion, warning, nil
+	return etcdVersion, warning, nil
 }
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present

@@ -316,7 +316,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Y3.String(),
 						KubeadmVersion: v1Y3.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Y3),
 					},
 				},
@@ -361,7 +361,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Y3.String(),
 						KubeadmVersion: v1Y3.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    "",
 					},
 				},
@@ -406,7 +406,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Y3.String(),
 						KubeadmVersion: v1Y3.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Y3),
 					},
 				},
@@ -451,7 +451,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Z0.String(),
 						KubeadmVersion: v1Z0.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Z0),
 					},
 				},
@@ -496,7 +496,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Y5.String(),
 						KubeadmVersion: v1Y5.String(), // Note: The kubeadm version mustn't be "downgraded" here
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Y5),
 					},
 				},
@@ -523,7 +523,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Z1.String(),
 						KubeadmVersion: v1Z1.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Z1),
 					},
 				},
@@ -587,7 +587,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Z0alpha2.String(),
 						KubeadmVersion: v1Z0alpha2.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Z0alpha2),
 					},
 				},
@@ -633,7 +633,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Z0alpha2.String(),
 						KubeadmVersion: v1Z0alpha2.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Z0alpha2),
 					},
 				},
@@ -680,7 +680,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Z0beta1.String(),
 						KubeadmVersion: v1Z0beta1.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Z0beta1),
 					},
 				},
@@ -727,7 +727,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Z0rc1.String(),
 						KubeadmVersion: v1Z0rc1.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Z0rc1),
 					},
 				},
@@ -774,7 +774,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Z0rc1.String(),
 						KubeadmVersion: v1Z0rc1.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Z0rc1),
 					},
 				},
@@ -821,7 +821,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Z0rc1.String(),
 						KubeadmVersion: v1Z0rc1.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Z0rc1),
 					},
 				},
@@ -848,7 +848,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Y0alpha1.String(),
 						KubeadmVersion: v1Y0alpha1.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Y0alpha1),
 					},
 				},
@@ -892,7 +892,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    v1Z1.String(),
 						KubeadmVersion: v1Z1.String(),
-						DNSVersion:     constants.DefaultCoreDNSVersion,
+						DNSVersion:     constants.CoreDNSVersion,
 						EtcdVersion:    getEtcdVersion(v1Z1),
 					},
 				},

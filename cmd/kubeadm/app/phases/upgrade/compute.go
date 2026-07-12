@@ -199,7 +199,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 					Before:      beforeState,
 					After: ClusterState{
 						KubeVersion:    patchVersionStr,
-						DNSVersion:     getSuggestedCoreDNSVersion(patchVersionStr, dnsImageTagOverride),
+						DNSVersion:     getSuggestedCoreDNSVersion(dnsImageTagOverride),
 						KubeadmVersion: newKubeadmVer,
 						EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, patchVersionStr),
 					},
@@ -214,7 +214,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 			Before:      beforeState,
 			After: ClusterState{
 				KubeVersion:    stableVersionStr,
-				DNSVersion:     getSuggestedCoreDNSVersion(stableVersionStr, dnsImageTagOverride),
+				DNSVersion:     getSuggestedCoreDNSVersion(dnsImageTagOverride),
 				KubeadmVersion: stableVersionStr,
 				EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, stableVersionStr),
 			},
@@ -260,7 +260,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				Before:      beforeState,
 				After: ClusterState{
 					KubeVersion:    previousBranchLatestVersionStr,
-					DNSVersion:     getSuggestedCoreDNSVersion(previousBranchLatestVersionStr, dnsImageTagOverride),
+					DNSVersion:     getSuggestedCoreDNSVersion(dnsImageTagOverride),
 					KubeadmVersion: previousBranchLatestVersionStr,
 					EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, previousBranchLatestVersionStr),
 				},
@@ -283,7 +283,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				Before:      beforeState,
 				After: ClusterState{
 					KubeVersion:    unstableKubeVersion,
-					DNSVersion:     getSuggestedCoreDNSVersion(unstableKubeVersion, dnsImageTagOverride),
+					DNSVersion:     getSuggestedCoreDNSVersion(dnsImageTagOverride),
 					KubeadmVersion: unstableKubeVersion,
 					EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, unstableKubeVersion),
 				},
@@ -333,22 +333,13 @@ func getSuggestedEtcdVersion(isExternalEtcd bool, kubernetesVersion string) stri
 	return etcdVersion.String()
 }
 
-// getSuggestedCoreDNSVersion returns the CoreDNS version to suggest for the given target
-// Kubernetes version, honoring dnsImageTagOverride (the user's cfg.DNS.ImageTag) if set.
-func getSuggestedCoreDNSVersion(kubernetesVersion, dnsImageTagOverride string) string {
+// getSuggestedCoreDNSVersion returns the CoreDNS version to suggest, honoring
+// dnsImageTagOverride (the user's cfg.DNS.ImageTag) if set.
+func getSuggestedCoreDNSVersion(dnsImageTagOverride string) string {
 	if dnsImageTagOverride != "" {
 		return dnsImageTagOverride
 	}
-	coreDNSVersion, warning, err := kubeadmconstants.CoreDNSSupportedVersion(kubeadmconstants.SupportedCoreDNSVersion, kubernetesVersion)
-	if err != nil {
-		klog.Warningf("[upgrade/versions] could not retrieve a CoreDNS version for the target Kubernetes version: %v", err)
-		return "N/A"
-	}
-	if warning != nil {
-		klog.V(1).Infof("[upgrade/versions] WARNING: %v", warning)
-	}
-	// CoreDNS images are tagged with a "v" prefix (e.g. "v1.14.4"), unlike version.Version.String().
-	return "v" + coreDNSVersion.String()
+	return kubeadmconstants.CoreDNSVersion
 }
 
 func getLatestClusterVersion(kubeAPIServerVersions map[string][]string) (*versionutil.Version, error) {
