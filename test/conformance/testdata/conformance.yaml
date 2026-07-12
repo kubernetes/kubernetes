@@ -2550,6 +2550,14 @@
     from the main Pod endpoint after the resize is completed.
   release: v1.35
   file: test/e2e/common/node/pod_resize.go
+- testname: Pod Level Resources Spec and QoS
+  codename: '[sig-node] Pod Level Resources should support pod-level resource limits
+    and requests specification [Conformance]'
+  description: Ensure pods created with pod-level resources (requests and limits)
+    are successfully created with correct pod-level resources defaulted and assigned
+    appropriate QoS class.
+  release: v1.37
+  file: test/e2e/common/node/pod_level_resources.go
 - testname: PodTemplate, delete a collection
   codename: '[sig-node] PodTemplates should delete a collection of pod templates [Conformance]'
   description: A set of Pod Templates is created with a label selector which MUST
