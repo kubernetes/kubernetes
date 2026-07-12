@@ -32,15 +32,42 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
+// activationOptions holds options for newActivation.
+type activationOptions struct {
+	useSchemalessTypeRef bool
+}
+
+// activationOption defines a functional option for newActivation.
+type activationOption func(*activationOptions)
+
+// useSchemalessTypeRef returns an activationOption that configures the activation to use SchemalessTypeRef on the versioned attributes.
+func useSchemalessTypeRef() activationOption {
+	return func(o *activationOptions) {
+		o.useSchemalessTypeRef = true
+	}
+}
+
 // newActivation creates an activation for CEL admission plugins from the given request, admission chain and
 // variable binding information.
-func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace, options ...admission.CELValueOption) (*evaluationActivation, error) {
-	celOldObjVal, err := versionedAttr.VersionedOldObject.CELValue(options...)
+func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace, options ...activationOption) (*evaluationActivation, error) {
+	opts := &activationOptions{}
+	for _, o := range options {
+		o(opts)
+	}
+	if opts.useSchemalessTypeRef && versionedAttr != nil {
+		// SA1019: admission.LazyObject.UseSchemalessTypeRef is deprecated: This field is temporary and will be removed when schemaless becomes the default.
+		//nolint:staticcheck
+		versionedAttr.VersionedObject.UseSchemalessTypeRef = true
+		//nolint:staticcheck
+		versionedAttr.VersionedOldObject.UseSchemalessTypeRef = true
+	}
+
+	celOldObjVal, err := versionedAttr.VersionedOldObject.CELValue()
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare oldObject variable for evaluation: %w", err)
 	}
 
-	celObjVal, err := versionedAttr.VersionedObject.CELValue(options...)
+	celObjVal, err := versionedAttr.VersionedObject.CELValue()
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare object variable for evaluation: %w", err)
 	}

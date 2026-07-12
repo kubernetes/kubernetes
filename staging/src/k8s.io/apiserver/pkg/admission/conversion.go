@@ -104,27 +104,14 @@ func NewVersionedAttributes(attr Attributes, gvk schema.GroupVersionKind, o Obje
 	return versionedAttr, nil
 }
 
-// celValueOptions holds options for CELValue conversion.
-type celValueOptions struct {
-	// UseSchemalessTypeRef indicates whether to use SchemalessTypedToVal (reflection-based lazy ref.Val)
-	// instead of converting to an unstructured representation with DefaultTypeAdapter.
-	UseSchemalessTypeRef bool
-}
-
-// CELValueOption defines a functional option for CELValue.
-type CELValueOption func(*celValueOptions)
-
-// UseSchemalessTypeRef returns a CELValueOption that configures CELValue to use SchemalessTypedToVal.
-func UseSchemalessTypeRef() CELValueOption {
-	return func(o *celValueOptions) {
-		o.UseSchemalessTypeRef = true
-	}
-}
-
 // LazyObject encapsulates a versioned runtime.Object and its lazily-evaluated Common Expression Language (CEL) representation.
 type LazyObject struct {
-	object               runtime.Object
-	useSchemalessTypeRef bool
+	object runtime.Object
+	// UseSchemalessTypeRef indicates whether to use SchemalessTypedToVal (reflection-based lazy ref.Val)
+	// instead of converting to an unstructured representation with DefaultTypeAdapter.
+	//
+	// Deprecated: This field is temporary and will be removed when schemaless becomes the default.
+	UseSchemalessTypeRef bool
 	celVal               ref.Val
 }
 
@@ -143,25 +130,19 @@ func (l *LazyObject) Set(obj runtime.Object) {
 	l.celVal = nil
 }
 
-func (l *LazyObject) CELValue(options ...CELValueOption) (ref.Val, error) {
-	opts := &celValueOptions{}
-	for _, o := range options {
-		o(opts)
-	}
-	if l.celVal != nil && l.useSchemalessTypeRef == opts.UseSchemalessTypeRef {
+func (l *LazyObject) CELValue() (ref.Val, error) {
+	if l.celVal != nil {
 		return l.celVal, nil
 	}
 	if l.object == nil {
 		return nil, nil
 	}
-
-	l.useSchemalessTypeRef = opts.UseSchemalessTypeRef
 	if u, ok := l.object.(*unstructured.Unstructured); ok {
 		l.celVal = types.DefaultTypeAdapter.NativeToValue(u.Object)
 		return l.celVal, nil
 	}
 	// TODO: use SchemalessTypeRef always.
-	if opts.UseSchemalessTypeRef {
+	if l.UseSchemalessTypeRef {
 		l.celVal = common.SchemalessTypedToVal(l.object)
 		return l.celVal, nil
 	}
