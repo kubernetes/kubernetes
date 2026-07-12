@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"path"
 	"reflect"
 	"strings"
@@ -765,7 +766,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// loop until we have filled the requested limit from etcd or there are no more results
 	var lastKey []byte
 	var hasMore bool
-	var getResp kubernetes.ListResponse
+	var count int64
 	var numFetched int
 	var numEvald int
 	// Because these metrics are for understanding the costs of handling LIST requests,
@@ -776,74 +777,105 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	}()
 
 	aggregator := s.listErrAggrFactory()
-	for {
-		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
-			Revision: withRev,
-			Limit:    limit,
-			Continue: continueKey,
-		})
-		if err != nil {
-			if errors.Is(err, etcdrpc.ErrFutureRev) {
-				currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
-				if getRVErr != nil {
-					// If we can't get the current RV, use 0 as a fallback.
-					currentRV = 0
-				}
-				return storage.NewTooLargeResourceVersionError(uint64(withRev), currentRV, 0)
-			}
-			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
+
+	for chunk, chunkErr := range s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey) {
+		if chunkErr != nil {
+			return chunkErr
 		}
-		numFetched += len(getResp.Kvs)
-		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
+		numFetched += len(chunk.kvs)
+		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(chunk.revision)); err != nil {
 			return err
 		}
-		hasMore = int64(len(getResp.Kvs)) < getResp.Count
-
-		if len(getResp.Kvs) == 0 && hasMore {
+		if len(chunk.kvs) == 0 && chunk.hasMore {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 		// indicate to the client which resource version was returned, and use the same resource version for subsequent requests.
 		if withRev == 0 {
-			withRev = getResp.Revision
+			withRev = chunk.revision
 		}
+		count = chunk.count
 
-		chunkLastKey, chunkEvaluated, chunkHasMore, err := s.appendChunk(ctx, getResp.Kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
+		chunkLastKey, chunkEvaluated, limitReached, err := s.appendChunk(ctx, chunk.kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
 		if err != nil {
 			return err
 		}
 		numEvald += chunkEvaluated
-		if chunkHasMore {
-			hasMore = true
-		}
 		if chunkLastKey != nil {
 			lastKey = chunkLastKey
 		}
-		continueKey = string(lastKey) + "\x00"
+		hasMore = chunk.hasMore || limitReached
 
-		// no more results remain or we didn't request paging
-		if !hasMore || !paging {
+		// the limit was reached mid-chunk or no results remain
+		if limitReached || !chunk.hasMore {
 			break
 		}
 		// we're paging but we have filled our bucket
-		if int64(v.Len()) >= opts.Predicate.Limit {
+		if paging && int64(v.Len()) >= opts.Predicate.Limit {
 			break
-		}
-
-		if limit < maxLimit {
-			// We got incomplete result due to field/label selector dropping the object.
-			// Double page size to reduce total number of calls to etcd.
-			limit *= 2
-			if limit > maxLimit {
-				limit = maxLimit
-			}
 		}
 	}
 
-	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, getResp.Count, hasMore, opts)
+	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, count, hasMore, opts)
 	if err != nil {
 		return err
 	}
 	return s.finalizeList(listObj, opts.Predicate, uint64(withRev), continueValue, remainingItemCount, aggregator, v)
+}
+
+// listChunk is one batch of kvs from a list read.
+type listChunk struct {
+	kvs      []*mvccpb.KeyValue
+	revision int64
+	count    int64 // etcd's count of keys remaining in the range, including this batch
+	hasMore  bool
+}
+
+func (s *store) pagedChunks(ctx context.Context, keyPrefix string, opts storage.ListOptions, withRev, limit int64, continueKey string) iter.Seq2[listChunk, error] {
+	return func(yield func(listChunk, error) bool) {
+		for {
+			getResp, err := s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
+				Revision: withRev,
+				Limit:    limit,
+				Continue: continueKey,
+			})
+			if err != nil {
+				if errors.Is(err, etcdrpc.ErrFutureRev) {
+					currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
+					if getRVErr != nil {
+						// If we can't get the current RV, use 0 as a fallback.
+						currentRV = 0
+					}
+					yield(listChunk{}, storage.NewTooLargeResourceVersionError(uint64(withRev), currentRV, 0))
+					return
+				}
+				yield(listChunk{}, interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix))
+				return
+			}
+			hasMore := int64(len(getResp.Kvs)) < getResp.Count
+			// use the same resource version for subsequent requests
+			if withRev == 0 {
+				withRev = getResp.Revision
+			}
+			// capture the next continue key before yielding, the consumer nils out kvs as it decodes them
+			if len(getResp.Kvs) > 0 {
+				continueKey = string(getResp.Kvs[len(getResp.Kvs)-1].Key) + "\x00"
+			}
+			if !yield(listChunk{kvs: getResp.Kvs, revision: getResp.Revision, count: getResp.Count, hasMore: hasMore}, nil) {
+				return
+			}
+			if !hasMore {
+				return
+			}
+			if limit < maxLimit {
+				// We got incomplete result due to field/label selector dropping the object.
+				// Double page size to reduce total number of calls to etcd.
+				limit *= 2
+				if limit > maxLimit {
+					limit = maxLimit
+				}
+			}
+		}
+	}
 }
 
 func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator ListErrorAggregator, v reflect.Value) error {
@@ -898,7 +930,7 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 }
 
 // appendChunk appends the kvs matching pred to v.
-func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value, paging bool) (lastKey []byte, evaluated int, hasMore bool, err error) {
+func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value, paging bool) (lastKey []byte, evaluated int, limitReached bool, err error) {
 	// avoid small allocations for the result slice, since this can be called in many
 	// different contexts and we don't know how significantly the result will be filtered
 	if pred.Empty() {
