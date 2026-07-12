@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"path"
 	"reflect"
 	"strings"
@@ -776,30 +777,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	}()
 
 	aggregator := s.listErrAggrFactory()
-	for {
-		getResp, err := s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
-			Revision: withRev,
-			Limit:    limit,
-			Continue: continueKey,
-		})
-		if err != nil {
-			if errors.Is(err, etcdrpc.ErrFutureRev) {
-				currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
-				if getRVErr != nil {
-					// If we can't get the current RV, use 0 as a fallback.
-					currentRV = 0
-				}
-				return storage.NewTooLargeResourceVersionError(uint64(withRev), currentRV, 0)
-			}
-			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
-		}
-		pageHasMore := int64(len(getResp.Kvs)) < getResp.Count
-		// the continue key must be captured before appendChunk nils out the kvs
-		if len(getResp.Kvs) > 0 {
-			continueKey = string(getResp.Kvs[len(getResp.Kvs)-1].Key) + "\x00"
-		}
-		chunk := listChunk{kvs: getResp.Kvs, revision: getResp.Revision, count: getResp.Count, hasMore: pageHasMore}
 
+	for chunk, chunkErr := range s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey) {
+		if chunkErr != nil {
+			return chunkErr
+		}
 		numFetched += len(chunk.kvs)
 		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(chunk.revision)); err != nil {
 			return err
@@ -831,15 +813,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if paging && int64(v.Len()) >= opts.Predicate.Limit {
 			break
 		}
-
-		if limit < maxLimit {
-			// We got incomplete result due to field/label selector dropping the object.
-			// Double page size to reduce total number of calls to etcd.
-			limit *= 2
-			if limit > maxLimit {
-				limit = maxLimit
-			}
-		}
 	}
 
 	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, count, hasMore, opts)
@@ -855,6 +828,54 @@ type listChunk struct {
 	revision int64
 	count    int64 // etcd's count of keys remaining in the range, including this batch
 	hasMore  bool
+}
+
+func (s *store) pagedChunks(ctx context.Context, keyPrefix string, opts storage.ListOptions, withRev, limit int64, continueKey string) iter.Seq2[listChunk, error] {
+	return func(yield func(listChunk, error) bool) {
+		for {
+			getResp, err := s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
+				Revision: withRev,
+				Limit:    limit,
+				Continue: continueKey,
+			})
+			if err != nil {
+				if errors.Is(err, etcdrpc.ErrFutureRev) {
+					currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
+					if getRVErr != nil {
+						// If we can't get the current RV, use 0 as a fallback.
+						currentRV = 0
+					}
+					yield(listChunk{}, storage.NewTooLargeResourceVersionError(uint64(withRev), currentRV, 0))
+					return
+				}
+				yield(listChunk{}, interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix))
+				return
+			}
+			hasMore := int64(len(getResp.Kvs)) < getResp.Count
+			// use the same resource version for subsequent requests
+			if withRev == 0 {
+				withRev = getResp.Revision
+			}
+			// capture the next continue key before yielding, the consumer nils out kvs as it decodes them
+			if len(getResp.Kvs) > 0 {
+				continueKey = string(getResp.Kvs[len(getResp.Kvs)-1].Key) + "\x00"
+			}
+			if !yield(listChunk{kvs: getResp.Kvs, revision: getResp.Revision, count: getResp.Count, hasMore: hasMore}, nil) {
+				return
+			}
+			if !hasMore {
+				return
+			}
+			if limit < maxLimit {
+				// We got incomplete result due to field/label selector dropping the object.
+				// Double page size to reduce total number of calls to etcd.
+				limit *= 2
+				if limit > maxLimit {
+					limit = maxLimit
+				}
+			}
+		}
+	}
 }
 
 func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator ListErrorAggregator, v reflect.Value) error {
