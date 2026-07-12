@@ -339,7 +339,39 @@ func Validate_DeploymentSpec(
 	obj, oldObj *appsv1.DeploymentSpec) (errs field.ErrorList) {
 
 	// field appsv1.DeploymentSpec.Replicas has no validation
-	// field appsv1.DeploymentSpec.Selector has no validation
+
+	{ // field appsv1.DeploymentSpec.Selector
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.LabelSelector,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1.DeploymentSpec) *metav1.LabelSelector {
+				return oldObj.Selector
+			})
+		errs = append(errs, fn(fldPath.Child("selector"), obj.Selector, oldVal, oldObj != nil)...)
+	}
 
 	{ // field appsv1.DeploymentSpec.Template
 		fn := func(

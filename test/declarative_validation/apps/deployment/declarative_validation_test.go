@@ -25,7 +25,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	apps "k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/apps/deployment"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -40,6 +40,12 @@ func tweakPodSpec(podTweaks ...podtest.Tweak) func(*apps.Deployment) {
 			tweak(pod)
 		}
 		deploy.Spec.Template.Spec = pod.Spec
+	}
+}
+
+func tweakSelector(selector *metav1.LabelSelector) func(*apps.Deployment) {
+	return func(deploy *apps.Deployment) {
+		deploy.Spec.Selector = selector
 	}
 }
 
@@ -70,8 +76,10 @@ func mkDeployment(tweaks ...func(*apps.Deployment)) *apps.Deployment {
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-			APIGroup:   "apps",
-			APIVersion: apiVersion,
+			APIGroup:          "apps",
+			APIVersion:        apiVersion,
+			IsResourceRequest: true,
+			Verb:              "create",
 		})
 		testCases := map[string]struct {
 			input        *apps.Deployment
@@ -92,6 +100,13 @@ func TestDeclarativeValidate(t *testing.T) {
 					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				},
 			},
+			"missing selector": {
+				input: mkDeployment(tweakSelector(nil)),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("spec", "selector"), "").MarkAlpha(),
+					field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, "").MarkFromImperative(),
+				},
+			},
 		}
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
@@ -106,14 +121,47 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
-		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-			APIGroup:   "apps",
-			APIVersion: apiVersion,
-			Name:       "abc",
-			Verb:       "update",
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateUpdate(t, apiVersion)
 		})
-		meta.RunObjectMetaUpdateTestCases(t, ctx, mkDeployment(), registry.Strategy,
-			meta.WithStringentFinalizerValidation(),
-		)
+	}
+}
+
+func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "apps",
+		APIVersion:        apiVersion,
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
+	meta.RunObjectMetaUpdateTestCases(t, ctx, mkDeployment(), registry.Strategy,
+		meta.WithStringentFinalizerValidation(),
+	)
+
+	testCases := map[string]struct {
+		old          *apps.Deployment
+		update       *apps.Deployment
+		expectedErrs field.ErrorList
+	}{
+		"valid update": {
+			old:    mkDeployment(),
+			update: mkDeployment(),
+		},
+		"selector changed": {
+			old:    mkDeployment(),
+			update: mkDeployment(tweakSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"name": "different"}})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, "").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec", "selector"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+	}
+
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "2"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, tc.update, tc.old, registry.Strategy, tc.expectedErrs)
+		})
 	}
 }
