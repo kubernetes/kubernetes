@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -417,12 +416,12 @@ var _ = SIGDescribe("Downward API", framework.WithSerial(), framework.WithDisrup
 
 })
 
-var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
+var _ = SIGDescribe("Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Downward API tests for pod level resources", func() {
-		ginkgo.It("should provide default limits.cpu/memory from pod level resources", func(ctx context.Context) {
+		f.It("should provide default limits.cpu/memory from pod level resources", f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{
 				{
@@ -481,7 +480,7 @@ var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFea
 			testDownwardAPIUsingPod(ctx, f, pod, env, expectations)
 		})
 
-		ginkgo.It("should provide default limits.cpu/memory from pod level resources or node allocatable", func(ctx context.Context) {
+		f.It("should provide default limits.cpu/memory from pod level resources or node allocatable", f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			cName := "dapi-container"
 			env := []v1.EnvVar{
