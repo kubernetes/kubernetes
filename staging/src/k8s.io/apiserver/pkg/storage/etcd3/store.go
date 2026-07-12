@@ -765,7 +765,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// loop until we have filled the requested limit from etcd or there are no more results
 	var lastKey []byte
 	var hasMore bool
-	var getResp kubernetes.ListResponse
+	var count int64
 	var numFetched int
 	var numEvald int
 	// Because these metrics are for understanding the costs of handling LIST requests,
@@ -777,7 +777,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	aggregator := s.listErrAggrFactory()
 	for {
-		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
+		getResp, err := s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
 			Revision: withRev,
 			Limit:    limit,
 			Continue: continueKey,
@@ -806,6 +806,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if withRev == 0 {
 			withRev = getResp.Revision
 		}
+		count = getResp.Count
 
 		chunkLastKey, chunkEvaluated, chunkHasMore, err := s.appendChunk(ctx, getResp.Kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
 		if err != nil {
@@ -839,7 +840,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 	}
 
-	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, getResp.Count, hasMore, opts)
+	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, count, hasMore, opts)
 	if err != nil {
 		return err
 	}
