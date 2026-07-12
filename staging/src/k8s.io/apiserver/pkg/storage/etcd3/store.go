@@ -798,6 +798,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			return err
 		}
 		pageHasMore := int64(len(getResp.Kvs)) < getResp.Count
+		// the continue key must be captured before appendChunk nils out the kvs
+		if len(getResp.Kvs) > 0 {
+			continueKey = string(getResp.Kvs[len(getResp.Kvs)-1].Key) + "\x00"
+		}
 
 		if len(getResp.Kvs) == 0 && pageHasMore {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
@@ -816,7 +820,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if chunkLastKey != nil {
 			lastKey = chunkLastKey
 		}
-		continueKey = string(lastKey) + "\x00"
 		hasMore = pageHasMore || limitReached
 
 		// the limit was reached mid-chunk or no results remain
