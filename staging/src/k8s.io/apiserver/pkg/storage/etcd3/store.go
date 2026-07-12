@@ -797,9 +797,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
 			return err
 		}
-		hasMore = int64(len(getResp.Kvs)) < getResp.Count
+		pageHasMore := int64(len(getResp.Kvs)) < getResp.Count
 
-		if len(getResp.Kvs) == 0 && hasMore {
+		if len(getResp.Kvs) == 0 && pageHasMore {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 		// indicate to the client which resource version was returned, and use the same resource version for subsequent requests.
@@ -808,18 +808,16 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 		count = getResp.Count
 
-		chunkLastKey, chunkEvaluated, chunkHasMore, err := s.appendChunk(ctx, getResp.Kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
+		chunkLastKey, chunkEvaluated, limitReached, err := s.appendChunk(ctx, getResp.Kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
 		if err != nil {
 			return err
 		}
 		numEvald += chunkEvaluated
-		if chunkHasMore {
-			hasMore = true
-		}
 		if chunkLastKey != nil {
 			lastKey = chunkLastKey
 		}
 		continueKey = string(lastKey) + "\x00"
+		hasMore = pageHasMore || limitReached
 
 		// no more results remain or we didn't request paging
 		if !hasMore || !paging {
@@ -899,7 +897,7 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 }
 
 // appendChunk appends the kvs matching pred to v.
-func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value, paging bool) (lastKey []byte, evaluated int, hasMore bool, err error) {
+func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value, paging bool) (lastKey []byte, evaluated int, limitReached bool, err error) {
 	// avoid small allocations for the result slice, since this can be called in many
 	// different contexts and we don't know how significantly the result will be filtered
 	if pred.Empty() {
