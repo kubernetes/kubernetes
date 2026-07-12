@@ -819,12 +819,12 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		continueKey = string(lastKey) + "\x00"
 		hasMore = pageHasMore || limitReached
 
-		// no more results remain or we didn't request paging
-		if !hasMore || !paging {
+		// the limit was reached mid-chunk or no results remain
+		if limitReached || !pageHasMore {
 			break
 		}
 		// we're paging but we have filled our bucket
-		if int64(v.Len()) >= opts.Predicate.Limit {
+		if paging && int64(v.Len()) >= opts.Predicate.Limit {
 			break
 		}
 
