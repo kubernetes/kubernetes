@@ -839,16 +839,7 @@ func (s *store) pagedChunks(ctx context.Context, keyPrefix string, opts storage.
 				Continue: continueKey,
 			})
 			if err != nil {
-				if errors.Is(err, etcdrpc.ErrFutureRev) {
-					currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
-					if getRVErr != nil {
-						// If we can't get the current RV, use 0 as a fallback.
-						currentRV = 0
-					}
-					yield(listChunk{}, storage.NewTooLargeResourceVersionError(uint64(withRev), currentRV, 0))
-					return
-				}
-				yield(listChunk{}, interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix))
+				yield(listChunk{}, s.listReadError(ctx, err, withRev, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix))
 				return
 			}
 			hasMore := int64(len(getResp.Kvs)) < getResp.Count
@@ -876,6 +867,19 @@ func (s *store) pagedChunks(ctx context.Context, keyPrefix string, opts storage.
 			}
 		}
 	}
+}
+
+// listReadError maps an etcd list read error to the error GetList returns.
+func (s *store) listReadError(ctx context.Context, err error, withRev int64, paging bool, continueKey, keyPrefix string) error {
+	if errors.Is(err, etcdrpc.ErrFutureRev) {
+		currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
+		if getRVErr != nil {
+			// If we can't get the current RV, use 0 as a fallback.
+			currentRV = 0
+		}
+		return storage.NewTooLargeResourceVersionError(uint64(withRev), currentRV, 0)
+	}
+	return interpretListError(err, paging, continueKey, keyPrefix)
 }
 
 func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator ListErrorAggregator, v reflect.Value) error {
