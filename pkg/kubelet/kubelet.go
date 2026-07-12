@@ -376,8 +376,9 @@ func makePodSourceConfig(ctx context.Context, kubeCfg *kubeletconfiginternal.Kub
 			for i := range v {
 				manifestURLHeader.Add(k, v[i])
 			}
-			manifestURLHeaderKeys = append(manifestURLHeaderKeys, k)
+			manifestURLHeaderKeys = append(manifestURLHeaderKeys, http.CanonicalHeaderKey(k))
 		}
+		sort.Strings(manifestURLHeaderKeys)
 	}
 
 	// source of all configuration

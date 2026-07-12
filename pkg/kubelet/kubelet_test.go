@@ -122,6 +122,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -5367,4 +5368,69 @@ func cleanUpTempDir(t *testing.T, tempDir, originalLogsDir string) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	require.NoError(t, err)
+}
+
+func TestMakePodSourceConfig_DoesNotLogHeaderValues(t *testing.T) {
+	const secretBearer = "Bearer static-pod-url-secret-must-not-leak"
+	const secretAPIKey = "super-secret-api-key-must-not-leak"
+
+	tests := []struct {
+		name       string
+		headers    map[string][]string
+		wantKeys   []string
+		wantAbsent []string
+	}{
+		{
+			name:       "Authorization bearer not leaked",
+			headers:    map[string][]string{"Authorization": {secretBearer}},
+			wantKeys:   []string{"Authorization"},
+			wantAbsent: []string{secretBearer},
+		},
+		{
+			name:       "multiple sensitive headers not leaked",
+			headers:    map[string][]string{"Authorization": {secretBearer}, "X-API-Key": {secretAPIKey}},
+			wantKeys:   []string{"Authorization", "X-Api-Key"}, // http.CanonicalHeaderKey: X-API-Key → X-Api-Key
+			wantAbsent: []string{secretBearer, secretAPIKey},
+		},
+		{
+			name:       "lowercase input canonicalized",
+			headers:    map[string][]string{"authorization": {secretBearer}},
+			wantKeys:   []string{"Authorization"},
+			wantAbsent: []string{secretBearer, "authorization"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Use buffered ktesting logger — same pattern as watchdog and nodeshutdown log tests.
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+			ctx := klog.NewContext(tCtx, logger)
+
+			kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+				StaticPodURL:       "http://127.0.0.1:1/static-pods.yaml",
+				StaticPodURLHeader: tc.headers,
+				HTTPCheckFrequency: metav1.Duration{Duration: time.Hour},
+			}
+			deps := &Dependencies{PodStartupLatencyTracker: kubeletutil.NewPodStartupLatencyTracker()}
+
+			_, err := makePodSourceConfig(ctx, kubeCfg, deps, "node-a", func() bool { return true })
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			require.True(t, ok, "expected ktesting Underlier sink, got %T", logger.GetSink())
+			logStr := underlier.GetBuffer().String()
+
+			for _, absent := range tc.wantAbsent {
+				if strings.Contains(logStr, absent) {
+					t.Fatalf("log contains %q which must not be present\nlogs: %s", absent, logStr)
+				}
+			}
+			for _, want := range tc.wantKeys {
+				if !strings.Contains(logStr, want) {
+					t.Fatalf("log does not contain expected header key %q\nlogs: %s", want, logStr)
+				}
+			}
+		})
+	}
 }
