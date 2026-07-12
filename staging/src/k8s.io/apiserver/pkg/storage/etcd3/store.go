@@ -793,26 +793,27 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			}
 			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 		}
-		numFetched += len(getResp.Kvs)
-		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
-			return err
-		}
 		pageHasMore := int64(len(getResp.Kvs)) < getResp.Count
 		// the continue key must be captured before appendChunk nils out the kvs
 		if len(getResp.Kvs) > 0 {
 			continueKey = string(getResp.Kvs[len(getResp.Kvs)-1].Key) + "\x00"
 		}
+		chunk := listChunk{kvs: getResp.Kvs, revision: getResp.Revision, count: getResp.Count, hasMore: pageHasMore}
 
-		if len(getResp.Kvs) == 0 && pageHasMore {
+		numFetched += len(chunk.kvs)
+		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(chunk.revision)); err != nil {
+			return err
+		}
+		if len(chunk.kvs) == 0 && chunk.hasMore {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 		// indicate to the client which resource version was returned, and use the same resource version for subsequent requests.
 		if withRev == 0 {
-			withRev = getResp.Revision
+			withRev = chunk.revision
 		}
-		count = getResp.Count
+		count = chunk.count
 
-		chunkLastKey, chunkEvaluated, limitReached, err := s.appendChunk(ctx, getResp.Kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
+		chunkLastKey, chunkEvaluated, limitReached, err := s.appendChunk(ctx, chunk.kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
 		if err != nil {
 			return err
 		}
@@ -820,10 +821,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if chunkLastKey != nil {
 			lastKey = chunkLastKey
 		}
-		hasMore = pageHasMore || limitReached
+		hasMore = chunk.hasMore || limitReached
 
 		// the limit was reached mid-chunk or no results remain
-		if limitReached || !pageHasMore {
+		if limitReached || !chunk.hasMore {
 			break
 		}
 		// we're paging but we have filled our bucket
@@ -846,6 +847,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		return err
 	}
 	return s.finalizeList(listObj, opts.Predicate, uint64(withRev), continueValue, remainingItemCount, aggregator, v)
+}
+
+// listChunk is one batch of kvs from a list read.
+type listChunk struct {
+	kvs      []*mvccpb.KeyValue
+	revision int64
+	count    int64 // etcd's count of keys remaining in the range, including this batch
+	hasMore  bool
 }
 
 func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator ListErrorAggregator, v reflect.Value) error {
