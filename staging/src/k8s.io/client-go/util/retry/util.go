@@ -49,17 +49,19 @@ func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) 
 	var lastErr error
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		err := fn()
+		if err != nil {
+			lastErr = err
+		}
 		switch {
 		case err == nil:
 			return true, nil
 		case retriable(err):
-			lastErr = err
 			return false, nil
 		default:
 			return false, err
 		}
 	})
-	if wait.Interrupted(err) {
+	if wait.Interrupted(err) && lastErr != nil {
 		err = lastErr
 	}
 	return err
