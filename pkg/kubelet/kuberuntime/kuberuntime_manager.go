@@ -1641,14 +1641,14 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 		wg.Wait()
 		close(containerResults)
-		var killErr error
+		killFailed := false
 		for containerResult := range containerResults {
 			result.AddSyncResult(containerResult)
-			if containerResult.Error != nil && killErr == nil {
-				killErr = containerResult.Error
+			if containerResult.Error != nil {
+				killFailed = true
 			}
 		}
-		if killErr != nil {
+		if killFailed {
 			return
 		}
 
