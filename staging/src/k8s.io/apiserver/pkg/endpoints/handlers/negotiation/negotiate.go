@@ -56,8 +56,19 @@ func NegotiateOutputMediaType(req *http.Request, ns runtime.NegotiatedSerializer
 	}
 	// TODO: move into resthandler
 	info := mediaType.Accepted
+	// Reject an explicit request for both field dropping and pretty-printing rather
+	// than silently honoring one. Only the explicit pretty=1 parameter conflicts;
+	// User-Agent-implied pretty does not, so clients like curl can still use drop=.
+	if len(mediaType.Drop) > 0 && mediaType.Pretty {
+		supported, _ := MediaTypesForSerializer(ns)
+		return mediaType, runtime.SerializerInfo{}, NewNotAcceptableError(supported)
+	}
 	if (mediaType.Pretty || isPrettyPrint(req)) && info.PrettySerializer != nil {
 		info.Serializer = info.PrettySerializer
+	}
+	// After pretty so an explicit drop= is honored even when pretty is only implied.
+	if len(mediaType.Drop) > 0 && info.DropFieldsSerializer != nil {
+		info.Serializer = info.DropFieldsSerializer
 	}
 	return mediaType, info, nil
 }
@@ -69,7 +80,14 @@ func NegotiateOutputMediaTypeStream(req *http.Request, ns runtime.NegotiatedSeri
 		_, supported := MediaTypesForSerializer(ns)
 		return runtime.SerializerInfo{}, NewNotAcceptableError(supported)
 	}
-	return mediaType.Accepted, nil
+	info := mediaType.Accepted
+	// Swap the embedded-object serializer so each watch event's object is encoded
+	// with the dropped fields omitted. The StreamSerializer encodes only the
+	// WatchEvent envelope, which has no such fields, so it is left unchanged.
+	if len(mediaType.Drop) > 0 && info.DropFieldsSerializer != nil {
+		info.Serializer = info.DropFieldsSerializer
+	}
+	return info, nil
 }
 
 // NegotiateInputSerializer returns the input serializer for the provided request.
@@ -168,6 +186,13 @@ type MediaTypeOptions struct {
 	// has set
 	Export bool
 
+	// Drop lists the recognized field paths the client requested to omit from the
+	// response via the "drop" Accept parameter (e.g. "metadata.managedFields").
+	// Only paths whose feature gate is enabled are included; unknown paths are
+	// ignored for forward compatibility. It is honored when the negotiated
+	// serializer provides a DropFieldsSerializer.
+	Drop []string
+
 	// profile controls the discovery profile (e.g., "local" for local (non peer-aggregated) discovery)
 	Profile string
 
@@ -176,6 +201,29 @@ type MediaTypeOptions struct {
 
 	// the accepted media type from the client
 	Accepted runtime.SerializerInfo
+}
+
+// dropManagedFieldsTarget is the only target currently recognized by the "drop"
+// Accept parameter (e.g. "Accept: application/json;drop=metadata.managedFields").
+const dropManagedFieldsTarget = "metadata.managedFields"
+
+// parseDropParam returns the recognized, feature-enabled targets from a "drop" Accept
+// parameter value ("+"-separated). It returns ok=false if a target is repeated.
+func parseDropParam(value string) (drop []string, ok bool) {
+	seen := map[string]bool{}
+	for target := range strings.SplitSeq(value, "+") {
+		if target == "" {
+			continue
+		}
+		if seen[target] {
+			return nil, false
+		}
+		seen[target] = true
+		if target == dropManagedFieldsTarget && utilfeature.DefaultFeatureGate.Enabled(features.ManagedFieldsOptOut) {
+			drop = append(drop, target)
+		}
+	}
+	return drop, true
 }
 
 // acceptMediaTypeOptions returns an options object that matches the provided media type params. If
@@ -225,6 +273,18 @@ func acceptMediaTypeOptions(params map[string]string, accepts *runtime.Serialize
 		// or which fit the default behavior.
 		case "export":
 			options.Export = v == "1"
+
+		// if specified, the server should drop the listed fields from the returned
+		// output. Targets are "+"-separated. Repeated targets are rejected. Currently
+		// only "metadata.managedFields" is recognized (and only when the
+		// ManagedFieldsOptOut feature is enabled); unknown targets are silently
+		// ignored for forward compatibility.
+		case "drop":
+			drop, ok := parseDropParam(v)
+			if !ok {
+				return MediaTypeOptions{}, false
+			}
+			options.Drop = drop
 
 		// if specified, the pretty serializer will be used
 		case "pretty":

@@ -17,6 +17,7 @@ limitations under the License.
 package negotiation
 
 import (
+	"io"
 	"mime"
 	"net/http"
 	"net/url"
@@ -25,6 +26,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 // statusError is an object that can be converted into an metav1.Status
@@ -305,5 +310,144 @@ func BenchmarkNegotiateMediaTypeOptions(b *testing.B) {
 		if options.Accepted != accepted[1] {
 			b.Errorf("Unexpected result")
 		}
+	}
+}
+
+// idSerializer is a minimal runtime.Serializer that only carries an identifier,
+// used to detect which serializer negotiation selected.
+type idSerializer struct{ id runtime.Identifier }
+
+func (s idSerializer) Encode(runtime.Object, io.Writer) error { return nil }
+func (s idSerializer) Decode([]byte, *schema.GroupVersionKind, runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	return nil, nil, nil
+}
+func (s idSerializer) Identifier() runtime.Identifier { return s.id }
+
+// dropNegotiatedSerializer returns the given infos from SupportedMediaTypes.
+type dropNegotiatedSerializer struct{ infos []runtime.SerializerInfo }
+
+func (n dropNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo { return n.infos }
+func (n dropNegotiatedSerializer) EncoderForVersion(e runtime.Encoder, _ runtime.GroupVersioner) runtime.Encoder {
+	return e
+}
+func (n dropNegotiatedSerializer) DecoderToVersion(d runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
+	return d
+}
+
+func TestNegotiateDropManagedFields(t *testing.T) {
+	jsonInfo := runtime.SerializerInfo{
+		MediaType:            runtime.ContentTypeJSON,
+		MediaTypeType:        "application",
+		MediaTypeSubType:     "json",
+		EncodesAsText:        true,
+		Serializer:           idSerializer{id: "full"},
+		DropFieldsSerializer: idSerializer{id: "dropped"},
+	}
+	noDropSerializer := jsonInfo
+	noDropSerializer.DropFieldsSerializer = nil
+
+	for _, tc := range []struct {
+		name        string
+		header      string
+		userAgent   string
+		gateEnabled bool
+		info        runtime.SerializerInfo
+		wantErr     bool
+		wantID      runtime.Identifier
+	}{
+		{
+			name:        "drop, gate on",
+			header:      "application/json;drop=metadata.managedFields",
+			gateEnabled: true,
+			info:        jsonInfo,
+			wantID:      "dropped",
+		},
+		{
+			name:        "drop, gate off",
+			header:      "application/json;drop=metadata.managedFields",
+			gateEnabled: false,
+			info:        jsonInfo,
+			wantID:      "full",
+		},
+		{
+			name:        "unknown target ignored",
+			header:      "application/json;drop=metadata.annotations",
+			gateEnabled: true,
+			info:        jsonInfo,
+			wantID:      "full",
+		},
+		{
+			name:        "managedFields among multiple targets",
+			header:      "application/json;drop=metadata.annotations+metadata.managedFields",
+			gateEnabled: true,
+			info:        jsonInfo,
+			wantID:      "dropped",
+		},
+		{
+			name:        "no drop parameter",
+			header:      "application/json",
+			gateEnabled: true,
+			info:        jsonInfo,
+			wantID:      "full",
+		},
+		{
+			name:        "empty drop parameter",
+			header:      "application/json;drop=",
+			gateEnabled: true,
+			info:        jsonInfo,
+			wantID:      "full",
+		},
+		{
+			name:        "no drop serializer available",
+			header:      "application/json;drop=metadata.managedFields",
+			gateEnabled: true,
+			info:        noDropSerializer,
+			wantID:      "full",
+		},
+		{
+			name:        "repeated target rejected",
+			header:      "application/json;drop=metadata.managedFields+metadata.managedFields",
+			gateEnabled: true,
+			info:        jsonInfo,
+			wantErr:     true,
+		},
+		{
+			name:        "drop with explicit accept pretty rejected",
+			header:      "application/json;drop=metadata.managedFields;pretty=1",
+			gateEnabled: true,
+			info:        jsonInfo,
+			wantErr:     true,
+		},
+		{
+			name:        "drop with user-agent pretty still drops",
+			header:      "application/json;drop=metadata.managedFields",
+			userAgent:   "curl/8.0",
+			gateEnabled: true,
+			info:        jsonInfo,
+			wantID:      "dropped",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManagedFieldsOptOut, tc.gateEnabled)
+
+			req := &http.Request{Header: http.Header{"Accept": []string{tc.header}}, URL: &url.URL{}}
+			if tc.userAgent != "" {
+				req.Header.Set("User-Agent", tc.userAgent)
+			}
+			ns := dropNegotiatedSerializer{infos: []runtime.SerializerInfo{tc.info}}
+			_, info, err := NegotiateOutputMediaType(req, ns, DefaultEndpointRestrictions)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got := info.Serializer.Identifier(); got != tc.wantID {
+				t.Errorf("selected serializer = %q, want %q", got, tc.wantID)
+			}
+		})
 	}
 }
