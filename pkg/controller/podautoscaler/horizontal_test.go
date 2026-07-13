@@ -2218,7 +2218,7 @@ func TestScaleUpCMObject(t *testing.T) {
 			expectedActionLabel:     monitor.ActionLabelScaleUp,
 		},
 		{
-			name: "scale up from zero with feature gate enabled",
+			name: "scale up from zero with HPAScaleToZero enabled",
 			fixture: horizontalScenario{
 				minReplicas:    0,
 				maxReplicas:    6,
@@ -2265,7 +2265,7 @@ func TestScaleUpCMObject(t *testing.T) {
 			hpaScaleToZero: true,
 		},
 		{
-			name: "scale up from zero with feature gate disabled",
+			name: "scale up from zero with HPAScaleToZero disabled",
 			fixture: horizontalScenario{
 				minReplicas:    0,
 				maxReplicas:    6,
@@ -2309,7 +2309,7 @@ func TestScaleUpCMObject(t *testing.T) {
 			},
 		},
 		{
-			name: "scale up from zero ignores tolerance with feature gate enabled",
+			name: "scale up from zero ignores tolerance with HPAScaleToZero enabled",
 			fixture: horizontalScenario{
 				minReplicas:    0,
 				maxReplicas:    6,
@@ -2356,7 +2356,7 @@ func TestScaleUpCMObject(t *testing.T) {
 			hpaScaleToZero: true,
 		},
 		{
-			name: "scale up from zero ignores tolerance with feature gate disabled",
+			name: "scale up from zero ignores tolerance with HPAScaleToZero disabled",
 			fixture: horizontalScenario{
 				minReplicas:    0,
 				maxReplicas:    6,
@@ -2574,18 +2574,20 @@ func TestScaleWithOneInvalidMetric(t *testing.T) {
 			expectedErrorLabel:      monitor.ErrorLabelSpec,
 			expectedMetricActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 				autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
-				"CheddarCheese":                        monitor.ActionLabelNone,
+				// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+				"CheddarCheese": monitor.ActionLabelNone,
 			},
 			expectedMetricErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
 				autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-				"CheddarCheese":                        monitor.ErrorLabelSpec,
+				// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+				"CheddarCheese": monitor.ErrorLabelSpec,
 			},
 			expectedErrorFromReconcileAutoscaler: "invalid metrics (1 invalid out of 2)",
 		},
 		{
 			// From zero with CPU + invalid metric: CPU alone can't scale from zero (only object/external can),
 			// so HPA stays at 0 replicas regardless of feature gate state
-			name: "from zero with invalid metric, FG on",
+			name: "from zero with invalid metric, HPAScaleToZero enabled",
 			fixture: horizontalScenario{
 				minReplicas:         0,
 				maxReplicas:         6,
@@ -2617,7 +2619,7 @@ func TestScaleWithOneInvalidMetric(t *testing.T) {
 			},
 		},
 		{
-			name: "from zero with invalid metric, FG off",
+			name: "from zero with invalid metric, HPAScaleToZero disabled",
 			fixture: horizontalScenario{
 				minReplicas:         0,
 				maxReplicas:         6,
@@ -2917,7 +2919,7 @@ func TestScaleDownCM(t *testing.T) {
 			expectedDesiredReplicas: 3,
 		},
 		{
-			name: "scale down to zero object metric with feature gate enabled",
+			name: "scale down to zero object metric with HPAScaleToZero enabled",
 			fixture: horizontalScenario{
 				minReplicas:    0,
 				maxReplicas:    6,
@@ -2960,7 +2962,7 @@ func TestScaleDownCM(t *testing.T) {
 			hpaScaleToZero: true,
 		},
 		{
-			name: "scale down to zero object metric with feature gate disabled",
+			name: "scale down to zero object metric with HPAScaleToZero disabled",
 			fixture: horizontalScenario{
 				minReplicas:    0,
 				maxReplicas:    6,
@@ -3068,7 +3070,7 @@ func TestScaleDownCM(t *testing.T) {
 			expectedDesiredReplicas: 3,
 		},
 		{
-			name: "scale down to zero external metric with feature gate enabled",
+			name: "scale down to zero external metric with HPAScaleToZero enabled",
 			fixture: horizontalScenario{
 				minReplicas:    0,
 				maxReplicas:    6,
@@ -3106,7 +3108,7 @@ func TestScaleDownCM(t *testing.T) {
 			hpaScaleToZero: true,
 		},
 		{
-			name: "scale down to zero external metric with feature gate disabled",
+			name: "scale down to zero external metric with HPAScaleToZero disabled",
 			fixture: horizontalScenario{
 				minReplicas:    0,
 				maxReplicas:    6,
@@ -3250,13 +3252,13 @@ func TestScaleDownCM(t *testing.T) {
 }
 
 // TestScaleToZeroBehavior consolidates tests for HPA scale-to-zero handling:
-//   - Without ScaledToZero condition, scaling from zero is disabled regardless of feature gate.
+//   - Without ScaledToZero condition, scaling from zero is disabled regardless of HPAScaleToZero.
 //   - When minReplicas is increased above zero with ScaledToZero condition present, behavior
-//     differs based on feature gate: FG on → scale up to minReplicas; FG off → scaling disabled.
-//   - On normal rescale with stale ScaledToZero condition: FG on → condition set to False;
-//     FG off → condition removed entirely.
-//   - Manual scale to zero (minReplicas >= 1, no ScaledToZero condition) pauses HPA regardless of FG.
-//   - With feature gate disabled, no ScaledToZero condition is recorded on a normal rescale.
+//     differs based on HPAScaleToZero: enabled → scale up to minReplicas; disabled → scaling disabled.
+//   - On normal rescale with stale ScaledToZero condition: HPAScaleToZero enabled → condition set to False;
+//     disabled → condition removed entirely.
+//   - Manual scale to zero (minReplicas >= 1, no ScaledToZero condition) pauses HPA regardless of HPAScaleToZero.
+//   - With HPAScaleToZero disabled, no ScaledToZero condition is recorded on a normal rescale.
 func TestScaleToZeroBehavior(t *testing.T) {
 	targetValue := resource.MustParse("15.0")
 
@@ -3272,7 +3274,7 @@ func TestScaleToZeroBehavior(t *testing.T) {
 	}{
 		{
 			// Without ScaledToZero condition, scaling from zero is disabled regardless of feature gate
-			name:           "from zero without condition, FG on",
+			name:           "from zero without condition, HPAScaleToZero enabled",
 			hpaScaleToZero: true,
 			fixture: horizontalScenario{
 				minReplicas:    0,
@@ -3304,7 +3306,7 @@ func TestScaleToZeroBehavior(t *testing.T) {
 			},
 		},
 		{
-			name:           "from zero without condition, FG off",
+			name:           "from zero without condition, HPAScaleToZero disabled",
 			hpaScaleToZero: false,
 			fixture: horizontalScenario{
 				minReplicas:    0,
@@ -3337,7 +3339,7 @@ func TestScaleToZeroBehavior(t *testing.T) {
 		},
 		{
 			// HPA previously scaled to zero, minReplicas increased to 2 → scale up to minReplicas
-			name:           "minReplicas increased with ScaledToZero condition, FG on",
+			name:           "minReplicas increased with ScaledToZero condition, HPAScaleToZero enabled",
 			hpaScaleToZero: true,
 			fixture: horizontalScenario{
 				minReplicas:    2,
@@ -3374,8 +3376,8 @@ func TestScaleToZeroBehavior(t *testing.T) {
 			},
 		},
 		{
-			// FG off: scaledToZeroCondition=false → treated as manual scale-down, scaling disabled
-			name:           "minReplicas increased with ScaledToZero condition, FG off",
+			// HPAScaleToZero disabled: scaledToZeroCondition=false → treated as manual scale-down, scaling disabled
+			name:           "minReplicas increased with ScaledToZero condition, HPAScaleToZero disabled",
 			hpaScaleToZero: false,
 			fixture: horizontalScenario{
 				minReplicas:    2,
@@ -3410,8 +3412,8 @@ func TestScaleToZeroBehavior(t *testing.T) {
 			},
 		},
 		{
-			// FG on: ScaledToZero condition set to False on normal rescale
-			name:           "stale ScaledToZero condition cleared on normal rescale, FG on",
+			// HPAScaleToZero enabled: ScaledToZero condition set to False on normal rescale
+			name:           "stale ScaledToZero condition cleared on normal rescale, HPAScaleToZero enabled",
 			hpaScaleToZero: true,
 			fixture: horizontalScenario{
 				minReplicas:         1,
@@ -3442,8 +3444,8 @@ func TestScaleToZeroBehavior(t *testing.T) {
 			},
 		},
 		{
-			// FG off: stale ScaledToZero condition removed on rescale
-			name:           "stale ScaledToZero condition removed on normal rescale, FG off",
+			// HPAScaleToZero disabled: stale ScaledToZero condition removed on rescale
+			name:           "stale ScaledToZero condition removed on normal rescale, HPAScaleToZero disabled",
 			hpaScaleToZero: false,
 			fixture: horizontalScenario{
 				minReplicas:         1,
@@ -3473,7 +3475,7 @@ func TestScaleToZeroBehavior(t *testing.T) {
 		{
 			// With minReplicas >= 1, a workload manually scaled to zero (no ScaledToZero condition)
 			// should cause HPA to pause (ScalingDisabled), regardless of feature gate
-			name:           "manual scale to zero disables HPA, FG on",
+			name:           "manual scale to zero disables HPA, HPAScaleToZero enabled",
 			hpaScaleToZero: true,
 			fixture: horizontalScenario{
 				minReplicas:         1,
@@ -3499,7 +3501,7 @@ func TestScaleToZeroBehavior(t *testing.T) {
 			},
 		},
 		{
-			name:           "manual scale to zero disables HPA, FG off",
+			name:           "manual scale to zero disables HPA, HPAScaleToZero disabled",
 			hpaScaleToZero: false,
 			fixture: horizontalScenario{
 				minReplicas:         1,
@@ -3525,8 +3527,8 @@ func TestScaleToZeroBehavior(t *testing.T) {
 			},
 		},
 		{
-			// With the feature gate disabled, no ScaledToZero condition is recorded.
-			name:           "no ScaledToZero condition when feature gate disabled",
+			// With HPAScaleToZero disabled, no ScaledToZero condition is recorded.
+			name:           "no ScaledToZero condition when HPAScaleToZero disabled",
 			hpaScaleToZero: false,
 			fixture: horizontalScenario{
 				minReplicas:         1,
