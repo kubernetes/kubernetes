@@ -18,6 +18,8 @@ package testsuites
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 
@@ -242,5 +244,55 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 		framework.ExpectNoError(err, "failed to delete pod1")
 		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, l.cs, pod2.Name, pod2.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "failed to wait for pod2 running status")
+	})
+
+	ginkgo.It("should successfully mount a ReadWriteOncePod volume when consumed by a single pod with multiple containers", func(ctx context.Context) {
+		ginkgo.By("creating the ReadWriteOncePod PVC")
+		accessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}
+		l.volume = storageframework.CreateVolumeResourceWithAccessModes(ctx, driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes, nil)
+
+		podConfig := e2epod.Config{
+			NS:           f.Namespace.Name,
+			PVCs:         []*v1.PersistentVolumeClaim{l.volume.Pvc},
+			SeLinuxLabel: e2epv.SELinuxLabel,
+		}
+
+		ginkgo.By("creating the Pod with two containers")
+		pod, err := e2epod.MakeSecPod(&podConfig)
+		framework.ExpectNoError(err, "failed to create pod spec")
+		pod.Spec.Containers[0].Name = "container-one"
+		secondContainer := pod.Spec.Containers[0]
+		secondContainer.Name = "container-two"
+		pod.Spec.Containers = append(pod.Spec.Containers, secondContainer)
+
+		_, err = l.cs.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create pod")
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, l.cs, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+		framework.ExpectNoError(err, "failed to wait for pod running status")
+		l.pods = append(l.pods, pod)
+
+		testFile := e2epod.VolumeMountPath1 + "/testfile"
+		checkVolumeWriteAndRead := func(containerName string) {
+			e2epod.ExecShellInContainer(f, pod.Name, containerName, fmt.Sprintf("echo \"storage test\" >%s && sync -f %s", testFile, testFile))
+			stdout := e2epod.ExecShellInContainer(f, pod.Name, containerName, fmt.Sprintf("cat %s", testFile))
+			if !strings.Contains(stdout, "storage test") {
+				framework.Failf("expected %s in container %q to contain %q, got %q", testFile, containerName, "storage test", stdout)
+			}
+		}
+
+		ginkgo.By("checking that the first container can read and write on the mounted volume")
+		checkVolumeWriteAndRead("container-one")
+
+		ginkgo.By("checking that data written by the first container is visible in the second container")
+		stdout := e2epod.ExecShellInContainer(f, pod.Name, "container-two", fmt.Sprintf("cat %s", testFile))
+		if !strings.Contains(stdout, "storage test") {
+			framework.Failf("expected %s in container %q to contain %q, got %q", testFile, "container-two", "storage test", stdout)
+		}
+
+		ginkgo.By("deleting the test file from the second container")
+		e2epod.ExecShellInContainer(f, pod.Name, "container-two", fmt.Sprintf("rm %s", testFile))
+
+		ginkgo.By("checking that the second container can read and write on the mounted volume")
+		checkVolumeWriteAndRead("container-two")
 	})
 }
