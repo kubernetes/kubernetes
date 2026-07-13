@@ -65,6 +65,7 @@ func TestPodGroupPreemption(t *testing.T) {
 		pdb                                *policyv1.PodDisruptionBudget
 		expectedScheduled                  []string
 		expectedPreempted                  []string
+		expectedSurvivingInitialPods       *int
 		expectedUnschedulable              []string
 		expectedToHaveNNNInfo              []string
 		expectedPodsPreemptedByWAP         int
@@ -432,7 +433,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
-			name: "Basic scheduling: reprieve if it does not reduce scheduled pods below max possible",
+			name: "Basic scheduling: reprieves exactly one victim under fixed assignment",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
@@ -453,10 +454,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("p-b").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("p-c").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"p-a", "p-b", "p-c", "p4"},
-			expectedPreempted:          []string{"p1", "p2", "p3"},
-			expectedToHaveNNNInfo:      []string{"p-a", "p-b", "p-c"},
-			expectedPodsPreemptedByWAP: 3,
+			expectedScheduled:            []string{"p-a", "p-b", "p-c"},
+			expectedSurvivingInitialPods: ptr.To(1),
+			expectedToHaveNNNInfo:        []string{"p-a", "p-b", "p-c"},
+			expectedPodsPreemptedByWAP:   3,
 		},
 		{
 			name: "Basic scheduling: schedule as many pods as possible without preempting higher priority pods",
@@ -1092,10 +1093,17 @@ func TestPodGroupPreemption(t *testing.T) {
 
 			// 5. Wait for preemption to complete if WAP calls are expected
 			if tt.expectedPodsPreemptedByWAP > 0 {
+				podsToCheck := tt.expectedPreempted
+				if tt.expectedSurvivingInitialPods != nil {
+					podsToCheck = make([]string, 0, len(tt.initialPods))
+					for _, pod := range tt.initialPods {
+						podsToCheck = append(podsToCheck, pod.Name)
+					}
+				}
 				wapCalls := 0
 				err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 					wapCalls = 0
-					for _, podName := range tt.expectedPreempted {
+					for _, podName := range podsToCheck {
 						events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
 							FieldSelector: "involvedObject.name=" + podName,
 						})
@@ -1112,7 +1120,7 @@ func TestPodGroupPreemption(t *testing.T) {
 					return wapCalls == tt.expectedPodsPreemptedByWAP, nil
 				})
 				if err != nil {
-					t.Errorf("WorkloadAwarePreemption was not called expected times within timeout: want=%d, got=%d", wapCalls, tt.expectedPodsPreemptedByWAP)
+					t.Errorf("WorkloadAwarePreemption was not called expected times within timeout: want=%d, got=%d", tt.expectedPodsPreemptedByWAP, wapCalls)
 				}
 			}
 
@@ -1133,20 +1141,45 @@ func TestPodGroupPreemption(t *testing.T) {
 			}
 
 			// 8. Verify preempted pods
+			podPreempted := func(ctx context.Context, podName string) (bool, error) {
+				pod, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						return true, nil
+					}
+					return false, err
+				}
+				if pod.DeletionTimestamp != nil {
+					return true, nil
+				}
+				_, cond := podutil.GetPodCondition(&pod.Status, v1.DisruptionTarget)
+				return cond != nil, nil
+			}
 			for _, podName := range tt.expectedPreempted {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 5*time.Second, false,
 					func(ctx context.Context) (bool, error) {
-						pod, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
-						if err != nil {
-							return apierrors.IsNotFound(err), nil
-						}
-						if pod.DeletionTimestamp != nil {
-							return true, nil
-						}
-						_, cond := podutil.GetPodCondition(&pod.Status, v1.DisruptionTarget)
-						return cond != nil, nil
+						return podPreempted(ctx, podName)
 					}); err != nil {
 					t.Errorf("Pod %s was expected to be preempted but wasn't", podName)
+				}
+			}
+			if tt.expectedSurvivingInitialPods != nil {
+				var surviving int
+				err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+					surviving = 0
+					for _, pod := range tt.initialPods {
+						preempted, err := podPreempted(ctx, pod.Name)
+						if err != nil {
+							return false, err
+						}
+						if !preempted {
+							surviving++
+						}
+					}
+					return surviving == *tt.expectedSurvivingInitialPods, nil
+				})
+				if err != nil {
+					t.Errorf("Unexpected number of initial pods survived preemption: want=%d, got=%d", *tt.expectedSurvivingInitialPods, surviving)
 				}
 			}
 
