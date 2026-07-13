@@ -7222,7 +7222,7 @@ type NamespaceList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
-// +k8s:isSubresource="/binding"
+// +k8s:supportsSubresource="/binding"
 // Binding ties one object to another; for example, a pod is bound to a node by a scheduler.
 type Binding struct {
 	metav1.TypeMeta `json:""`
