@@ -46,7 +46,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		(*corev1.Binding)(nil),
 		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 			switch op.Request.SubresourcePath() {
-			case "/":
+			case "/binding":
 				return Validate_Binding(
 					ctx, op, nil, /* fldPath */
 					obj.(*corev1.Binding),
