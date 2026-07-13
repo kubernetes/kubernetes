@@ -5723,32 +5723,27 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
-			t.Run(test.name, func(t *testing.T) {
-				logger, tCtx := ktesting.NewTestContext(t)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResourcesVerticalScalingEnabled)
+		t.Run(test.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResourcesVerticalScalingEnabled)
 
-				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-				defer testKubelet.Cleanup()
-				kl := testKubelet.kubelet
-				kl.statusManager.SetPodStatus(logger, test.pod, test.previousStatus)
-				for _, name := range test.unreadyContainer {
-					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
-				}
-				expected := test.expected.DeepCopy()
-				actual := kl.generateAPIPodStatus(tCtx, test.pod, test.currentStatus, test.isPodTerminal)
-				if enablePodReadyToStartContainersCondition {
-					expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
-				}
-				if test.expectedPodDisruptionCondition != nil {
-					expected.Conditions = append([]v1.PodCondition{*test.expectedPodDisruptionCondition}, expected.Conditions...)
-				}
-				if !apiequality.Semantic.DeepEqual(*expected, actual) {
-					t.Fatalf("Unexpected status: %s", cmp.Diff(*expected, actual))
-				}
-			})
-		}
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			kl.statusManager.SetPodStatus(logger, test.pod, test.previousStatus)
+			for _, name := range test.unreadyContainer {
+				kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
+			}
+			expected := test.expected.DeepCopy()
+			actual := kl.generateAPIPodStatus(tCtx, test.pod, test.currentStatus, test.isPodTerminal)
+			expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
+			if test.expectedPodDisruptionCondition != nil {
+				expected.Conditions = append([]v1.PodCondition{*test.expectedPodDisruptionCondition}, expected.Conditions...)
+			}
+			if !apiequality.Semantic.DeepEqual(*expected, actual) {
+				t.Fatalf("Unexpected status: %s", cmp.Diff(*expected, actual))
+			}
+		})
 	}
 }
 

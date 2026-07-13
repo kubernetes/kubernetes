@@ -778,10 +778,12 @@ const (
 	// Enables the pod to report status.ObservedGeneration to reflect the generation of the last observed podspec.
 	PodObservedGenerationTracking featuregate.Feature = "PodObservedGenerationTracking"
 
-	// owner: @ddebroy, @kannon92
+	// owner: @ddebroy, @kannon92, @Priyankasaggu11929
+	// kep: https://kep.k8s.io/3085, https://kep.k8s.io/4138
 	//
-	// Enables reporting of PodReadyToStartContainersCondition condition in pod status after pod
-	// sandbox creation and network configuration completes successfully
+	// Enables reporting of PodReadyToStartContainersCondition condition in pod status
+	// after pod sandbox creation, network configuration, volume mounting, and
+	// (if requested) dynamic resource allocation are complete.
 	PodReadyToStartContainersCondition featuregate.Feature = "PodReadyToStartContainersCondition"
 
 	// owner: @Huang-Wei
@@ -1742,6 +1744,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	PodReadyToStartContainersCondition: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.37, remove in 1.40
 	},
 
 	PodSchedulingReadiness: {
