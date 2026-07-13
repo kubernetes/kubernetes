@@ -2568,6 +2568,17 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics/resource
+- name: csi_node_storage_health_status
+  help: CSI node storage backend health conditions currently reported (1 = present).
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  - reason
+  - status
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: operations_seconds
   subsystem: csi
   help: Container Storage Interface operation duration with gRPC error code status

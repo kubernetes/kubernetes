@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/utils/ptr"
 )
 
 type fakeCsiDriverClient struct {
@@ -130,7 +129,7 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		}
 		if len(conditions) > 0 {
 			message := conditions[0].Message
-			metrics.Abnormal, metrics.Message = ptr.To(true), &message
+			metrics.Abnormal, metrics.Message = new(true), &message
 		}
 	}
 

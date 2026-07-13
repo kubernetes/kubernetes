@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -238,13 +238,12 @@ func TestProbeVolumeHealth(t *testing.T) {
 			status := &testStatusUpdater{}
 			client := &fakeHealthClient{supportsVolumeHealth: tc.supportsVolumeHealth}
 			m := newTestManager(t, status, client)
-			logger := klog.Background()
 
 			prevCalls := 0
 			for i, s := range tc.steps {
 				client.volumeConditions = s.volumeConditions
 				client.volumeErr = s.volumeErr
-				m.probeVolumeHealth(context.Background(), logger)
+				m.probeVolumeHealth(context.Background())
 
 				got := status.callCount()
 				if got != s.wantCallCount {
@@ -337,13 +336,12 @@ func TestProbeStorageHealth(t *testing.T) {
 			updater := &fakeCSINodeUpdater{}
 			m := newTestManager(t, &testStatusUpdater{}, client)
 			m.csiNodeUpdater = func() CSINodeUpdater { return updater }
-			logger := klog.Background()
 
 			prevCalls := 0
 			for i, s := range tc.steps {
 				client.storageConditions = s.storageConditions
 				client.storageErr = s.storageErr
-				m.probeStorageHealth(context.Background(), logger)
+				m.probeStorageHealth(context.Background())
 
 				updater.mu.Lock()
 				got := len(updater.calls)

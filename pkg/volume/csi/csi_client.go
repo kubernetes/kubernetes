@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/utils/ptr"
 )
 
 type csiClient interface {
@@ -658,9 +657,9 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 			}
 			if len(conditions) > 0 {
 				message := conditions[0].Message
-				metrics.Abnormal, metrics.Message = ptr.To(true), &message
+				metrics.Abnormal, metrics.Message = new(true), &message
 			} else {
-				metrics.Abnormal = ptr.To(false)
+				metrics.Abnormal = new(false)
 			}
 		}
 	}
@@ -714,7 +713,12 @@ func (c *csiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagin
 	if err != nil {
 		return nil, err
 	}
-	defer closer.Close()
+	defer func() {
+		err := closer.Close()
+		if err != nil {
+			klog.Errorf("error closing node client %v", err)
+		}
+	}()
 
 	req := &csipbv1.NodeGetVolumeHealthRequest{
 		VolumeId:          volID,
@@ -738,7 +742,12 @@ func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[
 	if err != nil {
 		return nil, err
 	}
-	defer closer.Close()
+	defer func() {
+		err := closer.Close()
+		if err != nil {
+			klog.Errorf("error closing node client: %v", err)
+		}
+	}()
 
 	req := &csipbv1.NodeGetStorageHealthRequest{
 		Secrets: secrets,

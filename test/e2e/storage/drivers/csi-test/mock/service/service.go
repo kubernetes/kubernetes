@@ -256,7 +256,7 @@ func (s *service) findVolByID(
 	return s.findVol("id", id)
 }
 
-func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string]string) *cache.Snapshot {
+func (s *service) newSnapshot(name, sourceVolumeID string, parameters map[string]string) *cache.Snapshot {
 
 	ptime := timestamppb.Now()
 	return &cache.Snapshot{
@@ -265,7 +265,7 @@ func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string
 		SnapshotCSI: &csi.Snapshot{
 			SnapshotId:     fmt.Sprintf("%d", s.snapshotsNID.Add(1)),
 			CreationTime:   ptime,
-			SourceVolumeId: sourceVolumeId,
+			SourceVolumeId: sourceVolumeID,
 			ReadyToUse:     true,
 		},
 	}

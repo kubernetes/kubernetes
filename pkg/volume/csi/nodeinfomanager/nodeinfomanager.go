@@ -740,7 +740,7 @@ func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(driverName string, condit
 		return true, nil
 	})
 	if err != nil {
-		return fmt.Errorf("error updating CSINode status: %v; caused by: %v", err, utilerrors.NewAggregate(updateErrs))
+		return fmt.Errorf("error updating CSINode status: %w; caused by: %w", err, utilerrors.NewAggregate(updateErrs))
 	}
 	return nil
 }
@@ -776,7 +776,10 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 		return nil
 	}
 
-	nodeInfo.Status.StorageHealth = append(otherDriversConds, conditions...)
+	combined := make([]storagev1.StorageHealthCondition, 0, len(otherDriversConds)+len(conditions))
+	combined = append(combined, otherDriversConds...)
+	combined = append(combined, conditions...)
+	nodeInfo.Status.StorageHealth = combined
 	_, err = csiKubeClient.StorageV1().CSINodes().UpdateStatus(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 	return err
 }

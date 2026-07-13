@@ -1316,6 +1316,22 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 			expectUpdate: true,
 		},
 		{
+			name:           "replace driver conditions preserves other drivers",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{
+					{Name: driver1, NodeID: "n1"},
+					{Name: driver2, NodeID: "n2"},
+				}},
+				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealthCondition{cond1, cond2}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{cond1New},
+			expectStatus: []storage.StorageHealthCondition{cond2, cond1New},
+			expectUpdate: true,
+		},
+		{
 			name:           "no-op when identity unchanged",
 			featureEnabled: true,
 			existingCSINode: &storage.CSINode{
@@ -1357,7 +1373,12 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 			if err != nil {
 				t.Fatalf("can't create temp dir: %v", err)
 			}
-			defer os.RemoveAll(tmpDir)
+			defer func() {
+				err := os.RemoveAll(tmpDir)
+				if err != nil {
+					t.Errorf("error removing tmpdir: %v", err)
+				}
+			}()
 
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, tmpDir, client, nil, existingNode.Name, nil, nil)
 			nim := NewNodeInfoManager(types.NodeName(existingNode.Name), host, nil).(*nodeInfoManager)

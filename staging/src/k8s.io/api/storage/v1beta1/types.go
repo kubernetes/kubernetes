@@ -593,6 +593,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:deprecated=1.17
 // +k8s:prerelease-lifecycle-gen:removed=1.22
 // +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSINode
+// +k8s:supportsSubresource="/status"
 
 // DEPRECATED - This group version of CSINode is deprecated by storage/v1/CSINode.
 // See the release notes for more information.

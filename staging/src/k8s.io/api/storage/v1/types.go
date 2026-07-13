@@ -582,6 +582,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.17
+// +k8s:supportsSubresource="/status"
 
 // CSINode holds information about all CSI drivers installed on a node.
 // CSI drivers do not need to create the CSINode object directly. As long as

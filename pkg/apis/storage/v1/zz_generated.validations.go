@@ -62,7 +62,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		(*storagev1.CSINode)(nil),
 		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 			switch op.Request.SubresourcePath() {
-			case "/":
+			case "/", "/status":
 				return Validate_CSINode(
 					ctx, op, nil, /* fldPath */
 					obj.(*storagev1.CSINode),
@@ -273,6 +273,7 @@ func Validate_CSINode(
 	}
 
 	// field storagev1.CSINode.Spec has no validation
+	// field storagev1.CSINode.Status has no validation
 	return errs
 }
 

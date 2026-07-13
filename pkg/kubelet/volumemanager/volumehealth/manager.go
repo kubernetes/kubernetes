@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -95,14 +95,14 @@ func (m *manager) Run(ctx context.Context) {
 }
 
 func (m *manager) reconcile(ctx context.Context) {
-	logger := klog.FromContext(ctx)
 	var wg sync.WaitGroup
-	wg.Go(func() { m.probeVolumeHealth(ctx, logger) })
-	wg.Go(func() { m.probeStorageHealth(ctx, logger) })
+	wg.Go(func() { m.probeVolumeHealth(ctx) })
+	wg.Go(func() { m.probeStorageHealth(ctx) })
 	wg.Wait()
 }
 
-func (m *manager) probeVolumeHealth(ctx context.Context, logger klog.Logger) {
+func (m *manager) probeVolumeHealth(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	volumes := cache.GetVolumesToReportHealth(m.dsw, m.asw)
 
 	for _, vol := range volumes {
@@ -140,7 +140,8 @@ func (m *manager) probeVolumeHealth(ctx context.Context, logger klog.Logger) {
 	}
 }
 
-func (m *manager) probeStorageHealth(ctx context.Context, logger klog.Logger) {
+func (m *manager) probeStorageHealth(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	updater := m.csiNodeUpdater()
 	if updater == nil {
 		return
