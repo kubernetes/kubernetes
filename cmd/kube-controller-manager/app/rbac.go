@@ -32,7 +32,7 @@ func newClusterRoleAggregrationControllerDescriptor() *ControllerDescriptor {
 }
 
 func newClusterRoleAggregationController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("clusterrole-aggregation-controller")
+	client, err := controllerContext.NewClient(names.ClusterRoleAggregationController)
 	if err != nil {
 		return nil, err
 	}
