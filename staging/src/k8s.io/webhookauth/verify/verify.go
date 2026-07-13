@@ -24,19 +24,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const (
-	// allowedAPIGroupClaimKey is the fully-namespaced key under
-	// kubernetes.io.attestationClaims that carries the API group(s) a token is
-	// authorized for. Per KEP-6060 this key is namespaced; the bare
-	// "allowedAPIGroup" form is a known issuer bug and MUST NOT be used.
-	//
-	// TODO(kep-6060): source this from the server-side PR once published; the
-	// final key will not carry the "webhook-authentication.k8s.io" prefix.
-	allowedAPIGroupClaimKey = "webhook-authentication.k8s.io/allowedAPIGroup"
-
-	// wildcardAPIGroup is the allowedAPIGroup value that authorizes every API group.
-	wildcardAPIGroup = "*"
-)
+// wildcardAPIGroup is the allowedAPIGroup value that authorizes every API group.
+const wildcardAPIGroup = "*"
 
 // ErrVerificationFailed is the single, generic error every verification failure
 // returns. Callers check errors.Is(err, ErrVerificationFailed) (or simply
@@ -47,29 +36,23 @@ const (
 var ErrVerificationFailed = errors.New("webhook token verification failed")
 
 // TokenAuthenticator verifies a token's signature and standard claims and
-// returns the decoded claims for policy evaluation. It is the seam through
-// which the core verifier obtains a signature- and standard-claim-verified
-// token without importing any JOSE/OIDC library: an implementation (see the
-// oidc package, which uses go-oidc) performs OIDC discovery, signature
-// verification, and the iss/aud/exp checks, then hands back a VerifiedClaims for
-// the pure-stdlib policy layer here to finish.
+// returns the KEP-6060 allowedAPIGroup values it carries. It is the seam through
+// which the core verifier obtains a verified token's authorized API groups
+// without importing any JOSE/OIDC library: an implementation (see the oidc
+// package, which uses go-oidc) performs OIDC discovery, signature verification,
+// and the iss/aud/exp checks, then decodes the "kubernetes.io" private claims
+// and returns just the allowedAPIGroup list for the policy layer here to match.
 type TokenAuthenticator interface {
 	// AuthenticateToken verifies rawToken's signature and standard claims
-	// (issuer, audience, expiry) and returns the decoded claims. It returns a
-	// non-nil error if the token is not well-formed, not signed by a trusted
-	// key, or fails any standard-claim check; the returned claims MUST NOT be
-	// trusted unless err is nil.
+	// (issuer, audience, expiry) and returns the token's allowedAPIGroup values.
+	// It returns a non-nil error if the token is not well-formed, not signed by a
+	// trusted key, or fails any standard-claim check; the returned groups MUST
+	// NOT be trusted unless err is nil.
 	//
 	// The returned error's text is used ONLY as a non-sensitive log reason: the
 	// Verifier collapses every authentication failure into the single generic
 	// ErrVerificationFailed, so a caller can never learn which check failed.
-	//
-	// The 2-value (claims, error) shape is intentional and does NOT mirror the
-	// k8s authenticator.Token (response, ok, error) triple: any failure — including
-	// an unauthenticated token — is a non-nil error, and callers must not branch
-	// on an ok-versus-error distinction, which anti-enumeration deliberately
-	// denies them.
-	AuthenticateToken(ctx context.Context, rawToken string) (*VerifiedClaims, error)
+	AuthenticateToken(ctx context.Context, rawToken string) (allowedAPIGroups []string, err error)
 }
 
 // Verifier applies the KEP-6060 policy on top of a TokenAuthenticator. Signature
@@ -102,26 +85,21 @@ func NewVerifier(authenticator TokenAuthenticator) (*Verifier, error) {
 func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup string) error {
 	logger := klog.FromContext(ctx)
 
-	// Signature + standard claims (iss/aud/exp) are the authenticator's job. Its
-	// descriptive text is logged for operators only, never returned.
-	claims, err := v.authenticator.AuthenticateToken(ctx, rawToken)
+	// The authenticator owns everything go-oidc verifies (signature, iss/aud/exp)
+	// and returns just the token's allowedAPIGroup values. Its descriptive error
+	// text is logged for operators only, never returned.
+	groups, err := v.authenticator.AuthenticateToken(ctx, rawToken)
 	if err != nil {
 		logger.V(2).Info("Webhook token verification denied",
-			"reason", "token signature or standard claim verification failed",
+			"reason", "token authentication failed",
 			"detail", err.Error())
 		return ErrVerificationFailed
 	}
 
-	// The webhook cares only about the API group. The allowedAPIGroup
-	// attestation claim, under its fully-namespaced key, must contain either the
-	// review's group or the "*" wildcard. The API server decides how many groups
-	// the list holds; the webhook only checks membership.
-	groups, ok := claims.Kubernetes.AttestationClaims[allowedAPIGroupClaimKey]
-	if !ok || len(groups) == 0 {
-		logger.V(2).Info("Webhook token verification denied",
-			"reason", "token is missing the allowedAPIGroup attestation claim")
-		return ErrVerificationFailed
-	}
+	// The webhook cares only about the API group: the token's allowedAPIGroup
+	// list must contain either the review's group or the "*" wildcard. The API
+	// server decides how many groups the list holds; the webhook only checks
+	// membership (an empty list authorizes nothing).
 	if !slices.Contains(groups, reviewAPIGroup) && !slices.Contains(groups, wildcardAPIGroup) {
 		logger.V(2).Info("Webhook token verification denied",
 			"reason", "token allowedAPIGroup does not authorize the review's API group")

@@ -23,46 +23,22 @@ import (
 	"testing"
 )
 
-// TODO(kep-6060): rebuild fuller coverage after review. The Commit-2 slimming
-// dropped the bound-object cases (both/neither), the "len>1 -> reject" case
-// (multi-value lists are now allowed), and the per-branch Reason() assertions
-// with the error taxonomy. See kep-6060-review-2.2-actions.md ("Tests to rebuild").
+const testGroup = "apps"
 
-const (
-	testAudience = "webhook.example.com"
-	testGroup    = "apps"
-	testIssuer   = "https://issuer.example.com"
-	testSubject  = "system:serviceaccount:kube-system:webhook-auth"
-)
+// TODO(kep-6060): rebuild after review. The claims-decode tests (namespaced vs.
+// bare allowedAPIGroup key) moved to the oidc package along with the claim
+// decoding and should be rebuilt there. The removed policy cases (bound-object,
+// len>1 reject) do not apply. See kep-6060-review-2.2-actions.md.
 
-// fakeAuthenticator is a stand-in TokenAuthenticator that exercises the policy
-// layer without any real crypto. When err is non-nil it simulates a
-// signature/standard-claim failure; otherwise it returns claims verbatim.
+// fakeAuthenticator is a stand-in TokenAuthenticator returning a fixed set of
+// allowedAPIGroups (or an error), so the policy layer is tested without crypto.
 type fakeAuthenticator struct {
-	claims *VerifiedClaims
+	groups []string
 	err    error
 }
 
-func (f fakeAuthenticator) AuthenticateToken(_ context.Context, _ string) (*VerifiedClaims, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return f.claims, nil
-}
-
-// baseClaims returns a valid, already-authenticated claim set authorizing
-// testGroup. Tests mutate it to drive each policy branch.
-func baseClaims() *VerifiedClaims {
-	return &VerifiedClaims{
-		Issuer:   testIssuer,
-		Subject:  testSubject,
-		Audience: []string{testAudience},
-		Kubernetes: kubernetesClaims{
-			AttestationClaims: map[string][]string{
-				allowedAPIGroupClaimKey: {testGroup},
-			},
-		},
-	}
+func (f fakeAuthenticator) AuthenticateToken(_ context.Context, _ string) ([]string, error) {
+	return f.groups, f.err
 }
 
 func mustVerifier(t *testing.T, auth TokenAuthenticator) *Verifier {
@@ -83,69 +59,34 @@ func TestNewVerifier_Validation(t *testing.T) {
 	if errors.Is(err, ErrVerificationFailed) {
 		t.Fatal("construction error must not satisfy ErrVerificationFailed")
 	}
-	if _, err := NewVerifier(fakeAuthenticator{claims: baseClaims()}); err != nil {
+	if _, err := NewVerifier(fakeAuthenticator{groups: []string{testGroup}}); err != nil {
 		t.Fatalf("unexpected error for valid authenticator: %v", err)
 	}
 }
 
-// TestVerify covers the slimmed policy: the allowedAPIGroup claim's list must
-// contain the review group or "*"; any failure returns the generic
-// ErrVerificationFailed.
+// TestVerify covers the policy: the authenticator's allowedAPIGroup list must
+// contain the review group or "*"; any failure returns ErrVerificationFailed.
 func TestVerify(t *testing.T) {
 	tests := []struct {
 		name    string
-		mutate  func(c *VerifiedClaims)
+		groups  []string
 		group   string
 		wantErr bool
 	}{
-		{
-			name: "exact group -> accepted",
-		},
-		{
-			name: "wildcard -> matches any group -> accepted",
-			mutate: func(c *VerifiedClaims) {
-				c.Kubernetes.AttestationClaims = map[string][]string{allowedAPIGroupClaimKey: {wildcardAPIGroup}}
-			},
-			group: "any.group.example.com",
-		},
-		{
-			name: "multi-value list containing the group -> accepted",
-			mutate: func(c *VerifiedClaims) {
-				c.Kubernetes.AttestationClaims = map[string][]string{allowedAPIGroupClaimKey: {"extensions", testGroup}}
-			},
-		},
-		{
-			name: "allowedAPIGroup claim absent -> rejected",
-			mutate: func(c *VerifiedClaims) {
-				c.Kubernetes.AttestationClaims = map[string][]string{}
-			},
-			wantErr: true,
-		},
-		{
-			name: "bare allowedAPIGroup key -> treated as missing -> rejected",
-			mutate: func(c *VerifiedClaims) {
-				c.Kubernetes.AttestationClaims = map[string][]string{"allowedAPIGroup": {testGroup}}
-			},
-			wantErr: true,
-		},
-		{
-			name:    "review group not authorized -> rejected",
-			group:   "batch",
-			wantErr: true,
-		},
+		{name: "exact group -> accepted", groups: []string{testGroup}},
+		{name: "wildcard -> matches any group -> accepted", groups: []string{wildcardAPIGroup}, group: "any.group.example.com"},
+		{name: "multi-value list containing the group -> accepted", groups: []string{"extensions", testGroup}},
+		{name: "empty list -> rejected", groups: []string{}, wantErr: true},
+		{name: "group not authorized -> rejected", groups: []string{"extensions"}, wantErr: true},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			claims := baseClaims()
-			if tc.mutate != nil {
-				tc.mutate(claims)
-			}
 			group := tc.group
 			if group == "" {
 				group = testGroup
 			}
-			v := mustVerifier(t, fakeAuthenticator{claims: claims})
+			v := mustVerifier(t, fakeAuthenticator{groups: tc.groups})
 			err := v.Verify(context.Background(), "raw-token", group)
 
 			if tc.wantErr {

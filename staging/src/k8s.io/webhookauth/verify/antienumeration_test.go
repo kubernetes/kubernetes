@@ -22,17 +22,16 @@ import (
 	"testing"
 )
 
-// TODO(kep-6060): rebuild the full anti-enumeration matrix after review. This
-// slimmed version only checks that two representative rejection paths (a policy
-// rejection and an authenticator failure carrying secret detail) return the
-// identical generic ErrVerificationFailed. The removed suite asserted EVERY
-// rejection path is byte-for-byte indistinguishable to the caller and that the
-// specific reason lives only in logs. See kep-6060-review-2.2-actions.md.
+// TODO(kep-6060): rebuild the full anti-enumeration matrix after review (see
+// kep-6060-review-2.2-actions.md). This slim version checks that two
+// representative rejection paths (a policy rejection and an authenticator
+// failure carrying secret detail) return the identical generic
+// ErrVerificationFailed with no detail leaking to the caller.
 func TestAntiEnumeration_RejectionsAreGeneric(t *testing.T) {
 	generic := ErrVerificationFailed.Error()
 
-	// Policy rejection: the review group is not authorized by the claim.
-	policyErr := mustVerifier(t, fakeAuthenticator{claims: baseClaims()}).
+	// Policy rejection: the review group is not in the authorized list.
+	policyErr := mustVerifier(t, fakeAuthenticator{groups: []string{"extensions"}}).
 		Verify(context.Background(), "raw-token", "batch")
 
 	// Authenticator rejection carrying descriptive (secret) detail that must

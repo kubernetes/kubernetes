@@ -29,8 +29,7 @@ limitations under the License.
 // The canonical precedent for reusing go-oidc this way is kube-apiserver's own
 // OIDC authenticator, which likewise layers its claim policy on top of a go-oidc
 // verifier. Here the layering is: discovery + signature + iss/aud/exp = go-oidc;
-// the KEP-6060 policy (bound-object exactly-one, allowedAPIGroup match) = the
-// core verify package.
+// the KEP-6060 allowedAPIGroup match = the core verify package.
 package oidc // import "k8s.io/webhookauth/verify/oidc"
 
 import (
@@ -70,43 +69,63 @@ func WithHTTPClient(c *http.Client) Option {
 
 // oidcAuthenticator implements [verify.TokenAuthenticator] on top of a go-oidc
 // *oidc.IDTokenVerifier. It performs the entire signature + iss/aud/exp check
-// and hands the decoded claims back to the core policy layer.
+// and returns the token's allowedAPIGroup values to the core policy layer.
 type oidcAuthenticator struct {
 	verifier *coreosoidc.IDTokenVerifier
+	// issuer is the expected token issuer, used for a cheap unverified pre-check
+	// before the expensive signature/JWKS verification.
+	issuer string
 }
 
-// AuthenticateToken verifies rawToken via go-oidc — parsing the JWS, enforcing
-// the signing-algorithm allowlist, verifying the signature against the
-// discovered/rotated JWKS, and checking issuer, audience and expiry — and then
-// decodes the webhook private claims.
+// allowedAPIGroupClaimKey is the fully-namespaced key under
+// kubernetes.io.attestationClaims that carries the API group(s) a token is
+// authorized for. Per KEP-6060 this key is namespaced; the bare "allowedAPIGroup"
+// form is a known issuer bug and MUST NOT be matched.
 //
-// The standard claims returned in VerifiedClaims are taken from the values
-// go-oidc validated (idToken.Issuer/Subject/Audience), NOT re-read from the raw
-// payload, so a token cannot smuggle a different issuer/subject/audience past
-// the checks by adding extra top-level fields. Only the "kubernetes.io" private
-// claims are decoded from the raw payload.
+// TODO(kep-6060): source this from the server-side PR once published; the final
+// key will not carry the "webhook-authentication.k8s.io" prefix.
+const allowedAPIGroupClaimKey = "webhook-authentication.k8s.io/allowedAPIGroup"
+
+// webhookPrivateClaims decodes the subset of the "kubernetes.io" private claims
+// the policy needs: the allowedAPIGroup attestation values.
+type webhookPrivateClaims struct {
+	Kubernetes struct {
+		AttestationClaims map[string][]string `json:"attestationClaims,omitempty"`
+	} `json:"kubernetes.io"`
+}
+
+// AuthenticateToken verifies rawToken and returns the token's allowedAPIGroup
+// values for the policy layer to match. It first does a cheap unverified issuer
+// pre-check — parsing the token's "iss" and bailing before the expensive
+// signature/JWKS work if it is not the issuer this authenticator expects — then
+// verifies via go-oidc (JWS parse, signing-algorithm allowlist, signature
+// against the discovered/rotated JWKS, and the issuer/audience/expiry checks),
+// and finally decodes only the "kubernetes.io" private claims.
 //
-// Any verification error (go-oidc's descriptive "expired", "audience mismatch",
-// bad-signature, or issuer-mismatch messages) is returned as-is; the core
-// Verifier collapses it into the single generic failure, so the descriptive
-// text never reaches the caller.
-func (a *oidcAuthenticator) AuthenticateToken(ctx context.Context, rawToken string) (*verify.VerifiedClaims, error) {
+// go-oidc owns the standard-claim verification (iss/aud/exp); this package no
+// longer re-derives or returns those. Any verification error (go-oidc's
+// descriptive "expired", "audience mismatch", or bad-signature messages, or the
+// issuer pre-check) is returned as-is; the core Verifier collapses it into the
+// single generic failure, so the descriptive text never reaches the caller.
+func (a *oidcAuthenticator) AuthenticateToken(ctx context.Context, rawToken string) ([]string, error) {
+	// Cheap pre-check: if the token's (unverified) issuer is not ours, this token
+	// was not minted for us — fail before the expensive signature/JWKS work.
+	if parsed, err := parseUnverifiedClaims(rawToken); err != nil {
+		return nil, fmt.Errorf("oidc: parsing token issuer: %w", err)
+	} else if parsed.Issuer != a.issuer {
+		return nil, fmt.Errorf("oidc: token issuer %q is not the expected issuer", parsed.Issuer)
+	}
+
 	idToken, err := a.verifier.Verify(ctx, rawToken)
 	if err != nil {
 		return nil, err
 	}
 
-	claims := &verify.VerifiedClaims{}
-	// Decode the raw payload for the "kubernetes.io" private claims. This also
-	// touches the exported standard-claim fields, so overwrite them afterwards
-	// with the values go-oidc actually validated.
-	if err := idToken.Claims(claims); err != nil {
+	var claims webhookPrivateClaims
+	if err := idToken.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("oidc: decoding token claims: %w", err)
 	}
-	claims.Issuer = idToken.Issuer
-	claims.Subject = idToken.Subject
-	claims.Audience = append([]string(nil), idToken.Audience...)
-	return claims, nil
+	return claims.Kubernetes.AttestationClaims[allowedAPIGroupClaimKey], nil
 }
 
 // NewRemoteVerifier returns a [verify.Verifier] whose signatures and standard
@@ -156,5 +175,5 @@ func NewRemoteVerifier(ctx context.Context, issuer, audience string, opts ...Opt
 	// discovery, the signature, the issuer, the audience (ClientID) and expiry.
 	idv := provider.Verifier(&coreosoidc.Config{ClientID: audience})
 
-	return verify.NewVerifier(&oidcAuthenticator{verifier: idv})
+	return verify.NewVerifier(&oidcAuthenticator{verifier: idv, issuer: issuer})
 }
