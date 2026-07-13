@@ -6173,6 +6173,50 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
 		},
+		"list-attributes-match-constaint-list-of-int-values-requires-backtracking": {
+			// Regression test for the allocator failing to find a valid
+			// allocation because matchAttributeConstraint.remove() did not
+			// restore the intersection on backtrack, leaving it stale from
+			// a device that was already removed from consideration.
+			//
+			// device1: numa=[1,2], device2: numa=[1], device3: numa=[2], device4: numa=[2]
+			// Requesting 3 devices, the only valid combination is
+			// {device1, device3, device4}, which requires the allocator to
+			// backtrack past device2 (added and then removed) and have the
+			// intersection correctly restored to [1,2] before re-evaluating
+			// device3 and device4.
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &intAttribute}},
+				request(req0, classA, 3)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"numa": {IntValues: []int64{1, 2}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"numa": {IntValues: []int64{1}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"numa": {IntValues: []int64{2}},
+				}),
+				device(device4, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"numa": {IntValues: []int64{2}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+				deviceAllocationResult(req0, driverA, pool1, device4, false),
+			)},
+		},
 		"list-attributes-match-constaint-list-of-bool-values-with-common-elements": {
 			features: Features{
 				ListTypeAttributes: true,
