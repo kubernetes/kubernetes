@@ -37,6 +37,9 @@ func init() {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.controller": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"spec.parameters.kind": {
 				{ErrorType: "FieldValueRequired"},
 			},
