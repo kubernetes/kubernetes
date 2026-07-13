@@ -121,7 +121,7 @@ func (v *ObjectVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		result[k] = converted
 	}
 	switch typeDesc {
-	case reflect.TypeOf(result):
+	case reflect.TypeFor[map[string]any]():
 		return result, nil
 	// CEL's builtin data literal values all support conversion to structpb.Value, which
 	// can then be serialized to JSON. This is convenient for CEL expressions that return
