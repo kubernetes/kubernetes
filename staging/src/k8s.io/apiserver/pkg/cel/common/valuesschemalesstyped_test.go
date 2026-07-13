@@ -26,6 +26,8 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -212,9 +214,31 @@ func assertEquivalence(t *testing.T, val interface{}) {
 			unstrMap, expectedCEL, expectedCEL.Type(), gotCEL.Value(), gotCEL, gotCEL.Type())
 	}
 
-	// Verify inverse equality (NativeToValue.Equal(SchemalessTypedToVal)).
+	// Verify reverse-direction equivalence (expectedCEL.Equal(gotCEL)).
 	if expectedCEL.Equal(gotCEL) != types.True {
-		t.Errorf("Inverse equivalence mismatch!")
+		t.Errorf("Reverse equivalence mismatch!\nExpected: %v (Type: %T, CEL: %v)\nGot:      %v (Type: %T, CEL: %v)",
+			unstrMap, expectedCEL, expectedCEL.Type(), gotCEL.Value(), gotCEL, gotCEL.Type())
+	}
+
+	// Verify ConvertToNative(structpbValueType) matches the result of converting unstrMap via expectedCEL.ConvertToNative(structpbValueType).
+	gotPB, err := gotCEL.ConvertToNative(structpbValueType)
+	if err != nil {
+		t.Fatalf("SchemalessTypedToVal.ConvertToNative(structpbValueType) failed: %v", err)
+	}
+
+	expectedPB, err := expectedCEL.ConvertToNative(structpbValueType)
+	if err != nil {
+		t.Fatalf("expectedCEL.ConvertToNative(structpbValueType) failed: %v", err)
+	}
+
+	gotStructPB, ok1 := gotPB.(*structpb.Value)
+	expectedStructPB, ok2 := expectedPB.(*structpb.Value)
+	if !ok1 || !ok2 {
+		t.Fatalf("expected *structpb.Value results, got %T and %T", gotPB, expectedPB)
+	}
+
+	if !proto.Equal(gotStructPB, expectedStructPB) {
+		t.Errorf("ConvertToNative(structpbValueType) equivalence mismatch!\nGot:      %v\nExpected: %v", gotStructPB, expectedStructPB)
 	}
 }
 
@@ -977,6 +1001,264 @@ func TestSchemalessTypedMap_Equal(t *testing.T) {
 			}
 			if got != tc.expected {
 				t.Errorf("expected equal result %v, got %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestSchemalessTyped_ConvertToNative(t *testing.T) {
+	type CustomString string
+	type SimpleStruct struct {
+		Name  string `json:"name"`
+		Value int    `json:"value"`
+	}
+
+	sampleStruct := &SimpleStruct{Name: "foo", Value: 42}
+	sampleMap := map[string]interface{}{"name": "foo", "value": int64(42)}
+	sampleSlice := []interface{}{"item1", int64(10)}
+
+	type Item struct {
+		IP string `json:"ip"`
+	}
+
+	tests := []struct {
+		name       string
+		val        ref.Val
+		targetType reflect.Type
+		expected   interface{}
+	}{
+		{
+			name:       "struct to structpb.Value",
+			val:        SchemalessTypedToVal(sampleStruct),
+			targetType: structpbValueType,
+			expected: &structpb.Value{
+				Kind: &structpb.Value_StructValue{
+					StructValue: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"name":  structpb.NewStringValue("foo"),
+							"value": structpb.NewNumberValue(42),
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "struct to anyType",
+			val:        SchemalessTypedToVal(sampleStruct),
+			targetType: anyType,
+			expected:   SimpleStruct{Name: "foo", Value: 42},
+		},
+		{
+			name:       "struct to mapStringAnyType",
+			val:        SchemalessTypedToVal(sampleStruct),
+			targetType: mapStringAnyType,
+			expected: map[string]interface{}{
+				"name":  "foo",
+				"value": int64(42),
+			},
+		},
+		{
+			name:       "map to structpb.Value",
+			val:        SchemalessTypedToVal(sampleMap),
+			targetType: structpbValueType,
+			expected: &structpb.Value{
+				Kind: &structpb.Value_StructValue{
+					StructValue: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"name":  structpb.NewStringValue("foo"),
+							"value": structpb.NewNumberValue(42),
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "map to anyType",
+			val:        SchemalessTypedToVal(sampleMap),
+			targetType: anyType,
+			expected: map[string]interface{}{
+				"name":  "foo",
+				"value": int64(42),
+			},
+		},
+		{
+			name:       "map to mapStringAnyType",
+			val:        SchemalessTypedToVal(sampleMap),
+			targetType: mapStringAnyType,
+			expected: map[string]interface{}{
+				"name":  "foo",
+				"value": int64(42),
+			},
+		},
+		{
+			name:       "custom string key map to mapStringAnyType",
+			val:        SchemalessTypedToVal(map[CustomString]interface{}{"name": "foo", "value": int64(42)}),
+			targetType: mapStringAnyType,
+			expected: map[string]interface{}{
+				"name":  "foo",
+				"value": int64(42),
+			},
+		},
+		{
+			name:       "slice to structpb.Value",
+			val:        SchemalessTypedToVal(sampleSlice),
+			targetType: structpbValueType,
+			expected: &structpb.Value{
+				Kind: &structpb.Value_ListValue{
+					ListValue: &structpb.ListValue{
+						Values: []*structpb.Value{
+							structpb.NewStringValue("item1"),
+							structpb.NewNumberValue(10),
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "slice to anyType",
+			val:        SchemalessTypedToVal(sampleSlice),
+			targetType: anyType,
+			expected: []interface{}{
+				"item1",
+				int64(10),
+			},
+		},
+		{
+			name:       "concatenated list to structpb.Value",
+			val:        SchemalessTypedToVal([]Item{{IP: "1.2.3.4"}}).(traits.Lister).Add(SchemalessTypedToVal([]Item{{IP: "5.6.7.8"}})),
+			targetType: structpbValueType,
+			expected: &structpb.Value{
+				Kind: &structpb.Value_ListValue{
+					ListValue: &structpb.ListValue{
+						Values: []*structpb.Value{
+							{
+								Kind: &structpb.Value_StructValue{
+									StructValue: &structpb.Struct{
+										Fields: map[string]*structpb.Value{
+											"ip": structpb.NewStringValue("1.2.3.4"),
+										},
+									},
+								},
+							},
+							{
+								Kind: &structpb.Value_StructValue{
+									StructValue: &structpb.Struct{
+										Fields: map[string]*structpb.Value{
+											"ip": structpb.NewStringValue("5.6.7.8"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := tc.val.ConvertToNative(tc.targetType)
+			if err != nil {
+				t.Fatalf("unexpected error converting to %v: %v", tc.targetType, err)
+			}
+			if res == nil {
+				t.Fatalf("expected non-nil conversion result for target type %v", tc.targetType)
+			}
+			if tc.expected != nil {
+				if pbVal, ok := res.(*structpb.Value); ok {
+					if expectedPB, ok := tc.expected.(*structpb.Value); ok {
+						if !proto.Equal(pbVal, expectedPB) {
+							t.Fatalf("unexpected converted structpb.Value:\n got:  %v\n want: %v", pbVal, expectedPB)
+						}
+					}
+				} else if !reflect.DeepEqual(res, tc.expected) {
+					t.Fatalf("unexpected converted result:\n got:  %v\n want: %v", res, tc.expected)
+				}
+			}
+		})
+	}
+}
+
+func TestSchemalessTypedStruct_OmitEmpty(t *testing.T) {
+	type SampleStruct struct {
+		FieldOmitEmpty *string `json:"fieldOmitEmpty,omitempty"`
+		FieldRequired  string  `json:"fieldRequired"`
+	}
+
+	val := "present"
+	tests := []struct {
+		name                string
+		input               *SampleStruct
+		targetField         string
+		expectedIsSet       ref.Val
+		expectedFind        bool
+		expectedSize        int64
+		expectedInNativeMap bool
+	}{
+		{
+			name:                "omitted field when nil",
+			input:               &SampleStruct{FieldRequired: "val"},
+			targetField:         "fieldOmitEmpty",
+			expectedIsSet:       types.False,
+			expectedFind:        false,
+			expectedSize:        1,
+			expectedInNativeMap: false,
+		},
+		{
+			name:                "required field when set",
+			input:               &SampleStruct{FieldRequired: "val"},
+			targetField:         "fieldRequired",
+			expectedIsSet:       types.True,
+			expectedFind:        true,
+			expectedSize:        1,
+			expectedInNativeMap: true,
+		},
+		{
+			name:                "omitted field when populated",
+			input:               &SampleStruct{FieldOmitEmpty: &val, FieldRequired: "val"},
+			targetField:         "fieldOmitEmpty",
+			expectedIsSet:       types.True,
+			expectedFind:        true,
+			expectedSize:        2,
+			expectedInNativeMap: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			celVal := SchemalessTypedToVal(tc.input)
+
+			tester, ok := celVal.(traits.FieldTester)
+			if !ok {
+				t.Fatalf("expected celVal to implement traits.FieldTester")
+			}
+			if got := tester.IsSet(types.String(tc.targetField)); got != tc.expectedIsSet {
+				t.Errorf("IsSet(%q) = %v, expected %v", tc.targetField, got, tc.expectedIsSet)
+			}
+
+			mapper, ok := celVal.(traits.Mapper)
+			if !ok {
+				t.Fatalf("expected celVal to implement traits.Mapper")
+			}
+			if _, found := mapper.Find(types.String(tc.targetField)); found != tc.expectedFind {
+				t.Errorf("Find(%q) found = %v, expected %v", tc.targetField, found, tc.expectedFind)
+			}
+			if size := mapper.Size().(types.Int); int64(size) != tc.expectedSize {
+				t.Errorf("Size() = %d, expected %d", size, tc.expectedSize)
+			}
+
+			res, err := celVal.ConvertToNative(mapStringAnyType)
+			if err != nil {
+				t.Fatalf("unexpected error converting to map[string]interface{}: %v", err)
+			}
+			m, ok := res.(map[string]interface{})
+			if !ok {
+				t.Fatalf("expected map[string]interface{}, got %T", res)
+			}
+			_, exists := m[tc.targetField]
+			if exists != tc.expectedInNativeMap {
+				t.Errorf("native map key %q exists = %v, expected %v", tc.targetField, exists, tc.expectedInNativeMap)
 			}
 		})
 	}
