@@ -2555,6 +2555,55 @@ var (
 			23: topology.CPUInfo{NUMANodeID: 0, SocketID: 0, CoreID: 15, UncoreCacheID: 0},
 		},
 	}
+
+	/*
+		Topology from Intel Core i7-14700
+		CPU(s):                28
+		On-line CPU(s) list:   0-27
+		Core(s) per socket:    20
+		Socket(s):             1
+		NUMA node(s):          1
+	*/
+	topoSingleSocketSingleNumaPerSocketPCoreHTECoreST = &topology.CPUTopology{
+		NumCPUs:      28,
+		NumCores:     20,
+		NumNUMANodes: 1,
+		NumSockets:   1,
+		CPUDetails: topology.CPUDetails{
+			// P-Cores (HT)
+			0:  topology.CPUInfo{CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			1:  topology.CPUInfo{CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			2:  topology.CPUInfo{CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			3:  topology.CPUInfo{CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			4:  topology.CPUInfo{CoreID: 8, SocketID: 0, NUMANodeID: 0},
+			5:  topology.CPUInfo{CoreID: 8, SocketID: 0, NUMANodeID: 0},
+			6:  topology.CPUInfo{CoreID: 12, SocketID: 0, NUMANodeID: 0},
+			7:  topology.CPUInfo{CoreID: 12, SocketID: 0, NUMANodeID: 0},
+			8:  topology.CPUInfo{CoreID: 16, SocketID: 0, NUMANodeID: 0},
+			9:  topology.CPUInfo{CoreID: 16, SocketID: 0, NUMANodeID: 0},
+			10: topology.CPUInfo{CoreID: 20, SocketID: 0, NUMANodeID: 0},
+			11: topology.CPUInfo{CoreID: 20, SocketID: 0, NUMANodeID: 0},
+			12: topology.CPUInfo{CoreID: 24, SocketID: 0, NUMANodeID: 0},
+			13: topology.CPUInfo{CoreID: 24, SocketID: 0, NUMANodeID: 0},
+			14: topology.CPUInfo{CoreID: 28, SocketID: 0, NUMANodeID: 0},
+			15: topology.CPUInfo{CoreID: 28, SocketID: 0, NUMANodeID: 0},
+
+			// E-Cores (ST)
+			16: topology.CPUInfo{CoreID: 32, SocketID: 0, NUMANodeID: 0},
+			17: topology.CPUInfo{CoreID: 33, SocketID: 0, NUMANodeID: 0},
+			18: topology.CPUInfo{CoreID: 34, SocketID: 0, NUMANodeID: 0},
+			19: topology.CPUInfo{CoreID: 35, SocketID: 0, NUMANodeID: 0},
+			20: topology.CPUInfo{CoreID: 36, SocketID: 0, NUMANodeID: 0},
+			21: topology.CPUInfo{CoreID: 37, SocketID: 0, NUMANodeID: 0},
+			22: topology.CPUInfo{CoreID: 38, SocketID: 0, NUMANodeID: 0},
+			23: topology.CPUInfo{CoreID: 39, SocketID: 0, NUMANodeID: 0},
+			24: topology.CPUInfo{CoreID: 40, SocketID: 0, NUMANodeID: 0},
+			25: topology.CPUInfo{CoreID: 41, SocketID: 0, NUMANodeID: 0},
+			26: topology.CPUInfo{CoreID: 42, SocketID: 0, NUMANodeID: 0},
+			27: topology.CPUInfo{CoreID: 43, SocketID: 0, NUMANodeID: 0},
+		},
+	}
+
 	/*
 		Topology from 1P ARM Ampere Altra 128C; lscpu excerpt
 		CPU(s):                128
