@@ -287,7 +287,7 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 				return
 			case isShuttingDown, ok := <-events:
 				if !ok {
-					m.logger.Error(err, "Ended to watching the node for shutdown events")
+					m.logger.Error(nil, "Ended to watching the node for shutdown events")
 					close(stop)
 					return
 				}
