@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	schedulingapply "k8s.io/client-go/applyconfigurations/scheduling/v1alpha3"
 	v1informers "k8s.io/client-go/informers/core/v1"
@@ -56,6 +57,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -75,7 +77,7 @@ const (
 	podGroupResourceClaimTemplateIndex = "podGroupResourceClaimTemplate"
 
 	// claimPodOwnerIndex is used to find ResourceClaims which have
-	// a specific pod as owner. Values for this index are the pod UID.
+	// a specific pod as owner. Values for this index are the pod "namespace/UID".
 	claimPodOwnerIndex = "claimPodOwner"
 
 	// claimPodGroupOwnerIndex is used to find ResourceClaims which have a
@@ -97,7 +99,7 @@ const (
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
 type Controller struct {
 	// features defines the feature gates that are enabled.
-	features Features
+	features controllerFeatures
 
 	// kubeClient is the kube API client used to communicate with the API
 	// server.
@@ -140,7 +142,10 @@ type Controller struct {
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
 
-	queue workqueue.TypedRateLimitingInterface[string]
+	// syncHandlerFunc runs for each item in the workqueue. It is replaced in
+	// some tests that exercise the workqueue.
+	syncHandlerFunc func(context.Context, string) error
+	queue           workqueue.TypedRateLimitingInterface[string]
 
 	// The deletedObjects cache keeps track of Pods for which we know that
 	// they have existed and have been removed. For those we can be sure
@@ -154,22 +159,68 @@ const (
 	podGroupKeyPrefix = "podgroup:"
 )
 
-// Features defines which features should be enabled in the controller.
-type Features struct {
+// controllerFeatures defines which features should be enabled in the controller.
+type controllerFeatures struct {
 	AdminAccess            bool
+	GenericWorkload        bool
 	PrioritizedList        bool
 	WorkloadResourceClaims bool
+}
+
+// String describes the features suitably for unit test names.
+func (f controllerFeatures) String() string {
+	enabled := func(b bool) string {
+		if b {
+			return "enabled"
+		}
+		return "disabled"
+	}
+	return fmt.Sprintf(
+		"adminaccess-%s-genericworkload-%s-prioritizedlist-%s-workloadresourceclaims-%s",
+		enabled(f.AdminAccess),
+		enabled(f.GenericWorkload),
+		enabled(f.PrioritizedList),
+		enabled(f.WorkloadResourceClaims),
+	)
+}
+
+// nonRetryableError is an error for a key in the workqueue that will not be requeued.
+type nonRetryableError struct {
+	error
 }
 
 // NewController creates a ResourceClaim controller.
 func NewController(
 	logger klog.Logger,
-	features Features,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
 	podGroupInformer schedulinginformers.PodGroupInformer,
 	claimInformer resourceinformers.ResourceClaimInformer,
 	templateInformer resourceinformers.ResourceClaimTemplateInformer) (*Controller, error) {
+	return newControllerWithFeatures(
+		logger,
+		kubeClient,
+		podInformer,
+		podGroupInformer,
+		claimInformer,
+		templateInformer,
+		controllerFeatures{
+			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			GenericWorkload:        utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
+			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
+		},
+	)
+}
+
+func newControllerWithFeatures(
+	logger klog.Logger,
+	kubeClient clientset.Interface,
+	podInformer v1informers.PodInformer,
+	podGroupInformer schedulinginformers.PodGroupInformer,
+	claimInformer resourceinformers.ResourceClaimInformer,
+	templateInformer resourceinformers.ResourceClaimTemplateInformer,
+	features controllerFeatures) (*Controller, error) {
 
 	ec := &Controller{
 		features:        features,
@@ -187,33 +238,34 @@ func NewController(
 		),
 		deletedObjects: newUIDCache(maxUIDCacheEntries),
 	}
+	ec.syncHandlerFunc = ec.syncHandler
 
 	resourceclaimmetrics.RegisterMetrics()
 	controllermetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
 
 	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			ec.enqueuePod(logger, obj, false)
 		},
-		UpdateFunc: func(old, updated interface{}) {
+		UpdateFunc: func(old, updated any) {
 			ec.enqueuePod(logger, updated, false)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			ec.enqueuePod(logger, obj, true)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
 	if _, err := claimInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			logger.V(6).Info("New claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, nil, obj)
 		},
-		UpdateFunc: func(old, updated interface{}) {
+		UpdateFunc: func(old, updated any) {
 			logger.V(6).Info("Updated claim", "claimDump", updated)
 			ec.enqueueResourceClaim(logger, old, updated)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			logger.V(6).Info("Deleted claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, obj, nil)
 		},
@@ -221,15 +273,15 @@ func NewController(
 		return nil, err
 	}
 	if _, err := templateInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			logger.V(6).Info("New claim template", "claimTemplateDump", obj)
 			ec.enqueueResourceClaimTemplate(logger, obj)
 		},
-		UpdateFunc: func(old, updated interface{}) {
+		UpdateFunc: func(old, updated any) {
 			logger.V(6).Info("Updated claim template", "claimTemplateDump", updated)
 			ec.enqueueResourceClaimTemplate(logger, updated)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			logger.V(6).Info("Deleted claim template", "claimTemplateDump", obj)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
@@ -243,22 +295,24 @@ func NewController(
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
 
+	if features.GenericWorkload {
+		ec.podGroupLister = podGroupInformer.Lister()
+	}
 	ec.podGroupSynced = func() bool { return true }
 	if features.WorkloadResourceClaims {
-		ec.podGroupLister = podGroupInformer.Lister()
 		ec.podGroupSynced = podGroupInformer.Informer().HasSynced
 		ec.podGroupIndexer = podGroupInformer.Informer().GetIndexer()
 
 		if _, err := podGroupInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
+			AddFunc: func(obj any) {
 				logger.V(6).Info("New PodGroup", "podGroupDump", obj)
 				ec.enqueuePodGroup(logger, obj, false)
 			},
-			UpdateFunc: func(old, updated interface{}) {
+			UpdateFunc: func(old, updated any) {
 				logger.V(6).Info("Updated PodGroup", "podGroupDump", updated)
 				ec.enqueuePodGroup(logger, updated, false)
 			},
-			DeleteFunc: func(obj interface{}) {
+			DeleteFunc: func(obj any) {
 				logger.V(6).Info("Deleted PodGroup", "podGroupDump", obj)
 				ec.enqueuePodGroup(logger, obj, true)
 			},
@@ -307,7 +361,7 @@ func NewController(
 	return ec, nil
 }
 
-func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj interface{}) {
+func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj any) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -372,7 +426,7 @@ func (ec *Controller) enqueueResourceClaimTemplate(logger klog.Logger, obj inter
 	}
 }
 
-func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bool) {
+func (ec *Controller) enqueuePod(logger klog.Logger, obj any, deleted bool) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -537,7 +591,7 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 	return false, "nothing to do for any claim: " + strings.Join(doNothingReasons, ", ")
 }
 
-func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj interface{}, deleted bool) {
+func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj any, deleted bool) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -613,7 +667,7 @@ func (ec *Controller) enqueuePodGroup(logger klog.Logger, obj interface{}, delet
 			runtime.HandleErrorWithLogger(logger, nil, "unexpected object in Pod indexer", "type", fmt.Sprintf("%T", object))
 			return
 		}
-		logger.V(4).Info(
+		logger.V(6).Info(
 			"Enqueuing Pod due to PodGroup change",
 			"podgroup", klog.KObj(podGroup),
 			"pod", klog.KObj(pod),
@@ -678,7 +732,7 @@ func (ec *Controller) podGroupNeedsWork(podGroup *schedulingapi.PodGroup) (bool,
 	return false, "nothing to do for any claim: " + strings.Join(doNothingReasons, ", ")
 }
 
-func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj interface{}) {
+func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj any) {
 	deleted := newObj == nil
 	if d, ok := oldObj.(cache.DeletedFinalStateUnknown); ok {
 		oldObj = d.Obj
@@ -775,7 +829,7 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 		return
 	}
 
-	for i := 0; i < workers; i++ {
+	for range workers {
 		wg.Go(func() {
 			wait.UntilWithContext(ctx, ec.runWorker, time.Second)
 		})
@@ -795,8 +849,12 @@ func (ec *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer ec.queue.Done(key)
 
-	err := ec.syncHandler(ctx, key)
-	if err == nil {
+	err := ec.syncHandlerFunc(ctx, key)
+	_, nonRetryable := errors.AsType[nonRetryableError](err)
+	if nonRetryable {
+		runtime.HandleErrorWithContext(ctx, err, "Work item failed, will not retry", "item", key)
+	}
+	if err == nil || nonRetryable {
 		ec.queue.Forget(key)
 		return true
 	}
@@ -933,6 +991,15 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 			if err != nil {
 				return err
 			}
+			if isPodGroupClaim(bindTo) && !ec.features.WorkloadResourceClaims {
+				// It's not expected for ResourceClaims to remain allocated but
+				// unreserved for too long. This message is logged at a lower
+				// verbosity threshold so cluster admins can more easily
+				// identify when that happens because of this feature gate in
+				// normal production clusters.
+				logger.V(3).Info("Not reserving PodGroup ResourceClaim because feature is disabled", "feature", features.DRAWorkloadResourceClaims, "resourceClaim", klog.KObj(claim))
+				continue
+			}
 			logger.V(5).Info("Reserve claim", "resourceClaim", klog.KObj(claim), "reservedForResource", bindTo.Resource)
 			if err := ec.reserveFor(ctx, bindTo, claim); err != nil {
 				return err
@@ -995,9 +1062,11 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 	if err != nil {
 		return err
 	}
-	isPodGroupClaim := bindTo.APIGroup == schedulingapi.GroupName && bindTo.Resource == "podgroups"
 	var claim *resourceapi.ResourceClaim
-	if isPodGroupClaim {
+	if isPodGroupClaim(bindTo) {
+		if !ec.features.WorkloadResourceClaims {
+			return nonRetryableError{fmt.Errorf("claim %s is a PodGroup claim but the %s feature is disabled", podClaim.Name, features.DRAWorkloadResourceClaims)}
+		}
 		claim, err = ec.findPodGroupResourceClaim(podGroup, schedulingapi.PodGroupResourceClaim{
 			Name: podClaim.Name,
 		})
@@ -1111,7 +1180,7 @@ func hasPrioritizedList(claimTemplate *resourceapi.ResourceClaimTemplate) bool {
 // the pod).
 func (ec *Controller) findPodResourceClaim(pod *v1.Pod, podClaim v1.PodResourceClaim) (*resourceapi.ResourceClaim, error) {
 	// Only claims owned by the pod will get returned here.
-	claims, err := ec.claimCache.ByIndex(claimPodOwnerIndex, string(pod.UID))
+	claims, err := ec.claimCache.ByIndex(claimPodOwnerIndex, pod.Namespace+"/"+string(pod.UID))
 	if err != nil {
 		return nil, err
 	}
@@ -1594,10 +1663,13 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 }
 
 func (ec *Controller) getPodGroup(pod *v1.Pod) (*schedulingapi.PodGroup, error) {
-	if !ec.features.WorkloadResourceClaims ||
-		pod.Spec.SchedulingGroup == nil ||
+	if pod.Spec.SchedulingGroup == nil ||
 		pod.Spec.SchedulingGroup.PodGroupName == nil {
+		// Pod is not a member of a PodGroup.
 		return nil, nil
+	}
+	if !ec.features.GenericWorkload {
+		return nil, nonRetryableError{fmt.Errorf("Pod is a member of PodGroup %s but %s feature is disabled", *pod.Spec.SchedulingGroup.PodGroupName, features.GenericWorkload)}
 	}
 	return ec.podGroupLister.PodGroups(pod.Namespace).Get(*pod.Spec.SchedulingGroup.PodGroupName)
 }
@@ -1613,7 +1685,7 @@ func owningPod(claim *resourceapi.ResourceClaim) (string, types.UID) {
 	return "", ""
 }
 
-func podResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
+func podResourceClaimTemplateIndexFunc(obj any) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return nil, nil
@@ -1633,7 +1705,7 @@ func podResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
 
 // podResourceClaimIndexFunc is an index function that returns ResourceClaim keys (=
 // namespace/name) for ResourceClaim or ResourceClaimTemplates in a given pod.
-func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
+func podResourceClaimIndexFunc(obj any) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return nil, nil
@@ -1654,7 +1726,7 @@ func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 
 // podGroupMemberIndexFunc is an index function that returns PodGroup keys (=
 // namespace/name) for Pods in a given group.
-func podGroupMemberIndexFunc(obj interface{}) ([]string, error) {
+func podGroupMemberIndexFunc(obj any) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return nil, nil
@@ -1668,7 +1740,7 @@ func podGroupMemberIndexFunc(obj interface{}) ([]string, error) {
 
 // podGroupResourceClaimTemplateIndexFunc is an index function that returns
 // ResourceClaimTemplate keys (= namespace/name) for a given PodGroup.
-func podGroupResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
+func podGroupResourceClaimTemplateIndexFunc(obj any) ([]string, error) {
 	podGroup, ok := obj.(*schedulingapi.PodGroup)
 	if !ok {
 		return nil, nil
@@ -1689,7 +1761,7 @@ func podGroupResourceClaimTemplateIndexFunc(obj interface{}) ([]string, error) {
 // podGroupResourceClaimIndexFunc is an index function that returns
 // ResourceClaim keys (= namespace/name) for ResourceClaim or
 // ResourceClaimTemplates in a given PodGroup.
-func podGroupResourceClaimIndexFunc(obj interface{}) ([]string, error) {
+func podGroupResourceClaimIndexFunc(obj any) ([]string, error) {
 	podGroup, ok := obj.(*schedulingapi.PodGroup)
 	if !ok {
 		return nil, nil
@@ -1717,7 +1789,7 @@ func isPodDone(pod *v1.Pod) bool {
 
 // claimPodOwnerIndexFunc is an index function that returns the pod UIDs of
 // all pods which own the resource claim. Should only be one, though.
-func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
+func claimPodOwnerIndexFunc(obj any) ([]string, error) {
 	claim, ok := obj.(*resourceapi.ResourceClaim)
 	if !ok {
 		return nil, nil
@@ -1728,7 +1800,7 @@ func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
 			*owner.Controller &&
 			owner.APIVersion == "v1" &&
 			owner.Kind == "Pod" {
-			keys = append(keys, string(owner.UID))
+			keys = append(keys, claim.Namespace+"/"+string(owner.UID))
 		}
 	}
 	return keys, nil
@@ -1736,7 +1808,7 @@ func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
 
 // claimPodGroupOwnerIndexFunc is an index function that returns the PodGroup UIDs of
 // all PodGroups which own the resource claim. Should only be one, though.
-func claimPodGroupOwnerIndexFunc(obj interface{}) ([]string, error) {
+func claimPodGroupOwnerIndexFunc(obj any) ([]string, error) {
 	claim, ok := obj.(*resourceapi.ResourceClaim)
 	if !ok {
 		return nil, nil
@@ -1759,6 +1831,10 @@ func getAdminAccessMetricLabel(claim *resourceapi.ResourceClaim) string {
 		}
 	}
 	return "false"
+}
+
+func isPodGroupClaim(bindTo resourceapi.ResourceClaimConsumerReference) bool {
+	return bindTo.APIGroup == schedulingapi.GroupName && bindTo.Resource == "podgroups"
 }
 
 func newCustomCollector(rcLister resourcelisters.ResourceClaimLister, adminAccessFunc func(*resourceapi.ResourceClaim) string, logger klog.Logger) metrics.StableCollector {
