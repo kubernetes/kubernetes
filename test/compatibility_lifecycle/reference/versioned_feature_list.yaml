@@ -1399,6 +1399,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.29"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.37"
 - name: PodsAPI
   versionedSpecs:
   - default: false
