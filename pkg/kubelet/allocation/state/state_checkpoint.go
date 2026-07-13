@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 )
 
 var _ State = &stateCheckpoint{}
@@ -176,8 +177,8 @@ func (sc *stateCheckpoint) RemovePod(logger klog.Logger, podUID types.UID) error
 	return sc.cache.RemovePod(logger, podUID)
 }
 
-func (sc *stateCheckpoint) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
-	sc.cache.RemoveOrphanedPods(remainingPods)
+func (sc *stateCheckpoint) RemoveOrphanedPods(remainingPods sets.Set[types.UID], sourceForPodReady config.SourceForPodReadyFn) {
+	sc.cache.RemoveOrphanedPods(remainingPods, sourceForPodReady)
 	// Don't bother updating the stored state. If Kubelet is restarted before the cache is written,
 	// the orphaned pods will be removed the next time this method is called.
 }
@@ -221,4 +222,5 @@ func (sc *noopStateCheckpoint) RemovePod(_ klog.Logger, _ types.UID) error {
 	return nil
 }
 
-func (sc *noopStateCheckpoint) RemoveOrphanedPods(_ sets.Set[types.UID]) {}
+func (sc *noopStateCheckpoint) RemoveOrphanedPods(_ sets.Set[types.UID], _ config.SourceForPodReadyFn) {
+}

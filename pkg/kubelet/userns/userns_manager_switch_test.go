@@ -136,7 +136,7 @@ func TestCleanupOrphanedPodUsernsAllocationsSwitch(t *testing.T) {
 	// pods registered.
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
-	err = m.CleanupOrphanedPodUsernsAllocations(ctx, nil, nil)
+	err = m.CleanupOrphanedPodUsernsAllocations(ctx, nil, nil, func(_ types.UID) bool { return true })
 	require.NoError(t, err)
 
 	// The feature gate is off, no pods should be allocated.

@@ -27,6 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/util/removeall"
@@ -166,7 +167,7 @@ func (kl *Kubelet) removeOrphanedPodVolumeDirs(logger klog.Logger, uid types.UID
 
 // cleanupOrphanedPodDirs removes the volumes of pods that should not be
 // running and that have no containers running.  Note that we roll up logs here since it runs in the main loop.
-func (kl *Kubelet) cleanupOrphanedPodDirs(logger klog.Logger, pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
+func (kl *Kubelet) cleanupOrphanedPodDirs(logger klog.Logger, pods []*v1.Pod, runningPods []*kubecontainer.Pod, sourceForPodReady config.SourceForPodReadyFn) error {
 	allPods := sets.New[string]()
 	for _, pod := range pods {
 		allPods.Insert(string(pod.UID))
@@ -185,6 +186,10 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(logger klog.Logger, pods []*v1.Pod, ru
 	var totalPods, errorPods int
 
 	for _, uid := range found {
+		// Wait for relevant source to be ready before doing cleanup
+		if !sourceForPodReady(uid) {
+			continue
+		}
 		if allPods.Has(string(uid)) {
 			continue
 		}

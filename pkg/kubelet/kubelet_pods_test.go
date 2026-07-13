@@ -8349,7 +8349,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				kl.rejectPod(tCtx, pod, reject.reason, reject.message)
 			}
 
-			if err := kl.HandlePodCleanups(tCtx); (err != nil) != tt.wantErr {
+			if err := kl.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }); (err != nil) != tt.wantErr {
 				t.Errorf("Kubelet.HandlePodCleanups() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			drainAllWorkers(podWorkers)
@@ -8364,7 +8364,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 			// check after the terminating error clears
 			if tt.wantWorkerAfterRetry != nil {
 				podWorkers.podSyncer = originalPodSyncer
-				if err := kl.HandlePodCleanups(tCtx); (err != nil) != tt.wantErr {
+				if err := kl.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }); (err != nil) != tt.wantErr {
 					t.Errorf("Kubelet.HandlePodCleanups() second error = %v, wantErr %v", err, tt.wantErr)
 				}
 				drainAllWorkers(podWorkers)

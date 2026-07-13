@@ -289,7 +289,7 @@ type SyncHandler interface {
 	HandlePodRemoves(ctx context.Context, pods []*v1.Pod)
 	HandlePodReconcile(ctx context.Context, pods []*v1.Pod)
 	HandlePodSyncs(ctx context.Context, pods []*v1.Pod)
-	HandlePodCleanups(ctx context.Context) error
+	HandlePodCleanups(ctx context.Context, sourceForPodReady config.SourceForPodReadyFn) error
 }
 
 // Option is a functional option type for Kubelet
@@ -619,7 +619,7 @@ func NewMainKubelet(ctx context.Context,
 		rootDirectory:                filepath.Clean(rootDirectory),
 		podLogsDirectory:             podLogsDirectory,
 		resyncInterval:               kubeCfg.SyncFrequency.Duration,
-		sourcesReady:                 config.NewSourcesReady(kubeDeps.PodConfig.SourcesReadyFn(logger)),
+		sourcesReady:                 config.NewSourcesReady(kubeDeps.PodConfig.SourcesReadyFn(logger), kubeDeps.PodConfig.SourceForPodReady),
 		registerNode:                 registerNode,
 		registerWithTaints:           registerWithTaints,
 		dnsConfigurer:                dns.NewConfigurer(kubeDeps.Recorder, nodeRef, nodeIPs, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
@@ -2601,16 +2601,17 @@ func (kl *Kubelet) getPodsToSync() []*v1.Pod {
 // 1.  stopping the associated pod worker asynchronously
 // 2.  signaling to kill the pod by sending on the podKillingCh channel
 //
-// deletePod returns an error if not all sources are ready or the pod is not
+// deletePod returns an error if the source of this pod is not ready or the pod is not
 // found in the runtime cache.
 func (kl *Kubelet) deletePod(ctx context.Context, pod *v1.Pod) error {
 	if pod == nil {
 		return fmt.Errorf("deletePod does not allow nil pod")
 	}
-	if !kl.sourcesReady.AllReady() {
-		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
-		// for sources that haven't reported yet.
-		return fmt.Errorf("skipping delete because sources aren't ready yet")
+	// Check if the relevant source is ready.
+	if !kl.sourcesReady.SourceForPodReady(pod.UID) {
+		// If the source isn't ready, skip deletion, as we may accidentally delete pods
+		// for a source that hasn't reported yet.
+		return fmt.Errorf("skipping delete because source isn't ready yet")
 	}
 	klog.FromContext(ctx).V(3).Info("Pod has been deleted and must be killed", "pod", klog.KObj(pod), "podUID", pod.UID)
 	kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
@@ -2831,22 +2832,16 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			handler.HandlePodSyncs(ctx, pods)
 		}
 	case <-housekeepingCh:
-		if !kl.sourcesReady.AllReady() {
-			// If the sources aren't ready or volume manager has not yet synced the states,
-			// skip housekeeping, as we may accidentally delete pods from unready sources.
-			logger.V(4).Info("SyncLoop (housekeeping, skipped): sources aren't ready yet")
-		} else {
-			start := time.Now()
-			logger.V(4).Info("SyncLoop (housekeeping)")
-			if err := handler.HandlePodCleanups(ctx); err != nil {
-				logger.Error(err, "Failed cleaning pods")
-			}
-			duration := time.Since(start)
-			if duration > housekeepingWarningDuration {
-				logger.Error(fmt.Errorf("housekeeping took too long"), "Housekeeping took longer than expected", "expected", housekeepingWarningDuration, "actual", duration.Round(time.Millisecond))
-			}
-			logger.V(4).Info("SyncLoop (housekeeping) end", "duration", duration.Round(time.Millisecond))
+		start := time.Now()
+		logger.V(4).Info("SyncLoop (housekeeping)")
+		if err := handler.HandlePodCleanups(ctx, kl.sourcesReady.SourceForPodReady); err != nil {
+			logger.Error(err, "Failed cleaning pods")
 		}
+		duration := time.Since(start)
+		if duration > housekeepingWarningDuration {
+			logger.Error(fmt.Errorf("housekeeping took too long"), "Housekeeping took longer than expected", "expected", housekeepingWarningDuration, "actual", duration.Round(time.Millisecond))
+		}
+		logger.V(4).Info("SyncLoop (housekeeping) end", "duration", duration.Round(time.Millisecond))
 	}
 	return true
 }

@@ -252,7 +252,7 @@ func newTestKubeletWithImageList(
 	kubelet.runtimeState.setNetworkState(nil)
 	kubelet.rootDirectory = t.TempDir()
 	kubelet.podLogsDirectory = t.TempDir()
-	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }, func(_ types.UID) bool { return true })
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.serviceHasSynced = func() bool { return true }
 	kubelet.nodeHasSynced = func() bool { return true }
@@ -345,7 +345,7 @@ func newTestKubeletWithImageList(
 		func(ctx context.Context, pod *v1.Pod) { kubelet.HandlePodSyncs(ctx, []*v1.Pod{pod}) },
 		kubelet.GetActivePods,
 		kubelet.podManager.GetPodByUID,
-		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }),
+		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }, func(_ types.UID) bool { return true }),
 		kubelet.recorder,
 	)
 	volumeStatsAggPeriod := time.Second * 10
@@ -625,7 +625,7 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	// within a goroutine so a two second delay should be enough time to
 	// mark the pod as killed (within this test case).
 
-	require.NoError(t, kubelet.HandlePodCleanups(tCtx))
+	require.NoError(t, kubelet.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }))
 
 	// assert that unwanted pods were killed
 	if actual, expected := kubelet.podWorkers.(*fakePodWorkers).triggeredDeletion, []types.UID{"12345678"}; !reflect.DeepEqual(actual, expected) {
@@ -636,9 +636,9 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	// simulate Runtime.KillPod
 	fakeRuntime.PodList = nil
 
-	require.NoError(t, kubelet.HandlePodCleanups(tCtx))
-	require.NoError(t, kubelet.HandlePodCleanups(tCtx))
-	require.NoError(t, kubelet.HandlePodCleanups(tCtx))
+	require.NoError(t, kubelet.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }))
+	require.NoError(t, kubelet.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }))
+	require.NoError(t, kubelet.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }))
 
 	destroyCount := 0
 	err := wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
@@ -824,7 +824,7 @@ func TestHandlePodCleanups(t *testing.T) {
 	}
 	kubelet := testKubelet.kubelet
 
-	require.NoError(t, kubelet.HandlePodCleanups(tCtx))
+	require.NoError(t, kubelet.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }))
 
 	// assert that unwanted pods were queued to kill
 	if actual, expected := kubelet.podWorkers.(*fakePodWorkers).triggeredDeletion, []types.UID{"12345678"}; !reflect.DeepEqual(actual, expected) {
@@ -960,7 +960,7 @@ func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 		{Pod: fakePod},
 	}
 	kubelet := testKubelet.kubelet
-	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.Set[string]) bool { return ready })
+	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.Set[string]) bool { return ready }, func(_ types.UID) bool { return ready })
 
 	kubelet.HandlePodRemoves(tCtx, pods)
 	time.Sleep(2 * time.Second)
@@ -1368,7 +1368,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
 	kl.podManager.SetPods([]*v1.Pod{})
-	require.NoError(t, kl.HandlePodCleanups(tCtx))
+	require.NoError(t, kl.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }))
 	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); found {
 		t.Fatalf("expected to not have status cached for pod2")
 	}
@@ -1650,7 +1650,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	}
 
 	// Sync with an empty pod list to delete all mirror pods.
-	require.NoError(t, kl.HandlePodCleanups(tCtx))
+	require.NoError(t, kl.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }))
 	assert.Empty(t, manager.GetPods(), "Expected no mirror pods")
 	for i, pod := range orphanPods {
 		name := kubecontainer.GetPodFullName(pod)
@@ -1746,7 +1746,7 @@ func TestFilterOutInactivePods(t *testing.T) {
 
 	expected := []*v1.Pod{pods[2], pods[3], pods[4], pods[7]}
 	kubelet.podManager.SetPods(pods)
-	actual := kubelet.filterOutInactivePods(pods)
+	actual := kubelet.filterOutInactivePods(pods, func(_ types.UID) bool { return true })
 	assert.Equal(t, expected, actual)
 }
 
@@ -2000,7 +2000,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 
 	// Pod 1 has been deleted and no longer exists.
 	kl.podManager.SetPods([]*v1.Pod{pods[0]})
-	require.NoError(t, kl.HandlePodCleanups(tCtx))
+	require.NoError(t, kl.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }))
 	assert.True(t, dirExists(kl.getPodDir(pods[0].UID)), "Expected directory to exist for pod 0")
 	assert.False(t, dirExists(kl.getPodDir(pods[1].UID)), "Expected directory to be deleted for pod 1")
 }
@@ -2012,7 +2012,7 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod,
 
 	kl.podManager.SetPods(pods)
 	kl.HandlePodSyncs(tCtx, pods)
-	require.NoError(t, kl.HandlePodCleanups(tCtx))
+	require.NoError(t, kl.HandlePodCleanups(tCtx, func(_ types.UID) bool { return true }))
 	for i, pod := range podsToCheck {
 		exist := dirExists(kl.getPodDir(pod.UID))
 		assert.Equal(t, shouldExist, exist, "directory of pod %d", i)

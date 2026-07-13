@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 )
 
 // PodResourceInfo stores resource requirements for containers within a pod.
@@ -63,7 +64,7 @@ type writer interface {
 	SetPodLevelResources(logger klog.Logger, podUID types.UID, alloc *v1.ResourceRequirements) error
 	RemovePod(logger klog.Logger, podUID types.UID) error
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
-	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
+	RemoveOrphanedPods(remainingPods sets.Set[types.UID], sourceForPodReady config.SourceForPodReadyFn)
 }
 
 // State interface provides methods for tracking and setting pod resources
