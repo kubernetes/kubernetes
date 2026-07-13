@@ -738,11 +738,11 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 
 	matcher := field.ErrorMatcher{}.ByField().ByType().BySource().ByOrigin()
 
-	toExpectedErrs := func(allDeclarativeEnforced bool, errs field.ErrorList) field.ErrorList {
+	toExpectedErrs := func(allDeclarativeEnforced bool, betaEnabled bool, errs field.ErrorList) field.ErrorList {
 		expected := make(field.ErrorList, 0, len(errs))
 		for _, err := range errs {
 			e := *err
-			if !allDeclarativeEnforced && (e.IsAlpha() || e.IsBeta()) {
+			if !allDeclarativeEnforced && (e.IsAlpha() || (!betaEnabled && e.IsBeta())) {
 				_ = e.MarkFromImperative()
 				e.ValidationStabilityLevel = 0
 			}
@@ -760,7 +760,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 						testCtx = validate.WithAllDeclarativeEnforcedForTest(ctx)
 					}
 					errs := ValidateObjectMetaDeclaratively(testCtx, operation.Create, tc.obj, nil, tc.requiresNamespace, NameIsDNSSubdomain, fldPath, betaEnabled)
-					matcher.Test(t, toExpectedErrs(allDeclarativeEnforced, tc.expectedErrs), errs)
+					matcher.Test(t, toExpectedErrs(allDeclarativeEnforced, betaEnabled, tc.expectedErrs), errs)
 				})
 			}
 		}
@@ -907,7 +907,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 						testCtx = validate.WithAllDeclarativeEnforcedForTest(ctx)
 					}
 					errs := ValidateObjectMetaDeclaratively(testCtx, operation.Update, tc.obj, tc.oldObj, tc.requiresNamespace, NameIsDNSSubdomain, fldPath, betaEnabled)
-					matcher.Test(t, toExpectedErrs(allDeclarativeEnforced, tc.expectedErrs), errs)
+					matcher.Test(t, toExpectedErrs(allDeclarativeEnforced, betaEnabled, tc.expectedErrs), errs)
 				})
 			}
 		}
