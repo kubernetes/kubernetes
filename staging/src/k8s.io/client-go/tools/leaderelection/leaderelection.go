@@ -70,6 +70,10 @@ import (
 
 const (
 	JitterFactor = 1.2
+
+	// onStartedLeadingBlockedWarningPeriod is the interval between warnings
+	// logged when OnStartedLeading has not returned after context cancellation.
+	onStartedLeadingBlockedWarningPeriod = 10 * time.Second
 )
 
 // NewLeaderElector creates a LeaderElector from a LeaderElectionConfig
@@ -214,7 +218,13 @@ type LeaderElector struct {
 
 // Run starts the leader election loop. Run will not return
 // before leader election loop is stopped by ctx or it has
-// stopped holding the leader lease
+// stopped holding the leader lease.
+//
+// When ReleaseOnCancel is true, Run keeps renewing the lock after ctx
+// is cancelled until OnStartedLeading returns, and only then releases
+// it. Run waits for OnStartedLeading to return, so it must exit
+// promptly once its context is cancelled or Run will block
+// indefinitely.
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer runtime.HandleCrashWithContext(ctx)
 	defer le.config.Callbacks.OnStoppedLeading()
@@ -237,10 +247,45 @@ func (le *LeaderElector) Run(ctx context.Context) {
 	// keeps the lock held until that shutdown is complete.
 	renewCtx, cancelRenew := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
+	onStartedReturned := make(chan struct{})
 	wg.Go(func() {
-		defer cancelRenew()
+		defer func() {
+			cancelRenew()
+			close(onStartedReturned)
+		}()
 		le.config.Callbacks.OnStartedLeading(ctx)
 	})
+
+	// Log a warning periodically if OnStartedLeading is still running
+	// after the caller's context has been cancelled.
+	wg.Go(func() {
+		var (
+			warningTicker *time.Ticker
+			warningCh     <-chan time.Time
+			ctxDone       = ctx.Done()
+		)
+		defer func() {
+			if warningTicker != nil {
+				warningTicker.Stop()
+			}
+		}()
+		for {
+			select {
+			case <-onStartedReturned:
+				return
+			case <-ctxDone:
+				ctxDone = nil
+				warningTicker = time.NewTicker(onStartedLeadingBlockedWarningPeriod)
+				warningCh = warningTicker.C
+			case <-warningCh:
+				klog.FromContext(ctx).Info(
+					"Still waiting for OnStartedLeading callback to return before releasing the leader election lock",
+					"lock", le.config.Lock.Describe(),
+				)
+			}
+		}
+	})
+
 	le.renew(renewCtx)
 	// Signal OnStartedLeading to stop in case renew exited due to renewal
 	// failure rather than context cancellation.
