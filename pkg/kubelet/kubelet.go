@@ -240,6 +240,16 @@ const (
 
 	// instrumentationScope is the name of OpenTelemetry instrumentation scope
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet"
+
+	// mirrorPodAPITimeout bounds API calls made during mirror pod
+	// reconciliation (create and delete). On single-master clusters where
+	// etcd runs as a static pod, an etcd manifest change causes a circular
+	// dependency: the API server can't respond because etcd is restarting,
+	// and the new etcd can't start because SyncPod is blocked waiting for
+	// the API server. This timeout breaks that deadlock. Reconciliation is
+	// retried on every subsequent SyncPod cycle, so a transient timeout is
+	// harmless.
+	mirrorPodAPITimeout = 10 * time.Second
 )
 
 var (
@@ -3507,8 +3517,17 @@ func (kl *Kubelet) UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) e
 	return kl.containerManager.UnprepareDynamicResources(ctx, pod)
 }
 
-// Ensure Mirror Pod for Static Pod exists and matches the current pod definition.
-// The function logs and ignores any errors.
+// tryReconcileMirrorPods ensures the mirror pod for a static pod exists and
+// matches the current pod definition. When the mirror pod is outdated or
+// missing, it is deleted and/or recreated.
+//
+// All API server calls (create/delete) are bounded by mirrorPodAPITimeout.
+// On single-master clusters where etcd runs as a static pod, an etcd manifest
+// change creates a circular dependency: the API server needs etcd, but etcd
+// can't start until SyncPod finishes, which is waiting for the API server.
+// The timeout breaks the deadlock. Reconciliation is retried on every
+// subsequent SyncPod cycle, so a transient timeout only delays mirror pod
+// visibility — it does not affect the static pod container itself.
 func (kl *Kubelet) tryReconcileMirrorPods(ctx context.Context, staticPod, mirrorPod *v1.Pod) {
 	logger := klog.FromContext(ctx)
 	if !kubetypes.IsStaticPod(staticPod) {
@@ -3521,10 +3540,7 @@ func (kl *Kubelet) tryReconcileMirrorPods(ctx context.Context, staticPod, mirror
 			// it. The mirror pod will get recreated later.
 			logger.Info("Trying to delete pod", "pod", klog.KObj(mirrorPod), "podUID", mirrorPod.UID)
 			podFullName := kubecontainer.GetPodFullName(staticPod)
-			// Use a bounded timeout so mirror pod deletion doesn't block
-			// indefinitely if the API server is unreachable (e.g. during
-			// etcd restarts). Reconciliation will be retried on the next sync.
-			deleteCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			deleteCtx, cancel := context.WithTimeout(ctx, mirrorPodAPITimeout)
 			if ok, err := kl.mirrorPodClient.DeleteMirrorPod(deleteCtx, podFullName, &mirrorPod.UID); err != nil {
 				logger.Error(err, "Failed deleting mirror pod", "pod", klog.KObj(mirrorPod))
 			} else if ok {
@@ -3542,9 +3558,11 @@ func (kl *Kubelet) tryReconcileMirrorPods(ctx context.Context, staticPod, mirror
 			logger.Info("No need to create a mirror pod, since node has been removed from the cluster", "node", klog.KRef("", string(kl.nodeName)))
 		} else {
 			logger.Info("Creating a mirror pod for static pod", "pod", klog.KObj(staticPod))
-			if err := kl.mirrorPodClient.CreateMirrorPod(ctx, staticPod); err != nil {
+			createCtx, cancel := context.WithTimeout(ctx, mirrorPodAPITimeout)
+			if err := kl.mirrorPodClient.CreateMirrorPod(createCtx, staticPod); err != nil {
 				logger.Error(err, "Failed creating a mirror pod", "pod", klog.KObj(staticPod))
 			}
+			cancel()
 		}
 	}
 }
