@@ -1212,6 +1212,60 @@ func TestRunPlacementFeasiblePlugins(t *testing.T) {
 			expectedCalled: []bool{true, true},
 		},
 		{
+			name: "First plugin returns PartialSuccess, continues",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.PartialSuccess, "partial")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.NewStatus(fwk.PartialSuccess, "partial").WithPlugin("p1"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns Wait, second returns PartialSuccess, returns Wait",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Wait, "wait")},
+				{name: "p2", status: fwk.NewStatus(fwk.PartialSuccess, "partial")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Wait, "wait").WithPlugin("p1"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns PartialSuccess, second returns Wait, returns Wait",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.PartialSuccess, "partial")},
+				{name: "p2", status: fwk.NewStatus(fwk.Wait, "wait")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Wait, "wait").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns PartialSuccess, second returns Unschedulable, returns Unschedulable",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.PartialSuccess, "partial")},
+				{name: "p2", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin succeeds, second returns PartialSuccess, returns PartialSuccess",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: nil},
+				{name: "p2", status: fwk.NewStatus(fwk.PartialSuccess, "partial")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.PartialSuccess, "partial").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns PartialSuccess, second returns PartialSuccess, returns first PartialSuccess",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.PartialSuccess, "partial1")},
+				{name: "p2", status: fwk.NewStatus(fwk.PartialSuccess, "partial2")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.PartialSuccess, "partial1").WithPlugin("p1"),
+			expectedCalled: []bool{true, true},
+		},
+		{
 			name: "Plugin returns Error, breaks",
 			plugins: []*mockPlacementFeasiblePlugin{
 				{name: "p1", status: fwk.NewStatus(fwk.Error, "error")},

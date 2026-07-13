@@ -1422,7 +1422,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create domain: %v", err)
 			}
-			res, gotStatus := pl.selectVictimsOnDomain(ctx, tt.preemptor, domain, tt.pdbs, mockSchedulingFunc)
+			res, gotStatus := pl.selectVictimsOnDomain(ctx, framework.NewCycleState(), tt.preemptor, domain, tt.pdbs, mockSchedulingFunc)
 			if !gotStatus.IsSuccess() {
 				t.Logf("SelectVictimsOnDomain failed: %v", gotStatus.Message())
 			}
@@ -1523,7 +1523,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 	if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	result, gotStatus := pl.selectVictimsOnDomain(ctx, preemptor, domain, nil, mockSchedulingFunc)
+	result, gotStatus := pl.selectVictimsOnDomain(ctx, framework.NewCycleState(), preemptor, domain, nil, mockSchedulingFunc)
 	if err := pl.Handle.MutableSnapshotSharedLister().EndMutations(); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

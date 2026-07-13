@@ -98,10 +98,14 @@ const (
 	// When the scheduling queue requeues Pods, which was rejected with Pending in the last scheduling,
 	// the Pod goes to activeQ directly ignoring backoff.
 	Pending
+	// PartialSuccess is returned by PlacementFeasible when a subsequent scheduling attempt
+	// of a pod group is partially successful (some pods schedulable, some not), indicating
+	// that preemption should be prioritized over binding for the group.
+	PartialSuccess
 )
 
 // This list should be exactly the same as the codes iota defined above in the same order.
-var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip", "Pending"}
+var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip", "Pending", "PartialSuccess"}
 
 func (c Code) String() string {
 	return codes[c]
@@ -185,6 +189,11 @@ func (s *Status) IsWait() bool {
 // IsSkip returns true if and only if "Status" is non-nil and its Code is "Skip".
 func (s *Status) IsSkip() bool {
 	return s.Code() == Skip
+}
+
+// IsPartialSuccess returns true if and only if "Status" is non-nil and its Code is "PartialSuccess".
+func (s *Status) IsPartialSuccess() bool {
+	return s.Code() == PartialSuccess
 }
 
 // IsRejected returns true if "Status" is Unschedulable (Unschedulable, UnschedulableAndUnresolvable, or Pending).

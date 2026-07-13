@@ -613,27 +613,82 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 
 func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 	tests := []struct {
-		name                             string
-		genericWorkloadEnabled           bool
-		postFilterPlugin                 string
+		name                   string
+		genericWorkloadEnabled bool
+		postFilterPlugin       string
+		// directly inject p3 it into the scheduler's node cache as already being assigned to a node
+		isSubsequent                     bool
+		filterStatus                     map[string]*fwk.Status
+		placementFeasibleStatuses        []fwk.Code
 		expectedPodGroupPostFilterCalled bool
 	}{
 		{
-			name:                             "runs pod group post filter when GenericWorkload is enabled and DefaultPreemption is registered",
-			genericWorkloadEnabled:           true,
-			postFilterPlugin:                 "DefaultPreemption",
+			name:                   "runs pod group post filter when GenericWorkload is enabled and DefaultPreemption is registered",
+			genericWorkloadEnabled: true,
+			postFilterPlugin:       "DefaultPreemption",
+			filterStatus: map[string]*fwk.Status{
+				"p1": fwk.NewStatus(fwk.Unschedulable, "always fail p1"),
+				"p2": fwk.NewStatus(fwk.Unschedulable, "always fail p2"),
+			},
+			placementFeasibleStatuses:        []fwk.Code{fwk.Success, fwk.Success, fwk.Success},
 			expectedPodGroupPostFilterCalled: true,
 		},
 		{
-			name:                             "disables pod group post filter when GenericWorkload feature gate is disabled",
-			genericWorkloadEnabled:           false,
-			postFilterPlugin:                 "DefaultPreemption",
+			name:                   "disables pod group post filter when GenericWorkload feature gate is disabled",
+			genericWorkloadEnabled: false,
+			postFilterPlugin:       "DefaultPreemption",
+			filterStatus: map[string]*fwk.Status{
+				"p1": fwk.NewStatus(fwk.Unschedulable, "always fail p1"),
+				"p2": fwk.NewStatus(fwk.Unschedulable, "always fail p2"),
+			},
+			placementFeasibleStatuses:        []fwk.Code{fwk.Success, fwk.Success, fwk.Success},
 			expectedPodGroupPostFilterCalled: false,
 		},
 		{
-			name:                             "disables pod group post filter when DefaultPreemption is not registered",
-			genericWorkloadEnabled:           true,
-			postFilterPlugin:                 "FakePodGroupPlugin",
+			name:                   "disables pod group post filter when DefaultPreemption is not registered",
+			genericWorkloadEnabled: true,
+			postFilterPlugin:       "FakePodGroupPlugin",
+			filterStatus: map[string]*fwk.Status{
+				"p1": fwk.NewStatus(fwk.Unschedulable, "always fail p1"),
+				"p2": fwk.NewStatus(fwk.Unschedulable, "always fail p2"),
+			},
+			placementFeasibleStatuses:        []fwk.Code{fwk.Success, fwk.Success, fwk.Success},
+			expectedPodGroupPostFilterCalled: false,
+		},
+		{
+			name:                   "subsequent scheduling: runs preemption even if some pods are schedulable",
+			genericWorkloadEnabled: true,
+			postFilterPlugin:       "DefaultPreemption",
+			isSubsequent:           true,
+			filterStatus: map[string]*fwk.Status{
+				"p1": nil,
+				"p2": fwk.NewStatus(fwk.Unschedulable, "fail p2"),
+			},
+			placementFeasibleStatuses:        []fwk.Code{fwk.Success, fwk.PartialSuccess, fwk.PartialSuccess},
+			expectedPodGroupPostFilterCalled: true,
+		},
+		{
+			name:                   "initial scheduling: does not run preemption if some pods are schedulable (overall success)",
+			genericWorkloadEnabled: true,
+			postFilterPlugin:       "DefaultPreemption",
+			isSubsequent:           false,
+			filterStatus: map[string]*fwk.Status{
+				"p1": nil,
+				"p2": fwk.NewStatus(fwk.Unschedulable, "fail p2"),
+			},
+			placementFeasibleStatuses:        []fwk.Code{fwk.Success, fwk.Success, fwk.Success},
+			expectedPodGroupPostFilterCalled: false,
+		},
+		{
+			name:                   "subsequent scheduling: does not run preemption if all pods are schedulable",
+			genericWorkloadEnabled: true,
+			postFilterPlugin:       "DefaultPreemption",
+			isSubsequent:           true,
+			filterStatus: map[string]*fwk.Status{
+				"p1": nil,
+				"p2": nil,
+			},
+			placementFeasibleStatuses:        []fwk.Code{fwk.Success, fwk.Success, fwk.Success},
 			expectedPodGroupPostFilterCalled: false,
 		},
 	}
@@ -644,9 +699,10 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 				features.GenericWorkload: tt.genericWorkloadEnabled,
 			})
 
-			testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
-			p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
-			p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+			pgName := "pg"
+			testPodGroup := st.MakePodGroup().Name(pgName).Namespace("default").Obj()
+			p1 := st.MakePod().Name("p1").UID("p1").PodGroupName(pgName).SchedulerName("test-scheduler").Obj()
+			p2 := st.MakePod().Name("p2").UID("p2").PodGroupName(pgName).SchedulerName("test-scheduler").Obj()
 			testNode := st.MakeNode().Name("node1").UID("node1").Obj()
 
 			qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
@@ -655,7 +711,7 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			podGroupInfo := &framework.QueuedPodGroupInfo{
 				QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2},
 				PodGroupInfo: &framework.PodGroupInfo{
-					Name:            "pg",
+					Name:            pgName,
 					Namespace:       "default",
 					UnscheduledPods: []*v1.Pod{p1, p2},
 					PodGroup:        testPodGroup,
@@ -667,11 +723,12 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			defer cancel()
 
 			fakePlugin := &fakePodGroupPlugin{
-				filterStatus: map[string]*fwk.Status{
-					"p1": fwk.NewStatus(fwk.Unschedulable, "always fail p1"),
-					"p2": fwk.NewStatus(fwk.Unschedulable, "always fail p2"),
-				},
+				filterStatus:             tt.filterStatus,
 				podGroupPostFilterStatus: nil,
+			}
+
+			placementFeasiblePlugin := &fakePlacementFeasiblePlugin{
+				placementFeasibleStatuses: [][]fwk.Code{tt.placementFeasibleStatuses},
 			}
 
 			registry := frameworkruntime.Registry{
@@ -679,6 +736,9 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 				defaultbinder.Name: defaultbinder.New,
 				"FakePodGroupPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 					return fakePlugin, nil
+				},
+				"GangScheduling": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+					return placementFeasiblePlugin, nil
 				},
 			}
 
@@ -712,6 +772,9 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 					PodGroupPostFilter: config.PluginSet{
 						Enabled: pgPostFilterPlugins,
 					},
+					Permit: config.PluginSet{
+						Enabled: []config.Plugin{{Name: "GangScheduling"}},
+					},
 				},
 			}
 
@@ -729,6 +792,8 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 				frameworkruntime.WithPodNominator(queue),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 			)
 			if err != nil {
 				t.Fatalf("Failed to create new framework: %v", err)
@@ -737,6 +802,14 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			cache := internalcache.New(ctx, nil, true)
 			logger, ctx := ktesting.NewTestContext(t)
 			cache.AddNode(logger, testNode)
+
+			if tt.isSubsequent {
+				p3 := st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName(pgName).Node(testNode.Name).SchedulerName("test-scheduler").Obj()
+				err := cache.AddPod(logger, p3)
+				if err != nil {
+					t.Fatalf("Failed to add pod to cache: %v", err)
+				}
+			}
 
 			sched := &Scheduler{
 				Profiles:               profile.Map{"test-scheduler": schedFwk},
@@ -750,6 +823,9 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			}
 
 			sched.SchedulePod = sched.schedulePod
+			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
 			sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, time.Now())
 
 			if fakePlugin.podGroupPostFilterCalled != tt.expectedPodGroupPostFilterCalled {
@@ -1698,6 +1774,63 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 				Status:  metav1.ConditionFalse,
 				Reason:  schedulingapi.PodGroupReasonSchedulerError,
 				Message: fwk.NewStatus(fwk.Error, "scheduling error for pod group, some pods were not processed").AsError().Error(),
+			},
+		},
+		{
+			name: "PartialSuccess with waitingOnPreemption=false, should bind successful pods and fail unschedulable ones",
+			algorithmResult: podGroupAlgorithmResult{
+				status:              fwk.NewStatus(fwk.PartialSuccess, "some pods unschedulable"),
+				waitingOnPreemption: false,
+				podResults: []algorithmResult{{
+					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
+					status:         nil,
+				}, {
+					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
+					status:         fwk.NewStatus(fwk.Unschedulable, "failed to schedule p2"),
+				}, {
+					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
+					status:         fwk.NewStatus(fwk.Unschedulable, "failed to schedule p3"),
+				}},
+			},
+			expectBound:  sets.New("p1"),
+			expectFailed: sets.New("p2", "p3"),
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.PodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Scheduled",
+				Message: "some pods unschedulable",
+			},
+		},
+		{
+			name: "PartialSuccess with waitingOnPreemption=true, should send all pods to FailureHandler waiting for preemption",
+			algorithmResult: podGroupAlgorithmResult{
+				status:              fwk.NewStatus(fwk.PartialSuccess, "waiting for preemption to complete"),
+				waitingOnPreemption: true,
+				podResults: []algorithmResult{{
+					scheduleResult: ScheduleResult{
+						SuggestedHost:  "node1",
+						nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride},
+					},
+					status:             nil,
+					requiresPreemption: false,
+				}, {
+					scheduleResult:     ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
+					status:             fwk.NewStatus(fwk.Unschedulable, "failed to schedule p2"),
+					requiresPreemption: true,
+				}, {
+					scheduleResult:     ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
+					status:             fwk.NewStatus(fwk.Unschedulable, "failed to schedule p3"),
+					requiresPreemption: true,
+				}},
+			},
+			expectBound:      sets.New[string](),
+			expectPreempting: sets.New("p1"),
+			expectFailed:     sets.New("p2", "p3"),
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.PodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.PodGroupReasonUnschedulable,
+				Message: "waiting for preemption to complete",
 			},
 		},
 	}

@@ -70,7 +70,7 @@ func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor, enablePodGroupPreem
 // pods assumed in their place.
 // The caller is expected to backup the NodeInfo before calling this function
 // and rollback the state to the backup after function is finished.
-func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+func (ev *PodGroupEvaluator) Preempt(ctx context.Context, state fwk.PodGroupCycleState, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	// In case of workload-aware preemption, the domain is whole cluster.
 	// We do not make a snapshot of node info. Those nodes will be shared
 	// with the PodGroup scheduling algorithm passed as podGroupSchedulingFunc.
@@ -84,7 +84,7 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodG
 		return nil, fwk.AsStatus(fmt.Errorf("failed to get pod disruption budgets: %w", err))
 	}
 
-	res, status := ev.selectVictimsOnDomain(ctx, preemptor, domain, pdbs, podGroupSchedulingFunc)
+	res, status := ev.selectVictimsOnDomain(ctx, state, preemptor, domain, pdbs, podGroupSchedulingFunc)
 	if !status.IsSuccess() {
 		return nil, status
 	}
@@ -102,6 +102,7 @@ type selectVictimsResult struct {
 // It prioritizes victims that are not protected by a PDB.
 func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	ctx context.Context,
+	state fwk.PodGroupCycleState,
 	preemptor *podGroupPreemptor,
 	domain *domain,
 	pdbs []*policy.PodDisruptionBudget,
@@ -203,9 +204,27 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		}
 	}
 
+	var originalCount int
+	if state != nil {
+		if data, err := state.Read(OriginalScheduledCountKey); err == nil {
+			if originalCountState, ok := data.(*OriginalScheduledCount); ok {
+				originalCount = originalCountState.Count
+			}
+		}
+	}
+
 	// If the scheduling failed after removing all potential victims, return the status.
 	podGroupAssignments, status := podGroupSchedulingFunc(ctx)
-	if !status.IsSuccess() {
+
+	validAssignment := make([]fwk.ProposedAssignment, 0, len(podGroupAssignments.ProposedAssignments))
+	// Prepare podInfos for each of the assigned preemptor pods
+	for _, assignment := range podGroupAssignments.ProposedAssignments {
+		if assignment.GetNodeName() != "" {
+			validAssignment = append(validAssignment, assignment)
+		}
+	}
+
+	if !status.IsSuccess() && !(status.IsPartialSuccess() && len(validAssignment) > originalCount) {
 		return nil, status
 	}
 
@@ -215,15 +234,6 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 
 	violatingVictims, nonViolatingVictims := FilterVictimsWithPDBViolation(potentialVictims, pdbs)
 	numViolatingVictim := 0
-
-	validAssignment := make([]fwk.ProposedAssignment, 0, len(podGroupAssignments.ProposedAssignments))
-
-	// Prepare podInfos for each of the assigned preemptor pods
-	for _, assignment := range podGroupAssignments.ProposedAssignments {
-		if assignment.GetNodeName() != "" {
-			validAssignment = append(validAssignment, assignment)
-		}
-	}
 
 	// reprieveVictim tries to reprieve a victim as a single unit.
 	// It adds all victim's pods back to snapshot and to CycleStates of preemptor pods
