@@ -82,8 +82,9 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) &&
 			h.containerManager.GetNodeConfig().CPUManagerPolicy == string(cpumanager.PolicyStatic) &&
-			h.guaranteedPodResourceResizeRequired(pod, v1.ResourceCPU) {
-			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside CPU Manager policy \"%s\"", string(cpumanager.PolicyStatic))
+			h.guaranteedPodResourceResizeRequired(pod, v1.ResourceCPU) &&
+			h.hasIntegerCPURequests(pod) {
+			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods with integer CPU requests alongside CPU Manager policy \"%s\"", string(cpumanager.PolicyStatic))
 			logger.V(3).Info(msg, "pod", format.Pod(pod))
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy").Inc()
 			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
@@ -133,6 +134,22 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 		}
 	}
 	return false, ""
+}
+
+func (h *podResizesAdmitHandler) hasIntegerCPURequests(pod *v1.Pod) bool {
+	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if !IsResizableContainer(container, containerType) {
+			continue
+		}
+		cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
+		if cpuQuantity.IsZero() {
+			continue
+		}
+		if cpuQuantity.Value()*1000 == cpuQuantity.MilliValue() {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *podResizesAdmitHandler) guaranteedPodResourceResizeRequired(pod *v1.Pod, resourceName v1.ResourceName) bool {
