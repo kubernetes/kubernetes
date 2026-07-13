@@ -85,3 +85,104 @@ func Test_uniqueLVCombos(t *testing.T) {
 		})
 	}
 }
+
+// Test_separateClientConnections verifies that kubescheduler under test and test framework use
+// two separate client connections (and configurations) to the API server, and that connection
+// parameters set on workload or testcase level are correctly interpreted.
+func Test_separateClientConnections(t *testing.T) {
+	var (
+		tcQPS   float32 = 10.0
+		tcBurst         = 20
+		wQPS    float32 = 123.45
+		wBurst          = 678
+	)
+
+	tests := []struct {
+		name          string
+		testCaseQPS   *float32
+		testCaseBurst *int
+		workloadQPS   *float32
+		workloadBurst *int
+		expectedQPS   float32
+		expectedBurst int
+	}{
+		{
+			name:          "workload override takes precedence",
+			testCaseQPS:   &tcQPS,
+			testCaseBurst: &tcBurst,
+			workloadQPS:   &wQPS,
+			workloadBurst: &wBurst,
+			expectedQPS:   wQPS,
+			expectedBurst: wBurst,
+		},
+		{
+			name:          "fallback to testCase baseline when workload limits are nil",
+			testCaseQPS:   &tcQPS,
+			testCaseBurst: &tcBurst,
+			workloadQPS:   nil,
+			workloadBurst: nil,
+			expectedQPS:   tcQPS,
+			expectedBurst: tcBurst,
+		},
+		{
+			name:          "global default fallback when both are nil",
+			testCaseQPS:   nil,
+			testCaseBurst: nil,
+			workloadQPS:   nil,
+			workloadBurst: nil,
+			expectedQPS:   5000.0,
+			expectedBurst: 5000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := &testCase{
+				Name:                    "TestTC",
+				SchedulerAPIClientQPS:   tt.testCaseQPS,
+				SchedulerAPIClientBurst: tt.testCaseBurst,
+			}
+			w := &Workload{
+				Name:                    "TestWorkload",
+				SchedulerAPIClientQPS:   tt.workloadQPS,
+				SchedulerAPIClientBurst: tt.workloadBurst,
+			}
+
+			scheduler, _, done, frameworkTCtx := setupTestCase(t, tc, nil, w, &schedulerPerfOptions{})
+
+			frameworkTCtx.Cleanup(func() {
+				frameworkTCtx.Cancel("test is done")
+				<-done
+			})
+
+			// Verify framework QPS and Burst are at their default values (5000)
+			frameworkCfg := frameworkTCtx.RESTConfig()
+			if frameworkCfg == nil {
+				t.Fatal("Expected non-nil framework REST config")
+			}
+			if frameworkCfg.QPS != 5000.0 {
+				t.Errorf("Expected framework QPS to be 5000.0, got %f", frameworkCfg.QPS)
+			}
+			if frameworkCfg.Burst != 5000 {
+				t.Errorf("Expected framework Burst to be 5000, got %d", frameworkCfg.Burst)
+			}
+
+			// Verify scheduler QPS and Burst match the expected values
+			if len(scheduler.Profiles) == 0 {
+				t.Fatal("Expected at least one scheduler profile")
+			}
+			for _, profile := range scheduler.Profiles {
+				schedulerCfg := profile.KubeConfig()
+				if schedulerCfg == nil {
+					t.Fatal("Expected non-nil scheduler REST config")
+				}
+				if schedulerCfg.QPS != tt.expectedQPS {
+					t.Errorf("Expected scheduler QPS to be %f, got %f", tt.expectedQPS, schedulerCfg.QPS)
+				}
+				if schedulerCfg.Burst != tt.expectedBurst {
+					t.Errorf("Expected scheduler Burst to be %d, got %d", tt.expectedBurst, schedulerCfg.Burst)
+				}
+			}
+		})
+	}
+}
