@@ -29,9 +29,9 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/webhook-auth/verify"
-	"k8s.io/webhook-auth/verify/admissionhttp"
-	"k8s.io/webhook-auth/verify/oidc"
+	"k8s.io/webhookauth/verify"
+	"k8s.io/webhookauth/verify/admissionhttp"
+	"k8s.io/webhookauth/verify/oidc"
 )
 
 func TestDeriveExpectedAudience(t *testing.T) {

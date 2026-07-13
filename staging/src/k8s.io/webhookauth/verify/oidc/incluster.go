@@ -28,7 +28,7 @@ import (
 	"os"
 	"strings"
 
-	"k8s.io/webhook-auth/verify"
+	"k8s.io/webhookauth/verify"
 )
 
 // serviceAccountTokenPath and serviceAccountCACertPath are where the kubelet

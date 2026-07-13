@@ -45,8 +45,8 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/webhook-auth/verify/admissionhttp"
-	"k8s.io/webhook-auth/verify/oidc"
+	"k8s.io/webhookauth/verify/admissionhttp"
+	"k8s.io/webhookauth/verify/oidc"
 )
 
 // The verifier's config surface is the issuer, the audience minted for this

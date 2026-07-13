@@ -1,6 +1,6 @@
 // This is a generated file. Do not edit directly.
 
-module k8s.io/webhook-auth
+module k8s.io/webhookauth
 
 go 1.26.0
 

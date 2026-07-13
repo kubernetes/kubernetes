@@ -3,7 +3,7 @@ rules:
   - selectorRegexp: k8s[.]io/kubernetes
     forbiddenPrefixes:
       - ''
-  # prevent import of k8s.io/client-go — webhook-auth must stay below client-go
+  # prevent import of k8s.io/client-go — webhookauth must stay below client-go
   # so consumers can import it without pulling in the client-go dependency tree
   - selectorRegexp: k8s[.]io/client-go
     forbiddenPrefixes:

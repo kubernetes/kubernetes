@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/webhook-auth/verify"
-	"k8s.io/webhook-auth/verify/oidc"
+	"k8s.io/webhookauth/verify"
+	"k8s.io/webhookauth/verify/oidc"
 )
 
 // writeRawSAToken writes an arbitrary raw string as the projected SA-token file.

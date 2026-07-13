@@ -31,7 +31,7 @@ limitations under the License.
 // verifier. Here the layering is: discovery + signature + iss/aud/exp = go-oidc;
 // the KEP-6060 policy (bound-object exactly-one, allowedAPIGroup match) = the
 // core verify package.
-package oidc // import "k8s.io/webhook-auth/verify/oidc"
+package oidc // import "k8s.io/webhookauth/verify/oidc"
 
 import (
 	"context"
@@ -40,7 +40,7 @@ import (
 	"net/http"
 
 	coreosoidc "github.com/coreos/go-oidc"
-	"k8s.io/webhook-auth/verify"
+	"k8s.io/webhookauth/verify"
 )
 
 // config holds the resolved options for NewRemoteVerifier.

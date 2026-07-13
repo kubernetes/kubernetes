@@ -2499,7 +2499,7 @@ rules:
       branch: release-1.36
       dirs:
       - staging/src/k8s.io/externaljwt
-- destination: webhook-auth
+- destination: webhookauth
   branches:
   - name: master
     dependencies:
@@ -2510,7 +2510,7 @@ rules:
     source:
       branch: master
       dirs:
-      - staging/src/k8s.io/webhook-auth
+      - staging/src/k8s.io/webhookauth
   library: true
 recursive-delete-patterns:
 - '*/.gitattributes'

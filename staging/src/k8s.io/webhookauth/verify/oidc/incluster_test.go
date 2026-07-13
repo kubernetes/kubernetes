@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/webhook-auth/verify/oidc"
+	"k8s.io/webhookauth/verify/oidc"
 )
 
 // writeFakeSAToken writes an UNSIGNED compact-JWT-shaped file whose payload

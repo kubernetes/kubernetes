@@ -256,5 +256,5 @@ replace (
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 	k8s.io/streaming => ./staging/src/k8s.io/streaming
-	k8s.io/webhook-auth => ./staging/src/k8s.io/webhook-auth
+	k8s.io/webhookauth => ./staging/src/k8s.io/webhookauth
 )

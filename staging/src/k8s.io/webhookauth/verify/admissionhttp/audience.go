@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/webhook-auth/verify"
+	"k8s.io/webhookauth/verify"
 )
 
 // deriveAudience is the single source of the PROVISIONAL webhook-audience

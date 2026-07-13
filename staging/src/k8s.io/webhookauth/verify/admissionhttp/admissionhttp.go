@@ -36,7 +36,7 @@ limitations under the License.
 // example the oidc package). Decoding the AdmissionReview to extract the
 // resource API group pulls in k8s.io/api/admission/v1 and k8s.io/apimachinery,
 // the module's only Kubernetes dependencies.
-package admissionhttp // import "k8s.io/webhook-auth/verify/admissionhttp"
+package admissionhttp // import "k8s.io/webhookauth/verify/admissionhttp"
 
 import (
 	"context"
@@ -47,7 +47,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/webhook-auth/verify"
+	"k8s.io/webhookauth/verify"
 )
 
 // defaultMaxBodyBytes bounds how much of the request body the adapter reads
