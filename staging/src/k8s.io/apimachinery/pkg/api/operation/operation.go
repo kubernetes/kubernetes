@@ -31,8 +31,10 @@ type Operation struct {
 	Type Type
 
 	// Options are the validation options in effect for this operation, mapping option
-	// name to whether it is enabled. Option names typically match feature gates. Set by
-	// the resource strategy and read-only during validation.
+	// name to whether it is enabled. Option names typically match feature gates, but an
+	// option may be enabled even when its feature gate is off — e.g. when the feature is
+	// already in use by the object being updated. Set by the resource strategy and
+	// read-only during validation.
 	//
 	// Every option a validation tag references must be defined here by the strategy; an
 	// option that is not defined is a programming error (see HasOption).

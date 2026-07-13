@@ -294,9 +294,12 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
 		return rest.ValidateCreate(c, obj, strategy)
 	}, ctx, opts, obj)
-	// Pass the strategy's declared options to the cross-version check below.
-	if dvs, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
-		testConfigs = append(testConfigs, WithOptions(dvs.DeclarativeValidationConfig(ctx, obj, nil).Options))
+	// Fall back to the strategy's declared options for the cross-version check, unless
+	// the caller supplied its own.
+	if opts.Options == nil {
+		if dvs, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
+			testConfigs = append(testConfigs, WithOptions(dvs.DeclarativeValidationConfig(ctx, obj, nil).Options))
+		}
 	}
 	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
 }
@@ -326,9 +329,12 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
 		return rest.ValidateUpdate(c, obj, old, strategy)
 	}, ctx, opts, obj)
-	// Pass the strategy's declared options to the cross-version check below.
-	if dvs, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
-		testConfigs = append(testConfigs, WithOptions(dvs.DeclarativeValidationConfig(ctx, obj, old).Options))
+	// Fall back to the strategy's declared options for the cross-version check, unless
+	// the caller supplied its own.
+	if opts.Options == nil {
+		if dvs, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
+			testConfigs = append(testConfigs, WithOptions(dvs.DeclarativeValidationConfig(ctx, obj, old).Options))
+		}
 	}
 	VerifyVersionedValidationEquivalence(t, obj, old, testConfigs...)
 }

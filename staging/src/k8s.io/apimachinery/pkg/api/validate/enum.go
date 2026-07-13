@@ -79,14 +79,11 @@ type EnumExclusion[T ~string] struct {
 
 func isExcluded[T ~string](op operation.Operation, exclusions []EnumExclusion[T], value T) (bool, error) {
 	for _, rule := range exclusions {
-		if rule.Value != value {
-			continue
-		}
 		on, defined := op.HasOption(rule.Option)
 		if !defined {
 			return false, fmt.Errorf("undefined validation option %q", rule.Option)
 		}
-		if rule.ExcludeWhen == on {
+		if rule.Value == value && rule.ExcludeWhen == on {
 			return true, nil
 		}
 	}
