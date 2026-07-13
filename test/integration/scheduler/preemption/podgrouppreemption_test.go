@@ -23,15 +23,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -71,6 +75,15 @@ func TestPodGroupPreemption(t *testing.T) {
 		enablePodGroupPreemptionPolicy     bool
 		customPluginName                   string
 		customPluginFunc                   frameworkruntime.PluginFactory
+		// tempRemovePG, if true, temporarily removes PodGroups for the time of creating preemptor pods
+		// - but after initial pods have been scheduled.
+		// This ensures that the initial pods get scheduled before preemptor pods are created AND
+		// all preemptor pods are created and kept in incompletePodGroupPods.
+		// Once the PodGroup is recreated, all pods become schedulable simultaneously and
+		// are guaranteed to be evaluated together in the next PodGroup scheduling cycle.
+		// This avoids test flakiness caused by running multiple PodGroup scheduling cycles with a partial set of preemptor pods.
+		tempRemovePG       bool
+		expectedEventOrder []string
 	}{
 		{
 			name: "Full PodGroup Preemption",
@@ -838,6 +851,58 @@ func TestPodGroupPreemption(t *testing.T) {
 				return &mockReservePlugin{maxPods: 2}, nil
 			},
 		},
+		{
+			name: "Binding first before preemption for gang policy",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingapi.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pg-pod-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg-pod-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"pg-pod-1", "pg-pod-2", "high-1", "high-2"},
+			expectedPreempted:          []string{"low-1"},
+			expectedPodsPreemptedByWAP: 1,
+			tempRemovePG:               true,
+			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
+			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
+			// preemption will be called in the subsequent cycle to make room for the second pod.
+			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
+		},
+		{
+			name: "Binding first before preemption for basic policy",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingapi.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).BasicPolicy().Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pg-pod-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("pg-pod-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"pg-pod-1", "pg-pod-2", "high-1", "high-2"},
+			expectedPreempted:          []string{"low-1"},
+			expectedPodsPreemptedByWAP: 1,
+			tempRemovePG:               true,
+			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
+			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
+			// preemption will be called in the subsequent cycle to make room for the second pod.
+			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -846,6 +911,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				features.GenericWorkload:          true,
 				features.PodGroupPreemptionPolicy: tt.enablePodGroupPreemptionPolicy,
 			})
+			recorder := eventRecorder{}
 			registry := make(frameworkruntime.Registry)
 
 			// Register mock bind plugin that will register NNN information during binding.
@@ -854,6 +920,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				name:       mockBindPluginName,
 				realPlugin: nil,
 				nnnInfo:    sync.Map{},
+				recorder:   &recorder,
 			}
 			err := registry.Register(mockBindPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 				db, err := defaultbinder.New(ctx, o, fh)
@@ -867,6 +934,18 @@ func TestPodGroupPreemption(t *testing.T) {
 				t.Fatalf("Error registering a bind plugin: %v", err)
 			}
 
+			mockPGPostFilterPluginName := "mockPGPostFilterPlugin"
+			var pgPostFilterPlugin = mockPodGroupPostFilterPlugin{
+				name:     mockPGPostFilterPluginName,
+				recorder: &recorder,
+			}
+			err = registry.Register(mockPGPostFilterPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+				return &pgPostFilterPlugin, nil
+			})
+			if err != nil {
+				t.Fatalf("Error registering a pg post filter plugin: %v", err)
+			}
+
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{{
 					SchedulerName: ptr.To(v1.DefaultSchedulerName),
@@ -874,9 +953,15 @@ func TestPodGroupPreemption(t *testing.T) {
 						MultiPoint: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
 								{Name: mockBindPluginName},
+								{Name: mockPGPostFilterPluginName},
+								{Name: names.DefaultPreemption},
 							},
 							Disabled: []configv1.Plugin{
 								{Name: names.DefaultBinder},
+								// Disable DefaultPreemption from its default position to allow explicit ordering.
+								// If not disabled, it runs as an override first and terminates the post-filter chain,
+								// preventing our mock plugins from recording events.
+								{Name: names.DefaultPreemption},
 							},
 						},
 					},
@@ -939,13 +1024,28 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 
+			recorder.Clear()
+
 			// 4. Create preemptor pods
+			if tt.tempRemovePG {
+				// Temporarily remove PodGroups. This is a trick to ensure that all preemptor pods
+				// are created and queued as unschedulable first, and then become schedulable at once
+				// when the PodGroup is recreated.
+				pgNames := make([]string, len(tt.podGroups))
+				for i, pg := range tt.podGroups {
+					pgNames[i] = pg.Name
+				}
+				if err := deletePodGroups(testCtx.Ctx, cs, ns, pgNames); err != nil {
+					t.Fatalf("Failed to delete PodGroups: %v", err)
+				}
+			}
+
 			for _, p := range tt.preemptorPods {
 				p.Namespace = ns
 				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
 				}
-				if tt.preemptorPodsQueuedInCreationOrder {
+				if !tt.tempRemovePG && tt.preemptorPodsQueuedInCreationOrder {
 					podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
 					err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 						_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
@@ -957,6 +1057,27 @@ func TestPodGroupPreemption(t *testing.T) {
 					})
 					if err != nil {
 						t.Fatalf("Failed to ensure order of pod %s: %v", p.Name, err)
+					}
+				}
+			}
+
+			if tt.tempRemovePG {
+				// Wait for preemptor pods to be unschedulable
+				for _, p := range tt.preemptorPods {
+					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
+						func(ctx context.Context) (bool, error) {
+							return isPodInUnschedulableQueue(testCtx.Scheduler, p.Name, ns), nil
+						}); err != nil {
+						t.Fatalf("Failed to wait for pod %s to be unschedulable: %v", p.Name, err)
+					}
+				}
+
+				// Recreate PodGroups
+				for _, pg := range tt.podGroups {
+					pgCopy := pg.DeepCopy()
+					pgCopy.ResourceVersion = ""
+					if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to recreate PodGroup %s: %v", pg.Name, err)
 					}
 				}
 			}
@@ -1028,6 +1149,14 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 
+			// Verify event order
+			if len(tt.expectedEventOrder) > 0 {
+				actualEvents := recorder.GetEvents()
+				if diff := cmp.Diff(tt.expectedEventOrder, actualEvents); diff != "" {
+					t.Errorf("Unexpected event order (-want,+got):\n%s", diff)
+				}
+			}
+
 			// 10. Dump the state of pods to ease debugging failed runs.
 			if t.Failed() {
 				t.Log("Dumping states of initial and preemptor pods:")
@@ -1072,6 +1201,7 @@ type mockBindPlugin struct {
 	name       string
 	realPlugin fwk.BindPlugin
 	nnnInfo    sync.Map
+	recorder   *eventRecorder
 }
 
 func (bp *mockBindPlugin) Name() string {
@@ -1082,10 +1212,54 @@ func (bp *mockBindPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.
 	if p.Status.NominatedNodeName != "" {
 		bp.nnnInfo.Store(p.Name, p.Status.NominatedNodeName)
 	}
+	if bp.recorder != nil {
+		bp.recorder.Record("Bind:" + p.Name)
+	}
 	return bp.realPlugin.Bind(ctx, state, p, nodeName)
 }
 
 var _ fwk.BindPlugin = &mockBindPlugin{}
+
+type eventRecorder struct {
+	lock   sync.Mutex
+	events []string
+}
+
+func (er *eventRecorder) Record(event string) {
+	er.lock.Lock()
+	defer er.lock.Unlock()
+	er.events = append(er.events, event)
+}
+
+func (er *eventRecorder) GetEvents() []string {
+	er.lock.Lock()
+	defer er.lock.Unlock()
+	return append([]string(nil), er.events...)
+}
+
+func (er *eventRecorder) Clear() {
+	er.lock.Lock()
+	defer er.lock.Unlock()
+	er.events = nil
+}
+
+type mockPodGroupPostFilterPlugin struct {
+	name     string
+	recorder *eventRecorder
+}
+
+func (p *mockPodGroupPostFilterPlugin) Name() string {
+	return p.name
+}
+
+func (p *mockPodGroupPostFilterPlugin) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	if p.recorder != nil {
+		p.recorder.Record("PodGroupPostFilter:" + pgInfo.GetName())
+	}
+	return nil, fwk.NewStatus(fwk.Unschedulable, "injected PodGroupPostFilter log")
+}
+
+var _ fwk.PodGroupPostFilterPlugin = &mockPodGroupPostFilterPlugin{}
 
 type mockReservePlugin struct {
 	lock          sync.Mutex
@@ -1162,4 +1336,41 @@ func newPresetScorePlugin(scores map[string]int64) frameworkruntime.PluginFactor
 	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &mockScorePlugin{scores: scores}, nil
 	}
+}
+
+func isPodInUnschedulableQueue(sched *scheduler.Scheduler, name, namespace string) bool {
+	for _, p := range sched.SchedulingQueue.UnschedulablePods() {
+		if p.Name == name && p.Namespace == namespace {
+			return true
+		}
+	}
+	for _, p := range sched.SchedulingQueue.IncompletePodGroupPodsPods() {
+		if p.Name == name && p.Namespace == namespace {
+			return true
+		}
+	}
+	return false
+}
+
+func deletePodGroups(ctx context.Context, cs clientset.Interface, ns string, pgNames []string) error {
+	for _, name := range pgNames {
+		patch := []byte(`{"metadata":{"finalizers":null}}`)
+		if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Patch(ctx, name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		if err := cs.SchedulingV1alpha3().PodGroups(ns).Delete(ctx, name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	// Wait for the pod groups to be deleted.
+	for _, name := range pgNames {
+		err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			_, err := cs.SchedulingV1alpha3().PodGroups(ns).Get(ctx, name, metav1.GetOptions{})
+			return apierrors.IsNotFound(err), nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
