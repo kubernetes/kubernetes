@@ -131,6 +131,37 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			},
 		},
 		{
+			Name: "ownerReferences: invalid apiVersion with too many slashes",
+			Modify: func(meta metav1.Object) {
+				meta.SetOwnerReferences([]metav1.OwnerReference{
+					mkOwnerReference(tweakAPIVersion("a/b/c")),
+				})
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "a/b/c", "must be <group>/<version> or <version>").MarkFromImperative(),
+			},
+		},
+		{
+			Name: "ownerReferences: invalid apiVersion with empty version",
+			Modify: func(meta metav1.Object) {
+				meta.SetOwnerReferences([]metav1.OwnerReference{
+					mkOwnerReference(tweakAPIVersion("foo/")),
+				})
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("ownerReferences").Index(0).Child("apiVersion"), "foo/", "must be <group>/<version> or <version>").MarkFromImperative(),
+			},
+		},
+		{
+			Name: "valid: ownerReferences: apiVersion with no slashes",
+			Modify: func(meta metav1.Object) {
+				meta.SetOwnerReferences([]metav1.OwnerReference{
+					mkOwnerReference(tweakAPIVersion("v1")),
+				})
+			},
+			ExpectedErrs: field.ErrorList{},
+		},
+		{
 			Name: "ownerReferences: empty kind",
 			Modify: func(meta metav1.Object) {
 				meta.SetOwnerReferences([]metav1.OwnerReference{

@@ -217,6 +217,45 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 			expectedErrorMessage: "is disallowed from being an owner",
 		},
 		{
+			description: "simple failures - invalid apiVersion with too many slashes",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "a/b/c",
+					Kind:       "Pod",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expectError:          true,
+			expectedErrorMessage: "must be <group>/<version> or <version>",
+		},
+		{
+			description: "simple failures - invalid apiVersion with empty version",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "foo/",
+					Kind:       "Pod",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expectError:          true,
+			expectedErrorMessage: "must be <group>/<version> or <version>",
+		},
+		{
+			description: "simple success - apiVersion with no slashes (legacy core group)",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expectError:          false,
+			expectedErrorMessage: "",
+		},
+		{
 			description: "simple controller ref success - one reference with Controller set",
 			ownerReferences: []metav1.OwnerReference{
 				{
