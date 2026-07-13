@@ -18,6 +18,10 @@ package verify
 
 import (
 	"context"
+	"errors"
+	"slices"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -25,17 +29,22 @@ const (
 	// kubernetes.io.attestationClaims that carries the API group(s) a token is
 	// authorized for. Per KEP-6060 this key is namespaced; the bare
 	// "allowedAPIGroup" form is a known issuer bug and MUST NOT be used.
+	//
+	// TODO(kep-6060): source this from the server-side PR once published; the
+	// final key will not carry the "webhook-authentication.k8s.io" prefix.
 	allowedAPIGroupClaimKey = "webhook-authentication.k8s.io/allowedAPIGroup"
 
 	// wildcardAPIGroup is the allowedAPIGroup value that authorizes every API group.
 	wildcardAPIGroup = "*"
-
-	// kindValidatingWebhookConfiguration and kindMutatingWebhookConfiguration are
-	// the values Result.BoundObjectKind takes, identifying which webhook
-	// configuration the token was bound to.
-	kindValidatingWebhookConfiguration = "ValidatingWebhookConfiguration"
-	kindMutatingWebhookConfiguration   = "MutatingWebhookConfiguration"
 )
+
+// ErrVerificationFailed is the single, generic error every verification failure
+// returns. Callers check errors.Is(err, ErrVerificationFailed) (or simply
+// err != nil) and MUST NOT branch on any finer taxonomy: the specific reason is
+// logged inline via the context logger for operators and is never surfaced to
+// the caller, so a rejection cannot be used to enumerate objects or probe claim
+// values.
+var ErrVerificationFailed = errors.New("webhook token verification failed")
 
 // TokenAuthenticator verifies a token's signature and standard claims and
 // returns the decoded claims for policy evaluation. It is the seam through
@@ -63,31 +72,10 @@ type TokenAuthenticator interface {
 	AuthenticateToken(ctx context.Context, rawToken string) (*VerifiedClaims, error)
 }
 
-// Result is the validated identity extracted from a token that passed every
-// contract check.
-type Result struct {
-	// BoundObjectKind is "ValidatingWebhookConfiguration" or
-	// "MutatingWebhookConfiguration".
-	BoundObjectKind string
-	// BoundObjectName and BoundObjectUID identify the webhook configuration the
-	// token is bound to.
-	BoundObjectName string
-	BoundObjectUID  string
-	// AllowedAPIGroup is the single value from the allowedAPIGroup attestation
-	// claim ("*" for all groups).
-	AllowedAPIGroup string
-	// Audience is the token's audience list.
-	Audience []string
-	// Subject is the token's "sub" claim (typically the service account identity).
-	Subject string
-	// Issuer is the token's "iss" claim.
-	Issuer string
-}
-
 // Verifier applies the KEP-6060 policy on top of a TokenAuthenticator. Signature
 // and standard-claim verification are delegated to the authenticator; this type
-// carries only the checks go-oidc has no concept of (the bound-object exactly-one
-// rule and the namespaced allowedAPIGroup match) and builds the Result.
+// carries only the check go-oidc has no concept of: the namespaced
+// allowedAPIGroup match.
 type Verifier struct {
 	authenticator TokenAuthenticator
 }
@@ -97,81 +85,48 @@ type Verifier struct {
 // returns an error if authenticator is nil so callers fail fast at startup.
 func NewVerifier(authenticator TokenAuthenticator) (*Verifier, error) {
 	if authenticator == nil {
-		return nil, errNilAuthenticator
+		return nil, errors.New("verify: TokenAuthenticator must not be nil")
 	}
 	return &Verifier{authenticator: authenticator}, nil
 }
 
-// Verify authenticates rawToken and, on success, applies the KEP-6060 policy and
-// returns the bound identity. reviewAPIGroup is the API group of the resource in
-// the AdmissionReview being processed; it is matched against the token's
-// allowedAPIGroup claim.
+// Verify authenticates rawToken and applies the KEP-6060 policy: the token's
+// allowedAPIGroup attestation claim must authorize reviewAPIGroup (an exact
+// match or the "*" wildcard). reviewAPIGroup is the API group of the resource in
+// the AdmissionReview being processed.
 //
-// On any failure Verify returns a single generic error that satisfies
-// errors.Is(err, ErrVerificationFailed) and nothing else: there is no per-check
-// error taxonomy for callers to branch on. The specific reason is available only
-// as a non-sensitive log string via Reason(err). Authentication failures
-// surfaced by the authenticator (for example go-oidc's descriptive "expired
-// token" or "audience mismatch" errors) are likewise collapsed into the generic
-// failure so rejections cannot be used to enumerate objects or probe claim
-// values; the descriptive text is retained only for logging.
-func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup string) (*Result, error) {
-	// 1. Signature + standard claims (iss/aud/exp) are the authenticator's job.
-	// Any failure collapses to the single generic error; the authenticator's
-	// descriptive text is kept only as a log-only reason, never returned.
+// It returns nil on success or ErrVerificationFailed on any failure. The
+// specific reason is logged via klog.FromContext(ctx) for operators and is never
+// returned: callers get one generic error and cannot branch on why verification
+// failed (anti-enumeration).
+func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup string) error {
+	logger := klog.FromContext(ctx)
+
+	// Signature + standard claims (iss/aud/exp) are the authenticator's job. Its
+	// descriptive text is logged for operators only, never returned.
 	claims, err := v.authenticator.AuthenticateToken(ctx, rawToken)
 	if err != nil {
-		return nil, Fail(authenticationFailedReason(err))
+		logger.V(2).Info("Webhook token verification denied",
+			"reason", "token signature or standard claim verification failed",
+			"detail", err.Error())
+		return ErrVerificationFailed
 	}
 
-	k := &claims.Kubernetes
-
-	// 2. Bound-object rule: exactly one of validating / mutating.
-	kind, name, uid, err := boundObject(k)
-	if err != nil {
-		return nil, err
+	// The webhook cares only about the API group. The allowedAPIGroup
+	// attestation claim, under its fully-namespaced key, must contain either the
+	// review's group or the "*" wildcard. The API server decides how many groups
+	// the list holds; the webhook only checks membership.
+	groups, ok := claims.Kubernetes.AttestationClaims[allowedAPIGroupClaimKey]
+	if !ok || len(groups) == 0 {
+		logger.V(2).Info("Webhook token verification denied",
+			"reason", "token is missing the allowedAPIGroup attestation claim")
+		return ErrVerificationFailed
+	}
+	if !slices.Contains(groups, reviewAPIGroup) && !slices.Contains(groups, wildcardAPIGroup) {
+		logger.V(2).Info("Webhook token verification denied",
+			"reason", "token allowedAPIGroup does not authorize the review's API group")
+		return ErrVerificationFailed
 	}
 
-	// 3. allowedAPIGroup attestation claim must be present with exactly one
-	// value, under the fully-namespaced key.
-	groups, ok := k.AttestationClaims[allowedAPIGroupClaimKey]
-	if !ok || len(groups) != 1 {
-		return nil, Fail(reasonMissingAllowedAPIGroup)
-	}
-	allowed := groups[0]
-
-	// 4. Wildcard matches all; otherwise it must exactly equal the review group.
-	if allowed != wildcardAPIGroup && allowed != reviewAPIGroup {
-		return nil, Fail(reasonAPIGroupNotAuthorized)
-	}
-
-	return &Result{
-		BoundObjectKind: kind,
-		BoundObjectName: name,
-		BoundObjectUID:  uid,
-		AllowedAPIGroup: allowed,
-		Audience:        claims.Audience,
-		Subject:         claims.Subject,
-		Issuer:          claims.Issuer,
-	}, nil
-}
-
-// boundObject enforces the exactly-one bound-object rule and returns the kind,
-// name, and UID of the single bound webhook configuration.
-func boundObject(k *kubernetesClaims) (kind, name, uid string, err error) {
-	hasValidating := k.ValidatingWebhookConfiguration != nil
-	hasMutating := k.MutatingWebhookConfiguration != nil
-
-	switch {
-	case hasValidating && hasMutating:
-		return "", "", "", Fail(reasonBothBoundObjects)
-	case !hasValidating && !hasMutating:
-		return "", "", "", Fail(reasonNoBoundObject)
-	case hasValidating:
-		ref := k.ValidatingWebhookConfiguration
-		return kindValidatingWebhookConfiguration, ref.Name, ref.UID, nil
-	default:
-		ref := k.MutatingWebhookConfiguration
-		return kindMutatingWebhookConfiguration, ref.Name, ref.UID, nil
-	}
+	return nil
 }

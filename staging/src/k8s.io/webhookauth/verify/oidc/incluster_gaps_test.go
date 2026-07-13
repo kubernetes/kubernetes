@@ -73,7 +73,7 @@ func TestInCluster_MultiAudienceFirstWins(t *testing.T) {
 	// A token whose aud is the FIRST SA audience verifies.
 	firstAudClaims := ts.baseClaims()
 	firstAudClaims["aud"] = []string{testAudience}
-	if _, err := v.Verify(context.Background(), ts.sign(t, firstAudClaims), testAPIGroup); err != nil {
+	if err := v.Verify(context.Background(), ts.sign(t, firstAudClaims), testAPIGroup); err != nil {
 		t.Fatalf("token with the first SA audience should verify: %v", err)
 	}
 
@@ -81,7 +81,7 @@ func TestInCluster_MultiAudienceFirstWins(t *testing.T) {
 	// the second audience was not adopted as the expected value.
 	secondAudClaims := ts.baseClaims()
 	secondAudClaims["aud"] = []string{secondAudience}
-	_, err = v.Verify(context.Background(), ts.sign(t, secondAudClaims), testAPIGroup)
+	err = v.Verify(context.Background(), ts.sign(t, secondAudClaims), testAPIGroup)
 	if err == nil {
 		t.Fatal("token carrying only the second SA audience must be rejected (first wins)")
 	}

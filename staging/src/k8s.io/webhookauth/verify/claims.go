@@ -48,23 +48,12 @@ type VerifiedClaims struct {
 }
 
 // kubernetesClaims mirrors the subset of the standard "kubernetes.io" private
-// claims object relevant to webhook authentication. Both webhook references use
-// omitempty so the bound-object rule (exactly one) can be enforced by presence.
+// claims object relevant to webhook authentication. The only value the policy
+// layer consults is the allowedAPIGroup attestation claim.
 type kubernetesClaims struct {
-	ValidatingWebhookConfiguration *objectRef `json:"validatingWebhookConfiguration,omitempty"`
-	MutatingWebhookConfiguration   *objectRef `json:"mutatingWebhookConfiguration,omitempty"`
-
 	// AttestationClaims carries the attestation values keyed by their
 	// fully-namespaced claim key. For webhook authentication the only key we
 	// consult is allowedAPIGroupClaimKey. The JSON wire shape is a plain
 	// map[string][]string, matching the server-side map[string]AttestationClaimValue.
 	AttestationClaims map[string][]string `json:"attestationClaims,omitempty"`
-}
-
-// objectRef identifies a bound Kubernetes object by name and UID, mirroring the
-// { "name": ..., "uid": ... } refs the issuer places under the kubernetes.io
-// private claims for the validating- or mutating-webhook configuration.
-type objectRef struct {
-	Name string `json:"name"`
-	UID  string `json:"uid"`
 }

@@ -86,15 +86,8 @@ func TestInCluster_EndToEnd(t *testing.T) {
 	// A real KEP-6060 token minted by the server must verify end to end. The
 	// provisional in-cluster audience is the SA token's aud (testAudience), which
 	// baseClaims() also stamps into the token.
-	res, err := v.Verify(context.Background(), ts.sign(t, ts.baseClaims()), testAPIGroup)
-	if err != nil {
+	if err := v.Verify(context.Background(), ts.sign(t, ts.baseClaims()), testAPIGroup); err != nil {
 		t.Fatalf("verifying in-cluster token: %v", err)
-	}
-	if res.Issuer != ts.issuer {
-		t.Errorf("issuer = %q, want %q", res.Issuer, ts.issuer)
-	}
-	if len(res.Audience) == 0 || res.Audience[0] != testAudience {
-		t.Errorf("audience = %v, want %q", res.Audience, testAudience)
 	}
 }
 
@@ -117,7 +110,7 @@ func TestInCluster_SingleStringAudience(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InCluster: %v", err)
 	}
-	if _, err := v.Verify(context.Background(), ts.sign(t, ts.baseClaims()), testAPIGroup); err != nil {
+	if err := v.Verify(context.Background(), ts.sign(t, ts.baseClaims()), testAPIGroup); err != nil {
 		t.Fatalf("verifying in-cluster token: %v", err)
 	}
 }

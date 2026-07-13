@@ -556,9 +556,6 @@ func TestVerifyAdmissionReview(t *testing.T) {
 		if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
 			t.Fatalf("want generic verification failure, got %v", err)
 		}
-		if !strings.Contains(verify.Reason(err), "authorize") {
-			t.Errorf("reason = %q, want it to mention authorization", verify.Reason(err))
-		}
 	})
 
 	t.Run("nil request -> fails closed", func(t *testing.T) {

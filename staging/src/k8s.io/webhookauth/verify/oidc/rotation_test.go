@@ -149,7 +149,7 @@ func TestRemoteVerifier_KeyRotation(t *testing.T) {
 	}
 
 	// 1. A token from the original key verifies and primes go-oidc's key cache.
-	if _, err := v.Verify(context.Background(), ts.sign(t, ts.baseClaims()), testAPIGroup); err != nil {
+	if err := v.Verify(context.Background(), ts.sign(t, ts.baseClaims()), testAPIGroup); err != nil {
 		t.Fatalf("pre-rotation token should verify: %v", err)
 	}
 
@@ -158,7 +158,7 @@ func TestRemoteVerifier_KeyRotation(t *testing.T) {
 
 	// 3. A token signed by the ROTATED key must verify through the same verifier:
 	// go-oidc sees an unknown key id and refetches the now-updated JWKS.
-	if _, err := v.Verify(context.Background(), ts.sign(t, ts.baseClaims()), testAPIGroup); err != nil {
+	if err := v.Verify(context.Background(), ts.sign(t, ts.baseClaims()), testAPIGroup); err != nil {
 		t.Fatalf("post-rotation token should verify after JWKS refresh: %v", err)
 	}
 }

@@ -242,10 +242,10 @@ func TestRemoteVerifier_EndToEnd(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := v.Verify(context.Background(), tc.token(), testAPIGroup)
+			err := v.Verify(context.Background(), tc.token(), testAPIGroup)
 			if tc.wantErr {
 				if err == nil {
-					t.Fatalf("expected verification failure, got result %+v", res)
+					t.Fatal("expected verification failure, got success")
 				}
 				if !errors.Is(err, verify.ErrVerificationFailed) {
 					t.Fatalf("expected generic ErrVerificationFailed, got %v", err)
@@ -254,18 +254,6 @@ func TestRemoteVerifier_EndToEnd(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
-			}
-			if res.Issuer != ts.issuer {
-				t.Errorf("issuer = %q, want %q", res.Issuer, ts.issuer)
-			}
-			if res.BoundObjectName != testWebhookNm {
-				t.Errorf("bound object name = %q, want %q", res.BoundObjectName, testWebhookNm)
-			}
-			if res.AllowedAPIGroup != testAPIGroup {
-				t.Errorf("allowedAPIGroup = %q, want %q", res.AllowedAPIGroup, testAPIGroup)
-			}
-			if res.Subject != testSubject {
-				t.Errorf("subject = %q, want %q", res.Subject, testSubject)
 			}
 		})
 	}

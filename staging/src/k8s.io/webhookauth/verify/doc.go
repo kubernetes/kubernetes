@@ -26,17 +26,14 @@ limitations under the License.
 //     is delegated to a [TokenAuthenticator] so the core policy logic carries
 //     no JOSE/OIDC dependency; the oidc package provides an
 //     implementation built on OIDC discovery and go-oidc.
-//  2. The token is bound to exactly one of the validating- or
-//     mutating-webhook configuration references (never both, never neither).
-//  3. The attestation claim keyed by the fully-namespaced allowedAPIGroup
-//     string carries exactly one API group.
-//  4. That API group is either "*" (matches all) or exactly equals the API
-//     group of the resource in the incoming AdmissionReview.
+//  2. The attestation claim keyed by the fully-namespaced allowedAPIGroup
+//     string authorizes the API group of the resource in the incoming
+//     AdmissionReview: the claim's list contains either that group or the "*"
+//     wildcard.
 //
-// This package is pure stdlib: signature and standard-claim verification live
-// behind the [TokenAuthenticator] seam, so importing verify pulls in no
-// third-party crypto. The policy this package owns is exactly the part go-oidc
-// has no concept of — the bound-object exactly-one rule and the namespaced
+// Signature and standard-claim verification live behind the [TokenAuthenticator]
+// seam, so the core policy carries no JOSE/OIDC dependency. The policy this
+// package owns is exactly the part go-oidc has no concept of: the namespaced
 // allowedAPIGroup match.
 //
 // Anti-enumeration: all verification failures surface the single generic
@@ -45,8 +42,8 @@ limitations under the License.
 // webhook, group, or object. Descriptive errors reported by the authenticator
 // (for example go-oidc's "token is expired" or audience-mismatch messages) are
 // likewise collapsed into the generic failure. Callers must not branch on why
-// verification failed; the specific reason is available only as a
-// non-sensitive log string via [Reason] for operators and debugging.
+// verification failed; the specific reason is logged inline via the context
+// logger for operators and debugging only.
 //
 // This package deliberately omits the http.Handler adapter and the
 // controller-runtime decorator; callers wire [Verifier.Verify] into their own

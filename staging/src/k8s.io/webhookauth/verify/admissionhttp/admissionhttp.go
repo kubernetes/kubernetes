@@ -145,20 +145,15 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// decodeReview guarantees review.Request is non-nil, so the resource API
 	// group is well-defined here.
-	res, err := h.verifier.Verify(ctx, token, review.Request.Resource.Group)
-	if err != nil {
-		h.deny(ctx, w, verify.Reason(err))
+	if err := h.verifier.Verify(ctx, token, review.Request.Resource.Group); err != nil {
+		// Verify has already logged the specific reason; deny generically.
+		writeDenied(w)
 		return
 	}
 
-	// Never log the token. The bound identity is logged at high verbosity for
-	// operators; it is never written to the HTTP response (anti-enumeration).
-	klog.FromContext(ctx).V(4).Info("Admission webhook token verified",
-		"boundObjectKind", res.BoundObjectKind,
-		"boundObjectName", res.BoundObjectName,
-		"allowedAPIGroup", res.AllowedAPIGroup,
-		"subject", res.Subject,
-	)
+	// Never log the token. Verification succeeded; the outcome is logged at high
+	// verbosity for operators and never written to the HTTP response.
+	klog.FromContext(ctx).V(4).Info("Admission webhook token verified")
 
 	if h.next != nil {
 		h.next(w, r, review)
@@ -214,14 +209,14 @@ func (h *handler) decodeReview(r *http.Request) (review *admissionv1.AdmissionRe
 //
 // It returns nil on success, or a generic error that satisfies
 // errors.Is(err, verify.ErrVerificationFailed) on any failure (including a nil
-// review or a review with no Request). Use verify.Reason(err) for the log
-// string; do not branch on the error.
+// review or a review with no Request). The specific reason is logged for
+// operators; do not branch on the error.
 func VerifyAdmissionReview(ctx context.Context, v *verify.Verifier, review *admissionv1.AdmissionReview, token string) error {
 	if review == nil || review.Request == nil {
-		return verify.Fail(reasonUndecodableBody)
+		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", reasonUndecodableBody)
+		return verify.ErrVerificationFailed
 	}
-	_, err := v.Verify(ctx, token, review.Request.Resource.Group)
-	return err
+	return v.Verify(ctx, token, review.Request.Resource.Group)
 }
 
 // BearerToken extracts the token from an "Authorization: Bearer <token>"

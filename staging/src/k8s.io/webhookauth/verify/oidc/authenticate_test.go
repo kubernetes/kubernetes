@@ -42,9 +42,9 @@ func TestRemoteVerifier_MalformedKubernetesClaims(t *testing.T) {
 	// claims struct fails.
 	claims["kubernetes.io"] = "not-an-object"
 
-	res, err := v.Verify(context.Background(), ts.sign(t, claims), testAPIGroup)
+	err := v.Verify(context.Background(), ts.sign(t, claims), testAPIGroup)
 	if err == nil {
-		t.Fatalf("expected verification to fail on an undecodable kubernetes.io claim, got %+v", res)
+		t.Fatal("expected verification to fail on an undecodable kubernetes.io claim")
 	}
 	if !errors.Is(err, verify.ErrVerificationFailed) {
 		t.Fatalf("expected generic ErrVerificationFailed, got %v", err)
