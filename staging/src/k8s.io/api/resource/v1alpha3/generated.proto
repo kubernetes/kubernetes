@@ -308,16 +308,16 @@ message PartitionTypeStatus {
 
   // Total is the number of devices of this partition type in the pool.
   //
-  // +optional
-  // +k8s:optional
+  // +required
+  // +k8s:required
   // +k8s:minimum=0
   optional int32 total = 2;
 
   // Allocatable is the number of additional devices of this partition type
   // that could still be allocated given current shared-counter consumption.
   //
-  // +optional
-  // +k8s:optional
+  // +required
+  // +k8s:required
   // +k8s:minimum=0
   optional int32 allocatable = 3;
 }
@@ -589,16 +589,16 @@ message ShareableSummaryStatus {
   // FullyAvailableDevices is the number of shareable devices with no
   // capacity consumed.
   //
-  // +optional
-  // +k8s:optional
+  // +required
+  // +k8s:required
   // +k8s:minimum=0
   optional int32 fullyAvailableDevices = 1;
 
   // PartiallyAvailableDevices is the number of shareable devices with some
   // but not all capacity consumed.
   //
-  // +optional
-  // +k8s:optional
+  // +required
+  // +k8s:required
   // +k8s:minimum=0
   optional int32 partiallyAvailableDevices = 2;
 

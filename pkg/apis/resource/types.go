@@ -196,7 +196,9 @@ type ResourceSliceSpec struct {
 	// devices sharing a value must share the same ConsumesCounters cost.
 	// It opts the pool into the typed partitionSummary view of
 	// ResourcePoolStatusRequest; unset keeps the CounterSet fallback view.
-	// Only meaningful for pools that publish SharedCounters.
+	// It does not disable SharedCounters: when a pool publishes them, counter
+	// accounting still governs allocation and the summary reports the
+	// allocatable device count per partition type.
 	//
 	// +optional
 	// +featureGate=DRAResourcePoolStatus
@@ -2288,11 +2290,13 @@ type PartitionTypeStatus struct {
 	Type string
 
 	// Total is the number of devices of this partition type in the pool.
-	Total int32
+	// +required
+	Total *int32
 
 	// Allocatable is the number of additional devices of this partition type
 	// that could still be allocated given current shared-counter consumption.
-	Allocatable int32
+	// +required
+	Allocatable *int32
 }
 
 // CounterSetStatus reports capacity, consumption, and availability for the
@@ -2323,11 +2327,13 @@ type CounterStatus struct {
 type ShareableSummaryStatus struct {
 	// FullyAvailableDevices is the number of shareable devices with no
 	// capacity consumed.
-	FullyAvailableDevices int32
+	// +required
+	FullyAvailableDevices *int32
 
 	// PartiallyAvailableDevices is the number of shareable devices with some
 	// but not all capacity consumed.
-	PartiallyAvailableDevices int32
+	// +required
+	PartiallyAvailableDevices *int32
 
 	// Capacity reports aggregate total, consumed, and available amounts per
 	// shareable capacity key across the pool.

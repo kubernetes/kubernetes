@@ -1272,7 +1272,7 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 	}
 	got := map[string][2]int32{}
 	for _, p := range pool.PartitionSummary {
-		got[p.Type] = [2]int32{p.Total, p.Allocatable}
+		got[p.Type] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
 	}
 	if got["Full"] != [2]int32{1, 1} {
 		t.Errorf("Full {total,allocatable} = %v, want [1 1]", got["Full"])
@@ -1303,8 +1303,8 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 		t.Fatal("expected a shareableSummary")
 	}
 	sh := pool.ShareableSummary
-	if sh.FullyAvailableDevices != 0 || sh.PartiallyAvailableDevices != 1 {
-		t.Errorf("full/partial devices = %d/%d, want 0/1", sh.FullyAvailableDevices, sh.PartiallyAvailableDevices)
+	if ptr.Deref(sh.FullyAvailableDevices, 0) != 0 || ptr.Deref(sh.PartiallyAvailableDevices, 0) != 1 {
+		t.Errorf("full/partial devices = %d/%d, want 0/1", ptr.Deref(sh.FullyAvailableDevices, 0), ptr.Deref(sh.PartiallyAvailableDevices, 0))
 	}
 	if len(sh.Capacity) != 1 {
 		t.Fatalf("want 1 capacity key, got %d", len(sh.Capacity))

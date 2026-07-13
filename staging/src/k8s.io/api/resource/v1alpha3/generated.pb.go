@@ -537,12 +537,16 @@ func (m *PartitionTypeStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	i = encodeVarintGenerated(dAtA, i, uint64(m.Allocatable))
-	i--
-	dAtA[i] = 0x18
-	i = encodeVarintGenerated(dAtA, i, uint64(m.Total))
-	i--
-	dAtA[i] = 0x10
+	if m.Allocatable != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.Allocatable))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.Total != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.Total))
+		i--
+		dAtA[i] = 0x10
+	}
 	i -= len(m.Type)
 	copy(dAtA[i:], m.Type)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Type)))
@@ -956,12 +960,16 @@ func (m *ShareableSummaryStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 			dAtA[i] = 0x1a
 		}
 	}
-	i = encodeVarintGenerated(dAtA, i, uint64(m.PartiallyAvailableDevices))
-	i--
-	dAtA[i] = 0x10
-	i = encodeVarintGenerated(dAtA, i, uint64(m.FullyAvailableDevices))
-	i--
-	dAtA[i] = 0x8
+	if m.PartiallyAvailableDevices != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.PartiallyAvailableDevices))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.FullyAvailableDevices != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.FullyAvailableDevices))
+		i--
+		dAtA[i] = 0x8
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -1145,8 +1153,12 @@ func (m *PartitionTypeStatus) Size() (n int) {
 	_ = l
 	l = len(m.Type)
 	n += 1 + l + sovGenerated(uint64(l))
-	n += 1 + sovGenerated(uint64(m.Total))
-	n += 1 + sovGenerated(uint64(m.Allocatable))
+	if m.Total != nil {
+		n += 1 + sovGenerated(uint64(*m.Total))
+	}
+	if m.Allocatable != nil {
+		n += 1 + sovGenerated(uint64(*m.Allocatable))
+	}
 	return n
 }
 
@@ -1302,8 +1314,12 @@ func (m *ShareableSummaryStatus) Size() (n int) {
 	}
 	var l int
 	_ = l
-	n += 1 + sovGenerated(uint64(m.FullyAvailableDevices))
-	n += 1 + sovGenerated(uint64(m.PartiallyAvailableDevices))
+	if m.FullyAvailableDevices != nil {
+		n += 1 + sovGenerated(uint64(*m.FullyAvailableDevices))
+	}
+	if m.PartiallyAvailableDevices != nil {
+		n += 1 + sovGenerated(uint64(*m.PartiallyAvailableDevices))
+	}
 	if len(m.Capacity) > 0 {
 		for _, e := range m.Capacity {
 			l = e.Size()
@@ -1444,8 +1460,8 @@ func (this *PartitionTypeStatus) String() string {
 	}
 	s := strings.Join([]string{`&PartitionTypeStatus{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
-		`Total:` + fmt.Sprintf("%v", this.Total) + `,`,
-		`Allocatable:` + fmt.Sprintf("%v", this.Allocatable) + `,`,
+		`Total:` + valueToStringGenerated(this.Total) + `,`,
+		`Allocatable:` + valueToStringGenerated(this.Allocatable) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1567,8 +1583,8 @@ func (this *ShareableSummaryStatus) String() string {
 	}
 	repeatedStringForCapacity += "}"
 	s := strings.Join([]string{`&ShareableSummaryStatus{`,
-		`FullyAvailableDevices:` + fmt.Sprintf("%v", this.FullyAvailableDevices) + `,`,
-		`PartiallyAvailableDevices:` + fmt.Sprintf("%v", this.PartiallyAvailableDevices) + `,`,
+		`FullyAvailableDevices:` + valueToStringGenerated(this.FullyAvailableDevices) + `,`,
+		`PartiallyAvailableDevices:` + valueToStringGenerated(this.PartiallyAvailableDevices) + `,`,
 		`Capacity:` + repeatedStringForCapacity + `,`,
 		`}`,
 	}, "")
@@ -2975,7 +2991,7 @@ func (m *PartitionTypeStatus) Unmarshal(dAtA []byte) error {
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Total", wireType)
 			}
-			m.Total = 0
+			var v int32
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowGenerated
@@ -2985,16 +3001,17 @@ func (m *PartitionTypeStatus) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Total |= int32(b&0x7F) << shift
+				v |= int32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			m.Total = &v
 		case 3:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Allocatable", wireType)
 			}
-			m.Allocatable = 0
+			var v int32
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowGenerated
@@ -3004,11 +3021,12 @@ func (m *PartitionTypeStatus) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Allocatable |= int32(b&0x7F) << shift
+				v |= int32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			m.Allocatable = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -4189,7 +4207,7 @@ func (m *ShareableSummaryStatus) Unmarshal(dAtA []byte) error {
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field FullyAvailableDevices", wireType)
 			}
-			m.FullyAvailableDevices = 0
+			var v int32
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowGenerated
@@ -4199,16 +4217,17 @@ func (m *ShareableSummaryStatus) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.FullyAvailableDevices |= int32(b&0x7F) << shift
+				v |= int32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			m.FullyAvailableDevices = &v
 		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field PartiallyAvailableDevices", wireType)
 			}
-			m.PartiallyAvailableDevices = 0
+			var v int32
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowGenerated
@@ -4218,11 +4237,12 @@ func (m *ShareableSummaryStatus) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.PartiallyAvailableDevices |= int32(b&0x7F) << shift
+				v |= int32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			m.PartiallyAvailableDevices = &v
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Capacity", wireType)

@@ -1993,7 +1993,9 @@ message ResourceSliceSpec {
   // devices sharing a value must share the same ConsumesCounters cost.
   // It opts the pool into the typed partitionSummary view of
   // ResourcePoolStatusRequest; unset keeps the CounterSet fallback view.
-  // Only meaningful for pools that publish SharedCounters.
+  // It does not disable SharedCounters: when a pool publishes them, counter
+  // accounting still governs allocation and the summary reports the
+  // allocatable device count per partition type.
   //
   // +optional
   // +featureGate=DRAResourcePoolStatus

@@ -25,6 +25,7 @@ import (
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 )
 
 // maxStatusListItems matches the +k8s:maxItems=32 marker on the status lists.
@@ -230,8 +231,8 @@ func computePartitionSummary(in poolViewInput) ([]resourcev1alpha3.PartitionType
 		}
 		result = append(result, resourcev1alpha3.PartitionTypeStatus{
 			Type:        typeValue,
-			Total:       g.total,
-			Allocatable: allocatable,
+			Total:       ptr.To(g.total),
+			Allocatable: ptr.To(allocatable),
 		})
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Type < result[j].Type })
@@ -330,8 +331,8 @@ func computeShareableSummary(in poolViewInput) (*resourcev1alpha3.ShareableSumma
 	}
 
 	return &resourcev1alpha3.ShareableSummaryStatus{
-		FullyAvailableDevices:     full,
-		PartiallyAvailableDevices: partial,
+		FullyAvailableDevices:     ptr.To(full),
+		PartiallyAvailableDevices: ptr.To(partial),
 		Capacity:                  capacities,
 	}, ""
 }

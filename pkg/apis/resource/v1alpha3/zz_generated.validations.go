@@ -406,7 +406,8 @@ func Validate_PartitionTypeStatus(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -419,9 +420,9 @@ func Validate_PartitionTypeStatus(
 		}
 		oldVal := safe.Field(oldObj,
 			func(oldObj *resourcev1alpha3.PartitionTypeStatus) *int32 {
-				return &oldObj.Total
+				return oldObj.Total
 			})
-		errs = append(errs, fn(fldPath.Child("total"), &obj.Total, oldVal, oldObj != nil)...)
+		errs = append(errs, fn(fldPath.Child("total"), obj.Total, oldVal, oldObj != nil)...)
 	}
 
 	{ // field resourcev1alpha3.PartitionTypeStatus.Allocatable
@@ -437,7 +438,8 @@ func Validate_PartitionTypeStatus(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -450,9 +452,9 @@ func Validate_PartitionTypeStatus(
 		}
 		oldVal := safe.Field(oldObj,
 			func(oldObj *resourcev1alpha3.PartitionTypeStatus) *int32 {
-				return &oldObj.Allocatable
+				return oldObj.Allocatable
 			})
-		errs = append(errs, fn(fldPath.Child("allocatable"), &obj.Allocatable, oldVal, oldObj != nil)...)
+		errs = append(errs, fn(fldPath.Child("allocatable"), obj.Allocatable, oldVal, oldObj != nil)...)
 	}
 
 	return errs
@@ -1263,7 +1265,8 @@ func Validate_ShareableSummaryStatus(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -1276,9 +1279,9 @@ func Validate_ShareableSummaryStatus(
 		}
 		oldVal := safe.Field(oldObj,
 			func(oldObj *resourcev1alpha3.ShareableSummaryStatus) *int32 {
-				return &oldObj.FullyAvailableDevices
+				return oldObj.FullyAvailableDevices
 			})
-		errs = append(errs, fn(fldPath.Child("fullyAvailableDevices"), &obj.FullyAvailableDevices, oldVal, oldObj != nil)...)
+		errs = append(errs, fn(fldPath.Child("fullyAvailableDevices"), obj.FullyAvailableDevices, oldVal, oldObj != nil)...)
 	}
 
 	{ // field resourcev1alpha3.ShareableSummaryStatus.PartiallyAvailableDevices
@@ -1294,7 +1297,8 @@ func Validate_ShareableSummaryStatus(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -1307,9 +1311,9 @@ func Validate_ShareableSummaryStatus(
 		}
 		oldVal := safe.Field(oldObj,
 			func(oldObj *resourcev1alpha3.ShareableSummaryStatus) *int32 {
-				return &oldObj.PartiallyAvailableDevices
+				return oldObj.PartiallyAvailableDevices
 			})
-		errs = append(errs, fn(fldPath.Child("partiallyAvailableDevices"), &obj.PartiallyAvailableDevices, oldVal, oldObj != nil)...)
+		errs = append(errs, fn(fldPath.Child("partiallyAvailableDevices"), obj.PartiallyAvailableDevices, oldVal, oldObj != nil)...)
 	}
 
 	{ // field resourcev1alpha3.ShareableSummaryStatus.Capacity

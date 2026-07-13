@@ -770,8 +770,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					"PoolName":        gomega.Equal("partitioned"),
 					"ValidationError": gomega.BeNil(),
 					"PartitionSummary": gomega.ConsistOf(
-						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Type: "Full", Total: 1, Allocatable: 1}),
-						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Type: "Half", Total: 2, Allocatable: 2}),
+						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Type: "Full", Total: ptr.To[int32](1), Allocatable: ptr.To[int32](1)}),
+						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Type: "Half", Total: ptr.To[int32](2), Allocatable: ptr.To[int32](2)}),
 					),
 					"CounterSets": gomega.BeEmpty(),
 				}))
@@ -808,8 +808,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					"PoolName":        gomega.Equal("shareable"),
 					"ValidationError": gomega.BeNil(),
 					"ShareableSummary": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-						"FullyAvailableDevices":     gomega.BeEquivalentTo(2),
-						"PartiallyAvailableDevices": gomega.BeEquivalentTo(0),
+						"FullyAvailableDevices":     gstruct.PointTo(gomega.BeEquivalentTo(2)),
+						"PartiallyAvailableDevices": gstruct.PointTo(gomega.BeEquivalentTo(0)),
 						"Capacity": gomega.ConsistOf(
 							gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 								"Name": gomega.Equal("memory"),

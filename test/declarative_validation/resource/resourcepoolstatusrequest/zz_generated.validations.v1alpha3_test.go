@@ -134,9 +134,11 @@ func init() {
 			},
 			"status.pools[*].partitionSummary[*].allocatable": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
 			},
 			"status.pools[*].partitionSummary[*].total": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
 			},
 			"status.pools[*].partitionSummary[*].type": {
 				{ErrorType: "FieldValueRequired"},
@@ -156,9 +158,11 @@ func init() {
 			},
 			"status.pools[*].shareableSummary.fullyAvailableDevices": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
 			},
 			"status.pools[*].shareableSummary.partiallyAvailableDevices": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
 			},
 			"status.pools[*].totalDevices": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},

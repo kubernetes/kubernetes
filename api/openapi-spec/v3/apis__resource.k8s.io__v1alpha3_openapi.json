@@ -262,7 +262,9 @@
           }
         },
         "required": [
-          "type"
+          "type",
+          "total",
+          "allocatable"
         ],
         "type": "object"
       },
@@ -560,6 +562,10 @@
             "type": "integer"
           }
         },
+        "required": [
+          "fullyAvailableDevices",
+          "partiallyAvailableDevices"
+        ],
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.api.resource.Quantity": {

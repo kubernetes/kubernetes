@@ -609,18 +609,18 @@ type PartitionTypeStatus struct {
 
 	// Total is the number of devices of this partition type in the pool.
 	//
-	// +optional
-	// +k8s:optional
+	// +required
+	// +k8s:required
 	// +k8s:minimum=0
-	Total int32 `json:"total,omitempty" protobuf:"varint,2,name=total"`
+	Total *int32 `json:"total,omitempty" protobuf:"varint,2,opt,name=total"`
 
 	// Allocatable is the number of additional devices of this partition type
 	// that could still be allocated given current shared-counter consumption.
 	//
-	// +optional
-	// +k8s:optional
+	// +required
+	// +k8s:required
 	// +k8s:minimum=0
-	Allocatable int32 `json:"allocatable,omitempty" protobuf:"varint,3,name=allocatable"`
+	Allocatable *int32 `json:"allocatable,omitempty" protobuf:"varint,3,opt,name=allocatable"`
 }
 
 // CounterSetStatus reports capacity, consumption, and availability for the
@@ -664,18 +664,18 @@ type ShareableSummaryStatus struct {
 	// FullyAvailableDevices is the number of shareable devices with no
 	// capacity consumed.
 	//
-	// +optional
-	// +k8s:optional
+	// +required
+	// +k8s:required
 	// +k8s:minimum=0
-	FullyAvailableDevices int32 `json:"fullyAvailableDevices,omitempty" protobuf:"varint,1,name=fullyAvailableDevices"`
+	FullyAvailableDevices *int32 `json:"fullyAvailableDevices,omitempty" protobuf:"varint,1,opt,name=fullyAvailableDevices"`
 
 	// PartiallyAvailableDevices is the number of shareable devices with some
 	// but not all capacity consumed.
 	//
-	// +optional
-	// +k8s:optional
+	// +required
+	// +k8s:required
 	// +k8s:minimum=0
-	PartiallyAvailableDevices int32 `json:"partiallyAvailableDevices,omitempty" protobuf:"varint,2,name=partiallyAvailableDevices"`
+	PartiallyAvailableDevices *int32 `json:"partiallyAvailableDevices,omitempty" protobuf:"varint,2,opt,name=partiallyAvailableDevices"`
 
 	// Capacity reports aggregate total, consumed, and available amounts per
 	// shareable capacity key across the pool.

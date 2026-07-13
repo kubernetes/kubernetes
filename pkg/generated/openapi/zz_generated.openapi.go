@@ -49273,7 +49273,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 					},
 					"partitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest; unset keeps the CounterSet fallback view. Only meaningful for pools that publish SharedCounters.",
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest; unset keeps the CounterSet fallback view. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -49678,7 +49678,7 @@ func schema_k8sio_api_resource_v1alpha3_PartitionTypeStatus(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"type"},
+				Required: []string{"type", "total", "allocatable"},
 			},
 		},
 	}
@@ -50095,6 +50095,7 @@ func schema_k8sio_api_resource_v1alpha3_ShareableSummaryStatus(ref common.Refere
 						},
 					},
 				},
+				Required: []string{"fullyAvailableDevices", "partiallyAvailableDevices"},
 			},
 		},
 		Dependencies: []string{
@@ -52366,7 +52367,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 					},
 					"partitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest; unset keeps the CounterSet fallback view. Only meaningful for pools that publish SharedCounters.",
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest; unset keeps the CounterSet fallback view. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -54847,7 +54848,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 					},
 					"partitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest; unset keeps the CounterSet fallback view. Only meaningful for pools that publish SharedCounters.",
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest; unset keeps the CounterSet fallback view. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

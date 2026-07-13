@@ -349,7 +349,7 @@ func testPartitionSummary(tCtx ktesting.TContext) {
 	}
 	got := map[string][2]int32{}
 	for _, p := range pool.PartitionSummary {
-		got[p.Type] = [2]int32{p.Total, p.Allocatable}
+		got[p.Type] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
 	}
 	if got["Full"] != [2]int32{1, 1} {
 		tCtx.Errorf("Full {total,allocatable} = %v, want [1 1]", got["Full"])
@@ -411,8 +411,8 @@ func testShareableSummary(tCtx ktesting.TContext) {
 		tCtx.Fatalf("expected a shareableSummary, got nil (pool %+v)", pool)
 	}
 	sh := pool.ShareableSummary
-	if sh.FullyAvailableDevices != 2 || sh.PartiallyAvailableDevices != 0 {
-		tCtx.Errorf("full/partial devices = %d/%d, want 2/0", sh.FullyAvailableDevices, sh.PartiallyAvailableDevices)
+	if ptr.Deref(sh.FullyAvailableDevices, 0) != 2 || ptr.Deref(sh.PartiallyAvailableDevices, 0) != 0 {
+		tCtx.Errorf("full/partial devices = %d/%d, want 2/0", ptr.Deref(sh.FullyAvailableDevices, 0), ptr.Deref(sh.PartiallyAvailableDevices, 0))
 	}
 	if len(sh.Capacity) != 1 || sh.Capacity[0].Total.Cmp(resource.MustParse("80Gi")) != 0 {
 		tCtx.Errorf("capacity = %+v, want a single memory key totaling 80Gi", sh.Capacity)

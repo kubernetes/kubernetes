@@ -144,11 +144,11 @@ func TestComputePartitionSummary(t *testing.T) {
 				t.Fatalf("unexpected error: %s", gotErr)
 			}
 			for _, p := range got {
-				if want, ok := tc.want[p.Type]; ok && p.Allocatable != want {
-					t.Errorf("type %s: allocatable = %d, want %d", p.Type, p.Allocatable, want)
+				if want, ok := tc.want[p.Type]; ok && ptr.Deref(p.Allocatable, 0) != want {
+					t.Errorf("type %s: allocatable = %d, want %d", p.Type, ptr.Deref(p.Allocatable, 0), want)
 				}
-				if want, ok := tc.total[p.Type]; ok && p.Total != want {
-					t.Errorf("type %s: total = %d, want %d", p.Type, p.Total, want)
+				if want, ok := tc.total[p.Type]; ok && ptr.Deref(p.Total, 0) != want {
+					t.Errorf("type %s: total = %d, want %d", p.Type, ptr.Deref(p.Total, 0), want)
 				}
 			}
 			if len(got) != len(tc.total) {
@@ -188,7 +188,7 @@ func TestComputePartitionSummary_MultiCounterSet(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 	// memory allows 2 (160/80), but the sm counter allows only 1 (8/8) -> min is 1.
-	if len(got) != 1 || got[0].Allocatable != 1 {
+	if len(got) != 1 || ptr.Deref(got[0].Allocatable, 0) != 1 {
 		t.Errorf("allocatable = %+v, want 1 (bound by the sm counter)", got)
 	}
 }
@@ -216,8 +216,8 @@ func TestComputePoolViews_Hybrid(t *testing.T) {
 	if len(ps) != 1 || cs != nil || sh == nil {
 		t.Errorf("hybrid: want partitionSummary set, counterSets nil, shareableSummary set; got ps=%d cs=%v sh=%v", len(ps), cs, sh)
 	}
-	if sh != nil && sh.FullyAvailableDevices != 1 {
-		t.Errorf("shareable fullyAvailable = %d, want 1", sh.FullyAvailableDevices)
+	if sh != nil && ptr.Deref(sh.FullyAvailableDevices, 0) != 1 {
+		t.Errorf("shareable fullyAvailable = %d, want 1", ptr.Deref(sh.FullyAvailableDevices, 0))
 	}
 }
 
@@ -278,11 +278,11 @@ func TestComputeShareableSummary(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected a shareable summary")
 	}
-	if got.FullyAvailableDevices != 1 {
-		t.Errorf("fullyAvailableDevices = %d, want 1", got.FullyAvailableDevices)
+	if ptr.Deref(got.FullyAvailableDevices, 0) != 1 {
+		t.Errorf("fullyAvailableDevices = %d, want 1", ptr.Deref(got.FullyAvailableDevices, 0))
 	}
-	if got.PartiallyAvailableDevices != 1 {
-		t.Errorf("partiallyAvailableDevices = %d, want 1", got.PartiallyAvailableDevices)
+	if ptr.Deref(got.PartiallyAvailableDevices, 0) != 1 {
+		t.Errorf("partiallyAvailableDevices = %d, want 1", ptr.Deref(got.PartiallyAvailableDevices, 0))
 	}
 	if len(got.Capacity) != 1 {
 		t.Fatalf("want 1 capacity key, got %d", len(got.Capacity))
