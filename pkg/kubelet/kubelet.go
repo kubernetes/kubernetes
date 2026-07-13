@@ -365,8 +365,6 @@ func newCrashLoopBackOff(kubeCfg *kubeletconfiginternal.KubeletConfiguration) (t
 	return boMax, boInitial
 }
 
-// makePodSourceConfig creates a config.PodConfig from the given
-// KubeletConfiguration or returns an error.
 // staticPodURLHeaderAndKeys canonicalizes the StaticPodURLHeader config map
 // into an http.Header and a sorted slice of canonicalized header key names.
 func staticPodURLHeaderAndKeys(headers map[string][]string) (http.Header, []string) {
