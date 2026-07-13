@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -212,7 +211,7 @@ func (s *server) Name() string {
 	return "device-plugin"
 }
 
-func (s *server) Check(_ *http.Request) error {
+func (s *server) Check(_ context.Context) error {
 	return s.lastError
 }
 

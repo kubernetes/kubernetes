@@ -17,7 +17,7 @@ limitations under the License.
 package healthz
 
 import (
-	"net/http"
+	"context"
 
 	"k8s.io/apiserver/pkg/server/healthz"
 )
@@ -37,7 +37,7 @@ func NamedHealthChecker(name string, check UnnamedHealthChecker) healthz.HealthC
 // UnnamedHealthChecker is an unnamed healthz checker.
 // The name of the check can be set by the controller manager.
 type UnnamedHealthChecker interface {
-	Check(req *http.Request) error
+	Check(ctx context.Context) error
 }
 
 var _ UnnamedHealthChecker = (healthz.HealthChecker)(nil)

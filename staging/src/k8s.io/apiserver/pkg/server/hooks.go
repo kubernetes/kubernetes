@@ -235,7 +235,7 @@ func (h postStartHookHealthz) Name() string {
 
 var errHookNotFinished = errors.New("not finished")
 
-func (h postStartHookHealthz) Check(req *http.Request) error {
+func (h postStartHookHealthz) Check(ctx context.Context) error {
 	select {
 	case <-h.done:
 		return nil
