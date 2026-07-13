@@ -128,7 +128,7 @@ func IsForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim, acceptPodGroupOwner
 		return fmt.Errorf("ResourceClaim %s/%s is not in the same namespace as Pod %s/%s", claim.Namespace, claim.Name, pod.Namespace, pod.Name)
 	}
 	if !metav1.IsControlledBy(claim, pod) {
-		if acceptPodGroupOwner {
+		if acceptPodGroupOwner && pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
 			if !isForPodGroupByPod(pod, claim) {
 				return fmt.Errorf("ResourceClaim %s/%s was not created for Pod %s/%s (neither Pod nor PodGroup %s is the owner)", claim.Namespace, claim.Name, pod.Namespace, pod.Name, *pod.Spec.SchedulingGroup.PodGroupName)
 			}
