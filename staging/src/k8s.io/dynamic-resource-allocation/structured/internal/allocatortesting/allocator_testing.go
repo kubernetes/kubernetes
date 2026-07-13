@@ -2033,13 +2033,13 @@ func TestAllocator(t *testing.T,
 			slices: unwrapResourceSlices(
 				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
 					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"numa": {IntValue: ptr.To(int64(1))},
+						"numa": {IntValue: new(int64(1))},
 					}),
 					// device2 mismatches the constraint and consumes the single
 					// counter, so it reserves the counter first and then fails the
 					// constraint, reaching the must-error path with state to undo.
 					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"numa": {IntValue: ptr.To(int64(2))},
+						"numa": {IntValue: new(int64(2))},
 					}).withDeviceCounterConsumption(
 						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
 					),
@@ -3139,17 +3139,17 @@ func TestAllocator(t *testing.T,
 			slices: unwrapResourceSlices(
 				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
 					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"stringAttribute": {StringValue: ptr.To("red")},
+						"stringAttribute": {StringValue: new("red")},
 					}).withDeviceCounterConsumption(
 						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
 					),
 					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"stringAttribute": {StringValue: ptr.To("blue")},
+						"stringAttribute": {StringValue: new("blue")},
 					}).withDeviceCounterConsumption(
 						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
 					),
 					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"stringAttribute": {StringValue: ptr.To("blue")},
+						"stringAttribute": {StringValue: new("blue")},
 					}).withDeviceCounterConsumption(
 						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
 					),
@@ -3192,19 +3192,19 @@ func TestAllocator(t *testing.T,
 					// shared counter. It is listed first, so req0 reserves its counter
 					// on the first try.
 					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"kind": {StringValue: ptr.To("shared")},
+						"kind": {StringValue: new("shared")},
 					}).withAllowMultipleAllocations().withDeviceCounterConsumption(
 						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
 					),
 					// device2 consumes no counter and is the correct choice for req0
 					// once device1 has been backtracked.
 					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"kind": {StringValue: ptr.To("shared")},
+						"kind": {StringValue: new("shared")},
 					}),
 					// device3 is the only device that satisfies req1 and needs the same
 					// counter device1 reserved.
 					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"kind": {StringValue: ptr.To("counteronly")},
+						"kind": {StringValue: new("counteronly")},
 					}).withDeviceCounterConsumption(
 						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
 					),
@@ -3235,7 +3235,7 @@ func TestAllocator(t *testing.T,
 				// subject to claim1's constraint, so it does not set the reference value.
 				claim(claim0).withRequests(
 					deviceRequest(req0, classA, 1).
-						withCapacityRequest(ptr.To(two)).
+						withCapacityRequest(new(two)).
 						withSelectors(resourceapi.DeviceSelector{
 							CEL: &resourceapi.CELDeviceSelector{
 								Expression: fmt.Sprintf(`device.attributes["%s"].stringAttribute == "cap"`, driverA),
@@ -3254,7 +3254,7 @@ func TestAllocator(t *testing.T,
 								Expression: fmt.Sprintf(`device.attributes["%s"].stringAttribute == "cap"`, driverA),
 							}}).
 							withAllocationMode(resourceapi.DeviceAllocationModeAll).
-							withCapacityRequest(ptr.To(two)),
+							withCapacityRequest(new(two)),
 						subRequest(subReq1, classA, 1, resourceapi.DeviceSelector{
 							CEL: &resourceapi.CELDeviceSelector{
 								Expression: fmt.Sprintf(`device.attributes["%s"].stringAttribute == "fb"`, driverA),
@@ -3266,11 +3266,11 @@ func TestAllocator(t *testing.T,
 				sliceWithDevices(slice1, node1, pool1, driverA,
 					device(device1, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two},
 						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-							"stringAttribute": {StringValue: ptr.To("cap")},
+							"stringAttribute": {StringValue: new("cap")},
 						}).withAllowMultipleAllocations(),
 					device(device2, nil,
 						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-							"stringAttribute": {StringValue: ptr.To("fb")},
+							"stringAttribute": {StringValue: new("fb")},
 						}),
 				),
 			),
@@ -3329,20 +3329,20 @@ func TestAllocator(t *testing.T,
 					// device1: allow-multiple, no capacity, consumes the single counter.
 					// kind steers the selectors; stringAttribute steers the constraint.
 					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"kind":            {StringValue: ptr.To("shared")},
-						"stringAttribute": {StringValue: ptr.To("red")},
+						"kind":            {StringValue: new("shared")},
+						"stringAttribute": {StringValue: new("red")},
 					}).withAllowMultipleAllocations().withDeviceCounterConsumption(
 						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
 					),
 					// device2: the fallback for req1, matching req2's stringAttribute.
 					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"kind":            {StringValue: ptr.To("fallback")},
-						"stringAttribute": {StringValue: ptr.To("blue")},
+						"kind":            {StringValue: new("fallback")},
+						"stringAttribute": {StringValue: new("blue")},
 					}),
 					// device3: the only device req2 can take.
 					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"kind":            {StringValue: ptr.To("gate")},
-						"stringAttribute": {StringValue: ptr.To("blue")},
+						"kind":            {StringValue: new("gate")},
+						"stringAttribute": {StringValue: new("blue")},
 					}),
 				),
 				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
