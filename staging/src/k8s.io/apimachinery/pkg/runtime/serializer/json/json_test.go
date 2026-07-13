@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -1087,5 +1088,47 @@ func TestRoundtripUnstructuredFractionlessFloat64(t *testing.T) {
 
 	if diff := cmp.Diff(expected, final); diff != "" {
 		t.Fatalf("unexpected diff:\n%s", diff)
+	}
+}
+
+// dropFieldsTestManager is a distinctive manager name so tests can detect whether
+// managedFields data survived encoding regardless of key-vs-value omission.
+const dropFieldsTestManager = "drop-fields-test-manager"
+
+func carpWithManagedFields() *testapigroupv1.Carp {
+	return &testapigroupv1.Carp{
+		TypeMeta: metav1.TypeMeta{APIVersion: "testapigroup.apimachinery.k8s.io/v1", Kind: "Carp"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+			ManagedFields: []metav1.ManagedFieldsEntry{{
+				Manager:    dropFieldsTestManager,
+				Operation:  metav1.ManagedFieldsOperationApply,
+				APIVersion: "v1",
+			}},
+		},
+	}
+}
+
+// TestDropFields covers the build-agnostic behavior: DropFields changes the
+// Identifier and never mutates the input. The actual omission (Go 1.27+ json/v2)
+// is verified in dropfields_jsonv2_test.go.
+func TestDropFields(t *testing.T) {
+	def := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{})
+	drop := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{DropFields: []string{"metadata.managedFields"}})
+
+	if def.Identifier() == drop.Identifier() {
+		t.Errorf("expected distinct identifiers, both are %q", def.Identifier())
+	}
+	if strings.Contains(string(def.Identifier()), "dropFields") {
+		t.Errorf("default identifier changed unexpectedly: %q", def.Identifier())
+	}
+
+	obj := carpWithManagedFields()
+	var buf bytes.Buffer
+	if err := drop.Encode(obj, &buf); err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	if len(obj.ManagedFields) == 0 {
+		t.Errorf("input object was mutated by encode")
 	}
 }

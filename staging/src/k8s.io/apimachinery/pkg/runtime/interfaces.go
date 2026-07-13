@@ -159,6 +159,13 @@ type SerializerInfo struct {
 	// StrictSerializer, if set, deserializes this object strictly,
 	// erring on unknown fields.
 	StrictSerializer Serializer
+	// DropFieldsSerializer, if set, encodes objects with certain fields omitted. It
+	// is selected during content negotiation when the client requests the "drop"
+	// Accept parameter (e.g. "drop=metadata.managedFields"). Its Identifier differs
+	// from Serializer's so that runtime.CacheableObject implementations cache the
+	// reduced form separately. It only affects encoding. Currently the only
+	// supported drop target is metadata.managedFields.
+	DropFieldsSerializer Serializer
 	// StreamSerializer, if set, describes the streaming serialization format
 	// for this media type.
 	StreamSerializer *StreamSerializerInfo

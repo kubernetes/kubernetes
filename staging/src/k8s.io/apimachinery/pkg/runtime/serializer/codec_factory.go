@@ -40,6 +40,12 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 			mf, scheme, scheme,
 			json.SerializerOptions{Yaml: false, Pretty: false, Strict: true, StreamingCollectionsEncoding: options.StreamingCollectionsEncodingToJSON},
 		),
+		// Selected via the "drop=metadata.managedFields" Accept parameter. Its
+		// distinct Identifier lets the watch cache cache the reduced form separately.
+		DropFieldsSerializer: json.NewSerializerWithOptions(
+			mf, scheme, scheme,
+			json.SerializerOptions{Yaml: false, Pretty: false, Strict: options.Strict, DropFields: []string{"metadata.managedFields"}},
+		),
 		StreamSerializer: &runtime.StreamSerializerInfo{
 			EncodesAsText: true,
 			Serializer:    jsonSerializer,
