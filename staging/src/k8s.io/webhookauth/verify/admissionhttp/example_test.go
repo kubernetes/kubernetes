@@ -25,8 +25,8 @@ limitations under the License.
 //   - Example_rawHTTPWebhook       — a plain net/http webhook (mount our handler)
 //   - Example_controllerRuntimeStyle — a decorator over an ALREADY-decoded review
 //     (controller-runtime / Gatekeeper / kube-rbac-proxy: capture the bearer
-//     token in HTTP middleware, then call VerifyAdmissionReview on the review the
-//     framework already decoded).
+//     token in HTTP middleware, then call VerifyAdmissionRequest on the request
+//     the framework already decoded).
 //
 // The ONLY production change is pointing oidc.NewRemoteVerifier at the
 // cluster's real OIDC issuer instead of the throwaway TLS issuer these examples
@@ -103,7 +103,7 @@ func exampleReview(group string) *admissionv1.AdmissionReview {
 // Example_rawHTTPWebhook is the plain net/http consumer path. A webhook author
 // copies these few lines to add KEP-6060 authentication in front of existing
 // admission logic. The handler decodes the body once, enforces the token, and —
-// only on success — calls the downstream ReviewHandler with the decoded review.
+// only on success — calls the downstream AdmissionHandler with the decoded request.
 func Example_rawHTTPWebhook() {
 	// PRODUCTION: point NewRemoteVerifier at the cluster's OIDC issuer. The
 	// example stands up a throwaway TLS issuer so it verifies REAL signatures.
@@ -121,15 +121,11 @@ func Example_rawHTTPWebhook() {
 		panic(err) // misconfiguration (empty issuer/audience) or discovery failure
 	}
 
-	// 2. Your existing admission logic, unchanged, as a ReviewHandler. It runs
-	//    ONLY after the token is verified, and receives the already-decoded review.
-	admit := func(w http.ResponseWriter, _ *http.Request, review *admissionv1.AdmissionReview) {
-		resp := admissionv1.AdmissionReview{
-			TypeMeta: review.TypeMeta,
-			Response: &admissionv1.AdmissionResponse{UID: review.Request.UID, Allowed: true},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+	// 2. Your existing admission logic, unchanged, as an AdmissionHandler. It runs
+	//    ONLY after the token is verified, receives the already-decoded request,
+	//    and returns the response (the adapter wraps and writes it).
+	admit := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+		return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
 	}
 
 	// 3. Mount the verification handler in front of it. That is the whole wiring.
@@ -159,8 +155,8 @@ func Example_rawHTTPWebhook() {
 // Example_controllerRuntimeStyle is the decoded-input path used by a decorator
 // over a framework that has ALREADY decoded the review — controller-runtime,
 // Gatekeeper, kube-rbac-proxy. There is no second decode: the framework hands
-// you the review, and an HTTP middleware you install captures the bearer token
-// into the request context. You then call VerifyAdmissionReview and branch.
+// you the request, and an HTTP middleware you install captures the bearer token
+// into the request context. You then call VerifyAdmissionRequest and branch.
 func Example_controllerRuntimeStyle() {
 	issuer, err := startOIDCServer()
 	if err != nil {
@@ -182,8 +178,8 @@ func Example_controllerRuntimeStyle() {
 	token := exampleSignedToken(issuer, exampleAPIGroup)
 
 	// One call gates your admission logic. nil == verified; any error is a single
-	// generic failure (use verify.Reason(err) for a non-sensitive log line).
-	if err := admissionhttp.VerifyAdmissionReview(ctx, v, review, token); err != nil {
+	// generic failure (the reason is logged internally; do not branch on it).
+	if err := admissionhttp.VerifyAdmissionRequest(ctx, v, review.Request, token); err != nil {
 		fmt.Println("denied") // return a 401 / deny AdmissionResponse here
 		return
 	}
@@ -204,9 +200,9 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 	}
 
 	var reached bool
-	admit := func(w http.ResponseWriter, _ *http.Request, _ *admissionv1.AdmissionReview) {
+	admit := func(_ context.Context, _ *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		reached = true
-		w.WriteHeader(http.StatusOK)
+		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
 	srv := httptest.NewServer(admissionhttp.WithTokenVerification(v, admit))
 	defer srv.Close()

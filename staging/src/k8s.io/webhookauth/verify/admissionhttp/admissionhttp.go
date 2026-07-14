@@ -28,7 +28,7 @@ limitations under the License.
 // defaults off; it is not a runtime knob on this handler.
 //
 // Callers that have already decoded the AdmissionReview (for example
-// controller-runtime) should use [VerifyAdmissionReview] directly so the body
+// controller-runtime) should use [VerifyAdmissionRequest] directly so the body
 // is never decoded twice.
 //
 // The adapter imports only the core verify package, so JOSE/JWT dependencies
@@ -46,9 +46,24 @@ import (
 	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	"k8s.io/webhookauth/verify"
 )
+
+// scheme and codecs decode incoming AdmissionReview bodies through the codec
+// factory (TypeMeta-aware) rather than a raw json.Unmarshal.
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
+
+func init() {
+	utilruntime.Must(admissionv1.AddToScheme(scheme))
+}
 
 // defaultMaxBodyBytes bounds how much of the request body the adapter reads
 // before decoding the AdmissionReview. It is deliberately generous relative to
@@ -70,11 +85,13 @@ const (
 	reasonBodyTooLarge    = "request body exceeds the configured limit"
 )
 
-// ReviewHandler processes an AdmissionReview that the adapter has already
-// decoded. The adapter decodes the request body exactly once and passes the
-// decoded review here, so the downstream handler never re-reads r.Body or
-// re-decodes the AdmissionReview.
-type ReviewHandler func(w http.ResponseWriter, r *http.Request, review *admissionv1.AdmissionReview)
+// AdmissionHandler performs the admission decision for a request whose API-server
+// identity has already been verified and whose AdmissionReview has already been
+// decoded. It takes the AdmissionRequest and returns the AdmissionResponse — the
+// same shape as controller-runtime's Handle(ctx, Request) Response. The adapter
+// echoes the request UID onto the response, wraps it in an AdmissionReview, and
+// writes it, so the downstream never touches the raw request or response body.
+type AdmissionHandler func(ctx context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse
 
 // Option configures the handler.
 type Option func(*handler)
@@ -92,27 +109,30 @@ func WithMaxBodyBytes(n int64) Option {
 // handler is the http.Handler returned by WithTokenVerification.
 type handler struct {
 	verifier *verify.Verifier
-	next     ReviewHandler
+	next     AdmissionHandler
 	maxBody  int64
 }
 
-// WithTokenVerification returns an http.Handler that, on every request, decodes
-// the AdmissionReview body EXACTLY ONCE, verifies the presented bearer token
-// against the KEP-6060 contract, and — only on success — invokes next with the
-// already-decoded review.
+// WithTokenVerification returns an http.Handler that, on every request, checks
+// the presented bearer token BEFORE reading the body, decodes the
+// AdmissionReview EXACTLY ONCE, verifies the token against the KEP-6060
+// contract, and — only on success — invokes next with the decoded
+// AdmissionRequest and writes next's AdmissionResponse.
 //
-// The handler always enforces: any failure (missing/invalid token, audience
-// mismatch, unauthorized API group, undecodable or over-limit body, …) is
-// answered with a generic 401 and next is not invoked. There is no permissive
-// mode.
+// Enforcement is unconditional (no permissive mode). A failure BEFORE decoding
+// (missing token, undecodable or over-limit body — no UID yet) is answered with
+// a bare generic 401. A verification failure AFTER decoding is answered with a
+// denied AdmissionResponse (HTTP 200, Allowed:false, Result.Code 401): an
+// explicit deny, which — unlike a non-2xx status — failurePolicy: Ignore cannot
+// turn into an allow. next is never invoked on failure.
 //
-// next is REQUIRED: it receives the decoded review and performs the real
+// next is REQUIRED: it receives the decoded request and performs the real
 // admission logic. WithTokenVerification panics if next is nil, so a
 // misconfiguration fails fast at startup rather than silently becoming a no-op
 // authentication gate.
-func WithTokenVerification(v *verify.Verifier, next ReviewHandler, opts ...Option) http.Handler {
+func WithTokenVerification(v *verify.Verifier, next AdmissionHandler, opts ...Option) http.Handler {
 	if next == nil {
-		panic("admissionhttp: next ReviewHandler must not be nil")
+		panic("admissionhttp: next AdmissionHandler must not be nil")
 	}
 	h := &handler{
 		verifier: v,
@@ -131,48 +151,87 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Check the bearer token FIRST: extracting it from the header is far cheaper
 	// than reading and decoding the body, so an unauthenticated caller is
-	// rejected before any body work.
+	// rejected before any body work. There is no UID yet, so a pre-decode
+	// failure is answered with a bare generic 401.
 	token, ok := BearerToken(r)
 	if !ok {
-		h.deny(ctx, w, reasonNoBearerToken)
+		denyPreDecode(ctx, w, reasonNoBearerToken)
 		return
 	}
 
-	// Decode the AdmissionReview once. The body is read a single time and never
-	// reset; downstream consumes the decoded review, not r.Body.
+	// Decode the AdmissionReview once via the scheme's serializer.
 	review, reason, ok := h.decodeReview(r)
 	if !ok {
-		h.deny(ctx, w, reason)
+		denyPreDecode(ctx, w, reason)
+		return
+	}
+	req := review.Request
+
+	// decodeReview guarantees req is non-nil, so the resource API group is
+	// well-defined here.
+	if err := h.verifier.Verify(ctx, token, req.Resource.Group); err != nil {
+		// Verify has already logged the specific reason. Fail closed with an
+		// explicit denied AdmissionResponse (HTTP 200, Allowed:false).
+		writeResponse(w, req, deniedResponse())
 		return
 	}
 
-	// decodeReview guarantees review.Request is non-nil, so the resource API
-	// group is well-defined here.
-	if err := h.verifier.Verify(ctx, token, review.Request.Resource.Group); err != nil {
-		// Verify has already logged the specific reason; deny generically.
-		writeDenied(w)
-		return
-	}
+	// TODO(kep-6060, D1.B): additionally check the INNER OBJECT's group — decode
+	// req.Object (or req.OldObject on DELETE) apiVersion and require its group ==
+	// req.Resource.Group, denying on mismatch. Pending Mo's confirmation of the
+	// defense-in-depth vs. threat-model tradeoff (see .squad/todo/
+	// kep-6060-review-2.3-1-admission-seam-6b.md, D1.B).
 
 	// Never log the token. Verification succeeded; the outcome is logged at high
-	// verbosity for operators and never written to the HTTP response. next is
-	// required (WithTokenVerification rejects a nil next), so it is safe to call.
+	// verbosity for operators. next is required, so it is safe to call.
 	klog.FromContext(ctx).V(4).Info("Admission webhook token verified")
-	h.next(w, r, review)
+	writeResponse(w, req, h.next(ctx, req))
 }
 
-// deny logs the non-sensitive reason via contextual logging and writes a
-// uniform generic denial. It is the single enforcement point: there is no path
-// that forwards a failed request downstream, and reason (which never contains
-// claim values) is logged for operators but never written to the response.
-func (h *handler) deny(ctx context.Context, w http.ResponseWriter, reason string) {
+// denyPreDecode answers a failure that occurred before a review was decoded (so
+// there is no UID to echo): it logs the non-sensitive reason and writes a bare
+// generic 401. reason never contains claim values.
+func denyPreDecode(ctx context.Context, w http.ResponseWriter, reason string) {
 	klog.FromContext(ctx).V(2).Info("Admission webhook token verification denied", "reason", reason)
-	writeDenied(w)
+	http.Error(w, genericDenyMessage, http.StatusUnauthorized)
+}
+
+// deniedResponse builds the fail-closed denial: Allowed:false with a uniform
+// generic message and a 401 Result.Code and no claim values (anti-enumeration).
+// Wrapped in an AdmissionReview it is an EXPLICIT deny — which, unlike a non-2xx
+// HTTP status, failurePolicy: Ignore cannot override.
+func deniedResponse() *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{
+		Allowed: false,
+		Result: &metav1.Status{
+			Status:  metav1.StatusFailure,
+			Message: genericDenyMessage,
+			Code:    http.StatusUnauthorized,
+		},
+	}
+}
+
+// writeResponse echoes the request UID onto resp, wraps it in a v1
+// AdmissionReview, and writes it as HTTP 200 JSON — the admission response wire
+// format. A nil resp (a misbehaving downstream) fails closed as a denial.
+func writeResponse(w http.ResponseWriter, req *admissionv1.AdmissionRequest, resp *admissionv1.AdmissionResponse) {
+	if resp == nil {
+		resp = deniedResponse()
+	}
+	resp.UID = req.UID
+	out := &admissionv1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: admissionv1.SchemeGroupVersion.String(),
+			Kind:       "AdmissionReview",
+		},
+		Response: resp,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // decodeReview reads the request body once (bounded by maxBody) and decodes it
-// into an AdmissionReview exactly once. It never buffers-and-resets the body:
-// the decoded review is the single representation passed downstream.
+// into an AdmissionReview via the scheme's serializer.
 //
 // ok is false — with a non-sensitive log reason — when the body is over the
 // limit or is not a decodable AdmissionReview carrying a Request, so the handler
@@ -191,41 +250,44 @@ func (h *handler) decodeReview(r *http.Request) (review *admissionv1.AdmissionRe
 	if int64(len(buf)) > h.maxBody {
 		return nil, reasonBodyTooLarge, false
 	}
-	var ar admissionv1.AdmissionReview
-	if err := json.Unmarshal(buf, &ar); err != nil {
+	obj, _, err := codecs.UniversalDeserializer().Decode(buf, nil, &admissionv1.AdmissionReview{})
+	if err != nil {
 		return nil, reasonUndecodableBody, false
 	}
-	if ar.Request == nil {
+	ar, ok := obj.(*admissionv1.AdmissionReview)
+	if !ok || ar.Request == nil {
 		return nil, reasonUndecodableBody, false
 	}
-	return &ar, "", true
+	return ar, "", true
 }
 
-// VerifyAdmissionReview verifies token against the KEP-6060 contract for an
-// AdmissionReview the caller has ALREADY decoded. It is the primary entry point
-// for consumers (for example controller-runtime) that decode the request body
-// themselves, so the review is never decoded twice.
+// VerifyAdmissionRequest verifies token against the KEP-6060 contract for an
+// AdmissionRequest the caller has ALREADY decoded. It is the primary entry point
+// for consumers (for example controller-runtime, whose Request embeds an
+// AdmissionRequest) that decode the review themselves, so it is never decoded
+// twice.
 //
 // It returns nil on success, or a generic error that satisfies
 // errors.Is(err, verify.ErrVerificationFailed) on any failure (including a nil
-// review or a review with no Request). The specific reason is logged for
-// operators; do not branch on the error.
-func VerifyAdmissionReview(ctx context.Context, v *verify.Verifier, review *admissionv1.AdmissionReview, token string) error {
-	if review == nil || review.Request == nil {
+// request). The specific reason is logged for operators; do not branch on the
+// error.
+func VerifyAdmissionRequest(ctx context.Context, v *verify.Verifier, req *admissionv1.AdmissionRequest, token string) error {
+	if req == nil {
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", reasonUndecodableBody)
 		return verify.ErrVerificationFailed
 	}
-	return v.Verify(ctx, token, review.Request.Resource.Group)
+	// TODO(kep-6060, D1.B): also check req.Object/OldObject group == req.Resource.Group (pending Mo).
+	return v.Verify(ctx, token, req.Resource.Group)
 }
 
 // BearerToken extracts the token from an "Authorization: Bearer <token>"
 // header, mirroring the extraction logic in
 // k8s.io/apiserver/pkg/authentication/request/bearertoken so this adapter does
 // not drift from the apiserver's parsing: the header is trimmed, split on the
-// first spaces, the scheme is matched case-insensitively, and an empty token is
+// first space, the scheme is matched case-insensitively, and an empty token is
 // rejected. ok is false for a missing header, a non-Bearer scheme, or an empty
 // token. It is exported so a caller that decodes the AdmissionReview itself can
-// obtain the token to pass to [VerifyAdmissionReview].
+// obtain the token to pass to [VerifyAdmissionRequest].
 func BearerToken(r *http.Request) (token string, ok bool) {
 	auth := strings.TrimSpace(r.Header.Get("Authorization"))
 	if auth == "" {
@@ -240,10 +302,4 @@ func BearerToken(r *http.Request) (token string, ok bool) {
 		return "", false
 	}
 	return token, true
-}
-
-// writeDenied writes a uniform generic denial (401). The body is a fixed message
-// that reveals nothing about which check failed.
-func writeDenied(w http.ResponseWriter) {
-	http.Error(w, genericDenyMessage, http.StatusUnauthorized)
 }

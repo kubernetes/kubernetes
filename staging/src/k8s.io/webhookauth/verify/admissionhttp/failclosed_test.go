@@ -263,16 +263,16 @@ func TestWithTokenVerification_DecodeOnce_BodyConsumedExactlyOnce(t *testing.T) 
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 
-	// A downstream that records the decoded review but deliberately does NOT
-	// touch r.Body, so the poisoned body reflects ONLY the adapter's own reads:
-	// any read-after-close would then indicate a second decode pass in the
-	// adapter, not routine downstream draining.
-	var gotReview *admissionv1.AdmissionReview
+	// A downstream that records the decoded request. It cannot touch r.Body (the
+	// seam receives the decoded AdmissionRequest, not the raw request), so the
+	// poisoned body reflects ONLY the adapter's own reads: any read-after-close
+	// would indicate a second decode pass in the adapter.
+	var gotRequest *admissionv1.AdmissionRequest
 	reached := false
-	next := func(w http.ResponseWriter, _ *http.Request, review *admissionv1.AdmissionReview) {
+	next := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		reached = true
-		gotReview = review
-		w.WriteHeader(http.StatusOK)
+		gotRequest = req
+		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
 	adapter := admissionhttp.WithTokenVerification(v, next)
 
@@ -300,45 +300,32 @@ func TestWithTokenVerification_DecodeOnce_BodyConsumedExactlyOnce(t *testing.T) 
 	if readAfterClose {
 		t.Error("adapter read the body after Close — indicates a second decode pass")
 	}
-	// The downstream received the decoded review, not a re-read of the body.
-	if gotReview == nil || gotReview.Request == nil || gotReview.Request.Resource.Group != testGroup {
-		t.Errorf("downstream did not receive the single decoded review: %+v", gotReview)
+	// The downstream received the decoded request, not a re-read of the body.
+	if gotRequest == nil || gotRequest.Resource.Group != testGroup {
+		t.Errorf("downstream did not receive the single decoded request: %+v", gotRequest)
 	}
 }
 
-// TestVerifyAdmissionReview_ZeroDecode documents and asserts the structural
-// guarantee of the already-decoded entry point: VerifyAdmissionReview operates
-// on the caller's decoded *AdmissionReview and performs NO body read or JSON
+// TestVerifyAdmissionRequest_ZeroDecode documents and asserts the structural
+// guarantee of the already-decoded entry point: VerifyAdmissionRequest operates
+// on the caller's decoded *AdmissionRequest and performs NO body read or JSON
 // decode of its own (there is no io.Reader in its signature). The controller-
 // runtime path therefore decodes exactly once — in the framework, never here.
-// The test drives a valid review and a nil-Request review through the entry
-// point using the same in-memory object, with no HTTP body involved.
-func TestVerifyAdmissionReview_ZeroDecode(t *testing.T) {
+func TestVerifyAdmissionRequest_ZeroDecode(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	token := ts.sign(t, ts.baseClaims())
 
-	review := &admissionv1.AdmissionReview{
-		TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
-		Request: &admissionv1.AdmissionRequest{
-			Resource: metav1.GroupVersionResource{Group: testGroup, Version: "v1", Resource: "deployments"},
-		},
+	req := &admissionv1.AdmissionRequest{
+		Resource: metav1.GroupVersionResource{Group: testGroup, Version: "v1", Resource: "deployments"},
 	}
-	// The same pointer is used before and after; a decode would have to replace
-	// or mutate it. We assert the call succeeds and the caller's object is
-	// unchanged (Request identity preserved).
-	before := review.Request
-	if err := admissionhttp.VerifyAdmissionReview(context.Background(), v, review, token); err != nil {
+	if err := admissionhttp.VerifyAdmissionRequest(context.Background(), v, req, token); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if review.Request != before {
-		t.Error("VerifyAdmissionReview replaced the caller's Request — it must not decode")
-	}
 
-	// A nil-Request review fails closed with the generic error, still without any
-	// decode.
-	err := admissionhttp.VerifyAdmissionReview(context.Background(), v, &admissionv1.AdmissionReview{}, token)
+	// A nil request fails closed with the generic error, still without any decode.
+	err := admissionhttp.VerifyAdmissionRequest(context.Background(), v, nil, token)
 	if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
-		t.Fatalf("nil-Request review: want generic ErrVerificationFailed, got %v", err)
+		t.Fatalf("nil request: want generic ErrVerificationFailed, got %v", err)
 	}
 }
