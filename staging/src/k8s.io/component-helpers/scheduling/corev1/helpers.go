@@ -77,20 +77,31 @@ func TolerationsTolerateTaint(logger klog.Logger, tolerations []v1.Toleration, t
 
 type taintsFilterFunc func(*v1.Taint) bool
 
-// FindMatchingUntoleratedTaint checks if the given tolerations tolerates
-// all the filtered taints, and returns the first taint without a toleration
-// Returns true if there is an untolerated taint
-// Returns false if all taints are tolerated
+// FindMatchingUntoleratedTaint checks if the given tolerations tolerate
+// all the filtered taints, and returns a taint without a matching toleration.
+// Prefer a cleanly untolerated taint over a comparison parse failure so callers
+// get a stable result regardless of taint order.
+// Returns true if there is an untolerated taint (or only comparison errors).
+// Returns false if all taints are tolerated.
 func FindMatchingUntoleratedTaint(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc, enableComparisonOperators bool) (v1.Taint, bool, error) {
 	filteredTaints := getFilteredTaints(taints, inclusionFilter)
+	var firstErrTaint v1.Taint
+	var firstErr error
 	for _, taint := range filteredTaints {
 		tolerated, err := TolerationsTolerateTaint(logger, tolerations, &taint, enableComparisonOperators)
 		if err != nil {
-			return taint, true, err
+			if firstErr == nil {
+				firstErr = err
+				firstErrTaint = taint
+			}
+			continue
 		}
 		if !tolerated {
 			return taint, true, nil
 		}
+	}
+	if firstErr != nil {
+		return firstErrTaint, true, firstErr
 	}
 	return v1.Taint{}, false, nil
 }
