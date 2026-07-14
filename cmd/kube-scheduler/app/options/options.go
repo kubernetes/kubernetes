@@ -82,6 +82,7 @@ type Options struct {
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
 
+	// InformerName identifies the scheduler's shared informers in client-go informer metrics.
 	InformerName *cache.InformerName
 
 	// Flags hold the parsed CLI flags.
