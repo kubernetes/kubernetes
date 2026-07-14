@@ -300,6 +300,11 @@ func TestQuantity(t *testing.T) {
 			expr:        `quantity("50.703k").asApproximateFloat()`,
 			expectValue: types.Double(50703),
 		},
+		{
+			name:        "add_does_not_mutate_receiver",
+			expr:        `[quantity("9999999999999999999999999999999999999")].all(x, x.add(quantity("1")).compareTo(x.add(quantity("2"))) == -1)`,
+			expectValue: trueVal,
+		},
 	}
 
 	for _, c := range cases {
