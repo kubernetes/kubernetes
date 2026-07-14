@@ -908,6 +908,25 @@ func TestCalculatePoolStatus_UnavailableFromTaints(t *testing.T) {
 	}
 }
 
+// A None-effect taint does not make a device unavailable; it counts the same
+// as an untainted device. Unknown effects are treated like None as well.
+func TestCalculatePoolStatus_NoneTaintIsAvailable(t *testing.T) {
+	driver := "test.example.com"
+	slices := []*resourcev1.ResourceSlice{
+		makeSliceWithTaintedDevices("slice-1", driver, "pool-1", "node-1", 5, 2, resourcev1.DeviceTaintEffectNone),
+	}
+	pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, nil))
+	if got := derefInt32(pool.TotalDevices); got != 5 {
+		t.Errorf("TotalDevices = %d, want 5", got)
+	}
+	if got := derefInt32(pool.UnavailableDevices); got != 0 {
+		t.Errorf("UnavailableDevices = %d, want 0 (None effect is not unavailable)", got)
+	}
+	if got := derefInt32(pool.AvailableDevices); got != 5 {
+		t.Errorf("AvailableDevices = %d, want 5 (None taint counts as available)", got)
+	}
+}
+
 // A matching DeviceTaintRule marks a device unavailable only when the
 // DRADeviceTaintRules gate is enabled.
 func TestCalculatePoolStatus_UnavailableFromTaintRule(t *testing.T) {
@@ -1311,5 +1330,39 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 	}
 	if sh.Capacity[0].Total.String() != "40Gi" || sh.Capacity[0].Consumed.String() != "10Gi" || sh.Capacity[0].Available.Cmp(qty("30Gi")) != 0 {
 		t.Errorf("capacity = %+v, want total=40Gi consumed=10Gi available=30Gi", sh.Capacity[0])
+	}
+}
+
+// End-to-end: a shareable device advertising multiple capacities aggregates and
+// reports each key independently, sorted by name.
+func TestCalculatePoolStatus_ShareableSummary_MultipleCapacities(t *testing.T) {
+	driver := "gpu.example.com"
+	slice := makeSlice("shareable", driver, "pool-0", "node-0", 1)
+	slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+	slice.Spec.Devices[0].Capacity = map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
+		"memory": {Value: qty("40Gi")},
+		"cores":  {Value: qty("8")},
+	}
+	claim := makeAllocatedClaim("c0", "ns", driver, "pool-0", "device-0")
+	claim.Status.Allocation.Devices.Results[0].ConsumedCapacity = map[resourcev1.QualifiedName]resource.Quantity{
+		"memory": qty("10Gi"),
+		"cores":  qty("2"),
+	}
+
+	status := runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{slice}, []*resourcev1.ResourceClaim{claim})
+	pool := requireSinglePool(t, status)
+
+	if pool.ShareableSummary == nil {
+		t.Fatal("expected a shareableSummary")
+	}
+	got := map[string][3]string{}
+	for _, c := range pool.ShareableSummary.Capacity {
+		got[c.Name] = [3]string{c.Total.String(), c.Consumed.String(), c.Available.String()}
+	}
+	if want := [3]string{"8", "2", "6"}; got["cores"] != want {
+		t.Errorf("cores {total,consumed,available} = %v, want %v", got["cores"], want)
+	}
+	if want := [3]string{"40Gi", "10Gi", "30Gi"}; got["memory"] != want {
+		t.Errorf("memory {total,consumed,available} = %v, want %v", got["memory"], want)
 	}
 }

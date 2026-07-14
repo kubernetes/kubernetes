@@ -293,6 +293,60 @@ func TestComputeShareableSummary(t *testing.T) {
 	}
 }
 
+// Shareable devices advertising multiple capacities: each key is summed across
+// devices and reported independently, sorted by name.
+func TestComputeShareableSummary_MultipleCapacities(t *testing.T) {
+	devices := []deviceRecord{
+		{
+			name:          "shareable-0",
+			allowMultiple: true,
+			capacity: map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
+				"memory": {Value: qty("40Gi")},
+				"cores":  {Value: qty("4")},
+			},
+		},
+		{
+			name:          "shareable-1",
+			allowMultiple: true,
+			capacity: map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
+				"memory": {Value: qty("40Gi")},
+				"cores":  {Value: qty("4")},
+			},
+		},
+	}
+	in := poolViewInput{
+		driver:   "gpu.example.com",
+		poolName: "pool-0",
+		devices:  devices,
+		inUse:    inUseSet("shareable-0"),
+		consumedCapacity: map[resourcev1.QualifiedName]resource.Quantity{
+			"memory": qty("10Gi"),
+			"cores":  qty("1"),
+		},
+	}
+
+	got, err := computeShareableSummary(in)
+	if err != "" {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if got == nil {
+		t.Fatal("expected a shareable summary")
+	}
+	if ptr.Deref(got.FullyAvailableDevices, 0) != 1 || ptr.Deref(got.PartiallyAvailableDevices, 0) != 1 {
+		t.Errorf("full/partial = %d/%d, want 1/1", ptr.Deref(got.FullyAvailableDevices, 0), ptr.Deref(got.PartiallyAvailableDevices, 0))
+	}
+	byKey := map[string][3]string{}
+	for _, c := range got.Capacity {
+		byKey[c.Name] = [3]string{c.Total.String(), c.Consumed.String(), c.Available.String()}
+	}
+	if want := [3]string{"8", "1", "7"}; byKey["cores"] != want {
+		t.Errorf("cores {total,consumed,available} = %v, want %v", byKey["cores"], want)
+	}
+	if want := [3]string{"80Gi", "10Gi", "70Gi"}; byKey["memory"] != want {
+		t.Errorf("memory {total,consumed,available} = %v, want %v", byKey["memory"], want)
+	}
+}
+
 func TestComputeShareableSummary_NoShareableDevices(t *testing.T) {
 	in := poolViewInput{devices: []deviceRecord{{name: "plain"}}, inUse: inUseSet()}
 	got, err := computeShareableSummary(in)
