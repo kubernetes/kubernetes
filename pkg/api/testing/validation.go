@@ -111,7 +111,7 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 		opts.Fuzzer.Fill(internalObj)
 	}
 	if old == nil {
-		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
+		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, opts.Options, internalObj, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
 	} else {
 		// Convert old versioned object to internal format before validation.
 		// runtimetest.RunUpdateValidationForEachVersion requires unversioned (internal) objects as input.
@@ -126,7 +126,7 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 		if opts.Fuzzer != nil {
 			opts.Fuzzer.Fill(internalOld)
 		}
-		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, internalOld, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
+		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, opts.Options, internalObj, internalOld, accumulate, opts.IgnoreObjectConversionErrors, opts.SubResources...)
 	}
 
 	// Make a copy so we can modify it.
@@ -234,6 +234,15 @@ type validationOption struct {
 
 	// Fuzzer is the fuzzer to use for generating test objects.
 	Fuzzer *randfill.Filler
+
+	// Options are the validation options to apply.
+	Options map[string]bool
+}
+
+func WithOptions(options map[string]bool) ValidationTestConfig {
+	return func(o *validationOption) {
+		o.Options = options
+	}
 }
 
 func WithSubResources(subResources ...string) ValidationTestConfig {
@@ -285,6 +294,13 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
 		return rest.ValidateCreate(c, obj, strategy)
 	}, ctx, opts, obj)
+	// Fall back to the strategy's declared options for the cross-version check, unless
+	// the caller supplied its own.
+	if opts.Options == nil {
+		if dvs, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
+			testConfigs = append(testConfigs, WithOptions(dvs.DeclarativeValidationConfig(ctx, obj, nil).Options))
+		}
+	}
 	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
 }
 
@@ -313,6 +329,13 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
 		return rest.ValidateUpdate(c, obj, old, strategy)
 	}, ctx, opts, obj)
+	// Fall back to the strategy's declared options for the cross-version check, unless
+	// the caller supplied its own.
+	if opts.Options == nil {
+		if dvs, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
+			testConfigs = append(testConfigs, WithOptions(dvs.DeclarativeValidationConfig(ctx, obj, old).Options))
+		}
+	}
 	VerifyVersionedValidationEquivalence(t, obj, old, testConfigs...)
 }
 

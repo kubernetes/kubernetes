@@ -1518,6 +1518,7 @@ func (g *genValidations) emitCallsToValidators(c *generator.Context, validations
 			targs := generator.Args{
 				"funcName": c.Universe.Type(g.resolveFunc(v.Function)),
 				"field":    mkSymbolArgs(c, fieldPkgSymbols),
+				"fmt":      mkSymbolArgs(c, fmtPkgSymbols),
 			}
 
 			emitCall := func() {
@@ -1553,26 +1554,40 @@ func (g *genValidations) emitCallsToValidators(c *generator.Context, validations
 			if !v.Conditions.Empty() {
 				emitBaseFunction := emitCall
 				emitCall = func() {
+					// emitOptionLookup emits "<var>, defined := op.HasOption(<option>)" and
+					// surfaces an undefined option as an internal error.
+					emitOptionLookup := func(varName, option string) {
+						la := generator.Args{"field": targs["field"], "fmt": targs["fmt"], "opt": strconv.Quote(option)}
+						sw.Do("  "+varName+", defined := op.HasOption($.opt$)\n", la)
+						sw.Do("  if !defined {\n", nil)
+						sw.Do("    return $.field.ErrorList|raw${$.field.InternalError|raw$(fldPath, $.fmt.Errorf|raw$(\"undefined validation option %q\", $.opt$))}\n", la)
+						sw.Do("  }\n", nil)
+					}
 					sw.Do("func() $.field.ErrorList|raw$ {\n", targs)
+					if len(v.Conditions.OptionEnabled) > 0 {
+						emitOptionLookup("optionEnabled", v.Conditions.OptionEnabled)
+					}
+					if len(v.Conditions.OptionDisabled) > 0 {
+						emitOptionLookup("optionDisabled", v.Conditions.OptionDisabled)
+					}
 					sw.Do("  if ", nil)
 					firstCondition := true
 					if len(v.Conditions.OptionEnabled) > 0 {
-						sw.Do("op.HasOption($.$)", strconv.Quote(v.Conditions.OptionEnabled))
+						sw.Do("optionEnabled", nil)
 						firstCondition = false
 					}
 					if len(v.Conditions.OptionDisabled) > 0 {
 						if !firstCondition {
 							sw.Do(" && ", nil)
 						}
-						sw.Do("!op.HasOption($.$)", strconv.Quote(v.Conditions.OptionDisabled))
+						sw.Do("!optionDisabled", nil)
 					}
 					sw.Do(" {\n", nil)
 					sw.Do("    return ", nil)
 					emitBaseFunction()
 					sw.Do("\n", nil)
-					sw.Do("  } else {\n", nil)
-					sw.Do("    return nil // skip validation\n", nil)
 					sw.Do("  }\n", nil)
+					sw.Do("  return nil // skip validation\n", nil)
 					sw.Do("}()", nil)
 				}
 			}
