@@ -51,7 +51,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -434,11 +433,10 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
 
-	// When pod-level resources are being introduced for the first time via resize
-	// (old pod had none, new pod explicitly sets them), apply the same defaulting
-	// as PrepareForCreate so the new resources are complete and consistent.
+	// When pod-level resources are set or updated via resize, apply defaulting
+	// so any unmanaged resources (e.g. memory when only CPU existed) are complete and consistent.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
-		if newPod.Spec.Resources != nil && oldPod.Spec.Resources == nil {
+		if newPod.Spec.Resources != nil {
 			applyPodLevelResourceDefaults(newPod)
 		}
 	}
@@ -1034,24 +1032,7 @@ func applyPodLevelResourceDefaults(pod *api.Pod) {
 		return
 	}
 
-	// TODO(ndixita): Move DefaultHugePagePodLevelLimits and DefaultPodLevelRequests to pkg/api/pod/util.go
-	// so they can operate directly on *api.Pod without requiring v1 conversions.
-	v1PodSpec := &apiv1.PodSpec{}
-	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
-		Containers:     pod.Spec.Containers,
-		InitContainers: pod.Spec.InitContainers,
-		Resources:      pod.Spec.Resources,
-	}, v1PodSpec, nil); err == nil {
-		v1Pod := &apiv1.Pod{Spec: *v1PodSpec}
-		corev1.DefaultHugePagePodLevelLimits(v1Pod)
-		corev1.DefaultPodLevelRequests(v1Pod)
-		if v1Pod.Spec.Resources != nil {
-			var coreResources api.ResourceRequirements
-			if err := corev1.Convert_v1_ResourceRequirements_To_core_ResourceRequirements(v1Pod.Spec.Resources, &coreResources, nil); err == nil {
-				pod.Spec.Resources = &coreResources
-			}
-		}
-	}
-
+	podutil.DefaultHugePagePodLevelLimits(pod)
+	podutil.DefaultPodLevelRequests(pod)
 	podutil.DefaultPodLevelLimits(pod)
 }

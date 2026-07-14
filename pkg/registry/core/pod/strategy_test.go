@@ -859,13 +859,15 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 // TestPrepareForUpdatePodLevelResources tests update and resize strategy PrepareForUpdate behaviors.
 func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 	tests := []struct {
-		name         string
-		useResize    bool
-		oldResources *api.ResourceRequirements
-		newResources *api.ResourceRequirements
-		wantNil      bool
-		wantRequests api.ResourceList
-		wantLimits   api.ResourceList
+		name          string
+		useResize     bool
+		oldResources  *api.ResourceRequirements
+		newResources  *api.ResourceRequirements
+		oldContainers []api.Container
+		newContainers []api.Container
+		wantNil       bool
+		wantRequests  api.ResourceList
+		wantLimits    api.ResourceList
 	}{
 		{
 			name:         "client omits spec.resources on update (nil) - leaves nil for validation",
@@ -883,11 +885,47 @@ func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 			wantLimits:   getResourceList("300m", "512Mi"),
 		},
 		{
-			name:         "resize: pod-level resources added for first time (old pod had none) - applies defaults",
+			name:         "scenario 1: old pod didn't have resources set, new pod has resources set",
 			useResize:    true,
 			oldResources: nil,
 			newResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
 			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:         "scenario 2: old pod has request set, and container requests; new pod sets limits for containers",
+			useResize:    true,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+			oldContainers: []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), nil),
+			},
+			newContainers: []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:         "scenario 3: old pod has memory set, new pod sets cpu",
+			useResize:    true,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("100m", "")},
+			wantRequests: getResourceList("100m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:         "scenario 4: old pod had memory set only, container-level cpu added on update - cpu pod-level defaults applied",
+			useResize:    true,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
+			newResources: &api.ResourceRequirements{},
+			oldContainers: []api.Container{
+				newContainer("c1", getResourceList("", "128Mi"), getResourceList("", "256Mi")),
+			},
+			newContainers: []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+			},
+			wantRequests: getResourceList("100m", "256Mi"),
 			wantLimits:   getResourceList("200m", "256Mi"),
 		},
 		{
@@ -899,12 +937,67 @@ func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 			wantLimits:   getResourceList("200m", "256Mi"),
 		},
 		{
-			name:         "resize: partial update preserves old memory request when adding new CPU request",
+			name:         "resize: old pod had pod-level CPU only, container memory present - defaults missing pod-level memory",
 			useResize:    true,
-			oldResources: &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
-			newResources: &api.ResourceRequirements{Requests: getResourceList("100m", "")},
-			wantRequests: getResourceList("100m", "256Mi"),
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "")},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("200m", "")},
+			wantRequests: getResourceList("200m", "128Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:         "edge case: multi-container pod where c2 lacks limits - limit defaulting skipped",
+			useResize:    true,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+			oldContainers: []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+				newContainer("c2", getResourceList("100m", "128Mi"), nil),
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
 			wantLimits:   nil,
+		},
+		{
+			name:         "edge case: c2 updated to set limits so all containers now have limits - pod limits defaulted",
+			useResize:    true,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+			oldContainers: []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+				newContainer("c2", getResourceList("100m", "128Mi"), nil),
+			},
+			newContainers: []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+				newContainer("c2", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:         "edge case: c2 updated to set CPU limit only - only pod CPU limit defaulted",
+			useResize:    true,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+			oldContainers: []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+				newContainer("c2", getResourceList("100m", "128Mi"), nil),
+			},
+			newContainers: []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+				newContainer("c2", getResourceList("100m", "128Mi"), getResourceList("100m", "")),
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", ""),
+		},
+		{
+			name:         "edge case: pod-level request exceeds aggregated container limit - pod limit raised to match pod request",
+			useResize:    true,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("500m", "512Mi")},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("500m", "512Mi")},
+			oldContainers: []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+			},
+			wantRequests: getResourceList("500m", "512Mi"),
+			wantLimits:   getResourceList("500m", "512Mi"),
 		},
 	}
 
@@ -913,14 +1006,22 @@ func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
 
-			oldPod := newPod("plr-update", []api.Container{
+			defaultContainers := []api.Container{
 				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
-			})
+			}
+			oldCtrs := tc.oldContainers
+			if oldCtrs == nil {
+				oldCtrs = defaultContainers
+			}
+			newCtrs := tc.newContainers
+			if newCtrs == nil {
+				newCtrs = oldCtrs
+			}
+
+			oldPod := newPod("plr-update", oldCtrs)
 			oldPod.Spec.Resources = tc.oldResources
 
-			newPod := newPod("plr-update", []api.Container{
-				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
-			})
+			newPod := newPod("plr-update", newCtrs)
 			newPod.Spec.Resources = tc.newResources
 
 			if tc.useResize {
