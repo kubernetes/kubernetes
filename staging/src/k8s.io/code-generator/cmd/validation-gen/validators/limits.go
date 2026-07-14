@@ -144,7 +144,7 @@ func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 func (mbtv maxBytesTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mbtv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(mbtv.ValidScopes()),
 		Description: `Indicates that a string field has a limit on its length in bytes.
 		This could only allow as few as N/4 multi-byte characters.
