@@ -837,6 +837,60 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			enableComparisonOperatorsFG: true,
 		},
 		{
+			description: "prefer cleanly untolerated taint over earlier comparison parse error",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "high",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "dedicated",
+					Value:  "gpu",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             false,
+			expectError:                 false,
+			enableComparisonOperatorsFG: true,
+		},
+		{
+			description: "prefer cleanly untolerated taint even when it appears before comparison parse error",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "dedicated",
+					Value:  "gpu",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "high",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             false,
+			expectError:                 false,
+			enableComparisonOperatorsFG: true,
+		},
+		{
 			description: "numeric Gt parse error is ignored when a later toleration matches the taint",
 			tolerations: []v1.Toleration{
 				{
