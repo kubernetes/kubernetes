@@ -454,6 +454,12 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		if !l.driver.GetDriverInfo().Capabilities[storageframework.CapRWX] {
 			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", l.driver.GetDriverInfo().Name, storageframework.CapRWX)
 		}
+		if pattern.FsType != "" {
+			// This test always forces ReadWriteMany access, which is normally backed by a
+			// network filesystem rather than a per-node formatted block device, so a specific
+			// fsType (ext4, xfs, ntfs, ...) doesn't apply here -- skipping.
+			e2eskipper.Skipf("fsType %q is not applicable to ReadWriteMany volumes -- skipping", pattern.FsType)
+		}
 
 		// Check different-node test requirement
 		if l.config.ClientNodeSelection.Name != "" {
