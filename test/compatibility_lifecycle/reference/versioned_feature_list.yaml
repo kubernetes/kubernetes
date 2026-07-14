@@ -1369,6 +1369,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.37"
 - name: PodLogsQuerySplitStreams
   versionedSpecs:
   - default: false
