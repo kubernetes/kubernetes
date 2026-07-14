@@ -35,9 +35,8 @@ import (
 // placementNodes stores nodes that are present in the current placement.
 // Placement is a limited set of nodes that is used in the pod group scheduling cycle.
 type placementNodes struct {
-	// nodeInfoList contains the list of nodes in the placement.
-	// This is useful for quickly returning the entire list to the caller.
-	nodeInfoList []fwk.NodeInfo
+	// placement is the placement object used to assume this placement.
+	placement *fwk.Placement
 	// nodeInfoSet contains the set of nodes in the placement.
 	// This is useful for quickly checking if a node belongs the the placement.
 	nodeInfoSet sets.Set[string]
@@ -207,6 +206,46 @@ func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []
 			s.podGroupStates[key] = pgs
 		}
 		pgs.podGroup = podGroup
+	}
+	return s
+}
+
+// NewTestSnapshotWithCompositePodGroups initializes a Snapshot struct with pod groups and composite pod groups and returns it.
+// It should be used only in the tests.
+func NewTestSnapshotWithCompositePodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1alpha3.PodGroup, compositePodGroups []*schedulingv1alpha3.CompositePodGroup) *Snapshot {
+	s := NewTestSnapshotWithPodGroups(pods, nodes, podGroups)
+	for _, cpg := range compositePodGroups {
+		key := fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name)
+		cpgs, ok := s.compositePodGroupStates[key]
+		if !ok {
+			cpgs = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
+			s.compositePodGroupStates[key] = cpgs
+		}
+		cpgs.compositePodGroup = cpg
+	}
+	for entityKey, cpgs := range s.compositePodGroupStates {
+		if cpgs.compositePodGroup == nil || cpgs.compositePodGroup.Spec.ParentCompositePodGroupName == nil {
+			continue
+		}
+		parentKey := fwk.CompositePodGroupKey(cpgs.compositePodGroup.Namespace, *cpgs.compositePodGroup.Spec.ParentCompositePodGroupName)
+		parentState, ok := s.compositePodGroupStates[parentKey]
+		if !ok {
+			parentState = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
+			s.compositePodGroupStates[parentKey] = parentState
+		}
+		parentState.addChild(entityKey)
+	}
+	for entityKey, pgs := range s.podGroupStates {
+		if pgs.podGroup == nil || pgs.podGroup.Spec.ParentCompositePodGroupName == nil {
+			continue
+		}
+		parentKey := fwk.CompositePodGroupKey(pgs.podGroup.Namespace, *pgs.podGroup.Spec.ParentCompositePodGroupName)
+		parentState, ok := s.compositePodGroupStates[parentKey]
+		if !ok {
+			parentState = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
+			s.compositePodGroupStates[parentKey] = parentState
+		}
+		parentState.addChild(entityKey)
 	}
 	return s
 }
@@ -460,7 +499,7 @@ func (l *podGroupStateSnapshotLister) Get(namespace string, podGroupName string)
 // This function is not thread safe so it should be executed when no other routines can write to the snapshot.
 func (s *Snapshot) NumNodesInPlacement() int {
 	if s.placementNodes != nil {
-		return len(s.placementNodes.nodeInfoList)
+		return len(s.placementNodes.placement.Nodes)
 	}
 	return len(s.nodeInfoList)
 }
@@ -650,20 +689,34 @@ func removeAssumedNodeInfo(logger klog.Logger, list []fwk.NodeInfo, nodeInfo fwk
 	return list[:len(list)-1]
 }
 
+// GetPlacement returns the placement object of the currently assumed placement.
+// Returns nil if no placement was assumed.
+func (s *Snapshot) GetPlacement() *fwk.Placement {
+	if s.placementNodes != nil {
+		return s.placementNodes.placement
+	}
+	return nil
+}
+
 // AssumePlacement sets placement context in the snapshot.
 // The snapshot should not be updated if a placement is assumed.
 // The placement should be unset with ForgetPlacement once it's no longer needed.
+// Subsequent calls to AssumePlacement will overwrite the previously assumed placement.
 // This function should only be used by the scheduler to limit the node candidates for scheduling.
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
 func (s *Snapshot) AssumePlacement(placement *fwk.Placement) error {
+	if placement == nil {
+		s.ForgetPlacement()
+		return nil
+	}
 	if len(placement.Nodes) == len(s.nodeInfoList) {
 		// All nodes in placement, meaning we can treat it the same as no placement and avoid copying the buffer.
 		s.ForgetPlacement()
 		return nil
 	}
 	s.placementNodes = &placementNodes{
-		nodeInfoList: placement.Nodes,
-		nodeInfoSet:  sets.New[string](),
+		placement:   placement,
+		nodeInfoSet: sets.New[string](),
 	}
 	for _, node := range placement.Nodes {
 		snapshotNode, ok := s.nodeInfoMap[node.Node().Name]
@@ -710,7 +763,7 @@ func (s *Snapshot) ListNodesInPlacement() ([]fwk.NodeInfo, error) {
 	if s.placementNodes == nil {
 		return s.List()
 	}
-	return s.placementNodes.nodeInfoList, nil
+	return s.placementNodes.placement.Nodes, nil
 }
 
 // AddPod adds a pod to the snapshot.

@@ -18,15 +18,19 @@ package podgrouppodscount
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes/fake"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
@@ -35,6 +39,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {
@@ -65,18 +70,17 @@ func (pa *mockProposedAssignment) GetCycleState() fwk.CycleState {
 }
 
 func TestScorePlacement(t *testing.T) {
-	podGroupName := "pg1"
-
-	createPod := func(podName, podGroupName, nodeName string) *v1.Pod {
-		return st.MakePod().Name(podName).Namespace("default").UID(podName).PodGroupName(podGroupName).Node(nodeName).Obj()
+	type scheduledPod struct {
+		pathToRoot   []string
+		assignedNode string
 	}
 
 	createPodWithoutNode := func(podName, podGroupName string) *v1.Pod {
-		return createPod(podName, podGroupName, "")
+		return st.MakePod().Name(podName).Namespace("default").UID(podName).PodGroupName(podGroupName).Obj()
 	}
 
-	podInfo1, _ := framework.NewPodInfo(createPodWithoutNode("proposed-pod-1", podGroupName))
-	podInfo2, _ := framework.NewPodInfo(createPodWithoutNode("proposed-pod-2", podGroupName))
+	podInfo1, _ := framework.NewPodInfo(createPodWithoutNode("proposed-pod-1", "root"))
+	podInfo2, _ := framework.NewPodInfo(createPodWithoutNode("proposed-pod-2", "root"))
 	proposedAssignments := []fwk.ProposedAssignment{
 		&mockProposedAssignment{
 			nodeName: "node1",
@@ -90,23 +94,21 @@ func TestScorePlacement(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		pod           *v1.Pod
-		assignedPods  []*v1.Pod // Pods to be added to the snapshot
-		assumedPods   []*v1.Pod // Pods to be assumed in the snapshot
+		podGroupInfo  fwk.PodGroupInfo
+		assignedPods  []scheduledPod // Pods to be added to the snapshot
+		assumedPods   []scheduledPod // Pods to be assumed in the snapshot
 		placement     *fwk.PodGroupAssignments
 		expectedScore int64
 	}{
 		{
-			name: "existing assigned and assumed pods",
-			pod:  createPodWithoutNode("p-new", podGroupName),
-			assignedPods: []*v1.Pod{
-				// Assigned pods
-				createPod("p2", podGroupName, "node2"),
-				createPod("p3", podGroupName, "node3"),
+			name:         "existing assigned and assumed pods",
+			podGroupInfo: makePodGroup(),
+			assignedPods: []scheduledPod{
+				{assignedNode: "node2"},
+				{assignedNode: "node3"},
 			},
-			assumedPods: []*v1.Pod{
-				// Assumed pod
-				createPod("p1", podGroupName, "node1"),
+			assumedPods: []scheduledPod{
+				{assignedNode: "node1"},
 			},
 			placement: &fwk.PodGroupAssignments{
 				ProposedAssignments: proposedAssignments,
@@ -114,10 +116,10 @@ func TestScorePlacement(t *testing.T) {
 			expectedScore: 5, // 1 assumed + 2 assigned + 2 proposed = 5
 		},
 		{
-			name: "no assumed pods",
-			pod:  createPodWithoutNode("p-new", podGroupName),
-			assignedPods: []*v1.Pod{
-				createPod("p1", podGroupName, "node1"),
+			name:         "no assumed pods",
+			podGroupInfo: makePodGroup(),
+			assignedPods: []scheduledPod{
+				{assignedNode: "node1"},
 			},
 			placement: &fwk.PodGroupAssignments{
 				ProposedAssignments: proposedAssignments,
@@ -125,11 +127,10 @@ func TestScorePlacement(t *testing.T) {
 			expectedScore: 3, // 1 assigned + 2 proposed = 3
 		},
 		{
-			name: "no assigned pods",
-			pod:  createPodWithoutNode("p-new", podGroupName),
-			assumedPods: []*v1.Pod{
-				// Assumed pod
-				createPod("p1", podGroupName, "node1"),
+			name:         "no assigned pods",
+			podGroupInfo: makePodGroup(),
+			assumedPods: []scheduledPod{
+				{assignedNode: "node1"},
 			},
 			placement: &fwk.PodGroupAssignments{
 				ProposedAssignments: proposedAssignments,
@@ -137,8 +138,68 @@ func TestScorePlacement(t *testing.T) {
 			expectedScore: 3, // 1 assumed + 2 proposed = 3
 		},
 		{
-			name: "no assigned pods, no assumed pods",
-			pod:  createPodWithoutNode("p-new", podGroupName),
+			name:         "no assigned pods, no assumed pods",
+			podGroupInfo: makePodGroup(),
+			placement: &fwk.PodGroupAssignments{
+				ProposedAssignments: proposedAssignments,
+			},
+			expectedScore: 2, // 2 proposed
+		},
+		{
+			name:         "for cpg existing assigned and assumed pods across multi-level hierarchies",
+			podGroupInfo: makeCompositePodGroup(),
+			assignedPods: []scheduledPod{
+				{
+					pathToRoot:   []string{"pg1", "cpg1"},
+					assignedNode: "node2",
+				},
+				{
+					pathToRoot:   []string{"pg2", "cpg2"},
+					assignedNode: "node3",
+				},
+			},
+			assumedPods: []scheduledPod{
+				{
+					pathToRoot:   []string{"pg1", "cpg1"},
+					assignedNode: "node1",
+				},
+			},
+			placement: &fwk.PodGroupAssignments{
+				ProposedAssignments: proposedAssignments,
+			},
+			expectedScore: 5, // 1 assumed + 2 assigned across pg1 and pg2 + 2 proposed = 5
+		},
+		{
+			name:         "for cpg with no assumed pods",
+			podGroupInfo: makeCompositePodGroup(),
+			assignedPods: []scheduledPod{
+				{
+					pathToRoot:   []string{"pg1", "cpg1"},
+					assignedNode: "node1",
+				},
+			},
+			placement: &fwk.PodGroupAssignments{
+				ProposedAssignments: proposedAssignments,
+			},
+			expectedScore: 3, // 1 assigned + 2 proposed = 3
+		},
+		{
+			name:         "for cpg with no assigned pods",
+			podGroupInfo: makeCompositePodGroup(),
+			assumedPods: []scheduledPod{
+				{
+					pathToRoot:   []string{"pg1", "cpg1"},
+					assignedNode: "node1",
+				},
+			},
+			placement: &fwk.PodGroupAssignments{
+				ProposedAssignments: proposedAssignments,
+			},
+			expectedScore: 3, // 1 assumed + 2 proposed = 3
+		},
+		{
+			name:         "for cpg with no assigned pods, no assumed pods",
+			podGroupInfo: makeCompositePodGroup(),
 			placement: &fwk.PodGroupAssignments{
 				ProposedAssignments: proposedAssignments,
 			},
@@ -146,76 +207,106 @@ func TestScorePlacement(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Enable GenericWorkload feature gate to populate PodGroupState in cache
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: true,
+	for _, cpgEnabled := range []bool{false, true} {
+		for _, tt := range tests {
+			if !cpgEnabled && tt.podGroupInfo.GetCompositePodGroup() != nil {
+				continue
+			}
+			t.Run(fmt.Sprintf("%s (cpg=%v)", tt.name, cpgEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload:                 true,
+					features.TopologyAwareWorkloadScheduling: true,
+					features.CompositePodGroup:               cpgEnabled,
+				})
+				_, tCtx := ktesting.NewTestContext(t)
+
+				pgs := []schedulingapi.PodGroup{}
+				cpgs := []schedulingapi.CompositePodGroup{}
+				pods := []*v1.Pod{}
+				alreadyAdded := sets.New[string]()
+				namespace := tt.podGroupInfo.GetNamespace()
+
+				for i, scheduledPod := range tt.assignedPods {
+					parent := tt.podGroupInfo.GetName()
+					for j, entityName := range slices.Backward(scheduledPod.pathToRoot) {
+						if !alreadyAdded.Has(entityName) {
+							if j == 0 {
+								pgs = append(pgs, *st.MakePodGroup().Name(entityName).Namespace(namespace).ParentCompositePodGroup(parent).Obj())
+							} else {
+								cpgs = append(cpgs, *st.MakeCompositePodGroup().Name(entityName).Namespace(namespace).ParentCompositePodGroup(parent).Obj())
+							}
+							alreadyAdded.Insert(entityName)
+						}
+						parent = entityName
+					}
+					name := fmt.Sprintf("assigned-pod%v", i)
+					pods = append(pods, st.MakePod().Name(name).UID(name).Namespace(namespace).Node(scheduledPod.assignedNode).PodGroupName(parent).Obj())
+				}
+
+				for i, scheduledPod := range tt.assumedPods {
+					parent := tt.podGroupInfo.GetName()
+					for j, entityName := range slices.Backward(scheduledPod.pathToRoot) {
+						if !alreadyAdded.Has(entityName) {
+							if j == 0 {
+								pgs = append(pgs, *st.MakePodGroup().Name(entityName).Namespace(namespace).ParentCompositePodGroup(parent).Obj())
+							} else {
+								cpgs = append(cpgs, *st.MakeCompositePodGroup().Name(entityName).Namespace(namespace).ParentCompositePodGroup(parent).Obj())
+							}
+							alreadyAdded.Insert(entityName)
+						}
+						parent = entityName
+					}
+					name := fmt.Sprintf("assumed-pod%v", i)
+					pods = append(pods, st.MakePod().Name(name).UID(name).Namespace(namespace).Node(scheduledPod.assignedNode).PodGroupName(parent).Obj())
+				}
+
+				if cpg := tt.podGroupInfo.GetCompositePodGroup(); cpg != nil {
+					cpgs = append(cpgs, *cpg)
+				} else {
+					pgs = append(pgs, *tt.podGroupInfo.GetPodGroup())
+				}
+
+				cs := clientsetfake.NewClientset(
+					&schedulingapi.PodGroupList{Items: pgs},
+					&schedulingapi.CompositePodGroupList{Items: cpgs},
+				)
+				informerFactory := informers.NewSharedInformerFactory(cs, 0)
+				_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+				_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
+				informerFactory.StartWithContext(tCtx)
+				informerFactory.WaitForCacheSyncWithContext(tCtx)
+
+				pgPtrs := make([]*schedulingapi.PodGroup, len(pgs))
+				cpgPtrs := make([]*schedulingapi.CompositePodGroup, len(cpgs))
+				for i := range pgs {
+					pgPtrs[i] = &pgs[i]
+				}
+				for i := range cpgs {
+					cpgPtrs[i] = &cpgs[i]
+				}
+
+				snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(pods, nil, pgPtrs, cpgPtrs)
+
+				fh, _ := frameworkruntime.NewFramework(tCtx, nil, nil,
+					frameworkruntime.WithInformerFactory(informerFactory),
+					frameworkruntime.WithSnapshotSharedLister(snapshot),
+				)
+
+				plugin, err := New(tCtx, nil, fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+				if err != nil {
+					t.Fatalf("Failed to create plugin: %v", err)
+				}
+				pl := plugin.(*PodGroupPodsCount)
+
+				score, status := pl.ScorePlacement(tCtx, nil, tt.podGroupInfo, tt.placement)
+				if !status.IsSuccess() {
+					t.Errorf("ScorePlacement failed: %v", status.Message())
+				}
+				if score != tt.expectedScore {
+					t.Errorf("Expected score %d, got %d", tt.expectedScore, score)
+				}
 			})
-
-			logger, ctx := ktesting.NewTestContext(t)
-
-			// Setup cache, snapshot and framework
-			snapshot := internalcache.NewEmptySnapshot()
-			cache := internalcache.New(ctx, nil, true, true)
-			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
-
-			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
-				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithSnapshotSharedLister(snapshot),
-			)
-			if err != nil {
-				t.Fatalf("Failed to create framework: %v", err)
-			}
-
-			// Add assigned pods to cache
-			for _, p := range tt.assignedPods {
-				if err := cache.AddPod(logger, p); err != nil {
-					t.Fatalf("Failed to add pod %v: %v", p.Name, err)
-				}
-			}
-
-			// Add assumed pods to cache
-			for _, p := range tt.assumedPods {
-				cache.AddPodGroupMember(p)
-				if err := cache.AssumePod(logger, p); err != nil {
-					t.Fatalf("Failed to assume pod %v: %v", p.Name, err)
-				}
-			}
-			// Add proposed pods to cache
-			for _, assignment := range tt.placement.ProposedAssignments {
-				cache.AddPodGroupMember(assignment.GetPod())
-			}
-
-			// Update snapshot
-			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
-				t.Fatalf("Failed to update snapshot: %v", err)
-			}
-
-			// Create the plugin
-			plugin, err := New(ctx, nil, fh, feature.Features{})
-			if err != nil {
-				t.Fatalf("Failed to create plugin: %v", err)
-			}
-			pl := plugin.(*PodGroupPodsCount)
-
-			// Construct PodGroupInfo for the test pod
-			pgInfo := &framework.PodGroupInfo{
-				Namespace: tt.pod.Namespace,
-				Name:      *tt.pod.Spec.SchedulingGroup.PodGroupName,
-				Type:      fwk.PodGroupKeyType,
-			}
-
-			// Run ScorePlacement
-			score, status := pl.ScorePlacement(ctx, nil, pgInfo, tt.placement)
-			if !status.IsSuccess() {
-				t.Errorf("ScorePlacement failed: %v", status.Message())
-			}
-			if score != tt.expectedScore {
-				t.Errorf("Expected score %d, got %d", tt.expectedScore, score)
-			}
-		})
+		}
 	}
 }
 
@@ -310,4 +401,40 @@ func TestNormalizePlacementScore(t *testing.T) {
 			}
 		})
 	}
+}
+
+func makePodGroupInfoFromPG(pg *schedulingapi.PodGroup) fwk.PodGroupInfo {
+	return &framework.PodGroupInfo{
+		Name:      pg.Name,
+		Namespace: pg.Namespace,
+		PodGroup:  pg,
+		Type:      fwk.PodGroupKeyType,
+	}
+}
+
+func makePodGroupInfoFromCPG(cpg *schedulingapi.CompositePodGroup) fwk.PodGroupInfo {
+	return &framework.PodGroupInfo{
+		Name:              cpg.Name,
+		Namespace:         cpg.Namespace,
+		CompositePodGroup: cpg,
+		Type:              fwk.CompositePodGroupKeyType,
+	}
+}
+
+func makePodGroup() fwk.PodGroupInfo {
+	return makePodGroupInfoFromPG(&schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "root",
+			Namespace: "default",
+		},
+	})
+}
+
+func makeCompositePodGroup() fwk.PodGroupInfo {
+	return makePodGroupInfoFromCPG(&schedulingapi.CompositePodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "root",
+			Namespace: "default",
+		},
+	})
 }

@@ -1901,3 +1901,15 @@ func (wrapper *CompositePodGroupWrapper) WorkloadRef(workloadName, templateName 
 	}
 	return wrapper
 }
+
+// TopologyKey sets appropriate TopologyKey field in the SchedulingConstraints of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) TopologyKey(topologyKey string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.SchedulingConstraints = &schedulingapi.CompositePodGroupSchedulingConstraints{
+		Topology: []schedulingapi.TopologyConstraint{
+			{
+				Key: topologyKey,
+			},
+		},
+	}
+	return wrapper
+}

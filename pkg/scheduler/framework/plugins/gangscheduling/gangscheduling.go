@@ -487,14 +487,6 @@ func (pl *GangScheduling) allowAssumedPodsInHierarchy(snapshot fwk.PodGroupManag
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
 // In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
 func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args framework.PlacementProgress) *fwk.Status {
-	// When CompositePodGroup feature gate is disabled, we return nil immediately for non-gang pod groups.
-	if !pl.isCompositePodGroupEnabled {
-		pg := podGroupInfo.GetPodGroup()
-		if pg == nil || pg.Spec.SchedulingPolicy.Gang == nil {
-			return nil
-		}
-	}
-
 	minCount := getMinCount(podGroupInfo)
 	remaining := args.Remaining
 	scheduled := args.Scheduled
