@@ -35,6 +35,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/sharding"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/features"
@@ -627,4 +630,98 @@ func initStoreData(ctx context.Context, store storage.Interface) ([]interface{},
 		created = append(created, item.key)
 	}
 	return created, nil
+}
+
+func TestWatchWithShardSelector(t *testing.T) {
+	// The shard [boundary, 2^64) contains exactly the higher of the two UID hashes.
+	uidA, uidB := "uid-a", "uid-b"
+	hashA, hashB := "0x"+sharding.HashField(uidA), "0x"+sharding.HashField(uidB)
+	inShardUID, outOfShardUID, boundary := uidA, uidB, hashA
+	if sharding.HexLess(hashA, hashB) {
+		inShardUID, outOfShardUID, boundary = uidB, uidA, hashB
+	}
+	shardSelector := sharding.NewSelector(sharding.ShardRangeRequirement{
+		Key:   "object.metadata.uid",
+		Start: boundary,
+		End:   "0x10000000000000000",
+	})
+
+	newPod := func(name, uid string) *example.Pod {
+		return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test-ns", UID: types.UID(uid)}}
+	}
+	expectAddedEvent := func(t *testing.T, w watch.Interface, name string) {
+		t.Helper()
+		select {
+		case event := <-w.ResultChan():
+			if event.Type != watch.Added {
+				t.Fatalf("expected %s event, got %s", watch.Added, event.Type)
+			}
+			pod, ok := event.Object.(*example.Pod)
+			if !ok {
+				t.Fatalf("expected *example.Pod, got %T", event.Object)
+			}
+			if pod.Name != name {
+				t.Fatalf("expected event for pod %q, got %q", name, pod.Name)
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatalf("timed out waiting for event for pod %q", name)
+		}
+	}
+
+	testCases := []struct {
+		name                  string
+		gateEnabled           bool
+		expectOutOfShardEvent bool
+	}{
+		{
+			name:                  "gate enabled filters out-of-shard events",
+			gateEnabled:           true,
+			expectOutOfShardEvent: false,
+		},
+		{
+			name:                  "gate disabled ignores the shard selector",
+			gateEnabled:           false,
+			expectOutOfShardEvent: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, tc.gateEnabled)
+			ctx, store, _ := testSetup(t)
+
+			marker := &example.Pod{}
+			if err := store.Create(ctx, "/pods/test-ns/marker", newPod("marker", "uid-marker"), marker, 0); err != nil {
+				t.Fatalf("Create marker failed: %v", err)
+			}
+
+			w, err := store.Watch(ctx, "/pods", storage.ListOptions{
+				ResourceVersion: marker.ResourceVersion,
+				Recursive:       true,
+				Predicate: storage.SelectionPredicate{
+					Label:         labels.Everything(),
+					Field:         fields.Everything(),
+					GetAttrs:      storage.DefaultNamespaceScopedAttr,
+					ShardSelector: shardSelector,
+				},
+			})
+			if err != nil {
+				t.Fatalf("Watch failed: %v", err)
+			}
+			defer w.Stop()
+
+			// pod-out is created first so that receiving pod-in's event first
+			// proves pod-out's event was filtered rather than still in flight.
+			if err := store.Create(ctx, "/pods/test-ns/pod-out", newPod("pod-out", outOfShardUID), &example.Pod{}, 0); err != nil {
+				t.Fatalf("Create pod-out failed: %v", err)
+			}
+			if err := store.Create(ctx, "/pods/test-ns/pod-in", newPod("pod-in", inShardUID), &example.Pod{}, 0); err != nil {
+				t.Fatalf("Create pod-in failed: %v", err)
+			}
+
+			if tc.expectOutOfShardEvent {
+				expectAddedEvent(t, w, "pod-out")
+			}
+			expectAddedEvent(t, w, "pod-in")
+		})
+	}
 }
