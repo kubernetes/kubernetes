@@ -889,7 +889,7 @@ func takeByTopologyNUMAPacked(logger klog.Logger, topo *topology.CPUTopology, av
 // of size 'cpuGroupSize' according to the algorithm described above. This is
 // important, for example, to ensure that all CPUs (i.e. all hyperthreads) from
 // a single core are allocated together.
-func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy) (cpuset.CPUSet, error) {
+func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, alignBySocket bool) (cpuset.CPUSet, error) {
 	// If the number of CPUs requested cannot be handed out in chunks of
 	// 'cpuGroupSize', then we just call out the packing algorithm since we
 	// can't distribute CPUs in this chunk size.
@@ -927,10 +927,11 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 		var bestBalance float64 = math.MaxFloat64
 		var bestRemainder []int = nil
 		var bestCombo []int = nil
+		var bestBalanceInOneSocket = false
 		acc.iterateCombinations(numas, k, func(combo []int) LoopControl {
 			// If we've already found a combo with a balance of 0 in a
 			// different iteration, then don't bother checking any others.
-			if bestBalance == 0 {
+			if bestBalance == 0 && (!alignBySocket || bestBalanceInOneSocket) {
 				return Break
 			}
 
@@ -940,7 +941,6 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 			if cpus.Size() < numCPUs {
 				return Continue
 			}
-
 			// Check that CPUs can be handed out in groups of size
 			// 'cpuGroupSize' across the NUMA nodes in this combo.
 			numCPUGroups := 0
@@ -951,17 +951,27 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 				return Continue
 			}
 
-			// Check that each NUMA node in this combination can allocate an
-			// even distribution of CPUs in groups of size 'cpuGroupSize',
-			// modulo some remainder.
+			//  Calculate an even distribution of CPUs in groups of size
+			// 'cpuGroupSize'.
 			distribution := (numCPUs / len(combo) / cpuGroupSize) * cpuGroupSize
+			if alignBySocket {
+				for _, numa := range combo {
+					// distribution should not be more than available CPUs
+					// in each NUMA node in combo if alignBySocket is set.
+					availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize * cpuGroupSize
+					if distribution > availableCPUsInNUMA {
+						distribution = availableCPUsInNUMA
+					}
+				}
+			}
+			// Check that each NUMA node in this combination can allocate
+			// an even distribution of CPUs in groups of size 'cpuGroupSize'.
 			for _, numa := range combo {
 				cpus := acc.details.CPUsInNUMANodes(numa)
 				if cpus.Size() < distribution {
 					return Continue
 				}
 			}
-
 			// Calculate how many CPUs will be available on each NUMA node in
 			// the system after allocating an even distribution of CPU groups
 			// of size 'cpuGroupSize' from each NUMA node in 'combo'. This will
@@ -1055,13 +1065,26 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 				})
 			}
 
-			// If the best "balance score" for this combo is less than the
-			// lowest "balance score" of all previous combos, then update this
-			// combo (and remainder set) to be the best one found so far.
-			if bestLocalBalance < bestBalance {
+			// If alignBySocket is enabled, prefer combinations whose NUMA nodes
+			// are in one socket over any cross-socket combination. When comparing
+			// combinations in the same socket category, pick the one with the
+			// lower balance score.
+			inSameSocket := false
+			if alignBySocket {
+				inSameSocket = topo.CPUDetails.AreNUMANodesInSameSocket(combo)
+			}
+			isBetter := bestLocalBalance < bestBalance
+			if alignBySocket && inSameSocket != bestBalanceInOneSocket {
+				isBetter = inSameSocket
+			}
+
+			if isBetter {
 				bestBalance = bestLocalBalance
 				bestRemainder = bestLocalRemainder
 				bestCombo = combo
+				if alignBySocket {
+					bestBalanceInOneSocket = inSameSocket
+				}
 			}
 
 			return Continue
@@ -1078,6 +1101,12 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 		// chosen. First allocate an even distribution of CPUs in groups of
 		// size 'cpuGroupSize' from 'bestCombo'.
 		distribution := (numCPUs / len(bestCombo) / cpuGroupSize) * cpuGroupSize
+		for _, numa := range bestCombo {
+			availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize * cpuGroupSize
+			if distribution > availableCPUsInNUMA {
+				distribution = availableCPUsInNUMA
+			}
+		}
 		for _, numa := range bestCombo {
 			cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), distribution, cpuSortingStrategy, false)
 			acc.take(cpus)

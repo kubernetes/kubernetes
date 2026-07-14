@@ -826,7 +826,7 @@ func (p *staticPolicy) takeByTopology(logger klog.Logger, availableCPUs cpuset.C
 		if p.options.FullPhysicalCPUsOnly {
 			cpuGroupSize = p.cpuGroupSize
 		}
-		return takeByTopologyNUMADistributed(logger, p.topology, availableCPUs, numCPUs, cpuGroupSize, cpuSortingStrategy)
+		return takeByTopologyNUMADistributed(logger, p.topology, availableCPUs, numCPUs, cpuGroupSize, cpuSortingStrategy, p.options.AlignBySocket)
 	}
 
 	return takeByTopologyNUMAPacked(logger, p.topology, availableCPUs, numCPUs, cpuSortingStrategy, p.options.PreferAlignByUncoreCacheOption)
