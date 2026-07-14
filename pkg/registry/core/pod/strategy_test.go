@@ -45,6 +45,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ptr "k8s.io/utils/ptr"
 
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -268,6 +269,15 @@ func newContainer(name string, requests api.ResourceList, limits api.ResourceLis
 	}
 }
 
+func newSidecarContainer(name string, requests api.ResourceList, limits api.ResourceList) api.Container {
+	restartAlways := api.ContainerRestartPolicyAlways
+	return api.Container{
+		Name:          name,
+		Resources:     getResourceRequirements(requests, limits),
+		RestartPolicy: &restartAlways,
+	}
+}
+
 func newPod(name string, containers []api.Container) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -309,6 +319,669 @@ func TestGetPodQOS(t *testing.T) {
 		if actual != testCase.expected {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
+	}
+}
+
+// TestApplyPodLevelResourceDefaults tests all pod-level resource defaulting logic during creation.
+func TestApplyPodLevelResourceDefaults(t *testing.T) {
+	tests := []struct {
+		name                string
+		plrEnabled          bool
+		plrFixUpdateEnabled bool
+		pod                 *api.Pod
+		wantRequests        api.ResourceList
+		wantLimits          api.ResourceList
+	}{
+		{
+			name:                "Case 1: empty resources struct",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+					},
+					Resources: &api.ResourceRequirements{},
+				},
+			},
+			wantRequests: nil,
+			wantLimits:   nil,
+		},
+		{
+			name:                "Case 2: empty requests map",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+					},
+					Resources: &api.ResourceRequirements{Requests: api.ResourceList{}},
+				},
+			},
+			wantRequests: nil,
+			wantLimits:   nil,
+		},
+		{
+			name:                "Case 3: empty limits map",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+					},
+					Resources: &api.ResourceRequirements{Limits: api.ResourceList{}},
+				},
+			},
+			wantRequests: nil,
+			wantLimits:   nil,
+		},
+		{
+			name:                "Case 4: empty requests and limits maps",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+					},
+					Resources: &api.ResourceRequirements{Requests: api.ResourceList{}, Limits: api.ResourceList{}},
+				},
+			},
+			wantRequests: nil,
+			wantLimits:   nil,
+		},
+		{
+			name:                "Case 5: memory request set, container limits set for CPU",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "")),
+						newContainer("c2", getResourceList("200m", "128Mi"), getResourceList("200m", "")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
+				},
+			},
+			wantRequests: getResourceList("300m", "256Mi"),
+			wantLimits:   getResourceList("300m", ""),
+		},
+		{
+			name:                "Case 6: memory request set, container limits set for memory",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("", "128Mi"), getResourceList("", "128Mi")),
+						newContainer("c2", getResourceList("", "128Mi"), getResourceList("", "128Mi")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
+				},
+			},
+			wantRequests: getResourceList("", "256Mi"),
+			wantLimits:   getResourceList("", "256Mi"),
+		},
+		{
+			name:                "Case 7: memory request set, containers have CPU reqs (5m, 6m) and limits (9m, 10m)",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("5m", ""), getResourceList("9m", "")),
+						newContainer("c2", getResourceList("6m", ""), getResourceList("10m", "")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
+				},
+			},
+			wantRequests: getResourceList("11m", "256Mi"),
+			wantLimits:   getResourceList("19m", ""),
+		},
+		{
+			name:                "limits defaulted from container limits when requests set",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("", ""), getResourceList("100m", "128Mi")),
+						newContainer("c2", getResourceList("", ""), getResourceList("100m", "128Mi")),
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("200m", "256Mi"),
+					},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:                "limits not defaulted when container missing limits",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("50m", "64Mi"), getResourceList("100m", "128Mi")),
+						newContainer("c2", getResourceList("50m", "64Mi"), getResourceList("", "")),
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("200m", "256Mi"),
+					},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   nil,
+		},
+		{
+			name:                "partial limit defaulting - cpu set, memory not",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+						newContainer("c2", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("200m", "256Mi"),
+						Limits:   getResourceList("200m", ""),
+					},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:                "partial limit defaulting - memory set, cpu not",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+						newContainer("c2", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("200m", "256Mi"),
+						Limits:   getResourceList("", "256Mi"),
+					},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:                "both limits already set - no defaulting",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("100m", "128Mi"),
+						Limits:   getResourceList("500m", "512Mi"),
+					},
+				},
+			},
+			wantRequests: getResourceList("100m", "128Mi"),
+			wantLimits:   getResourceList("500m", "512Mi"),
+		},
+		{
+			name:                "cpu set, container missing memory limits - memory limit not defaulted",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+						newContainer("c2", getResourceList("100m", "128Mi"), getResourceList("100m", "")),
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("200m", "256Mi"),
+					},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", ""),
+		},
+		{
+			name:                "per-resource independence - cpu limits set for all, memory for none",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "")),
+						newContainer("c2", getResourceList("100m", "128Mi"), getResourceList("100m", "")),
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("200m", "256Mi"),
+					},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", ""),
+		},
+		{
+			name:                "per-resource independence - one container missing memory limit",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+						newContainer("c2", getResourceList("100m", "128Mi"), getResourceList("", "128Mi")),
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("200m", "256Mi"),
+					},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("", "256Mi"),
+		},
+		{
+			name:                "init container with limits included in defaulting",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+					InitContainers: []api.Container{
+						newContainer("init1", getResourceList("200m", "256Mi"), getResourceList("200m", "256Mi")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:                "init container missing limits - no limit defaulting",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+					InitContainers: []api.Container{
+						newContainer("init1", getResourceList("200m", "256Mi"), getResourceList("", "")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   nil,
+		},
+		{
+			name:                "sidecar container with limits included in defaulting",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+					InitContainers: []api.Container{
+						newSidecarContainer("sidecar", getResourceList("50m", "64Mi"), getResourceList("50m", "64Mi")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("150m", "192Mi")},
+				},
+			},
+			wantRequests: getResourceList("150m", "192Mi"),
+			wantLimits:   getResourceList("150m", "192Mi"),
+		},
+		{
+			name:                "sidecar container missing limits - no limit defaulting",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+					InitContainers: []api.Container{
+						newSidecarContainer("sidecar", getResourceList("50m", "64Mi"), getResourceList("", "")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("150m", "192Mi")},
+				},
+			},
+			wantRequests: getResourceList("150m", "192Mi"),
+			wantLimits:   nil,
+		},
+		{
+			name:                "limit raised to pod request when aggr limit less than request",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("500m", "512Mi")},
+				},
+			},
+			wantRequests: getResourceList("500m", "512Mi"),
+			wantLimits:   getResourceList("500m", "512Mi"),
+		},
+		{
+			name:                "single container limit defaulting",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi")},
+				},
+			},
+			wantRequests: getResourceList("100m", "128Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:                "pod requests defaulted from container requests when limits set",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+					},
+					Resources: &api.ResourceRequirements{Limits: getResourceList("500m", "512Mi")},
+				},
+			},
+			wantRequests: getResourceList("100m", "128Mi"),
+			wantLimits:   getResourceList("500m", "512Mi"),
+		},
+		{
+			name:                "pod requests not defaulted from containers when gate off",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: false,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+					},
+					Resources: &api.ResourceRequirements{Limits: getResourceList("500m", "512Mi")},
+				},
+			},
+			wantRequests: nil,
+			wantLimits:   getResourceList("500m", "512Mi"),
+		},
+		{
+			name:                "feature gate PodLevelResourcesFixUpdateDefaulting off - no limit defaulting",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: false,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi")},
+				},
+			},
+			wantRequests: getResourceList("100m", "128Mi"),
+			wantLimits:   nil,
+		},
+		{
+			name:                "main feature gate PodLevelResources off - no limit defaulting",
+			plrEnabled:          false,
+			plrFixUpdateEnabled: false,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi")},
+				},
+			},
+			wantRequests: getResourceList("100m", "128Mi"),
+			wantLimits:   nil,
+		},
+		{
+			name:                "spec.resources is nil - noop",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+					},
+				},
+			},
+			wantRequests: nil,
+			wantLimits:   nil,
+		},
+		{
+			name:                "unsupported resources ignored in limit defaulting",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "c1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceName("example.com/gpu"): resource.MustParse("1")},
+								Limits:   api.ResourceList{api.ResourceName("example.com/gpu"): resource.MustParse("1")},
+							},
+						},
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceName("example.com/gpu"): resource.MustParse("1")},
+					},
+				},
+			},
+			wantRequests: api.ResourceList{api.ResourceName("example.com/gpu"): resource.MustParse("1")},
+			wantLimits:   nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.plrEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, tc.plrFixUpdateEnabled)
+
+			applyPodLevelResourceDefaults(tc.pod)
+
+			if len(tc.wantRequests) == 0 {
+				if tc.pod.Spec.Resources != nil && len(tc.pod.Spec.Resources.Requests) > 0 {
+					t.Errorf("expected no requests, got %v", tc.pod.Spec.Resources.Requests)
+				}
+			} else {
+				if tc.pod.Spec.Resources == nil || tc.pod.Spec.Resources.Requests == nil {
+					t.Fatalf("expected non-nil requests")
+				}
+				if diff := cmp.Diff(tc.wantRequests, tc.pod.Spec.Resources.Requests); diff != "" {
+					t.Errorf("unexpected requests (-want, +got):\n%s", diff)
+				}
+			}
+
+			if len(tc.wantLimits) == 0 {
+				if tc.pod.Spec.Resources != nil && len(tc.pod.Spec.Resources.Limits) > 0 {
+					t.Errorf("expected no limits, got %v", tc.pod.Spec.Resources.Limits)
+				}
+			} else {
+				if tc.pod.Spec.Resources == nil || tc.pod.Spec.Resources.Limits == nil {
+					t.Fatalf("expected non-nil limits")
+				}
+				if diff := cmp.Diff(tc.wantLimits, tc.pod.Spec.Resources.Limits); diff != "" {
+					t.Errorf("unexpected limits (-want, +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
+
+
+
+
+
+
+// TestPrepareForUpdatePodLevelResources tests update and resize strategy PrepareForUpdate behaviors.
+func TestPrepareForUpdatePodLevelResources(t *testing.T) {
+	tests := []struct {
+		name         string
+		useResize    bool
+		oldResources *api.ResourceRequirements
+		newResources *api.ResourceRequirements
+		wantNil      bool
+		wantRequests api.ResourceList
+		wantLimits   api.ResourceList
+	}{
+		{
+			name:         "client omits spec.resources on update (nil) - leaves nil for validation",
+			useResize:    false,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi"), Limits: getResourceList("200m", "256Mi")},
+			newResources: nil,
+			wantNil:      true,
+		},
+		{
+			name:         "PLR-aware client explicitly updates spec.resources",
+			useResize:    false,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi"), Limits: getResourceList("200m", "256Mi")},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("300m", "512Mi"), Limits: getResourceList("300m", "512Mi")},
+			wantRequests: getResourceList("300m", "512Mi"),
+			wantLimits:   getResourceList("300m", "512Mi"),
+		},
+		{
+			name:         "resize: pod-level resources added for first time (old pod had none) - applies defaults",
+			useResize:    true,
+			oldResources: nil,
+			newResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi")},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:         "resize: old pod already has pod-level resources - skips defaulting and merges",
+			useResize:    true,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi"), Limits: getResourceList("200m", "256Mi")},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("300m", "300Mi")},
+			wantRequests: getResourceList("300m", "300Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:         "resize: partial update preserves old memory request when adding new CPU request",
+			useResize:    true,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("100m", "")},
+			wantRequests: getResourceList("100m", "256Mi"),
+			wantLimits:   nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+			oldPod := newPod("plr-update", []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+			})
+			oldPod.Spec.Resources = tc.oldResources
+
+			newPod := newPod("plr-update", []api.Container{
+				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+			})
+			newPod.Spec.Resources = tc.newResources
+
+			if tc.useResize {
+				ResizeStrategy.PrepareForUpdate(genericapirequest.NewContext(), newPod, oldPod)
+			} else {
+				Strategy.PrepareForUpdate(genericapirequest.NewContext(), newPod, oldPod)
+			}
+
+			if tc.wantNil {
+				if newPod.Spec.Resources != nil {
+					t.Errorf("expected pod-level resources to remain nil, got %v", newPod.Spec.Resources)
+				}
+				return
+			}
+
+			if newPod.Spec.Resources == nil {
+				t.Fatalf("expected non-nil pod-level resources")
+			}
+
+			if diff := cmp.Diff(tc.wantRequests, newPod.Spec.Resources.Requests); diff != "" {
+				t.Errorf("unexpected requests (-want, +got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff(tc.wantLimits, newPod.Spec.Resources.Limits); diff != "" {
+				t.Errorf("unexpected limits (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestMergePodLevelResourcesDirect tests podutil.MergePodLevelResources directly.
+func TestMergePodLevelResourcesDirect(t *testing.T) {
+	tests := []struct {
+		name         string
+		newRes       *api.ResourceRequirements
+		oldRes       *api.ResourceRequirements
+		wantNil      bool
+		wantRequests api.ResourceList
+		wantLimits   api.ResourceList
+	}{
+		{
+			name:    "newRes is nil returns nil",
+			newRes:  nil,
+			oldRes:  &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi")},
+			wantNil: true,
+		},
+		{
+			name:         "oldRes is nil returns deep copy of newRes",
+			newRes:       &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi")},
+			oldRes:       nil,
+			wantRequests: getResourceList("100m", "128Mi"),
+			wantLimits:   nil,
+		},
+		{
+			name:         "merge newRes (cpu: 100m) and oldRes (memory: 256Mi)",
+			newRes:       &api.ResourceRequirements{Requests: getResourceList("100m", "")},
+			oldRes:       &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
+			wantRequests: getResourceList("100m", "256Mi"),
+			wantLimits:   nil,
+		},
+		{
+			name:         "merge preserves existing limits when patch only specifies requests",
+			newRes:       &api.ResourceRequirements{Requests: getResourceList("200m", "")},
+			oldRes:       &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi"), Limits: getResourceList("500m", "512Mi")},
+			wantRequests: getResourceList("200m", "128Mi"),
+			wantLimits:   getResourceList("500m", "512Mi"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := podutil.MergePodLevelResources(tc.newRes, tc.oldRes)
+			if tc.wantNil {
+				if got != nil {
+					t.Errorf("expected nil, got %v", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("expected non-nil merged resources")
+			}
+			if diff := cmp.Diff(tc.wantRequests, got.Requests); diff != "" {
+				t.Errorf("unexpected requests (-want, +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantLimits, got.Limits); diff != "" {
+				t.Errorf("unexpected limits (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
 
