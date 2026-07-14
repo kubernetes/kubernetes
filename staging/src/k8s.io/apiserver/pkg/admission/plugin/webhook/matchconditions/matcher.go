@@ -18,7 +18,6 @@ package matchconditions
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -105,7 +104,7 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 		if !ok {
 			// This shouldnt happen, but if it does treat same as eval error
 			klog.Error("Invalid type conversion to MatchCondition")
-			errorList = append(errorList, errors.New(fmt.Sprintf("internal error converting ExpressionAccessor to MatchCondition")))
+			errorList = append(errorList, fmt.Errorf("internal error converting ExpressionAccessor to MatchCondition"))
 			continue
 		}
 		if evalResult.Error != nil {

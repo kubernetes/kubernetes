@@ -114,7 +114,7 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string)
 // Validate validates the provided options
 func (o *Options) Validate() error {
 	if len(o.args) != 0 {
-		return errors.New(fmt.Sprintf("extra arguments: %v", o.args))
+		return fmt.Errorf("extra arguments: %v", o.args)
 	}
 
 	if o.Output != "" && o.Output != "yaml" && o.Output != "json" {

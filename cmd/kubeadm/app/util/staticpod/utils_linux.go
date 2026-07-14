@@ -29,7 +29,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
@@ -74,7 +73,7 @@ func RunComponentAsNonRoot(componentName string, pod *v1.Pod, usersAndGroups *us
 			cfg,
 		)
 	}
-	return errors.New(fmt.Sprintf("component name %q is not valid", componentName))
+	return fmt.Errorf("component name %q is not valid", componentName)
 }
 
 // runKubeAPIServerAsNonRoot updates the pod manifest and the hostVolume permissions to run kube-apiserver as non root.
