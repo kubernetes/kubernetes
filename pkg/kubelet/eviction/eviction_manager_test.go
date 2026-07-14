@@ -25,9 +25,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -2754,6 +2756,128 @@ func TestStorageLimitEvictions(t *testing.T) {
 			}
 			if *podKiller.gracePeriodOverride != 1 {
 				t.Errorf("Manager should have evicted with gracePeriodOverride of 1, but used: %v", *podKiller.gracePeriodOverride)
+			}
+		})
+	}
+}
+
+func TestEmptyDirLimitEviction(t *testing.T) {
+	specLimit := resource.MustParse("1Gi") // 1Gi set as the 'desired' sizeLimit in the podspec.
+
+	tests := []struct {
+		testName            string
+		medium              v1.StorageMedium
+		enableGate          bool
+		actualCapacityBytes *uint64
+		usedBytes           uint64
+		expectEviction      bool
+	}{
+		{
+			testName:            "Memory medium, gate disabled: falls back to spec limit, used (2Gi) > spec (1Gi) -> evict",
+			medium:              v1.StorageMediumMemory,
+			enableGate:          false,
+			actualCapacityBytes: new(uint64(3 * 1024 * 1024 * 1024)), // 3Gi stat capacity (ignored)
+			usedBytes:           2 * 1024 * 1024 * 1024,              // 2Gi used (exceeds 'desired', but within 'allocated')
+			expectEviction:      true,
+		},
+		{
+			testName:            "Memory medium, gate disabled: within spec limit, used (500Mi) < spec (1Gi) -> NO evict",
+			medium:              v1.StorageMediumMemory,
+			enableGate:          false,
+			actualCapacityBytes: new(uint64(500 * 1024 * 1024)),
+			usedBytes:           500 * 1024 * 1024,
+			expectEviction:      false,
+		},
+		{
+			testName:            "Memory medium, gate enabled: uses stat capacity, identical usage (2Gi) < stat capacity (3Gi) -> NO evict",
+			medium:              v1.StorageMediumMemory,
+			enableGate:          true,
+			actualCapacityBytes: new(uint64(3 * 1024 * 1024 * 1024)), // 3Gi stat capacity (respected)
+			usedBytes:           2 * 1024 * 1024 * 1024,              // 2Gi used (identical to case 1, except the FG is enabled)
+			expectEviction:      false,
+		},
+		{
+			testName:            "Memory medium, gate enabled: missing stat capacity skips evaluation -> NO evict",
+			medium:              v1.StorageMediumMemory,
+			enableGate:          true,
+			actualCapacityBytes: nil, // transiently missing stat
+			usedBytes:           2 * 1024 * 1024 * 1024,
+			expectEviction:      false,
+		},
+
+		{
+			testName:            "Default medium: ignores stat capacity entirely, used (2Gi) > spec (1Gi) -> evict",
+			medium:              v1.StorageMediumDefault,
+			enableGate:          true,                                // Gate status is irrelevant for default volumes
+			actualCapacityBytes: new(uint64(3 * 1024 * 1024 * 1024)), // 3Gi stat capacity (ignored)
+			usedBytes:           2 * 1024 * 1024 * 1024,              // 2Gi used (exceeds 'desired', but within 'allocated')
+			expectEviction:      true,
+		},
+		{
+			testName:            "Default medium: within spec limit, used (500Mi) < spec (1Gi) -> NO evict",
+			medium:              v1.StorageMediumDefault,
+			enableGate:          true,
+			actualCapacityBytes: new(uint64(500 * 1024 * 1024)),
+			usedBytes:           500 * 1024 * 1024,
+			expectEviction:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, tc.enableGate)
+
+			logger, _ := ktesting.NewTestContext(t)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  types.UID("test-uid"),
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "test-volume",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    tc.medium,
+									SizeLimit: &specLimit,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			podStats := statsapi.PodStats{
+				PodRef: statsapi.PodReference{
+					Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+				},
+				VolumeStats: []statsapi.VolumeStats{
+					{
+						Name: "test-volume",
+						FsStats: statsapi.FsStats{
+							UsedBytes:     &tc.usedBytes,
+							CapacityBytes: tc.actualCapacityBytes,
+						},
+					},
+				},
+			}
+
+			podKiller := &mockPodKiller{}
+			m := &managerImpl{
+				killPodFunc: podKiller.killPodNow,
+				recorder:    &record.FakeRecorder{},
+			}
+
+			evicted := m.emptyDirLimitEviction(logger, podStats, pod)
+
+			assert.Equal(t, tc.expectEviction, evicted, "Eviction decision boundary failed")
+
+			if tc.expectEviction {
+				assert.NotNil(t, podKiller.pod, "Expected pod to be killed")
+			} else {
+				assert.Nil(t, podKiller.pod, "Expected pod killer to remain inactive")
 			}
 		})
 	}
