@@ -158,6 +158,7 @@ var map_PodGroupTemplate = map[string]string{
 	"disruptionMode":        "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Single, All. This field is immutable.",
 	"priorityClassName":     "PriorityClassName indicates the priority that should be considered when scheduling a pod group created from this template. This field is immutable.",
 	"priority":              "Priority is the value of priority of pod groups created from this template. Various system components use this field to find the priority of the pod group. The higher the value, the higher the priority. This field is immutable.",
+	"preemptionPolicy":      "PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.",
 }
 
 func (PodGroupTemplate) SwaggerDoc() map[string]string {

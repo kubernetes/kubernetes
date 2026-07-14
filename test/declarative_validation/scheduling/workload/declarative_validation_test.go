@@ -59,6 +59,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		input                           scheduling.Workload
 		enableTopologyAwareScheduling   bool
 		enableDRAWorkloadResourceClaims bool
+		enablePodGroupPreemptionPolicy  bool
 		expectedErrs                    field.ErrorList
 	}{
 		"valid": {
@@ -224,6 +225,24 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("priority"), nil, "").WithOrigin("maximum"),
 			},
 		},
+		"valid PreemptionPolicy": {
+			input:                          mkValidWorkload(setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"invalid PreemptionPolicy": {
+			input:                          mkValidWorkload(setPreemptionPolicy(0, scheduling.PreemptionPolicy("Invalid"))),
+			enablePodGroupPreemptionPolicy: true,
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "podGroupTemplates").Index(0).Child("preemptionPolicy"), scheduling.PreemptionPolicy("Invalid"), []string{"Never", "PreemptLowerPriority"}),
+			},
+		},
+		"forbidden PreemptionPolicy when PodGroupPreemptionPolicy is disabled": {
+			input: mkValidWorkload(setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(0).Child("preemptionPolicy"), ""),
+			},
+		},
+
 		"ok resourceClaimName reference": {
 			input: mkValidWorkload(addResourceClaims(scheduling.PodGroupResourceClaim{Name: "claim", ResourceClaimName: new("resource-claim")})),
 		},
@@ -323,6 +342,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
+				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
@@ -347,6 +367,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		updateObj                       scheduling.Workload
 		enableTopologyAwareScheduling   bool
 		enableDRAWorkloadResourceClaims bool
+		enablePodGroupPreemptionPolicy  bool
 		expectedErrs                    field.ErrorList
 	}{
 		"valid update": {
@@ -591,6 +612,33 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("priority"), nil, "").WithOrigin("immutable"),
 			},
 		},
+		"valid update with unchanged PreemptionPolicy": {
+			oldObj:                         mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"invalid update of PreemptionPolicy": {
+			oldObj:                         mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptNever)),
+			enablePodGroupPreemptionPolicy: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("preemptionPolicy"), nil, "").WithOrigin("immutable"),
+			},
+		},
+		"valid update with unchanged PreemptionPolicy when PodGroupPreemptionPolicy is disabled": {
+			oldObj:                         mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			enablePodGroupPreemptionPolicy: false,
+		},
+		"invalid update of PreemptionPolicy when PodGroupPreemptionPolicy is disabled": {
+			oldObj:                         mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptNever)),
+			enablePodGroupPreemptionPolicy: false,
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(0).Child("preemptionPolicy"), ""),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("preemptionPolicy"), nil, "").WithOrigin("immutable"),
+			},
+		},
 	}
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
@@ -607,6 +655,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
+				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
@@ -795,5 +844,11 @@ func setPriorityClassName(pgIdx int, priorityClassName string) func(obj *schedul
 func setPriority(pgIdx int, priority int32) func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
 		obj.Spec.PodGroupTemplates[pgIdx].Priority = new(priority)
+	}
+}
+
+func setPreemptionPolicy(pgIdx int, policy scheduling.PreemptionPolicy) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		obj.Spec.PodGroupTemplates[pgIdx].PreemptionPolicy = &policy
 	}
 }

@@ -749,6 +749,7 @@ const (
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
 	// owner: @wojtek-t @argh4k
+	// kep: https://kep.k8s.io/5710
 	//
 	// Enables specifying PreemptionPolicy at podgroup level.
 	PodGroupPreemptionPolicy featuregate.Feature = "PodGroupPreemptionPolicy"
