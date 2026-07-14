@@ -61,7 +61,7 @@ func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 func (itv immutableTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            itv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(itv.ValidScopes()),
 		Description:    "Indicates that a field may not be updated.",
 	}
