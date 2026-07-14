@@ -770,6 +770,7 @@ var _ storageframework.DynamicPVTestDriver = &cinderDriver{}
 func InitCinderDriver() storageframework.TestDriver {
 	return &cinderDriver{
 		driverInfo: storageframework.DriverInfo{
+			TestTags:         []any{framework.WithProvider("openstack")},
 			Name:             "cinder",
 			InTreePluginName: "kubernetes.io/cinder",
 			MaxFileSize:      storageframework.FileSizeMedium,
@@ -799,7 +800,6 @@ func (c *cinderDriver) GetDriverInfo() *storageframework.DriverInfo {
 }
 
 func (c *cinderDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("openstack")
 }
 
 func (c *cinderDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -840,6 +840,7 @@ func InitGcePdDriver() storageframework.TestDriver {
 	)
 	return &gcePdDriver{
 		driverInfo: storageframework.DriverInfo{
+			TestTags:         []any{framework.WithProvider("gce")},
 			Name:             "gcepd",
 			InTreePluginName: "kubernetes.io/gce-pd",
 			MaxFileSize:      storageframework.FileSizeMedium,
@@ -879,6 +880,7 @@ func InitWindowsGcePdDriver() storageframework.TestDriver {
 	)
 	return &gcePdDriver{
 		driverInfo: storageframework.DriverInfo{
+			TestTags:         []any{framework.WithProvider("gce")},
 			Name:             "windows-gcepd",
 			InTreePluginName: "kubernetes.io/gce-pd",
 			MaxFileSize:      storageframework.FileSizeMedium,
@@ -907,7 +909,6 @@ func (g *gcePdDriver) GetDriverInfo() *storageframework.DriverInfo {
 }
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("gce")
 	for _, tag := range pattern.TestTags {
 		if tag == feature.Windows {
 			e2eskipper.SkipUnlessNodeOSDistroIs("windows")
@@ -957,6 +958,7 @@ var _ storageframework.DynamicPVTestDriver = &vSphereDriver{}
 func InitVSphereDriver() storageframework.TestDriver {
 	return &vSphereDriver{
 		driverInfo: storageframework.DriverInfo{
+			TestTags:         []any{framework.WithProvider("vsphere")},
 			Name:             "vsphere",
 			InTreePluginName: "kubernetes.io/vsphere-volume",
 			MaxFileSize:      storageframework.FileSizeMedium,
@@ -987,7 +989,6 @@ func (v *vSphereDriver) GetDriverInfo() *storageframework.DriverInfo {
 }
 
 func (v *vSphereDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("vsphere")
 }
 
 func (v *vSphereDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -1022,6 +1023,7 @@ var _ storageframework.CustomTimeoutsTestDriver = &azureDiskDriver{}
 func InitAzureDiskDriver() storageframework.TestDriver {
 	return &azureDiskDriver{
 		driverInfo: storageframework.DriverInfo{
+			TestTags:         []any{framework.WithProvider("azure")},
 			Name:             "azure-disk",
 			InTreePluginName: "kubernetes.io/azure-disk",
 			MaxFileSize:      storageframework.FileSizeMedium,
@@ -1055,7 +1057,6 @@ func (a *azureDiskDriver) GetDriverInfo() *storageframework.DriverInfo {
 }
 
 func (a *azureDiskDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("azure")
 }
 
 func (a *azureDiskDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -1098,6 +1099,7 @@ var _ storageframework.DynamicPVTestDriver = &awsDriver{}
 func InitAwsDriver() storageframework.TestDriver {
 	return &awsDriver{
 		driverInfo: storageframework.DriverInfo{
+			TestTags:         []any{framework.WithProvider("aws")},
 			Name:             "aws",
 			InTreePluginName: "kubernetes.io/aws-ebs",
 			MaxFileSize:      storageframework.FileSizeMedium,
@@ -1137,7 +1139,6 @@ func (a *awsDriver) GetDriverInfo() *storageframework.DriverInfo {
 }
 
 func (a *awsDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("aws")
 }
 
 func (a *awsDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -1413,6 +1414,7 @@ var _ storageframework.DynamicPVTestDriver = &azureFileDriver{}
 func InitAzureFileDriver() storageframework.TestDriver {
 	return &azureFileDriver{
 		driverInfo: storageframework.DriverInfo{
+			TestTags:         []any{framework.WithProvider("azure")},
 			Name:             "azure-file",
 			InTreePluginName: "kubernetes.io/azure-file",
 			MaxFileSize:      storageframework.FileSizeMedium,
@@ -1440,7 +1442,6 @@ func (a *azureFileDriver) GetDriverInfo() *storageframework.DriverInfo {
 }
 
 func (a *azureFileDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("azure")
 }
 
 func (a *azureFileDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {

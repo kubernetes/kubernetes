@@ -22,21 +22,15 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = SIGDescribe("crictl", func() {
+var _ = SIGDescribe("crictl", framework.WithProvider("gce") /* `crictl` is not available on all cloud providers. */, func() {
 	f := framework.NewDefaultFramework("crictl")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-
-	ginkgo.BeforeEach(func() {
-		// `crictl` is not available on all cloud providers.
-		e2eskipper.SkipUnlessProviderIs("gce")
-	})
 
 	ginkgo.It("should be able to run crictl on the node", func(ctx context.Context) {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)

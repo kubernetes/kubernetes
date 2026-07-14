@@ -903,7 +903,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 	return &gcePDCSIDriver{
 		driverInfo: storageframework.DriverInfo{
 			Name:        GCEPDCSIDriverName,
-			TestTags:    []interface{}{framework.WithSerial()},
+			TestTags:    []interface{}{framework.WithSerial(), framework.WithProvider("gce")},
 			MaxFileSize: storageframework.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
@@ -958,7 +958,6 @@ func (g *gcePDCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 }
 
 func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("gce")
 	if pattern.FsType == "xfs" {
 		e2eskipper.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
