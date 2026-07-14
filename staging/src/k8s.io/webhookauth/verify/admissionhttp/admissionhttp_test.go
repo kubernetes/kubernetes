@@ -56,12 +56,12 @@ const (
 	testSubject  = "system:serviceaccount:kube-system:webhook-auth"
 	reviewUID    = "req-uid-1"
 
-	// allowedAPIGroupClaimKey is the fully-namespaced KEP-6060 attestation claim
-	// key. The core package's constant is unexported, so the tests hard-code the
-	// wire string a spec-compliant issuer must emit; the bare "allowedAPIGroup"
-	// form is a known issuer bug and MUST NOT be used.
-	allowedAPIGroupClaimKey = "webhook-authentication.k8s.io/allowedAPIGroup"
-	wildcardAPIGroup        = "*"
+	// admissionReviewAPIGroupsClaimKey is the KEP-6060 attestation claim key (the
+	// server-side authentication.AttestationAdmissionReviewAPIGroups value). The
+	// core package's constant is unexported, so the tests hard-code the wire
+	// string it must match.
+	admissionReviewAPIGroupsClaimKey = "admissionReviewAPIGroups"
+	wildcardAPIGroup                 = "*"
 )
 
 // oidcTestServer is a httptest TLS server that serves an OIDC discovery document
@@ -179,8 +179,8 @@ func (ts *oidcTestServer) baseClaims() map[string]any {
 		"iat": now.Unix(),
 		"kubernetes.io": map[string]any{
 			"validatingWebhookConfiguration": map[string]any{"name": "vwc", "uid": "vwc-uid"},
-			"attestationClaims": map[string]any{
-				allowedAPIGroupClaimKey: []string{testGroup},
+			"attestations": map[string]any{
+				admissionReviewAPIGroupsClaimKey: []string{testGroup},
 			},
 		},
 	}
@@ -193,8 +193,8 @@ func (ts *oidcTestServer) baseClaims() map[string]any {
 func (ts *oidcTestServer) coreGroupClaims() map[string]any {
 	c := ts.baseClaims()
 	k8s := c["kubernetes.io"].(map[string]any)
-	k8s["attestationClaims"] = map[string]any{
-		allowedAPIGroupClaimKey: []string{""},
+	k8s["attestations"] = map[string]any{
+		admissionReviewAPIGroupsClaimKey: []string{""},
 	}
 	return c
 }
@@ -353,8 +353,8 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 			token: func() string {
 				c := ts.baseClaims()
 				k8s := c["kubernetes.io"].(map[string]any)
-				k8s["attestationClaims"] = map[string]any{
-					allowedAPIGroupClaimKey: []string{wildcardAPIGroup},
+				k8s["attestations"] = map[string]any{
+					admissionReviewAPIGroupsClaimKey: []string{wildcardAPIGroup},
 				}
 				return ts.sign(t, c)
 			},

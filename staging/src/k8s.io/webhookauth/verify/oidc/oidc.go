@@ -69,20 +69,19 @@ type oidcAuthenticator struct {
 	issuer string
 }
 
-// allowedAPIGroupClaimKey is the fully-namespaced key under
-// kubernetes.io.attestationClaims that carries the API group(s) a token is
-// authorized for. Per KEP-6060 this key is namespaced; the bare "allowedAPIGroup"
-// form is a known issuer bug and MUST NOT be matched.
-//
-// TODO(kep-6060): source this from the server-side PR once published; the final
-// key will not carry the "webhook-authentication.k8s.io" prefix.
-const allowedAPIGroupClaimKey = "webhook-authentication.k8s.io/allowedAPIGroup"
+// admissionReviewAPIGroupsClaimKey is the key, within the "kubernetes.io"
+// "attestations" claim, that carries the API group(s) a webhook token is
+// authorized for. It matches the server-side KEP-6060 contract
+// (authentication.AttestationAdmissionReviewAPIGroups in
+// k8s.io/kubernetes/pkg/apis/authentication, which staging cannot import, so the
+// literal is duplicated here and kept honest by the test tripwires).
+const admissionReviewAPIGroupsClaimKey = "admissionReviewAPIGroups"
 
 // webhookPrivateClaims decodes the subset of the "kubernetes.io" private claims
-// the policy needs: the allowedAPIGroup attestation values.
+// the policy needs: the admissionReviewAPIGroups attestation values.
 type webhookPrivateClaims struct {
 	Kubernetes struct {
-		AttestationClaims map[string][]string `json:"attestationClaims,omitempty"`
+		Attestations map[string][]string `json:"attestations,omitempty"`
 	} `json:"kubernetes.io"`
 }
 
@@ -112,7 +111,7 @@ func (a *oidcAuthenticator) AuthenticateToken(ctx context.Context, rawToken stri
 	if err := idToken.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("oidc: decoding token claims: %w", err)
 	}
-	return claims.Kubernetes.AttestationClaims[allowedAPIGroupClaimKey], nil
+	return claims.Kubernetes.Attestations[admissionReviewAPIGroupsClaimKey], nil
 }
 
 // NewRemoteVerifier returns a [verify.Verifier] that checks tokens against

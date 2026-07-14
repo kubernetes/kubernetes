@@ -76,8 +76,8 @@ func exampleSignedToken(issuer *oidcTestServer, group string) string {
 			},
 			// The namespaced key is required; the bare "allowedAPIGroup" form is a
 			// known issuer bug and is rejected.
-			"attestationClaims": map[string]any{
-				allowedAPIGroupClaimKey: []string{group},
+			"attestations": map[string]any{
+				admissionReviewAPIGroupsClaimKey: []string{group},
 			},
 		},
 	}

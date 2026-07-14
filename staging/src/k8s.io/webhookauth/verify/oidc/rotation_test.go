@@ -129,7 +129,7 @@ func (ts *rotatingOIDCServer) baseClaims() map[string]any {
 		"iat": now.Unix(),
 		"kubernetes.io": map[string]any{
 			"validatingWebhookConfiguration": map[string]any{"name": testWebhookNm, "uid": testWebhookID},
-			"attestationClaims":              map[string]any{allowedAPIGroupClaimKey: []string{testAPIGroup}},
+			"attestations":                   map[string]any{admissionReviewAPIGroupsClaimKey: []string{testAPIGroup}},
 		},
 	}
 }

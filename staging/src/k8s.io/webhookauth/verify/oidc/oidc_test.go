@@ -41,10 +41,11 @@ const (
 	testWebhookNm = "example-validating-webhook"
 	testWebhookID = "11111111-2222-3333-4444-555555555555"
 
-	// allowedAPIGroupClaimKey is the fully-namespaced attestation claim key from
-	// KEP-6060. The core package's constant is unexported, so the test hard-codes
-	// the wire string it must match.
-	allowedAPIGroupClaimKey = "webhook-authentication.k8s.io/allowedAPIGroup"
+	// admissionReviewAPIGroupsClaimKey is the KEP-6060 attestation claim key (the
+	// server-side authentication.AttestationAdmissionReviewAPIGroups value). The
+	// core package's constant is unexported, so the test hard-codes the wire
+	// string it must match.
+	admissionReviewAPIGroupsClaimKey = "admissionReviewAPIGroups"
 )
 
 // oidcTestServer is an httptest TLS server that serves an OIDC discovery
@@ -148,8 +149,8 @@ func (ts *oidcTestServer) baseClaims() map[string]any {
 				"name": testWebhookNm,
 				"uid":  testWebhookID,
 			},
-			"attestationClaims": map[string]any{
-				allowedAPIGroupClaimKey: []string{testAPIGroup},
+			"attestations": map[string]any{
+				admissionReviewAPIGroupsClaimKey: []string{testAPIGroup},
 			},
 		},
 	}
