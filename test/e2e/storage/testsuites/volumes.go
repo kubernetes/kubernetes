@@ -100,19 +100,6 @@ func (t *volumesTestSuite) SkipUnsupportedTests(driver storageframework.TestDriv
 	return ""
 }
 
-func skipExecTest(driver storageframework.TestDriver) {
-	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[storageframework.CapExec] {
-		e2eskipper.Skipf("Driver %q does not support exec - skipping", dInfo.Name)
-	}
-}
-
-func skipTestIfBlockNotSupported(driver storageframework.TestDriver) {
-	if reason := checkIfBlockNotSupported(driver); reason != "" {
-		e2eskipper.Skipf("%s", reason)
-	}
-}
-
 func checkIfBlockNotSupported(driver storageframework.TestDriver) string {
 	dInfo := driver.GetDriverInfo()
 	if !dInfo.Capabilities[storageframework.CapBlock] {
@@ -195,9 +182,9 @@ func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, patte
 	})
 
 	// Exec works only on filesystem volumes
-	if pattern.VolMode != v1.PersistentVolumeBlock {
+	if pattern.VolMode != v1.PersistentVolumeBlock &&
+		driver.GetDriverInfo().Capabilities[storageframework.CapExec] {
 		ginkgo.It("should allow exec of files on the volume", func(ctx context.Context) {
-			skipExecTest(driver)
 			init(ctx)
 			ginkgo.DeferCleanup(cleanup)
 
