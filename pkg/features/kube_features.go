@@ -805,6 +805,11 @@ const (
 	// Fixes handling of nil/empty pod-level resources values for QoS classes.
 	PodLevelResourcesFixKubeletQOSClass featuregate.Feature = "PodLevelResourcesFixKubeletQOSClass"
 
+	// owner: @ndixita
+	//
+	// Enables PodLevelResourcesFixUpdateDefaulting.
+	PodLevelResourcesFixUpdateDefaulting featuregate.Feature = "PodLevelResourcesFixUpdateDefaulting"
+
 	// owner: @knight42
 	// kep: https://kep.k8s.io/3288
 	//
@@ -1812,6 +1817,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PodLevelResourcesFixUpdateDefaulting: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	PodLogsQuerySplitStreams: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2584,6 +2593,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodLevelResources: {},
 
 	PodLevelResourcesFixKubeletQOSClass: {PodLevelResources},
+
+	PodLevelResourcesFixUpdateDefaulting: {PodLevelResources},
 
 	PodLogsQuerySplitStreams: {},
 

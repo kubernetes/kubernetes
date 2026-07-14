@@ -1463,6 +1463,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: PodLevelResourcesFixUpdateDefaulting
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: PodLogsQuerySplitStreams
   versionedSpecs:
   - default: false
