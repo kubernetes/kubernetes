@@ -796,43 +796,43 @@ type deviceAttributeListAsSet struct {
 	versionValue sets.Set[string]
 }
 
-// hasIntersection checks if two attribute sets have common elements.
-// Returns true if there is at least one common element.
-func (s *deviceAttributeListAsSet) hasIntersection(other *deviceAttributeListAsSet) bool {
-	if s == nil || other == nil {
-		return false
-	}
+// intersection returns the new intersection set of two attribute sets as a new set.
+// Returns nil if there is no intersection or if the types do not match.
+func (s *deviceAttributeListAsSet) intersection(other *deviceAttributeListAsSet) *deviceAttributeListAsSet {
+	result := &deviceAttributeListAsSet{}
 
 	switch {
 	case s.intValue != nil && other.intValue != nil:
-		return s.intValue.Intersection(other.intValue).Len() > 0
+		intersection := s.intValue.Intersection(other.intValue)
+		if intersection.Len() == 0 {
+			return nil
+		}
+		result.intValue = intersection
+		return result
 	case s.boolValue != nil && other.boolValue != nil:
-		return s.boolValue.Intersection(other.boolValue).Len() > 0
+		intersection := s.boolValue.Intersection(other.boolValue)
+		if intersection.Len() == 0 {
+			return nil
+		}
+		result.boolValue = intersection
+		return result
 	case s.stringValue != nil && other.stringValue != nil:
-		return s.stringValue.Intersection(other.stringValue).Len() > 0
+		intersection := s.stringValue.Intersection(other.stringValue)
+		if intersection.Len() == 0 {
+			return nil
+		}
+		result.stringValue = intersection
+		return result
 	case s.versionValue != nil && other.versionValue != nil:
-		return s.versionValue.Intersection(other.versionValue).Len() > 0
+		intersection := s.versionValue.Intersection(other.versionValue)
+		if intersection.Len() == 0 {
+			return nil
+		}
+		result.versionValue = intersection
+		return result
 	default:
 		// Type mismatch
-		return false
-	}
-}
-
-// updateToIntersection updates current set to intersection with the given set.
-func (s *deviceAttributeListAsSet) updateToIntersection(other *deviceAttributeListAsSet) {
-	if s == nil || other == nil {
-		return
-	}
-
-	switch {
-	case s.intValue != nil && other.intValue != nil:
-		s.intValue = s.intValue.Intersection(other.intValue)
-	case s.boolValue != nil && other.boolValue != nil:
-		s.boolValue = s.boolValue.Intersection(other.boolValue)
-	case s.stringValue != nil && other.stringValue != nil:
-		s.stringValue = s.stringValue.Intersection(other.stringValue)
-	case s.versionValue != nil && other.versionValue != nil:
-		s.versionValue = s.versionValue.Intersection(other.versionValue)
+		return nil
 	}
 }
 
@@ -894,8 +894,10 @@ type matchAttributeConstraint struct {
 	// For scalar values (existing behavior)
 	attribute *resourceapi.DeviceAttribute
 
-	// For list values (when DRAListTypeAttributes feature gate is enabled)
-	intersection *deviceAttributeListAsSet
+	// For list values (when DRAListTypeAttributes feature gate is enabled).
+	// intersectionStack[len-1] is the current intersection; each add() pushes and each remove() pops,
+	// so backtracking always restores the intersection to its pre-add state.
+	intersectionStack []*deviceAttributeListAsSet
 
 	numDevices int
 }
@@ -919,11 +921,12 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 		// Initialize either scalar attribute or list set based on the attribute type.
 		if m.features.ListTypeAttributes {
 			// Convert attribute to set representation (both scalar and list)
-			m.intersection = attributeAsSet(attribute)
-			if m.intersection == nil {
+			first := attributeAsSet(attribute)
+			if first == nil {
 				m.logger.V(7).Info("Attribute type unknown")
 				return false
 			}
+			m.intersectionStack = append(m.intersectionStack, first)
 		} else {
 			// Scalar attribute: use existing behavior
 			m.attribute = attribute
@@ -941,12 +944,14 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 			m.logger.V(7).Info("Unknown attribute type")
 			return false
 		}
-		if !m.intersection.hasIntersection(newSet) {
+		current := m.intersectionStack[m.numDevices-1]
+		narrowed := current.intersection(newSet)
+		if narrowed == nil {
 			m.logger.V(7).Info("Attribute values have no common elements")
 			return false
 		}
-		// Update to intersection
-		m.intersection.updateToIntersection(newSet)
+		// Push a narrowed copy so remove() can pop back to the previous intersection.
+		m.intersectionStack = append(m.intersectionStack, narrowed)
 	} else {
 		// Scalar matching: use existing behavior
 		switch {
@@ -992,6 +997,10 @@ func (m *matchAttributeConstraint) remove(requestName, subRequestName string, de
 	}
 
 	m.numDevices--
+	if m.features.ListTypeAttributes {
+		// Pop the current intersection; the previous entry on the stack becomes current or the stack is empty.
+		m.intersectionStack = m.intersectionStack[:m.numDevices]
+	}
 	m.logger.V(7).Info("Device removed from constraint set", "device", deviceID, "numDevices", m.numDevices)
 }
 

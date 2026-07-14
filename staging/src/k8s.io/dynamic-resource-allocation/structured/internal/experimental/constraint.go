@@ -110,7 +110,7 @@ func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.Dev
 			if existingSet == nil {
 				continue
 			}
-			if newSet.hasIntersection(existingSet) {
+			if newSet.intersection(existingSet) != nil {
 				// New device has common elements with an existing device.
 				// This violates the distinct constraint.
 				m.logger.V(7).Info("Constraint not satisfied, devices have common elements")

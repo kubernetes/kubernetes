@@ -6051,6 +6051,39 @@ func TestAllocator(t *testing.T,
 
 			expectResults: nil,
 		},
+		"list-attributes-match-constraint-backtrack-needs-intersection-restore": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 3),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1"}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2"}},
+				}),
+				device(device4, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+				deviceAllocationResult(req0, driverA, pool1, device4, false),
+			)},
+		},
 		"list-attributes-match-constaint-list-of-string-values-without-common-elements": {
 			features: Features{
 				ListTypeAttributes: true,
@@ -6561,6 +6594,50 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 
 			expectResults: nil,
+		},
+		"list-attributes-distinct-constraint-backtrack-needs-remove": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withConstraints(
+					resourceapi.DeviceConstraint{
+						Requests:          []string{req0, req1, req2},
+						DistinctAttribute: &stringAttribute,
+					},
+				).withRequests(
+					deviceRequest(req0, classA, 1),
+					deviceRequest(req1, classA, 1),
+					deviceRequest(req2, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2", "value3"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value3", "value4", "value5"}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+				device(device4, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value3", "value4"}},
+				}),
+				device(device0, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value5", "value6"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+				deviceAllocationResult(req1, driverA, pool1, device4, false),
+				deviceAllocationResult(req2, driverA, pool1, device0, false),
+			)},
 		},
 
 		"allocation-mode-all-with-multi-host-resource-pool": {
