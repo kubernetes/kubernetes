@@ -1,0 +1,9 @@
+rules:
+  # This is the ONLY package in the module permitted to import k8s.io/client-go:
+  # it wires the standard in-cluster REST config. import-boss applies the nearest
+  # .import-restrictions file, so this allowance overrides the module-root ban for
+  # this package only. Every other package stays client-go-free, so out-of-cluster
+  # consumers of verify/oidc never pull in the client-go dependency tree.
+  - selectorRegexp: k8s[.]io/client-go
+    allowedPrefixes:
+      - ''
