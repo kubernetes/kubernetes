@@ -4226,7 +4226,7 @@ func createReactor(tracker cgotesting.ObjectTracker, failPatch bool) func(action
 				uidCounter++
 			}
 			if inUseUIDs.Has(obj.GetUID()) {
-				return true, nil, errors.New("UID %s already in use")
+				return true, nil, fmt.Errorf("UID %s already in use", obj.GetUID())
 			}
 			inUseUIDs.Insert(obj.GetUID())
 			obj.SetResourceVersion(fmt.Sprintf("%d", resourceVersionCounter))
