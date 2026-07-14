@@ -129,7 +129,7 @@ func TestFilterTerminatedContainerInfo_ReturnsAllTerminatedInstances(t *testing.
 		container = "c0"
 	)
 
-	infos := map[string]cadvisorapiv2.ContainerInfo{
+	infos := map[string]cadvisorapi.ContainerInfo{
 		// Old terminated container
 		"/pod0-c0-terminated-1": getTerminatedContainerInfo(
 			seedPastPodInfra, podName, namespace, container,
