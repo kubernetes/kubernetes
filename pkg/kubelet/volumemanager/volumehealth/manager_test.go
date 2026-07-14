@@ -164,8 +164,8 @@ func newTestManager(t *testing.T, statusUpdater StatusUpdater, client csi.Health
 		asw:           asw,
 		statusUpdater: statusUpdater,
 		probeInterval: time.Minute,
-		clientFactory: func(driverName string) (csi.HealthClient, error) {
-			return client, nil
+		clientFactory: func(driverName string) csi.HealthClient {
+			return client
 		},
 		listDrivers: func() []string { return []string{"test.driver"} },
 		csiNodeUpdater: func() CSINodeUpdater {

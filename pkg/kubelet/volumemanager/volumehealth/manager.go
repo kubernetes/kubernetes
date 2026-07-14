@@ -41,7 +41,7 @@ type CSINodeUpdater interface {
 }
 
 // HealthClientFactory creates CSI health clients for registered drivers.
-type HealthClientFactory func(driverName string) (csi.HealthClient, error)
+type HealthClientFactory func(driverName string) csi.HealthClient
 
 // Manager periodically probes CSI volume and storage health and writes results
 // to PodStatus.VolumeHealth and CSINode.Status.StorageHealth.
@@ -110,12 +110,7 @@ func (m *manager) probeVolumeHealth(ctx context.Context) {
 			continue
 		}
 
-		client, err := m.clientFactory(vol.DriverName)
-		if err != nil {
-			logger.V(4).Info("Skipping volume health probe; CSI client unavailable",
-				"driver", vol.DriverName, "volume", vol.OuterVolumeName, "err", err)
-			continue
-		}
+		client := m.clientFactory(vol.DriverName)
 		supported, err := client.NodeSupportsVolumeHealth(ctx)
 		if err != nil {
 			logger.V(4).Info("Failed to check volume health capability",
@@ -147,12 +142,7 @@ func (m *manager) probeStorageHealth(ctx context.Context) {
 		return
 	}
 	for _, driverName := range m.listDrivers() {
-		client, err := m.clientFactory(driverName)
-		if err != nil {
-			logger.V(4).Info("Skipping storage health probe; CSI client unavailable",
-				"driver", driverName, "err", err)
-			continue
-		}
+		client := m.clientFactory(driverName)
 		supported, err := client.NodeSupportsStorageHealth(ctx)
 		if err != nil {
 			logger.V(4).Info("Failed to check storage health capability",

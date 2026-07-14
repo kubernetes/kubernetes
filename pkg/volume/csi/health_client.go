@@ -33,9 +33,13 @@ type HealthClient interface {
 }
 
 // NewHealthClient returns a HealthClient for the given registered CSI driver.
-func NewHealthClient(driverName string) (HealthClient, error) {
-	return newCsiDriverClient(csiDriverName(driverName))
+func NewHealthClient(driverName string) HealthClient {
+	c := &CSIHealthClient{}
+	c.csiClientGetter.driverName = csiDriverName(driverName)
+	return c
 }
+
+var _ HealthClient = &CSIHealthClient{}
 
 // ListRegisteredDrivers returns the names of CSI drivers currently registered with kubelet.
 func ListRegisteredDrivers() []string {
@@ -46,4 +50,49 @@ func ListRegisteredDrivers() []string {
 // It may be nil before the CSI plugin is initialized.
 func GetNodeInfoManager() nodeinfomanager.Interface {
 	return nim
+}
+
+// CSIHealthClient wraps a cached CSI client with per-call timeouts.
+type CSIHealthClient struct {
+	csiClientGetter
+}
+
+func (c *CSIHealthClient) NodeSupportsVolumeHealth(ctx context.Context) (bool, error) {
+	client, err := c.csiClientGetter.Get()
+	if err != nil {
+		return false, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, csiTimeout)
+	defer cancel()
+	return client.NodeSupportsVolumeHealth(ctx)
+}
+
+func (c *CSIHealthClient) NodeSupportsStorageHealth(ctx context.Context) (bool, error) {
+	client, err := c.csiClientGetter.Get()
+	if err != nil {
+		return false, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, csiTimeout)
+	defer cancel()
+	return client.NodeSupportsStorageHealth(ctx)
+}
+
+func (c *CSIHealthClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) ([]api.VolumeHealthCondition, error) {
+	client, err := c.csiClientGetter.Get()
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, csiTimeout)
+	defer cancel()
+	return client.NodeGetVolumeHealth(ctx, volID, stagingTargetPath, volumePublishPath)
+}
+
+func (c *CSIHealthClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
+	client, err := c.csiClientGetter.Get()
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, csiTimeout)
+	defer cancel()
+	return client.NodeGetStorageHealth(ctx, secrets)
 }
