@@ -346,7 +346,7 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	if len(condition.Type) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "is required").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, ValidateLabelName(condition.Type, fldPath.Child("type"))...)
+		allErrs = append(allErrs, ValidateLabelName(condition.Type, fldPath.Child("type")).WithOrigin("format=k8s-label-key").MarkCoveredByDeclarative()...)
 	}
 
 	// status is set and is an accepted value
