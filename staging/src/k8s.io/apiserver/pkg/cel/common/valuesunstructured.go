@@ -296,6 +296,7 @@ func (t *unstructuredMapList) Equal(other ref.Val) ref.Val {
 		return types.False
 	}
 	tMap := t.getMap()
+	seen := make(map[interface{}]struct{}, len(tMap))
 	for it := oMapList.Iterator(); it.HasNext() == types.True; {
 		v := it.Next()
 		k := t.toMapKey(v.Value())
@@ -307,8 +308,9 @@ func (t *unstructuredMapList) Equal(other ref.Val) ref.Val {
 		if eq != types.True {
 			return eq // either false or error
 		}
+		seen[k] = struct{}{}
 	}
-	return types.True
+	return types.Bool(len(seen) == len(tMap))
 }
 
 // Add for a map list `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values
@@ -319,26 +321,11 @@ func (t *unstructuredMapList) Add(other ref.Val) ref.Val {
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
-	elements := make([]interface{}, len(t.elements))
-	keyToIdx := map[interface{}]int{}
-	for i, e := range t.elements {
-		k := t.toMapKey(e)
-		keyToIdx[k] = i
-		elements[i] = e
+	elements := make([]ref.Val, len(t.elements))
+	for i := range t.elements {
+		elements[i] = t.Get(types.Int(i))
 	}
-	for it := oMapList.Iterator(); it.HasNext() == types.True; {
-		v := it.Next().Value()
-		k := t.toMapKey(v)
-		if overwritePosition, ok := keyToIdx[k]; ok {
-			elements[overwritePosition] = v
-		} else {
-			elements = append(elements, v)
-		}
-	}
-	return &unstructuredMapList{
-		unstructuredList: unstructuredList{elements: elements, itemsSchema: t.itemsSchema},
-		escapedKeyProps:  t.escapedKeyProps,
-	}
+	return addToMapList(elements, oMapList, t.escapedKeyProps)
 }
 
 // escapeKeyProps returns identifiers with Escape applied to each.
@@ -362,21 +349,25 @@ type unstructuredSetList struct {
 
 	sync.Once // for lazy load of setOfList since it is only needed if Equals is called
 	set       map[interface{}]struct{}
+	setErr    ref.Val
 }
 
-func (t *unstructuredSetList) getSet() map[interface{}]struct{} {
-	// sets are only allowed to contain scalar elements, which are comparable in go, and can safely be used as
-	// golang map keys
+func (t *unstructuredSetList) getSet() (map[interface{}]struct{}, ref.Val) {
 	t.Do(func() {
 		t.set = make(map[interface{}]struct{}, len(t.elements))
-		for _, e := range t.elements {
-			t.set[e] = struct{}{}
+		for i := range t.elements {
+			k, err := setElementKey(t.Get(types.Int(i)))
+			if err != nil {
+				t.set, t.setErr = nil, err
+				return
+			}
+			t.set[k] = struct{}{}
 		}
 	})
-	return t.set
+	return t.set, t.setErr
 }
 
-// Equal on a map list ignores list element order.
+// Equal on a set list ignores list element order.
 func (t *unstructuredSetList) Equal(other ref.Val) ref.Val {
 	oSetList, ok := other.(traits.Lister)
 	if !ok {
@@ -386,15 +377,22 @@ func (t *unstructuredSetList) Equal(other ref.Val) ref.Val {
 	if sz != oSetList.Size() {
 		return types.False
 	}
-	tSet := t.getSet()
+	tSet, err := t.getSet()
+	if err != nil {
+		return err
+	}
+	seen := make(map[interface{}]struct{}, len(tSet))
 	for it := oSetList.Iterator(); it.HasNext() == types.True; {
-		next := it.Next().Value()
-		_, ok := tSet[next]
-		if !ok {
+		k, err := setElementKey(it.Next())
+		if err != nil {
+			return err
+		}
+		if _, ok := tSet[k]; !ok {
 			return types.False
 		}
+		seen[k] = struct{}{}
 	}
-	return types.True
+	return types.Bool(len(seen) == len(tSet))
 }
 
 // Add for a set list `X + Y` performs a union where the array positions of all elements in `X` are preserved and
@@ -404,18 +402,11 @@ func (t *unstructuredSetList) Add(other ref.Val) ref.Val {
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
-	elements := t.elements
-	set := t.getSet()
-	for it := oSetList.Iterator(); it.HasNext() == types.True; {
-		next := it.Next().Value()
-		if _, ok := set[next]; !ok {
-			set[next] = struct{}{}
-			elements = append(elements, next)
-		}
+	elements := make([]ref.Val, len(t.elements))
+	for i := range t.elements {
+		elements[i] = t.Get(types.Int(i))
 	}
-	return &unstructuredSetList{
-		unstructuredList: unstructuredList{elements: elements, itemsSchema: t.itemsSchema},
-	}
+	return addToSetList(elements, oSetList)
 }
 
 // unstructuredList represents an unstructured data instance of an OpenAPI array with x-kubernetes-list-type=atomic (the default).
@@ -490,13 +481,15 @@ func (t *unstructuredList) Add(other ref.Val) ref.Val {
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
-	elements := t.elements
-	for it := oList.Iterator(); it.HasNext() == types.True; {
-		next := it.Next().Value()
-		elements = append(elements, next)
+	otherSz, _ := oList.Size().(types.Int)
+	elements := make([]ref.Val, 0, len(t.elements)+int(otherSz))
+	for i := range t.elements {
+		elements = append(elements, t.Get(types.Int(i)))
 	}
-
-	return &unstructuredList{elements: elements, itemsSchema: t.itemsSchema}
+	for it := oList.Iterator(); it.HasNext() == types.True; {
+		elements = append(elements, it.Next())
+	}
+	return types.NewRefValList(types.DefaultTypeAdapter, elements)
 }
 
 func (t *unstructuredList) Contains(val ref.Val) ref.Val {

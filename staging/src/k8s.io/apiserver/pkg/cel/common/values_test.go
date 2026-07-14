@@ -1111,16 +1111,19 @@ func TestListAdd(t *testing.T) {
 		Value int64   `json:"value"`
 	}
 	type AddListsStruct struct {
-		Tags    []string       `json:"tags"`
-		I32s    []int32        `json:"i32s"`
-		Items   []MapListEntry `json:"items"`
-		Nested  []Nested       `json:"nested"`
-		Empty   []int64        `json:"empty"`
-		MapList []MapListEntry `json:"mapList"`
-		IfList  []IfEntry      `json:"ifList"`
-		Wide    []WideEntry    `json:"wide"`
-		Tri     []WideEntry    `json:"tri"`
-		PtrList []PtrEntry     `json:"ptrList"`
+		Tags       []string       `json:"tags"`
+		I32s       []int32        `json:"i32s"`
+		Items      []MapListEntry `json:"items"`
+		Nested     []Nested       `json:"nested"`
+		Empty      []int64        `json:"empty"`
+		MapList    []MapListEntry `json:"mapList"`
+		IfList     []IfEntry      `json:"ifList"`
+		Wide       []WideEntry    `json:"wide"`
+		Tri        []WideEntry    `json:"tri"`
+		PtrList    []PtrEntry     `json:"ptrList"`
+		SetList    []SetEntry     `json:"setList"`
+		PtrSet     []*int64       `json:"ptrSet"`
+		SetOfLists [][]string     `json:"setOfLists"`
 	}
 	strptr := func(s string) *string { return &s }
 	intptr := func(i int64) *int64 { return &i }
@@ -1203,21 +1206,42 @@ func TestListAdd(t *testing.T) {
 					}},
 					SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: ptrEntrySchema}},
 				},
+				"setList": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type": "set",
+					}},
+					SchemaProps: intArraySchema.SchemaProps,
+				},
+				"ptrSet": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type": "set",
+					}},
+					SchemaProps: intArraySchema.SchemaProps,
+				},
+				"setOfLists": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type": "set",
+					}},
+					SchemaProps: spec.ArrayProperty(stringArraySchema).SchemaProps,
+				},
 			},
 		},
 	}
 
 	x := typedValue{value: AddListsStruct{
-		Tags:    []string{"a", "b", "c"},
-		I32s:    []int32{1, 2, 3},
-		Items:   []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
-		Nested:  []Nested{{Name: "n1", Info: Struct{S: "hello"}}},
-		Empty:   []int64{},
-		MapList: []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
-		IfList:  []IfEntry{{If: "a", Value: 1}, {If: "b", Value: 2}},
-		Wide:    []WideEntry{{Key1: "a b", Key2: "c", Key3: "d", Key4: "e", Value: 1}},
-		Tri:     []WideEntry{{Key1: "ta", Key2: "tb", Key3: "tc", Value: 1}, {Key1: "td", Key2: "te", Key3: "tf", Value: 2}},
-		PtrList: []PtrEntry{{Name: strptr("a"), Port: intptr(80), Value: 1}, {Name: strptr("b"), Port: intptr(81), Value: 2}},
+		Tags:       []string{"a", "b", "c"},
+		I32s:       []int32{1, 2, 3},
+		Items:      []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
+		Nested:     []Nested{{Name: "n1", Info: Struct{S: "hello"}}},
+		Empty:      []int64{},
+		MapList:    []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
+		IfList:     []IfEntry{{If: "a", Value: 1}, {If: "b", Value: 2}},
+		Wide:       []WideEntry{{Key1: "a b", Key2: "c", Key3: "d", Key4: "e", Value: 1}},
+		Tri:        []WideEntry{{Key1: "ta", Key2: "tb", Key3: "tc", Value: 1}, {Key1: "td", Key2: "te", Key3: "tf", Value: 2}},
+		PtrList:    []PtrEntry{{Name: strptr("a"), Port: intptr(80), Value: 1}, {Name: strptr("b"), Port: intptr(81), Value: 2}},
+		SetList:    []SetEntry{1, 2, 3},
+		PtrSet:     []*int64{intptr(80), intptr(81)},
+		SetOfLists: [][]string{{"a b", "c"}, {"x"}},
 	}, schema: addListsSchema}
 	y := typedValue{value: AddListsStruct{
 		Tags:    []string{"d", "e"},
@@ -1230,22 +1254,37 @@ func TestListAdd(t *testing.T) {
 		// y.wide[0] has the same key prop values as x.wide[0] except that the
 		// whitespace boundary between key1 and key2 is shifted. The two must be
 		// treated as distinct keys.
-		Wide:    []WideEntry{{Key1: "a", Key2: "b c", Key3: "d", Key4: "e", Value: 2}},
-		Tri:     []WideEntry{{Key1: "tg", Key2: "th", Key3: "ti", Value: 3}},
-		PtrList: []PtrEntry{{Name: strptr("b"), Port: intptr(81), Value: 20}, {Name: strptr("c"), Port: intptr(82), Value: 3}},
+		Wide:       []WideEntry{{Key1: "a", Key2: "b c", Key3: "d", Key4: "e", Value: 2}},
+		Tri:        []WideEntry{{Key1: "tg", Key2: "th", Key3: "ti", Value: 3}},
+		PtrList:    []PtrEntry{{Name: strptr("b"), Port: intptr(81), Value: 20}, {Name: strptr("c"), Port: intptr(82), Value: 3}},
+		SetList:    []SetEntry{3, 30},
+		PtrSet:     []*int64{intptr(81), intptr(82)},
+		SetOfLists: [][]string{{"a", "b c"}, {"x"}},
 	}, schema: addListsSchema}
 	// z.mapList contains the same entries as (x.mapList + y.mapList), in a different order.
 	// z.ifList and z.tri contain the same entries as x.ifList and x.tri, in a different order.
 	// z.wide contains the same entries as (x.wide + y.wide), in a different order.
 	z := typedValue{value: AddListsStruct{
-		MapList: []MapListEntry{{Key1: "k1v3", Key2: "k2v3", Value: 3}, {Key1: "k1v1", Key2: "k2v1", Value: 10}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
-		IfList:  []IfEntry{{If: "b", Value: 2}, {If: "a", Value: 1}},
-		Wide:    []WideEntry{{Key1: "a", Key2: "b c", Key3: "d", Key4: "e", Value: 2}, {Key1: "a b", Key2: "c", Key3: "d", Key4: "e", Value: 1}},
-		Tri:     []WideEntry{{Key1: "td", Key2: "te", Key3: "tf", Value: 2}, {Key1: "ta", Key2: "tb", Key3: "tc", Value: 1}},
-		PtrList: []PtrEntry{{Name: strptr("c"), Port: intptr(82), Value: 3}, {Name: strptr("a"), Port: intptr(80), Value: 1}, {Name: strptr("b"), Port: intptr(81), Value: 20}},
+		MapList:    []MapListEntry{{Key1: "k1v3", Key2: "k2v3", Value: 3}, {Key1: "k1v1", Key2: "k2v1", Value: 10}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
+		IfList:     []IfEntry{{If: "b", Value: 2}, {If: "a", Value: 1}},
+		Wide:       []WideEntry{{Key1: "a", Key2: "b c", Key3: "d", Key4: "e", Value: 2}, {Key1: "a b", Key2: "c", Key3: "d", Key4: "e", Value: 1}},
+		Tri:        []WideEntry{{Key1: "td", Key2: "te", Key3: "tf", Value: 2}, {Key1: "ta", Key2: "tb", Key3: "tc", Value: 1}},
+		PtrList:    []PtrEntry{{Name: strptr("c"), Port: intptr(82), Value: 3}, {Name: strptr("a"), Port: intptr(80), Value: 1}, {Name: strptr("b"), Port: intptr(81), Value: 20}},
+		SetList:    []SetEntry{30, 3, 2, 1},
+		PtrSet:     []*int64{intptr(82), intptr(80), intptr(81)},
+		SetOfLists: [][]string{{"x"}, {"a b", "c"}},
 	}, schema: addListsSchema}
 
-	activation := map[string]typedValue{"x": x, "y": y, "z": z}
+	// w.mapList contains entries with duplicate keys and w.setList contains duplicate
+	// elements. Such data is invalid, but may be encountered as the right operand of an
+	// equality check and must not be treated as equal to a valid map or set list of the
+	// same size.
+	w := typedValue{value: AddListsStruct{
+		MapList: []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v1", Key2: "k2v1", Value: 1}},
+		SetList: []SetEntry{1, 1, 1},
+	}, schema: addListsSchema}
+
+	activation := map[string]typedValue{"x": x, "y": y, "z": z, "w": w}
 
 	tests := []struct {
 		testCase
@@ -1285,13 +1324,11 @@ func TestListAdd(t *testing.T) {
 		{testCase: testCase{
 			name:       "struct list + literal list, field access",
 			expression: "(x.items + [{'key1': 'lk1', 'key2': 'lk2', 'value': 100}])[2].value == 100",
-		}, // skipUnstructured: unstructuredList.Add stores raw CEL literal element values that UnstructuredToVal cannot rewrap.
-			skipUnstructured: true},
+		}},
 		{testCase: testCase{
 			name:       "struct list + literal list, exists",
 			expression: "(x.items + [{'key1': 'lk1', 'key2': 'lk2', 'value': 100}]).exists(e, e.key1 == 'lk1')",
-		}, // skipUnstructured: unstructuredList.Add stores raw CEL literal element values that UnstructuredToVal cannot rewrap.
-			skipUnstructured: true},
+		}},
 		{testCase: testCase{
 			name:       "literal list + struct list",
 			expression: "([{'key1': 'lk1'}] + x.items)[0].key1 == 'lk1' && ([{'key1': 'lk1'}] + x.items)[1].key1 == 'k1v1'",
@@ -1303,8 +1340,7 @@ func TestListAdd(t *testing.T) {
 		{testCase: testCase{
 			name:       "nested field access on appended literal",
 			expression: "(x.nested + [{'name': 'n2', 'info': {'s': 'deep'}}])[1].info.s == 'deep'",
-		}, // skipUnstructured: unstructuredList.Add stores raw CEL literal element values that UnstructuredToVal cannot rewrap.
-			skipUnstructured: true},
+		}},
 		{testCase: testCase{
 			name:       "size of concatenated list",
 			expression: "size(x.items + [{'key1': 'lk1'}]) == 3",
@@ -1320,8 +1356,7 @@ func TestListAdd(t *testing.T) {
 		{testCase: testCase{
 			name:       "heterogeneous literal elements",
 			expression: "(x.tags + [1])[3] == 1",
-		}, // skipUnstructured: unstructuredList.Add stores raw CEL literal element values that UnstructuredToVal cannot rewrap.
-			skipUnstructured: true},
+		}},
 		{testCase: testCase{
 			name:       "add non-list",
 			expression: "(x.tags + dyn(1)) == ['a']",
@@ -1344,18 +1379,15 @@ func TestListAdd(t *testing.T) {
 		{testCase: testCase{
 			name:       "map list + literal list merges by key",
 			expression: "(x.mapList + [{'key1': 'k1v1', 'key2': 'k2v1', 'value': 99}])[0].value == 99 && size(x.mapList + [{'key1': 'k1v1', 'key2': 'k2v1', 'value': 99}]) == 2",
-		}, // skipUnstructured: unstructuredMapList.Add cannot compute merge keys for CEL literal elements.
-			skipSchemaless: true, skipUnstructured: true},
+		}, skipSchemaless: true},
 		{testCase: testCase{
 			name:       "map list + literal list appends non-intersecting keys",
 			expression: "(x.mapList + [{'key1': 'k1v9', 'key2': 'k2v9', 'value': 9}])[2].value == 9",
-		}, // skipUnstructured: unstructuredMapList.Add cannot compute merge keys for CEL literal elements.
-			skipSchemaless: true, skipUnstructured: true},
+		}, skipSchemaless: true},
 		{testCase: testCase{
 			name:       "chained map list merge",
 			expression: "(x.mapList + y.mapList + [{'key1': 'k1v3', 'key2': 'k2v3', 'value': 33}])[2].value == 33",
-		}, // skipUnstructured: unstructuredMapList.Add cannot compute merge keys for CEL literal elements.
-			skipSchemaless: true, skipUnstructured: true},
+		}, skipSchemaless: true},
 		{testCase: testCase{
 			name:       "map list equality ignores element order",
 			expression: "(x.mapList + y.mapList) == z.mapList",
@@ -1367,17 +1399,15 @@ func TestListAdd(t *testing.T) {
 		{testCase: testCase{
 			name:       "map list with escaped key prop merges intersecting keys",
 			expression: "(x.ifList + y.ifList)[0].value == 10 && size(x.ifList + y.ifList) == 3",
-		}, // skipUnstructured: unstructuredMapList allows raw JSON field names with escaped key props,
-			skipSchemaless: true, skipUnstructured: true},
+		}, skipSchemaless: true},
 		{testCase: testCase{
 			name:       "map list with escaped key prop appends non-intersecting keys",
 			expression: "(x.ifList + y.ifList)[2].__if__ == 'c'",
-		}, // skipUnstructured: unstructuredMapList allows raw JSON field names with escaped key props,
-			skipSchemaless: true, skipUnstructured: true},
+		}, skipSchemaless: true},
 		{testCase: testCase{
 			name:       "map list equality with escaped key prop ignores element order",
 			expression: "x.ifList == z.ifList",
-		}, // skipUnstructured: unstructuredMapList allows raw JSON field names with escaped key props,
+		}, // skipUnstructured: unstructuredMapList.Equal looks up escaped key prop names in raw JSON data, where field names are unescaped.
 			skipSchemaless: true, skipUnstructured: true},
 		{testCase: testCase{
 			name:       "serialized map keys distinguish value boundaries on merge",
@@ -1410,13 +1440,19 @@ func TestListAdd(t *testing.T) {
 		{testCase: testCase{
 			name:       "concatenated map lists with different appended keys are not equal",
 			expression: "(x.mapList + [{'key1': 'A', 'key2': 'B', 'value': 9}]) != (x.mapList + [{'key1': 'C', 'key2': 'D', 'value': 9}])",
-		}, // skipUnstructured: unstructuredMapList.Add does not compute merge keys for CEL literal elements.
-			skipSchemaless: true, skipUnstructured: true},
+		}, skipSchemaless: true},
 		{testCase: testCase{
 			name:       "concatenated map lists with same keys but different values are not equal",
 			expression: "(x.mapList + [{'key1': 'A', 'key2': 'B', 'value': 1}]) != (x.mapList + [{'key1': 'A', 'key2': 'B', 'value': 2}])",
-		}, // skipUnstructured: unstructuredMapList.Add does not compute merge keys for CEL literal elements.
-			skipSchemaless: true, skipUnstructured: true},
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "map list is not equal to a list with duplicate keys",
+			expression: "x.mapList != w.mapList && w.mapList != x.mapList",
+		}},
+		{testCase: testCase{
+			name:       "concatenated map list is not equal to a list with duplicate keys",
+			expression: "(x.mapList + w.mapList) != w.mapList",
+		}},
 		{testCase: testCase{
 			name:       "map list add non-list",
 			expression: "(x.mapList + dyn(1)) == x.mapList",
@@ -1425,6 +1461,101 @@ func TestListAdd(t *testing.T) {
 		{testCase: testCase{
 			name:       "concatenated map list add non-list",
 			expression: "(x.mapList + y.mapList + dyn(1)) == x.mapList",
+			wantErr:    "no such overload",
+		}},
+		// Lists with x-kubernetes-list-type=set.
+		{testCase: testCase{
+			name:       "set list union with literal list",
+			expression: "(x.setList + [3, 4]) == [1, 2, 3, 4]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set list union with set list",
+			expression: "(x.setList + y.setList) == [1, 2, 3, 30]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set list equality ignores element order",
+			expression: "(x.setList + [4]) == [4, 3, 2, 1]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "chained set list union",
+			expression: "(x.setList + [4] + [4, 5]) == [1, 2, 3, 4, 5]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "schemaless set list concatenates atomically",
+			expression: "(x.setList + [3, 4]) == [1, 2, 3, 3, 4]",
+		}, skipTyped: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "set list union with set list ignores element order",
+			expression: "(x.setList + y.setList) == z.setList && z.setList == (x.setList + y.setList)",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set lists with different elements are not equal",
+			expression: "x.setList != y.setList",
+		}},
+		{testCase: testCase{
+			name:       "concatenated set list differs from its left operand",
+			expression: "(x.setList + y.setList) != x.setList && x.setList != (x.setList + y.setList)",
+		}},
+		{testCase: testCase{
+			name:       "concatenated set lists with same elements are equal",
+			expression: "(x.setList + [4]) == (x.setList + [4])",
+		}},
+		{testCase: testCase{
+			name:       "repeated concatenation of the same set list wrapper",
+			expression: "[x.setList].all(s, (s + y.setList) == (s + y.setList))",
+		}},
+		{testCase: testCase{
+			name:       "concatenated set lists with different appended elements are not equal",
+			expression: "(x.setList + [4]) != (x.setList + [5])",
+		}},
+		{testCase: testCase{
+			name:       "set list with pointer elements unions distinct elements",
+			expression: "size(x.ptrSet + y.ptrSet) == 3 && (x.ptrSet + y.ptrSet)[2] == 82",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set list equality with pointer elements ignores element order",
+			expression: "(x.ptrSet + y.ptrSet) == z.ptrSet && z.ptrSet == (x.ptrSet + y.ptrSet)",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set of lists: Equal between two set wrappers errors",
+			expression: "x.setOfLists == z.setOfLists",
+			wantErr:    "listSet operations are only supported on lists of scalar values",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set of lists: Equal between set wrapper and literal list errors",
+			expression: "x.setOfLists == [['a b', 'c'], ['x']]",
+			wantErr:    "listSet operations are only supported on lists of scalar values",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set of lists: Add of two set wrappers errors",
+			expression: "size(x.setOfLists + y.setOfLists) == 3",
+			wantErr:    "listSet operations are only supported on lists of scalar values",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set of lists: Add of set wrapper and literal list errors",
+			expression: "size(x.setOfLists + [['x']]) == 2",
+			wantErr:    "listSet operations are only supported on lists of scalar values",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set list is not equal to a list with duplicate elements",
+			expression: "x.setList != w.setList && w.setList != x.setList",
+		}},
+		{testCase: testCase{
+			name:       "set list is not equal to a literal list with duplicate elements",
+			expression: "x.setList != [1, 1, 3]",
+		}},
+		{testCase: testCase{
+			name:       "concatenated set list is not equal to a list with duplicate elements",
+			expression: "(x.setList + [4]) != [1, 1, 3, 4]",
+		}},
+		{testCase: testCase{
+			name:       "set list add non-list",
+			expression: "(x.setList + dyn(1)) == x.setList",
+			wantErr:    "no such overload",
+		}},
+		{testCase: testCase{
+			name:       "concatenated set list add non-list",
+			expression: "(x.setList + y.setList + dyn(1)) == x.setList",
 			wantErr:    "no such overload",
 		}},
 	}
