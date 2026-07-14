@@ -19,6 +19,7 @@ package dra
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -46,6 +47,8 @@ import (
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
+	"k8s.io/dynamic-resource-allocation/devicemetadata"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -59,6 +62,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	dratest "k8s.io/kubernetes/test/integration/dra"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
@@ -623,7 +627,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	})
 
-	// ResourcePoolStatusRequest tests with network resources — no kubelet needed.
+	// ResourcePoolStatusRequest tests with network resources - no kubelet needed.
 	framework.Context("control plane", f.WithFeatureGate(features.DRAResourcePoolStatus), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false))
@@ -717,6 +721,236 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						})),
 					})))
 			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+		})
+	})
+
+	type expectedMetadataFile struct {
+		claimName      string
+		claimNamespace string
+		claimUID       string
+		podClaimName   *string
+		requestName    string
+		driverName     string
+		generation     int64
+	}
+
+	expectStringMetadataAttribute := func(tCtx ktesting.TContext, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, name resourceapi.QualifiedName, expected, filePath string) {
+		tCtx.Helper()
+		attr, ok := attributes[name]
+		if !ok {
+			tCtx.Fatalf("metadata attribute %q in %s is missing", name, filePath)
+		}
+		tCtx.Expect(attr.StringValue).ToNot(gomega.BeNil(), "metadata attribute %q string value in %s", name, filePath)
+		if attr.StringValue != nil {
+			tCtx.Expect(*attr.StringValue).To(gomega.Equal(expected), "metadata attribute %q in %s", name, filePath)
+		}
+	}
+
+	testContainerMetadataFile := func(tCtx ktesting.TContext, pod *v1.Pod, containerName, filePath string, expected expectedMetadataFile) {
+		tCtx.Helper()
+		stdout, stderr, err := e2epod.Exec(tCtx, e2epod.ExecOptions{
+			Command:       []string{"cat", filePath},
+			Namespace:     pod.Namespace,
+			PodName:       pod.Name,
+			ContainerName: containerName,
+			CaptureStdout: true,
+			CaptureStderr: true,
+			Quiet:         true,
+		})
+		tCtx.ExpectNoError(err, "read metadata file %s in container %s", filePath, containerName)
+		tCtx.Expect(stderr).To(gomega.BeEmpty(), "metadata file stderr for container %s", containerName)
+
+		var md metadata.DeviceMetadata
+		tCtx.ExpectNoError(devicemetadata.DecodeMetadataFromStream(
+			json.NewDecoder(strings.NewReader(stdout)), &md,
+		), "decode metadata file %s", filePath)
+
+		if expected.claimName != "" {
+			tCtx.Expect(md.Name).To(gomega.Equal(expected.claimName), "claim name in %s", filePath)
+		}
+		if expected.claimNamespace != "" {
+			tCtx.Expect(md.Namespace).To(gomega.Equal(expected.claimNamespace), "claim namespace in %s", filePath)
+		}
+		if expected.claimUID != "" {
+			tCtx.Expect(string(md.UID)).To(gomega.Equal(expected.claimUID), "claim UID in %s", filePath)
+		}
+		if expected.generation != 0 {
+			tCtx.Expect(md.Generation).To(gomega.Equal(expected.generation), "metadata generation in %s", filePath)
+		}
+		tCtx.Expect(md.PodClaimName).To(gomega.Equal(expected.podClaimName), "pod claim name in %s", filePath)
+
+		tCtx.Expect(md.Requests).To(gomega.HaveLen(1), "requests in %s", filePath)
+		req := md.Requests[0]
+		tCtx.Expect(req.Name).To(gomega.Equal(expected.requestName), "request name in %s", filePath)
+		tCtx.Expect(req.Devices).ToNot(gomega.BeEmpty(), "devices in request %s of %s", req.Name, filePath)
+		for _, dev := range req.Devices {
+			tCtx.Expect(dev.Driver).To(gomega.Equal(expected.driverName), "device driver in %s", filePath)
+			tCtx.Expect(dev.Pool).ToNot(gomega.BeEmpty(), "device pool in %s", filePath)
+			tCtx.Expect(dev.Name).ToNot(gomega.BeEmpty(), "device name in %s", filePath)
+			expectStringMetadataAttribute(tCtx, dev.Attributes, "driverName", expected.driverName, filePath)
+			expectStringMetadataAttribute(tCtx, dev.Attributes, "pool", dev.Pool, filePath)
+			expectStringMetadataAttribute(tCtx, dev.Attributes, "device", dev.Name, filePath)
+		}
+	}
+
+	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(2))
+		driver.EnableDeviceMetadata = true
+		b := drautils.NewBuilder(f, driver)
+
+		ginkgo.It("must mount device metadata for resource claims", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
+			created := b.Create(tCtx, claim, pod)
+			createdClaim := created[0].(*resourceapi.ResourceClaim)
+
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			expectedPath := metadata.ResourceClaimFilePath(driver.Name, claim.Name, "my-request")
+			testContainerMetadataFile(tCtx, pod, "with-resource", expectedPath, expectedMetadataFile{
+				claimName:      createdClaim.Name,
+				claimNamespace: createdClaim.Namespace,
+				claimUID:       string(createdClaim.UID),
+				requestName:    "my-request",
+				driverName:     driver.Name,
+				generation:     1,
+			})
+		})
+
+		ginkgo.It("must map device metadata to the right containers", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			claim := b.ExternalClaim()
+			claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *claim.Spec.Devices.Requests[0].DeepCopy())
+			claim.Spec.Devices.Requests[0].Name = "req0"
+			claim.Spec.Devices.Requests[1].Name = "req1"
+
+			pod := b.PodExternal(claim.Name)
+			pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy())
+			pod.Spec.Containers[0].Name = "all-requests"
+			pod.Spec.Containers[1].Name = "req1-only"
+			pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: "resource-claim"}}
+			pod.Spec.Containers[1].Resources.Claims = []v1.ResourceClaim{{Name: "resource-claim", Request: "req1"}}
+
+			created := b.Create(tCtx, claim, pod)
+			createdClaim := created[0].(*resourceapi.ResourceClaim)
+
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			expectMetadata := func(containerName, requestName string) {
+				expectedPath := metadata.ResourceClaimFilePath(driver.Name, claim.Name, requestName)
+				testContainerMetadataFile(tCtx, pod, containerName, expectedPath, expectedMetadataFile{
+					claimName:      createdClaim.Name,
+					claimNamespace: createdClaim.Namespace,
+					claimUID:       string(createdClaim.UID),
+					requestName:    requestName,
+					driverName:     driver.Name,
+					generation:     1,
+				})
+			}
+			expectMetadata("all-requests", "req0")
+			expectMetadata("all-requests", "req1")
+			expectMetadata("req1-only", "req1")
+
+			req0Path := metadata.ResourceClaimFilePath(driver.Name, claim.Name, "req0")
+			_, _, err = e2epod.Exec(tCtx, e2epod.ExecOptions{
+				Command:       []string{"cat", req0Path},
+				Namespace:     pod.Namespace,
+				PodName:       pod.Name,
+				ContainerName: "req1-only",
+				CaptureStdout: true,
+				CaptureStderr: true,
+				Quiet:         true,
+			})
+			tCtx.Expect(err).To(gomega.HaveOccurred(), "metadata file %s in container %s", req0Path, "req1-only")
+		})
+
+		ginkgo.It("must mount device metadata for resource claim templates", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			pod, template := b.PodInline()
+			b.Create(tCtx, template, pod)
+
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			expectedPath := metadata.ResourceClaimTemplateFilePath(driver.Name, "my-inline-claim", "my-request")
+			testContainerMetadataFile(tCtx, pod, "with-resource", expectedPath, expectedMetadataFile{
+				claimNamespace: f.Namespace.Name,
+				podClaimName:   new("my-inline-claim"),
+				requestName:    "my-request",
+				driverName:     driver.Name,
+				generation:     1,
+			})
+		})
+	})
+
+	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+
+		driverA := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
+		driverA.NameSuffix = "-a"
+		driverA.EnableDeviceMetadata = true
+
+		driverB := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
+		driverB.NameSuffix = "-b"
+		driverB.EnableDeviceMetadata = true
+
+		bA := drautils.NewBuilder(f, driverA)
+
+		ginkgo.It("must not race when multiple drivers write metadata for the same request", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+
+			sharedClass := &resourceapi.DeviceClass{
+				ObjectMeta: metav1.ObjectMeta{Name: f.Namespace.Name + "-shared-class"},
+				Spec: resourceapi.DeviceClassSpec{
+					Selectors: []resourceapi.DeviceSelector{{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.driver == "%s" || device.driver == "%s"`, driverA.Name, driverB.Name),
+						},
+					}},
+				},
+			}
+
+			claim := &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "multi-driver-claim",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: resourceapi.ResourceClaimSpec{
+					Devices: resourceapi.DeviceClaim{
+						Requests: []resourceapi.DeviceRequest{{
+							Name: "my-request",
+							Exactly: &resourceapi.ExactDeviceRequest{
+								DeviceClassName: sharedClass.Name,
+								AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+								Count:           2,
+							},
+						}},
+					},
+				},
+			}
+
+			pod := bA.PodExternal(claim.Name)
+			created := bA.Create(tCtx, sharedClass, claim, pod)
+			createdClaim := created[1].(*resourceapi.ResourceClaim)
+
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			for _, driverName := range []string{driverA.Name, driverB.Name} {
+				expectedPath := metadata.ResourceClaimFilePath(driverName, claim.Name, "my-request")
+				testContainerMetadataFile(tCtx, pod, "with-resource", expectedPath, expectedMetadataFile{
+					claimName:      createdClaim.Name,
+					claimNamespace: createdClaim.Namespace,
+					claimUID:       string(createdClaim.UID),
+					requestName:    "my-request",
+					driverName:     driverName,
+					generation:     1,
+				})
+			}
 		})
 	})
 
