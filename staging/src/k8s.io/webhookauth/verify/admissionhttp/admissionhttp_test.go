@@ -42,6 +42,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/webhookauth/verify"
 	"k8s.io/webhookauth/verify/admissionhttp"
@@ -584,6 +585,63 @@ func TestVerifyAdmissionRequest(t *testing.T) {
 		err := admissionhttp.VerifyAdmissionRequest(context.Background(), v, nil, token)
 		if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
 			t.Fatalf("want generic verification failure for a nil request, got %v", err)
+		}
+	})
+}
+
+// TestWithTokenVerification_InnerObjectGroupChecked proves the D1.B defense:
+// with a token authorizing testGroup, a request whose embedded object belongs to
+// a DIFFERENT group than Resource.Group is denied, while a consistent object is
+// allowed.
+func TestWithTokenVerification_InnerObjectGroupChecked(t *testing.T) {
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
+	token := ts.sign(t, ts.baseClaims())
+
+	reviewWithObject := func(resourceGroup, objectAPIVersion string) []byte {
+		obj, err := json.Marshal(map[string]any{"apiVersion": objectAPIVersion, "kind": "Deployment"})
+		if err != nil {
+			t.Fatalf("marshal object: %v", err)
+		}
+		review := &admissionv1.AdmissionReview{
+			TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
+			Request: &admissionv1.AdmissionRequest{
+				UID:      types.UID(reviewUID),
+				Resource: metav1.GroupVersionResource{Group: resourceGroup, Version: "v1", Resource: "deployments"},
+				Object:   runtime.RawExtension{Raw: obj},
+			},
+		}
+		body, err := json.Marshal(review)
+		if err != nil {
+			t.Fatalf("marshal review: %v", err)
+		}
+		return body
+	}
+
+	t.Run("object group matches resource group -> allowed", func(t *testing.T) {
+		spy := newSpyHandler()
+		adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+		rec := httptest.NewRecorder()
+		adapter.ServeHTTP(rec, newRequest(t, reviewWithObject(testGroup, "apps/v1"), token))
+		if !spy.wasReached() {
+			t.Error("downstream should be reached when the object group matches")
+		}
+	})
+
+	t.Run("object group differs from resource group -> denied", func(t *testing.T) {
+		spy := newSpyHandler()
+		adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+		rec := httptest.NewRecorder()
+		adapter.ServeHTTP(rec, newRequest(t, reviewWithObject(testGroup, "batch/v1"), token))
+		if spy.wasReached() {
+			t.Error("downstream must not be reached when the object group mismatches")
+		}
+		var review admissionv1.AdmissionReview
+		if err := json.Unmarshal(rec.Body.Bytes(), &review); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if review.Response == nil || review.Response.Allowed {
+			t.Errorf("expected a deny, got %+v", review.Response)
 		}
 	})
 }

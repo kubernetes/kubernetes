@@ -41,6 +41,7 @@ package admissionhttp // import "k8s.io/webhookauth/verify/admissionhttp"
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -48,6 +49,7 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -176,14 +178,18 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO(kep-6060, D1.B): additionally check the INNER OBJECT's group — decode
-	// req.Object (or req.OldObject on DELETE) apiVersion and require its group ==
-	// req.Resource.Group, denying on mismatch. Pending Mo's confirmation of the
-	// defense-in-depth vs. threat-model tradeoff (see .squad/todo/
-	// kep-6060-review-2.3-1-admission-seam-6b.md, D1.B).
+	// Defense in depth: the token authorized req.Resource.Group, so require the
+	// admitted object's own group to match — an authorized-group envelope must not
+	// carry a different-group payload.
+	if err := checkObjectGroup(req); err != nil {
+		klog.FromContext(ctx).V(2).Info("Admission webhook token verification denied",
+			"reason", "admitted object group does not match the resource group", "detail", err.Error())
+		writeResponse(w, req, deniedResponse())
+		return
+	}
 
-	// Never log the token. Verification succeeded; the outcome is logged at high
-	// verbosity for operators. next is required, so it is safe to call.
+	// next is required, so it is safe to call. The verified outcome is logged at
+	// high verbosity for operators; the token is never logged.
 	klog.FromContext(ctx).V(4).Info("Admission webhook token verified")
 	writeResponse(w, req, h.next(ctx, req))
 }
@@ -261,6 +267,34 @@ func (h *handler) decodeReview(r *http.Request) (review *admissionv1.AdmissionRe
 	return ar, "", true
 }
 
+// checkObjectGroup enforces that the admitted object's own API group matches the
+// request's Resource.Group (the group the token was authorized for), so an
+// authorized-group envelope cannot carry a different-group payload. It reads the
+// apiVersion from req.Object, falling back to req.OldObject (populated on
+// DELETE). A request with no embedded object (for example CONNECT) has no inner
+// group to check and passes; an undecodable object fails closed.
+func checkObjectGroup(req *admissionv1.AdmissionRequest) error {
+	raw := req.Object.Raw
+	if len(raw) == 0 {
+		raw = req.OldObject.Raw
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	var tm metav1.TypeMeta
+	if err := json.Unmarshal(raw, &tm); err != nil {
+		return fmt.Errorf("object is undecodable: %w", err)
+	}
+	gv, err := schema.ParseGroupVersion(tm.APIVersion)
+	if err != nil {
+		return fmt.Errorf("object apiVersion %q is invalid: %w", tm.APIVersion, err)
+	}
+	if gv.Group != req.Resource.Group {
+		return fmt.Errorf("object group %q != resource group %q", gv.Group, req.Resource.Group)
+	}
+	return nil
+}
+
 // VerifyAdmissionRequest verifies token against the KEP-6060 contract for an
 // AdmissionRequest the caller has ALREADY decoded. It is the primary entry point
 // for consumers (for example controller-runtime, whose Request embeds an
@@ -276,8 +310,17 @@ func VerifyAdmissionRequest(ctx context.Context, v *verify.Verifier, req *admiss
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", reasonUndecodableBody)
 		return verify.ErrVerificationFailed
 	}
-	// TODO(kep-6060, D1.B): also check req.Object/OldObject group == req.Resource.Group (pending Mo).
-	return v.Verify(ctx, token, req.Resource.Group)
+	if err := v.Verify(ctx, token, req.Resource.Group); err != nil {
+		return err
+	}
+	// Defense in depth: the admitted object's own group must match the authorized
+	// resource group.
+	if err := checkObjectGroup(req); err != nil {
+		klog.FromContext(ctx).V(2).Info("Webhook token verification denied",
+			"reason", "admitted object group does not match the resource group", "detail", err.Error())
+		return verify.ErrVerificationFailed
+	}
+	return nil
 }
 
 // BearerToken extracts the token from an "Authorization: Bearer <token>"
