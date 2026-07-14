@@ -17,9 +17,14 @@ limitations under the License.
 package common_test
 
 import (
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,9 +34,6 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/openapi"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"reflect"
-	"testing"
-	"time"
 )
 
 // TestToValue tests that both UnstructuredToValue and TypedToValue correctly
@@ -1089,19 +1091,70 @@ func TestReflectiveMapListWithThreeKeysEqual(t *testing.T) {
 }
 
 func TestListAdd(t *testing.T) {
-	type AddListsStruct struct {
-		Tags   []string       `json:"tags"`
-		I32s   []int32        `json:"i32s"`
-		Items  []MapListEntry `json:"items"`
-		Nested []Nested       `json:"nested"`
-		Empty  []int64        `json:"empty"`
+	// IfEntry has a map key prop that is a CEL reserved word and so requires escaping.
+	type IfEntry struct {
+		If    string `json:"if"`
+		Value int64  `json:"value"`
 	}
+	// WideEntry has enough key props to exercise the serialized map key fallback.
+	type WideEntry struct {
+		Key1  string `json:"key1"`
+		Key2  string `json:"key2"`
+		Key3  string `json:"key3"`
+		Key4  string `json:"key4"`
+		Value int64  `json:"value"`
+	}
+
+	type PtrEntry struct {
+		Name  *string `json:"name"`
+		Port  *int64  `json:"port"`
+		Value int64   `json:"value"`
+	}
+	type AddListsStruct struct {
+		Tags    []string       `json:"tags"`
+		I32s    []int32        `json:"i32s"`
+		Items   []MapListEntry `json:"items"`
+		Nested  []Nested       `json:"nested"`
+		Empty   []int64        `json:"empty"`
+		MapList []MapListEntry `json:"mapList"`
+		IfList  []IfEntry      `json:"ifList"`
+		Wide    []WideEntry    `json:"wide"`
+		Tri     []WideEntry    `json:"tri"`
+		PtrList []PtrEntry     `json:"ptrList"`
+	}
+	strptr := func(s string) *string { return &s }
+	intptr := func(i int64) *int64 { return &i }
 
 	mapListEntrySchema := &spec.Schema{SchemaProps: spec.SchemaProps{
 		Type: []string{"object"},
 		Properties: map[string]spec.Schema{
 			"key1":  *stringSchema,
 			"key2":  *stringSchema,
+			"value": *int64Schema,
+		},
+	}}
+	ifEntrySchema := &spec.Schema{SchemaProps: spec.SchemaProps{
+		Type: []string{"object"},
+		Properties: map[string]spec.Schema{
+			"if":    *stringSchema,
+			"value": *int64Schema,
+		},
+	}}
+	wideEntrySchema := &spec.Schema{SchemaProps: spec.SchemaProps{
+		Type: []string{"object"},
+		Properties: map[string]spec.Schema{
+			"key1":  *stringSchema,
+			"key2":  *stringSchema,
+			"key3":  *stringSchema,
+			"key4":  *stringSchema,
+			"value": *int64Schema,
+		},
+	}}
+	ptrEntrySchema := &spec.Schema{SchemaProps: spec.SchemaProps{
+		Type: []string{"object"},
+		Properties: map[string]spec.Schema{
+			"name":  *stringSchema,
+			"port":  *int64Schema,
 			"value": *int64Schema,
 		},
 	}}
@@ -1115,26 +1168,84 @@ func TestListAdd(t *testing.T) {
 				"items":  *spec.ArrayProperty(mapListEntrySchema),
 				"nested": *spec.ArrayProperty(nestedSchema),
 				"empty":  *intArraySchema,
+				"mapList": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type":     "map",
+						"x-kubernetes-list-map-keys": []any{"key1", "key2"},
+					}},
+					SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: mapListEntrySchema}},
+				},
+				"ifList": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type":     "map",
+						"x-kubernetes-list-map-keys": []any{"if"},
+					}},
+					SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: ifEntrySchema}},
+				},
+				"wide": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type":     "map",
+						"x-kubernetes-list-map-keys": []any{"key1", "key2", "key3", "key4"},
+					}},
+					SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: wideEntrySchema}},
+				},
+				"tri": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type":     "map",
+						"x-kubernetes-list-map-keys": []any{"key1", "key2", "key3"},
+					}},
+					SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: wideEntrySchema}},
+				},
+				"ptrList": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type":     "map",
+						"x-kubernetes-list-map-keys": []any{"name", "port"},
+					}},
+					SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: ptrEntrySchema}},
+				},
 			},
 		},
 	}
 
 	x := typedValue{value: AddListsStruct{
-		Tags:   []string{"a", "b", "c"},
-		I32s:   []int32{1, 2, 3},
-		Items:  []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
-		Nested: []Nested{{Name: "n1", Info: Struct{S: "hello"}}},
-		Empty:  []int64{},
+		Tags:    []string{"a", "b", "c"},
+		I32s:    []int32{1, 2, 3},
+		Items:   []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
+		Nested:  []Nested{{Name: "n1", Info: Struct{S: "hello"}}},
+		Empty:   []int64{},
+		MapList: []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
+		IfList:  []IfEntry{{If: "a", Value: 1}, {If: "b", Value: 2}},
+		Wide:    []WideEntry{{Key1: "a b", Key2: "c", Key3: "d", Key4: "e", Value: 1}},
+		Tri:     []WideEntry{{Key1: "ta", Key2: "tb", Key3: "tc", Value: 1}, {Key1: "td", Key2: "te", Key3: "tf", Value: 2}},
+		PtrList: []PtrEntry{{Name: strptr("a"), Port: intptr(80), Value: 1}, {Name: strptr("b"), Port: intptr(81), Value: 2}},
 	}, schema: addListsSchema}
 	y := typedValue{value: AddListsStruct{
-		Tags:   []string{"d", "e"},
-		I32s:   []int32{30},
-		Items:  []MapListEntry{{Key1: "yk1", Key2: "yk2", Value: 7}},
-		Nested: []Nested{},
-		Empty:  []int64{},
+		Tags:    []string{"d", "e"},
+		I32s:    []int32{30},
+		Items:   []MapListEntry{{Key1: "yk1", Key2: "yk2", Value: 7}},
+		Nested:  []Nested{},
+		Empty:   []int64{},
+		MapList: []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 10}, {Key1: "k1v3", Key2: "k2v3", Value: 3}},
+		IfList:  []IfEntry{{If: "a", Value: 10}, {If: "c", Value: 3}},
+		// y.wide[0] has the same key prop values as x.wide[0] except that the
+		// whitespace boundary between key1 and key2 is shifted. The two must be
+		// treated as distinct keys.
+		Wide:    []WideEntry{{Key1: "a", Key2: "b c", Key3: "d", Key4: "e", Value: 2}},
+		Tri:     []WideEntry{{Key1: "tg", Key2: "th", Key3: "ti", Value: 3}},
+		PtrList: []PtrEntry{{Name: strptr("b"), Port: intptr(81), Value: 20}, {Name: strptr("c"), Port: intptr(82), Value: 3}},
+	}, schema: addListsSchema}
+	// z.mapList contains the same entries as (x.mapList + y.mapList), in a different order.
+	// z.ifList and z.tri contain the same entries as x.ifList and x.tri, in a different order.
+	// z.wide contains the same entries as (x.wide + y.wide), in a different order.
+	z := typedValue{value: AddListsStruct{
+		MapList: []MapListEntry{{Key1: "k1v3", Key2: "k2v3", Value: 3}, {Key1: "k1v1", Key2: "k2v1", Value: 10}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
+		IfList:  []IfEntry{{If: "b", Value: 2}, {If: "a", Value: 1}},
+		Wide:    []WideEntry{{Key1: "a", Key2: "b c", Key3: "d", Key4: "e", Value: 2}, {Key1: "a b", Key2: "c", Key3: "d", Key4: "e", Value: 1}},
+		Tri:     []WideEntry{{Key1: "td", Key2: "te", Key3: "tf", Value: 2}, {Key1: "ta", Key2: "tb", Key3: "tc", Value: 1}},
+		PtrList: []PtrEntry{{Name: strptr("c"), Port: intptr(82), Value: 3}, {Name: strptr("a"), Port: intptr(80), Value: 1}, {Name: strptr("b"), Port: intptr(81), Value: 20}},
 	}, schema: addListsSchema}
 
-	activation := map[string]typedValue{"x": x, "y": y}
+	activation := map[string]typedValue{"x": x, "y": y, "z": z}
 
 	tests := []struct {
 		testCase
@@ -1220,6 +1331,101 @@ func TestListAdd(t *testing.T) {
 			name:       "index out of bounds on concatenated list",
 			expression: "(x.i32s + [4])[10] == 1",
 			wantErr:    "index out of bounds: 10",
+		}},
+		// Lists with x-kubernetes-list-type=map.
+		{testCase: testCase{
+			name:       "map list merge overwrites intersecting keys in place",
+			expression: "(x.mapList + y.mapList)[0].value == 10 && size(x.mapList + y.mapList) == 3",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "map list merge appends non-intersecting keys",
+			expression: "(x.mapList + y.mapList)[2].key1 == 'k1v3'",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "map list + literal list merges by key",
+			expression: "(x.mapList + [{'key1': 'k1v1', 'key2': 'k2v1', 'value': 99}])[0].value == 99 && size(x.mapList + [{'key1': 'k1v1', 'key2': 'k2v1', 'value': 99}]) == 2",
+		}, // skipUnstructured: unstructuredMapList.Add cannot compute merge keys for CEL literal elements.
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "map list + literal list appends non-intersecting keys",
+			expression: "(x.mapList + [{'key1': 'k1v9', 'key2': 'k2v9', 'value': 9}])[2].value == 9",
+		}, // skipUnstructured: unstructuredMapList.Add cannot compute merge keys for CEL literal elements.
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "chained map list merge",
+			expression: "(x.mapList + y.mapList + [{'key1': 'k1v3', 'key2': 'k2v3', 'value': 33}])[2].value == 33",
+		}, // skipUnstructured: unstructuredMapList.Add cannot compute merge keys for CEL literal elements.
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "map list equality ignores element order",
+			expression: "(x.mapList + y.mapList) == z.mapList",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "schemaless map list concatenates atomically",
+			expression: "size(x.mapList + [{'key1': 'k1v1', 'key2': 'k2v1', 'value': 99}]) == 3",
+		}, skipTyped: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "map list with escaped key prop merges intersecting keys",
+			expression: "(x.ifList + y.ifList)[0].value == 10 && size(x.ifList + y.ifList) == 3",
+		}, // skipUnstructured: unstructuredMapList allows raw JSON field names with escaped key props,
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "map list with escaped key prop appends non-intersecting keys",
+			expression: "(x.ifList + y.ifList)[2].__if__ == 'c'",
+		}, // skipUnstructured: unstructuredMapList allows raw JSON field names with escaped key props,
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "map list equality with escaped key prop ignores element order",
+			expression: "x.ifList == z.ifList",
+		}, // skipUnstructured: unstructuredMapList allows raw JSON field names with escaped key props,
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "serialized map keys distinguish value boundaries on merge",
+			expression: "size(x.wide + y.wide) == 2 && (x.wide + y.wide)[0].value == 1",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "serialized map key equality ignores element order",
+			expression: "(x.wide + y.wide) == z.wide && z.wide == (x.wide + y.wide)",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "merge and equality of map lists with three key props",
+			expression: "size(x.tri + y.tri) == 3 && x.tri == z.tri",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "map list with pointer key props merges intersecting keys",
+			expression: "(x.ptrList + y.ptrList)[1].value == 20 && size(x.ptrList + y.ptrList) == 3",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "map list equality with pointer key props ignores element order",
+			expression: "(x.ptrList + y.ptrList) == z.ptrList && z.ptrList == (x.ptrList + y.ptrList)",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "map lists with same keys but different values are not equal",
+			expression: "x.mapList != y.mapList",
+		}},
+		{testCase: testCase{
+			name:       "concatenated map list differs from its left operand",
+			expression: "(x.mapList + y.mapList) != x.mapList && x.mapList != (x.mapList + y.mapList)",
+		}},
+		{testCase: testCase{
+			name:       "concatenated map lists with different appended keys are not equal",
+			expression: "(x.mapList + [{'key1': 'A', 'key2': 'B', 'value': 9}]) != (x.mapList + [{'key1': 'C', 'key2': 'D', 'value': 9}])",
+		}, // skipUnstructured: unstructuredMapList.Add does not compute merge keys for CEL literal elements.
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "concatenated map lists with same keys but different values are not equal",
+			expression: "(x.mapList + [{'key1': 'A', 'key2': 'B', 'value': 1}]) != (x.mapList + [{'key1': 'A', 'key2': 'B', 'value': 2}])",
+		}, // skipUnstructured: unstructuredMapList.Add does not compute merge keys for CEL literal elements.
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "map list add non-list",
+			expression: "(x.mapList + dyn(1)) == x.mapList",
+			wantErr:    "no such overload",
+		}},
+		{testCase: testCase{
+			name:       "concatenated map list add non-list",
+			expression: "(x.mapList + y.mapList + dyn(1)) == x.mapList",
+			wantErr:    "no such overload",
 		}},
 	}
 
