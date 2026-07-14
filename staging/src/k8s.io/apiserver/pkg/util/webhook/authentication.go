@@ -60,6 +60,8 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 				ret.Wrap(tracing.WrapperFor(tp))
 
 				if egressSelector != nil {
+					ret.Wrap(egressselector.RequestDeadlineRoundTripperWrapper)
+
 					networkContext := egressselector.ControlPlane.AsNetworkContext()
 					var egressDialer utilnet.DialFunc
 					egressDialer, err = egressSelector.Lookup(networkContext)
@@ -83,6 +85,8 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 				ret.Wrap(tracing.WrapperFor(tp))
 
 				if egressSelector != nil {
+					ret.Wrap(egressselector.RequestDeadlineRoundTripperWrapper)
+
 					networkContext := egressselector.Cluster.AsNetworkContext()
 					var egressDialer utilnet.DialFunc
 					egressDialer, err = egressSelector.Lookup(networkContext)
