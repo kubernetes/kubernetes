@@ -355,7 +355,7 @@ func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []a
 		case featureGate:
 			addFeatureGate(arg.name, arg.spec, true)
 		case label:
-			fullLabel := strings.Join(arg.parts, ":")
+			fullLabel := arg.String()
 			addLabel(fullLabel)
 			if !leafNodeLabels.Has(fullLabel) {
 				texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
@@ -783,37 +783,27 @@ func withKubeletMinVersion(version string) interface{} {
 	return newLabel("KubeletMinVersion", version)
 }
 
+// label must be comparable, some code uses that to detect feature.Windows.
 type label struct {
 	// parts get concatenated with ":" to build the full label.
-	parts []string
+	parts [2]string
+	len   int
+}
+
+func (l label) String() string {
+	if l.len == 2 {
+		return l.parts[0] + ":" + l.parts[1]
+	}
+	return l.parts[0]
 }
 
 func newLabel(parts ...string) label {
-	return label{
-		parts: parts,
-	}
-}
-
-// TagsEqual can be used to check whether two tags are the same.
-// It's safe to compare e.g. the result of WithSlow() against the result
-// of WithSerial(), the result will be false. False is also returned
-// when a parameter is some completely different value.
-func TagsEqual(a, b interface{}) bool {
-	switch a := a.(type) {
-	case label:
-		b, ok := b.(label)
-		if !ok {
-			return false
-		}
-		return slices.Equal(a.parts, b.parts)
-	case featureGate:
-		b, ok := b.(featureGate)
-		if !ok {
-			return false
-		}
-		return a == b
+	switch len(parts) {
+	case 1:
+		return label{parts: [2]string{parts[0], ""}, len: 1}
+	case 2:
+		return label{parts: [2]string{parts[0], parts[1]}, len: 2}
 	default:
-		// Unknown tag, cannot compare.
-		return false
+		panic(fmt.Sprintf("invalid number of part strings: %v", parts))
 	}
 }
