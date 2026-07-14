@@ -320,7 +320,7 @@ func quantityAdd(arg ref.Val, other ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(arg)
 	}
 
-	copy := *q
+	copy := q.DeepCopy()
 	copy.Add(*q2)
 	return &apiservercel.Quantity{
 		Quantity: &copy,
@@ -340,7 +340,7 @@ func quantityAddInt(arg ref.Val, other ref.Val) ref.Val {
 
 	q2Converted := *resource.NewQuantity(q2, resource.DecimalExponent)
 
-	copy := *q
+	copy := q.DeepCopy()
 	copy.Add(q2Converted)
 	return &apiservercel.Quantity{
 		Quantity: &copy,
@@ -358,7 +358,7 @@ func quantitySub(arg ref.Val, other ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(arg)
 	}
 
-	copy := *q
+	copy := q.DeepCopy()
 	copy.Sub(*q2)
 	return &apiservercel.Quantity{
 		Quantity: &copy,
@@ -378,7 +378,7 @@ func quantitySubInt(arg ref.Val, other ref.Val) ref.Val {
 
 	q2Converted := *resource.NewQuantity(q2, resource.DecimalExponent)
 
-	copy := *q
+	copy := q.DeepCopy()
 	copy.Sub(q2Converted)
 	return &apiservercel.Quantity{
 		Quantity: &copy,
