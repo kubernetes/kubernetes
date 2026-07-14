@@ -18,7 +18,6 @@ package tainttoleration
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -445,7 +444,17 @@ func TestTaintTolerationFilter(t *testing.T) {
 			name:                               "Pod with Gt toleration cannot be scheduled on node with non-numeric taint value",
 			pod:                                podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
 			node:                               nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "high", Effect: "NoSchedule"}}),
-			wantStatus:                         fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(errors.New(`failed to parse taint value "high" as int64: must be a valid decimal integer in canonical form`)),
+			wantStatus:                         fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
+			enableTaintTolerationComparisonOps: true,
+		},
+		{
+			name: "Parse error before clean untolerated taint still reports stable Filter reason",
+			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
+			node: nodeWithTaints("nodeA", []v1.Taint{
+				{Key: "node.kubernetes.io/sla", Value: "high", Effect: "NoSchedule"},
+				{Key: "dedicated", Value: "gpu", Effect: "NoSchedule"},
+			}),
+			wantStatus:                         fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
 			enableTaintTolerationComparisonOps: true,
 		},
 	}

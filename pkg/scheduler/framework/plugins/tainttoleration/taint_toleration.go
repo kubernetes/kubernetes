@@ -106,14 +106,14 @@ func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod
 	taint, isUntolerated, err := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations,
 		helper.DoNotScheduleTaintsFilterFunc(),
 		pl.enableTaintTolerationComparisonOperators)
-	if err != nil {
-		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
-	}
 	if !isUntolerated {
 		return nil
 	}
-
-	logger.V(4).Info("node had untolerated taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint)
+	if err != nil {
+		logger.V(4).Info("node had a taint that could not be compared with pod tolerations", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint, "err", err)
+	} else {
+		logger.V(4).Info("node had untolerated taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint)
+	}
 	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)")
 }
 
