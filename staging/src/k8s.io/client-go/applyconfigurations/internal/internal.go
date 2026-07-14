@@ -14947,6 +14947,18 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: io.k8s.api.scheduling.v1alpha3.AllCompositeDisruptionMode
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.api.scheduling.v1alpha3.AllDisruptionMode
   map:
     elementType:
@@ -14983,6 +14995,21 @@ var schemaYAML = typed.YAMLObject(`types:
         elementType:
           namedType: __untyped_deduced_
         elementRelationship: separable
+- name: io.k8s.api.scheduling.v1alpha3.CompositeDisruptionMode
+  map:
+    fields:
+    - name: all
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.AllCompositeDisruptionMode
+    - name: single
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.SingleCompositeDisruptionMode
+    unions:
+    - fields:
+      - fieldName: all
+        discriminatorValue: All
+      - fieldName: single
+        discriminatorValue: Single
 - name: io.k8s.api.scheduling.v1alpha3.CompositeGangSchedulingPolicy
   map:
     fields:
@@ -15038,7 +15065,15 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.scheduling.v1alpha3.CompositePodGroupSpec
   map:
     fields:
+    - name: disruptionMode
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.CompositeDisruptionMode
+      default:
+        single: {}
     - name: parentCompositePodGroupName
+      type:
+        scalar: string
+    - name: preemptionPolicy
       type:
         scalar: string
     - name: priority
@@ -15079,6 +15114,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: disruptionMode
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.CompositeDisruptionMode
     - name: name
       type:
         scalar: string
@@ -15091,6 +15129,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: preemptionPolicy
+      type:
+        scalar: string
     - name: priority
       type:
         scalar: numeric
@@ -15285,6 +15326,18 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.scheduling.v1alpha3.PodGroupSchedulingPolicy
       default: {}
+- name: io.k8s.api.scheduling.v1alpha3.SingleCompositeDisruptionMode
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode
   map:
     elementType:
@@ -15462,6 +15515,18 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+- name: io.k8s.api.scheduling.v1beta1.AllCompositeDisruptionMode
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.api.scheduling.v1beta1.AllDisruptionMode
   map:
     elementType:
@@ -15498,6 +15563,21 @@ var schemaYAML = typed.YAMLObject(`types:
         elementType:
           namedType: __untyped_deduced_
         elementRelationship: separable
+- name: io.k8s.api.scheduling.v1beta1.CompositeDisruptionMode
+  map:
+    fields:
+    - name: all
+      type:
+        namedType: io.k8s.api.scheduling.v1beta1.AllCompositeDisruptionMode
+    - name: single
+      type:
+        namedType: io.k8s.api.scheduling.v1beta1.SingleCompositeDisruptionMode
+    unions:
+    - fields:
+      - fieldName: all
+        discriminatorValue: All
+      - fieldName: single
+        discriminatorValue: Single
 - name: io.k8s.api.scheduling.v1beta1.CompositeGangSchedulingPolicy
   map:
     fields:
@@ -15540,6 +15620,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: disruptionMode
+      type:
+        namedType: io.k8s.api.scheduling.v1beta1.CompositeDisruptionMode
     - name: name
       type:
         scalar: string
@@ -15552,6 +15635,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: preemptionPolicy
+      type:
+        scalar: string
     - name: priority
       type:
         scalar: numeric
@@ -15772,6 +15858,18 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: io.k8s.api.scheduling.v1beta1.SingleCompositeDisruptionMode
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.api.scheduling.v1beta1.SingleDisruptionMode
   map:
     elementType:

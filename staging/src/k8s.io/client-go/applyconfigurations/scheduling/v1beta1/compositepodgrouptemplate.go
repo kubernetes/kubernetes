@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1beta1
 
+import (
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+)
+
 // CompositePodGroupTemplateApplyConfiguration represents a declarative configuration of the CompositePodGroupTemplate type for use
 // with apply.
 //
@@ -28,6 +32,13 @@ type CompositePodGroupTemplateApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 	// schedulingPolicy defines the scheduling policy for this template.
 	SchedulingPolicy *CompositePodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
+	// This field is immutable.
+	SchedulingConstraints *CompositePodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
+	// disruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+	// One of Single, All.
+	// This field is immutable.
+	DisruptionMode *CompositeDisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
 	// priorityClassName indicates the priority that should be considered when scheduling
 	// a composite pod group created from this template. If no priority class is specified,
 	// admission control can set this to the global default priority class if it exists.
@@ -42,6 +53,11 @@ type CompositePodGroupTemplateApplyConfiguration struct {
 	// The higher the value, the higher the priority.
 	// This field is immutable.
 	Priority *int32 `json:"priority,omitempty"`
+	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// This field is immutable.
+	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+	PreemptionPolicy *schedulingv1beta1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 	// podGroupTemplates is the list of templates for children PodGroups.
 	// The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
 	// or PodGroupTemplates must be set.
@@ -50,9 +66,6 @@ type CompositePodGroupTemplateApplyConfiguration struct {
 	// The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
 	// or PodGroupTemplates must be set.
 	CompositePodGroupTemplates []CompositePodGroupTemplateApplyConfiguration `json:"compositePodGroupTemplates,omitempty"`
-	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
-	// This field is immutable.
-	SchedulingConstraints *CompositePodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
 }
 
 // CompositePodGroupTemplateApplyConfiguration constructs a declarative configuration of the CompositePodGroupTemplate type for use with
@@ -77,6 +90,22 @@ func (b *CompositePodGroupTemplateApplyConfiguration) WithSchedulingPolicy(value
 	return b
 }
 
+// WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SchedulingConstraints field is set to the value of the last call.
+func (b *CompositePodGroupTemplateApplyConfiguration) WithSchedulingConstraints(value *CompositePodGroupSchedulingConstraintsApplyConfiguration) *CompositePodGroupTemplateApplyConfiguration {
+	b.SchedulingConstraints = value
+	return b
+}
+
+// WithDisruptionMode sets the DisruptionMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DisruptionMode field is set to the value of the last call.
+func (b *CompositePodGroupTemplateApplyConfiguration) WithDisruptionMode(value *CompositeDisruptionModeApplyConfiguration) *CompositePodGroupTemplateApplyConfiguration {
+	b.DisruptionMode = value
+	return b
+}
+
 // WithPriorityClassName sets the PriorityClassName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PriorityClassName field is set to the value of the last call.
@@ -90,6 +119,14 @@ func (b *CompositePodGroupTemplateApplyConfiguration) WithPriorityClassName(valu
 // If called multiple times, the Priority field is set to the value of the last call.
 func (b *CompositePodGroupTemplateApplyConfiguration) WithPriority(value int32) *CompositePodGroupTemplateApplyConfiguration {
 	b.Priority = &value
+	return b
+}
+
+// WithPreemptionPolicy sets the PreemptionPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PreemptionPolicy field is set to the value of the last call.
+func (b *CompositePodGroupTemplateApplyConfiguration) WithPreemptionPolicy(value schedulingv1beta1.PreemptionPolicy) *CompositePodGroupTemplateApplyConfiguration {
+	b.PreemptionPolicy = &value
 	return b
 }
 
@@ -116,13 +153,5 @@ func (b *CompositePodGroupTemplateApplyConfiguration) WithCompositePodGroupTempl
 		}
 		b.CompositePodGroupTemplates = append(b.CompositePodGroupTemplates, *values[i])
 	}
-	return b
-}
-
-// WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SchedulingConstraints field is set to the value of the last call.
-func (b *CompositePodGroupTemplateApplyConfiguration) WithSchedulingConstraints(value *CompositePodGroupSchedulingConstraintsApplyConfiguration) *CompositePodGroupTemplateApplyConfiguration {
-	b.SchedulingConstraints = value
 	return b
 }

@@ -22,6 +22,11 @@ limitations under the License.
 package v1alpha3
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AllCompositeDisruptionMode) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1alpha3.AllCompositeDisruptionMode"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in AllDisruptionMode) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1alpha3.AllDisruptionMode"
 }
@@ -34,6 +39,11 @@ func (in BasicSchedulingPolicy) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CompositeBasicSchedulingPolicy) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1alpha3.CompositeBasicSchedulingPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CompositeDisruptionMode) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1alpha3.CompositeDisruptionMode"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -129,6 +139,11 @@ func (in PodGroupStatus) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodGroupTemplate) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1alpha3.PodGroupTemplate"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SingleCompositeDisruptionMode) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1alpha3.SingleCompositeDisruptionMode"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

@@ -56,8 +56,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	strategy := registry.NewStrategy()
 
 	testCases := map[string]struct {
-		input        scheduling.CompositePodGroup
-		expectedErrs field.ErrorList
+		input                          scheduling.CompositePodGroup
+		enablePodGroupPreemptionPolicy bool
+		expectedErrs                   field.ErrorList
 	}{
 		"valid": {
 			input: mkValidCompositePodGroup(),
@@ -142,6 +143,40 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input:        mkValidCompositePodGroup(addTopologyConstraint("Example.com/Foo")),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints", "topology").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key")},
 		},
+		"composite pod group disruption mode all": {
+			input: mkValidCompositePodGroup(setDisruptionModeAll()),
+		},
+		"disruption mode with neither single nor all": {
+			input:        mkValidCompositePodGroup(setDisruptionModeNeither()),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "disruptionMode"), nil, "").WithOrigin("union")},
+		},
+		"disruption mode with both single and all": {
+			input:        mkValidCompositePodGroup(setDisruptionModeBoth()),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "disruptionMode"), nil, "").WithOrigin("union")},
+		},
+		"composite pod group without disruption mode": {
+			input:        mkValidCompositePodGroup(clearDisruptionMode()),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "disruptionMode"), "")},
+		},
+		"preemption policy set, PodGroupPreemptionPolicy disabled": {
+			input:        mkValidCompositePodGroup(setPreemptionPolicy(scheduling.PreemptNever)),
+			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "preemptionPolicy"), "")},
+		},
+		"valid preemption policy (Never), PodGroupPreemptionPolicy enabled": {
+			input:                          mkValidCompositePodGroup(setPreemptionPolicy(scheduling.PreemptNever)),
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"invalid preemption policy, PodGroupPreemptionPolicy enabled": {
+			input:                          mkValidCompositePodGroup(setPreemptionPolicy(scheduling.PreemptionPolicy("Invalid"))),
+			enablePodGroupPreemptionPolicy: true,
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "preemptionPolicy"), scheduling.PreemptionPolicy("Invalid"), []string{"Never", "PreemptLowerPriority"}),
+			},
+		},
+		"composite pod group without preemption policy, PodGroupPreemptionPolicy enabled": {
+			input:                          mkValidCompositePodGroup(clearPreemptionPolicy()),
+			enablePodGroupPreemptionPolicy: true,
+		},
 	}
 
 	for k, tc := range testCases {
@@ -150,6 +185,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				features.GenericWorkload:                 true,
 				features.CompositePodGroup:               true,
 				features.TopologyAwareWorkloadScheduling: true,
+				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs)
 		})
@@ -179,9 +215,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	})
 
 	testCases := map[string]struct {
-		oldObj       scheduling.CompositePodGroup
-		updateObj    scheduling.CompositePodGroup
-		expectedErrs field.ErrorList
+		oldObj                         scheduling.CompositePodGroup
+		updateObj                      scheduling.CompositePodGroup
+		enablePodGroupPreemptionPolicy bool
+		expectedErrs                   field.ErrorList
 	}{
 		"valid update": {
 			oldObj:    mkValidCompositePodGroup(setResourceVersion("1")),
@@ -256,6 +293,38 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj:    mkValidCompositePodGroup(setResourceVersion("1"), addTopologyConstraint("bar")),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable")},
 		},
+		"invalid update of disruption mode": {
+			oldObj:       mkValidCompositePodGroup(setResourceVersion("1")),
+			updateObj:    mkValidCompositePodGroup(setResourceVersion("1"), setDisruptionModeAll()),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "disruptionMode"), &scheduling.CompositeDisruptionMode{All: &scheduling.AllCompositeDisruptionMode{}}, "field is immutable").WithOrigin("immutable")},
+		},
+		"valid update with unchanged PreemptionPolicy": {
+			oldObj:                         mkValidCompositePodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidCompositePodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptLowerPriority)),
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"invalid update of PreemptionPolicy": {
+			oldObj:                         mkValidCompositePodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidCompositePodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptNever)),
+			enablePodGroupPreemptionPolicy: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "preemptionPolicy"), nil, "").WithOrigin("immutable"),
+			},
+		},
+		"valid update with unchanged PreemptionPolicy when PodGroupPreemptionPolicy is disabled": {
+			oldObj:                         mkValidCompositePodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidCompositePodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptLowerPriority)),
+			enablePodGroupPreemptionPolicy: false,
+		},
+		"invalid update of PreemptionPolicy when PodGroupPreemptionPolicy is disabled": {
+			oldObj:                         mkValidCompositePodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidCompositePodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptNever)),
+			enablePodGroupPreemptionPolicy: false,
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "preemptionPolicy"), ""),
+				field.Invalid(field.NewPath("spec", "preemptionPolicy"), nil, "").WithOrigin("immutable"),
+			},
+		},
 	}
 
 	for k, tc := range testCases {
@@ -264,6 +333,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				features.GenericWorkload:                 true,
 				features.CompositePodGroup:               true,
 				features.TopologyAwareWorkloadScheduling: true,
+				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			strategy := registry.NewStrategy()
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy, tc.expectedErrs)
@@ -353,6 +423,9 @@ func mkValidCompositePodGroup(tweaks ...func(cpg *scheduling.CompositePodGroup))
 			SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
 				Basic: &scheduling.CompositeBasicSchedulingPolicy{},
 			},
+			DisruptionMode: &scheduling.CompositeDisruptionMode{
+				Single: &scheduling.SingleCompositeDisruptionMode{},
+			},
 		},
 	}
 	for _, tweak := range tweaks {
@@ -370,6 +443,47 @@ func setResourceVersion(v string) func(obj *scheduling.CompositePodGroup) {
 func setParentCompositePodGroupName(name string) func(obj *scheduling.CompositePodGroup) {
 	return func(obj *scheduling.CompositePodGroup) {
 		obj.Spec.ParentCompositePodGroupName = &name
+	}
+}
+
+func setDisruptionModeAll() func(obj *scheduling.CompositePodGroup) {
+	return func(obj *scheduling.CompositePodGroup) {
+		obj.Spec.DisruptionMode = &scheduling.CompositeDisruptionMode{
+			All: &scheduling.AllCompositeDisruptionMode{},
+		}
+	}
+}
+
+func setDisruptionModeNeither() func(obj *scheduling.CompositePodGroup) {
+	return func(obj *scheduling.CompositePodGroup) {
+		obj.Spec.DisruptionMode = &scheduling.CompositeDisruptionMode{}
+	}
+}
+
+func setDisruptionModeBoth() func(obj *scheduling.CompositePodGroup) {
+	return func(obj *scheduling.CompositePodGroup) {
+		obj.Spec.DisruptionMode = &scheduling.CompositeDisruptionMode{
+			Single: &scheduling.SingleCompositeDisruptionMode{},
+			All:    &scheduling.AllCompositeDisruptionMode{},
+		}
+	}
+}
+
+func clearDisruptionMode() func(obj *scheduling.CompositePodGroup) {
+	return func(obj *scheduling.CompositePodGroup) {
+		obj.Spec.DisruptionMode = nil
+	}
+}
+
+func setPreemptionPolicy(policy scheduling.PreemptionPolicy) func(obj *scheduling.CompositePodGroup) {
+	return func(obj *scheduling.CompositePodGroup) {
+		obj.Spec.PreemptionPolicy = &policy
+	}
+}
+
+func clearPreemptionPolicy() func(obj *scheduling.CompositePodGroup) {
+	return func(obj *scheduling.CompositePodGroup) {
+		obj.Spec.PreemptionPolicy = nil
 	}
 }
 

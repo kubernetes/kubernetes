@@ -1,6 +1,10 @@
 {
   "components": {
     "schemas": {
+      "io.k8s.api.scheduling.v1beta1.AllCompositeDisruptionMode": {
+        "description": "AllCompositeDisruptionMode means that children of a CompositePodGroup can only be disrupted or preempted together.",
+        "type": "object"
+      },
       "io.k8s.api.scheduling.v1beta1.AllDisruptionMode": {
         "description": "AllDisruptionMode specifies that children can only be disrupted together.",
         "type": "object"
@@ -12,6 +16,36 @@
       "io.k8s.api.scheduling.v1beta1.CompositeBasicSchedulingPolicy": {
         "description": "CompositeBasicSchedulingPolicy indicates that the groups belonging to the composite group should be scheduled independently.",
         "type": "object"
+      },
+      "io.k8s.api.scheduling.v1beta1.CompositeDisruptionMode": {
+        "description": "CompositeDisruptionMode defines how individual entities within a composite pod group can be disrupted. Exactly one mode must be set.",
+        "properties": {
+          "all": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1beta1.AllCompositeDisruptionMode"
+              }
+            ],
+            "description": "all specifies that all children groups can only be disrupted together."
+          },
+          "single": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1beta1.SingleCompositeDisruptionMode"
+              }
+            ],
+            "description": "single specifies that children groups can be disrupted independently from each other."
+          }
+        },
+        "type": "object",
+        "x-kubernetes-unions": [
+          {
+            "fields-to-discriminateBy": {
+              "all": "All",
+              "single": "Single"
+            }
+          }
+        ]
       },
       "io.k8s.api.scheduling.v1beta1.CompositeGangSchedulingPolicy": {
         "description": "CompositeGangSchedulingPolicy indicates that the groups belonging to the composite group should be scheduled using all-or-nothing semantics.",
@@ -86,6 +120,14 @@
             ],
             "x-kubernetes-list-type": "map"
           },
+          "disruptionMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1beta1.CompositeDisruptionMode"
+              }
+            ],
+            "description": "disruptionMode defines the mode in which a given CompositePodGroup can be disrupted. One of Single, All. This field is immutable."
+          },
           "name": {
             "default": "",
             "description": "name is a unique identifier for the CompositePodGroupTemplate within the Workload. It must be a DNS label. This field is required.",
@@ -101,6 +143,10 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          },
+          "preemptionPolicy": {
+            "description": "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.",
+            "type": "string"
           },
           "priority": {
             "description": "priority is the value of priority of composite pod groups created from this template. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
@@ -526,6 +572,10 @@
           "name",
           "schedulingPolicy"
         ],
+        "type": "object"
+      },
+      "io.k8s.api.scheduling.v1beta1.SingleCompositeDisruptionMode": {
+        "description": "SingleCompositeDisruptionMode means that individual children of a CompositePodGroup can be disrupted or preempted independently.",
         "type": "object"
       },
       "io.k8s.api.scheduling.v1beta1.SingleDisruptionMode": {

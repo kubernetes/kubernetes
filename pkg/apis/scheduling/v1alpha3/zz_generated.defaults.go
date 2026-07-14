@@ -32,9 +32,31 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha3.CompositePodGroup{}, func(obj interface{}) {
+		SetObjectDefaults_CompositePodGroup(obj.(*schedulingv1alpha3.CompositePodGroup))
+	})
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha3.CompositePodGroupList{}, func(obj interface{}) {
+		SetObjectDefaults_CompositePodGroupList(obj.(*schedulingv1alpha3.CompositePodGroupList))
+	})
 	scheme.AddTypeDefaultingFunc(&schedulingv1alpha3.PodGroup{}, func(obj interface{}) { SetObjectDefaults_PodGroup(obj.(*schedulingv1alpha3.PodGroup)) })
 	scheme.AddTypeDefaultingFunc(&schedulingv1alpha3.PodGroupList{}, func(obj interface{}) { SetObjectDefaults_PodGroupList(obj.(*schedulingv1alpha3.PodGroupList)) })
 	return nil
+}
+
+func SetObjectDefaults_CompositePodGroup(in *schedulingv1alpha3.CompositePodGroup) {
+	SetDefaults_CompositePodGroup(in)
+	if in.Spec.DisruptionMode == nil {
+		if err := json.Unmarshal([]byte(`{"single": {}}`), &in.Spec.DisruptionMode); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func SetObjectDefaults_CompositePodGroupList(in *schedulingv1alpha3.CompositePodGroupList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_CompositePodGroup(a)
+	}
 }
 
 func SetObjectDefaults_PodGroup(in *schedulingv1alpha3.PodGroup) {
