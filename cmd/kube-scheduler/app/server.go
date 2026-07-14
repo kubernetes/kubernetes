@@ -47,6 +47,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -149,6 +150,14 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 		os.Exit(1)
 	}
 	cliflag.PrintFlags(cmd.Flags())
+
+	if opts.InformerName == nil {
+		informerName, err := cache.NewInformerName("kube-scheduler")
+		if err != nil {
+			return err
+		}
+		opts.InformerName = informerName
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

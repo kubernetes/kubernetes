@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
@@ -80,6 +81,8 @@ type Options struct {
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
+
+	InformerName *cache.InformerName
 
 	// Flags hold the parsed CLI flags.
 	Flags *cliflag.NamedFlagSets
@@ -335,7 +338,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	}
 
 	c.Client = client
-	c.InformerFactory = scheduler.NewInformerFactory(client, 0)
+	c.InformerFactory = scheduler.NewInformerFactory(client, 0, o.InformerName)
 	dynClient := dynamic.NewForConfigOrDie(c.KubeConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
 	c.LeaderElection = leaderElectionConfig
