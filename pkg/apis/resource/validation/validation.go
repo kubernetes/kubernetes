@@ -257,6 +257,16 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	for i, toleration := range subRequest.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
+	allErrs = append(allErrs, validateCapacityRequirements(subRequest.Capacity, fldPath.Child("capacity"))...)
+	return allErrs
+}
+
+func validateCapacityRequirements(capacity *resource.CapacityRequirements, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if capacity == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, validateMap(capacity.Requests, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateNonNegativeQuantity, fldPath.Child("requests"))...)
 	return allErrs
 }
 
@@ -268,6 +278,7 @@ func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *fi
 	for i, toleration := range request.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
+	allErrs = append(allErrs, validateCapacityRequirements(request.Capacity, fldPath.Child("capacity"))...)
 	return allErrs
 }
 
@@ -528,9 +539,18 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	if result.ShareID != nil {
 		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
+	allErrs = append(allErrs, validateMap(result.ConsumedCapacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateNonNegativeQuantity, fldPath.Child("consumedCapacity"))...)
 	return allErrs
 }
 
+// validateNonNegativeQuantity checks that a resource.Quantity used as a capacity value is not negative.
+func validateNonNegativeQuantity(value apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if value.Sign() < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), "must not be negative"))
+	}
+	return allErrs
+}
 func validateDeviceAllocationConfiguration(config resource.DeviceAllocationConfiguration, fldPath *field.Path, requestNames requestNames, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateAllocationConfigSource(config.Source, fldPath.Child("source"))...)
