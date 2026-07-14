@@ -156,12 +156,18 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 						return nil, fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity is nil, but Capacity key '%s' is set in NodeAllocatableResourceMappings for resource %s", key.Namespace, key.Name, result.Device, capacityKey, resourceName)
 					}
 					if consumed, exists := result.ConsumedCapacity[capacityKey]; exists {
+						if consumed.Sign() < 0 {
+							return nil, fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity for capacity key '%s' must not be negative, got %s", key.Namespace, key.Name, result.Device, capacityKey, consumed.String())
+						}
 						quantity = consumed.DeepCopy()
 						if resourceMap.AllocationMultiplier != nil {
 							qDec := quantity.AsDec()
 							multiplier := resourceMap.AllocationMultiplier.DeepCopy()
 							qDec.Mul(qDec, multiplier.AsDec())
 							quantity = *resource.NewDecimalQuantity(*qDec, quantity.Format)
+						}
+						if quantity.Sign() < 0 {
+							return nil, fmt.Errorf("claim %s/%s, device %s: computed node-allocatable footprint for resource %s must not be negative, got %s", key.Namespace, key.Name, result.Device, resourceName, quantity.String())
 						}
 					} else {
 						// If the capacityKey is not in ConsumedCapacity, this mapping is not relevant for this allocation
