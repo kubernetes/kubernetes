@@ -354,7 +354,11 @@ func (v *validatingWebhookAccessor) GetValidatingWebhook() (*v1.ValidatingWebhoo
 // to create a HookClient and the purpose of the config struct is to share that with other packages
 // that need to create a HookClient.
 func hookClientConfigForWebhook(w WebhookAccessor) webhookutil.ClientConfig {
-	ret := webhookutil.ClientConfig{Name: w.GetName(), CABundle: w.GetClientConfig().CABundle}
+	ret := webhookutil.ClientConfig{
+		Name:           w.GetName(),
+		CABundle:       w.GetClientConfig().CABundle,
+		TimeoutSeconds: w.GetTimeoutSeconds(),
+	}
 	if w.GetClientConfig().URL != nil {
 		ret.URL = *w.GetClientConfig().URL
 	}

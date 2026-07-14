@@ -26,11 +26,13 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/x509metrics"
@@ -45,10 +47,11 @@ const (
 
 // ClientConfig defines parameters required for creating a hook client.
 type ClientConfig struct {
-	Name     string
-	URL      string
-	CABundle []byte
-	Service  *ClientConfigService
+	Name           string
+	URL            string
+	CABundle       []byte
+	Service        *ClientConfigService
+	TimeoutSeconds *int32
 }
 
 // ClientConfigService defines service discovery parameters of the webhook.
@@ -166,6 +169,21 @@ func (cm *ClientManager) hookClientConfig(cc ClientConfig) (*rest.Config, error)
 			x509MissingSANCounter,
 			x509InsecureSHA1Counter,
 		))
+
+		if cc.TimeoutSeconds != nil {
+			timeout := time.Duration(*cc.TimeoutSeconds) * time.Second
+			cfg.Timeout = timeout
+
+			// Apply the timeout to the dialer as well because net/http detaches the
+			// request context before dialing, allowing the dial to outlive cfg.Timeout.
+			delegateDialer := dialerForConfig(cfg)
+			cfg.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+				ctx, cancel := context.WithTimeout(ctx, timeout)
+				defer cancel()
+
+				return delegateDialer(ctx, network, address)
+			}
+		}
 		return cfg, nil
 	}
 
@@ -198,11 +216,7 @@ func (cm *ClientManager) hookClientConfig(cc ClientConfig) (*rest.Config, error)
 		}
 
 		if !utilfeature.DefaultFeatureGate.Enabled(features.WebhookRoundTripLoadBalancing) {
-			delegateDialer := cfg.Dial
-			if delegateDialer == nil {
-				var d net.Dialer
-				delegateDialer = d.DialContext
-			}
+			delegateDialer := dialerForConfig(cfg)
 			cfg.Dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
 				if addr == host {
 					u, err := cm.serviceResolver.ResolveEndpoint(cc.Service.Namespace, cc.Service.Name, port)
@@ -260,6 +274,14 @@ func (cm *ClientManager) hookClientConfig(cc ClientConfig) (*rest.Config, error)
 	}
 
 	return complete(cfg)
+}
+
+func dialerForConfig(cfg *rest.Config) utilnet.DialFunc {
+	if cfg.Dial != nil {
+		return cfg.Dial
+	}
+	var d net.Dialer
+	return d.DialContext
 }
 
 func isLocalHost(u *url.URL) bool {
