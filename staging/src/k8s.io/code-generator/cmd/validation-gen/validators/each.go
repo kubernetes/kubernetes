@@ -374,7 +374,7 @@ func (ektv eachKeyTagValidator) Docs() TagDoc {
 		Tag:            ektv.TagName(),
 		Scopes:         sets.List(ektv.ValidScopes()),
 		StabilityLevel: TagStabilityLevelStable,
-		Description:    "Declares a validation for each value in a map or list.",
+		Description:    "Declares a validation for each key in a map.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",
 			Docs:        "The tag to evaluate for each key.",
