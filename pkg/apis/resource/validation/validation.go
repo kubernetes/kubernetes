@@ -551,6 +551,7 @@ func validateNonNegativeQuantity(value apiresource.Quantity, fldPath *field.Path
 	}
 	return allErrs
 }
+
 func validateDeviceAllocationConfiguration(config resource.DeviceAllocationConfiguration, fldPath *field.Path, requestNames requestNames, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateAllocationConfigSource(config.Source, fldPath.Child("source"))...)
