@@ -52,8 +52,14 @@ import (
 
 type mockState struct {
 	assignments    state.ContainerCPUAssignments
+	baselines      state.ContainerCPUBaselines
 	podAssignments state.PodCPUAssignments
 	defaultCPUSet  cpuset.CPUSet
+}
+
+func (s *mockState) GetBaselineCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
+	res, exists := s.baselines[podUID][containerName]
+	return res.Baseline.Clone(), exists
 }
 
 func (s *mockState) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
@@ -82,6 +88,16 @@ func (s *mockState) SetCPUSet(podUID string, containerName string, cset cpuset.C
 		s.assignments[podUID] = make(map[string]cpuset.CPUSet)
 	}
 	s.assignments[podUID][containerName] = cset
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		if _, exists := s.baselines[podUID]; !exists {
+			s.baselines[podUID] = make(map[string]state.ContainerCPUBaseline)
+			s.baselines[podUID][containerName] = state.ContainerCPUBaseline{Baseline: cset.Clone()}
+		} else {
+			if _, exists := s.baselines[podUID][containerName]; !exists {
+				s.baselines[podUID][containerName] = state.ContainerCPUBaseline{Baseline: cset.Clone()}
+			}
+		}
+	}
 }
 
 func (s *mockState) SetPodCPUSet(podUID string, cset cpuset.CPUSet) {
@@ -103,11 +119,18 @@ func (s *mockState) Delete(podUID string, containerName string) {
 	if len(s.assignments[podUID]) == 0 {
 		delete(s.assignments, podUID)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		delete(s.baselines[podUID], containerName)
+		if len(s.baselines[podUID]) == 0 {
+			delete(s.baselines, podUID)
+		}
+	}
 }
 
 func (s *mockState) ClearState() {
 	s.defaultCPUSet = cpuset.New()
 	s.assignments = make(state.ContainerCPUAssignments)
+	s.baselines = make(state.ContainerCPUBaselines)
 	s.podAssignments = make(state.PodCPUAssignments)
 }
 
@@ -123,12 +146,20 @@ func (s *mockState) SetPodCPUAssignments(a state.PodCPUAssignments) {
 	s.podAssignments = a.Clone()
 }
 
+func (s *mockState) SetCPUBaselines(a state.ContainerCPUBaselines) {
+	s.baselines = a.Clone()
+}
+
 func (s *mockState) GetCPUAssignments() state.ContainerCPUAssignments {
 	return s.assignments.Clone()
 }
 
 func (s *mockState) GetPodCPUAssignments() state.PodCPUAssignments {
 	return s.podAssignments.Clone()
+}
+
+func (s *mockState) GetCPUBaselines() state.ContainerCPUBaselines {
+	return s.baselines.Clone()
 }
 
 type mockPolicy struct {
@@ -352,6 +383,7 @@ func TestCPUManagerAdd(t *testing.T) {
 	}
 
 	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
 
 	testPolicy, _ := NewStaticPolicy(
 		logger,
@@ -400,7 +432,8 @@ func TestCPUManagerAdd(t *testing.T) {
 
 	for _, testCase := range testCases {
 		mgr := &manager{
-			policy: testCase.policy,
+			policy:          testCase.policy,
+			reconcilePeriod: 10 * time.Second,
 			state: &mockState{
 				assignments:   state.ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.New(1, 2, 3, 4),
@@ -442,6 +475,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
 	testCases := []struct {
 		description      string
 		topo             *topology.CPUTopology
@@ -698,6 +732,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
 	testCases := []struct {
 		description                string
 		cpuPolicyName              string
@@ -814,6 +849,7 @@ func TestCPUManagerRemove(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
 	containerID := "fakeID"
 	containerMap := containermap.NewContainerMap()
 
@@ -863,6 +899,7 @@ func TestReconcileState(t *testing.T) {
 	}
 
 	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
 
 	testPolicy, _ := NewStaticPolicy(
 		logger,
@@ -1393,6 +1430,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 	}
 
 	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
 	testPolicy, _ := NewStaticPolicy(
 		logger,
 		&topology.CPUTopology{
@@ -1472,6 +1510,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
 	testCases := []struct {
 		description      string
 		cpuPolicyName    string
@@ -1546,6 +1585,7 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
 	nonePolicy, _ := NewNonePolicy(nil)
 	staticPolicy, _ := NewStaticPolicy(
 		logger,

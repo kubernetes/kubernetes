@@ -126,7 +126,9 @@ func (sc *stateCheckpoint) restoreState() error {
 
 	var tmpDefaultCPUSet cpuset.CPUSet
 	var tmpContainerCPUSet cpuset.CPUSet
+	var tmpContainerBaselineCPUSet cpuset.CPUSet
 	tmpAssignments := ContainerCPUAssignments{}
+	tmpBaselines := ContainerCPUBaselines{}
 
 	if sc.policyName != cp.CheckpointData.PolicyName {
 		return fmt.Errorf("configured policy %q differs from state checkpoint policy %q", sc.policyName, cp.CheckpointData.PolicyName)
@@ -144,8 +146,36 @@ func (sc *stateCheckpoint) restoreState() error {
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		if len(cp.CheckpointData.Baselines) > 0 {
+			// restore Baselines from checkpoint data
+			for pod := range cp.CheckpointData.Baselines {
+				tmpBaselines[pod] = make(map[string]ContainerCPUBaseline, len(cp.CheckpointData.Baselines[pod]))
+				for container, cpuBaselines := range cp.CheckpointData.Baselines[pod] {
+					if tmpContainerBaselineCPUSet, err = cpuset.Parse(cpuBaselines.Baseline); err != nil {
+						return fmt.Errorf("could not parse Baseline cpuset %q for container %q in pod %q: %w", cpuBaselines.Baseline, container, pod, err)
+					}
+					tmpBaselines[pod][container] = ContainerCPUBaseline{Baseline: tmpContainerBaselineCPUSet}
+				}
+			}
+		} else {
+			// It's safe to use Entries as Baselines because Baselines are unset only by kubelets
+			// without the in-place vertical resize with exclusive CPUs.
+			// In that case, no resize was possible so the two set are identical by construction.
+			for pod := range tmpAssignments {
+				tmpBaselines[pod] = make(map[string]ContainerCPUBaseline, len(tmpAssignments[pod]))
+				for container, entries := range tmpAssignments[pod] {
+					tmpBaselines[pod][container] = ContainerCPUBaseline{Baseline: entries.Clone()}
+				}
+			}
+		}
+	}
+
 	sc.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
 	sc.cache.SetCPUAssignments(tmpAssignments)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		sc.cache.SetCPUBaselines(tmpBaselines)
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
 		sc.cache.SetPodCPUAssignments(cp.CheckpointData.PodEntries)
 	}
@@ -244,12 +274,20 @@ func (sc *stateCheckpoint) storeState() error {
 	checkpoint := newCPUManagerCheckpoint()
 	checkpoint.CheckpointData.PolicyName = sc.policyName
 	checkpoint.CheckpointData.DefaultCPUSet = sc.cache.GetDefaultCPUSet().String()
-
 	assignments := sc.cache.GetCPUAssignments()
 	for pod := range assignments {
 		checkpoint.CheckpointData.Entries[pod] = make(map[string]string, len(assignments[pod]))
 		for container, cset := range assignments[pod] {
 			checkpoint.CheckpointData.Entries[pod][container] = cset.String()
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		baselines := sc.cache.GetCPUBaselines()
+		for pod := range baselines {
+			checkpoint.CheckpointData.Baselines[pod] = make(map[string]ContainerCPUs, len(baselines[pod]))
+			for container, cpuAllocation := range baselines[pod] {
+				checkpoint.CheckpointData.Baselines[pod][container] = ContainerCPUs{Baseline: cpuAllocation.Baseline.String()}
+			}
 		}
 	}
 
@@ -397,6 +435,33 @@ func (sc *stateCheckpoint) ClearState() {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.ClearState()
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+// GetBaselineCPUSet returns container-level CPU assignment recorded at admission time, prior to any resize
+func (sc *stateCheckpoint) GetBaselineCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetBaselineCPUSet(podUID, containerName)
+}
+
+// GetCPUBaselines returns container-level CPU assignments recorded at admission time, prior to any resize, for all containers
+func (sc *stateCheckpoint) GetCPUBaselines() ContainerCPUBaselines {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetCPUBaselines()
+}
+
+// SetCPUBaselines stores container-level CPU assignments recorded at admission time, prior to any resize, for all containers
+func (sc *stateCheckpoint) SetCPUBaselines(a ContainerCPUBaselines) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.SetCPUBaselines(a)
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint")
