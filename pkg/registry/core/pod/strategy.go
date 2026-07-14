@@ -98,7 +98,13 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	mutatePodAffinity(pod)
 	mutateTopologySpreadConstraints(pod)
 	applyAppArmorVersionSkew(ctx, pod)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		podutil.DefaultPodLevelResources(pod)
+	}
 }
+
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
@@ -377,8 +383,17 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	// If PodLevelResources and InPlacePodLevelResourcesVerticalScaling feature gates is enabled,
 	// restore the saved pod-level resource requests to the new pod's spec.
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		newPod.Spec.Resources = newPodResources
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+			if newPodResources != nil {
+				newPod.Spec.Resources = podutil.MergePodLevelResources(newPodResources, oldPod.Spec.Resources)
+			}
+		} else {
+			newPod.Spec.Resources = newPodResources
+		}
 	}
+
+
+
 
 	newPod.Status = oldPod.Status
 	metav1.ResetObjectMetaForStatus(&newPod.ObjectMeta, &oldPod.ObjectMeta)
@@ -415,9 +430,17 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	oldPod := old.(*api.Pod)
 
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) &&
+		podutil.ShouldDefaultPodLevelResourcesOnUpdate(newPod, oldPod) {
+		podutil.DefaultPodLevelResources(newPod)
+	}
+
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
 }
+
 
 func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPod := obj.(*api.Pod)
