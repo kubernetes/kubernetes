@@ -479,7 +479,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetUID("uid-2")
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("uid"), "", "field is immutable").MarkFromImperative(),
+				field.Invalid(fldPath.Child("uid"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		{
@@ -489,7 +489,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetCreationTimestamp(t2)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("creationTimestamp"), "", "field is immutable").MarkFromImperative(),
+				field.Invalid(fldPath.Child("creationTimestamp"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		{
@@ -499,7 +499,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetDeletionTimestamp(&t2)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("deletionTimestamp"), "", "field is immutable").MarkFromImperative(),
+				field.Invalid(fldPath.Child("deletionTimestamp"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		{
@@ -511,7 +511,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetDeletionGracePeriodSeconds(&g2)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), "", "field is immutable").MarkFromImperative(),
+				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		{
