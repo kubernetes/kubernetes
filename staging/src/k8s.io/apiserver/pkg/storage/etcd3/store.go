@@ -32,6 +32,8 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.opentelemetry.io/otel/attribute"
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -730,6 +732,18 @@ func (s *store) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
 	return uint64(getResp.Revision), nil
 }
 
+// shouldStream determines whether a list request should use etcd RangeStream.
+func shouldStream(opts storage.ListOptions) bool {
+	// Only recursive lists stream, a non-recursive request reads a single object.
+	// Streaming's main goal is to bound unbounded reads, limited and continue requests are
+	// already bounded by pagination, so we are opting out of streaming for them for now.
+	if !opts.Recursive || opts.Predicate.Limit > 0 || opts.Predicate.Continue != "" {
+		return false
+	}
+	return utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) &&
+		etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RangeStream)
+}
+
 // GetList implements storage.Interface.
 func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	keyPrefix, err := s.prepareKey(key, opts.Recursive)
@@ -778,7 +792,18 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	aggregator := s.listErrAggrFactory()
 
-	for chunk, chunkErr := range s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey) {
+	chunks := s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey)
+	if shouldStream(opts) {
+		streamChunks, supported := s.streamChunks(ctx, keyPrefix, withRev)
+		if supported {
+			chunks = streamChunks
+		} else {
+			etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
+			klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", s.groupResource)
+		}
+	}
+
+	for chunk, chunkErr := range chunks {
 		if chunkErr != nil {
 			return chunkErr
 		}
@@ -825,7 +850,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	return s.finalizeList(listObj, opts.Predicate, uint64(withRev), continueValue, remainingItemCount, aggregator, v)
 }
 
-// listChunk is one batch of kvs from a list read.
+// listChunk is one batch of kvs from a list read: a page of a paginated Range, or a
+// chunk of a RangeStream.
 type listChunk struct {
 	kvs      []*mvccpb.KeyValue
 	revision *int64
@@ -884,6 +910,66 @@ func (s *store) listReadError(ctx context.Context, err error, withRev int64, pag
 		return storage.NewTooLargeResourceVersionError(uint64(withRev), currentRV, 0)
 	}
 	return interpretListError(err, paging, continueKey, keyPrefix)
+}
+
+// streamChunks reads the list as a single etcd RangeStream, pinned to withRev when
+// nonzero. supported is false when the etcd server does not implement RangeStream.
+func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev int64) (chunks iter.Seq2[listChunk, error], supported bool) {
+	startTime := time.Now()
+	streamOpts := []clientv3.OpOption{clientv3.WithRange(clientv3.GetPrefixRangeEnd(keyPrefix))}
+	if withRev > 0 {
+		streamOpts = append(streamOpts, clientv3.WithRev(withRev))
+	}
+	stream, streamErr := s.client.KV.GetStream(ctx, keyPrefix, streamOpts...)
+	var first clientv3.RangeStreamResponse
+	var firstOk bool
+	if streamErr == nil {
+		first, firstOk = <-stream
+		if firstOk && grpcstatus.Code(first.Err()) == grpccodes.Unimplemented {
+			return nil, false
+		}
+	} else if grpcstatus.Code(streamErr) == grpccodes.Unimplemented {
+		return nil, false
+	}
+	return func(yield func(listChunk, error) bool) {
+		var err error
+		defer func() {
+			metrics.RecordEtcdRequest("listStream", s.groupResource, err, startTime)
+		}()
+		if err = streamErr; err != nil {
+			yield(listChunk{}, s.listReadError(ctx, err, withRev, false, "", keyPrefix))
+			return
+		}
+		estimator := s.getResourceSizeEstimator()
+		var revision *int64
+		if withRev > 0 {
+			revision = &withRev
+		}
+		resp, ok := first, firstOk
+		for ok {
+			if err = resp.Err(); err != nil {
+				yield(listChunk{}, s.listReadError(ctx, err, withRev, false, "", keyPrefix))
+				return
+			}
+			rangeResp := resp.RangeResponse
+			if estimator != nil && len(rangeResp.Kvs) > 0 {
+				estimator.Update(rangeResp.Kvs)
+			}
+			// A pinned stream's final header holds the latest store revision, not withRev.
+			if revision == nil && rangeResp.Header != nil {
+				revision = &rangeResp.Header.Revision
+			}
+			next, nextOk := <-stream
+			if !yield(listChunk{kvs: rangeResp.Kvs, revision: revision, count: rangeResp.Count, hasMore: nextOk}, nil) {
+				return
+			}
+			resp, ok = next, nextOk
+		}
+		if revision == nil {
+			err = fmt.Errorf("rangeStream for %q completed without a revision", keyPrefix)
+			yield(listChunk{}, err)
+		}
+	}, true
 }
 
 func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator ListErrorAggregator, v reflect.Value) error {

@@ -30,10 +30,11 @@ type KVRecorder struct {
 
 	reads       uint64
 	streamReads uint64
+	lists       *KubernetesRecorder
 }
 
-func NewKVRecorder(kv clientv3.KV) *KVRecorder {
-	return &KVRecorder{KV: kv}
+func NewKVRecorder(kv clientv3.KV, lists *KubernetesRecorder) *KVRecorder {
+	return &KVRecorder{KV: kv, lists: lists}
 }
 
 func (r *KVRecorder) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
@@ -47,6 +48,9 @@ func (r *KVRecorder) GetReadsAndReset() uint64 {
 
 func (r *KVRecorder) GetStream(ctx context.Context, key string, opts ...clientv3.OpOption) (clientv3.GetStreamChan, error) {
 	atomic.AddUint64(&r.streamReads, 1)
+	if r.lists != nil {
+		r.lists.record(ctx, RecordedList{Key: key, ListOptions: kubernetes.ListOptions{Revision: clientv3.OpGet(key, opts...).Rev()}})
+	}
 	return r.KV.GetStream(ctx, key, opts...)
 }
 
@@ -69,13 +73,18 @@ func NewKubernetesRecorder(client kubernetes.Interface) *KubernetesRecorder {
 }
 
 func (r *KubernetesRecorder) List(ctx context.Context, key string, opts kubernetes.ListOptions) (kubernetes.ListResponse, error) {
-	recorderKey, ok := ctx.Value(RecorderContextKey).(string)
-	if ok {
-		r.mux.Lock()
-		r.listsPerKey[recorderKey] = append(r.listsPerKey[recorderKey], RecordedList{Key: key, ListOptions: opts})
-		r.mux.Unlock()
-	}
+	r.record(ctx, RecordedList{Key: key, ListOptions: opts})
 	return r.Interface.List(ctx, key, opts)
+}
+
+func (r *KubernetesRecorder) record(ctx context.Context, list RecordedList) {
+	recorderKey, ok := ctx.Value(RecorderContextKey).(string)
+	if !ok {
+		return
+	}
+	r.mux.Lock()
+	defer r.mux.Unlock()
+	r.listsPerKey[recorderKey] = append(r.listsPerKey[recorderKey], list)
 }
 
 func (r *KubernetesRecorder) ListRequestForKey(key string) []RecordedList {
