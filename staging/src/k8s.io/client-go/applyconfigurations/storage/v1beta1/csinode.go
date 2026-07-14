@@ -43,6 +43,7 @@ import (
 // CSINode has an OwnerReference that points to the corresponding node object.
 type CSINodeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	// metadata.name must be the Kubernetes node name.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec is the specification of CSINode
