@@ -16,6 +16,12 @@ limitations under the License.
 
 package oidc
 
+import (
+	"context"
+
+	"k8s.io/webhookauth/verify"
+)
+
 // SetInClusterPathsForTest redirects the projected service-account token and CA
 // bundle paths that InCluster reads. It exists only for tests: InCluster is
 // intentionally option-free in production, but tests must point it at temporary
@@ -29,4 +35,11 @@ func SetInClusterPathsForTest(tokenPath, caCertPath string) (restore func()) {
 		serviceAccountTokenPath = prevToken
 		serviceAccountCACertPath = prevCA
 	}
+}
+
+// NewDeferredVerifierForTest exposes the unexported deferred constructor (key set
+// fetched now, audience bound later via verify.Verifier.BindAudience) so tests can
+// exercise the in-cluster verifier shape before InCluster is rewired onto it.
+func NewDeferredVerifierForTest(ctx context.Context, issuer string, opts ...Option) (*verify.Verifier, error) {
+	return newDeferredVerifier(ctx, issuer, opts...)
 }

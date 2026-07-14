@@ -27,15 +27,26 @@ limitations under the License.
 // should use [VerifyAdmissionRequest] directly. The adapter imports only the
 // core verify package plus k8s.io/api/admission/v1 and k8s.io/apimachinery, so
 // JOSE/JWT dependencies stay confined to the authenticator the verifier uses.
+//
+// For an in-cluster verifier whose audience is derived at runtime, pass
+// [WithAudienceResolver] (see [InClusterAudienceResolver]): the handler binds the
+// audience from the first request and, until it can, denies fail-closed and
+// reports not-ready via [Handler.HealthCheck] — the seam to wire into a
+// controller-runtime health check.
 package admissionhttp // import "k8s.io/webhookauth/verify/admissionhttp"
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
+	"sync"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,23 +95,50 @@ const (
 type AdmissionHandler func(ctx context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse
 
 // Option configures the handler.
-type Option func(*handler)
+type Option func(*Handler)
 
 // WithMaxBodyBytes overrides the limit applied when reading the request body. A
 // non-positive value is ignored and the default is retained.
 func WithMaxBodyBytes(n int64) Option {
-	return func(h *handler) {
+	return func(h *Handler) {
 		if n > 0 {
 			h.maxBody = n
 		}
 	}
 }
 
-// handler is the http.Handler returned by WithTokenVerification.
-type handler struct {
+// AudienceResolver derives the expected token audience from the first admission
+// request. It is used by an in-cluster verifier whose audience is not known at
+// startup (see [InClusterAudienceResolver]). A non-nil error denies the request
+// fail-closed and leaves the verifier not-ready.
+type AudienceResolver func(r *http.Request) (audience string, err error)
+
+// WithAudienceResolver makes the handler derive and bind the expected audience
+// from the first request via resolve (see [InClusterAudienceResolver]). Until the
+// bind succeeds every request is denied fail-closed and [Handler.HealthCheck]
+// reports not-ready. A nil resolve is ignored.
+func WithAudienceResolver(resolve AudienceResolver) Option {
+	return func(h *Handler) {
+		if resolve != nil {
+			h.resolve = resolve
+		}
+	}
+}
+
+// Handler is the http.Handler returned by WithTokenVerification. Beyond serving
+// admission requests it exposes [Handler.HealthCheck] for readiness wiring.
+type Handler struct {
 	verifier *verify.Verifier
 	next     AdmissionHandler
 	maxBody  int64
+
+	// resolve, when non-nil, derives the expected audience from the first request
+	// and binds it (the in-cluster deferred-audience path); nil means the
+	// verifier's audience is already bound.
+	resolve AudienceResolver
+	// bindMu guards the one-time bind; bound records that it has happened.
+	bindMu sync.Mutex
+	bound  bool
 }
 
 // WithTokenVerification returns an http.Handler that checks the bearer token
@@ -115,11 +153,11 @@ type handler struct {
 //
 // next is required and performs the real admission logic; a nil next panics so a
 // misconfiguration fails fast instead of becoming a no-op auth gate.
-func WithTokenVerification(v *verify.Verifier, next AdmissionHandler, opts ...Option) http.Handler {
+func WithTokenVerification(v *verify.Verifier, next AdmissionHandler, opts ...Option) *Handler {
 	if next == nil {
 		panic("admissionhttp: next AdmissionHandler must not be nil")
 	}
-	h := &handler{
+	h := &Handler{
 		verifier: v,
 		next:     next,
 		maxBody:  defaultMaxBodyBytes,
@@ -131,7 +169,7 @@ func WithTokenVerification(v *verify.Verifier, next AdmissionHandler, opts ...Op
 }
 
 // ServeHTTP implements http.Handler.
-func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Check the bearer token first: it is far cheaper than reading and decoding
@@ -150,6 +188,17 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req := review.Request
+
+	// Bind the expected audience from the first request if the verifier needs it
+	// (in-cluster deferred path). A failure is fail-closed: deny with an explicit
+	// denied response and stay not-ready, so a scheduling race surfaces as a
+	// restart rather than a silent accept.
+	if err := h.ensureAudience(r); err != nil {
+		klog.FromContext(ctx).V(2).Info("Admission webhook token verification denied",
+			"reason", "expected audience could not be derived", "detail", err.Error())
+		writeResponse(w, req, deniedResponse())
+		return
+	}
 
 	// decodeReview guarantees req is non-nil, so the resource API group is
 	// well-defined here.
@@ -222,7 +271,7 @@ func writeResponse(w http.ResponseWriter, req *admissionv1.AdmissionRequest, res
 // AdmissionReview via the scheme's serializer. ok is false, with a non-sensitive
 // log reason, for an over-limit body or anything that is not a decodable
 // AdmissionReview carrying a Request — so the handler fails closed.
-func (h *handler) decodeReview(r *http.Request) (review *admissionv1.AdmissionReview, reason string, ok bool) {
+func (h *Handler) decodeReview(r *http.Request) (review *admissionv1.AdmissionReview, reason string, ok bool) {
 	if r.Body == nil {
 		return nil, reasonUndecodableBody, false
 	}
@@ -319,4 +368,86 @@ func BearerToken(r *http.Request) (token string, ok bool) {
 		return "", false
 	}
 	return token, true
+}
+
+// ensureAudience binds the expected audience from the first request when the
+// handler was given a resolver (the in-cluster deferred path). It binds at most
+// once; later calls are no-ops. With no resolver it does nothing, so the
+// out-of-cluster path (audience already bound) is unaffected.
+func (h *Handler) ensureAudience(r *http.Request) error {
+	if h.resolve == nil {
+		return nil
+	}
+	h.bindMu.Lock()
+	defer h.bindMu.Unlock()
+	if h.bound {
+		return nil
+	}
+	audience, err := h.resolve(r)
+	if err != nil {
+		return err
+	}
+	if err := h.verifier.BindAudience(audience); err != nil {
+		return err
+	}
+	h.bound = true
+	return nil
+}
+
+// HealthCheck reports whether the handler is ready to verify tokens by returning
+// the backing verifier's readiness. For an in-cluster deferred verifier it is
+// non-nil until the audience has been derived from a request. Wire it into a
+// controller-runtime health/readiness check so a webhook that can never derive
+// its audience (for example a scheduling race that never yields the Service env
+// var) is restarted rather than silently denying every request.
+func (h *Handler) HealthCheck() error {
+	return h.verifier.HealthCheck()
+}
+
+// InClusterAudienceResolver returns an [AudienceResolver] that derives the
+// expected token audience for an in-cluster, Service-backed admission webhook
+// from the first request, with no static configuration:
+//
+//   - host ← request.Host (the DNS name the apiserver dialed, e.g.
+//     <name>.<ns>.svc); its first two labels are the Service name and namespace,
+//   - port ← the kubelet-injected "<NAME>_SERVICE_PORT" env var for that Service
+//     (see k8s.io/kubernetes/pkg/kubelet/envvars), which also acts as a trust
+//     anchor: only a real Service in this pod's namespace has one, so a spoofed
+//     Host is rejected rather than trusted,
+//   - path ← request.URL.Path.
+//
+// The result mirrors kube-apiserver's validateWebhookAudience. It fails (denying
+// the request) if any component is missing; because the process environment is
+// fixed, a missing port env var keeps failing until the pod is rescheduled,
+// surfaced through [Handler.HealthCheck].
+func InClusterAudienceResolver() AudienceResolver {
+	return func(r *http.Request) (string, error) {
+		host := r.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+		if host == "" {
+			return "", errors.New("request Host is empty")
+		}
+		labels := strings.Split(host, ".")
+		if len(labels) < 2 || labels[0] == "" || labels[1] == "" {
+			return "", fmt.Errorf("request Host %q is not a <name>.<namespace>.svc service name", r.Host)
+		}
+		name, namespace := labels[0], labels[1]
+		portStr, ok := os.LookupEnv(serviceEnvPrefix(name) + "_SERVICE_PORT")
+		if !ok || portStr == "" {
+			return "", fmt.Errorf("no service port env var for %q: not a Service in this namespace, or a scheduling race", name)
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			return "", fmt.Errorf("service port env var for %q is not numeric: %w", name, err)
+		}
+		return verify.AudienceForService(name, namespace, int32(port), r.URL.Path), nil
+	}
+}
+
+// serviceEnvPrefix mirrors the kubelet's makeEnvVariableName
+// (k8s.io/kubernetes/pkg/kubelet/envvars): uppercase, dashes to underscores.
+func serviceEnvPrefix(name string) string {
+	return strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package oidc
+package verify
 
 import "fmt"
 
@@ -30,6 +30,10 @@ const defaultServiceAudiencePort = 443
 //
 // A URL-backed webhook does not use this helper: its audience is its configured
 // URL verbatim.
+//
+// It lives in this leaf package (not oidc) so both the OIDC authenticator and
+// the net/http adapter can share one source of truth without either importing
+// the other's dependencies.
 func AudienceForService(name, namespace string, port int32, path string) string {
 	if port == 0 {
 		port = defaultServiceAudiencePort

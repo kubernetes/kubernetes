@@ -48,6 +48,29 @@ type TokenAuthenticator interface {
 	AuthenticateToken(ctx context.Context, rawToken string) (allowedAPIGroups []string, err error)
 }
 
+// AudienceBinder is optionally implemented by a TokenAuthenticator whose expected
+// audience is not known at construction and must be supplied once at runtime (the
+// in-cluster case, where the audience is derived from the first admission
+// request). Until an audience is bound such an authenticator denies every token.
+type AudienceBinder interface {
+	// BindAudience sets the single expected audience. It is idempotent: the first
+	// successful bind wins and later calls with the same audience are no-ops; a
+	// call with a different audience is an error, so the audience cannot be
+	// silently repointed after it is frozen.
+	BindAudience(audience string) error
+}
+
+// HealthChecker is optionally implemented by a TokenAuthenticator to report
+// readiness — for an AudienceBinder, whether an audience has been bound. It maps
+// onto a controller-runtime health/readiness check so an authenticator that can
+// never become ready (for example a scheduling race that leaves the audience
+// underivable) surfaces as an unhealthy pod rather than a silent deny-all.
+type HealthChecker interface {
+	// HealthCheck returns nil when the authenticator is ready to verify tokens,
+	// or a non-nil error describing why it is not.
+	HealthCheck() error
+}
+
 // Verifier applies the KEP-6060 policy on top of a TokenAuthenticator: signature
 // and standard-claim verification are delegated to the authenticator, and this
 // type adds only the allowedAPIGroup match go-oidc has no concept of.
@@ -90,4 +113,30 @@ func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup s
 	}
 
 	return nil
+}
+
+// BindAudience supplies the expected audience to an authenticator that derives it
+// at runtime (see [AudienceBinder]). It returns nil for an authenticator that
+// already knows its audience (nothing to bind), and an error only if the backing
+// authenticator supports late binding and rejects this audience (for example a
+// second, conflicting bind). Callers that never use the in-cluster deferred path
+// can ignore it.
+func (v *Verifier) BindAudience(audience string) error {
+	binder, ok := v.authenticator.(AudienceBinder)
+	if !ok {
+		return nil
+	}
+	return binder.BindAudience(audience)
+}
+
+// HealthCheck reports whether the backing authenticator is ready to verify tokens
+// (see [HealthChecker]). An authenticator that does not implement HealthChecker is
+// always considered ready. This is the seam a webhook wires into a
+// controller-runtime health/readiness check.
+func (v *Verifier) HealthCheck() error {
+	checker, ok := v.authenticator.(HealthChecker)
+	if !ok {
+		return nil
+	}
+	return checker.HealthCheck()
 }
