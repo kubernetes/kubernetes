@@ -222,20 +222,24 @@ type KubeletConfiguration struct {
 	// +optional
 	ServerTLSBootstrap bool `json:"serverTLSBootstrap,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated.
+	//```yaml
 	// Defaults:
 	//   anonymous:
 	//     enabled: false
 	//   webhook:
 	//     enabled: true
 	//     cacheTTL: "2m"
+	//```
 	// +optional
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized.
+	// ```yaml
 	// Defaults:
 	//   mode: Webhook
 	//   webhook:
 	//     cacheAuthorizedTTL: "5m"
 	//     cacheUnauthorizedTTL: "30s"
+	//```
 	// +optional
 	Authorization KubeletAuthorization `json:"authorization"`
 	// registryPullQPS is the limit of registry pulls per second.
@@ -873,7 +877,7 @@ type KubeletConfiguration struct {
 	// 1. Duplicates, the same NUMA node, and memory type, but with a different value.
 	// 2. zero limits for any memory type.
 	// 3. NUMAs nodes IDs that do not exist under the machine.
-	// 4. memory types except for memory and hugepages-<size>
+	// 4. memory types except for memory and hugepages-SIZE
 	//
 	// Default: nil
 	// +optional
@@ -1111,9 +1115,9 @@ type CredentialProvider struct {
 	//
 	// Each entry in matchImages is a pattern which can optionally contain a port and a path.
 	// Globs can be used in the domain, but not in the port or the path. Globs are supported
-	// as subdomains like '*.k8s.io' or 'k8s.*.io', and top-level-domains such as 'k8s.*'.
-	// Matching partial subdomains like 'app*.k8s.io' is also supported. Each glob can only match
-	// a single subdomain segment, so *.io does not match *.k8s.io.
+	// as subdomains like `*.k8s.io` or `k8s.*.io`, and top-level-domains such as `k8s.*`.
+	// Matching partial subdomains like `app*.k8s.io` is also supported. Each glob can only match
+	// a single subdomain segment, so `*.io` does not match `*.k8s.io`.
 	//
 	// A match exists between an image and a matchImage when all of the below are true:
 	// - Both contain the same number of domain parts and each part matches.
@@ -1121,11 +1125,11 @@ type CredentialProvider struct {
 	// - If the imageMatch contains a port, then the port must match in the image as well.
 	//
 	// Example values of matchImages:
-	//   - 123456789.dkr.ecr.us-east-1.amazonaws.com
-	//   - *.azurecr.io
-	//   - gcr.io
-	//   - *.*.registry.io
-	//   - registry.io:8080/path
+	//   - `123456789.dkr.ecr.us-east-1.amazonaws.com`
+	//   - `*.azurecr.io`
+	//   - `gcr.io`
+	//   - `*.*.registry.io`
+	//   - `registry.io:8080/path`
 	MatchImages []string `json:"matchImages"`
 
 	// defaultCacheDuration is the default duration the plugin will cache credentials in-memory
