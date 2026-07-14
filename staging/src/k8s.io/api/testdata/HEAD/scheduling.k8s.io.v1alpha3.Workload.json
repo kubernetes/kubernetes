@@ -123,7 +123,14 @@
             "priority": 7,
             "preemptionPolicy": "preemptionPolicyValue"
           }
-        ]
+        ],
+        "schedulingConstraints": {
+          "topology": [
+            {
+              "key": "keyValue"
+            }
+          ]
+        }
       }
     ]
   }

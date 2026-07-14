@@ -88,6 +88,19 @@ message CompositePodGroupList {
   repeated CompositePodGroup items = 2;
 }
 
+// CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.
+message CompositePodGroupSchedulingConstraints {
+  // topology defines the topology constraints for the composite pod group.
+  // Currently only a single topology constraint can be specified. This may change in the future.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:maxItems=1
+  // +listType=atomic
+  // +k8s:listType=atomic
+  repeated TopologyConstraint topology = 1;
+}
+
 // CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup.
 // Exactly one policy must be set.
 //
@@ -169,6 +182,15 @@ message CompositePodGroupSpec {
   // +k8s:immutable
   // +k8s:maximum=1000000000 # HighestUserDefinablePriority
   optional int32 priority = 5;
+
+  // schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
+  // Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+  // This field is immutable.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  optional CompositePodGroupSchedulingConstraints schedulingConstraints = 6;
 }
 
 // CompositePodGroupStatus represents information about the status of a composite pod group.
@@ -277,6 +299,14 @@ message CompositePodGroupTemplate {
   // +k8s:update=NoAddItem
   // +k8s:update=NoRemoveItem
   repeated CompositePodGroupTemplate compositePodGroupTemplates = 6;
+
+  // schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
+  // This field is immutable.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  optional CompositePodGroupSchedulingConstraints schedulingConstraints = 7;
 }
 
 // DisruptionMode defines how individual entities within a group can be disrupted.

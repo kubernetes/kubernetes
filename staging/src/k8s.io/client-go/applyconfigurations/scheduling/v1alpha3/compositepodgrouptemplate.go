@@ -50,6 +50,9 @@ type CompositePodGroupTemplateApplyConfiguration struct {
 	// The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
 	// or PodGroupTemplates must be set.
 	CompositePodGroupTemplates []CompositePodGroupTemplateApplyConfiguration `json:"compositePodGroupTemplates,omitempty"`
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
+	// This field is immutable.
+	SchedulingConstraints *CompositePodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
 }
 
 // CompositePodGroupTemplateApplyConfiguration constructs a declarative configuration of the CompositePodGroupTemplate type for use with
@@ -113,5 +116,13 @@ func (b *CompositePodGroupTemplateApplyConfiguration) WithCompositePodGroupTempl
 		}
 		b.CompositePodGroupTemplates = append(b.CompositePodGroupTemplates, *values[i])
 	}
+	return b
+}
+
+// WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SchedulingConstraints field is set to the value of the last call.
+func (b *CompositePodGroupTemplateApplyConfiguration) WithSchedulingConstraints(value *CompositePodGroupSchedulingConstraintsApplyConfiguration) *CompositePodGroupTemplateApplyConfiguration {
+	b.SchedulingConstraints = value
 	return b
 }

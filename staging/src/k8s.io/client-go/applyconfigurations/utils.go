@@ -1864,6 +1864,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1alpha3.CompositeGangSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroup"):
 		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingConstraints"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupSchedulingConstraintsApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingPolicy"):
 		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSpec"):

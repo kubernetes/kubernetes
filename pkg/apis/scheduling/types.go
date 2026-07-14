@@ -325,6 +325,12 @@ type CompositePodGroupTemplate struct {
 	// +listType=map
 	// +listMapKey=name
 	CompositePodGroupTemplates []CompositePodGroupTemplate
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +optional
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -784,6 +790,13 @@ type CompositePodGroupSpec struct {
 	//
 	// +optional
 	Priority *int32
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +optional
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints
 }
 
 // CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup.
@@ -855,4 +868,14 @@ type CompositePodGroupStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition
+}
+
+// CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.
+type CompositePodGroupSchedulingConstraints struct {
+	// Topology defines the topology constraints for the composite pod group.
+	// Currently only a single topology constraint can be specified. This may change in the future.
+	//
+	// +optional
+	// +listType=atomic
+	Topology []TopologyConstraint
 }

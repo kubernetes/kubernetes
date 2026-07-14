@@ -14894,6 +14894,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.scheduling.v1alpha3.CompositePodGroupStatus
       default: {}
+- name: io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints
+  map:
+    fields:
+    - name: topology
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha3.TopologyConstraint
+          elementRelationship: atomic
 - name: io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy
   map:
     fields:
@@ -14921,6 +14930,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: priorityClassName
       type:
         scalar: string
+    - name: schedulingConstraints
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints
     - name: schedulingPolicy
       type:
         namedType: io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy
@@ -14968,6 +14980,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: priorityClassName
       type:
         scalar: string
+    - name: schedulingConstraints
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints
     - name: schedulingPolicy
       type:
         namedType: io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy

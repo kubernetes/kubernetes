@@ -17,6 +17,7 @@ limitations under the License.
 package compositepodgroup
 
 import (
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,6 +105,42 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"workloadRef invalid workloadName": {
 			input:        mkValidCompositePodGroup(setWorkloadRef("template", "invalid/workload")),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "workloadRef", "workloadName"), nil, "").WithOrigin("format=k8s-long-name")},
+		},
+		"valid with schedulingConstraints": {
+			input: mkValidCompositePodGroup(addTopologyConstraint("foo")),
+		},
+		"schedulingConstraints with multiple topology constraints": {
+			input:        mkValidCompositePodGroup(addTopologyConstraint("foo"), addTopologyConstraint("bar")),
+			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("spec", "schedulingConstraints", "topology"), 2, 1).WithOrigin("maxItems")},
+		},
+		"valid with empty schedulingConstraints": {
+			input: mkValidCompositePodGroup(setSchedulingConstraints()),
+		},
+		"topologyConstraint with empty topology key": {
+			input:        mkValidCompositePodGroup(addTopologyConstraint("")),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "schedulingConstraints", "topology").Index(0).Child("key"), "")},
+		},
+		"valid with topology key with DNS prefix": {
+			input: mkValidCompositePodGroup(addTopologyConstraint("example.com/Foo")),
+		},
+		"valid with topology key with prefix with max length": {
+			input: mkValidCompositePodGroup(addTopologyConstraint(strings.Repeat("a", 253) + "/" + strings.Repeat("b", 63))),
+		},
+		"with topology key with prefix exceending max prefix length": {
+			input:        mkValidCompositePodGroup(addTopologyConstraint(strings.Repeat("a", 254) + "/foo")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints", "topology").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key")},
+		},
+		"with topology key with prefix exceending max name length": {
+			input:        mkValidCompositePodGroup(addTopologyConstraint("foo/" + strings.Repeat("b", 64))),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints", "topology").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key")},
+		},
+		"with topology key without prefix exceeding max length": {
+			input:        mkValidCompositePodGroup(addTopologyConstraint(strings.Repeat("b", 64))),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints", "topology").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key")},
+		},
+		"with topology key with invalid characters": {
+			input:        mkValidCompositePodGroup(addTopologyConstraint("Example.com/Foo")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints", "topology").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key")},
 		},
 	}
 
@@ -199,6 +236,25 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "workloadRef"), nil, "").WithOrigin("immutable"),
 			},
+		},
+		"valid update with unchanged scheduling constraints": {
+			oldObj:    mkValidCompositePodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
+			updateObj: mkValidCompositePodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
+		},
+		"invalid update to scheduling constraints": {
+			oldObj:       mkValidCompositePodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
+			updateObj:    mkValidCompositePodGroup(setResourceVersion("1"), setSchedulingConstraints()),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable")},
+		},
+		"invalid update to topology constraints": {
+			oldObj:       mkValidCompositePodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
+			updateObj:    mkValidCompositePodGroup(setResourceVersion("1"), addTopologyConstraint("foo"), addTopologyConstraint("bar")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable")},
+		},
+		"invalid update to topology key": {
+			oldObj:       mkValidCompositePodGroup(setResourceVersion("1"), addTopologyConstraint("foo")),
+			updateObj:    mkValidCompositePodGroup(setResourceVersion("1"), addTopologyConstraint("bar")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable")},
 		},
 	}
 
@@ -369,5 +425,20 @@ func addCondition(conditionType string) func(*scheduling.CompositePodGroup) {
 			Reason:             "Reason",
 			Message:            "Message",
 		})
+	}
+}
+
+func setSchedulingConstraints() func(obj *scheduling.CompositePodGroup) {
+	return func(obj *scheduling.CompositePodGroup) {
+		obj.Spec.SchedulingConstraints = &scheduling.CompositePodGroupSchedulingConstraints{}
+	}
+}
+
+func addTopologyConstraint(value string) func(obj *scheduling.CompositePodGroup) {
+	return func(obj *scheduling.CompositePodGroup) {
+		if obj.Spec.SchedulingConstraints == nil {
+			setSchedulingConstraints()(obj)
+		}
+		obj.Spec.SchedulingConstraints.Topology = append(obj.Spec.SchedulingConstraints.Topology, scheduling.TopologyConstraint{Key: value})
 	}
 }

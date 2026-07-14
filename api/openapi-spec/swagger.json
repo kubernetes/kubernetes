@@ -19891,6 +19891,20 @@
         }
       ]
     },
+    "io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints": {
+      "description": "CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.",
+      "properties": {
+        "topology": {
+          "description": "topology defines the topology constraints for the composite pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.TopologyConstraint"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "type": "object"
+    },
     "io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy": {
       "description": "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.",
       "properties": {
@@ -19928,6 +19942,10 @@
         "priorityClassName": {
           "description": "priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the composite pod group's priority will be zero). This field is immutable.",
           "type": "string"
+        },
+        "schedulingConstraints": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints",
+          "description": "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable."
         },
         "schedulingPolicy": {
           "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy",
@@ -20000,6 +20018,10 @@
         "priorityClassName": {
           "description": "priorityClassName indicates the priority that should be considered when scheduling a composite pod group created from this template. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, composite pod groups created from this template will have the priority set to zero. This field is immutable.",
           "type": "string"
+        },
+        "schedulingConstraints": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints",
+          "description": "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate. This field is immutable."
         },
         "schedulingPolicy": {
           "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy",

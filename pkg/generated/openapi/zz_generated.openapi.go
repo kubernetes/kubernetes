@@ -1159,6 +1159,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		schedulingv1alpha3.CompositeGangSchedulingPolicy{}.OpenAPIModelName():                                           schema_k8sio_api_scheduling_v1alpha3_CompositeGangSchedulingPolicy(ref),
 		schedulingv1alpha3.CompositePodGroup{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1alpha3_CompositePodGroup(ref),
 		schedulingv1alpha3.CompositePodGroupList{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupList(ref),
+		schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName():                                  schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingConstraints(ref),
 		schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName():                                       schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingPolicy(ref),
 		schedulingv1alpha3.CompositePodGroupSpec{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSpec(ref),
 		schedulingv1alpha3.CompositePodGroupStatus{}.OpenAPIModelName():                                                 schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupStatus(ref),
@@ -54567,6 +54568,39 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupList(ref common.Refer
 	}
 }
 
+func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingConstraints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"topology": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "topology defines the topology constraints for the composite pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -54647,12 +54681,18 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSpec(ref common.Refer
 							Format:      "int32",
 						},
 					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
+							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"workloadRef", "schedulingPolicy"},
 			},
 		},
 		Dependencies: []string{
-			schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()},
+			schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -54772,12 +54812,18 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupTemplate(ref common.R
 							},
 						},
 					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate. This field is immutable.",
+							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"name", "schedulingPolicy"},
 			},
 		},
 		Dependencies: []string{
-			schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupTemplate{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName()},
+			schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupTemplate{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName()},
 	}
 }
 

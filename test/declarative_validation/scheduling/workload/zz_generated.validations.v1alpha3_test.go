@@ -164,6 +164,16 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.compositePodGroupTemplates[*].schedulingConstraints": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.compositePodGroupTemplates[*].schedulingConstraints.topology": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.compositePodGroupTemplates[*].schedulingConstraints.topology[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.compositePodGroupTemplates[*].schedulingPolicy": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},

@@ -61,6 +61,18 @@ var (
 	multipleFieldsSetError = "must specify exactly one of: `basic`, `gang`"
 )
 
+func compositePodGroupWithSchedulingConstraints(keys ...string) *scheduling.CompositePodGroup {
+	result := cpg.DeepCopy()
+	result.Spec.SchedulingConstraints = &scheduling.CompositePodGroupSchedulingConstraints{
+		Topology: []scheduling.TopologyConstraint{},
+	}
+	for _, key := range keys {
+		constraint := scheduling.TopologyConstraint{Key: key}
+		result.Spec.SchedulingConstraints.Topology = append(result.Spec.SchedulingConstraints.Topology, constraint)
+	}
+	return result
+}
+
 func TestStrategy(t *testing.T) {
 	strategy := NewStrategy()
 	if !strategy.NamespaceScoped() {
@@ -171,6 +183,14 @@ func TestStrategyCreate(t *testing.T) {
 				return cpg
 			}(),
 			expectValidationError: maximumError,
+		},
+		"multiple topology constraints": {
+			obj:                   compositePodGroupWithSchedulingConstraints("foo", "bar"),
+			expectValidationError: "must have at most 1 item",
+		},
+		"invalid topology key": {
+			obj:                   compositePodGroupWithSchedulingConstraints("foo-"),
+			expectValidationError: "Invalid value: \"foo-\"",
 		},
 	}
 
@@ -317,6 +337,21 @@ func TestStrategyUpdate(t *testing.T) {
 				newCpg.Spec.ParentCompositePodGroupName = new("parent1")
 				return newCpg
 			}(),
+			expectValidationError: fieldImmutableError,
+		},
+		"changing scheduling constraints not allowed": {
+			oldObj:                compositePodGroupWithSchedulingConstraints("foo"),
+			newObj:                compositePodGroupWithSchedulingConstraints(),
+			expectValidationError: fieldImmutableError,
+		},
+		"changing topology constraints not allowed": {
+			oldObj:                compositePodGroupWithSchedulingConstraints("foo"),
+			newObj:                compositePodGroupWithSchedulingConstraints(),
+			expectValidationError: fieldImmutableError,
+		},
+		"changing topology key not allowed": {
+			oldObj:                compositePodGroupWithSchedulingConstraints("foo"),
+			newObj:                compositePodGroupWithSchedulingConstraints("foobar"),
 			expectValidationError: fieldImmutableError,
 		},
 	}
