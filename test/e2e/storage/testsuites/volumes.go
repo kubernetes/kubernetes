@@ -93,10 +93,11 @@ func (t *volumesTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (t *volumesTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	if pattern.VolMode == v1.PersistentVolumeBlock {
-		skipTestIfBlockNotSupported(driver)
+		return checkIfBlockNotSupported(driver)
 	}
+	return ""
 }
 
 func skipExecTest(driver storageframework.TestDriver) {
@@ -107,10 +108,17 @@ func skipExecTest(driver storageframework.TestDriver) {
 }
 
 func skipTestIfBlockNotSupported(driver storageframework.TestDriver) {
+	if reason := checkIfBlockNotSupported(driver); reason != "" {
+		e2eskipper.Skipf("%s", reason)
+	}
+}
+
+func checkIfBlockNotSupported(driver storageframework.TestDriver) string {
 	dInfo := driver.GetDriverInfo()
 	if !dInfo.Capabilities[storageframework.CapBlock] {
-		e2eskipper.Skipf("Driver %q does not provide raw block - skipping", dInfo.Name)
+		return fmt.Sprintf("Driver %q does not provide raw block", dInfo.Name)
 	}
+	return ""
 }
 
 func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

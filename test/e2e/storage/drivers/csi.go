@@ -66,7 +66,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	mockdriver "k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/driver"
 	mockservice "k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/service"
@@ -203,10 +202,11 @@ func (h *hostpathCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &h.driverInfo
 }
 
-func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
 	if pattern.VolType == storageframework.CSIInlineVolume && len(h.volumeAttributes) == 0 {
-		e2eskipper.Skipf("%s has no volume attributes defined, doesn't support ephemeral inline volumes", h.driverInfo.Name)
+		return fmt.Sprintf("%s has no volume attributes defined, doesn't support ephemeral inline volumes", h.driverInfo.Name)
 	}
+	return ""
 }
 
 func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -626,7 +626,8 @@ func (m *mockCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &m.driverInfo
 }
 
-func (m *mockCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (m *mockCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (m *mockCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -957,15 +958,19 @@ func (g *gcePDCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
 	if pattern.FsType == "xfs" {
-		e2eskipper.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
+		if !framework.NodeOSDistroIs("ubuntu", "custom") {
+			return "unsupported node OS"
+		}
+
 	}
 	for _, tag := range pattern.TestTags {
 		if tag == feature.Windows {
-			e2eskipper.Skipf("Skipping tests for windows since CSI does not support it yet")
+			return "Skipping tests for windows since CSI does not support it yet"
 		}
 	}
+	return ""
 }
 
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {

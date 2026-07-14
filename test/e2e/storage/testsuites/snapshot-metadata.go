@@ -32,7 +32,6 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
@@ -72,12 +71,13 @@ func (s *snapshotMetadataTestSuite) GetTestSuiteInfo() storageframework.TestSuit
 }
 
 // SkipUnsupportedTests implements framework.TestSuite.
-func (s *snapshotMetadataTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (s *snapshotMetadataTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	_, ok := driver.(storageframework.SnapshotMetadataTestDriver)
 	driverInfo := driver.GetDriverInfo()
 	if !driverInfo.Capabilities[storageframework.CapSnapshotMetadata] || !ok {
-		e2eskipper.Skipf("Driver %q does not support snapshot metadata", driverInfo.Name)
+		return fmt.Sprintf("Driver %q does not support snapshot metadata", driverInfo.Name)
 	}
+	return ""
 }
 
 func constructVerifierCommand(

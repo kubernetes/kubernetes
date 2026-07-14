@@ -80,12 +80,15 @@ func (t *multiVolumeTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo
 	return t.tsInfo
 }
 
-func (t *multiVolumeTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (t *multiVolumeTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	dInfo := driver.GetDriverInfo()
-	skipVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(storageframework.PreprovisionedPV))
-	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[storageframework.CapBlock] {
-		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
+	if reason := checkVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(storageframework.PreprovisionedPV)); reason != "" {
+		return reason
 	}
+	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[storageframework.CapBlock] {
+		return fmt.Sprintf("Driver %s doesn't support %v", dInfo.Name, pattern.VolMode)
+	}
+	return ""
 }
 
 func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

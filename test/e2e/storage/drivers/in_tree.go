@@ -143,7 +143,8 @@ func (n *nfsDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &n.driverInfo
 }
 
-func (n *nfsDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (n *nfsDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
@@ -289,7 +290,8 @@ func (i *iSCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &i.driverInfo
 }
 
-func (i *iSCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (i *iSCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
@@ -429,7 +431,8 @@ func (h *hostPathDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &h.driverInfo
 }
 
-func (h *hostPathDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (h *hostPathDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (h *hostPathDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
@@ -585,7 +588,8 @@ func (h *hostPathSymlinkDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &h.driverInfo
 }
 
-func (h *hostPathSymlinkDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (h *hostPathSymlinkDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
@@ -732,7 +736,8 @@ func (e *emptydirDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &e.driverInfo
 }
 
-func (e *emptydirDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (e *emptydirDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (e *emptydirDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
@@ -799,7 +804,8 @@ func (c *cinderDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &c.driverInfo
 }
 
-func (c *cinderDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (c *cinderDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (c *cinderDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -908,12 +914,15 @@ func (g *gcePdDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
 	for _, tag := range pattern.TestTags {
 		if tag == feature.Windows {
-			e2eskipper.SkipUnlessNodeOSDistroIs("windows")
+			if !framework.NodeOSDistroIs("windows") {
+				return "not supported on Windows"
+			}
 		}
 	}
+	return ""
 }
 
 func (g *gcePdDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -988,7 +997,8 @@ func (v *vSphereDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &v.driverInfo
 }
 
-func (v *vSphereDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (v *vSphereDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (v *vSphereDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -1056,7 +1066,8 @@ func (a *azureDiskDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &a.driverInfo
 }
 
-func (a *azureDiskDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (a *azureDiskDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (a *azureDiskDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -1138,7 +1149,8 @@ func (a *awsDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &a.driverInfo
 }
 
-func (a *awsDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (a *awsDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (a *awsDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -1300,7 +1312,8 @@ func (l *localDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &l.driverInfo
 }
 
-func (l *localDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (l *localDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (l *localDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
@@ -1441,7 +1454,8 @@ func (a *azureFileDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &a.driverInfo
 }
 
-func (a *azureFileDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+func (a *azureFileDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (a *azureFileDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
