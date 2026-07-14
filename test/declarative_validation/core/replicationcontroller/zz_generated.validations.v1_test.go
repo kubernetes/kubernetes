@@ -49,6 +49,9 @@ func init() {
 			"metadata.name": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"metadata.ownerReferences[*].apiVersion": {
 				{ErrorType: "FieldValueRequired"},
 			},
