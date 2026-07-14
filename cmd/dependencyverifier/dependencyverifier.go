@@ -62,7 +62,18 @@ func runCommand(cmd ...string) (string, error) {
 	return runCommandInDir("", cmd)
 }
 
+// allowedCommands is the set of executable names permitted to be run by runCommandInDir.
+var allowedCommands = map[string]bool{
+	"go": true,
+}
+
 func runCommandInDir(dir string, cmd []string) (string, error) {
+	if len(cmd) == 0 {
+		return "", fmt.Errorf("no command provided")
+	}
+	if !allowedCommands[cmd[0]] {
+		return "", fmt.Errorf("executable %q is not in the list of allowed commands", cmd[0])
+	}
 	c := exec.Command(cmd[0], cmd[1:]...)
 	c.Dir = dir
 	output, err := c.CombinedOutput()
