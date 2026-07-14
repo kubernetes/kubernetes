@@ -1090,11 +1090,13 @@ func TestReflectiveMapListWithThreeKeysEqual(t *testing.T) {
 
 func TestListAdd(t *testing.T) {
 	type AddListsStruct struct {
-		Tags   []string       `json:"tags"`
-		I32s   []int32        `json:"i32s"`
-		Items  []MapListEntry `json:"items"`
-		Nested []Nested       `json:"nested"`
-		Empty  []int64        `json:"empty"`
+		Tags    []string       `json:"tags"`
+		I32s    []int32        `json:"i32s"`
+		Items   []MapListEntry `json:"items"`
+		Nested  []Nested       `json:"nested"`
+		Empty   []int64        `json:"empty"`
+		MapList []MapListEntry `json:"mapList"`
+		SetList []SetEntry     `json:"setList"`
 	}
 
 	mapListEntrySchema := &spec.Schema{SchemaProps: spec.SchemaProps{
@@ -1115,26 +1117,47 @@ func TestListAdd(t *testing.T) {
 				"items":  *spec.ArrayProperty(mapListEntrySchema),
 				"nested": *spec.ArrayProperty(nestedSchema),
 				"empty":  *intArraySchema,
+				"mapList": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type":     "map",
+						"x-kubernetes-list-map-keys": []any{"key1", "key2"},
+					}},
+					SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: mapListEntrySchema}},
+				},
+				"setList": {
+					VendorExtensible: spec.VendorExtensible{Extensions: map[string]interface{}{
+						"x-kubernetes-list-type": "set",
+					}},
+					SchemaProps: intArraySchema.SchemaProps,
+				},
 			},
 		},
 	}
 
 	x := typedValue{value: AddListsStruct{
-		Tags:   []string{"a", "b", "c"},
-		I32s:   []int32{1, 2, 3},
-		Items:  []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
-		Nested: []Nested{{Name: "n1", Info: Struct{S: "hello"}}},
-		Empty:  []int64{},
+		Tags:    []string{"a", "b", "c"},
+		I32s:    []int32{1, 2, 3},
+		Items:   []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
+		Nested:  []Nested{{Name: "n1", Info: Struct{S: "hello"}}},
+		Empty:   []int64{},
+		MapList: []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 1}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
+		SetList: []SetEntry{1, 2, 3},
 	}, schema: addListsSchema}
 	y := typedValue{value: AddListsStruct{
-		Tags:   []string{"d", "e"},
-		I32s:   []int32{30},
-		Items:  []MapListEntry{{Key1: "yk1", Key2: "yk2", Value: 7}},
-		Nested: []Nested{},
-		Empty:  []int64{},
+		Tags:    []string{"d", "e"},
+		I32s:    []int32{30},
+		Items:   []MapListEntry{{Key1: "yk1", Key2: "yk2", Value: 7}},
+		Nested:  []Nested{},
+		Empty:   []int64{},
+		MapList: []MapListEntry{{Key1: "k1v1", Key2: "k2v1", Value: 10}, {Key1: "k1v3", Key2: "k2v3", Value: 3}},
+		SetList: []SetEntry{3, 30},
+	}, schema: addListsSchema}
+	// z.mapList contains the same entries as (x.mapList + y.mapList), in a different order.
+	z := typedValue{value: AddListsStruct{
+		MapList: []MapListEntry{{Key1: "k1v3", Key2: "k2v3", Value: 3}, {Key1: "k1v1", Key2: "k2v1", Value: 10}, {Key1: "k1v2", Key2: "k2v2", Value: 2}},
 	}, schema: addListsSchema}
 
-	activation := map[string]typedValue{"x": x, "y": y}
+	activation := map[string]typedValue{"x": x, "y": y, "z": z}
 
 	tests := []struct {
 		testCase
@@ -1221,6 +1244,59 @@ func TestListAdd(t *testing.T) {
 			expression: "(x.i32s + [4])[10] == 1",
 			wantErr:    "index out of bounds: 10",
 		}},
+		// Lists with x-kubernetes-list-type=map.
+		{testCase: testCase{
+			name:       "map list merge overwrites intersecting keys in place",
+			expression: "(x.mapList + y.mapList)[0].value == 10 && size(x.mapList + y.mapList) == 3",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "map list merge appends non-intersecting keys",
+			expression: "(x.mapList + y.mapList)[2].key1 == 'k1v3'",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "map list + literal list merges by key",
+			expression: "(x.mapList + [{'key1': 'k1v1', 'key2': 'k2v1', 'value': 99}])[0].value == 99 && size(x.mapList + [{'key1': 'k1v1', 'key2': 'k2v1', 'value': 99}]) == 2",
+		}, // skipUnstructured: unstructuredMapList.Add cannot compute merge keys for CEL literal elements.
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "map list + literal list appends non-intersecting keys",
+			expression: "(x.mapList + [{'key1': 'k1v9', 'key2': 'k2v9', 'value': 9}])[2].value == 9",
+		}, // skipUnstructured: unstructuredMapList.Add cannot compute merge keys for CEL literal elements.
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "chained map list merge",
+			expression: "(x.mapList + y.mapList + [{'key1': 'k1v3', 'key2': 'k2v3', 'value': 33}])[2].value == 33",
+		}, // skipUnstructured: unstructuredMapList.Add cannot compute merge keys for CEL literal elements.
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
+			name:       "map list equality ignores element order",
+			expression: "(x.mapList + y.mapList) == z.mapList",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "schemaless map list concatenates atomically",
+			expression: "size(x.mapList + [{'key1': 'k1v1', 'key2': 'k2v1', 'value': 99}]) == 3",
+		}, skipTyped: true, skipUnstructured: true},
+		// Lists with x-kubernetes-list-type=set.
+		{testCase: testCase{
+			name:       "set list union with literal list",
+			expression: "(x.setList + [3, 4]) == [1, 2, 3, 4]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set list union with set list",
+			expression: "(x.setList + y.setList) == [1, 2, 3, 30]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "set list equality ignores element order",
+			expression: "(x.setList + [4]) == [4, 3, 2, 1]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "chained set list union",
+			expression: "(x.setList + [4] + [4, 5]) == [1, 2, 3, 4, 5]",
+		}, skipSchemaless: true},
+		{testCase: testCase{
+			name:       "schemaless set list concatenates atomically",
+			expression: "(x.setList + [3, 4]) == [1, 2, 3, 3, 4]",
+		}, skipTyped: true, skipUnstructured: true},
 	}
 
 	var opts []cel.EnvOption
