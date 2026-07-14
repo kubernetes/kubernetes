@@ -2113,6 +2113,43 @@ func ShouldDefaultPodLevelResourcesOnUpdate(newPod, oldPod *api.Pod) bool {
 	return false
 }
 
+// MergePodLevelResources copies missing resource entries from oldRes into newRes
+// so that partial updates retain unspecified fields from oldPod.
+func MergePodLevelResources(newRes, oldRes *api.ResourceRequirements) *api.ResourceRequirements {
+	if newRes == nil {
+		return nil
+	}
+	if oldRes == nil {
+		return newRes.DeepCopy()
+	}
+
+	merged := oldRes.DeepCopy()
+
+	if len(newRes.Requests) > 0 {
+		if merged.Requests == nil {
+			merged.Requests = make(api.ResourceList)
+		}
+		for k, v := range newRes.Requests {
+			if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(k)) {
+				merged.Requests[k] = v.DeepCopy()
+			}
+		}
+	}
+
+	if len(newRes.Limits) > 0 {
+		if merged.Limits == nil {
+			merged.Limits = make(api.ResourceList)
+		}
+		for k, v := range newRes.Limits {
+			if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(k)) {
+				merged.Limits[k] = v.DeepCopy()
+			}
+		}
+	}
+
+	return merged
+}
+
 
 
 var initContainerAnnotations = map[string]struct{}{

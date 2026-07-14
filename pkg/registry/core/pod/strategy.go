@@ -386,7 +386,11 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	// If PodLevelResources and InPlacePodLevelResourcesVerticalScaling feature gates is enabled,
 	// restore the saved pod-level resource requests to the new pod's spec.
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		newPod.Spec.Resources = newPodResources
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+			newPod.Spec.Resources = podutil.MergePodLevelResources(newPodResources, oldPod.Spec.Resources)
+		} else {
+			newPod.Spec.Resources = newPodResources
+		}
 	}
 
 	newPod.Status = oldPod.Status
@@ -432,6 +436,15 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	oldPod := old.(*api.Pod)
 
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
+
+	// When pod-level resources are being introduced for the first time via resize
+	// (old pod had none, new pod explicitly sets them), apply the same defaulting
+	// as PrepareForCreate so the new resources are complete and consistent.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		if newPod.Spec.Resources != nil && oldPod.Spec.Resources == nil {
+			applyPodLevelResourceDefaults(newPod)
+		}
+	}
 
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
