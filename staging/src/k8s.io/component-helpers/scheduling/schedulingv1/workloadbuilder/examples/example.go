@@ -17,6 +17,8 @@ limitations under the License.
 package examples
 
 import (
+	"k8s.io/apimachinery/pkg/api/operation"
+
 	"context"
 	"fmt"
 
@@ -53,16 +55,16 @@ func ExampleoutOfTreeControllerValidation() {
 		DefaultConfig: &workloadbuilder.SchedulingConfig{
 			Policy: &workloadbuilder.SchedulingPolicy{Basic: &workloadbuilder.BasicSchedulingPolicy{}},
 		},
-		UserConfig: workloadbuilder.MapPodGroupConfig(workloadbuilder.WorkloadPodGroupConfig{
-			Policy:         policy,
-			DisruptionMode: mode,
-		}),
+		Input: workloadbuilder.WorkloadInput{
+			Policy:         workloadbuilder.PolicyInput{PodGroupData: policy},
+			DisruptionMode: workloadbuilder.DisruptionModeInput{PodGroupData: mode},
+		},
 	}
 	allErrs = append(allErrs, workloadbuilder.NewBuilder(item, workloadbuilder.BuildOptions{
 		Owner:                  &metav1.OwnerReference{APIVersion: "batch/v1", Kind: "Job", Name: "worker", UID: "job-uid"},
 		AllowedPolicies:        []workloadbuilder.SchedulingPolicyOption{workloadbuilder.BasicPolicy, workloadbuilder.GangPolicy},
 		AllowedDisruptionModes: []workloadbuilder.DisruptionModeOption{workloadbuilder.SingleMode, workloadbuilder.AllMode},
-	}).Validate(schedulingPath)...)
+	}).Validate(context.Background(), schedulingPath)...)
 
 	if len(allErrs) > 0 {
 		fmt.Printf("rejected: %v\n", allErrs.ToAggregate())
@@ -87,15 +89,15 @@ func ExamplejobControllerE2E() {
 	// 1. Map the user's spec.scheduling (here: gang with no minCount, pinned to a
 	//    single node per topology) into the library IR. A nil sub-field is left
 	//    nil so it can fall back to the controller default field-by-field.
-	userConfig := workloadbuilder.MapPodGroupConfig(workloadbuilder.WorkloadPodGroupConfig{
-		Policy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+	userInput := workloadbuilder.WorkloadInput{
+		Policy: workloadbuilder.PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
 			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}, // minCount defaulted below
-		},
-		Constraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
+		}},
+		Constraints: workloadbuilder.ConstraintsInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
 			Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "kubernetes.io/hostname"}},
-		},
+		}},
 		// DisruptionMode and ResourceClaims left unset: use the defaults.
-	})
+	}
 
 	// 2. Assemble the single-node workload tree: a controller default (Basic),
 	//    the user's intent layered on top, and a callback that defaults the gang
@@ -104,7 +106,7 @@ func ExamplejobControllerE2E() {
 	item := &workloadbuilder.WorkloadItem{
 		Name:          "trainer-pgt-0",
 		DefaultConfig: &workloadbuilder.SchedulingConfig{Policy: &workloadbuilder.SchedulingPolicy{Basic: &workloadbuilder.BasicSchedulingPolicy{}}},
-		UserConfig:    userConfig,
+		Input:    userInput,
 		Callbacks: []workloadbuilder.SchedulingConfigFunc{
 			func(cfg *workloadbuilder.SchedulingConfig) {
 				if g := cfg.Policy.Gang; g != nil && g.MinCount == nil {
@@ -131,7 +133,7 @@ func ExamplejobControllerE2E() {
 	//    get structural building-block validation from declarative validation at
 	//    the apiserver, out-of-tree controllers must also call the generated
 	//    schedulingv1alpha3.Validate_* functions first.
-	if errs := builder.Validate(field.NewPath("spec", "scheduling")); len(errs) > 0 {
+	if errs := builder.Validate(context.Background(), operation.Operation{Type: operation.Create}, nil, schedulingPath); len(errs) > 0 {
 		fmt.Printf("validation failed: %v\n", errs.ToAggregate())
 		return
 	}

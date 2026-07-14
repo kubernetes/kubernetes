@@ -62,6 +62,11 @@ type BuildOptions struct {
 	// into. Validate rejects any mode outside this set. An empty set allows
 	// nothing.
 	AllowedDisruptionModes []DisruptionModeOption
+
+	// DisableDeclarativeValidation skips running Declarative Validation
+	// on the user's input. In-tree controllers like Job disable this because
+	// their own APIServer validation already runs it.
+	DisableDeclarativeValidation bool
 }
 
 // Builder turns a controller's WorkloadItem tree into scheduler-facing objects.
@@ -151,8 +156,8 @@ func compilePodGroupTemplate(item *WorkloadItem) (schedulingv1alpha3.PodGroupTem
 	return buildLeafTemplate(item.Name, resolved)
 }
 
-// resolveSchedulingConfig merges DefaultConfig with UserConfig then runs the
-// item's callbacks against the merged result to apply controller defaulting.
+// resolveSchedulingConfig merges DefaultConfig with the mapped Input then runs
+// the item's callbacks against the merged result to apply controller defaulting.
 // Inputs are deep-copied so callbacks can't mutate the caller's configs. The
 // resolved config is passed to each callback to read and mutate, and is
 // returned once every callback has run.
@@ -162,7 +167,7 @@ func resolveSchedulingConfig(item *WorkloadItem) *SchedulingConfig {
 		resolved = &SchedulingConfig{}
 	}
 
-	if user := item.UserConfig.DeepCopy(); user != nil {
+	if user := mapWorkloadInput(item.Input); user != nil {
 		if user.Policy != nil {
 			resolved.Policy = user.Policy
 		}

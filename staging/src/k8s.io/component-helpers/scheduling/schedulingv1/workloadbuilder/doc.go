@@ -29,7 +29,7 @@ limitations under the License.
 //		AllowedPolicies:        []workloadbuilder.SchedulingPolicyOption{workloadbuilder.BasicPolicy, workloadbuilder.GangPolicy},
 //		AllowedDisruptionModes: []workloadbuilder.DisruptionModeOption{workloadbuilder.SingleMode, workloadbuilder.AllMode},
 //	})
-//	if errs := builder.Validate(fldPath); len(errs) > 0 { /* reject */ }
+//	if errs := builder.Validate(context.Background(), operation.Operation{Type: operation.Create}, nil, fldPath); len(errs) > 0 { /* reject */ }
 //	workload, err := builder.BuildWorkload()
 //	podGroup, err := builder.NewPodGroup("trainer-pg", "trainer-pgt-0")
 //
@@ -73,7 +73,7 @@ limitations under the License.
 //	allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupSchedulingPolicy(ctx, op, fldPath.Child("policy"), policy, nil)...)
 //	allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupDisruptionMode(ctx, op, fldPath.Child("disruptionMode"), mode, nil)...)
 //	builder := workloadbuilder.NewBuilder(item, opts)
-//	allErrs = append(allErrs, builder.Validate(fldPath)...)
+//	allErrs = append(allErrs, builder.Validate(context.Background(), operation.Operation{Type: operation.Create}, nil, fldPath)...)
 //
 // See ExampleoutOfTreeControllerValidation.
 package workloadbuilder

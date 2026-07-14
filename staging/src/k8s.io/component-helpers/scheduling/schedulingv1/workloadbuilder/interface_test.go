@@ -227,7 +227,7 @@ func jobOwner() *metav1.OwnerReference {
 func createGangWorkloadItem() *WorkloadItem {
 	return &WorkloadItem{
 		Name:       "pgt-0",
-		UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](3)}}},
+		Input: WorkloadInput{Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](3)}}}},
 	}
 }
 

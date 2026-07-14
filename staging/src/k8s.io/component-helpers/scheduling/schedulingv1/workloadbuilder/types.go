@@ -92,13 +92,54 @@ type WorkloadItem struct {
 	// any field the user left unset.
 	DefaultConfig *SchedulingConfig
 
-	// UserConfig is the user's intent for this node; nil fields fall back to
-	// DefaultConfig field-by-field.
-	UserConfig *SchedulingConfig
+	// Input holds the user's intent for this node, including original API objects
+	// and their associated field paths for precise declarative validation and error reporting.
+	// Nil fields fall back to DefaultConfig.
+	Input WorkloadInput
 
 	// Callbacks run in order against the resolved config after the
 	// default/user merge.
 	Callbacks []SchedulingConfigFunc
+}
+
+// WorkloadInput bundles the leaf-level building blocks a controller embeds
+// in its own API, along with their field paths.
+type WorkloadInput struct {
+	Policy         PolicyInput
+	Constraints    ConstraintsInput
+	DisruptionMode DisruptionModeInput
+	ResourceClaims ResourceClaimsInput
+}
+
+// PolicyInput wraps the scheduling policy with its field path.
+type PolicyInput struct {
+	PodGroupData *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
+	
+	// PathElements specifies the relative path from the WorkloadItem's rootPath
+	// to where this building block is embedded in the controller's API.
+	// For example, if rootPath is `job.spec.scheduling` and PathElements is
+	// `[]string{"policy"}`, validation errors will be reported at
+	// `job.spec.scheduling.policy`.
+	// If left empty, errors are reported directly at the rootPath.
+	PathElements []string
+}
+
+// ConstraintsInput wraps the topology constraints with its field path.
+type ConstraintsInput struct {
+	PodGroupData *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
+	PathElements []string
+}
+
+// DisruptionModeInput wraps the disruption mode with its field path.
+type DisruptionModeInput struct {
+	PodGroupData *schedulingv1alpha3.WorkloadPodGroupDisruptionMode
+	PathElements []string
+}
+
+// ResourceClaimsInput wraps the resource claims with their field path.
+type ResourceClaimsInput struct {
+	PodGroupData []schedulingv1alpha3.WorkloadPodGroupResourceClaim
+	PathElements []string
 }
 
 // DeepCopy returns a deep copy of c, or nil if c is nil. Build copies configs

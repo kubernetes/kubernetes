@@ -23,6 +23,7 @@ import (
 // WorkloadPodGroupConfig bundles the leaf-level building blocks a
 // controller embeds in its own API. The zero value means "nothing
 // set", so callers only populate the blocks they care about.
+// Deprecated: use WorkloadInput instead.
 type WorkloadPodGroupConfig struct {
 	Policy         *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
 	Constraints    *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
@@ -31,32 +32,44 @@ type WorkloadPodGroupConfig struct {
 }
 
 // MapPodGroupConfig translates the leaf-level scheduling.k8s.io building blocks
-// into the IR for a WorkloadItem's UserConfig or DefaultConfig. It returns a
-// non-nil config, leaving a field nil when its input is nil so resolveConfig can
-// fall back to defaults field-by-field.
-//
-// TODO: Add MapCompositeGroupConfig once the WorkloadCompositePodGroup* types
-// and CompositePodGroup resource are added to scheduling.k8s.io/v1alpha3.
+// into the IR for a WorkloadItem's config.
+// Deprecated: use WorkloadInput with the Builder directly.
 func MapPodGroupConfig(wcfg WorkloadPodGroupConfig) *SchedulingConfig {
+	return mapWorkloadInput(WorkloadInput{
+		Policy:         PolicyInput{PodGroupData: wcfg.Policy},
+		Constraints:    ConstraintsInput{PodGroupData: wcfg.Constraints},
+		DisruptionMode: DisruptionModeInput{PodGroupData: wcfg.DisruptionMode},
+		ResourceClaims: ResourceClaimsInput{PodGroupData: wcfg.ResourceClaims},
+	})
+}
+
+// mapWorkloadInput translates the leaf-level scheduling.k8s.io building blocks
+// into the IR for a WorkloadItem's config. It returns a non-nil config,
+// leaving a field nil when its input is nil so resolveConfig can fall back
+// to defaults field-by-field.
+//
+// TODO: Add mapCompositeGroupInput once the WorkloadCompositePodGroup* types
+// and CompositePodGroup resource are added to scheduling.k8s.io/v1alpha3.
+func mapWorkloadInput(input WorkloadInput) *SchedulingConfig {
 	cfg := &SchedulingConfig{}
 
-	if wcfg.Policy != nil {
-		if p := mapSchedulingPolicy(wcfg.Policy); p != nil {
+	if input.Policy.PodGroupData != nil {
+		if p := mapSchedulingPolicy(input.Policy.PodGroupData); p != nil {
 			cfg.Policy = p
 		}
 	}
-	if wcfg.Constraints != nil {
-		if c := mapTopologyConstraints(wcfg.Constraints); c != nil {
+	if input.Constraints.PodGroupData != nil {
+		if c := mapTopologyConstraints(input.Constraints.PodGroupData); c != nil {
 			cfg.Constraints = c
 		}
 	}
-	if wcfg.DisruptionMode != nil {
-		if d := mapDisruptionMode(wcfg.DisruptionMode); d != nil {
+	if input.DisruptionMode.PodGroupData != nil {
+		if d := mapDisruptionMode(input.DisruptionMode.PodGroupData); d != nil {
 			cfg.DisruptionMode = d
 		}
 	}
-	if len(wcfg.ResourceClaims) > 0 {
-		cfg.ResourceClaims = mapResourceClaims(wcfg.ResourceClaims)
+	if len(input.ResourceClaims.PodGroupData) > 0 {
+		cfg.ResourceClaims = mapResourceClaims(input.ResourceClaims.PodGroupData)
 	}
 
 	return cfg

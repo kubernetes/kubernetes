@@ -86,8 +86,7 @@ func TestBuildWorkload(t *testing.T) {
 			name: "gang minCount defaulted by callback",
 			root: &WorkloadItem{
 				Name:          "gang-job",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig:    &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{}}},
+				Input: WorkloadInput{Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}}}},
 				Callbacks:     []SchedulingConfigFunc{defaultGangMinCount(8)},
 			},
 			verify: func(t *testing.T, wl *schedulingv1alpha3.Workload, _ *WorkloadItem) {
@@ -105,7 +104,7 @@ func TestBuildWorkload(t *testing.T) {
 			root: &WorkloadItem{
 				Name:          "override-job",
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig:    &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
+				Input:    WorkloadInput{Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](2)}}}},
 			},
 			verify: func(t *testing.T, wl *schedulingv1alpha3.Workload, _ *WorkloadItem) {
 				gang := wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang
@@ -125,10 +124,10 @@ func TestBuildWorkload(t *testing.T) {
 					Policy:         &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}},
 					DisruptionMode: &DisruptionMode{Single: &SingleDisruptionMode{}},
 				},
-				UserConfig: &SchedulingConfig{
-					Constraints: &SchedulingConstraints{
+				Input: WorkloadInput{
+					Constraints: ConstraintsInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
 						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
-					},
+					}},
 				},
 			},
 			verify: func(t *testing.T, wl *schedulingv1alpha3.Workload, _ *WorkloadItem) {
@@ -149,10 +148,10 @@ func TestBuildWorkload(t *testing.T) {
 			root: &WorkloadItem{
 				Name:          "topo-job",
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig: &SchedulingConfig{
-					Constraints: &SchedulingConstraints{
+				Input: WorkloadInput{
+					Constraints: ConstraintsInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
 						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
-					},
+					}},
 				},
 			},
 			verify: func(t *testing.T, wl *schedulingv1alpha3.Workload, _ *WorkloadItem) {
@@ -170,7 +169,7 @@ func TestBuildWorkload(t *testing.T) {
 			root: &WorkloadItem{
 				Name:          "disruption-job",
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig:    &SchedulingConfig{DisruptionMode: &DisruptionMode{All: &AllDisruptionMode{}}},
+				Input:    WorkloadInput{DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}}}},
 			},
 			verify: func(t *testing.T, wl *schedulingv1alpha3.Workload, _ *WorkloadItem) {
 				tmpl := wl.Spec.PodGroupTemplates[0]
@@ -184,8 +183,8 @@ func TestBuildWorkload(t *testing.T) {
 			root: &WorkloadItem{
 				Name:          "dra-job",
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				UserConfig: &SchedulingConfig{
-					ResourceClaims: []ResourceClaim{{Name: "gpu", ResourceClaimName: new("my-claim")}},
+				Input: WorkloadInput{
+					ResourceClaims: ResourceClaimsInput{PodGroupData: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{Name: "gpu", ResourceClaimName: ptr.To("my-claim")}}},
 				},
 			},
 			verify: func(t *testing.T, wl *schedulingv1alpha3.Workload, _ *WorkloadItem) {
@@ -244,7 +243,7 @@ func TestBuildWorkload(t *testing.T) {
 			name: "empty leaf name fails before resolution and callbacks",
 			root: &WorkloadItem{
 				Name:       "",
-				UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Input: WorkloadInput{Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}}},
 				Callbacks: []SchedulingConfigFunc{
 					func(*SchedulingConfig) {
 						emptyNameCallbackRan = true
@@ -290,12 +289,12 @@ func TestBuildWorkload(t *testing.T) {
 			name: "resolution does not mutate caller inputs",
 			root: &WorkloadItem{
 				Name:       "gang-job",
-				UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{}}},
+				Input: WorkloadInput{Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}}}},
 				Callbacks:  []SchedulingConfigFunc{defaultGangMinCount(16)},
 			},
 			verify: func(t *testing.T, wl *schedulingv1alpha3.Workload, root *WorkloadItem) {
-				if root.UserConfig.Policy.Gang.MinCount != nil {
-					t.Errorf("callback mutated the caller's UserConfig; MinCount should remain nil, got %d", *root.UserConfig.Policy.Gang.MinCount)
+				if root.Input.Policy.PodGroupData.Gang.MinCount != nil {
+					t.Errorf("callback mutated the caller's Input; MinCount should remain nil, got %d", *root.Input.Policy.PodGroupData.Gang.MinCount)
 				}
 				gang := wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang
 				if gang == nil {
@@ -310,7 +309,7 @@ func TestBuildWorkload(t *testing.T) {
 			name: "gang missing minCount fails",
 			root: &WorkloadItem{
 				Name:       "gang-job",
-				UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{}}},
+				Input: WorkloadInput{Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}}}},
 			},
 			wantErr: true,
 		},
@@ -380,12 +379,19 @@ func TestResolveSchedulingConfigMergesEveryField(t *testing.T) {
 		ResourceClaims:    []ResourceClaim{{Name: "default-claim", ResourceClaimName: new("default")}},
 		PriorityClassName: "default-priority",
 	}
-	userConfig := &SchedulingConfig{
+	userInput := WorkloadInput{
+		Policy:         PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)}}},
+		Constraints:    ConstraintsInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/region"}}}},
+		DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}}},
+		ResourceClaims: ResourceClaimsInput{PodGroupData: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{Name: "user-claim", ResourceClaimName: ptr.To("user")}}},
+	}
+
+	expectedConfig := &SchedulingConfig{
 		Policy:            &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](4)}},
 		Constraints:       &SchedulingConstraints{Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/region"}}},
 		DisruptionMode:    &DisruptionMode{All: &AllDisruptionMode{}},
-		ResourceClaims:    []ResourceClaim{{Name: "user-claim", ResourceClaimName: new("user")}},
-		PriorityClassName: "user-priority",
+		ResourceClaims:    []ResourceClaim{{Name: "user-claim", ResourceClaimName: ptr.To("user")}},
+		PriorityClassName: "default-priority",
 	}
 
 	// Both fixtures must set every field to a non-zero value; otherwise the
@@ -394,22 +400,22 @@ func TestResolveSchedulingConfigMergesEveryField(t *testing.T) {
 	// here first.
 	cfgType := reflect.TypeFor[SchedulingConfig]()
 	defVal := reflect.ValueOf(*defaultConfig)
-	userVal := reflect.ValueOf(*userConfig)
+	expectedVal := reflect.ValueOf(*expectedConfig)
 	for i := 0; i < cfgType.NumField(); i++ {
 		name := cfgType.Field(i).Name
 		if defVal.Field(i).IsZero() {
 			t.Fatalf("defaultConfig fixture leaves SchedulingConfig.%s unset; populate it so this test stays exhaustive", name)
 		}
-		if userVal.Field(i).IsZero() {
-			t.Fatalf("userConfig fixture leaves SchedulingConfig.%s unset; populate it so this test stays exhaustive", name)
+		if expectedVal.Field(i).IsZero() {
+			t.Fatalf("expectedConfig fixture leaves SchedulingConfig.%s unset; populate it so this test stays exhaustive", name)
 		}
 	}
 
-	item := &WorkloadItem{Name: "job", DefaultConfig: defaultConfig, UserConfig: userConfig}
+	item := &WorkloadItem{Name: "job", DefaultConfig: defaultConfig, Input: userInput}
 	resolved := resolveSchedulingConfig(item)
 
-	if !reflect.DeepEqual(resolved, userConfig) {
-		t.Errorf("resolved config does not match UserConfig; a field is likely missing from resolveSchedulingConfig's merge\n resolved:   %+v\n userConfig: %+v", resolved, userConfig)
+	if !reflect.DeepEqual(resolved, expectedConfig) {
+		t.Errorf("resolved config does not match expected; a field is likely missing from resolveSchedulingConfig's merge\n resolved:   %+v\n expected: %+v", resolved, expectedConfig)
 	}
 }
 

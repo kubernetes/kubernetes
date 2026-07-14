@@ -183,22 +183,22 @@ func TestMapPodGroupConfig(t *testing.T) {
 // TestMapPodGroupConfigEndToEnd exercises the documented Job integration path:
 // map the public building blocks into the IR, then compile via the builder.
 func TestMapPodGroupConfigEndToEnd(t *testing.T) {
-	userConfig := MapPodGroupConfig(WorkloadPodGroupConfig{
-		Policy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+	userInput := WorkloadInput{
+		Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
 			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{},
-		},
-		Constraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
+		}},
+		Constraints: ConstraintsInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
 			Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
-		},
-		DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+		}},
+		DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
 			All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
-		},
-	})
+		}},
+	}
 
 	root := &WorkloadItem{
 		Name:          "job-root",
 		DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-		UserConfig:    userConfig,
+		Input:         userInput,
 		Callbacks:     []SchedulingConfigFunc{defaultGangMinCount(4)},
 	}
 
