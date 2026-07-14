@@ -411,7 +411,7 @@ func getCadvisorPodInfoFromPodUID(podUID types.UID, infos map[string]cadvisorapi
 // A ContainerInfo is considered to be of a terminated container if it has an
 // older CreationTime and zero CPU instantaneous and memory RSS usage.
 
-func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger klog.Logger, containerInfo map[string]cadvisorapi.ContainerInfo) (map[string]cadvisorapi.ContainerInfo, map[string]cadvisorapi.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo) {
+func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger klog.Logger, containerInfo map[string]cadvisorapi.ContainerInfo) (map[string]cadvisorapi.ContainerInfo, map[string]cadvisorapi.ContainerInfo, map[string]cadvisorapi.ContainerInfo) {
 	cinfoMap := make(map[containerID][]containerInfoWithCgroup)
 	cinfosByPodCgroupKey := make(map[string]cadvisorapi.ContainerInfo)
 	for key, cinfo := range containerInfo {
@@ -470,7 +470,7 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger klog.Logger, 
 	return result, terminated, cinfosByPodCgroupKey
 }
 
-func (p *cadvisorStatsProvider) containerInfosToPodStats(logger klog.Logger, containerInfos map[string]cadvisorapiv2.ContainerInfo, rootFsInfo, imageFsInfo cadvisorapiv2.FsInfo) map[statsapi.PodReference]*statsapi.PodStats {
+func (p *cadvisorStatsProvider) containerInfosToPodStats(logger klog.Logger, containerInfos map[string]cadvisorapi.ContainerInfo, rootFsInfo, imageFsInfo cadvisorapi.FsInfo) map[statsapi.PodReference]*statsapi.PodStats {
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
 	for key, cinfo := range containerInfos {
 		// On systemd using devicemapper each mount into the container has an
