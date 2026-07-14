@@ -44,10 +44,10 @@ type LeaseSpecApplyConfiguration struct {
 	// leaseTransitions is the number of transitions of a lease between
 	// holders.
 	LeaseTransitions *int32 `json:"leaseTransitions,omitempty"`
-	// strategy indicates the strategy for picking the leader for coordinated leader election.
+	// Strategy indicates the strategy for picking the leader for coordinated leader election
 	// (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
 	Strategy *coordinationv1.CoordinatedLeaseStrategy `json:"strategy,omitempty"`
-	// preferredHolder signals to a lease holder that the lease has a
+	// PreferredHolder signals to a lease holder that the lease has a
 	// more optimal holder and should be given up.
 	PreferredHolder *string `json:"preferredHolder,omitempty"`
 }

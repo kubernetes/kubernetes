@@ -70,8 +70,8 @@ func (c *dispatcher) Start(ctx context.Context) error {
 
 // Dispatch implements generic.Dispatcher.
 func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, hooks []PolicyHook) error {
+
 	var deniedDecisions []policyDecisionWithMetadata
-	var validationFailures []ValidationFailureValue
 
 	addConfigError := func(err error, definition *admissionregistrationv1.ValidatingAdmissionPolicy, binding *admissionregistrationv1.ValidatingAdmissionPolicyBinding) {
 		// we always default the FailurePolicy if it is unset and validate it in API level
@@ -242,13 +242,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 								})
 								celmetrics.Metrics.ObserveRejection(ctx, decision.Elapsed, definition.Name, binding.Name, ErrorType(&decision))
 							case admissionregistrationv1.Audit:
-								validationFailures = append(validationFailures, ValidationFailureValue{
-									ExpressionIndex:   i,
-									Message:           decision.Message,
-									ValidationActions: binding.Spec.ValidationActions,
-									Binding:           binding.Name,
-									Policy:            binding.Spec.PolicyName,
-								})
+								publishValidationFailureAnnotation(binding, i, decision, versionedAttr)
 								celmetrics.Metrics.ObserveAudit(ctx, decision.Elapsed, definition.Name, binding.Name, ErrorType(&decision))
 							case admissionregistrationv1.Warn:
 								warning.AddWarning(ctx, "", fmt.Sprintf("Validation failed for ValidatingAdmissionPolicy '%s' with binding '%s': %s", definition.Name, binding.Name, decision.Message))
@@ -293,10 +287,6 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 		auditAnnotationCollector.publish(definition.Name, a)
 	}
 
-	if len(validationFailures) > 0 {
-		publishValidationFailureAnnotations(a, validationFailures)
-	}
-
 	if len(deniedDecisions) > 0 {
 		// TODO: refactor admission.NewForbidden so the name extraction is reusable but the code/reason is customizable
 		var message string
@@ -319,38 +309,23 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 	return nil
 }
 
-// maxValidationFailures is the maximum number of validation failures to include in the audit annotation
-// to prevent audit logs resource exhaustion.
-// The expected size of 50 validation failures is ~10KB.
-const maxValidationFailures = 50
-
-func publishValidationFailureAnnotations(attributes admission.Attributes, failures []ValidationFailureValue) {
-	if len(failures) == 0 {
-		return
-	}
-	if len(failures) > maxValidationFailures {
-		klog.Warningf("Validation failures count %d for resource %s exceeds limit of %d; truncating audit annotation", len(failures), attributes.GetResource().String(), maxValidationFailures)
-		failures = failures[:maxValidationFailures]
-	}
-
+func publishValidationFailureAnnotation(binding *admissionregistrationv1.ValidatingAdmissionPolicyBinding, expressionIndex int, decision PolicyDecision, attributes admission.Attributes) {
 	key := "validation.policy.admission.k8s.io/validation_failure"
-	valueJSON, err := utiljson.Marshal(failures)
+	// Marshal to a list of failures since, in the future, we may need to support multiple failures
+	valueJSON, err := utiljson.Marshal([]ValidationFailureValue{{
+		ExpressionIndex:   expressionIndex,
+		Message:           decision.Message,
+		ValidationActions: binding.Spec.ValidationActions,
+		Binding:           binding.Name,
+		Policy:            binding.Spec.PolicyName,
+	}})
 	if err != nil {
-		klog.Warningf("Failed to marshal admission audit validation failures for key %s for ValidatingAdmissionPolicies and ValidatingAdmissionPolicyBindings %s: %v", key, formatPoliciesBindings(failures), err)
-		return
+		klog.Warningf("Failed to set admission audit annotation %s for ValidatingAdmissionPolicy %s and ValidatingAdmissionPolicyBinding %s: %v", key, binding.Spec.PolicyName, binding.Name, err)
 	}
 	value := string(valueJSON)
 	if err := attributes.AddAnnotation(key, value); err != nil {
-		klog.Warningf("Failed to set admission audit annotation %s to %s for ValidatingAdmissionPolicies and ValidatingAdmissionPolicyBindings %s: %v", key, value, formatPoliciesBindings(failures), err)
+		klog.Warningf("Failed to set admission audit annotation %s to %s for ValidatingAdmissionPolicy %s and ValidatingAdmissionPolicyBinding %s: %v", key, value, binding.Spec.PolicyName, binding.Name, err)
 	}
-}
-
-func formatPoliciesBindings(failures []ValidationFailureValue) string {
-	var policiesBindings []string
-	for _, failure := range failures {
-		policiesBindings = append(policiesBindings, fmt.Sprintf("%s/%s", failure.Policy, failure.Binding))
-	}
-	return strings.Join(policiesBindings, ", ")
 }
 
 const maxAuditAnnotationValueLength = 10 * 1024

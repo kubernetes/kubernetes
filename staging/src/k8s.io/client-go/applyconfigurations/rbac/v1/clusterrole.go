@@ -33,11 +33,11 @@ import (
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 type ClusterRoleApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// metadata is the standard object's metadata.
+	// Standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// rules holds all the PolicyRules for this ClusterRole
+	// Rules holds all the PolicyRules for this ClusterRole
 	Rules []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
-	// aggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
+	// AggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
 	// If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be
 	// stomped by the controller.
 	AggregationRule *AggregationRuleApplyConfiguration `json:"aggregationRule,omitempty"`

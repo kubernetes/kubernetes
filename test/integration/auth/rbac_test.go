@@ -568,14 +568,7 @@ func TestRBAC(t *testing.T) {
 					// Append our custom test authorizer
 					var rbacAuthz authorizer.Authorizer
 					rbacAuthz, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
-					authz, err := unionauthz.New(
-						unionauthz.NamedAuthorizer{AuthorizerName: "default", Authorizer: config.ControlPlane.Generic.Authorization.Authorizer},
-						unionauthz.NamedAuthorizer{AuthorizerName: "rbac-test", Authorizer: rbacAuthz},
-					)
-					if err != nil {
-						t.Fatalf("unionauthz.New: %v", err)
-					}
-					config.ControlPlane.Generic.Authorization.Authorizer = authz
+					config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, rbacAuthz)
 				},
 			})
 			defer tearDownFn()
@@ -994,14 +987,7 @@ func TestRBACContextContamination(t *testing.T) {
 			config.ControlPlane.Generic.Authentication.Authenticator = unionauthn.New(config.ControlPlane.Generic.Authentication.Authenticator, authenticator)
 			// Append our custom test authorizer
 			rbacAuthz, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
-			authz, err := unionauthz.New(
-				unionauthz.NamedAuthorizer{AuthorizerName: "default", Authorizer: config.ControlPlane.Generic.Authorization.Authorizer},
-				unionauthz.NamedAuthorizer{AuthorizerName: "rbac-test", Authorizer: rbacAuthz},
-			)
-			if err != nil {
-				t.Fatalf("unionauthz.New: %v", err)
-			}
-			config.ControlPlane.Generic.Authorization.Authorizer = authz
+			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, rbacAuthz)
 		},
 	})
 	defer tearDownFn()

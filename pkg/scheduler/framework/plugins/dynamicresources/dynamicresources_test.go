@@ -3832,7 +3832,7 @@ type testContext struct {
 func (tc *testContext) verify(tCtx ktesting.TContext, expected result, initialObjects []metav1.Object, testPod *v1.Pod, result interface{}, status *fwk.Status) {
 	tCtx.Helper()
 	if expected.status == nil {
-		assert.Nil(tCtx, status, status.AsError())
+		assert.Nil(tCtx, status)
 	} else if actualErr := status.AsError(); actualErr != nil {
 		// Compare only the error strings.
 		assert.ErrorContains(tCtx, actualErr, expected.status.AsError().Error())
@@ -5145,11 +5145,8 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 
 			tCtx.Helper()
 			logger := klog.FromContext(tCtx)
-			assumeCacheInformer := &testInformer{}
-			assumeCache := assumecache.NewAssumeCache(tCtx.Logger(), assumeCacheInformer, "", "", nil)
 			draManager := &DefaultDRAManager{
 				resourceClaimTracker: &claimTracker{
-					cache:               assumeCache,
 					inFlightAllocations: make(map[types.UID]inFlightAllocation),
 					allocatedDevices:    newAllocatedDevices(logger),
 				},
@@ -5159,7 +5156,6 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 			}
 			if tc.inflightResourceClaims != nil {
 				for claimUID, obj := range tc.inflightResourceClaims {
-					assumeCacheInformer.add(obj)
 					err := draManager.resourceClaimTracker.SignalClaimPendingAllocation(claimUID, obj)
 					if err != nil {
 						if !tc.expectErr {

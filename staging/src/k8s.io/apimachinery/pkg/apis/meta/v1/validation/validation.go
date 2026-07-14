@@ -17,12 +17,10 @@ limitations under the License.
 package validation
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"unicode"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -336,7 +334,7 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	}
 
 	if condition.LastTransitionTime.IsZero() {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lastTransitionTime"), "").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Required(fldPath.Child("lastTransitionTime"), ""))
 	}
 
 	if len(condition.Reason) == 0 {
@@ -396,15 +394,4 @@ func ValidateIgnoreStoreReadError(fldPath *field.Path, options *metav1.DeleteOpt
 	}
 
 	return allErrs
-}
-
-// ValidateCustom_Condition_LastTransitionTime is wired into the generated
-// declarative validation by +k8s:customValidation on Condition.LastTransitionTime.
-// It enforces that the field is set, mirroring the handwritten check in
-// ValidateCondition.
-func ValidateCustom_Condition_LastTransitionTime(ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *metav1.Time) field.ErrorList {
-	if value.IsZero() {
-		return field.ErrorList{field.Required(fldPath, "")}
-	}
-	return nil
 }

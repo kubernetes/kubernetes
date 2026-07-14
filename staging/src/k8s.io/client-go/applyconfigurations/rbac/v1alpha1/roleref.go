@@ -23,11 +23,11 @@ package v1alpha1
 //
 // RoleRef contains information that points to the role being used
 type RoleRefApplyConfiguration struct {
-	// apiGroup is the group for the resource being referenced
+	// APIGroup is the group for the resource being referenced
 	APIGroup *string `json:"apiGroup,omitempty"`
-	// kind is the type of resource being referenced
+	// Kind is the type of resource being referenced
 	Kind *string `json:"kind,omitempty"`
-	// name is the name of resource being referenced
+	// Name is the name of resource being referenced
 	Name *string `json:"name,omitempty"`
 }
 

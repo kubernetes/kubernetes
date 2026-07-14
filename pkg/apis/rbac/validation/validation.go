@@ -18,7 +18,6 @@ package validation
 
 import (
 	"k8s.io/apimachinery/pkg/api/validate/content"
-	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -203,7 +202,9 @@ func ValidateClusterRoleBindingUpdate(roleBinding *rbac.ClusterRoleBinding, oldR
 	allErrs := ValidateClusterRoleBinding(roleBinding)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&roleBinding.ObjectMeta, &oldRoleBinding.ObjectMeta, field.NewPath("metadata"))...)
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(roleBinding.RoleRef, oldRoleBinding.RoleRef, field.NewPath("roleRef")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	if oldRoleBinding.RoleRef != roleBinding.RoleRef {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef"), roleBinding.RoleRef, "cannot change roleRef"))
+	}
 
 	return allErrs
 }
