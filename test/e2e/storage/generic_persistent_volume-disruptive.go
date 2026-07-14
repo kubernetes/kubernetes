@@ -45,7 +45,6 @@ var _ = utils.SIGDescribe("GenericPersistentVolume", framework.WithDisruptive(),
 	ginkgo.BeforeEach(func() {
 		// Skip tests unless number of nodes is 2
 		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
-		e2eskipper.SkipIfProviderIs("local")
 		c = f.ClientSet
 		ns = f.Namespace.Name
 	})

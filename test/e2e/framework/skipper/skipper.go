@@ -108,13 +108,6 @@ func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
 	}
 }
 
-// SkipIfProviderIs skips if the provider is included in the unsupportedProviders.
-func SkipIfProviderIs(unsupportedProviders ...string) {
-	if framework.ProviderIs(unsupportedProviders...) {
-		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, framework.TestContext.Provider)
-	}
-}
-
 // SkipUnlessProviderIs skips if the provider is not included in the supportedProviders.
 func SkipUnlessProviderIs(supportedProviders ...string) {
 	if !framework.ProviderIs(supportedProviders...) {

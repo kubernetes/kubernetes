@@ -63,7 +63,6 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), fu
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		// To protect the NFS volume pod from the kubelet restart, we isolate it on its own node.
 		e2eskipper.SkipUnlessNodeCountIsAtLeast(minNodes)
-		e2eskipper.SkipIfProviderIs("local")
 
 		c = f.ClientSet
 		ns = f.Namespace.Name
