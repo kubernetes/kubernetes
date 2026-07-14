@@ -86,7 +86,7 @@ func predicates(logger klog.Logger, node *v1.Node, taints []v1.Taint, toleration
 		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
 	}, enableTaintTolerationComparisonOperators)
 	if err != nil {
-		logger.Error(err, "Failed to match pod tolerations against node taints", "node", klog.KObj(node))
+		logger.Error(err, "Failed to match tolerations against node taints", "node", klog.KObj(node))
 	}
 	fitsTaints = !hasUntoleratedTaint
 	return

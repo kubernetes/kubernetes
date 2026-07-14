@@ -24,6 +24,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestIsNativeResource(t *testing.T) {
@@ -671,6 +675,59 @@ func TestNodeSelectorRequirementKeyExistsInNodeSelectorTerms(t *testing.T) {
 		if test.exists != keyExists {
 			t.Errorf("test %s failed. Expected %v but got %v", test.name, test.exists, keyExists)
 		}
+	}
+}
+
+func TestGetMatchingTolerations(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testCases := []struct {
+		description                 string
+		tolerations                 []v1.Toleration
+		taints                      []v1.Taint
+		expectTolerated             bool
+		expectError                 bool
+		enableComparisonOperatorsFG bool
+	}{
+		{
+			description: "numeric Gt operator with non-numeric taint value returns error",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "high",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectTolerated:             false,
+			expectError:                 true,
+			enableComparisonOperatorsFG: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, tc.enableComparisonOperatorsFG)
+			tolerated, matching, err := GetMatchingTolerations(logger, tc.taints, tc.tolerations)
+			if (err != nil) != tc.expectError {
+				t.Errorf("expect error %v, got %v", tc.expectError, err)
+			}
+			if tc.expectTolerated != tolerated {
+				t.Errorf("expect tolerated %v, got %v", tc.expectTolerated, tolerated)
+			}
+			if tolerated && len(matching) == 0 {
+				t.Errorf("expected matching tolerations when tolerated is true")
+			}
+			if !tolerated && len(matching) != 0 {
+				t.Errorf("expected no matching tolerations when tolerated is false, got %+v", matching)
+			}
+		})
 	}
 }
 

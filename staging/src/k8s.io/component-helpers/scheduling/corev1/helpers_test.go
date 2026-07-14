@@ -653,6 +653,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 		applyFilter                 taintsFilterFunc
 		expectTolerated             bool
 		expectError                 bool
+		expectUntoleratedTaint      *v1.Taint
 		enableComparisonOperatorsFG bool
 	}{
 		{
@@ -858,9 +859,14 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
-			applyFilter:                 func(t *v1.Taint) bool { return true },
-			expectTolerated:             false,
-			expectError:                 false,
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+			expectError:     false,
+			expectUntoleratedTaint: &v1.Taint{
+				Key:    "dedicated",
+				Value:  "gpu",
+				Effect: v1.TaintEffectNoSchedule,
+			},
 			enableComparisonOperatorsFG: true,
 		},
 		{
@@ -885,9 +891,14 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
-			applyFilter:                 func(t *v1.Taint) bool { return true },
-			expectTolerated:             false,
-			expectError:                 false,
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+			expectError:     false,
+			expectUntoleratedTaint: &v1.Taint{
+				Key:    "dedicated",
+				Value:  "gpu",
+				Effect: v1.TaintEffectNoSchedule,
+			},
 			enableComparisonOperatorsFG: true,
 		},
 		{
@@ -919,7 +930,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, untolerated, err := FindMatchingUntoleratedTaint(logger, tc.taints, tc.tolerations, tc.applyFilter, tc.enableComparisonOperatorsFG)
+		untoleratedTaint, untolerated, err := FindMatchingUntoleratedTaint(logger, tc.taints, tc.tolerations, tc.applyFilter, tc.enableComparisonOperatorsFG)
 		if (err != nil) != tc.expectError {
 			t.Errorf("[%s] expect error %v, got %v", tc.description, tc.expectError, err)
 		}
@@ -932,6 +943,9 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 				filteredTaints = append(filteredTaints, taint)
 			}
 			t.Errorf("[%s] expect tolerations %+v tolerate filtered taints %+v in taints %+v", tc.description, tc.tolerations, filteredTaints, tc.taints)
+		}
+		if tc.expectUntoleratedTaint != nil && !apiequality.Semantic.DeepEqual(*tc.expectUntoleratedTaint, untoleratedTaint) {
+			t.Errorf("[%s] expect untolerated taint %+v, got %+v", tc.description, *tc.expectUntoleratedTaint, untoleratedTaint)
 		}
 	}
 }
