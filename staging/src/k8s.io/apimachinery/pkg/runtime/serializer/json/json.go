@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"io"
 	"strconv"
+	"strings"
 
 	kjson "sigs.k8s.io/json"
 	"sigs.k8s.io/yaml"
@@ -36,7 +37,7 @@ import (
 // is not nil, the object has the group, version, and kind fields set.
 // Deprecated: use NewSerializerWithOptions instead.
 func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, pretty bool) *Serializer {
-	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{false, pretty, false, false})
+	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{Pretty: pretty})
 }
 
 // NewYAMLSerializer creates a YAML serializer that handles encoding versioned objects into the proper YAML form. If typer
@@ -44,7 +45,7 @@ func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtim
 // matches JSON, and will error if constructs are used that do not serialize to JSON.
 // Deprecated: use NewSerializerWithOptions instead.
 func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
-	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{true, false, false, false})
+	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{Yaml: true})
 }
 
 // NewSerializerWithOptions creates a JSON/YAML serializer that handles encoding versioned objects into the proper JSON/YAML
@@ -67,6 +68,10 @@ func identifier(options SerializerOptions) runtime.Identifier {
 		"yaml":   strconv.FormatBool(options.Yaml),
 		"pretty": strconv.FormatBool(options.Pretty),
 		"strict": strconv.FormatBool(options.Strict),
+	}
+	if len(options.DropFields) > 0 {
+		// Only added when set so the identifier of the default serializer is unchanged.
+		result["dropFields"] = strings.Join(options.DropFields, "+")
 	}
 	identifier, err := json.Marshal(result)
 	if err != nil {
@@ -96,6 +101,12 @@ type SerializerOptions struct {
 
 	// StreamingCollectionsEncoding enables encoding collection, one item at the time, drastically reducing memory needed.
 	StreamingCollectionsEncoding bool
+
+	// DropFields lists field paths to omit from the encoded output (for example
+	// "metadata.managedFields"), without copying or mutating the object. Fields are
+	// omitted at marshal time. Currently only "metadata.managedFields" is supported,
+	// and only on Go 1.27+ (a no-op on older toolchains); it does not affect decoding.
+	DropFields []string
 }
 
 // Serializer handles encoding versioned objects into the proper JSON form
@@ -224,6 +235,9 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 }
 
 func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
+	if len(s.options.DropFields) > 0 {
+		return s.encodeDroppingFields(obj, w)
+	}
 	if s.options.Yaml {
 		json, err := json.Marshal(obj)
 		if err != nil {
