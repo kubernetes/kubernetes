@@ -22805,6 +22805,17 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 	}
 }
 
+func makeVolumeHealthConditions(n int) []core.VolumeHealthCondition {
+	conditions := make([]core.VolumeHealthCondition, n)
+	for i := range conditions {
+		conditions[i] = core.VolumeHealthCondition{
+			Status: core.VolumeHealthDegraded,
+			Reason: fmt.Sprintf("Reason%d", i),
+		}
+	}
+	return conditions
+}
+
 func TestValidateVolumeHealthStatus(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -22883,6 +22894,20 @@ func TestValidateVolumeHealthStatus(t *testing.T) {
 			},
 			isErr:       true,
 			expectedErr: "healthConditions[0].message",
+		},
+		{
+			name: "exactly max health conditions is valid",
+			healthStatus: &core.VolumeHealthStatus{
+				HealthConditions: makeVolumeHealthConditions(maxVolumeHealthConditions),
+			},
+		},
+		{
+			name: "too many health conditions",
+			healthStatus: &core.VolumeHealthStatus{
+				HealthConditions: makeVolumeHealthConditions(maxVolumeHealthConditions + 1),
+			},
+			isErr:       true,
+			expectedErr: "healthConditions",
 		},
 	}
 
@@ -22977,6 +23002,26 @@ func TestValidatePodVolumeHealth(t *testing.T) {
 			},
 			isErr:       true,
 			expectedErr: "volumeHealth[0].healthConditions[0].status",
+		},
+		{
+			name: "exactly max health conditions is valid",
+			volumeHealth: []core.PodVolumeHealth{
+				{
+					Name:             "vol1",
+					HealthConditions: makeVolumeHealthConditions(maxVolumeHealthConditions),
+				},
+			},
+		},
+		{
+			name: "too many health conditions",
+			volumeHealth: []core.PodVolumeHealth{
+				{
+					Name:             "vol1",
+					HealthConditions: makeVolumeHealthConditions(maxVolumeHealthConditions + 1),
+				},
+			},
+			isErr:       true,
+			expectedErr: "volumeHealth[0].healthConditions",
 		},
 	}
 

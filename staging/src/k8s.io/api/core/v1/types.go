@@ -785,9 +785,12 @@ type VolumeHealthCondition struct {
 	Status VolumeHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=VolumeHealthStatusType"`
 	// reason is a brief CamelCase machine-parseable reason.
 	// Together with status it forms the unique identity of a condition entry.
+	// Maximum permitted length of a reason is 256 characters.a
+	// +required
 	Reason string `json:"reason" protobuf:"bytes,2,opt,name=reason"`
 	// message is a human-readable description.
 	// +optional
+	// Maximum permitted length of a message is 1024 characters.
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 }
 
@@ -796,11 +799,14 @@ type VolumeHealthCondition struct {
 type VolumeHealthStatus struct {
 	// conditions is the set of adverse conditions reported by
 	// the CSI controller plugin. An empty list means no adverse condition.
+	// At most 16 conditions may be reported.
 	// +optional
 	// +listType=map
 	// +listMapKey=status
+	// +patchMergeKey=status
+	// +patchStrategy=merge
 	// +listMapKey=reason
-	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" protobuf:"bytes,1,rep,name=healthConditions"`
+	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" patchStrategy:"merge" patchMergeKey:"status" protobuf:"bytes,1,rep,name=healthConditions"`
 	// lastTransitionTime is when the current set of conditions first appeared.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,2,opt,name=lastTransitionTime"`
@@ -813,11 +819,14 @@ type PodVolumeHealth struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// conditions is the set of adverse conditions reported by
 	// the CSI node plugin for this volume on this node.
+	// At most 16 conditions may be reported.
 	// +optional
 	// +listType=map
 	// +listMapKey=status
+	// +patchMergeKey=status
+	// +patchStrategy=merge
 	// +listMapKey=reason
-	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" protobuf:"bytes,2,rep,name=healthConditions"`
+	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" patchStrategy:"merge" patchMergeKey:"status" protobuf:"bytes,2,rep,name=healthConditions"`
 	// lastTransitionTime is when the current set of conditions first appeared.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`

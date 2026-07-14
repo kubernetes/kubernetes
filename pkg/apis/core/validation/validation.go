@@ -2692,6 +2692,8 @@ var validVolumeHealthStatusTypes = sets.New(
 	core.VolumeHealthDegraded,
 )
 
+const maxVolumeHealthConditions = 16
+
 func validateVolumeHealthCondition(condition core.VolumeHealthCondition, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !validVolumeHealthStatusTypes.Has(condition.Status) {
@@ -2708,21 +2710,30 @@ func validateVolumeHealthCondition(condition core.VolumeHealthCondition, fldPath
 	return allErrs
 }
 
-func validateVolumeHealthStatus(healthStatus *core.VolumeHealthStatus, fldPath *field.Path) field.ErrorList {
+func validateVolumeHealthConditions(conditions []core.VolumeHealthCondition, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if healthStatus == nil {
-		return allErrs
+	if len(conditions) > maxVolumeHealthConditions {
+		allErrs = append(allErrs, field.TooMany(fldPath, len(conditions), maxVolumeHealthConditions))
 	}
 	seen := sets.New[string]()
-	for i, condition := range healthStatus.HealthConditions {
+	for i, condition := range conditions {
 		key := string(condition.Status) + "/" + condition.Reason
-		idxPath := fldPath.Child("healthConditions").Index(i)
+		idxPath := fldPath.Index(i)
 		if seen.Has(key) {
 			allErrs = append(allErrs, field.Duplicate(idxPath, key))
 		}
 		seen.Insert(key)
 		allErrs = append(allErrs, validateVolumeHealthCondition(condition, idxPath)...)
 	}
+	return allErrs
+}
+
+func validateVolumeHealthStatus(healthStatus *core.VolumeHealthStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if healthStatus == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, validateVolumeHealthConditions(healthStatus.HealthConditions, fldPath.Child("healthConditions"))...)
 	return allErrs
 }
 
@@ -2747,16 +2758,7 @@ func validatePodVolumeHealth(volumeHealth []core.PodVolumeHealth, spec *core.Pod
 		if len(vh.Name) > 0 && !volumeNames.Has(vh.Name) {
 			allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), vh.Name))
 		}
-		condSeen := sets.New[string]()
-		for j, cond := range vh.HealthConditions {
-			key := string(cond.Status) + "/" + cond.Reason
-			condPath := idxPath.Child("healthConditions").Index(j)
-			if condSeen.Has(key) {
-				allErrs = append(allErrs, field.Duplicate(condPath, key))
-			}
-			condSeen.Insert(key)
-			allErrs = append(allErrs, validateVolumeHealthCondition(cond, condPath)...)
-		}
+		allErrs = append(allErrs, validateVolumeHealthConditions(vh.HealthConditions, idxPath.Child("healthConditions"))...)
 	}
 	return allErrs
 }

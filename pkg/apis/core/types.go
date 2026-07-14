@@ -735,6 +735,7 @@ type VolumeHealthCondition struct {
 type VolumeHealthStatus struct {
 	// conditions is the set of adverse conditions reported by
 	// the CSI controller plugin. An empty list means no adverse condition.
+	// At most 16 conditions may be reported.
 	// +optional
 	// +listType=map
 	// +listMapKey=status
@@ -752,6 +753,7 @@ type PodVolumeHealth struct {
 	Name string
 	// conditions is the set of adverse conditions reported by
 	// the CSI node plugin for this volume on this node.
+	// At most 16 conditions may be reported.
 	// +optional
 	// +listType=map
 	// +listMapKey=status
