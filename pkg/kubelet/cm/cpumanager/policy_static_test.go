@@ -2113,7 +2113,7 @@ func TestPolicyWithAlignBySocketAndDistributeCPUsAcrossNUMAEnabled(t *testing.T)
 			expCSet:         cpuset.New(1, 3, 5, 7, 9, 11),
 		},
 		{
-			description: "AlighBySocket takes priority over DistributeCPUsAcrossNUMA",
+			description: "AlignBySocket takes priority over DistributeCPUsAcrossNUMA",
 			topo:        topoDualSocketMultiNumaPerSocketHTType2,
 			options: map[string]string{
 				AlignBySocketOption:            "true",
@@ -2129,7 +2129,7 @@ func TestPolicyWithAlignBySocketAndDistributeCPUsAcrossNUMAEnabled(t *testing.T)
 			expCSet:         cpuset.New(1, 3, 5, 7, 9, 13),
 		},
 		{
-			description: "AlighBySocket isn't enabled",
+			description: "AlignBySocket isn't enabled",
 			topo:        topoDualSocketMultiNumaPerSocketHTType2,
 			options: map[string]string{
 				AlignBySocketOption:            "false",
@@ -2145,7 +2145,7 @@ func TestPolicyWithAlignBySocketAndDistributeCPUsAcrossNUMAEnabled(t *testing.T)
 			expCSet:         cpuset.New(1, 4, 5, 8, 9, 12),
 		},
 		{
-			description: "No assignment that satisfy AlighBySocket",
+			description: "No assignment that satisfy AlignBySocket",
 			topo:        topoDualSocketMultiNumaPerSocketHTType2,
 			options: map[string]string{
 				AlignBySocketOption:            "true",

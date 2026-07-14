@@ -1101,6 +1101,9 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 		// chosen. First allocate an even distribution of CPUs in groups of
 		// size 'cpuGroupSize' from 'bestCombo'.
 		distribution := (numCPUs / len(bestCombo) / cpuGroupSize) * cpuGroupSize
+		// At this stage we are past NUMA-node selection (so we no longer need to
+		// consider alignBySocket); that happened when choosing bestCombo. Here we
+		// only ensure we do not ask any selected NUMA node for more CPUs than it can provide.
 		for _, numa := range bestCombo {
 			availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize * cpuGroupSize
 			if distribution > availableCPUsInNUMA {
