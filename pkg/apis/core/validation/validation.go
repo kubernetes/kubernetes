@@ -9635,8 +9635,13 @@ func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fld
 	if linuxContainerUser == nil {
 		return allErrors
 	}
-	for _, msg := range isValidLinuxContainerUserID(linuxContainerUser.UID) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("uid"), linuxContainerUser.UID, msg))
+	// linuxContainerUser.UID is a UID reported in the pod status by the container
+	// runtime, which may be any valid Linux uid_t (0 to math.MaxUint32). This is
+	// intentionally wider than the range allowed for a pod spec's runAsUser, so
+	// the check is kept inline here to ensure the expanded range applies only to
+	// container status validation.
+	if linuxContainerUser.UID < 0 || linuxContainerUser.UID > math.MaxUint32 {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("uid"), linuxContainerUser.UID, fmt.Sprintf("must be between 0 and %d, inclusive", int64(math.MaxUint32))))
 	}
 
 	for _, msg := range validation.IsValidGroupID(linuxContainerUser.GID) {
@@ -9648,18 +9653,6 @@ func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fld
 		}
 	}
 	return allErrors
-}
-
-const (
-	minLinuxContainerUserID int64 = 0
-	maxLinuxContainerUserID int64 = math.MaxUint32
-)
-
-func isValidLinuxContainerUserID(uid int64) []string {
-	if minLinuxContainerUserID <= uid && uid <= maxLinuxContainerUserID {
-		return nil
-	}
-	return []string{fmt.Sprintf(`must be between %d and %d, inclusive`, minLinuxContainerUserID, maxLinuxContainerUserID)}
 }
 
 func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
