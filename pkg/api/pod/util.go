@@ -21,13 +21,17 @@ import (
 	"iter"
 	"strings"
 
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -1961,6 +1965,155 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 	}
 	return false
 }
+
+// DefaultPodLevelResources handles pod-level resource defaulting when PodLevelResources
+// feature gate is enabled. Defaulting rules run in dependency order:
+// 1. HugePage pod limits from container aggregate limits.
+// 2. Pod requests from container aggregate requests or pod limits.
+// 3. Pod limits equal to container aggregate limits (when all containers specify limits).
+func DefaultPodLevelResources(pod *api.Pod) {
+	// If either the primary feature OR the sub-feature is disabled, exit.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		return
+	}
+	defaultPodLevelLimits(pod)
+	v1PodSpec := &apiv1.PodSpec{}
+	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
+		Containers:     pod.Spec.Containers,
+		InitContainers: pod.Spec.InitContainers,
+		Resources:      pod.Spec.Resources,
+	}, v1PodSpec, nil); err == nil {
+		v1Pod := &apiv1.Pod{Spec: *v1PodSpec}
+		corev1.DefaultHugePagePodLimits(v1Pod)
+		corev1.DefaultPodRequests(v1Pod)
+		if v1Pod.Spec.Resources != nil {
+			var coreResources api.ResourceRequirements
+			if err := corev1.Convert_v1_ResourceRequirements_To_core_ResourceRequirements(v1Pod.Spec.Resources, &coreResources, nil); err == nil {
+				pod.Spec.Resources = &coreResources
+			}
+		}
+	}
+}
+
+func defaultPodLevelLimits(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		return
+	}
+	if pod.Spec.Resources == nil {
+		return
+	}
+	if len(pod.Spec.Resources.Requests) == 0 && len(pod.Spec.Resources.Limits) == 0 {
+		return
+	}
+
+	candidates := sets.New[api.ResourceName]()
+	VisitContainers(&pod.Spec, AllContainers, func(ctr *api.Container, _ ContainerType) bool {
+		for resName := range ctr.Resources.Limits {
+			if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
+				if pod.Spec.Resources.Limits == nil {
+					candidates.Insert(resName)
+				} else if _, ok := pod.Spec.Resources.Limits[resName]; !ok {
+					candidates.Insert(resName)
+				}
+			}
+		}
+		return true
+	})
+
+	if candidates.Len() == 0 {
+		return
+	}
+
+	aggrLimits := aggregateContainerLimits(&pod.Spec, candidates)
+	if aggrLimits == nil {
+		return
+	}
+
+	for resName := range candidates {
+		val, ok := aggrLimits[apiv1.ResourceName(resName)]
+		if !ok {
+			continue
+		}
+		var podReq resource.Quantity
+		if pod.Spec.Resources.Requests != nil {
+			podReq = pod.Spec.Resources.Requests[resName]
+		}
+		if podReq.Cmp(val) > 0 {
+			val = podReq
+		}
+		if pod.Spec.Resources.Limits == nil {
+			pod.Spec.Resources.Limits = make(api.ResourceList)
+		}
+		pod.Spec.Resources.Limits[resName] = val.DeepCopy()
+	}
+}
+
+func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.ResourceName]) apiv1.ResourceList {
+	VisitContainers(spec, AllContainers, func(ctr *api.Container, _ ContainerType) bool {
+		for resName := range candidates {
+			if _, ok := ctr.Resources.Limits[resName]; !ok {
+				candidates.Delete(resName)
+			}
+		}
+		return candidates.Len() > 0
+	})
+
+	if candidates.Len() == 0 {
+		return nil
+	}
+
+	v1PodSpec := &apiv1.PodSpec{}
+	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
+		Containers:     spec.Containers,
+		InitContainers: spec.InitContainers,
+	}, v1PodSpec, nil); err != nil {
+		return nil
+	}
+
+	return resourcehelper.AggregateContainerLimits(&apiv1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
+}
+
+// ShouldDefaultPodLevelResourcesOnUpdate determines whether pod-level resource defaulting
+// should be executed during a pod update.
+func ShouldDefaultPodLevelResourcesOnUpdate(newPod, oldPod *api.Pod) bool {
+	if newPod.Spec.Resources == nil {
+		return false
+	}
+
+	if oldPod.Spec.Resources == nil || (len(oldPod.Spec.Resources.Requests) == 0 && len(oldPod.Spec.Resources.Limits) == 0) {
+		return true
+	}
+
+	hasResource := func(res *api.ResourceRequirements, name api.ResourceName) bool {
+		if res == nil {
+			return false
+		}
+		_, inReq := res.Requests[name]
+		_, inLim := res.Limits[name]
+		return inReq || inLim
+	}
+
+	for resName := range newPod.Spec.Resources.Requests {
+		if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
+			if !hasResource(oldPod.Spec.Resources, resName) {
+				return true
+			}
+		}
+	}
+	for resName := range newPod.Spec.Resources.Limits {
+		if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
+			if !hasResource(oldPod.Spec.Resources, resName) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+
 
 var initContainerAnnotations = map[string]struct{}{
 	"pod.beta.kubernetes.io/init-containers":          {},
