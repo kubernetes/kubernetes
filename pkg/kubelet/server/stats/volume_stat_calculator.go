@@ -45,6 +45,11 @@ type volumeStatCalculator struct {
 	stopO         sync.Once
 	latest        atomic.Value
 	eventRecorder record.EventRecorder
+	// lastMetricsErrors tracks the last non-NotSupported GetMetrics error string per
+	// volume name for this pod. Used to log at Error only when the failure is new or
+	// changes, while still logging repeats at high verbosity for debugging.
+	// Safe without a mutex: only the single calcAndStoreStats loop (and tests) mutate it.
+	lastMetricsErrors map[string]string
 }
 
 // PodVolumeStats encapsulates the VolumeStats for a pod.
@@ -57,11 +62,12 @@ type PodVolumeStats struct {
 // newVolumeStatCalculator creates a new VolumeStatCalculator
 func newVolumeStatCalculator(statsProvider Provider, jitterPeriod time.Duration, pod *v1.Pod, eventRecorder record.EventRecorder) *volumeStatCalculator {
 	return &volumeStatCalculator{
-		statsProvider: statsProvider,
-		jitterPeriod:  jitterPeriod,
-		pod:           pod,
-		stopChannel:   make(chan struct{}),
-		eventRecorder: eventRecorder,
+		statsProvider:     statsProvider,
+		jitterPeriod:      jitterPeriod,
+		pod:               pod,
+		stopChannel:       make(chan struct{}),
+		eventRecorder:     eventRecorder,
+		lastMetricsErrors: make(map[string]string),
 	}
 }
 
@@ -142,10 +148,11 @@ func (s *volumeStatCalculator) calcAndStoreStats(logger klog.Logger) {
 		if err != nil {
 			// Expected for Volumes that don't support Metrics
 			if !volume.IsNotSupported(err) {
-				logger.V(4).Info("Failed to calculate volume metrics", "pod", klog.KObj(s.pod), "podUID", s.pod.UID, "volumeName", name, "err", err)
+				s.logVolumeMetricsError(logger, name, err)
 			}
 			continue
 		}
+		delete(s.lastMetricsErrors, name)
 		// Lookup the volume spec and add a 'PVCReference' for volumes that reference a PVC
 		volSpec := volumesSpec[name]
 		var pvcRef *stats.PVCReference
@@ -177,6 +184,19 @@ func (s *volumeStatCalculator) calcAndStoreStats(logger klog.Logger) {
 	// Store the new stats
 	s.latest.Store(PodVolumeStats{EphemeralVolumes: ephemeralStats,
 		PersistentVolumes: persistentStats})
+}
+
+// logVolumeMetricsError logs GetMetrics failures. New or changed errors are logged at
+// Error so they are visible at default verbosity; identical repeats are V(4) only to
+// avoid spam from the periodic calculator loop.
+func (s *volumeStatCalculator) logVolumeMetricsError(logger klog.Logger, volumeName string, err error) {
+	errMsg := err.Error()
+	if prev, ok := s.lastMetricsErrors[volumeName]; !ok || prev != errMsg {
+		logger.Error(err, "Failed to calculate volume metrics", "pod", klog.KObj(s.pod), "podUID", s.pod.UID, "volumeName", volumeName)
+		s.lastMetricsErrors[volumeName] = errMsg
+		return
+	}
+	logger.V(4).Info("Failed to calculate volume metrics", "pod", klog.KObj(s.pod), "podUID", s.pod.UID, "volumeName", volumeName, "err", err)
 }
 
 // parsePodVolumeStats converts (internal) volume.Metrics to (external) stats.VolumeStats structures
