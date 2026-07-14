@@ -55,10 +55,6 @@ import (
 // realistic AdmissionReview sizes while still guarding against unbounded reads.
 const defaultMaxBodyBytes int64 = 3 << 20 // 3 MiB
 
-// bearerPrefix is the case-insensitive scheme prefix expected on the
-// Authorization header value.
-const bearerPrefix = "bearer "
-
 // genericDenyMessage is the fixed response body returned for every denied
 // request. Keeping it constant (and free of claim values) mirrors the core
 // verifier's anti-enumeration posture: a caller cannot distinguish which check
@@ -110,10 +106,14 @@ type handler struct {
 // answered with a generic 401 and next is not invoked. There is no permissive
 // mode.
 //
-// Because next receives the decoded review, no downstream re-decoding occurs.
-// If next is nil the handler is terminal: a verified request is answered with a
-// bare 200. Supply a next to forward to the real admission logic.
+// next is REQUIRED: it receives the decoded review and performs the real
+// admission logic. WithTokenVerification panics if next is nil, so a
+// misconfiguration fails fast at startup rather than silently becoming a no-op
+// authentication gate.
 func WithTokenVerification(v *verify.Verifier, next ReviewHandler, opts ...Option) http.Handler {
+	if next == nil {
+		panic("admissionhttp: next ReviewHandler must not be nil")
+	}
 	h := &handler{
 		verifier: v,
 		next:     next,
@@ -129,17 +129,20 @@ func WithTokenVerification(v *verify.Verifier, next ReviewHandler, opts ...Optio
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	// Check the bearer token FIRST: extracting it from the header is far cheaper
+	// than reading and decoding the body, so an unauthenticated caller is
+	// rejected before any body work.
+	token, ok := BearerToken(r)
+	if !ok {
+		h.deny(ctx, w, reasonNoBearerToken)
+		return
+	}
+
 	// Decode the AdmissionReview once. The body is read a single time and never
 	// reset; downstream consumes the decoded review, not r.Body.
 	review, reason, ok := h.decodeReview(r)
 	if !ok {
 		h.deny(ctx, w, reason)
-		return
-	}
-
-	token, ok := BearerToken(r)
-	if !ok {
-		h.deny(ctx, w, reasonNoBearerToken)
 		return
 	}
 
@@ -152,14 +155,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Never log the token. Verification succeeded; the outcome is logged at high
-	// verbosity for operators and never written to the HTTP response.
+	// verbosity for operators and never written to the HTTP response. next is
+	// required (WithTokenVerification rejects a nil next), so it is safe to call.
 	klog.FromContext(ctx).V(4).Info("Admission webhook token verified")
-
-	if h.next != nil {
-		h.next(w, r, review)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
+	h.next(w, r, review)
 }
 
 // deny logs the non-sensitive reason via contextual logging and writes a
@@ -220,16 +219,23 @@ func VerifyAdmissionReview(ctx context.Context, v *verify.Verifier, review *admi
 }
 
 // BearerToken extracts the token from an "Authorization: Bearer <token>"
-// header. The scheme match is case-insensitive per RFC 7235. ok is false for a
-// missing header, a non-Bearer scheme, or an empty token. It is exported so a
-// caller that decodes the AdmissionReview itself can obtain the token to pass to
-// [VerifyAdmissionReview].
+// header, mirroring the extraction logic in
+// k8s.io/apiserver/pkg/authentication/request/bearertoken so this adapter does
+// not drift from the apiserver's parsing: the header is trimmed, split on the
+// first spaces, the scheme is matched case-insensitively, and an empty token is
+// rejected. ok is false for a missing header, a non-Bearer scheme, or an empty
+// token. It is exported so a caller that decodes the AdmissionReview itself can
+// obtain the token to pass to [VerifyAdmissionReview].
 func BearerToken(r *http.Request) (token string, ok bool) {
-	h := r.Header.Get("Authorization")
-	if len(h) < len(bearerPrefix) || !strings.EqualFold(h[:len(bearerPrefix)], bearerPrefix) {
+	auth := strings.TrimSpace(r.Header.Get("Authorization"))
+	if auth == "" {
 		return "", false
 	}
-	token = strings.TrimSpace(h[len(bearerPrefix):])
+	parts := strings.SplitN(auth, " ", 3)
+	if len(parts) < 2 || strings.ToLower(parts[0]) != "bearer" {
+		return "", false
+	}
+	token = parts[1]
 	if token == "" {
 		return "", false
 	}

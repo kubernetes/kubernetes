@@ -45,7 +45,8 @@ func TestBearerToken_Table(t *testing.T) {
 		{name: "valid bearer", header: "Bearer abc.def.ghi", wantToken: "abc.def.ghi", wantOK: true},
 		{name: "lowercase scheme is accepted", header: "bearer abc", wantToken: "abc", wantOK: true},
 		{name: "mixed-case scheme is accepted", header: "BeArEr abc", wantToken: "abc", wantOK: true},
-		{name: "surrounding whitespace is trimmed", header: "Bearer    abc   ", wantToken: "abc", wantOK: true},
+		{name: "trailing header whitespace is trimmed", header: "Bearer abc   ", wantToken: "abc", wantOK: true},
+		{name: "extra space before the token is rejected (matches apiserver)", header: "Bearer    abc", wantOK: false},
 		{name: "no header", header: "", wantOK: false},
 		{name: "non-bearer scheme", header: "Basic dXNlcjpwYXNz", wantOK: false},
 		{name: "bearer with empty token", header: "Bearer ", wantOK: false},
@@ -171,25 +172,10 @@ func TestWithTokenVerification_EmptyBearerRejected(t *testing.T) {
 	}
 }
 
-// TestWithTokenVerification_NilNextTerminal covers the terminal handler shape:
-// when next is nil, a verified request is answered with a bare 200 and no body,
-// so a caller can use the adapter as a standalone authentication gate.
-func TestWithTokenVerification_NilNextTerminal(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	v := ts.verifier(t)
-	adapter := admissionhttp.WithTokenVerification(v, nil) // terminal
-
-	token := ts.sign(t, ts.baseClaims())
-	rec := httptest.NewRecorder()
-	adapter.ServeHTTP(rec, newRequest(t, admissionReviewBody(t, testGroup), token))
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-	if body := rec.Body.String(); body != "" {
-		t.Errorf("terminal 200 should have an empty body, got %q", body)
-	}
-}
+// TODO(kep-6060): the nil-next "terminal 200" mode was removed — next is now
+// required (WithTokenVerification panics on nil). If a standalone auth-gate use
+// case is ever needed, reintroduce it explicitly rather than via a nil next.
+// (Was TestWithTokenVerification_NilNextTerminal.)
 
 // erroringBody is a request body whose Read returns a non-EOF error, simulating
 // a client connection that drops mid-transfer. It lets the test drive the
