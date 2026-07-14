@@ -30,6 +30,9 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "ControllerRevision"},
 		coverage.FieldRules{
+			"data": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},

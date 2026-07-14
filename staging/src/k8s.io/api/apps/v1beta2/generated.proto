@@ -49,6 +49,7 @@ message ControllerRevision {
 
   // Data is the serialized representation of the state.
   // +required
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 2;
 
   // Revision indicates the revision of the state represented by Data.
@@ -298,6 +299,8 @@ message DeploymentSpec {
   // selected by this will be the ones affected by this deployment.
   // It must match the pod template's labels.
   // +required
+  // +k8s:alpha(since: "1.37")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
@@ -480,6 +483,8 @@ message ReplicaSetSpec {
   // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +required
+  // +k8s:alpha(since: "1.37")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template is the object that describes the pod that will be created if
