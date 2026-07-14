@@ -90,8 +90,20 @@
             "minGroupCount": 1
           }
         },
+        "schedulingConstraints": {
+          "topology": [
+            {
+              "key": "keyValue"
+            }
+          ]
+        },
+        "disruptionMode": {
+          "single": {},
+          "all": {}
+        },
         "priorityClassName": "priorityClassNameValue",
-        "priority": 4,
+        "priority": 6,
+        "preemptionPolicy": "preemptionPolicyValue",
         "podGroupTemplates": [
           {
             "name": "nameValue",
@@ -123,14 +135,7 @@
             "priority": 7,
             "preemptionPolicy": "preemptionPolicyValue"
           }
-        ],
-        "schedulingConstraints": {
-          "topology": [
-            {
-              "key": "keyValue"
-            }
-          ]
-        }
+        ]
       }
     ]
   }

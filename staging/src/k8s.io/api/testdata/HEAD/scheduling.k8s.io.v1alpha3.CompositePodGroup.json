@@ -55,15 +55,20 @@
         "minGroupCount": 1
       }
     },
-    "priorityClassName": "priorityClassNameValue",
-    "priority": 5,
     "schedulingConstraints": {
       "topology": [
         {
           "key": "keyValue"
         }
       ]
-    }
+    },
+    "disruptionMode": {
+      "single": {},
+      "all": {}
+    },
+    "priorityClassName": "priorityClassNameValue",
+    "priority": 7,
+    "preemptionPolicy": "preemptionPolicyValue"
   },
   "status": {
     "conditions": [
