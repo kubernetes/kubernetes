@@ -14,28 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package admissionhttp adapts the core token verifier to a plain
-// net/http admission webhook. WithTokenVerification returns an http.Handler
-// that decodes the incoming AdmissionReview exactly once, enforces KEP-6060
-// service-account token verification, and — only on success — hands the
-// already-decoded review to a downstream handler. An existing HTTP webhook can
-// thus adopt token authentication without re-decoding its request body.
+// Package admissionhttp adapts the core token verifier to a plain net/http
+// admission webhook. WithTokenVerification returns an http.Handler that decodes
+// the incoming AdmissionReview once, enforces KEP-6060 token verification, and —
+// only on success — hands the decoded AdmissionRequest to a downstream handler.
 //
-// The handler ALWAYS enforces: a verification failure is answered with a
-// generic 401 and the downstream handler is never reached. There is no
-// permissive / fail-open mode. Whether a webhook adopts verification at all is
-// a deployment-time (for example controller-runtime) configuration concern that
-// defaults off; it is not a runtime knob on this handler.
+// Enforcement is unconditional: a verification failure never reaches the
+// downstream handler. Whether a webhook adopts verification at all is a
+// deployment-time concern that defaults off, not a runtime knob here.
 //
-// Callers that have already decoded the AdmissionReview (for example
-// controller-runtime) should use [VerifyAdmissionRequest] directly so the body
-// is never decoded twice.
-//
-// The adapter imports only the core verify package, so JOSE/JWT dependencies
-// stay confined to the authenticator the caller supplies to the verifier (for
-// example the oidc package). Decoding the AdmissionReview to extract the
-// resource API group pulls in k8s.io/api/admission/v1 and k8s.io/apimachinery,
-// the module's only Kubernetes dependencies.
+// Callers that have already decoded the review (for example controller-runtime)
+// should use [VerifyAdmissionRequest] directly. The adapter imports only the
+// core verify package plus k8s.io/api/admission/v1 and k8s.io/apimachinery, so
+// JOSE/JWT dependencies stay confined to the authenticator the verifier uses.
 package admissionhttp // import "k8s.io/webhookauth/verify/admissionhttp"
 
 import (
@@ -67,15 +58,13 @@ func init() {
 	utilruntime.Must(admissionv1.AddToScheme(scheme))
 }
 
-// defaultMaxBodyBytes bounds how much of the request body the adapter reads
-// before decoding the AdmissionReview. It is deliberately generous relative to
-// realistic AdmissionReview sizes while still guarding against unbounded reads.
+// defaultMaxBodyBytes bounds the request body read before decoding, guarding
+// against unbounded reads while staying generous for real AdmissionReviews.
 const defaultMaxBodyBytes int64 = 3 << 20 // 3 MiB
 
-// genericDenyMessage is the fixed response body returned for every denied
-// request. Keeping it constant (and free of claim values) mirrors the core
-// verifier's anti-enumeration posture: a caller cannot distinguish which check
-// failed, nor learn any webhook name, uid, or group from the response.
+// genericDenyMessage is the fixed body/message returned for every denial. It
+// carries no claim values, so a caller cannot tell which check failed
+// (anti-enumeration).
 const genericDenyMessage = "webhook token verification failed"
 
 // Adapter-level denial reasons. Like the core verifier's reasons they are
@@ -87,12 +76,11 @@ const (
 	reasonBodyTooLarge    = "request body exceeds the configured limit"
 )
 
-// AdmissionHandler performs the admission decision for a request whose API-server
-// identity has already been verified and whose AdmissionReview has already been
-// decoded. It takes the AdmissionRequest and returns the AdmissionResponse — the
-// same shape as controller-runtime's Handle(ctx, Request) Response. The adapter
-// echoes the request UID onto the response, wraps it in an AdmissionReview, and
-// writes it, so the downstream never touches the raw request or response body.
+// AdmissionHandler performs the admission decision for a request that has already
+// been verified and decoded. It takes the AdmissionRequest and returns the
+// AdmissionResponse — the shape of controller-runtime's Handle(ctx, Request)
+// Response. The adapter echoes the request UID onto the response and wraps it in
+// an AdmissionReview, so the downstream never touches the raw body.
 type AdmissionHandler func(ctx context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse
 
 // Option configures the handler.
@@ -115,23 +103,18 @@ type handler struct {
 	maxBody  int64
 }
 
-// WithTokenVerification returns an http.Handler that, on every request, checks
-// the presented bearer token BEFORE reading the body, decodes the
-// AdmissionReview EXACTLY ONCE, verifies the token against the KEP-6060
-// contract, and — only on success — invokes next with the decoded
-// AdmissionRequest and writes next's AdmissionResponse.
+// WithTokenVerification returns an http.Handler that checks the bearer token
+// before reading the body, decodes the AdmissionReview once, verifies the token,
+// and — only on success — invokes next with the decoded AdmissionRequest and
+// writes next's AdmissionResponse.
 //
-// Enforcement is unconditional (no permissive mode). A failure BEFORE decoding
-// (missing token, undecodable or over-limit body — no UID yet) is answered with
-// a bare generic 401. A verification failure AFTER decoding is answered with a
-// denied AdmissionResponse (HTTP 200, Allowed:false, Result.Code 401): an
-// explicit deny, which — unlike a non-2xx status — failurePolicy: Ignore cannot
-// turn into an allow. next is never invoked on failure.
+// A failure before decoding (missing token, undecodable or over-limit body) is a
+// bare 401. A verification failure after decoding is a denied AdmissionResponse
+// (HTTP 200, Allowed:false, Result.Code 401): an explicit deny that, unlike a
+// non-2xx status, failurePolicy: Ignore cannot turn into an allow.
 //
-// next is REQUIRED: it receives the decoded request and performs the real
-// admission logic. WithTokenVerification panics if next is nil, so a
-// misconfiguration fails fast at startup rather than silently becoming a no-op
-// authentication gate.
+// next is required and performs the real admission logic; a nil next panics so a
+// misconfiguration fails fast instead of becoming a no-op auth gate.
 func WithTokenVerification(v *verify.Verifier, next AdmissionHandler, opts ...Option) http.Handler {
 	if next == nil {
 		panic("admissionhttp: next AdmissionHandler must not be nil")
@@ -151,10 +134,9 @@ func WithTokenVerification(v *verify.Verifier, next AdmissionHandler, opts ...Op
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Check the bearer token FIRST: extracting it from the header is far cheaper
-	// than reading and decoding the body, so an unauthenticated caller is
-	// rejected before any body work. There is no UID yet, so a pre-decode
-	// failure is answered with a bare generic 401.
+	// Check the bearer token first: it is far cheaper than reading and decoding
+	// the body, and rejects an unauthenticated caller before any body work. No
+	// UID exists yet, so a pre-decode failure is a bare 401.
 	token, ok := BearerToken(r)
 	if !ok {
 		denyPreDecode(ctx, w, reasonNoBearerToken)
@@ -236,12 +218,10 @@ func writeResponse(w http.ResponseWriter, req *admissionv1.AdmissionRequest, res
 	_ = json.NewEncoder(w).Encode(out)
 }
 
-// decodeReview reads the request body once (bounded by maxBody) and decodes it
-// into an AdmissionReview via the scheme's serializer.
-//
-// ok is false — with a non-sensitive log reason — when the body is over the
-// limit or is not a decodable AdmissionReview carrying a Request, so the handler
-// fails closed rather than defaulting the review group to the core group ("").
+// decodeReview reads the body once (bounded by maxBody) and decodes it into an
+// AdmissionReview via the scheme's serializer. ok is false, with a non-sensitive
+// log reason, for an over-limit body or anything that is not a decodable
+// AdmissionReview carrying a Request — so the handler fails closed.
 func (h *handler) decodeReview(r *http.Request) (review *admissionv1.AdmissionReview, reason string, ok bool) {
 	if r.Body == nil {
 		return nil, reasonUndecodableBody, false
@@ -296,15 +276,12 @@ func checkObjectGroup(req *admissionv1.AdmissionRequest) error {
 }
 
 // VerifyAdmissionRequest verifies token against the KEP-6060 contract for an
-// AdmissionRequest the caller has ALREADY decoded. It is the primary entry point
-// for consumers (for example controller-runtime, whose Request embeds an
-// AdmissionRequest) that decode the review themselves, so it is never decoded
-// twice.
+// already-decoded AdmissionRequest — the entry point for consumers (for example
+// controller-runtime) that decode the review themselves.
 //
-// It returns nil on success, or a generic error that satisfies
+// It returns nil on success or a generic error satisfying
 // errors.Is(err, verify.ErrVerificationFailed) on any failure (including a nil
-// request). The specific reason is logged for operators; do not branch on the
-// error.
+// request). The reason is logged; do not branch on the error.
 func VerifyAdmissionRequest(ctx context.Context, v *verify.Verifier, req *admissionv1.AdmissionRequest, token string) error {
 	if req == nil {
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", reasonUndecodableBody)
@@ -323,14 +300,11 @@ func VerifyAdmissionRequest(ctx context.Context, v *verify.Verifier, req *admiss
 	return nil
 }
 
-// BearerToken extracts the token from an "Authorization: Bearer <token>"
-// header, mirroring the extraction logic in
-// k8s.io/apiserver/pkg/authentication/request/bearertoken so this adapter does
-// not drift from the apiserver's parsing: the header is trimmed, split on the
-// first space, the scheme is matched case-insensitively, and an empty token is
-// rejected. ok is false for a missing header, a non-Bearer scheme, or an empty
-// token. It is exported so a caller that decodes the AdmissionReview itself can
-// obtain the token to pass to [VerifyAdmissionRequest].
+// BearerToken extracts the token from an "Authorization: Bearer <token>" header,
+// mirroring k8s.io/apiserver/pkg/authentication/request/bearertoken so this
+// adapter does not drift from the apiserver's parsing. ok is false for a missing
+// header, a non-Bearer scheme, or an empty token. It is exported so a caller that
+// decodes the review itself can obtain the token for [VerifyAdmissionRequest].
 func BearerToken(r *http.Request) (token string, ok bool) {
 	auth := strings.TrimSpace(r.Header.Get("Authorization"))
 	if auth == "" {
