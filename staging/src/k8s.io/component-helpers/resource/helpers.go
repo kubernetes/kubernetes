@@ -49,8 +49,6 @@ type PodResourcesOptions struct {
 	InPlacePodLevelResourcesVerticalScalingEnabled bool
 	// ExcludeOverhead controls if pod overhead is excluded from the calculation.
 	ExcludeOverhead bool
-	// ContainerFn is called with the effective resources required for each container within the pod.
-	ContainerFn func(res v1.ResourceList, containerType ContainerType)
 	// NonMissingContainerRequests if provided will replace any missing container level requests for the specified resources
 	// with the given values.  If the requests for those resources are explicitly set, even if zero, they will not be modified.
 	NonMissingContainerRequests v1.ResourceList
@@ -155,27 +153,12 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	}
 
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
-
-		var effectiveReqs v1.ResourceList
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
-			if pod.Status.Resources != nil {
-				effectiveReqs = determineEffectiveRequests(pod, &ResourceState{
-					Spec:      pod.Spec.Resources.Requests,
-					Actuated:  pod.Status.Resources.Requests,
-					Allocated: pod.Status.AllocatedResources,
-				})
-			}
+		effectiveReqs := pod.Spec.Resources.Requests
+		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
+			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, pod.Status.Resources.Requests, pod.Status.AllocatedResources)
 		}
 
-		for resourceName, quantity := range pod.Spec.Resources.Requests {
-			if IsSupportedPodLevelResource(resourceName) {
-				reqs[resourceName] = quantity
-				if effectiveReqs != nil {
-					reqs[resourceName] = effectiveReqs[resourceName]
-				}
-
-			}
-		}
+		applyPodLevelResources(reqs, effectiveReqs)
 	}
 
 	// Add overhead for running a pod to the sum of requests if requested:
@@ -186,50 +169,86 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	return reqs
 }
 
-// AggregateContainerRequests computes the total resource requests of all the containers
-// in a pod. This computation folows the formula defined in the KEP for sidecar
-// containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
-// for more details.
-func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
-	// attempt to reuse the maps if passed, or allocate otherwise
-	reqs := reuseOrClearResourceList(opts.Reuse)
-	var containerStatuses map[string]*v1.ContainerStatus
+func applyPodLevelResources(result, effectiveResources v1.ResourceList) {
+	for resourceName, quantity := range effectiveResources {
+		if IsSupportedPodLevelResource(resourceName) {
+			result[resourceName] = quantity
+		}
+	}
+}
+
+func effectivePodLevelResources(pod *v1.Pod, spec v1.ResourceList, statuses ...v1.ResourceList) v1.ResourceList {
+	if IsPodResizeInfeasible(pod) {
+		spec = nil
+	}
+	return max(spec, statuses...)
+}
+
+func containerSpecRequests(container *v1.Container, _ *v1.ContainerStatus, _ bool) v1.ResourceList {
+	return container.Resources.Requests
+}
+
+func containerAllocatedRequests(container *v1.Container, containerStatus *v1.ContainerStatus, isResizeInfeasible bool) v1.ResourceList {
+	if containerStatus != nil && containerStatus.AllocatedResources != nil {
+		return containerStatus.AllocatedResources
+	}
+	if isResizeInfeasible {
+		return nil
+	}
+	return container.Resources.Requests
+}
+
+func containerActuatedRequests(container *v1.Container, containerStatus *v1.ContainerStatus, isResizeInfeasible bool) v1.ResourceList {
+	if containerStatus != nil && containerStatus.Resources != nil && containerStatus.Resources.Requests != nil {
+		return containerStatus.Resources.Requests
+	}
+	if containerStatus != nil && containerStatus.AllocatedResources != nil {
+		return containerStatus.AllocatedResources
+	}
+	if isResizeInfeasible {
+		return nil
+	}
+	return container.Resources.Requests
+}
+
+func findContainerStatus(pod *v1.Pod, name string) *v1.ContainerStatus {
+	for i := range pod.Status.ContainerStatuses {
+		if pod.Status.ContainerStatuses[i].Name == name {
+			return &pod.Status.ContainerStatuses[i]
+		}
+	}
+	for i := range pod.Status.InitContainerStatuses {
+		if pod.Status.InitContainerStatuses[i].Name == name {
+			return &pod.Status.InitContainerStatuses[i]
+		}
+	}
+	return nil
+}
+
+func isRestartableInitContainer(container *v1.Container) bool {
+	return container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways
+}
+
+func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getResourceList func(container *v1.Container, containerStatus *v1.ContainerStatus, isResizeInfeasible bool) v1.ResourceList) v1.ResourceList {
+	var isResizeInfeasible bool
 	if opts.UseStatusResources {
-		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
-		for i := range pod.Status.ContainerStatuses {
-			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
-		}
-		for i := range pod.Status.InitContainerStatuses {
-			containerStatuses[pod.Status.InitContainerStatuses[i].Name] = &pod.Status.InitContainerStatuses[i]
-		}
+		isResizeInfeasible = IsPodResizeInfeasible(pod)
 	}
-
+	result := v1.ResourceList{}
 	for _, container := range pod.Spec.Containers {
-		containerReqs := container.Resources.Requests
+		var cs *v1.ContainerStatus
 		if opts.UseStatusResources {
-			cs, found := containerStatuses[container.Name]
-			if found && cs.Resources != nil {
-				containerReqs = determineEffectiveRequests(pod, &ResourceState{
-					Spec:      container.Resources.Requests,
-					Actuated:  cs.Resources.Requests,
-					Allocated: cs.AllocatedResources,
-				})
-			}
+			cs = findContainerStatus(pod, container.Name)
 		}
-
+		containerResources := getResourceList(&container, cs, isResizeInfeasible)
 		if len(opts.NonMissingContainerRequests) > 0 {
-			containerReqs = applyNonMissing(containerReqs, opts.NonMissingContainerRequests)
+			containerResources = applyNonMissing(containerResources, opts.NonMissingContainerRequests)
 		}
-
-		if opts.ContainerFn != nil {
-			opts.ContainerFn(containerReqs, Containers)
-		}
-
-		addResourceList(reqs, containerReqs)
+		addResourceList(result, containerResources)
 	}
 
-	restartableInitContainerReqs := v1.ResourceList{}
-	initContainerReqs := v1.ResourceList{}
+	restartableInitContainerResources := v1.ResourceList{}
+	initContainerResources := v1.ResourceList{}
 	// init containers define the minimum of any resource
 	//
 	// Let's say `InitContainerUse(i)` is the resource requirements when the i-th
@@ -238,45 +257,66 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
 	for _, container := range pod.Spec.InitContainers {
-		containerReqs := container.Resources.Requests
+		var cs *v1.ContainerStatus
 		if opts.UseStatusResources {
-			if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
-				cs, found := containerStatuses[container.Name]
-				if found && cs.Resources != nil {
-					containerReqs = determineEffectiveRequests(pod, &ResourceState{
-						Spec:      container.Resources.Requests,
-						Actuated:  cs.Resources.Requests,
-						Allocated: cs.AllocatedResources,
-					})
-				}
-			}
+			cs = findContainerStatus(pod, container.Name)
 		}
-
+		containerResources := getResourceList(&container, cs, isResizeInfeasible)
 		if len(opts.NonMissingContainerRequests) > 0 {
-			containerReqs = applyNonMissing(containerReqs, opts.NonMissingContainerRequests)
+			containerResources = applyNonMissing(containerResources, opts.NonMissingContainerRequests)
 		}
-
-		if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
+		// Is the init container marked as a restartable init container?
+		if isRestartableInitContainer(&container) {
 			// and add them to the resulting cumulative container requests
-			addResourceList(reqs, containerReqs)
+			addResourceList(result, containerResources)
 
 			// track our cumulative restartable init container resources
-			addResourceList(restartableInitContainerReqs, containerReqs)
-			containerReqs = restartableInitContainerReqs
+			addResourceList(restartableInitContainerResources, containerResources)
+			containerResources = restartableInitContainerResources
 		} else {
-			tmp := v1.ResourceList{}
-			addResourceList(tmp, containerReqs)
-			addResourceList(tmp, restartableInitContainerReqs)
-			containerReqs = tmp
+			combinedResources := v1.ResourceList{}
+			addResourceList(combinedResources, containerResources)
+			addResourceList(combinedResources, restartableInitContainerResources)
+			containerResources = combinedResources
 		}
-
-		if opts.ContainerFn != nil {
-			opts.ContainerFn(containerReqs, InitContainers)
-		}
-		maxResourceList(initContainerReqs, containerReqs)
+		maxResourceList(initContainerResources, containerResources)
 	}
+	maxResourceList(result, initContainerResources)
+	return result
+}
 
-	maxResourceList(reqs, initContainerReqs)
+// AggregateContainerRequests computes the total resource requests of all the containers
+// in a pod. This computation folows the formula defined in the KEP for sidecar
+// containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
+// for more details.
+func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
+	// attempt to reuse the maps if passed, or allocate otherwise
+	reqs := reuseOrClearResourceList(opts.Reuse)
+	if !opts.UseStatusResources {
+		addResourceList(reqs, aggregateContainerResourcesByFn(pod, opts, containerSpecRequests))
+	} else {
+		isResizeInfeasible := IsPodResizeInfeasible(pod)
+		var specReqs, allocatedReqs, actuatedReqs v1.ResourceList
+		// When pod-level status maps are populated, they already contain the aggregate values across all containers.
+		// When unpopulated (e.g., at creation time or when feature gates are disabled), we fall back to container status aggregation.
+		// Once InPlacePodLevelResourcesVerticalScaling and InPlacePodVerticalScaling are GA and feature gates are removed,
+		// container-level fallback becomes redundant because max(spec, actuated, allocated) naturally evaluates to spec at creation time.
+		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.AllocatedResources != nil && pod.Status.Resources != nil && pod.Status.Resources.Requests != nil {
+			specReqs = aggregateContainerResourcesByFn(pod, opts, containerSpecRequests)
+			allocatedReqs = pod.Status.AllocatedResources
+			actuatedReqs = pod.Status.Resources.Requests
+		} else {
+			specReqs = aggregateContainerResourcesByFn(pod, opts, containerSpecRequests)
+			allocatedReqs = aggregateContainerResourcesByFn(pod, opts, containerAllocatedRequests)
+			actuatedReqs = aggregateContainerResourcesByFn(pod, opts, containerActuatedRequests)
+		}
+
+		if isResizeInfeasible {
+			addResourceList(reqs, max(actuatedReqs, allocatedReqs))
+		} else {
+			addResourceList(reqs, max(specReqs, actuatedReqs, allocatedReqs))
+		}
+	}
 
 	// Add resources from node allocatable ResourceClaims
 	if opts.UseDRANodeAllocatableResourceClaimStatus && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
@@ -288,26 +328,6 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 	}
 
 	return reqs
-}
-
-type ResourceState struct {
-	Spec      v1.ResourceList
-	Actuated  v1.ResourceList
-	Allocated v1.ResourceList
-}
-
-func determineEffectiveRequests(pod *v1.Pod, rs *ResourceState) v1.ResourceList {
-	if IsPodResizeInfeasible(pod) {
-		return max(rs.Actuated, rs.Allocated)
-	}
-	return max(rs.Spec, rs.Actuated, rs.Allocated)
-}
-
-func determineEffectiveLimits(pod *v1.Pod, rs *ResourceState) v1.ResourceList {
-	if IsPodResizeInfeasible(pod) {
-		return rs.Actuated.DeepCopy()
-	}
-	return max(rs.Spec, rs.Actuated)
 }
 
 // IsPodResizeInfeasible returns true if the pod condition PodResizePending is set to infeasible.
@@ -347,6 +367,20 @@ func applyNonMissing(reqs v1.ResourceList, nonMissing v1.ResourceList) v1.Resour
 	return cp
 }
 
+func containerSpecLimits(c *v1.Container, _ *v1.ContainerStatus, _ bool) v1.ResourceList {
+	return c.Resources.Limits
+}
+
+func containerActuatedLimits(c *v1.Container, cs *v1.ContainerStatus, isResizeInfeasible bool) v1.ResourceList {
+	if cs != nil && cs.Resources != nil && cs.Resources.Limits != nil {
+		return cs.Resources.Limits
+	}
+	if isResizeInfeasible {
+		return nil
+	}
+	return c.Resources.Limits
+}
+
 // PodLimits computes the pod limits per the PodResourcesOptions supplied. If PodResourcesOptions is nil, then
 // the limits are returned including pod overhead for any non-zero limits. The computation is part of the API and must be reviewed
 // as an API change.
@@ -354,24 +388,11 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	limits := AggregateContainerLimits(pod, opts)
 	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
-
-		var effectiveLims v1.ResourceList
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
-			if pod.Status.Resources != nil {
-				effectiveLims = determineEffectiveLimits(pod, &ResourceState{
-					Spec:     pod.Spec.Resources.Limits,
-					Actuated: pod.Status.Resources.Limits,
-				})
-			}
+		effectiveLims := pod.Spec.Resources.Limits
+		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
+			effectiveLims = effectivePodLevelResources(pod, pod.Spec.Resources.Limits, pod.Status.Resources.Limits)
 		}
-		for resourceName, quantity := range pod.Spec.Resources.Limits {
-			if IsSupportedPodLevelResource(resourceName) {
-				limits[resourceName] = quantity
-				if effectiveLims != nil {
-					limits[resourceName] = effectiveLims[resourceName]
-				}
-			}
-		}
+		applyPodLevelResources(limits, effectiveLims)
 	}
 
 	// Add overhead to non-zero limits if requested:
@@ -392,81 +413,32 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 // containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 // for more details.
 func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
+	opts.NonMissingContainerRequests = nil
 	// attempt to reuse the maps if passed, or allocate otherwise
 	limits := reuseOrClearResourceList(opts.Reuse)
-	var containerStatuses map[string]*v1.ContainerStatus
-	if opts.UseStatusResources {
-		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
-		for i := range pod.Status.ContainerStatuses {
-			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
-		}
-		for i := range pod.Status.InitContainerStatuses {
-			containerStatuses[pod.Status.InitContainerStatuses[i].Name] = &pod.Status.InitContainerStatuses[i]
-		}
-	}
-
-	for _, container := range pod.Spec.Containers {
-		containerLimits := container.Resources.Limits
-		if opts.UseStatusResources {
-			cs, found := containerStatuses[container.Name]
-			if found && cs.Resources != nil {
-				containerLimits = determineEffectiveLimits(pod, &ResourceState{
-					Spec:     containerLimits,
-					Actuated: cs.Resources.Limits,
-				})
-			}
-		}
-
-		if opts.ContainerFn != nil {
-			opts.ContainerFn(containerLimits, Containers)
-		}
-		addResourceList(limits, containerLimits)
-	}
-
-	restartableInitContainerLimits := v1.ResourceList{}
-	initContainerLimits := v1.ResourceList{}
-	// init containers define the minimum of any resource
-	//
-	// Let's say `InitContainerUse(i)` is the resource requirements when the i-th
-	// init container is initializing, then
-	// `InitContainerUse(i) = sum(Resources of restartable init containers with index < i) + Resources of i-th init container`.
-	//
-	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
-	for _, container := range pod.Spec.InitContainers {
-		containerLimits := container.Resources.Limits
-		if opts.UseStatusResources {
-			if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
-				cs, found := containerStatuses[container.Name]
-				if found && cs.Resources != nil {
-					containerLimits = determineEffectiveLimits(pod, &ResourceState{
-						Spec:     containerLimits,
-						Actuated: cs.Resources.Limits,
-					})
-				}
-			}
-		}
-
-		// Is the init container marked as a restartable init container?
-		if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
-			addResourceList(limits, containerLimits)
-
-			// track our cumulative restartable init container resources
-			addResourceList(restartableInitContainerLimits, containerLimits)
-			containerLimits = restartableInitContainerLimits
+	if !opts.UseStatusResources {
+		addResourceList(limits, aggregateContainerResourcesByFn(pod, opts, containerSpecLimits))
+	} else {
+		isResizeInfeasible := IsPodResizeInfeasible(pod)
+		var specLimits, actuatedLimits v1.ResourceList
+		// When pod-level status maps are populated, they already contain the aggregate values across all containers.
+		// When unpopulated (e.g., at creation time or when feature gates are disabled), we fall back to container status aggregation.
+		// Once InPlacePodLevelResourcesVerticalScaling and InPlacePodVerticalScaling are GA and feature gates are removed,
+		// container-level fallback becomes redundant because max(spec, actuated) naturally evaluates to spec at creation time.
+		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.Resources != nil && pod.Status.Resources.Limits != nil {
+			specLimits = aggregateContainerResourcesByFn(pod, opts, containerSpecLimits)
+			actuatedLimits = pod.Status.Resources.Limits
 		} else {
-			tmp := v1.ResourceList{}
-			addResourceList(tmp, containerLimits)
-			addResourceList(tmp, restartableInitContainerLimits)
-			containerLimits = tmp
+			specLimits = aggregateContainerResourcesByFn(pod, opts, containerSpecLimits)
+			actuatedLimits = aggregateContainerResourcesByFn(pod, opts, containerActuatedLimits)
 		}
 
-		if opts.ContainerFn != nil {
-			opts.ContainerFn(containerLimits, InitContainers)
+		if isResizeInfeasible {
+			addResourceList(limits, actuatedLimits)
+		} else {
+			addResourceList(limits, max(specLimits, actuatedLimits))
 		}
-		maxResourceList(initContainerLimits, containerLimits)
 	}
-
-	maxResourceList(limits, initContainerLimits)
 	return limits
 }
 
