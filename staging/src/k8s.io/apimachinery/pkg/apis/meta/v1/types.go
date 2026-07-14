@@ -267,6 +267,7 @@ type ObjectMeta struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=uid
+	// +k8s:alpha(since:"1.37")=+k8s:optional
 	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid" protobuf:"bytes,13,rep,name=ownerReferences"`
 
 	// Must be empty before the object is deleted from the registry. Each entry
@@ -324,15 +325,19 @@ const (
 // +structType=atomic
 type OwnerReference struct {
 	// API version of the referent.
+	// +k8s:alpha(since:"1.37")=+k8s:required
 	APIVersion string `json:"apiVersion" protobuf:"bytes,5,opt,name=apiVersion"`
 	// Kind of the referent.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +k8s:alpha(since:"1.37")=+k8s:required
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// Name of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names
+	// +k8s:alpha(since:"1.37")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// UID of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids
+	// +k8s:alpha(since:"1.37")=+k8s:required
 	UID types.UID `json:"uid" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 	// If true, this reference points to the managing controller.
 	// +optional
