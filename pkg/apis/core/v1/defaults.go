@@ -202,8 +202,8 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	// have injected all containers, giving a complete view of the pod.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
-		DefaultHugePagePodLimits(obj)
-		DefaultPodRequests(obj)
+		DefaultHugePagePodLevelLimits(obj)
+		DefaultPodLevelRequests(obj)
 	}
 
 	if obj.Spec.EnableServiceLinks == nil {
@@ -513,7 +513,7 @@ func SetDefaults_PodLogOptions(obj *v1.PodLogOptions) {
 	}
 }
 
-// DefaultPodRequests applies default values for pod-level requests, only when
+// DefaultPodLevelRequests applies default values for pod-level requests, only when
 // pod-level limits are set, in following scenarios:
 // 1. When at least one container (regular, init or sidecar) has requests set:
 // The pod-level requests become equal to the effective requests of all containers
@@ -523,13 +523,13 @@ func SetDefaults_PodLogOptions(obj *v1.PodLogOptions) {
 // This defaulting behavior ensures consistent resource accounting at the pod-level
 // while maintaining compatibility with the container-level specifications, as detailed
 // in KEP-2837: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#proposed-validation--defaulting-rules
-func DefaultPodRequests(obj *v1.Pod) {
+func DefaultPodLevelRequests(obj *v1.Pod) {
 	// We only populate defaults when the pod-level resources are partly specified already.
 	if obj.Spec.Resources == nil {
 		return
 	}
 
-	if len(obj.Spec.Resources.Limits) == 0 {
+	if len(obj.Spec.Resources.Requests) == 0 && len(obj.Spec.Resources.Limits) == 0 {
 		return
 	}
 
@@ -554,11 +554,13 @@ func DefaultPodRequests(obj *v1.Pod) {
 	// When no containers specify requests for a resource, the pod-level requests
 	// will default to match the pod-level limits, if pod-level
 	// limits exist for that resource.
-	// Defaulting for pod level hugepages requests is dependent on DefaultHugePagePodLimits,
-	// if DefaultHugePagePodLimits defined the limit, the request will be set here.
-	for key, podLim := range obj.Spec.Resources.Limits {
-		if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
-			podReqs[key] = podLim.DeepCopy()
+	// Defaulting for pod level hugepages requests is dependent on DefaultHugePagePodLevelLimits,
+	// if DefaultHugePagePodLevelLimits defined the limit, the request will be set here.
+	if len(obj.Spec.Resources.Limits) > 0 {
+		for key, podLim := range obj.Spec.Resources.Limits {
+			if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
+				podReqs[key] = podLim.DeepCopy()
+			}
 		}
 	}
 
@@ -569,14 +571,14 @@ func DefaultPodRequests(obj *v1.Pod) {
 	}
 }
 
-// DefaultHugePagePodLimits applies default values for pod-level limits, only when
+// DefaultHugePagePodLevelLimits applies default values for pod-level limits, only when
 // container hugepage limits are set, but not at pod level, in following
 // scenario:
 // 1. When at least one container (regular, init or sidecar) has hugepage
 // limits set:
 // The pod-level limit becomes equal to the aggregated hugepages limit of all
 // the containers in the pod.
-func DefaultHugePagePodLimits(pod *v1.Pod) {
+func DefaultHugePagePodLevelLimits(pod *v1.Pod) {
 	// We only populate hugepage limit defaults when the pod-level resources are partly specified.
 	if pod.Spec.Resources == nil {
 		return
@@ -617,15 +619,4 @@ func DefaultHugePagePodLimits(pod *v1.Pod) {
 	if len(podLims) > 0 {
 		pod.Spec.Resources.Limits = podLims
 	}
-}
-
-// ApplyPodLevelResourceDefaults sets pod-level hugepage limits from aggregated container
-// hugepage limits, then defaults pod-level requests from aggregated container requests.
-// Hugepage limits must be set first because the request defaulting pass also fills in
-// pod-level requests for any resource that has a pod-level limit but no pod-level request.
-// Called from the registry's PrepareForCreate so both steps see the complete, post-admission
-// container list.
-func ApplyPodLevelResourceDefaults(pod *v1.Pod) {
-	DefaultHugePagePodLimits(pod)
-	DefaultPodRequests(pod)
 }

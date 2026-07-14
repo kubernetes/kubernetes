@@ -333,7 +333,22 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 		wantLimits          api.ResourceList
 	}{
 		{
-			name:                "Case 1: empty resources struct",
+			name:                "nil resources struct",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+					},
+					Resources: nil,
+				},
+			},
+			wantRequests: nil,
+			wantLimits:   nil,
+		},
+		{
+			name:                "empty resources struct",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
@@ -348,7 +363,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   nil,
 		},
 		{
-			name:                "Case 2: empty requests map",
+			name:                "empty requests map",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
@@ -363,7 +378,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   nil,
 		},
 		{
-			name:                "Case 3: empty limits map",
+			name:                "empty limits map",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
@@ -378,7 +393,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   nil,
 		},
 		{
-			name:                "Case 4: empty requests and limits maps",
+			name:                "empty requests and limits maps",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
@@ -393,7 +408,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   nil,
 		},
 		{
-			name:                "Case 5: memory request set, container limits set for CPU",
+			name:                "memory request set, container limits set for CPU",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
@@ -409,7 +424,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   getResourceList("300m", ""),
 		},
 		{
-			name:                "Case 6: memory request set, container limits set for memory",
+			name:                "memory request set, container limits set for memory",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
@@ -425,7 +440,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   getResourceList("", "256Mi"),
 		},
 		{
-			name:                "Case 7: memory request set, containers have CPU reqs (5m, 6m) and limits (9m, 10m)",
+			name:                "memory request set, containers have CPU reqs (5m, 6m) and limits (9m, 10m)",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
@@ -439,6 +454,24 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			},
 			wantRequests: getResourceList("11m", "256Mi"),
 			wantLimits:   getResourceList("19m", ""),
+		},
+		{
+			name:                "pod-level CPU request set, containers have memory requests (128Mi, 128Mi) and limits (256Mi, 256Mi)",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("", "128Mi"), getResourceList("", "256Mi")),
+						newContainer("c2", getResourceList("", "128Mi"), getResourceList("", "256Mi")),
+					},
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("200m", ""),
+					},
+				},
+			},
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("", "512Mi"),
 		},
 		{
 			name:                "limits defaulted from container limits when requests set",
@@ -496,22 +529,22 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   getResourceList("200m", "256Mi"),
 		},
 		{
-			name:                "partial limit defaulting - memory set, cpu not",
+			name:                "pod memory limit set, CPU limit defaulted from containers",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
-						newContainer("c2", getResourceList("100m", "128Mi"), getResourceList("100m", "128Mi")),
+						newContainer("c2", getResourceList("80m", "128Mi"), getResourceList("100m", "128Mi")),
 					},
 					Resources: &api.ResourceRequirements{
-						Requests: getResourceList("200m", "256Mi"),
+						Requests: getResourceList("", "256Mi"),
 						Limits:   getResourceList("", "256Mi"),
 					},
 				},
 			},
-			wantRequests: getResourceList("200m", "256Mi"),
+			wantRequests: getResourceList("180m", "256Mi"),
 			wantLimits:   getResourceList("200m", "256Mi"),
 		},
 		{
@@ -533,7 +566,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   getResourceList("500m", "512Mi"),
 		},
 		{
-			name:                "cpu set, container missing memory limits - memory limit not defaulted",
+			name:                "CPU limit defaulted, memory limit skipped when container missing memory limit",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
@@ -543,7 +576,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 						newContainer("c2", getResourceList("100m", "128Mi"), getResourceList("100m", "")),
 					},
 					Resources: &api.ResourceRequirements{
-						Requests: getResourceList("200m", "256Mi"),
+						Requests: getResourceList("", "256Mi"),
 					},
 				},
 			},
@@ -551,7 +584,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   getResourceList("200m", ""),
 		},
 		{
-			name:                "per-resource independence - cpu limits set for all, memory for none",
+			name:                "CPU limit defaulted when all containers set CPU limit and none set memory limit",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
@@ -569,7 +602,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   getResourceList("200m", ""),
 		},
 		{
-			name:                "per-resource independence - one container missing memory limit",
+			name:                "memory limit defaulted, CPU limit skipped when container missing CPU limit",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
 			pod: &api.Pod{
@@ -822,12 +855,6 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 		})
 	}
 }
-
-
-
-
-
-
 
 // TestPrepareForUpdatePodLevelResources tests update and resize strategy PrepareForUpdate behaviors.
 func TestPrepareForUpdatePodLevelResources(t *testing.T) {

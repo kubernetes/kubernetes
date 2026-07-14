@@ -1966,37 +1966,9 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 	return false
 }
 
-// DefaultPodLevelResources handles pod-level resource defaulting when PodLevelResources
-// feature gate is enabled. Defaulting rules run in dependency order:
-// 1. HugePage pod limits from container aggregate limits.
-// 2. Pod requests from container aggregate requests or pod limits.
-// 3. Pod limits equal to container aggregate limits (when all containers specify limits).
-func DefaultPodLevelResources(pod *api.Pod) {
-	// If either the primary feature OR the sub-feature is disabled, exit.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
-		return
-	}
-	defaultPodLevelLimits(pod)
-	v1PodSpec := &apiv1.PodSpec{}
-	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
-		Containers:     pod.Spec.Containers,
-		InitContainers: pod.Spec.InitContainers,
-		Resources:      pod.Spec.Resources,
-	}, v1PodSpec, nil); err == nil {
-		v1Pod := &apiv1.Pod{Spec: *v1PodSpec}
-		corev1.DefaultHugePagePodLimits(v1Pod)
-		corev1.DefaultPodRequests(v1Pod)
-		if v1Pod.Spec.Resources != nil {
-			var coreResources api.ResourceRequirements
-			if err := corev1.Convert_v1_ResourceRequirements_To_core_ResourceRequirements(v1Pod.Spec.Resources, &coreResources, nil); err == nil {
-				pod.Spec.Resources = &coreResources
-			}
-		}
-	}
-}
-
-func defaultPodLevelLimits(pod *api.Pod) {
+// DefaultPodLevelLimits sets pod-level limits equal to max(PLR request, aggregated container limits)
+// if all containers have limits set for candidate resources.
+func DefaultPodLevelLimits(pod *api.Pod) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
 		return
@@ -2075,44 +2047,6 @@ func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.Resourc
 	return resourcehelper.AggregateContainerLimits(&apiv1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
 }
 
-// ShouldDefaultPodLevelResourcesOnUpdate determines whether pod-level resource defaulting
-// should be executed during a pod update.
-func ShouldDefaultPodLevelResourcesOnUpdate(newPod, oldPod *api.Pod) bool {
-	if newPod.Spec.Resources == nil {
-		return false
-	}
-
-	if oldPod.Spec.Resources == nil || (len(oldPod.Spec.Resources.Requests) == 0 && len(oldPod.Spec.Resources.Limits) == 0) {
-		return true
-	}
-
-	hasResource := func(res *api.ResourceRequirements, name api.ResourceName) bool {
-		if res == nil {
-			return false
-		}
-		_, inReq := res.Requests[name]
-		_, inLim := res.Limits[name]
-		return inReq || inLim
-	}
-
-	for resName := range newPod.Spec.Resources.Requests {
-		if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
-			if !hasResource(oldPod.Spec.Resources, resName) {
-				return true
-			}
-		}
-	}
-	for resName := range newPod.Spec.Resources.Limits {
-		if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
-			if !hasResource(oldPod.Spec.Resources, resName) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
 // MergePodLevelResources copies missing resource entries from oldRes into newRes
 // so that partial updates retain unspecified fields from oldPod.
 func MergePodLevelResources(newRes, oldRes *api.ResourceRequirements) *api.ResourceRequirements {
@@ -2149,8 +2083,6 @@ func MergePodLevelResources(newRes, oldRes *api.ResourceRequirements) *api.Resou
 
 	return merged
 }
-
-
 
 var initContainerAnnotations = map[string]struct{}{
 	"pod.beta.kubernetes.io/init-containers":          {},
