@@ -83,7 +83,7 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) &&
 			h.containerManager.GetNodeConfig().CPUManagerPolicy == string(cpumanager.PolicyStatic) &&
 			h.guaranteedPodResourceResizeRequired(pod, v1.ResourceCPU) &&
-			h.hasIntegerCPURequests(pod) {
+			(h.hasIntegerCPURequests(pod) || h.hasIntegerCPURequests(allocatedPod)) {
 			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods with integer CPU requests alongside CPU Manager policy \"%s\"", string(cpumanager.PolicyStatic))
 			logger.V(3).Info(msg, "pod", format.Pod(pod))
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy").Inc()
