@@ -291,16 +291,18 @@ func buildServiceResolver(enabledAggregatorRouting bool, hostname string, inform
 	}
 
 	var serviceResolver webhook.ServiceResolver
-	if enabledAggregatorRouting {
-		serviceResolver = aggregatorapiserver.NewEndpointServiceResolver(
-			informer.Core().V1().Services().Lister(),
-			endpointSliceGetter,
-		)
-	} else {
-		serviceResolver = aggregatorapiserver.NewClusterIPServiceResolver(
-			informer.Core().V1().Services().Lister(),
-		)
-	}
+	// Always resolve to a specific ready endpoint IP.
+	//
+	// With ClusterIP resolution (historical EnableAggregatorRouting=false
+	// behavior), kube-proxy / connection handling can still deliver requests to
+	// webhook pods that have started failing readiness while other ready pods
+	// remain. Endpoint resolution picks a Ready endpoint from EndpointSlices
+	// directly, matching EnableAggregatorRouting=true behavior.
+	_ = enabledAggregatorRouting
+	serviceResolver = aggregatorapiserver.NewEndpointServiceResolver(
+		informer.Core().V1().Services().Lister(),
+		endpointSliceGetter,
+	)
 
 	// resolve kubernetes.default.svc locally
 	if localHost, err := url.Parse(hostname); err == nil {
