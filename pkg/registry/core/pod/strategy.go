@@ -32,12 +32,14 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -47,10 +49,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -87,12 +91,14 @@ func (podStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
 	pod.Generation = 1
+
+	podutil.DropDisabledPodFields(pod, nil)
+	applyPodLevelResourceDefaults(pod)
+
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
 		QOSClass: qos.GetPodQOS(pod),
 	}
-
-	podutil.DropDisabledPodFields(pod, nil)
 
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
@@ -105,6 +111,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
+
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
 }
@@ -425,6 +432,7 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	oldPod := old.(*api.Pod)
 
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
+
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
 }
@@ -996,4 +1004,132 @@ func updatePodGeneration(newPod, oldPod *api.Pod) {
 	if !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
 		newPod.Generation++
 	}
+}
+
+// applyPodLevelResourceDefaults runs all pod-level resource defaulting in dependency order,
+// called exclusively from PrepareForCreate after admission webhooks have run so the full
+// applyPodLevelResourceDefaults runs all pod-level resource defaulting in dependency order,
+// called exclusively from PrepareForCreate after admission webhooks have run so the full
+// container list is visible.
+//
+// Order matters:
+//  1. Set pod-level hugepage limits from aggregated container hugepage limits.
+//  2. Default pod-level requests from aggregated container requests (also fills requests
+//     for any resource that has a pod-level limit but no pod-level request, including
+//     hugepage limits set in step 1).
+//  3. Default pod-level limits to max(pod-level requests, aggregated container limits)
+//     for resources where all containers have limits. Step 2 must run first so that
+//     pod-level requests are complete before the max() comparison.
+func applyPodLevelResourceDefaults(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		return
+	}
+
+	// 1. Default pod-level limits equal to max(PLR request, aggregated container limits)
+	// when all containers specify limits.
+	defaultPodLevelLimits(pod)
+
+	// 2. Default HugePage limits and pod-level requests from aggregated container requests/limits.
+	v1PodSpec := &apiv1.PodSpec{}
+	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
+		Containers:     pod.Spec.Containers,
+		InitContainers: pod.Spec.InitContainers,
+		Resources:      pod.Spec.Resources,
+	}, v1PodSpec, nil); err == nil {
+		v1Pod := &apiv1.Pod{Spec: *v1PodSpec}
+		corev1.ApplyPodLevelResourceDefaults(v1Pod)
+		if v1Pod.Spec.Resources != nil {
+			var coreResources api.ResourceRequirements
+			if err := corev1.Convert_v1_ResourceRequirements_To_core_ResourceRequirements(v1Pod.Spec.Resources, &coreResources, nil); err == nil {
+				pod.Spec.Resources = &coreResources
+			}
+		}
+	}
+}
+
+// defaultPodLevelLimits sets pod-level limits equal to max(PLR request, aggregated container limits)
+// if all containers have limits set for candidate resources.
+func defaultPodLevelLimits(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		return
+	}
+	if pod.Spec.Resources == nil {
+		return
+	}
+	if len(pod.Spec.Resources.Requests) == 0 && len(pod.Spec.Resources.Limits) == 0 {
+		return
+	}
+
+	candidates := sets.New[api.ResourceName]()
+	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(ctr *api.Container, _ podutil.ContainerType) bool {
+		for resName := range ctr.Resources.Limits {
+			if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
+				if pod.Spec.Resources.Limits == nil {
+					candidates.Insert(resName)
+				} else if _, ok := pod.Spec.Resources.Limits[resName]; !ok {
+					candidates.Insert(resName)
+				}
+			}
+		}
+		return true
+	})
+
+	if candidates.Len() == 0 {
+		return
+	}
+
+	aggrLimits := aggregateContainerLimits(&pod.Spec, candidates)
+	if aggrLimits == nil {
+		return
+	}
+
+	for resName := range candidates {
+		val, ok := aggrLimits[apiv1.ResourceName(resName)]
+		if !ok {
+			continue
+		}
+		var podReq resource.Quantity
+		if pod.Spec.Resources.Requests != nil {
+			podReq = pod.Spec.Resources.Requests[resName]
+		}
+		if podReq.Cmp(val) > 0 {
+			val = podReq
+		}
+		if pod.Spec.Resources.Limits == nil {
+			pod.Spec.Resources.Limits = make(api.ResourceList)
+		}
+		pod.Spec.Resources.Limits[resName] = val.DeepCopy()
+	}
+}
+
+// aggregateContainerLimits returns the aggregated limits for all containers in the pod spec.
+// It also filters the candidates set, removing any resource for which not all containers have limits.
+func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.ResourceName]) apiv1.ResourceList {
+	// For a resource to be defaulted at the pod level, all containers (including sidecars)
+	// must have a limit specified for that resource.
+	podutil.VisitContainers(spec, podutil.AllContainers, func(ctr *api.Container, _ podutil.ContainerType) bool {
+		for resName := range candidates {
+			if _, ok := ctr.Resources.Limits[resName]; !ok {
+				candidates.Delete(resName)
+			}
+		}
+		return candidates.Len() > 0
+	})
+
+	if candidates.Len() == 0 {
+		return nil
+	}
+	// Simplest way to convert only the needed fields (containers and init containers)
+	// without manual loops, avoiding the overhead of converting the entire PodSpec.
+	v1PodSpec := &apiv1.PodSpec{}
+	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
+		Containers:     spec.Containers,
+		InitContainers: spec.InitContainers,
+	}, v1PodSpec, nil); err != nil {
+		return nil
+	}
+
+	return resourcehelper.AggregateContainerLimits(&apiv1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
 }
