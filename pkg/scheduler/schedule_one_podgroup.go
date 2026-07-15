@@ -598,10 +598,6 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			continue
 		}
 		if podResult.status.IsSuccess() {
-			nominatingInfo := &fwk.NominatingInfo{
-				NominatingMode:    fwk.ModeOverride,
-				NominatedNodeName: podResult.scheduleResult.SuggestedHost,
-			}
 			switch {
 			case podGroupResult.status.IsSuccess():
 				// Disable pod group scheduling in cycle state before binding.
@@ -619,7 +615,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			case podGroupResult.status.IsRejected():
 				if podGroupResult.waitingOnPreemption {
 					// Pod has to come back to the scheduling queue as unschedulable, waiting for preemption to complete.
-					sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status, nominatingInfo, podSchedulingStart)
+					sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status, podResult.scheduleResult.nominatingInfo, podSchedulingStart)
 				} else {
 					// Pod group is unschedulable, so the pod has to be marked as unschedulable.
 					// Its rejection status is set to the pod group's status message.

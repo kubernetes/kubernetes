@@ -1344,7 +1344,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 		existingPodGroup        *schedulingv1alpha3.PodGroup
 		algorithmResult         podGroupAlgorithmResult
 		expectBound             sets.Set[string]
-		expectPreempting        sets.Set[string]
+		expectPreempting        map[string]string
 		expectFailed            sets.Set[string]
 		expectCondition         *metav1.Condition
 		expectPodsInActiveQueue sets.Set[string]
@@ -1446,7 +1446,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 					requiresPreemption: true,
 				}},
 			},
-			expectPreempting: sets.New("p1", "p2", "p3"),
+			expectPreempting: map[string]string{"p1": "node1", "p2": "node1", "p3": "node1"},
 			expectCondition: &metav1.Condition{
 				Type:    schedulingapi.PodGroupInitiallyScheduled,
 				Status:  metav1.ConditionFalse,
@@ -1467,14 +1467,14 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 					status:             fwk.NewStatus(fwk.Unschedulable),
 					requiresPreemption: true,
 				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
+					scheduleResult: ScheduleResult{SuggestedHost: "node1", nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride}},
 					status:         nil,
 				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
+					scheduleResult: ScheduleResult{SuggestedHost: "node1", nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride}},
 					status:         nil,
 				}},
 			},
-			expectPreempting: sets.New("p1", "p2", "p3"),
+			expectPreempting: map[string]string{"p1": "node1", "p2": "node1", "p3": "node1"},
 			expectCondition: &metav1.Condition{
 				Type:    schedulingapi.PodGroupInitiallyScheduled,
 				Status:  metav1.ConditionFalse,
@@ -1498,11 +1498,11 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
 					status:         fwk.NewStatus(fwk.Unschedulable),
 				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
+					scheduleResult: ScheduleResult{SuggestedHost: "node1", nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride}},
 					status:         nil,
 				}},
 			},
-			expectPreempting: sets.New("p1", "p3"),
+			expectPreempting: map[string]string{"p1": "node1", "p3": "node1"},
 			expectFailed:     sets.New("p2"),
 			expectCondition: &metav1.Condition{
 				Type:    schedulingapi.PodGroupInitiallyScheduled,
@@ -1735,6 +1735,36 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			},
 		},
 		{
+			// If:
+			// - PodGroup failed scheduling
+			// - some pods were successfully evaluated
+			// - pod group preemption successfully found placement
+			// The scheduler should use the nominating info from preemption instead of suggested host from evaluation.
+			name: "PodGroup waiting on preemption uses nominating info instead of suggested host for successfully evaluated pods",
+			algorithmResult: podGroupAlgorithmResult{
+				status:              fwk.NewStatus(fwk.Unschedulable, "waiting on preemption"),
+				waitingOnPreemption: true,
+				podResults: []algorithmResult{{
+					scheduleResult: ScheduleResult{SuggestedHost: "node1", nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node2", NominatingMode: fwk.ModeOverride}},
+					status:         nil,
+				}, {
+					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
+					status:         fwk.NewStatus(fwk.Unschedulable),
+				}, {
+					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
+					status:         fwk.NewStatus(fwk.Unschedulable),
+				}},
+			},
+			expectPreempting: map[string]string{"p1": "node2"},
+			expectFailed:     sets.New("p2", "p3"),
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.PodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.PodGroupReasonUnschedulable,
+				Message: "waiting on preemption",
+			},
+		},
+		{
 			name: "Different number of pods in result and queue, should fail all queue pods",
 			algorithmResult: podGroupAlgorithmResult{
 				status: fwk.NewStatus(fwk.Error),
@@ -1759,7 +1789,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 
 			var lock sync.Mutex
 			boundPods := sets.New[string]()
-			preemptingPods := sets.New[string]()
+			preemptingPods := make(map[string]string)
 			failedPods := sets.New[string]()
 
 			pg := testPodGroup
@@ -1821,7 +1851,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 					lock.Lock()
 					if ni != nil && ni.NominatedNodeName != "" {
-						preemptingPods.Insert(p.Pod.Name)
+						preemptingPods[p.Pod.Name] = ni.NominatedNodeName
 					} else {
 						failedPods.Insert(p.Pod.Name)
 					}
@@ -1869,8 +1899,8 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			if !tt.expectBound.Equal(boundPods) {
 				t.Errorf("Expected bound pods: %v, but got: %v", tt.expectBound, boundPods)
 			}
-			if !tt.expectPreempting.Equal(preemptingPods) {
-				t.Errorf("Expected preempting pods: %v, but got: %v", tt.expectPreempting, preemptingPods)
+			if diff := cmp.Diff(tt.expectPreempting, preemptingPods, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("Unexpected preempting pods (-want, +got):\n%s", diff)
 			}
 			if !tt.expectFailed.Equal(failedPods) {
 				t.Errorf("Expected failed pods: %v, but got: %v", tt.expectFailed, failedPods)
