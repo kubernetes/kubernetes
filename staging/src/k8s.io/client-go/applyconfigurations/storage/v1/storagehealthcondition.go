@@ -37,8 +37,10 @@ type StorageHealthConditionApplyConfiguration struct {
 	Status *storagev1.StorageHealthStatusType `json:"status,omitempty"`
 	// reason is a brief CamelCase machine-parseable reason.
 	// Together with name and status it forms the unique identity of a condition entry.
+	// Maximum permitted length of a reason is 256 characters.
 	Reason *string `json:"reason,omitempty"`
 	// message is a human-readable description.
+	// Maximum permitted length of a message is 1024 characters.
 	Message *string `json:"message,omitempty"`
 	// accessModes are the access modes affected. An empty list means all access modes are affected.
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`

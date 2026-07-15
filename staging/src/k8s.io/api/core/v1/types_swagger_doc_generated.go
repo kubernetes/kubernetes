@@ -2041,7 +2041,7 @@ func (PodTemplateSpec) SwaggerDoc() map[string]string {
 var map_PodVolumeHealth = map[string]string{
 	"":                   "PodVolumeHealth contains health information for a volume used by a pod, reported by the CSI node plugin via the kubelet.",
 	"name":               "name matches an entry in pod.spec.volumes.",
-	"healthConditions":   "conditions is the set of adverse conditions reported by the CSI node plugin for this volume on this node.",
+	"healthConditions":   "conditions is the set of adverse conditions reported by the CSI node plugin for this volume on this node. At most 16 conditions may be reported.",
 	"lastTransitionTime": "lastTransitionTime is when the current set of conditions first appeared.",
 }
 
@@ -2818,8 +2818,8 @@ func (VolumeDevice) SwaggerDoc() map[string]string {
 var map_VolumeHealthCondition = map[string]string{
 	"":        "VolumeHealthCondition represents an adverse health condition reported for a volume.",
 	"status":  "status is the machine-parseable health category. One of \"Inaccessible\", \"DataLoss\", \"Degraded\".",
-	"reason":  "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry.",
-	"message": "message is a human-readable description.",
+	"reason":  "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.a",
+	"message": "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
 }
 
 func (VolumeHealthCondition) SwaggerDoc() map[string]string {
@@ -2828,7 +2828,7 @@ func (VolumeHealthCondition) SwaggerDoc() map[string]string {
 
 var map_VolumeHealthStatus = map[string]string{
 	"":                   "VolumeHealthStatus contains health information for a volume reported by the CSI controller plugin.",
-	"healthConditions":   "conditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition.",
+	"healthConditions":   "conditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
 	"lastTransitionTime": "lastTransitionTime is when the current set of conditions first appeared.",
 }
 

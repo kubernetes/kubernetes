@@ -30,6 +30,7 @@ import (
 type VolumeHealthStatusApplyConfiguration struct {
 	// conditions is the set of adverse conditions reported by
 	// the CSI controller plugin. An empty list means no adverse condition.
+	// At most 16 conditions may be reported.
 	HealthConditions []VolumeHealthConditionApplyConfiguration `json:"healthConditions,omitempty"`
 	// lastTransitionTime is when the current set of conditions first appeared.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`

@@ -5141,9 +5141,12 @@ message PodVolumeHealth {
 
   // conditions is the set of adverse conditions reported by
   // the CSI node plugin for this volume on this node.
+  // At most 16 conditions may be reported.
   // +optional
   // +listType=map
   // +listMapKey=status
+  // +patchMergeKey=status
+  // +patchStrategy=merge
   // +listMapKey=reason
   repeated VolumeHealthCondition healthConditions = 2;
 
@@ -7031,10 +7034,13 @@ message VolumeHealthCondition {
 
   // reason is a brief CamelCase machine-parseable reason.
   // Together with status it forms the unique identity of a condition entry.
+  // Maximum permitted length of a reason is 256 characters.a
+  // +required
   optional string reason = 2;
 
   // message is a human-readable description.
   // +optional
+  // Maximum permitted length of a message is 1024 characters.
   optional string message = 3;
 }
 
@@ -7043,9 +7049,12 @@ message VolumeHealthCondition {
 message VolumeHealthStatus {
   // conditions is the set of adverse conditions reported by
   // the CSI controller plugin. An empty list means no adverse condition.
+  // At most 16 conditions may be reported.
   // +optional
   // +listType=map
   // +listMapKey=status
+  // +patchMergeKey=status
+  // +patchStrategy=merge
   // +listMapKey=reason
   repeated VolumeHealthCondition healthConditions = 1;
 

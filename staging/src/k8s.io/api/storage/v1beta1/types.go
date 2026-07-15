@@ -699,7 +699,6 @@ type StorageHealthCondition struct {
 	// status is the health status category.
 	// One of "StorageUnreachable", "StorageDegraded".
 	// +required
-	// +k8s:required
 	Status StorageHealthStatusType `json:"status" protobuf:"bytes,2,opt,name=status,casttype=StorageHealthStatusType"`
 	// reason is a brief CamelCase machine-parseable reason.
 	// Together with name and status it forms the unique identity of a condition entry.

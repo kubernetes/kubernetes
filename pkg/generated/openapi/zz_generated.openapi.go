@@ -29644,11 +29644,13 @@ func schema_k8sio_api_core_v1_PodVolumeHealth(ref common.ReferenceCallback) comm
 									"status",
 									"reason",
 								},
-								"x-kubernetes-list-type": "map",
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "status",
+								"x-kubernetes-patch-strategy":  "merge",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "conditions is the set of adverse conditions reported by the CSI node plugin for this volume on this node.",
+							Description: "conditions is the set of adverse conditions reported by the CSI node plugin for this volume on this node. At most 16 conditions may be reported.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -33249,7 +33251,7 @@ func schema_k8sio_api_core_v1_VolumeHealthCondition(ref common.ReferenceCallback
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry.",
+							Description: "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.a",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -33257,7 +33259,7 @@ func schema_k8sio_api_core_v1_VolumeHealthCondition(ref common.ReferenceCallback
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "message is a human-readable description.",
+							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -33283,11 +33285,13 @@ func schema_k8sio_api_core_v1_VolumeHealthStatus(ref common.ReferenceCallback) c
 									"status",
 									"reason",
 								},
-								"x-kubernetes-list-type": "map",
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "status",
+								"x-kubernetes-patch-strategy":  "merge",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "conditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition.",
+							Description: "conditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -57913,7 +57917,9 @@ func schema_k8sio_api_storage_v1_CSINodeStatus(ref common.ReferenceCallback) com
 									"status",
 									"reason",
 								},
-								"x-kubernetes-list-type": "map",
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -58245,7 +58251,7 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason is a brief CamelCase machine-parseable reason. Together with name and status it forms the unique identity of a condition entry.",
+							Description: "reason is a brief CamelCase machine-parseable reason. Together with name and status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -58253,7 +58259,7 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "message is a human-readable description.",
+							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -59612,7 +59618,9 @@ func schema_k8sio_api_storage_v1beta1_CSINodeStatus(ref common.ReferenceCallback
 									"status",
 									"reason",
 								},
-								"x-kubernetes-list-type": "map",
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -59943,7 +59951,7 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason is a brief CamelCase machine-parseable reason. Together with name and status it forms the unique identity of a condition entry.",
+							Description: "reason is a brief CamelCase machine-parseable reason. Together with name and status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -59951,7 +59959,7 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "message is a human-readable description.",
+							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

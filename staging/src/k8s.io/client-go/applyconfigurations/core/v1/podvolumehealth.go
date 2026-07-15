@@ -32,6 +32,7 @@ type PodVolumeHealthApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 	// conditions is the set of adverse conditions reported by
 	// the CSI node plugin for this volume on this node.
+	// At most 16 conditions may be reported.
 	HealthConditions []VolumeHealthConditionApplyConfiguration `json:"healthConditions,omitempty"`
 	// lastTransitionTime is when the current set of conditions first appeared.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`

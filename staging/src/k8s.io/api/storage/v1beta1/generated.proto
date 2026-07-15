@@ -368,6 +368,8 @@ message CSINodeStatus {
   // +listMapKey=name
   // +listMapKey=status
   // +listMapKey=reason
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   // +featureGate=CSIVolumeHealth
   repeated StorageHealthCondition storageHealth = 1;
 }
@@ -538,18 +540,23 @@ message StorageClassList {
 // by a CSI driver for its storage backend on a node.
 message StorageHealthCondition {
   // name is the CSI driver name, matching CSINodeDriver.name.
+  // +required
   optional string name = 1;
 
   // status is the health status category.
   // One of "StorageUnreachable", "StorageDegraded".
+  // +required
   optional string status = 2;
 
   // reason is a brief CamelCase machine-parseable reason.
   // Together with name and status it forms the unique identity of a condition entry.
+  // +required
+  // Maximum permitted length of a reason is 256 characters.
   optional string reason = 3;
 
   // message is a human-readable description.
   // +optional
+  // Maximum permitted length of a message is 1024 characters.
   optional string message = 4;
 
   // accessModes are the access modes affected. An empty list means all access modes are affected.

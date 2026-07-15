@@ -1469,7 +1469,9 @@
               "status",
               "reason"
             ],
-            "x-kubernetes-list-type": "map"
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
           }
         },
         "type": "object"
@@ -1709,7 +1711,7 @@
             "description": "lastTransitionTime is when this condition first appeared at its current state."
           },
           "message": {
-            "description": "message is a human-readable description.",
+            "description": "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
             "type": "string"
           },
           "name": {
@@ -1719,7 +1721,7 @@
           },
           "reason": {
             "default": "",
-            "description": "reason is a brief CamelCase machine-parseable reason. Together with name and status it forms the unique identity of a condition entry.",
+            "description": "reason is a brief CamelCase machine-parseable reason. Together with name and status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.",
             "type": "string"
           },
           "status": {

@@ -5141,12 +5141,12 @@
         "description": "VolumeHealthCondition represents an adverse health condition reported for a volume.",
         "properties": {
           "message": {
-            "description": "message is a human-readable description.",
+            "description": "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
             "type": "string"
           },
           "reason": {
             "default": "",
-            "description": "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry.",
+            "description": "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.a",
             "type": "string"
           },
           "status": {
@@ -5165,7 +5165,7 @@
         "description": "VolumeHealthStatus contains health information for a volume reported by the CSI controller plugin.",
         "properties": {
           "healthConditions": {
-            "description": "conditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition.",
+            "description": "conditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthCondition"
             },
@@ -5174,7 +5174,9 @@
               "status",
               "reason"
             ],
-            "x-kubernetes-list-type": "map"
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "status",
+            "x-kubernetes-patch-strategy": "merge"
           },
           "lastTransitionTime": {
             "allOf": [
