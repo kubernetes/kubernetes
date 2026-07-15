@@ -257,14 +257,17 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	for i, toleration := range subRequest.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
-	allErrs = append(allErrs, validateCapacityRequirements(subRequest.Capacity, fldPath.Child("capacity"))...)
+	allErrs = append(allErrs, validateCapacityRequirements(subRequest.Capacity, nil, fldPath.Child("capacity"))...)
 	return allErrs
 }
 
-func validateCapacityRequirements(capacity *resource.CapacityRequirements, fldPath *field.Path) field.ErrorList {
+func validateCapacityRequirements(capacity, oldCapacity *resource.CapacityRequirements, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if capacity == nil {
 		return allErrs
+	}
+	if oldCapacity != nil && apiequality.Semantic.DeepEqual(capacity, oldCapacity) {
+		return allErrs // unchanged from a possibly-invalid stored value — don't re-validate
 	}
 	allErrs = append(allErrs, validateMap(capacity.Requests, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateNonNegativeQuantity, fldPath.Child("requests"))...)
 	return allErrs
@@ -278,7 +281,7 @@ func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *fi
 	for i, toleration := range request.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
-	allErrs = append(allErrs, validateCapacityRequirements(request.Capacity, fldPath.Child("capacity"))...)
+	allErrs = append(allErrs, validateCapacityRequirements(request.Capacity, nil, fldPath.Child("capacity"))...)
 	return allErrs
 }
 
