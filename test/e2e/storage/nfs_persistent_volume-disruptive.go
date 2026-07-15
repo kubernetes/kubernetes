@@ -44,7 +44,7 @@ type disruptiveTest struct {
 	runTest    testBody
 }
 
-var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), func() {
+var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), framework.WithSerial(), func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
