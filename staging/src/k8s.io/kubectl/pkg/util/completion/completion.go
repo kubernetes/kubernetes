@@ -95,6 +95,41 @@ func PodResourceNameCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []str
 	}
 }
 
+// DebugResourceNameCompletionFunc returns a completion function for the resource targeted by
+// kubectl debug. Bare names are completed as pods, and pods and nodes are offered for the
+// <type>/<name> form.
+func DebugResourceNameCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		directive := cobra.ShellCompDirectiveNoFileComp
+		if len(args) > 0 {
+			return nil, directive
+		}
+
+		resourceType, namePrefix, hasSlash := strings.Cut(toComplete, "/")
+		if hasSlash {
+			nameComps := CompGetResource(f, resourceType, namePrefix)
+			comps := make([]string, 0, len(nameComps))
+			for _, name := range nameComps {
+				comps = append(comps, fmt.Sprintf("%s/%s", resourceType, name))
+			}
+			return comps, directive
+		}
+
+		comps := CompGetResource(f, "pods", toComplete)
+		hasPodComps := len(comps) > 0
+		for _, resource := range []string{"nodes", "pods"} {
+			if strings.HasPrefix(resource, toComplete) {
+				comps = append(comps, resource+"/")
+			}
+		}
+
+		if !hasPodComps {
+			directive |= cobra.ShellCompDirectiveNoSpace
+		}
+		return comps, directive
+	}
+}
+
 // ResourceAndPortCompletionFunc Returns a completion function that completes, as a first argument:
 // 1- resources that match the toComplete prefix
 // 2- the ports of the specific resource. i.e: container ports for pod resources and port for services
