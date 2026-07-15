@@ -90,6 +90,14 @@ func (s sharedLister) PodGroups() fwk.PodGroupLister {
 	return nil
 }
 
+func (s sharedLister) CompositePodGroupStates() fwk.CompositePodGroupStateLister {
+	return nil
+}
+
+func (s sharedLister) CompositePodGroups() fwk.CompositePodGroupLister {
+	return nil
+}
+
 var batchRegistry = func() Registry {
 	r := make(Registry)
 	err := r.Register("batchTest", newBatchTestPlugin)

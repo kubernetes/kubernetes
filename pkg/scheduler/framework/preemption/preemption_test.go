@@ -619,7 +619,7 @@ func TestCallExtenders(t *testing.T) {
 			}
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
-			cache := internalcache.New(ctx, apiDispatcher, false)
+			cache := internalcache.New(ctx, apiDispatcher, false, false)
 			fwk.SetAPICacher(apicache.New(nil, cache))
 
 			fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
@@ -861,7 +861,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 			cs := clientsetfake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 
-			cache := internalcache.New(ctx, nil, tt.enableGenericWorkload)
+			cache := internalcache.New(ctx, nil, tt.enableGenericWorkload, false /* CompositePodGroup */)
 			for _, pg := range tt.podGroups {
 				cache.AddPodGroup(pg)
 			}

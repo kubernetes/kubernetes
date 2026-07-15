@@ -522,7 +522,7 @@ func TestPostFilter(t *testing.T) {
 					defer apiDispatcher.Close()
 				}
 
-				cache := internalcache.New(ctx, apiDispatcher, tt.features.EnableGenericWorkload)
+				cache := internalcache.New(ctx, apiDispatcher, tt.features.EnableGenericWorkload, false)
 				for _, podGroup := range tt.podGroups {
 					cache.AddPodGroup(podGroup)
 				}
@@ -1790,7 +1790,7 @@ func TestCustomSelection(t *testing.T) {
 			defer cancel()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
-			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload)
+			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload, false /* CompositePodGroup */)
 			for _, pg := range tt.podGroups {
 				cache.AddPodGroup(pg)
 			}
@@ -2052,7 +2052,7 @@ func TestCustomOrdering(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.pods, nodes, tt.podGroups)
 
-			cache := internalcache.New(ctx, nil, true)
+			cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
 			for _, pg := range tt.podGroups {
 				cache.AddPodGroup(pg)
 			}
@@ -2221,7 +2221,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			cache := internalcache.New(ctx, nil, test.features.EnableGenericWorkload)
+			cache := internalcache.New(ctx, nil, test.features.EnableGenericWorkload, false /* CompositePodGroup */)
 			for _, pg := range test.podGroups {
 				cache.AddPodGroup(pg)
 			}
@@ -2488,7 +2488,7 @@ func TestPreempt(t *testing.T) {
 						defer apiDispatcher.Close()
 					}
 
-					cache := internalcache.New(ctx, apiDispatcher, false)
+					cache := internalcache.New(ctx, apiDispatcher, false, false)
 					for _, pod := range testPods {
 						if err := cache.AddPod(logger, pod.DeepCopy()); err != nil {
 							t.Fatalf("Failed to add pod %s: %v", pod.Name, err)
@@ -3084,7 +3084,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload)
+			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload, false /* CompositePodGroup */)
 			for _, pg := range tt.podGroups {
 				cache.AddPodGroup(pg)
 			}
@@ -3283,7 +3283,7 @@ func TestPreEnqueue(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload)
+			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload, false)
 			for _, podGroup := range tt.pgs {
 				cache.AddPodGroup(podGroup)
 			}
@@ -3400,7 +3400,7 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
 
-	cache := internalcache.New(ctx, nil, true)
+	cache := internalcache.New(ctx, nil, true, false)
 	cache.AddPodGroup(preemptorPG)
 
 	snapshot := internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, []*v1alpha3.PodGroup{preemptorPG})
@@ -3467,7 +3467,7 @@ func TestDefaultPreemption_PodGroupPostFilter_SchedulingConstraints(t *testing.T
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
 
-	cache := internalcache.New(ctx, nil, true)
+	cache := internalcache.New(ctx, nil, true, false /* compositePodGroupEnabled */)
 	cache.AddPodGroup(pgWithConstraints)
 
 	snapshot := internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, []*v1alpha3.PodGroup{pgWithConstraints})
@@ -3552,7 +3552,7 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 
-			cache := internalcache.New(ctx, nil, true)
+			cache := internalcache.New(ctx, nil, true, false /* compositePodGroupEnabled */)
 			cache.AddPodGroup(pgOk)
 
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, []*v1alpha3.PodGroup{pgOk})
@@ -3596,6 +3596,74 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 				t.Errorf("Expected error message %q, got %q", tt.expectedMsg, gotStatus.Message())
 			}
 		})
+	}
+}
+
+func TestDefaultPreemption_PodGroupPostFilter_CompositePodGroup(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pgOk := st.MakePodGroup().Name("preemptor-pg-ok").Priority(highPriority).Obj()
+	client := clientsetfake.NewClientset(pgOk)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+	}
+
+	cache := internalcache.New(ctx, nil, true, true /* compositePodGroupEnabled */)
+	cache.AddPodGroup(pgOk)
+
+	snapshot := internalcache.NewEmptySnapshot()
+	f, err := tf.NewFramework(ctx, registeredPlugins, "",
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithPodGroupManager(cache),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	features := feature.Features{
+		EnableGenericWorkload:                 true,
+		EnableTopologyAwareWorkloadScheduling: true,
+		EnableCompositePodGroup:               true,
+	}
+	pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, features)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()}
+	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+		return nil, nil
+	}
+
+	cpg := &v1alpha3.CompositePodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cpg",
+			Namespace: "default",
+		},
+	}
+	pgInfo := &framework.PodGroupInfo{
+		Name:              cpg.Name,
+		Namespace:         cpg.Namespace,
+		Type:              fwk.CompositePodGroupKeyType,
+		UnscheduledPods:   preemptorPods,
+		CompositePodGroup: cpg,
+	}
+
+	_, gotStatus := pl.PodGroupPostFilter(ctx, framework.NewCycleState(), pgInfo, mockSchedulingFunc)
+	if gotStatus.Code() != fwk.Unschedulable {
+		t.Fatalf("Expected status code %v, got status: %v", fwk.Unschedulable, gotStatus)
+	}
+	expectedMsg := "pod group preemption: not supported for composite pod groups yet"
+	if gotStatus.Message() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, gotStatus.Message())
 	}
 }
 

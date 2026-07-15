@@ -297,7 +297,7 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 
 			logger, ctx := ktesting.NewTestContext(t)
 			snapshot := internalcache.NewSnapshot(tt.pods, tt.nodes)
-			cache := internalcache.New(ctx, nil, true)
+			cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
 
 			nodeInfos := make(map[string]fwk.NodeInfo)
 			for _, node := range tt.nodes {
@@ -511,7 +511,7 @@ func TestNewDomainVictim(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			snapshot := internalcache.NewSnapshot(nil, tt.nodes)
-			cache := internalcache.New(ctx, nil, true)
+			cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
 			for _, node := range tt.nodes {
 				cache.AddNode(logger, node)
 			}

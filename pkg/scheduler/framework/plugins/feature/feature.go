@@ -52,6 +52,7 @@ type Features struct {
 	EnableInPlacePodLevelResourcesVerticalScaling bool
 	EnableTopologyAwareWorkloadScheduling         bool
 	EnablePodGroupPreemptionPolicy                bool
+	EnableCompositePodGroup                       bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
@@ -84,5 +85,6 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableTopologyAwareWorkloadScheduling:         featureGate.Enabled(features.TopologyAwareWorkloadScheduling),
 		EnablePodGroupPreemptionPolicy:                featureGate.Enabled(features.PodGroupPreemptionPolicy),
 		EnableDRANodeAllocatableResources:             featureGate.Enabled(features.DRANodeAllocatableResources),
+		EnableCompositePodGroup:                       featureGate.Enabled(features.CompositePodGroup),
 	}
 }

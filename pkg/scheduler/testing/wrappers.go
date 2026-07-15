@@ -1676,6 +1676,12 @@ func (wrapper *PodGroupWrapper) PreemptionPolicy(policy schedulingapi.Preemption
 	return wrapper
 }
 
+// ParentCompositePodGroup sets the parent composite pod group name of the inner PodGroup.
+func (wrapper *PodGroupWrapper) ParentCompositePodGroup(parent string) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.ParentCompositePodGroupName = &parent
+	return wrapper
+}
+
 // WorkloadWrapper wraps a Workload inside.
 type WorkloadWrapper struct{ schedulingapi.Workload }
 
@@ -1726,6 +1732,12 @@ func (wrapper *PodGroupTemplateWrapper) Name(name string) *PodGroupTemplateWrapp
 	return wrapper
 }
 
+// Priority sets the priority of the inner PodGroupTemplate.
+func (wrapper *PodGroupTemplateWrapper) Priority(priority int32) *PodGroupTemplateWrapper {
+	wrapper.PodGroupTemplate.Priority = &priority
+	return wrapper
+}
+
 // MinCount sets the MinCount for the Gang scheduling policy.
 func (wrapper *PodGroupTemplateWrapper) MinCount(count int32) *PodGroupTemplateWrapper {
 	if wrapper.SchedulingPolicy.Gang == nil {
@@ -1750,5 +1762,142 @@ func (wrapper *PodGroupTemplateWrapper) DisruptionModeAll() *PodGroupTemplateWra
 // DisruptionModeSingle sets the disruption mode of the inner PodGroupTemplate to Single.
 func (wrapper *PodGroupTemplateWrapper) DisruptionModeSingle() *PodGroupTemplateWrapper {
 	wrapper.PodGroupTemplate.DisruptionMode = &schedulingapi.DisruptionMode{Single: &schedulingapi.SingleDisruptionMode{}}
+	return wrapper
+}
+
+// CompositePodGroupTemplate appends the given CompositePodGroupTemplate to the Workload spec.
+func (wrapper *WorkloadWrapper) CompositePodGroupTemplate(t schedulingapi.CompositePodGroupTemplate) *WorkloadWrapper {
+	wrapper.Workload.Spec.CompositePodGroupTemplates = append(wrapper.Workload.Spec.CompositePodGroupTemplates, t)
+	return wrapper
+}
+
+// Children adds children to the Workload.
+// It accepts *PodGroupTemplateWrapper and *CompositePodGroupTemplateWrapper.
+func (wrapper *WorkloadWrapper) Children(children ...any) *WorkloadWrapper {
+	for _, child := range children {
+		switch c := child.(type) {
+		case *PodGroupTemplateWrapper:
+			wrapper.Workload.Spec.PodGroupTemplates = append(wrapper.Workload.Spec.PodGroupTemplates, c.Obj())
+		case *CompositePodGroupTemplateWrapper:
+			wrapper.Workload.Spec.CompositePodGroupTemplates = append(wrapper.Workload.Spec.CompositePodGroupTemplates, c.Obj())
+		default:
+			panic(fmt.Sprintf("unexpected child type %T", child))
+		}
+	}
+	return wrapper
+}
+
+// CompositePodGroupTemplateWrapper wraps a CompositePodGroupTemplate inside.
+type CompositePodGroupTemplateWrapper struct {
+	schedulingapi.CompositePodGroupTemplate
+}
+
+// MakeCompositePodGroupTemplate creates a CompositePodGroupTemplate wrapper.
+func MakeCompositePodGroupTemplate() *CompositePodGroupTemplateWrapper {
+	return &CompositePodGroupTemplateWrapper{}
+}
+
+// Obj returns the inner CompositePodGroupTemplate.
+func (wrapper *CompositePodGroupTemplateWrapper) Obj() schedulingapi.CompositePodGroupTemplate {
+	return wrapper.CompositePodGroupTemplate
+}
+
+// Name sets `name` as the name of the inner CompositePodGroupTemplate.
+func (wrapper *CompositePodGroupTemplateWrapper) Name(name string) *CompositePodGroupTemplateWrapper {
+	wrapper.CompositePodGroupTemplate.Name = name
+	return wrapper
+}
+
+// Priority sets the priority of the inner CompositePodGroupTemplate.
+func (wrapper *CompositePodGroupTemplateWrapper) Priority(priority int32) *CompositePodGroupTemplateWrapper {
+	wrapper.CompositePodGroupTemplate.Priority = &priority
+	return wrapper
+}
+
+// Children adds children to the CompositePodGroupTemplate.
+// It accepts *PodGroupTemplateWrapper and *CompositePodGroupTemplateWrapper.
+func (wrapper *CompositePodGroupTemplateWrapper) Children(children ...any) *CompositePodGroupTemplateWrapper {
+	for _, child := range children {
+		switch c := child.(type) {
+		case *PodGroupTemplateWrapper:
+			wrapper.PodGroupTemplates = append(wrapper.PodGroupTemplates, c.Obj())
+		case *CompositePodGroupTemplateWrapper:
+			wrapper.CompositePodGroupTemplates = append(wrapper.CompositePodGroupTemplates, c.Obj())
+		default:
+			panic(fmt.Sprintf("unexpected child type %T", child))
+		}
+	}
+	return wrapper
+}
+
+// MinGroupCount sets the policy to Gang with the given minGroupCount.
+func (wrapper *CompositePodGroupTemplateWrapper) MinGroupCount(minGroupCount int32) *CompositePodGroupTemplateWrapper {
+	wrapper.SchedulingPolicy.Gang = &schedulingapi.CompositeGangSchedulingPolicy{MinGroupCount: minGroupCount}
+	return wrapper
+}
+
+// BasicPolicy sets the policy to Basic.
+func (wrapper *CompositePodGroupTemplateWrapper) BasicPolicy() *CompositePodGroupTemplateWrapper {
+	wrapper.SchedulingPolicy.Basic = &schedulingapi.CompositeBasicSchedulingPolicy{}
+	return wrapper
+}
+
+// CompositePodGroupWrapper wraps a CompositePodGroup inside.
+type CompositePodGroupWrapper struct {
+	schedulingapi.CompositePodGroup
+}
+
+// MakeCompositePodGroup creates a CompositePodGroup wrapper.
+func MakeCompositePodGroup() *CompositePodGroupWrapper {
+	return &CompositePodGroupWrapper{}
+}
+
+// Obj returns the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Obj() *schedulingapi.CompositePodGroup {
+	return &wrapper.CompositePodGroup
+}
+
+// Name sets `name` as the name of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Name(name string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Name = name
+	return wrapper
+}
+
+// Priority sets the priority of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Priority(priority int32) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.Priority = &priority
+	return wrapper
+}
+
+// Namespace sets `namespace` as the namespace of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Namespace(namespace string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Namespace = namespace
+	return wrapper
+}
+
+// ParentCompositePodGroup sets the parent CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) ParentCompositePodGroup(parent string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.ParentCompositePodGroupName = new(parent)
+	return wrapper
+}
+
+// MinGroupCount sets the policy to Gang with the given minGroupCount.
+func (wrapper *CompositePodGroupWrapper) MinGroupCount(minGroupCount int32) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.SchedulingPolicy.Gang = &schedulingapi.CompositeGangSchedulingPolicy{MinGroupCount: minGroupCount}
+	return wrapper
+}
+
+// BasicPolicy sets the policy to Basic.
+func (wrapper *CompositePodGroupWrapper) BasicPolicy() *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.SchedulingPolicy.Basic = &schedulingapi.CompositeBasicSchedulingPolicy{}
+	return wrapper
+}
+
+// WorkloadRef sets the WorkloadReference for the CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) WorkloadRef(workloadName, templateName string) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Spec.WorkloadRef = &schedulingapi.WorkloadReference{
+		WorkloadName: workloadName,
+		TemplateName: templateName,
+	}
 	return wrapper
 }

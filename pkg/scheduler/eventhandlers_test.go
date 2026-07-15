@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"maps"
 	"reflect"
 	"testing"
 	"time"
@@ -178,7 +179,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				// disable backoff queue
 				internalqueue.WithPodInitialBackoffDuration(0),
 				internalqueue.WithPodMaxBackoffDuration(0))
-			schedulerCache := internalcache.New(ctx, nil, false)
+			schedulerCache := internalcache.New(ctx, nil, false, false /* CompositePodGroup */)
 
 			// Put test pods into unschedulable queue
 			for _, pod := range unschedulablePods {
@@ -248,7 +249,7 @@ func TestUpdateAssignedPodInCache(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, false),
+				Cache:           internalcache.New(ctx, nil, false, false /* CompositePodGroup */),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
@@ -538,7 +539,16 @@ func TestAddAllEventHandlers(t *testing.T) {
 			staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
 			dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
 
-			if diff := cmp.Diff(tt.expectStaticInformers, staticInformers); diff != "" {
+			expectedStaticInformers := make(map[reflect.Type]bool)
+			maps.Copy(expectedStaticInformers, tt.expectStaticInformers)
+			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+				expectedStaticInformers[reflect.TypeFor[*schedulingapi.PodGroup]()] = true
+				if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+					expectedStaticInformers[reflect.TypeFor[*schedulingapi.CompositePodGroup]()] = true
+				}
+			}
+
+			if diff := cmp.Diff(expectedStaticInformers, staticInformers); diff != "" {
 				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.expectDynamicInformers, dynamicInformers); diff != "" {
@@ -803,7 +813,7 @@ func TestAddPod(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled),
+				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled, false /* CompositePodGroup */),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -1059,7 +1069,7 @@ func TestUpdatePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled),
+				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled, false /* CompositePodGroup */),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -1270,7 +1280,7 @@ func TestDeletePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled),
+				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled, false /* CompositePodGroup */),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -1368,7 +1378,7 @@ func TestAddPodGroup(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, true),
+				Cache:           internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
@@ -1419,7 +1429,7 @@ func TestUpdatePodGroup(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, true),
+				Cache:           internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
@@ -1466,7 +1476,7 @@ func TestDeletePodGroup(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, true),
+				Cache:           internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
@@ -1480,6 +1490,244 @@ func TestDeletePodGroup(t *testing.T) {
 			_, err := sched.Cache.PodGroups().Get(tt.initPodGroup.Namespace, tt.initPodGroup.Name)
 			if err == nil {
 				t.Errorf("Expected pod group to be deleted from cache, but it still exists")
+			}
+		})
+	}
+}
+
+func TestAddCompositePodGroup(t *testing.T) {
+	cpg := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").Obj()
+
+	tests := []struct {
+		name          string
+		cpg           any
+		cpgEnabled    bool
+		expectInCache bool
+	}{
+		{
+			name:          "add valid composite pod group with feature enabled",
+			cpg:           cpg,
+			cpgEnabled:    true,
+			expectInCache: true,
+		},
+		{
+			name:          "add valid composite pod group with feature disabled",
+			cpg:           cpg,
+			cpgEnabled:    false,
+			expectInCache: false,
+		},
+		{
+			name:          "add invalid composite pod group type with feature enabled",
+			cpg:           "invalid-type",
+			cpgEnabled:    true,
+			expectInCache: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: tt.cpgEnabled,
+				features.CompositePodGroup:               tt.cpgEnabled,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			sched := &Scheduler{
+				Cache:           internalcache.New(ctx, nil, true, tt.cpgEnabled),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				logger:          logger,
+			}
+
+			sched.addCompositePodGroup(tt.cpg)
+
+			gotCPG, err := sched.Cache.CompositePodGroups().Get(cpg.Namespace, cpg.Name)
+			if tt.expectInCache {
+				if err != nil {
+					t.Errorf("Expected composite pod group to be in cache, got error: %v", err)
+				}
+				if diff := cmp.Diff(cpg, gotCPG); diff != "" {
+					t.Errorf("Unexpected composite pod group in cache (-want, +got):\n%s", diff)
+				}
+			} else if err == nil {
+				t.Errorf("Expected composite pod group NOT to be in cache, but got: %v", gotCPG)
+			}
+		})
+	}
+}
+
+func TestUpdateCompositePodGroup(t *testing.T) {
+	oldCPG := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").MinGroupCount(1).Obj()
+	oldCPG.ResourceVersion = "1"
+	newCPG := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").MinGroupCount(2).Obj()
+	newCPG.ResourceVersion = "2"
+
+	tests := []struct {
+		name          string
+		oldCPG        any
+		newCPG        any
+		expectCPG     *schedulingapi.CompositePodGroup
+		cpgEnabled    bool
+		expectInCache bool
+	}{
+		{
+			name:          "update valid composite pod group with feature enabled",
+			oldCPG:        oldCPG,
+			newCPG:        newCPG,
+			expectCPG:     newCPG,
+			cpgEnabled:    true,
+			expectInCache: true,
+		},
+		{
+			name:          "update composite pod group with same resource version should be no-op",
+			oldCPG:        oldCPG,
+			newCPG:        oldCPG,
+			expectCPG:     oldCPG,
+			cpgEnabled:    true,
+			expectInCache: true,
+		},
+		{
+			name:          "update composite pod group with feature disabled",
+			oldCPG:        oldCPG,
+			newCPG:        newCPG,
+			expectCPG:     nil,
+			cpgEnabled:    false,
+			expectInCache: false,
+		},
+		{
+			name:          "update invalid old composite pod group type with feature enabled",
+			oldCPG:        "invalid-type",
+			newCPG:        newCPG,
+			expectCPG:     oldCPG,
+			cpgEnabled:    true,
+			expectInCache: true,
+		},
+		{
+			name:          "update invalid new composite pod group type with feature enabled",
+			oldCPG:        oldCPG,
+			newCPG:        "invalid-type",
+			expectCPG:     oldCPG,
+			cpgEnabled:    true,
+			expectInCache: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: tt.cpgEnabled,
+				features.CompositePodGroup:               tt.cpgEnabled,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			sched := &Scheduler{
+				Cache:           internalcache.New(ctx, nil, true, tt.cpgEnabled),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				logger:          logger,
+			}
+
+			if tt.cpgEnabled {
+				sched.Cache.AddCompositePodGroup(logger, oldCPG)
+			}
+
+			sched.updateCompositePodGroup(tt.oldCPG, tt.newCPG)
+
+			gotCPG, err := sched.Cache.CompositePodGroups().Get(oldCPG.Namespace, oldCPG.Name)
+			if tt.expectInCache {
+				if err != nil {
+					t.Errorf("Expected composite pod group to be in cache, got error: %v", err)
+				}
+				if diff := cmp.Diff(tt.expectCPG, gotCPG); diff != "" {
+					t.Errorf("Unexpected composite pod group in cache (-want, +got):\n%s", diff)
+				}
+			} else if err == nil {
+				t.Errorf("Expected composite pod group NOT to be in cache, but got: %v", gotCPG)
+			}
+		})
+	}
+}
+
+func TestDeleteCompositePodGroup(t *testing.T) {
+	cpg := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").Obj()
+
+	tests := []struct {
+		name              string
+		initCPG           *schedulingapi.CompositePodGroup
+		cpgToDelete       any
+		cpgEnabled        bool
+		expectStillExists bool
+	}{
+		{
+			name:              "delete composite pod group",
+			initCPG:           cpg,
+			cpgToDelete:       cpg,
+			cpgEnabled:        true,
+			expectStillExists: false,
+		},
+		{
+			name:              "delete DeletedFinalStateUnknown tombstone with composite pod group",
+			initCPG:           cpg,
+			cpgToDelete:       cache.DeletedFinalStateUnknown{Obj: cpg},
+			cpgEnabled:        true,
+			expectStillExists: false,
+		},
+		{
+			name:              "delete composite pod group with feature disabled",
+			initCPG:           cpg,
+			cpgToDelete:       cpg,
+			cpgEnabled:        false,
+			expectStillExists: false,
+		},
+		{
+			name:              "delete composite pod group with invalid type",
+			initCPG:           cpg,
+			cpgToDelete:       "invalid-type",
+			cpgEnabled:        true,
+			expectStillExists: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: tt.cpgEnabled,
+				features.CompositePodGroup:               tt.cpgEnabled,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			sched := &Scheduler{
+				Cache:           internalcache.New(ctx, nil, true, tt.cpgEnabled),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				logger:          logger,
+			}
+
+			if tt.initCPG != nil && tt.cpgEnabled {
+				sched.Cache.AddCompositePodGroup(logger, tt.initCPG)
+			}
+
+			sched.deleteCompositePodGroup(tt.cpgToDelete)
+
+			gotCPG, err := sched.Cache.CompositePodGroups().Get(cpg.Namespace, cpg.Name)
+			if tt.expectStillExists {
+				if err != nil {
+					t.Errorf("Expected composite pod group to still exist in cache, but got error: %v", err)
+				}
+				if diff := cmp.Diff(cpg, gotCPG); diff != "" {
+					t.Errorf("Unexpected composite pod group in cache (-want, +got):\n%s", diff)
+				}
+			} else if err == nil {
+				t.Errorf("Expected composite pod group NOT to be in cache, but got: %v", gotCPG)
 			}
 		})
 	}

@@ -18,6 +18,7 @@ package queue
 
 import (
 	v1 "k8s.io/api/core/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -26,12 +27,12 @@ import (
 type podGroupMemberPods struct {
 	// podGroupToPodInfos stores QueuedPodInfos keyed by their pod group key (pg-type/namespace/pg-name),
 	// and then by pod key (namespace/pg-name).
-	podGroupToPodInfos map[string]map[string]*framework.QueuedPodInfo
+	podGroupToPodInfos map[fwk.EntityKey]map[fwk.EntityKey]*framework.QueuedPodInfo
 }
 
 func newPodGroupMemberPods() *podGroupMemberPods {
 	return &podGroupMemberPods{
-		podGroupToPodInfos: make(map[string]map[string]*framework.QueuedPodInfo),
+		podGroupToPodInfos: make(map[fwk.EntityKey]map[fwk.EntityKey]*framework.QueuedPodInfo),
 	}
 }
 
@@ -39,7 +40,7 @@ func newPodGroupMemberPods() *podGroupMemberPods {
 func (p *podGroupMemberPods) add(pInfo *framework.QueuedPodInfo) {
 	pgKey, pKey := podGroupKeyForPod(pInfo.Pod), podKey(pInfo.Pod)
 	if p.podGroupToPodInfos[pgKey] == nil {
-		p.podGroupToPodInfos[pgKey] = make(map[string]*framework.QueuedPodInfo)
+		p.podGroupToPodInfos[pgKey] = make(map[fwk.EntityKey]*framework.QueuedPodInfo)
 	}
 	p.podGroupToPodInfos[pgKey][pKey] = pInfo
 }
@@ -101,7 +102,7 @@ func (p *podGroupMemberPods) list() []*v1.Pod {
 
 // clearGroup removes and returns all pod infos for a specific pod group namespace and name.
 func (p *podGroupMemberPods) clear(namespace, name string) []*framework.QueuedPodInfo {
-	pgKey := podGroupKeyFromName(namespace, name)
+	pgKey := fwk.PodGroupKey(namespace, name)
 	if pInfos, ok := p.podGroupToPodInfos[pgKey]; ok {
 		delete(p.podGroupToPodInfos, pgKey)
 		var pInfoList []*framework.QueuedPodInfo

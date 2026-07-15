@@ -470,6 +470,9 @@ func (pl *DefaultPreemption) isPreemptionAllowedAcrossAllVictimNodes(victim *pre
 
 // PodGroupPostFilter runs a default preemption for the pod group.
 func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (postFilterResult *fwk.PodGroupPostFilterResult, status *fwk.Status) {
+	if pl.fts.EnableCompositePodGroup && pgInfo.GetCompositePodGroup() != nil {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "pod group preemption: not supported for composite pod groups yet")
+	}
 	pg := pgInfo.GetPodGroup()
 
 	if pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0 {

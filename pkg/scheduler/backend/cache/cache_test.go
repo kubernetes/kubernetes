@@ -49,7 +49,7 @@ var nodeInfoCmpOpts = []cmp.Option{
 }
 
 var podGroupStateCmpOpts = []cmp.Option{
-	cmp.AllowUnexported(podGroupStateSnapshot{}, podGroupStateData{}, podGroupKey{}),
+	cmp.AllowUnexported(podGroupStateSnapshot{}, podGroupStateData{}, fwk.EntityKey{}),
 	cmpopts.IgnoreFields(podGroupStateData{}, "generation"),
 	cmpopts.EquateEmpty(),
 }
@@ -242,7 +242,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache := newCache(ctx, time.Second, nil, false)
+			cache := newCache(ctx, time.Second, nil, false, false)
 			for _, pod := range tc.pods {
 				if err := cache.AssumePod(logger, pod); err != nil {
 					t.Fatalf("AssumePod failed: %v", err)
@@ -303,7 +303,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, time.Second, nil, false)
+	cache := newCache(ctx, time.Second, nil, false, false)
 	for _, podToAssume := range test.podsToAssume {
 		if err := cache.AssumePod(logger, podToAssume); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -356,7 +356,7 @@ func TestDump(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, time.Second, nil, false)
+	cache := newCache(ctx, time.Second, nil, false, false)
 	for _, podToAssume := range test.podsToAssume {
 		if err := cache.AssumePod(logger, podToAssume); err != nil {
 			t.Errorf("assumePod failed: %v", err)
@@ -422,7 +422,7 @@ func TestAddPodAlwaysUpdatesPodInfoInNodeInfo(t *testing.T) {
 		},
 	}
 
-	cache := newCache(ctx, time.Second, nil, false)
+	cache := newCache(ctx, time.Second, nil, false, false)
 	for _, podToAssume := range test.podsToAssume {
 		if err := cache.AssumePod(logger, podToAssume); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -478,7 +478,7 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, time.Second, nil, false)
+	cache := newCache(ctx, time.Second, nil, false, false)
 	for _, podToAssume := range test.podsToAssume {
 		if err := cache.AssumePod(logger, podToAssume); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -547,7 +547,7 @@ func TestUpdatePod(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, time.Second, nil, false)
+	cache := newCache(ctx, time.Second, nil, false, false)
 	for _, podToAdd := range test.podsToAdd {
 		if err := cache.AddPod(logger, podToAdd); err != nil {
 			t.Fatalf("AddPod failed: %v", err)
@@ -607,7 +607,7 @@ func TestUpdatePodAndGet(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache := newCache(ctx, time.Second, nil, false)
+			cache := newCache(ctx, time.Second, nil, false, false)
 			// trying to get an unknown pod should return an error
 			// podToUpdate has not been added yet
 			if _, err := cache.GetPod(tc.podToUpdate); err == nil {
@@ -673,7 +673,7 @@ func TestEphemeralStorageResource(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, time.Second, nil, false)
+	cache := newCache(ctx, time.Second, nil, false, false)
 	if err := cache.AddPod(logger, test.pod); err != nil {
 		t.Fatalf("AddPod failed: %v", err)
 	}
@@ -736,35 +736,37 @@ func Test_AddPodGroupMember(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled)
-			if tt.initPodGroup != nil {
-				cache.AddPodGroup(tt.initPodGroup)
-			}
-
-			cache.AddPodGroupMember(tt.pod)
-
-			if !tt.genericWorkloadEnabled || tt.pod.Spec.SchedulingGroup == nil {
-				if count := len(cache.podGroupStates); count != 0 {
-					t.Errorf("Expected no pod groups states to exist in cache, but found %d", count)
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
+				cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
+				if tt.initPodGroup != nil {
+					cache.AddPodGroup(tt.initPodGroup)
 				}
-				return
-			}
 
-			podGroupState, err := cache.PodGroupStates().Get(tt.pod.Namespace, *tt.pod.Spec.SchedulingGroup.PodGroupName)
-			if err != nil {
-				t.Fatalf("Unexpected error getting pod group state: %v", err)
-			}
+				cache.AddPodGroupMember(tt.pod)
 
-			_, inUnscheduledPods := podGroupState.UnscheduledPods()[tt.pod.Name]
-			if inUnscheduledPods != tt.expectInUnscheduledPods {
-				t.Errorf("expected pod in UnscheduledPods: %v, got %v", tt.expectInUnscheduledPods, inUnscheduledPods)
-			}
+				if !tt.genericWorkloadEnabled || tt.pod.Spec.SchedulingGroup == nil {
+					if count := len(cache.podGroupStates); count != 0 {
+						t.Errorf("Expected no pod groups states to exist in cache, but found %d", count)
+					}
+					return
+				}
 
-			if inAssignedPods := podGroupState.AssignedPods().Has(tt.pod.UID); inAssignedPods != tt.expectInAssignedPods {
-				t.Errorf("expected pod in AssignedPods: %v, got %v", tt.expectInAssignedPods, inAssignedPods)
-			}
-		})
+				podGroupState, err := cache.PodGroupStates().Get(tt.pod.Namespace, *tt.pod.Spec.SchedulingGroup.PodGroupName)
+				if err != nil {
+					t.Fatalf("Unexpected error getting pod group state: %v", err)
+				}
+
+				_, inUnscheduledPods := podGroupState.UnscheduledPods()[tt.pod.Name]
+				if inUnscheduledPods != tt.expectInUnscheduledPods {
+					t.Errorf("expected pod in UnscheduledPods: %v, got %v", tt.expectInUnscheduledPods, inUnscheduledPods)
+				}
+
+				if inAssignedPods := podGroupState.AssignedPods().Has(tt.pod.UID); inAssignedPods != tt.expectInAssignedPods {
+					t.Errorf("expected pod in AssignedPods: %v, got %v", tt.expectInAssignedPods, inAssignedPods)
+				}
+			})
+		}
 	}
 }
 
@@ -825,48 +827,50 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled)
-			cache.AddPodGroupMember(tt.oldPod)
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
+				logger, _ := ktesting.NewTestContext(t)
+				cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
+				cache.AddPodGroupMember(tt.oldPod)
 
-			newPod := tt.newPod
-			if newPod == nil {
-				newPod = tt.oldPod
-			}
-			cache.UpdatePodGroupMember(logger, tt.oldPod, newPod)
-
-			if !tt.genericWorkloadEnabled || newPod.Spec.SchedulingGroup == nil {
-				if count := len(cache.podGroupStates); count != 0 {
-					t.Errorf("Expected no pod groups states to exist in cache, but found %d", count)
+				newPod := tt.newPod
+				if newPod == nil {
+					newPod = tt.oldPod
 				}
-				return
-			}
+				cache.UpdatePodGroupMember(logger, tt.oldPod, newPod)
 
-			podGroupState, err := cache.PodGroupStates().Get(newPod.Namespace, *newPod.Spec.SchedulingGroup.PodGroupName)
-			if err != nil {
-				t.Fatalf("Unexpected error getting pod group state: %v", err)
-			}
+				if !tt.genericWorkloadEnabled || newPod.Spec.SchedulingGroup == nil {
+					if count := len(cache.podGroupStates); count != 0 {
+						t.Errorf("Expected no pod groups states to exist in cache, but found %d", count)
+					}
+					return
+				}
 
-			_, inUnscheduledPods := podGroupState.UnscheduledPods()[newPod.Name]
-			if inUnscheduledPods != tt.expectInUnscheduledPods {
-				t.Errorf("expected pod in UnscheduledPods: %v, got %v", tt.expectInUnscheduledPods, inUnscheduledPods)
-			}
+				podGroupState, err := cache.PodGroupStates().Get(newPod.Namespace, *newPod.Spec.SchedulingGroup.PodGroupName)
+				if err != nil {
+					t.Fatalf("Unexpected error getting pod group state: %v", err)
+				}
 
-			if inAssignedPods := podGroupState.AssignedPods().Has(newPod.UID); inAssignedPods != tt.expectInAssignedPods {
-				t.Errorf("expected pod in AssignedPods: %v, got %v", tt.expectInAssignedPods, inAssignedPods)
-			}
+				_, inUnscheduledPods := podGroupState.UnscheduledPods()[newPod.Name]
+				if inUnscheduledPods != tt.expectInUnscheduledPods {
+					t.Errorf("expected pod in UnscheduledPods: %v, got %v", tt.expectInUnscheduledPods, inUnscheduledPods)
+				}
 
-			if inAssumedPods := podGroupState.AssumedPods().Has(newPod.UID); inAssumedPods != tt.expectInAssumedPods {
-				t.Errorf("expected pod in AssumedPods: %v, got %v", tt.expectInAssumedPods, inAssumedPods)
-			}
+				if inAssignedPods := podGroupState.AssignedPods().Has(newPod.UID); inAssignedPods != tt.expectInAssignedPods {
+					t.Errorf("expected pod in AssignedPods: %v, got %v", tt.expectInAssignedPods, inAssignedPods)
+				}
 
-			podGroupKey := newPodGroupKey(newPod.Namespace, *newPod.Spec.SchedulingGroup.PodGroupName)
-			gotPod := cache.podGroupStates[podGroupKey].allPods[newPod.UID]
-			if diff := cmp.Diff(tt.newPod, gotPod); diff != "" {
-				t.Errorf("stored pod does not match newPod (-want +got):\n%s", diff)
-			}
-		})
+				if inAssumedPods := podGroupState.AssumedPods().Has(newPod.UID); inAssumedPods != tt.expectInAssumedPods {
+					t.Errorf("expected pod in AssumedPods: %v, got %v", tt.expectInAssumedPods, inAssumedPods)
+				}
+
+				key := fwk.PodGroupKey(newPod.Namespace, *newPod.Spec.SchedulingGroup.PodGroupName)
+				gotPod := cache.podGroupStates[key].allPods[newPod.UID]
+				if diff := cmp.Diff(tt.newPod, gotPod); diff != "" {
+					t.Errorf("stored pod does not match newPod (-want +got):\n%s", diff)
+				}
+			})
+		}
 	}
 }
 
@@ -924,37 +928,39 @@ func Test_RemovePodGroupMember(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled)
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
+				cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
 
-			if tt.initPodGroup != nil {
-				cache.AddPodGroup(tt.initPodGroup)
-			}
+				if tt.initPodGroup != nil {
+					cache.AddPodGroup(tt.initPodGroup)
+				}
 
-			for _, pod := range tt.initPods {
-				cache.AddPodGroupMember(pod)
-			}
+				for _, pod := range tt.initPods {
+					cache.AddPodGroupMember(pod)
+				}
 
-			cache.RemovePodGroupMember(tt.podToDelete)
+				cache.RemovePodGroupMember(tt.podToDelete)
 
-			podGroupStateCount := len(cache.podGroupStates)
-			if podGroupStateCount != tt.expectPodGroupStateCount {
-				t.Errorf("expected %d pod groups remaining, got %d", tt.expectPodGroupStateCount, podGroupStateCount)
-			}
+				podGroupStateCount := len(cache.podGroupStates)
+				if podGroupStateCount != tt.expectPodGroupStateCount {
+					t.Errorf("expected %d pod groups remaining, got %d", tt.expectPodGroupStateCount, podGroupStateCount)
+				}
 
-			if podGroupStateCount == 0 {
-				return
-			}
+				if podGroupStateCount == 0 {
+					return
+				}
 
-			podGroupState, err := cache.PodGroupStates().Get(tt.podToDelete.Namespace, *tt.podToDelete.Spec.SchedulingGroup.PodGroupName)
-			if err != nil {
-				t.Fatalf("Unexpected error getting pod group state: %v", err)
-			}
+				podGroupState, err := cache.PodGroupStates().Get(tt.podToDelete.Namespace, *tt.podToDelete.Spec.SchedulingGroup.PodGroupName)
+				if err != nil {
+					t.Fatalf("Unexpected error getting pod group state: %v", err)
+				}
 
-			if podGroupState.AllPods().Has(tt.podToDelete.UID) {
-				t.Errorf("Expected pod %s to be deleted from pod group but it still exists", tt.podToDelete.UID)
-			}
-		})
+				if podGroupState.AllPods().Has(tt.podToDelete.UID) {
+					t.Errorf("Expected pod %s to be deleted from pod group but it still exists", tt.podToDelete.UID)
+				}
+			})
+		}
 	}
 }
 
@@ -962,53 +968,170 @@ func Test_AddPodGroup(t *testing.T) {
 	podGroup := st.MakePodGroup().Namespace("ns").Name("pg").Obj()
 	pod := st.MakePod().Namespace("ns").Name("pod1").PodGroupName("pg").Obj()
 
+	pg1 := st.MakePodGroup().Name("pg1").Namespace("ns1").UID("uid1").Obj()
+	pg2 := st.MakePodGroup().Name("pg2").Namespace("ns1").UID("uid2").Obj()
+	pg3WithParent := st.MakePodGroup().Name("pg3").Namespace("ns1").UID("uid3").ParentCompositePodGroup("cpg1").Obj()
+	pg4WithParent := st.MakePodGroup().Name("pg4").Namespace("ns1").UID("uid4").ParentCompositePodGroup("cpg1").Obj()
+	cpgChild := st.MakeCompositePodGroup().Name("cpgChild").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
+
+	cpg1Key := fwk.CompositePodGroupKey("ns1", "cpg1")
+
 	tests := []struct {
-		name                   string
-		initPod                *v1.Pod
-		podGroup               *schedulingv1alpha3.PodGroup
-		genericWorkloadEnabled bool
-		expectPodGroup         *schedulingv1alpha3.PodGroup
+		name                     string
+		genericWorkloadEnabled   bool
+		compositePodGroupEnabled bool
+		initPod                  *v1.Pod // From old tests
+		initialCPGs              []*schedulingv1alpha3.CompositePodGroup
+		podGroupsToAdd           []*schedulingv1alpha3.PodGroup
+		wantPodGroups            map[fwk.EntityKey]*schedulingv1alpha3.PodGroup
+		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
-			name:                   "add pod group with GenericWorkload disabled should be no-op",
-			podGroup:               podGroup,
-			genericWorkloadEnabled: false,
-			expectPodGroup:         nil,
+			name:                     "add pod group with GenericWorkload disabled should be no-op",
+			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{podGroup},
+			genericWorkloadEnabled:   false,
+			compositePodGroupEnabled: true,
 		},
 		{
-			name:                   "add pod group",
-			podGroup:               podGroup,
-			genericWorkloadEnabled: true,
-			expectPodGroup:         podGroup,
+			name:                     "add pod group",
+			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{podGroup},
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+				fwk.PodGroupKey("ns", "pg"): podGroup,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 		{
-			name:                   "add pod group when state already exists (from pod group members)",
-			initPod:                pod,
-			podGroup:               podGroup,
-			genericWorkloadEnabled: true,
-			expectPodGroup:         podGroup,
+			name:                     "add pod group when state already exists (from pod group members)",
+			initPod:                  pod,
+			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{podGroup},
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+				fwk.PodGroupKey("ns", "pg"): podGroup,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+		},
+		{
+			name:                     "add single pod group (hierarchical)",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg1},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+				fwk.PodGroupKey("ns1", "pg1"): pg1,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+		},
+		{
+			name:                     "add multiple pod groups (hierarchical)",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg1, pg2},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+				fwk.PodGroupKey("ns1", "pg1"): pg1,
+				fwk.PodGroupKey("ns1", "pg2"): pg2,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+		},
+		{
+			name:                     "add pod group with parent",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg3WithParent},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpg1Key: sets.New(fwk.PodGroupKey("ns1", "pg3")),
+			},
+		},
+		{
+			name:                     "add pod group with parent, parent already in children",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg3WithParent, pg4WithParent},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
+				fwk.PodGroupKey("ns1", "pg4"): pg4WithParent,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpg1Key: sets.New(
+					fwk.PodGroupKey("ns1", "pg3"),
+					fwk.PodGroupKey("ns1", "pg4"),
+				),
+			},
+		},
+		{
+			name:                     "add pod group with parent, parent already has composite pod group child",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
+			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg3WithParent},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpg1Key: sets.New(
+					fwk.CompositePodGroupKey("ns1", "cpgChild"),
+					fwk.PodGroupKey("ns1", "pg3"),
+				),
+			},
+		},
+		{
+			name:                     "add pod group with parent when CompositePodGroup disabled",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: false,
+			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg3WithParent},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
+			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, tt.compositePodGroupEnabled)
+			logger := klog.Background()
+
 			if tt.initPod != nil {
 				cache.AddPodGroupMember(tt.initPod)
 			}
-			cache.AddPodGroup(tt.podGroup)
+			for _, cpg := range tt.initialCPGs {
+				cache.AddCompositePodGroup(logger, cpg)
+			}
+			for _, pg := range tt.podGroupsToAdd {
+				cache.AddPodGroup(pg)
+			}
 
-			gotPodGroup, err := cache.PodGroups().Get(tt.podGroup.Namespace, tt.podGroup.Name)
-			if tt.expectPodGroup != nil {
-				if err != nil {
-					t.Fatalf("Expected pod group to exist, but got error: %v", err)
+			if !tt.genericWorkloadEnabled {
+				if len(cache.podGroupStates) > 0 {
+					t.Errorf("Expected pod group state to be empty, got %d", len(cache.podGroupStates))
 				}
-				if diff := cmp.Diff(tt.expectPodGroup, gotPodGroup); diff != "" {
-					t.Errorf("Unexpected pod group (-want, +got):\n%s", diff)
+				return
+			}
+
+			gotPodGroups := make(map[fwk.EntityKey]*schedulingv1alpha3.PodGroup)
+			for k, pgs := range cache.podGroupStates {
+				if pgs.podGroup != nil {
+					gotPodGroups[k] = pgs.podGroup
 				}
-			} else if err == nil {
-				t.Error("Expected error getting pod group, but got none")
+			}
+
+			gotChildren := make(map[fwk.EntityKey]sets.Set[fwk.EntityKey])
+			for k, cpgs := range cache.compositePodGroupStates {
+				if len(cpgs.children) > 0 {
+					gotChildren[k] = cpgs.children
+				}
+			}
+
+			if diff := cmp.Diff(tt.wantPodGroups, gotPodGroups); diff != "" {
+				t.Errorf("Unexpected podGroups (-want,+got)\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantChildren, gotChildren); diff != "" {
+				t.Errorf("Unexpected children (-want,+got)\n%s", diff)
 			}
 		})
 	}
@@ -1043,25 +1166,27 @@ func Test_UpdatePodGroup(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
-			cache.AddPodGroup(tt.oldPodGroup)
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
+				cache.AddPodGroup(tt.oldPodGroup)
 
-			cache.UpdatePodGroup(logger, tt.oldPodGroup, tt.newPodGroup)
+				cache.UpdatePodGroup(logger, tt.oldPodGroup, tt.newPodGroup)
 
-			gotPodGroup, err := cache.PodGroups().Get(tt.newPodGroup.Namespace, tt.newPodGroup.Name)
-			if tt.expectPodGroup != nil {
-				if err != nil {
-					t.Fatalf("Expected pod group to exist, but got error: %v", err)
+				gotPodGroup, err := cache.PodGroups().Get(tt.newPodGroup.Namespace, tt.newPodGroup.Name)
+				if tt.expectPodGroup != nil {
+					if err != nil {
+						t.Fatalf("Expected pod group to exist, but got error: %v", err)
+					}
+					if diff := cmp.Diff(tt.expectPodGroup, gotPodGroup); diff != "" {
+						t.Errorf("Unexpected pod group (-want, +got):\n%s", diff)
+					}
+				} else if err == nil {
+					t.Error("Expected error getting pod group, but got none")
 				}
-				if diff := cmp.Diff(tt.expectPodGroup, gotPodGroup); diff != "" {
-					t.Errorf("Unexpected pod group (-want, +got):\n%s", diff)
-				}
-			} else if err == nil {
-				t.Error("Expected error getting pod group, but got none")
-			}
-		})
+			})
+		}
 	}
 }
 
@@ -1069,144 +1194,232 @@ func Test_RemovePodGroup(t *testing.T) {
 	podGroup := st.MakePodGroup().Namespace("ns").Name("pg").Obj()
 	pod := st.MakePod().Namespace("ns").Name("pod1").PodGroupName("pg").Obj()
 
+	pg3WithParent := st.MakePodGroup().Name("pg3").Namespace("ns1").UID("uid3").ParentCompositePodGroup("cpg1").Obj()
+	pg4WithParent := st.MakePodGroup().Name("pg4").Namespace("ns1").UID("uid4").ParentCompositePodGroup("cpg1").Obj()
+	cpgChild := st.MakeCompositePodGroup().Name("cpgChild").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
+	cpg1Key := fwk.CompositePodGroupKey("ns1", "cpg1")
+
 	tests := []struct {
-		name                   string
-		initPod                *v1.Pod
-		podGroup               *schedulingv1alpha3.PodGroup
-		genericWorkloadEnabled bool
-		expectPodGroupExists   bool
-		expectStateExists      bool
-		expectPodsCount        int
+		name                     string
+		genericWorkloadEnabled   bool
+		compositePodGroupEnabled bool
+		initPod                  *v1.Pod // From old tests
+		initialPodGroups         []*schedulingv1alpha3.PodGroup
+		initialCPGs              []*schedulingv1alpha3.CompositePodGroup
+		podGroupToDelete         *schedulingv1alpha3.PodGroup
+		expectStateExists        string // "true", "false", or "" to skip
+		expectPodsCount          int
+		wantPodGroups            map[fwk.EntityKey]*schedulingv1alpha3.PodGroup
+		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
-			name:                   "remove pod group with GenericWorkload disabled should be no-op",
-			podGroup:               podGroup,
-			genericWorkloadEnabled: false,
+			name:                     "remove pod group with GenericWorkload disabled should be no-op",
+			podGroupToDelete:         podGroup,
+			genericWorkloadEnabled:   false,
+			compositePodGroupEnabled: true,
 		},
 		{
-			name:                   "remove pod group with GenericWorkload enabled",
-			podGroup:               podGroup,
-			genericWorkloadEnabled: true,
-			expectStateExists:      false,
+			name:                     "remove pod group with GenericWorkload enabled",
+			podGroupToDelete:         podGroup,
+			initialPodGroups:         []*schedulingv1alpha3.PodGroup{podGroup},
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			expectStateExists:        "false",
 		},
 		{
-			name:                   "remove pod group when it still has pod members",
-			initPod:                pod,
-			podGroup:               podGroup,
-			genericWorkloadEnabled: true,
-			expectStateExists:      true,
-			expectPodsCount:        1,
+			name:                     "remove pod group when it still has pod members",
+			initPod:                  pod,
+			initialPodGroups:         []*schedulingv1alpha3.PodGroup{podGroup},
+			podGroupToDelete:         podGroup,
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			expectStateExists:        "true",
+			expectPodsCount:          1,
+		},
+		{
+			name:                     "delete pod group with parent, parent has other pod group children",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			initialPodGroups:         []*schedulingv1alpha3.PodGroup{pg3WithParent, pg4WithParent},
+			podGroupToDelete:         pg3WithParent,
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+				fwk.PodGroupKey("ns1", "pg4"): pg4WithParent,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpg1Key: sets.New(fwk.PodGroupKey("ns1", "pg4")),
+			},
+		},
+		{
+			name:                     "delete pod group with parent, parent has other composite pod group children",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			initialPodGroups:         []*schedulingv1alpha3.PodGroup{pg3WithParent},
+			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
+			podGroupToDelete:         pg3WithParent,
+			wantPodGroups:            map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpg1Key: sets.New(fwk.CompositePodGroupKey("ns1", "cpgChild")),
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
+			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, tt.compositePodGroupEnabled)
+			logger := klog.Background()
+
 			if tt.initPod != nil {
 				cache.AddPodGroupMember(tt.initPod)
 			}
-			cache.AddPodGroup(tt.podGroup)
+			for _, cpg := range tt.initialCPGs {
+				cache.AddCompositePodGroup(logger, cpg)
+			}
+			for _, pg := range tt.initialPodGroups {
+				cache.AddPodGroup(pg)
+			}
 
-			cache.RemovePodGroup(tt.podGroup)
+			cache.RemovePodGroup(klog.FromContext(ctx), tt.podGroupToDelete)
 
-			_, err := cache.PodGroups().Get(tt.podGroup.Namespace, tt.podGroup.Name)
+			_, err := cache.PodGroups().Get(tt.podGroupToDelete.Namespace, tt.podGroupToDelete.Name)
 			if err == nil {
 				t.Error("Expected error getting pod group, but got none")
 			}
 
-			key := newPodGroupKey(tt.podGroup.Namespace, tt.podGroup.Name)
-			pgs, exists := cache.podGroupStates[key]
-			if tt.expectStateExists {
-				if !exists {
-					t.Fatalf("Expected pod group state to exist")
+			if tt.expectStateExists != "" {
+				key := fwk.PodGroupKey(tt.podGroupToDelete.Namespace, tt.podGroupToDelete.Name)
+				pgs, exists := cache.podGroupStates[key]
+				if tt.expectStateExists == "true" {
+					if !exists {
+						t.Fatalf("Expected pod group state to exist")
+					}
+					if pgs.PodGroup() != nil {
+						t.Error("Expected pod group object inside state to be nil, but it was not")
+					}
+					if len(pgs.allPods) != tt.expectPodsCount {
+						t.Errorf("Expected %d pods in state, got %d", tt.expectPodsCount, len(pgs.allPods))
+					}
+				} else if exists {
+					t.Error("Expected pod group state to be deleted, but it still exists")
 				}
-				if pgs.PodGroup() != nil {
-					t.Error("Expected pod group object inside state to be nil, but it was not")
+			}
+
+			if tt.wantPodGroups != nil {
+				gotPodGroups := make(map[fwk.EntityKey]*schedulingv1alpha3.PodGroup)
+				for k, pgs := range cache.podGroupStates {
+					if pgs.podGroup != nil {
+						gotPodGroups[k] = pgs.podGroup
+					}
 				}
-				if len(pgs.allPods) != tt.expectPodsCount {
-					t.Errorf("Expected %d pods in state, got %d", tt.expectPodsCount, len(pgs.allPods))
+
+				gotChildren := make(map[fwk.EntityKey]sets.Set[fwk.EntityKey])
+				for k, cpgs := range cache.compositePodGroupStates {
+					if len(cpgs.children) > 0 {
+						gotChildren[k] = cpgs.children
+					}
 				}
-			} else if exists {
-				t.Error("Expected pod group state to be deleted, but it still exists")
+
+				if diff := cmp.Diff(tt.wantPodGroups, gotPodGroups); diff != "" {
+					t.Errorf("Unexpected podGroups (-want,+got)\\n%s", diff)
+				}
+				if diff := cmp.Diff(tt.wantChildren, gotChildren); diff != "" {
+					t.Errorf("Unexpected children (-want,+got)\\n%s", diff)
+				}
 			}
 		})
 	}
 }
 
-// TestUpdatePodGroupStateSnapshot tests that pod group states of the snapshot have
-// their data and generations updated properly.
 func TestUpdatePodGroupStateSnapshot(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	cache := newCache(ctx, time.Second, nil, true)
-
 	podGroupName1 := "pg1"
 	podGroupName2 := "pg2"
 	pod1 := st.MakePod().Namespace("ns").Name("pod1").UID("uid1").PodGroupName(podGroupName1).Obj()
 	pod2 := st.MakePod().Namespace("ns").Name("pod2").UID("uid2").PodGroupName(podGroupName1).Obj()
 	pod3 := st.MakePod().Namespace("ns").Name("pod3").UID("uid3").PodGroupName(podGroupName2).Obj()
 
-	snapshot := NewEmptySnapshot()
-
 	tests := []struct {
 		name         string
-		action       func()
+		setup        func(cache *cacheImpl)
+		action       func(cache *cacheImpl)
 		expectedPods []*v1.Pod
 	}{
 		{
 			name:         "add a pod group member and update snapshot",
-			action:       func() { cache.AddPodGroupMember(pod1) },
+			action:       func(cache *cacheImpl) { cache.AddPodGroupMember(pod1) },
 			expectedPods: []*v1.Pod{pod1},
 		},
 		{
 			name:         "add a pod with different pod group and update snapshot",
-			action:       func() { cache.AddPodGroupMember(pod3) },
+			setup:        func(cache *cacheImpl) { cache.AddPodGroupMember(pod1) },
+			action:       func(cache *cacheImpl) { cache.AddPodGroupMember(pod3) },
 			expectedPods: []*v1.Pod{pod1, pod3},
 		},
 		{
-			name:         "remove a last pod group member and update snapshot",
-			action:       func() { cache.RemovePodGroupMember(pod1) },
+			name: "remove a last pod group member and update snapshot",
+			setup: func(cache *cacheImpl) {
+				cache.AddPodGroupMember(pod1)
+				cache.AddPodGroupMember(pod3)
+			},
+			action:       func(cache *cacheImpl) { cache.RemovePodGroupMember(pod1) },
 			expectedPods: []*v1.Pod{pod3},
 		},
 		{
-			name:         "add a pod to a recently deleted pod group and update snapshot",
-			action:       func() { cache.AddPodGroupMember(pod2) },
+			name: "add a pod to a recently deleted pod group and update snapshot",
+			setup: func(cache *cacheImpl) {
+				cache.AddPodGroupMember(pod1)
+				cache.AddPodGroupMember(pod3)
+				cache.RemovePodGroupMember(pod1)
+			},
+			action:       func(cache *cacheImpl) { cache.AddPodGroupMember(pod2) },
 			expectedPods: []*v1.Pod{pod2, pod3},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Capture cache generations before snapshot update to detect which pod groups are going to be modified.
-			prevCacheGenerations := make(map[podGroupKey]int64, len(cache.podGroupStates))
-			for key, pgs := range cache.podGroupStates {
-				prevCacheGenerations[key] = pgs.generation
-			}
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				cache := newCache(ctx, time.Second, nil, true, cpgEnabled)
+				snapshot := NewEmptySnapshot()
 
-			tt.action()
-			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
-				t.Fatalf("UpdateSnapshot failed: %v", err)
-			}
-
-			// For each pod group that the action modified (its cache generation advanced), the snapshot generation must have advanced too.
-			// Unmodified pod groups keep their previous generation.
-			for key, pgs := range snapshot.podGroupStates {
-				cachePgs, ok := cache.podGroupStates[key]
-				if !ok {
-					continue
-				}
-				if cachePgs.generation > prevCacheGenerations[key] {
-					if pgs.generation <= prevCacheGenerations[key] {
-						t.Errorf("pod group %s was modified but snapshot generation (%d) was not incremented (%d)", key, pgs.generation, prevCacheGenerations[key])
+				if tt.setup != nil {
+					tt.setup(cache)
+					if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+						t.Fatalf("setup UpdateSnapshot failed: %v", err)
 					}
 				}
-			}
 
-			expectedPodGroupStatesSnapshot := createPodGroupStates(tt.expectedPods)
-			if diff := cmp.Diff(expectedPodGroupStatesSnapshot, snapshot.podGroupStates, podGroupStateCmpOpts...); diff != "" {
-				t.Errorf("snapshot data mismatch (-want +got):\n%s", diff)
-			}
-		})
+				// Capture cache generations before snapshot update to detect which pod groups are going to be modified.
+				prevCacheGenerations := make(map[fwk.EntityKey]int64, len(cache.podGroupStates))
+				for key, pgs := range cache.podGroupStates {
+					prevCacheGenerations[key] = pgs.generation
+				}
+
+				tt.action(cache)
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("UpdateSnapshot failed: %v", err)
+				}
+
+				// For each pod group that the action modified (its cache generation advanced), the snapshot generation must have advanced too.
+				// Unmodified pod groups keep their previous generation.
+				for key, pgs := range snapshot.podGroupStates {
+					cachePgs, ok := cache.podGroupStates[key]
+					if !ok {
+						continue
+					}
+					if cachePgs.generation > prevCacheGenerations[key] {
+						if pgs.generation <= prevCacheGenerations[key] {
+							t.Errorf("pod group %s was modified but snapshot generation (%d) was not incremented (%d)", key, pgs.generation, prevCacheGenerations[key])
+						}
+					}
+				}
+
+				expectedPodGroupStatesSnapshot := createPodGroupStates(tt.expectedPods)
+				if diff := cmp.Diff(expectedPodGroupStatesSnapshot, snapshot.podGroupStates, podGroupStateCmpOpts...); diff != "" {
+					t.Errorf("snapshot data mismatch (-want +got):\n%s", diff)
+				}
+			})
+		}
 	}
 }
 
@@ -1242,7 +1455,7 @@ func TestBindingPodGroupMember(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache := newCache(ctx, time.Second, nil, true)
+			cache := newCache(ctx, time.Second, nil, true, false)
 
 			// Simulate the informer firing an Add event for an unscheduled pod.
 			cache.AddPodGroupMember(tt.pod)
@@ -1312,7 +1525,7 @@ func TestRemovePod(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			nodeName := pod.Spec.NodeName
-			cache := newCache(ctx, time.Second, nil, false)
+			cache := newCache(ctx, time.Second, nil, false, false)
 			// Add/Assume pod succeeds even before adding the nodes.
 			if tt.assume {
 				if err := cache.AddPod(logger, pod); err != nil {
@@ -1360,7 +1573,7 @@ func TestForgetPod(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	cache := newCache(ctx, time.Second, nil, false)
+	cache := newCache(ctx, time.Second, nil, false, false)
 	for _, pod := range pods {
 		if err := cache.AssumePod(logger, pod); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -1429,44 +1642,46 @@ func TestForgetPodGroupMember(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
 
-			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
-			cache.AddPodGroupMember(tt.pod)
-			if err := cache.AssumePod(logger, podWithNodeName); err != nil {
-				t.Fatalf("AssumePod failed: %v", err)
-			}
-
-			if err := cache.ForgetPod(logger, podWithNodeName); err != nil {
-				t.Fatalf("ForgetPod failed: %v", err)
-			}
-
-			if !tt.genericWorkloadEnabled {
-				if count := len(cache.podGroupStates); count != 0 {
-					t.Errorf("Expected no pod group states to exist in cache, but found %d", count)
+				cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
+				cache.AddPodGroupMember(tt.pod)
+				if err := cache.AssumePod(logger, podWithNodeName); err != nil {
+					t.Fatalf("AssumePod failed: %v", err)
 				}
-				return
-			}
 
-			pgs, err := cache.PodGroupStates().Get("test-ns", *tt.pod.Spec.SchedulingGroup.PodGroupName)
-			if err != nil {
-				t.Fatalf("expected pod group state to exist, but got error: %v", err)
-			}
+				if err := cache.ForgetPod(logger, podWithNodeName); err != nil {
+					t.Fatalf("ForgetPod failed: %v", err)
+				}
 
-			if pgs.AssumedPods().Has(tt.pod.UID) {
-				t.Fatalf("pod cannot be in AssumedPods after ForgetPod")
-			}
+				if !tt.genericWorkloadEnabled {
+					if count := len(cache.podGroupStates); count != 0 {
+						t.Errorf("Expected no pod group states to exist in cache, but found %d", count)
+					}
+					return
+				}
 
-			if inAssigned := pgs.AssignedPods().Has(tt.pod.UID); inAssigned != tt.expectInAssigned {
-				t.Errorf("pod in assignedPods: got %v, want %v", inAssigned, tt.expectInAssigned)
-			}
-			if inUnscheduled := pgs.UnscheduledPods()[tt.pod.Name] != nil; inUnscheduled != tt.expectInUnscheduled {
-				t.Errorf("pod in unscheduledPods: got %v, want %v", inUnscheduled, tt.expectInUnscheduled)
-			}
-		})
+				pgs, err := cache.PodGroupStates().Get("test-ns", *tt.pod.Spec.SchedulingGroup.PodGroupName)
+				if err != nil {
+					t.Fatalf("expected pod group state to exist, but got error: %v", err)
+				}
+
+				if pgs.AssumedPods().Has(tt.pod.UID) {
+					t.Fatalf("pod cannot be in AssumedPods after ForgetPod")
+				}
+
+				if inAssigned := pgs.AssignedPods().Has(tt.pod.UID); inAssigned != tt.expectInAssigned {
+					t.Errorf("pod in assignedPods: got %v, want %v", inAssigned, tt.expectInAssigned)
+				}
+				if inUnscheduled := pgs.UnscheduledPods()[tt.pod.Name] != nil; inUnscheduled != tt.expectInUnscheduled {
+					t.Errorf("pod in unscheduledPods: got %v, want %v", inUnscheduled, tt.expectInUnscheduled)
+				}
+			})
+		}
 	}
 }
 
@@ -1530,7 +1745,7 @@ func TestRemoveAssumedPod(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
+			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, false)
 
 			if tt.addPod != nil {
 				if err := cache.AddPod(logger, tt.addPod); err != nil {
@@ -1608,37 +1823,39 @@ func TestAssumePodGroupMember(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
 
-			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
-			cache.AddPodGroupMember(tt.pod)
+				cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
+				cache.AddPodGroupMember(tt.pod)
 
-			if err := cache.AssumePod(logger, podWithNodeName); err != nil {
-				t.Fatalf("AssumePod failed: %v", err)
-			}
-
-			if !tt.genericWorkloadEnabled {
-				if count := len(cache.podGroupStates); count != 0 {
-					t.Errorf("Expected no pod group states to exist in cache, but found %d", count)
+				if err := cache.AssumePod(logger, podWithNodeName); err != nil {
+					t.Fatalf("AssumePod failed: %v", err)
 				}
-				return
-			}
 
-			pgs, err := cache.PodGroupStates().Get("test-ns", *pod.Spec.SchedulingGroup.PodGroupName)
-			if err != nil {
-				t.Fatalf("unexpected error getting pod group state: %v", err)
-			}
+				if !tt.genericWorkloadEnabled {
+					if count := len(cache.podGroupStates); count != 0 {
+						t.Errorf("Expected no pod group states to exist in cache, but found %d", count)
+					}
+					return
+				}
 
-			if inAssigned := pgs.AssignedPods().Has(tt.pod.UID); inAssigned != tt.expectInAssigned {
-				t.Errorf("pod in assignedPods: got %v, want %v", inAssigned, tt.expectInAssigned)
-			}
-			if inAssumed := pgs.AssumedPods().Has(tt.pod.UID); inAssumed != tt.expectInAssumed {
-				t.Errorf("pod in assumedPods: got %v, want %v", inAssumed, tt.expectInAssumed)
-			}
-		})
+				pgs, err := cache.PodGroupStates().Get("test-ns", *pod.Spec.SchedulingGroup.PodGroupName)
+				if err != nil {
+					t.Fatalf("unexpected error getting pod group state: %v", err)
+				}
+
+				if inAssigned := pgs.AssignedPods().Has(tt.pod.UID); inAssigned != tt.expectInAssigned {
+					t.Errorf("pod in assignedPods: got %v, want %v", inAssigned, tt.expectInAssigned)
+				}
+				if inAssumed := pgs.AssumedPods().Has(tt.pod.UID); inAssumed != tt.expectInAssumed {
+					t.Errorf("pod in assumedPods: got %v, want %v", inAssumed, tt.expectInAssumed)
+				}
+			})
+		}
 	}
 }
 
@@ -1818,7 +2035,7 @@ func TestNodeOperators(t *testing.T) {
 			imageStates := buildImageStates(tc.nodes)
 			expected := buildNodeInfo(node, tc.pods, imageStates)
 
-			cache := newCache(ctx, time.Second, nil, false)
+			cache := newCache(ctx, time.Second, nil, false, false)
 			for _, nodeItem := range tc.nodes {
 				cache.AddNode(logger, nodeItem)
 			}
@@ -2083,7 +2300,7 @@ func TestPodGroupPodOperations(t *testing.T) {
 
 			// Initialize cache with feature gate enabled to ensure group state is
 			// properly established for operations that require it.
-			cache := newCache(ctx, time.Second, nil, true)
+			cache := newCache(ctx, time.Second, nil, true, false)
 			if tt.setup != nil {
 				tt.setup(t, cache, ctx)
 			}
@@ -2098,6 +2315,7 @@ func TestPodGroupPodOperations(t *testing.T) {
 				return
 			}
 
+			cache.genericWorkloadEnabled = true
 			pgs, err := cache.PodGroupStates().Get("test-ns", groupName)
 			if err != nil {
 				t.Fatalf("unexpected error getting pod group state: %v", err)
@@ -2390,7 +2608,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		operations                     []operation
 		expected                       []*v1.Node
 		expectedHavePodsWithAffinity   int
-		expectedPodGroupStatesSnapshot map[podGroupKey]*podGroupStateSnapshot
+		expectedPodGroupStatesSnapshot map[fwk.EntityKey]*podGroupStateSnapshot
 		expectedUsedPVCCounts          map[string]int
 	}{
 		{
@@ -2642,8 +2860,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			},
 			expected:              []*v1.Node{nodes[1], nodes[0], nodes[2]},
 			expectedUsedPVCCounts: map[string]int{},
-			expectedPodGroupStatesSnapshot: map[podGroupKey]*podGroupStateSnapshot{
-				newPodGroupKey("test-ns", "pg-0"): {
+			expectedPodGroupStatesSnapshot: map[fwk.EntityKey]*podGroupStateSnapshot{
+				fwk.PodGroupKey("test-ns", "pg-0"): {
 					podGroupStateData: podGroupStateData{
 						allPods:         map[types.UID]*v1.Pod{"puid-podgroup-0": podsWithPodGroupName[0]},
 						assignedPods:    sets.New[types.UID]("puid-podgroup-0"),
@@ -2651,7 +2869,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 						assumedPods:     make(map[types.UID]*v1.Pod),
 					},
 				},
-				newPodGroupKey("test-ns", "pg-2"): {
+				fwk.PodGroupKey("test-ns", "pg-2"): {
 					podGroupStateData: podGroupStateData{
 						allPods:         map[types.UID]*v1.Pod{"puid-podgroup-2": podsWithPodGroupName[2]},
 						assignedPods:    sets.New[types.UID]("puid-podgroup-2"),
@@ -2721,7 +2939,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache = newCache(ctx, time.Second, nil, true)
+			cache = newCache(ctx, time.Second, nil, true, false)
 			snapshot = NewEmptySnapshot()
 
 			for _, op := range test.operations {
@@ -2968,7 +3186,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache = newCache(ctx, time.Second, nil, false)
+			cache = newCache(ctx, time.Second, nil, false, false)
 			snapshot = NewEmptySnapshot()
 
 			test.operations(t)
@@ -3049,7 +3267,7 @@ func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
 	logger, ctx := ktesting.NewTestContext(b)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, time.Second, nil, false)
+	cache := newCache(ctx, time.Second, nil, false, false)
 	for i := 0; i < 1000; i++ {
 		nodeName := fmt.Sprintf("node-%d", i)
 		cache.AddNode(logger, st.MakeNode().Name(nodeName).Obj())
@@ -3088,4 +3306,436 @@ func (cache *cacheImpl) getNodeInfo(nodeName string) (*v1.Node, error) {
 	}
 
 	return n.info.Node(), nil
+}
+
+func Test_AddCompositePodGroup(t *testing.T) {
+	cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").Obj()
+	cpg2 := st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").Obj()
+	cpg3WithParent := st.MakeCompositePodGroup().Name("cpg3").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
+	cpg4WithParent := st.MakeCompositePodGroup().Name("cpg4").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
+
+	pgChild := st.MakePodGroup().Name("pgChild").Namespace("ns1").UID("uid1").ParentCompositePodGroup("cpg1").Obj()
+	cpg1Key := fwk.CompositePodGroupKey("ns1", "cpg1")
+
+	tests := []struct {
+		name         string
+		initialPGs   []*schedulingv1alpha3.PodGroup
+		cpgsToAdd    []*schedulingv1alpha3.CompositePodGroup
+		wantCPGs     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
+		wantChildren map[fwk.EntityKey]sets.Set[fwk.EntityKey]
+	}{
+		{
+			name:      "add multiple composite pod groups",
+			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{cpg1, cpg2},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg1"): cpg1,
+				fwk.CompositePodGroupKey("ns1", "cpg2"): cpg2,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+		},
+		{
+			name:      "add composite pod group with parent, parent already has other composite pod group child",
+			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent, cpg4WithParent},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg3"): cpg3WithParent,
+				fwk.CompositePodGroupKey("ns1", "cpg4"): cpg4WithParent,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpg1Key: sets.New(
+					fwk.CompositePodGroupKey("ns1", "cpg3"),
+					fwk.CompositePodGroupKey("ns1", "cpg4"),
+				),
+			},
+		},
+		{
+			name:       "add composite pod group with parent, parent already has pod group child",
+			initialPGs: []*schedulingv1alpha3.PodGroup{pgChild},
+			cpgsToAdd:  []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg3"): cpg3WithParent,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpg1Key: sets.New(
+					fwk.PodGroupKey("ns1", "pgChild"),
+					fwk.CompositePodGroupKey("ns1", "cpg3"),
+				),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cache := newCache(ctx, time.Second, nil, true, true)
+			logger := klog.Background()
+
+			for _, pg := range tt.initialPGs {
+				cache.AddPodGroup(pg)
+			}
+			for _, cpg := range tt.cpgsToAdd {
+				cache.AddCompositePodGroup(logger, cpg)
+			}
+
+			gotCPGs := make(map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup)
+			gotChildren := make(map[fwk.EntityKey]sets.Set[fwk.EntityKey])
+
+			for k, cpgs := range cache.compositePodGroupStates {
+				if cpgs.compositePodGroup != nil {
+					gotCPGs[k] = cpgs.compositePodGroup
+				}
+				if len(cpgs.children) > 0 {
+					gotChildren[k] = cpgs.children
+				}
+			}
+
+			if diff := cmp.Diff(tt.wantCPGs, gotCPGs); diff != "" {
+				t.Errorf("Unexpected compositePodGroups (-want,+got)\\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantChildren, gotChildren); diff != "" {
+				t.Errorf("Unexpected children (-want,+got)\\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_RemoveCompositePodGroup(t *testing.T) {
+	cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").Obj()
+	cpg3WithParent := st.MakeCompositePodGroup().Name("cpg3").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
+	cpg4WithParent := st.MakeCompositePodGroup().Name("cpg4").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
+
+	pgChild := st.MakePodGroup().Name("pgChild").Namespace("ns1").UID("uid1").ParentCompositePodGroup("cpg1").Obj()
+
+	cpgMid := st.MakeCompositePodGroup().Name("cpgMid").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
+	pgLeaf := st.MakePodGroup().Name("pgLeaf").Namespace("ns1").UID("uidLeaf").ParentCompositePodGroup("cpgMid").Obj()
+
+	cpg1Key := fwk.CompositePodGroupKey("ns1", "cpg1")
+	cpgMidKey := fwk.CompositePodGroupKey("ns1", "cpgMid")
+
+	tests := []struct {
+		name         string
+		initialPGs   []*schedulingv1alpha3.PodGroup
+		initialCPGs  []*schedulingv1alpha3.CompositePodGroup
+		cpgToDelete  *schedulingv1alpha3.CompositePodGroup
+		wantCPGs     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
+		wantChildren map[fwk.EntityKey]sets.Set[fwk.EntityKey]
+	}{
+		{
+			name:         "delete composite pod group with parent, cleans up children map",
+			initialCPGs:  []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent},
+			cpgToDelete:  cpg3WithParent,
+			wantCPGs:     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+		},
+		{
+			name:        "delete composite pod group with parent, parent has both other pg and cpg children",
+			initialPGs:  []*schedulingv1alpha3.PodGroup{pgChild},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent, cpg4WithParent},
+			cpgToDelete: cpg3WithParent,
+			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg4"): cpg4WithParent,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpg1Key: sets.New(
+					fwk.PodGroupKey("ns1", "pgChild"),
+					fwk.CompositePodGroupKey("ns1", "cpg4"),
+				),
+			},
+		},
+		{
+			name:        "delete mid cpg from root-mid-leaf hierarchy",
+			initialPGs:  []*schedulingv1alpha3.PodGroup{pgLeaf},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg1, cpgMid},
+			cpgToDelete: cpgMid,
+			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
+				cpg1Key: cpg1,
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
+				cpgMidKey: sets.New(fwk.PodGroupKey("ns1", "pgLeaf")),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cache := newCache(ctx, time.Second, nil, true, true)
+			logger := klog.Background()
+
+			for _, pg := range tt.initialPGs {
+				cache.AddPodGroup(pg)
+			}
+			for _, cpg := range tt.initialCPGs {
+				cache.AddCompositePodGroup(logger, cpg)
+			}
+
+			cache.RemoveCompositePodGroup(klog.FromContext(ctx), tt.cpgToDelete)
+
+			gotCPGs := make(map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup)
+			gotChildren := make(map[fwk.EntityKey]sets.Set[fwk.EntityKey])
+
+			for k, cpgs := range cache.compositePodGroupStates {
+				if cpgs.compositePodGroup != nil {
+					gotCPGs[k] = cpgs.compositePodGroup
+				}
+				if len(cpgs.children) > 0 {
+					gotChildren[k] = cpgs.children
+				}
+			}
+
+			if diff := cmp.Diff(tt.wantCPGs, gotCPGs); diff != "" {
+				t.Errorf("Unexpected compositePodGroups (-want,+got)\\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantChildren, gotChildren); diff != "" {
+				t.Errorf("Unexpected children (-want,+got)\\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_BuildHierarchySnapshotFromPod(t *testing.T) {
+	podNoGroup := st.MakePod().Name("p0").Namespace("ns1").UID("p0").Obj()
+	pod1 := st.MakePod().Name("p1").Namespace("ns1").UID("p1").PodGroupName("pg1").Obj()
+
+	pg1 := st.MakePodGroup().Name("pg1").Namespace("ns1").UID("pg1").Obj()
+
+	pod2 := st.MakePod().Name("p2").Namespace("ns1").UID("p2").PodGroupName("pg2").Obj()
+	pg2 := st.MakePodGroup().Name("pg2").Namespace("ns1").UID("pg2").ParentCompositePodGroup("cpg1").Obj()
+	cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").Obj()
+
+	pod3 := st.MakePod().Name("p3").Namespace("ns1").UID("p3").PodGroupName("pg3").Obj()
+	pg3 := st.MakePodGroup().Name("pg3").Namespace("ns1").UID("pg3").ParentCompositePodGroup("cpg2").Obj()
+	cpg2 := st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").ParentCompositePodGroup("cpg3").Obj()
+	cpg3 := st.MakeCompositePodGroup().Name("cpg3").Namespace("ns1").Obj()
+
+	podCycle := st.MakePod().Name("pCycle").Namespace("ns1").UID("pCycle").PodGroupName("pgCycle").Obj()
+	pgCycle := st.MakePodGroup().Name("pgCycle").Namespace("ns1").UID("pgCycle").ParentCompositePodGroup("cycle1").Obj()
+	cpgCycle1 := st.MakeCompositePodGroup().Name("cycle1").Namespace("ns1").ParentCompositePodGroup("cycle2").Obj()
+	cpgCycle2 := st.MakeCompositePodGroup().Name("cycle2").Namespace("ns1").ParentCompositePodGroup("cycle1").Obj()
+
+	tests := []struct {
+		name                     string
+		pod                      *v1.Pod
+		initialPGs               []*schedulingv1alpha3.PodGroup
+		initialCPGs              []*schedulingv1alpha3.CompositePodGroup
+		genericWorkloadEnabled   bool
+		compositePodGroupEnabled bool
+		wantErr                  bool
+		wantPGKeys               []fwk.EntityKey
+		wantCPGKeys              []fwk.EntityKey
+	}{
+		{
+			name:                   "pod without scheduling group",
+			pod:                    podNoGroup,
+			wantErr:                true,
+			genericWorkloadEnabled: true,
+		},
+		{
+			name:                   "pod with scheduling group but no pod group in cache",
+			pod:                    pod1,
+			wantErr:                true,
+			genericWorkloadEnabled: true,
+		},
+		{
+			name:                   "simple pod group",
+			pod:                    pod1,
+			initialPGs:             []*schedulingv1alpha3.PodGroup{pg1},
+			genericWorkloadEnabled: true,
+			wantPGKeys: []fwk.EntityKey{
+				fwk.PodGroupKey("ns1", "pg1"),
+			},
+		},
+		{
+			name:                     "pod group with parent CPG",
+			pod:                      pod2,
+			initialPGs:               []*schedulingv1alpha3.PodGroup{pg2},
+			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpg1},
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			wantPGKeys: []fwk.EntityKey{
+				fwk.PodGroupKey("ns1", "pg2"),
+			},
+			wantCPGKeys: []fwk.EntityKey{
+				fwk.CompositePodGroupKey("ns1", "cpg1"),
+			},
+		},
+		{
+			name:                     "pod group with parent CPG hierarchy",
+			pod:                      pod3,
+			initialPGs:               []*schedulingv1alpha3.PodGroup{pg3},
+			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpg2, cpg3},
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			wantPGKeys: []fwk.EntityKey{
+				fwk.PodGroupKey("ns1", "pg3"),
+			},
+			wantCPGKeys: []fwk.EntityKey{
+				fwk.CompositePodGroupKey("ns1", "cpg2"),
+				fwk.CompositePodGroupKey("ns1", "cpg3"),
+			},
+		},
+		{
+			name:                     "cycle detection in hierarchy",
+			pod:                      podCycle,
+			initialPGs:               []*schedulingv1alpha3.PodGroup{pgCycle},
+			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgCycle1, cpgCycle2},
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			wantErr:                  true,
+		},
+		{
+			name:                     "pod group with parent CPG but feature disabled",
+			pod:                      pod2,
+			initialPGs:               []*schedulingv1alpha3.PodGroup{pg2},
+			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpg1},
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: false,
+			wantPGKeys: []fwk.EntityKey{
+				fwk.PodGroupKey("ns1", "pg2"),
+			},
+			wantCPGKeys: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, tt.compositePodGroupEnabled)
+			logger := klog.Background()
+
+			for _, pg := range tt.initialPGs {
+				cache.AddPodGroup(pg)
+			}
+			for _, cpg := range tt.initialCPGs {
+				cache.AddCompositePodGroup(logger, cpg)
+			}
+
+			snapshot, err := cache.BuildHierarchySnapshotFromPod(tt.pod)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("BuildHierarchySnapshotFromPod() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				return
+			}
+
+			snap := snapshot.(*Snapshot)
+			if len(snap.podGroupStates) != len(tt.wantPGKeys) {
+				t.Errorf("Expected %d podGroupStates, got %d", len(tt.wantPGKeys), len(snap.podGroupStates))
+			}
+			for _, k := range tt.wantPGKeys {
+				if _, ok := snap.podGroupStates[k]; !ok {
+					t.Errorf("Expected podGroupState %v not found in snapshot", k)
+				}
+			}
+
+			if len(snap.compositePodGroupStates) != len(tt.wantCPGKeys) {
+				t.Errorf("Expected %d compositePodGroupStates, got %d", len(tt.wantCPGKeys), len(snap.compositePodGroupStates))
+			}
+			for _, k := range tt.wantCPGKeys {
+				if _, ok := snap.compositePodGroupStates[k]; !ok {
+					t.Errorf("Expected compositePodGroupState %v not found in snapshot", k)
+				}
+			}
+		})
+	}
+}
+
+func TestCache_GetRootKeyForGroup(t *testing.T) {
+	setupCacheForRootKeyTest := func(genericWorkloadEnabled, compositePodGroupEnabled bool) *cacheImpl {
+		ctx := context.Background()
+		c := newCache(ctx, time.Second, nil, genericWorkloadEnabled, compositePodGroupEnabled)
+
+		pg1 := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
+		cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").ParentCompositePodGroup("cpg2").Obj()
+		cpg2 := st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").Obj()
+
+		c.podGroupStates[fwk.PodGroupKey("ns1", "pg1")] = &podGroupState{podGroupStateData: podGroupStateData{podGroup: pg1}}
+		c.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg1")] = &compositePodGroupState{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: cpg1}}
+		c.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg2")] = &compositePodGroupState{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: cpg2}}
+
+		c.podGroupStates[fwk.PodGroupKey("ns1", "pg_cycle")] = &podGroupState{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_cycle").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_1").Obj()}}
+		c.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_cycle_1")] = &compositePodGroupState{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_cycle_1").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_2").Obj()}}
+		c.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_cycle_2")] = &compositePodGroupState{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_cycle_2").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_1").Obj()}}
+
+		c.podGroupStates[fwk.PodGroupKey("ns1", "pg_missing_parent")] = &podGroupState{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_missing_parent").Namespace("ns1").ParentCompositePodGroup("non-existent").Obj()}}
+
+		pod1 := st.MakePod().Name("pod1").Namespace("ns1").PodGroupName("pg1").Obj()
+		c.podStates["ns1/pod1"] = &podState{pod: pod1}
+
+		return c
+	}
+
+	tests := []struct {
+		name                     string
+		genericWorkloadEnabled   bool
+		compositePodGroupEnabled bool
+		key                      fwk.EntityKey
+		want                     fwk.EntityKey
+		wantErr                  bool
+		wantOk                   bool
+	}{
+		{
+			name:                     "from pg to root (GW=true, CPG=true)",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg1"),
+			want:                     fwk.CompositePodGroupKey("ns1", "cpg2"),
+			wantOk:                   true,
+		},
+		{
+			name:                     "from cpg to root (GW=true, CPG=true)",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.CompositePodGroupKey("ns1", "cpg1"),
+			want:                     fwk.CompositePodGroupKey("ns1", "cpg2"),
+			wantOk:                   true,
+		},
+		{
+			name:                     "from root (GW=true, CPG=true)",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.CompositePodGroupKey("ns1", "cpg2"),
+			want:                     fwk.CompositePodGroupKey("ns1", "cpg2"),
+			wantOk:                   true,
+		},
+		{
+			name:                     "from pg (with parent set), compositePodGroup disabled",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: false,
+			key:                      fwk.PodGroupKey("ns1", "pg1"),
+			want:                     fwk.PodGroupKey("ns1", "pg1"),
+			wantOk:                   true,
+		},
+		{
+			name:                     "missing intermediate",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg_missing_parent"),
+			wantOk:                   false,
+		},
+		{
+			name:                     "cycle detected",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg_cycle"),
+			wantErr:                  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := setupCacheForRootKeyTest(tt.genericWorkloadEnabled, tt.compositePodGroupEnabled)
+			got, gotOk, err := c.GetRootKeyForGroup(tt.key)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetRootKeyForGroup() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotOk != tt.wantOk {
+				t.Errorf("GetRootKeyForGroup() gotOk = %v, wantOk %v", gotOk, tt.wantOk)
+			}
+			if gotOk && got != tt.want {
+				t.Errorf("GetRootKeyForGroup() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

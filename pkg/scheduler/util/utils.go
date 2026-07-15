@@ -295,3 +295,15 @@ func PodGroupPriority(pg *schedulingv1alpha3.PodGroup) int32 {
 	// name of the pod group was empty. So, we resolve to the static default priority.
 	return 0
 }
+
+// CompositePodGroupPriority returns priority of a given composite pod group.
+func CompositePodGroupPriority(cpg *schedulingv1alpha3.CompositePodGroup) int32 {
+	if cpg.Spec.Priority != nil {
+		return *cpg.Spec.Priority
+	}
+	// When priority of a composite pod group is nil, it means it was created
+	// at a time that there was no global default priority class and the priority
+	// class name of the composite pod group was empty. So, we resolve to the
+	// static default priority.
+	return 0
+}
