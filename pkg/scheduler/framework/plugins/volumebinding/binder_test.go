@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -1981,7 +1983,9 @@ func TestBindPodVolumes(t *testing.T) {
 			initPVs:  []*v1.PersistentVolume{pvNode1a},
 			initPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
 			delayFunc: func(t *testing.T, ctx context.Context, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim) {
-				testEnv.client.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+				if err := testEnv.internalPodInformer.Informer().GetIndexer().Delete(pod); err != nil {
+					t.Errorf("failed to delete pod %q: %v", pod.Name, err)
+				}
 			},
 			shouldFail: true,
 		},
@@ -2078,9 +2082,22 @@ func TestBindPodVolumes(t *testing.T) {
 		}
 
 		if scenario.delayFunc != nil {
+			apiUpdateDone := make(chan struct{})
+			var apiUpdateDoneOnce sync.Once
+			testEnv.client.(*fake.Clientset).PrependReactor("update", "*", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				handled, ret, err := testEnv.reactor.React(ctx, action)
+				if err == nil && (action.Matches("update", "persistentvolumes") || action.Matches("update", "persistentvolumeclaims")) {
+					apiUpdateDoneOnce.Do(func() { close(apiUpdateDone) })
+				}
+				return handled, ret, err
+			})
+
 			go func(scenario scenarioType) {
-				time.Sleep(5 * time.Second)
-				// Sleep a while to run after bindAPIUpdate in BindPodVolumes
+				select {
+				case <-apiUpdateDone:
+				case <-ctx.Done():
+					return
+				}
 				logger.V(5).Info("Running delay function")
 				scenario.delayFunc(t, ctx, testEnv, pod, scenario.initPVs, scenario.initPVCs)
 			}(scenario)
