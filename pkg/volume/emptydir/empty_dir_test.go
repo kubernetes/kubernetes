@@ -43,6 +43,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/ptr"
 )
 
 // Construct an instance of a plugin, by name.
@@ -1294,6 +1295,7 @@ func TestResizeEphemeralVolume(t *testing.T) {
 					},
 				},
 			}
+
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					UID: types.UID("poduid"),
@@ -1344,5 +1346,138 @@ func TestResizeEphemeralVolume(t *testing.T) {
 				assert.Contains(t, targetMp.Opts, expectedOpt)
 			}
 		})
+	}
+}
+
+func TestEmptyDirVolumeMode(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirVolumeMode, true)
+
+	testCases := []struct {
+		name         string
+		mode         *int32
+		expectedPerm os.FileMode
+		expectSticky bool
+	}{
+		{
+			name:         "mode 0750",
+			mode:         ptr.To[int32](0o750),
+			expectedPerm: os.FileMode(0o750),
+		},
+		{
+			name:         "mode 01777 with sticky bit",
+			mode:         ptr.To[int32](0o1777),
+			expectedPerm: os.FileMode(0o777),
+			expectSticky: true,
+		},
+		{
+			name:         "nil mode defaults to 0777",
+			mode:         nil,
+			expectedPerm: os.FileMode(0o777),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			basePath, err := utiltesting.MkTmpdir("emptydir_mode_test")
+			if err != nil {
+				t.Fatalf("can't make a temp dir: %v", err)
+			}
+			t.Cleanup(func() { _ = os.RemoveAll(basePath) })
+
+			plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+
+			spec := &v1.Volume{
+				Name: "test-volume",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{Mode: tc.mode},
+				},
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: types.UID("poduid"),
+				},
+			}
+
+			mounter, err := plug.(*emptyDirPlugin).newMounterInternal(
+				volume.NewSpecFromVolume(spec),
+				pod,
+				mount.NewFakeMounter(nil),
+				&fakeMountDetector{},
+			)
+			if err != nil {
+				t.Fatalf("Failed to make a new Mounter: %v", err)
+			}
+
+			if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+				t.Fatalf("SetUp failed: %v", err)
+			}
+
+			volPath := mounter.GetPath()
+			fileinfo, err := os.Stat(volPath)
+			if err != nil {
+				t.Fatalf("Stat failed: %v", err)
+			}
+
+			if fileinfo.Mode().Perm() != tc.expectedPerm {
+				t.Errorf("expected permissions %v, got %v", tc.expectedPerm, fileinfo.Mode().Perm())
+			}
+
+			if tc.expectSticky {
+				if fileinfo.Mode()&os.ModeSticky == 0 {
+					t.Errorf("expected sticky bit to be set, got mode %v", fileinfo.Mode())
+				}
+			}
+		})
+	}
+}
+
+func TestEmptyDirVolumeModeFeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirVolumeMode, false)
+
+	basePath, err := utiltesting.MkTmpdir("emptydir_mode_gate_test")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(basePath) })
+
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+
+	mode := int32(0o750)
+	spec := &v1.Volume{
+		Name: "test-volume",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{Mode: &mode},
+		},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID("poduid"),
+		},
+	}
+
+	mounter, err := plug.(*emptyDirPlugin).newMounterInternal(
+		volume.NewSpecFromVolume(spec),
+		pod,
+		mount.NewFakeMounter(nil),
+		&fakeMountDetector{},
+	)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mounter: %v", err)
+	}
+
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+		t.Fatalf("SetUp failed: %v", err)
+	}
+
+	volPath := mounter.GetPath()
+	fileinfo, err := os.Stat(volPath)
+	if err != nil {
+		t.Fatalf("Stat failed: %v", err)
+	}
+
+	if fileinfo.Mode().Perm() != perm.Perm() {
+		t.Errorf("expected default permissions %v when feature gate is disabled, got %v", perm.Perm(), fileinfo.Mode().Perm())
 	}
 }
