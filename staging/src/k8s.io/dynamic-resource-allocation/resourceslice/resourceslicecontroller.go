@@ -200,7 +200,7 @@ type Slice struct {
 	SharedCounters         []resourceapi.CounterSet
 	PerDeviceNodeSelection *bool
 	// PartitionTypeAttribute names the device attribute whose value labels each
-	// device's partition type. Only effective when the DRAResourcePoolStatus
+	// device's partition type. Only effective when the DRAPartitionableDevicesType
 	// feature is enabled; dropped by the apiserver otherwise.
 	PartitionTypeAttribute *resourceapi.FullyQualifiedName
 }
@@ -371,9 +371,9 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 		}
 	}
 
-	// PartitionTypeAttribute is dropped when DRAResourcePoolStatus is disabled.
+	// PartitionTypeAttribute is dropped when DRAPartitionableDevicesType is disabled.
 	if err.DesiredSlice.Spec.PartitionTypeAttribute != nil && err.ActualSlice.Spec.PartitionTypeAttribute == nil {
-		disabled = append(disabled, "DRAResourcePoolStatus")
+		disabled = append(disabled, "DRAPartitionableDevicesType")
 	}
 
 	return disabled

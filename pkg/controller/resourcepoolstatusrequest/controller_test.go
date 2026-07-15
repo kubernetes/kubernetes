@@ -1286,8 +1286,62 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 	if pool.ValidationError != nil {
 		t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
 	}
-	if pool.CounterSets != nil {
-		t.Errorf("counterSets must be nil for a typed pool, got %+v", pool.CounterSets)
+	got := map[string][2]int32{}
+	for _, p := range pool.PartitionSummary {
+		got[p.Type] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
+	}
+	if got["Full"] != [2]int32{1, 1} {
+		t.Errorf("Full {total,allocatable} = %v, want [1 1]", got["Full"])
+	}
+	if got["Half"] != [2]int32{2, 2} {
+		t.Errorf("Half {total,allocatable} = %v, want [2 2]", got["Half"])
+	}
+}
+
+// The pool's own declaration wins; the request's attribute is only a default
+// for pools that declare none.
+func TestCalculatePoolStatus_PoolAttributeBeatsRequestDefault(t *testing.T) {
+	driver := "gpu.example.com"
+	counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", 2)
+	devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", 2)
+
+	// The slices declare driver/profile. The request names a different attribute
+	// that no device carries: if it won, every device would look untyped.
+	request := makeRequest(driver)
+	request.Spec.PartitionTypeAttribute = ptr.To(driver + "/other")
+
+	status := runCalculatePoolStatus(t, request, []*resourcev1.ResourceSlice{counters, devices}, nil)
+	pool := requireSinglePool(t, status)
+
+	if pool.ValidationError != nil {
+		t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
+	}
+	got := map[string][2]int32{}
+	for _, p := range pool.PartitionSummary {
+		got[p.Type] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
+	}
+	if got["Full"] != [2]int32{1, 1} || got["Half"] != [2]int32{2, 2} {
+		t.Errorf("want the pool's own profile grouping (Full [1 1], Half [2 2]), got %v", got)
+	}
+}
+
+// The request's attribute is used as the default when the pool declares none.
+func TestCalculatePoolStatus_RequestPartitionAttribute(t *testing.T) {
+	driver := "gpu.example.com"
+	counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", 2)
+	devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", 2)
+	// The driver does not declare a grouping attribute; the request supplies it.
+	counters.Spec.PartitionTypeAttribute = nil
+	devices.Spec.PartitionTypeAttribute = nil
+
+	request := makeRequest(driver)
+	request.Spec.PartitionTypeAttribute = ptr.To(driver + "/profile")
+
+	status := runCalculatePoolStatus(t, request, []*resourcev1.ResourceSlice{counters, devices}, nil)
+	pool := requireSinglePool(t, status)
+
+	if pool.ValidationError != nil {
+		t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
 	}
 	got := map[string][2]int32{}
 	for _, p := range pool.PartitionSummary {

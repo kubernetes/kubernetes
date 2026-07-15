@@ -13254,29 +13254,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.CounterSet
           elementRelationship: atomic
-- name: io.k8s.api.resource.v1alpha3.CounterSetStatus
-  map:
-    fields:
-    - name: counters
-      type:
-        map:
-          elementType:
-            namedType: io.k8s.api.resource.v1alpha3.CounterStatus
-    - name: name
-      type:
-        scalar: string
-- name: io.k8s.api.resource.v1alpha3.CounterStatus
-  map:
-    fields:
-    - name: available
-      type:
-        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-    - name: capacity
-      type:
-        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-    - name: consumed
-      type:
-        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.resource.v1alpha3.DeviceTaint
   map:
     fields:
@@ -13369,12 +13346,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: availableDevices
       type:
         scalar: numeric
-    - name: counterSets
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.resource.v1alpha3.CounterSetStatus
-          elementRelationship: atomic
     - name: driver
       type:
         scalar: string
@@ -13440,6 +13411,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 100
+    - name: partitionTypeAttribute
+      type:
+        scalar: string
     - name: poolName
       type:
         scalar: string

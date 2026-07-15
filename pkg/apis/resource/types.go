@@ -195,13 +195,15 @@ type ResourceSliceSpec struct {
 	// When set, every device in the pool must carry the attribute and
 	// devices sharing a value must share the same ConsumesCounters cost.
 	// It opts the pool into the typed partitionSummary view of
-	// ResourcePoolStatusRequest; unset keeps the CounterSet fallback view.
+	// ResourcePoolStatusRequest and takes precedence over the default attribute
+	// named in the ResourcePoolStatusRequest. When neither names an attribute,
+	// the pool reports no partitionSummary.
 	// It does not disable SharedCounters: when a pool publishes them, counter
 	// accounting still governs allocation and the summary reports the
 	// allocatable device count per partition type.
 	//
 	// +optional
-	// +featureGate=DRAResourcePoolStatus
+	// +featureGate=DRAPartitionableDevicesType
 	PartitionTypeAttribute *FullyQualifiedName
 }
 
@@ -2195,6 +2197,14 @@ type ResourcePoolStatusRequestSpec struct {
 	//
 	// +optional
 	Limit *int32
+
+	// PartitionTypeAttribute optionally names a device attribute (by its fully
+	// qualified name) to use as the default grouping attribute for pools which
+	// have not declared one themselves. A pool's own PartitionTypeAttribute
+	// always takes precedence. When neither the pool nor this default names an
+	// attribute, a partitionable pool reports no partitionSummary.
+	// +optional
+	PartitionTypeAttribute *string
 }
 
 // ResourcePoolStatusRequestLimitDefault is the default value for spec.limit.
@@ -2267,15 +2277,11 @@ type PoolStatus struct {
 	ValidationError *string
 
 	// PartitionSummary reports allocatability per partition type for a
-	// partitionable pool. Mutually exclusive with CounterSets.
+	// partitionable pool. It is populated only when a grouping attribute is
+	// resolved: the one declared on the pool's slices, or for a pool that
+	// declares none, the default named in the request.
 	// +optional
 	PartitionSummary []PartitionTypeStatus
-
-	// CounterSets reports per-counter capacity, consumption, and availability
-	// for a partitionable pool without a PartitionTypeAttribute.
-	// Mutually exclusive with PartitionSummary.
-	// +optional
-	CounterSets []CounterSetStatus
 
 	// ShareableSummary reports aggregate capacity for a pool that contains
 	// devices with AllowMultipleAllocations.
@@ -2297,29 +2303,6 @@ type PartitionTypeStatus struct {
 	// that could still be allocated given current shared-counter consumption.
 	// +required
 	Allocatable *int32
-}
-
-// CounterSetStatus reports capacity, consumption, and availability for the
-// counters of a single shared counter set.
-type CounterSetStatus struct {
-	// Name is the name of the counter set, matching a SharedCounters entry.
-	Name string
-
-	// Counters reports per-counter status, keyed by counter name.
-	Counters map[string]CounterStatus
-}
-
-// CounterStatus reports the capacity, consumption, and remaining availability
-// of a single counter.
-type CounterStatus struct {
-	// Capacity is the total value the counter provides.
-	Capacity resource.Quantity
-
-	// Consumed is the amount drawn by currently allocated devices.
-	Consumed resource.Quantity
-
-	// Available is Capacity minus Consumed, never negative.
-	Available resource.Quantity
 }
 
 // ShareableSummaryStatus reports aggregate capacity for a pool that contains

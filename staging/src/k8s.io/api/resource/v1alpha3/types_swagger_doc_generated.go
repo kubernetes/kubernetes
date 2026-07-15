@@ -36,27 +36,6 @@ func (CELDeviceSelector) SwaggerDoc() map[string]string {
 	return map_CELDeviceSelector
 }
 
-var map_CounterSetStatus = map[string]string{
-	"":         "CounterSetStatus reports capacity, consumption, and availability for the counters of a single shared counter set.",
-	"name":     "Name is the name of the counter set, matching a SharedCounters entry.",
-	"counters": "Counters reports per-counter status, keyed by counter name.",
-}
-
-func (CounterSetStatus) SwaggerDoc() map[string]string {
-	return map_CounterSetStatus
-}
-
-var map_CounterStatus = map[string]string{
-	"":          "CounterStatus reports the capacity, consumption, and remaining availability of a single counter.",
-	"capacity":  "Capacity is the total value the counter provides.",
-	"consumed":  "Consumed is the amount drawn by currently allocated devices.",
-	"available": "Available is Capacity minus Consumed, never negative.",
-}
-
-func (CounterStatus) SwaggerDoc() map[string]string {
-	return map_CounterStatus
-}
-
 var map_DeviceSelector = map[string]string{
 	"":    "DeviceSelector must have exactly one field set.",
 	"cel": "CEL contains a CEL expression for selecting a device.",
@@ -152,8 +131,7 @@ var map_PoolStatus = map[string]string{
 	"unavailableDevices": "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated. A value of 0 means all unallocated devices are available. May be unset when validationError is set.",
 	"nodeName":           "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node. Must be a valid DNS subdomain name (RFC1123).",
 	"validationError":    "ValidationError is set when the pool's data could not be fully validated (e.g., incomplete slice publication). When set, device count fields and ResourceSliceCount may be unset.",
-	"partitionSummary":   "PartitionSummary reports allocatability per partition type for a partitionable pool. It is populated only when the pool's slices set PartitionTypeAttribute and publish SharedCounters. Mutually exclusive with CounterSets.",
-	"counterSets":        "CounterSets reports per-counter capacity, consumption, and availability for a partitionable pool that publishes SharedCounters without a PartitionTypeAttribute. Mutually exclusive with PartitionSummary.",
+	"partitionSummary":   "PartitionSummary reports allocatability per partition type for a partitionable pool that publishes SharedCounters. It is populated only when a grouping attribute is resolved: the PartitionTypeAttribute declared on the pool's slices, or for a pool that declares none, the default named in the request. When neither names an attribute, the pool reports no partition summary.",
 	"shareableSummary":   "ShareableSummary reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations. It is populated only when at least one device in the pool is shareable.",
 }
 
@@ -183,10 +161,11 @@ func (ResourcePoolStatusRequestList) SwaggerDoc() map[string]string {
 }
 
 var map_ResourcePoolStatusRequestSpec = map[string]string{
-	"":         "ResourcePoolStatusRequestSpec defines the filters for the pool status request.",
-	"driver":   "Driver specifies the DRA driver name to filter pools. Only pools from ResourceSlices with this driver will be included. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
-	"poolName": "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",
-	"limit":    "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated (i.e., len(status.pools) < status.poolCount).\n\nDefault: 100 Minimum: 1 Maximum: 1000",
+	"":                       "ResourcePoolStatusRequestSpec defines the filters for the pool status request.",
+	"driver":                 "Driver specifies the DRA driver name to filter pools. Only pools from ResourceSlices with this driver will be included. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
+	"poolName":               "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",
+	"limit":                  "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated (i.e., len(status.pools) < status.poolCount).\n\nDefault: 100 Minimum: 1 Maximum: 1000",
+	"partitionTypeAttribute": "PartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for pools which have not declared one themselves.\n\nA pool's own PartitionTypeAttribute always takes precedence. This default applies only to pools whose slices do not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the pool nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
 }
 
 func (ResourcePoolStatusRequestSpec) SwaggerDoc() map[string]string {

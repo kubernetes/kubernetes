@@ -49,10 +49,11 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 	}{
 		"feature-enabled": {
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-				features.DRAResourcePoolStatus:     true,
-				features.DRAPartitionableDevices:   true,
-				features.DRAConsumableCapacity:     true,
+				features.DynamicResourceAllocation:   true,
+				features.DRAResourcePoolStatus:       true,
+				features.DRAPartitionableDevices:     true,
+				features.DRAPartitionableDevicesType: true,
+				features.DRAConsumableCapacity:       true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("ProcessRequest", testProcessResourcePoolStatusRequest)
@@ -343,9 +344,6 @@ func testPartitionSummary(tCtx ktesting.TContext) {
 	pool := request.Status.Pools[0]
 	if pool.ValidationError != nil {
 		tCtx.Fatalf("unexpected validationError: %s", *pool.ValidationError)
-	}
-	if pool.CounterSets != nil {
-		tCtx.Errorf("counterSets must be nil for a typed pool, got %+v", pool.CounterSets)
 	}
 	got := map[string][2]int32{}
 	for _, p := range pool.PartitionSummary {

@@ -95,41 +95,6 @@ message CELDeviceSelector {
   optional string expression = 1;
 }
 
-// CounterSetStatus reports capacity, consumption, and availability for the
-// counters of a single shared counter set.
-message CounterSetStatus {
-  // Name is the name of the counter set, matching a SharedCounters entry.
-  //
-  // +required
-  // +k8s:required
-  optional string name = 1;
-
-  // Counters reports per-counter status, keyed by counter name.
-  //
-  // +required
-  // +k8s:required
-  map<string, CounterStatus> counters = 2;
-}
-
-// CounterStatus reports the capacity, consumption, and remaining availability
-// of a single counter.
-message CounterStatus {
-  // Capacity is the total value the counter provides.
-  //
-  // +required
-  optional .k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 1;
-
-  // Consumed is the amount drawn by currently allocated devices.
-  //
-  // +required
-  optional .k8s.io.apimachinery.pkg.api.resource.Quantity consumed = 2;
-
-  // Available is Capacity minus Consumed, never negative.
-  //
-  // +required
-  optional .k8s.io.apimachinery.pkg.api.resource.Quantity available = 3;
-}
-
 // DeviceSelector must have exactly one field set.
 message DeviceSelector {
   // CEL contains a CEL expression for selecting a device.
@@ -415,25 +380,17 @@ message PoolStatus {
   optional string validationError = 10;
 
   // PartitionSummary reports allocatability per partition type for a
-  // partitionable pool. It is populated only when the pool's slices set
-  // PartitionTypeAttribute and publish SharedCounters. Mutually exclusive
-  // with CounterSets.
+  // partitionable pool that publishes SharedCounters. It is populated only
+  // when a grouping attribute is resolved: the PartitionTypeAttribute
+  // declared on the pool's slices, or for a pool that declares none, the
+  // default named in the request. When neither names an attribute, the pool
+  // reports no partition summary.
   //
   // +optional
   // +k8s:optional
   // +listType=atomic
   // +k8s:maxItems=32
   repeated PartitionTypeStatus partitionSummary = 11;
-
-  // CounterSets reports per-counter capacity, consumption, and availability
-  // for a partitionable pool that publishes SharedCounters without a
-  // PartitionTypeAttribute. Mutually exclusive with PartitionSummary.
-  //
-  // +optional
-  // +k8s:optional
-  // +listType=atomic
-  // +k8s:maxItems=32
-  repeated CounterSetStatus counterSets = 12;
 
   // ShareableSummary reports aggregate capacity for a pool that contains
   // devices with AllowMultipleAllocations. It is populated only when at
@@ -513,6 +470,24 @@ message ResourcePoolStatusRequestSpec {
   // +k8s:minimum=1
   // +k8s:maximum=1000
   optional int32 limit = 3;
+
+  // PartitionTypeAttribute optionally names a device attribute (by its fully
+  // qualified name, e.g. "gpu.example.com/profile") to use as the default
+  // grouping attribute for pools which have not declared one themselves.
+  //
+  // A pool's own PartitionTypeAttribute always takes precedence. This default
+  // applies only to pools whose slices do not declare one, so that a request
+  // can still get an accurate partitionSummary from a driver that has not
+  // been updated to declare it. When neither the pool nor this default names
+  // an attribute, a partitionable pool reports no partitionSummary.
+  //
+  // Must include the domain qualifier.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:format=k8s-resource-fully-qualified-name
+  // +featureGate=DRAPartitionableDevicesType
+  optional string partitionTypeAttribute = 4;
 }
 
 // ResourcePoolStatusRequestStatus contains the calculated pool status information.

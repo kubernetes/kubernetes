@@ -411,7 +411,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		},
 		"keep-fields-partition-type-attribute": {
 			obj:              sliceWithPartitionTypeAttribute,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: true},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithPartitionTypeAttribute.DeepCopy()
 				obj.Generation = 1
@@ -420,7 +420,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		},
 		"drop-fields-partition-type-attribute": {
 			obj:              sliceWithPartitionTypeAttribute,
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: false},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
 				obj.Generation = 1
@@ -554,7 +554,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
-			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: false},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: false},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithPartitionTypeAttribute.DeepCopy()
 				obj.ResourceVersion = "4"

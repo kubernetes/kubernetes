@@ -667,7 +667,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 									"NodeName":           gomega.BeNil(),
 									"ValidationError":    gomega.BeNil(),
 									"PartitionSummary":   gomega.BeEmpty(),
-									"CounterSets":        gomega.BeEmpty(),
 									"ShareableSummary":   gomega.BeNil(),
 								}),
 							),
@@ -717,7 +716,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 									"NodeName":           gomega.BeNil(),
 									"ValidationError":    gomega.BeNil(),
 									"PartitionSummary":   gomega.BeEmpty(),
-									"CounterSets":        gomega.BeEmpty(),
 									"ShareableSummary":   gomega.BeNil(),
 								}),
 							),
@@ -760,7 +758,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
 		}
 
-		framework.Context("partitionable typed view", f.WithFeatureGate(features.DRAPartitionableDevices), func() {
+		framework.Context("partitionable typed view", f.WithFeatureGate(features.DRAPartitionableDevices), f.WithFeatureGate(features.DRAPartitionableDevicesType), func() {
 			pnodes := drautils.NewNodes(f, 1, 1)
 			pdriver := drautils.NewDriver(f, pnodes, drautils.PartitionableResources(true))
 			pdriver.WithKubelet = false
@@ -773,27 +771,20 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Type: "Full", Total: ptr.To[int32](1), Allocatable: ptr.To[int32](1)}),
 						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Type: "Half", Total: ptr.To[int32](2), Allocatable: ptr.To[int32](2)}),
 					),
-					"CounterSets": gomega.BeEmpty(),
 				}))
 			})
 		})
 
-		framework.Context("partitionable counter view", f.WithFeatureGate(features.DRAPartitionableDevices), func() {
+		framework.Context("partitionable pool without a partition type", f.WithFeatureGate(features.DRAPartitionableDevices), func() {
 			cnodes := drautils.NewNodes(f, 1, 1)
 			cdriver := drautils.NewDriver(f, cnodes, drautils.PartitionableResources(false))
 			cdriver.WithKubelet = false
 
-			f.It("should report counterSets fallback when no partition type is declared", func(ctx context.Context) {
+			f.It("should report no partition summary when no partition type is declared", func(ctx context.Context) {
 				expectPool(ctx, cdriver.Name, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 					"PoolName":         gomega.Equal("partitioned"),
 					"ValidationError":  gomega.BeNil(),
 					"PartitionSummary": gomega.BeEmpty(),
-					"CounterSets": gomega.ConsistOf(
-						gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-							"Name":     gomega.Equal("gpu-0"),
-							"Counters": gomega.HaveKey("memory"),
-						}),
-					),
 				}))
 			})
 		})

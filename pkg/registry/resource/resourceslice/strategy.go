@@ -200,18 +200,18 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
 	dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice)
 	dropDisableDRAListTypeAttributesFields(newSlice, oldSlice)
-	dropDisabledDRAResourcePoolStatusFields(newSlice, oldSlice)
+	dropDisabledDRAPartitionableDevicesTypeFields(newSlice, oldSlice)
 }
 
-func dropDisabledDRAResourcePoolStatusFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourcePoolStatus) || draResourcePoolStatusFeatureInUse(oldSlice) {
+func dropDisabledDRAPartitionableDevicesTypeFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType) || draPartitionableDevicesTypeFeatureInUse(oldSlice) {
 		return
 	}
 
 	newSlice.Spec.PartitionTypeAttribute = nil
 }
 
-func draResourcePoolStatusFeatureInUse(slice *resource.ResourceSlice) bool {
+func draPartitionableDevicesTypeFeatureInUse(slice *resource.ResourceSlice) bool {
 	if slice == nil {
 		return false
 	}

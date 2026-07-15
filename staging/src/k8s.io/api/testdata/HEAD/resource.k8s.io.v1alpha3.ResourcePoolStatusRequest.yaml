@@ -35,6 +35,7 @@ metadata:
 spec:
   driver: driverValue
   limit: 3
+  partitionTypeAttribute: partitionTypeAttributeValue
   poolName: poolNameValue
 status:
   conditions:
@@ -48,13 +49,6 @@ status:
   pools:
   - allocatedDevices: 5
     availableDevices: 6
-    counterSets:
-    - counters:
-        countersKey:
-          available: "0"
-          capacity: "0"
-          consumed: "0"
-      name: nameValue
     driver: driverValue
     generation: 9
     nodeName: nodeNameValue

@@ -209,43 +209,15 @@ func TestComputePoolViews_Hybrid(t *testing.T) {
 		}},
 		inUse: inUseSet(),
 	}
-	ps, cs, sh, err := computePoolViews(in)
+	ps, sh, err := computePoolViews(in)
 	if err != "" {
 		t.Fatalf("unexpected error: %s", err)
 	}
-	if len(ps) != 1 || cs != nil || sh == nil {
-		t.Errorf("hybrid: want partitionSummary set, counterSets nil, shareableSummary set; got ps=%d cs=%v sh=%v", len(ps), cs, sh)
+	if len(ps) != 1 || sh == nil {
+		t.Errorf("hybrid: want partitionSummary set and shareableSummary set; got ps=%d sh=%v", len(ps), sh)
 	}
 	if sh != nil && ptr.Deref(sh.FullyAvailableDevices, 0) != 1 {
 		t.Errorf("shareable fullyAvailable = %d, want 1", ptr.Deref(sh.FullyAvailableDevices, 0))
-	}
-}
-
-func TestComputeCounterSets(t *testing.T) {
-	sc := []resourcev1.CounterSet{counterSet("gpu-0", map[string]string{"memory": "80Gi"})}
-	devices := []deviceRecord{
-		{name: "d0", consumesCounters: []resourcev1.DeviceCounterConsumption{consumes("gpu-0", map[string]string{"memory": "30Gi"})}},
-		{name: "d1", consumesCounters: []resourcev1.DeviceCounterConsumption{consumes("gpu-0", map[string]string{"memory": "30Gi"})}},
-	}
-	in := poolViewInput{driver: "gpu.example.com", poolName: "pool-0", sharedCounters: sc, devices: devices, inUse: inUseSet("d0")}
-
-	got, err := computeCounterSets(in)
-	if err != "" {
-		t.Fatalf("unexpected error: %s", err)
-	}
-	if len(got) != 1 || got[0].Name != "gpu-0" {
-		t.Fatalf("unexpected counter sets: %+v", got)
-	}
-	c := got[0].Counters["memory"]
-	// One in-use device (d0) consumes 30Gi; d1 is not in use.
-	if c.Capacity.String() != "80Gi" {
-		t.Errorf("capacity = %s, want 80Gi", c.Capacity.String())
-	}
-	if c.Consumed.String() != "30Gi" {
-		t.Errorf("consumed = %s, want 30Gi", c.Consumed.String())
-	}
-	if c.Available.Cmp(qty("50Gi")) != 0 {
-		t.Errorf("available = %s, want 50Gi", c.Available.String())
 	}
 }
 
@@ -355,35 +327,37 @@ func TestComputeShareableSummary_NoShareableDevices(t *testing.T) {
 	}
 }
 
-func TestComputePoolViews_MutualExclusion(t *testing.T) {
+// A resolved grouping attribute produces a partitionSummary; without one, a
+// partitionable pool reports no partition view (option 2, no counterSets fallback).
+func TestComputePoolViews_PartitionAttributeGatesView(t *testing.T) {
 	sc := []resourcev1.CounterSet{counterSet("gpu-0", map[string]string{"memory": "80Gi"})}
 
-	// With a partition attribute -> partitionSummary, no counterSets.
+	// With a grouping attribute -> partitionSummary.
 	typed := poolViewInput{
 		driver: "gpu.example.com", poolName: "p", sharedCounters: sc, hasPartitionAttr: true, partitionAttr: "gpu.example.com/profile",
 		devices: []deviceRecord{partitionDevice("d0", "Full", consumes("gpu-0", map[string]string{"memory": "80Gi"}))},
 		inUse:   inUseSet(),
 	}
-	ps, cs, _, err := computePoolViews(typed)
+	ps, _, err := computePoolViews(typed)
 	if err != "" {
 		t.Fatalf("typed: unexpected error %s", err)
 	}
-	if len(ps) == 0 || cs != nil {
-		t.Errorf("typed pool: want partitionSummary set and counterSets nil, got ps=%d cs=%v", len(ps), cs)
+	if len(ps) == 0 {
+		t.Errorf("typed pool: want partitionSummary set, got ps=%d", len(ps))
 	}
 
-	// Without a partition attribute -> counterSets, no partitionSummary.
-	fallback := poolViewInput{
+	// Without a grouping attribute -> no partition view.
+	noAttr := poolViewInput{
 		driver: "gpu.example.com", poolName: "p", sharedCounters: sc,
 		devices: []deviceRecord{{name: "d0", consumesCounters: []resourcev1.DeviceCounterConsumption{consumes("gpu-0", map[string]string{"memory": "10Gi"})}}},
 		inUse:   inUseSet(),
 	}
-	ps2, cs2, _, err := computePoolViews(fallback)
+	ps2, _, err := computePoolViews(noAttr)
 	if err != "" {
-		t.Fatalf("fallback: unexpected error %s", err)
+		t.Fatalf("no-attr: unexpected error %s", err)
 	}
-	if ps2 != nil || len(cs2) == 0 {
-		t.Errorf("fallback pool: want counterSets set and partitionSummary nil, got ps=%v cs=%d", ps2, len(cs2))
+	if ps2 != nil {
+		t.Errorf("no-attr pool: want no partition view, got ps=%d", len(ps2))
 	}
 }
 
@@ -394,7 +368,7 @@ func TestComputePoolViews_AttributeConflict(t *testing.T) {
 		hasPartitionAttr:      true,
 		partitionAttrConflict: true,
 	}
-	_, _, _, err := computePoolViews(in)
+	_, _, err := computePoolViews(in)
 	if !strings.HasPrefix(err, prefixPartitionTypeMissing) {
 		t.Errorf("want %q prefix, got %q", prefixPartitionTypeMissing, err)
 	}

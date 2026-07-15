@@ -46,7 +46,8 @@
   "spec": {
     "driver": "driverValue",
     "poolName": "poolNameValue",
-    "limit": 3
+    "limit": 3,
+    "partitionTypeAttribute": "partitionTypeAttributeValue"
   },
   "status": {
     "poolCount": 6,
@@ -67,18 +68,6 @@
             "type": "typeValue",
             "total": 2,
             "allocatable": 3
-          }
-        ],
-        "counterSets": [
-          {
-            "name": "nameValue",
-            "counters": {
-              "countersKey": {
-                "capacity": "0",
-                "consumed": "0",
-                "available": "0"
-              }
-            }
           }
         ],
         "shareableSummary": {

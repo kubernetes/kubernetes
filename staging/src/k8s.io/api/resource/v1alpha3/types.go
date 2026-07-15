@@ -425,6 +425,24 @@ type ResourcePoolStatusRequestSpec struct {
 	// +k8s:minimum=1
 	// +k8s:maximum=1000
 	Limit *int32 `json:"limit,omitempty" protobuf:"varint,3,opt,name=limit"`
+
+	// PartitionTypeAttribute optionally names a device attribute (by its fully
+	// qualified name, e.g. "gpu.example.com/profile") to use as the default
+	// grouping attribute for pools which have not declared one themselves.
+	//
+	// A pool's own PartitionTypeAttribute always takes precedence. This default
+	// applies only to pools whose slices do not declare one, so that a request
+	// can still get an accurate partitionSummary from a driver that has not
+	// been updated to declare it. When neither the pool nor this default names
+	// an attribute, a partitionable pool reports no partitionSummary.
+	//
+	// Must include the domain qualifier.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-resource-fully-qualified-name
+	// +featureGate=DRAPartitionableDevicesType
+	PartitionTypeAttribute *string `json:"partitionTypeAttribute,omitempty" protobuf:"bytes,4,opt,name=partitionTypeAttribute"`
 }
 
 // ResourcePoolStatusRequestLimitDefault is the default value for spec.limit.
@@ -569,25 +587,17 @@ type PoolStatus struct {
 	ValidationError *string `json:"validationError,omitempty" protobuf:"bytes,10,opt,name=validationError"`
 
 	// PartitionSummary reports allocatability per partition type for a
-	// partitionable pool. It is populated only when the pool's slices set
-	// PartitionTypeAttribute and publish SharedCounters. Mutually exclusive
-	// with CounterSets.
+	// partitionable pool that publishes SharedCounters. It is populated only
+	// when a grouping attribute is resolved: the PartitionTypeAttribute
+	// declared on the pool's slices, or for a pool that declares none, the
+	// default named in the request. When neither names an attribute, the pool
+	// reports no partition summary.
 	//
 	// +optional
 	// +k8s:optional
 	// +listType=atomic
 	// +k8s:maxItems=32
 	PartitionSummary []PartitionTypeStatus `json:"partitionSummary,omitempty" protobuf:"bytes,11,rep,name=partitionSummary"`
-
-	// CounterSets reports per-counter capacity, consumption, and availability
-	// for a partitionable pool that publishes SharedCounters without a
-	// PartitionTypeAttribute. Mutually exclusive with PartitionSummary.
-	//
-	// +optional
-	// +k8s:optional
-	// +listType=atomic
-	// +k8s:maxItems=32
-	CounterSets []CounterSetStatus `json:"counterSets,omitempty" protobuf:"bytes,12,rep,name=counterSets"`
 
 	// ShareableSummary reports aggregate capacity for a pool that contains
 	// devices with AllowMultipleAllocations. It is populated only when at
@@ -621,41 +631,6 @@ type PartitionTypeStatus struct {
 	// +k8s:required
 	// +k8s:minimum=0
 	Allocatable *int32 `json:"allocatable,omitempty" protobuf:"varint,3,opt,name=allocatable"`
-}
-
-// CounterSetStatus reports capacity, consumption, and availability for the
-// counters of a single shared counter set.
-type CounterSetStatus struct {
-	// Name is the name of the counter set, matching a SharedCounters entry.
-	//
-	// +required
-	// +k8s:required
-	Name string `json:"name,omitempty" protobuf:"bytes,1,name=name"`
-
-	// Counters reports per-counter status, keyed by counter name.
-	//
-	// +required
-	// +k8s:required
-	Counters map[string]CounterStatus `json:"counters,omitempty" protobuf:"bytes,2,rep,name=counters"`
-}
-
-// CounterStatus reports the capacity, consumption, and remaining availability
-// of a single counter.
-type CounterStatus struct {
-	// Capacity is the total value the counter provides.
-	//
-	// +required
-	Capacity resource.Quantity `json:"capacity" protobuf:"bytes,1,name=capacity"`
-
-	// Consumed is the amount drawn by currently allocated devices.
-	//
-	// +required
-	Consumed resource.Quantity `json:"consumed" protobuf:"bytes,2,name=consumed"`
-
-	// Available is Capacity minus Consumed, never negative.
-	//
-	// +required
-	Available resource.Quantity `json:"available" protobuf:"bytes,3,name=available"`
 }
 
 // ShareableSummaryStatus reports aggregate capacity for a pool that contains

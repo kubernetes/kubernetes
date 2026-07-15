@@ -219,13 +219,15 @@ type ResourceSliceSpec struct {
 	// When set, every device in the pool must carry the attribute and
 	// devices sharing a value must share the same ConsumesCounters cost.
 	// It opts the pool into the typed partitionSummary view of
-	// ResourcePoolStatusRequest; unset keeps the CounterSet fallback view.
+	// ResourcePoolStatusRequest and takes precedence over the default attribute
+	// named in the ResourcePoolStatusRequest. When neither names an attribute,
+	// the pool reports no partitionSummary.
 	// It does not disable SharedCounters: when a pool publishes them, counter
 	// accounting still governs allocation and the summary reports the
 	// allocatable device count per partition type.
 	//
 	// +optional
-	// +featureGate=DRAResourcePoolStatus
+	// +featureGate=DRAPartitionableDevicesType
 	PartitionTypeAttribute *FullyQualifiedName `json:"partitionTypeAttribute,omitempty" protobuf:"bytes,9,opt,name=partitionTypeAttribute"`
 }
 

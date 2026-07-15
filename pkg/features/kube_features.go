@@ -256,6 +256,16 @@ const (
 	//
 	DRAPartitionableDevices featuregate.Feature = "DRAPartitionableDevices"
 
+	// owner: @nmn3m
+	// kep: http://kep.k8s.io/5677
+	//
+	// Enables ResourceSlice.Spec.PartitionTypeAttribute, which opts a
+	// partitionable pool into the typed partitionSummary view of
+	// ResourcePoolStatusRequest. Depends on both DRAPartitionableDevices
+	// (the field is only meaningful for pools with SharedCounters) and
+	// DRAResourcePoolStatus (the feature that consumes it).
+	DRAPartitionableDevicesType featuregate.Feature = "DRAPartitionableDevicesType"
+
 	// owner: @mortent
 	// kep: http://kep.k8s.io/4816
 	//
@@ -1392,6 +1402,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	DRAPartitionableDevicesType: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRAPrioritizedList: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
@@ -2420,6 +2434,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRANodeAllocatableResources: {DynamicResourceAllocation},
 
 	DRAPartitionableDevices: {DynamicResourceAllocation},
+
+	DRAPartitionableDevicesType: {DynamicResourceAllocation, DRAPartitionableDevices, DRAResourcePoolStatus},
 
 	DRAPrioritizedList: {DynamicResourceAllocation},
 

@@ -73,6 +73,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.partitionTypeAttribute": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
+			},
 			"spec.poolName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-pool-name"},
 			},
@@ -108,15 +111,6 @@ func init() {
 			},
 			"status.pools[*].availableDevices": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
-			},
-			"status.pools[*].counterSets": {
-				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
-			},
-			"status.pools[*].counterSets[*].counters": {
-				{ErrorType: "FieldValueRequired"},
-			},
-			"status.pools[*].counterSets[*].name": {
-				{ErrorType: "FieldValueRequired"},
 			},
 			"status.pools[*].driver": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name-caseless"},

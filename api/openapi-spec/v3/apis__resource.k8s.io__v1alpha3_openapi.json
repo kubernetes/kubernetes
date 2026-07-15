@@ -1,62 +1,6 @@
 {
   "components": {
     "schemas": {
-      "io.k8s.api.resource.v1alpha3.CounterSetStatus": {
-        "description": "CounterSetStatus reports capacity, consumption, and availability for the counters of a single shared counter set.",
-        "properties": {
-          "counters": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.CounterStatus"
-            },
-            "description": "Counters reports per-counter status, keyed by counter name.",
-            "type": "object"
-          },
-          "name": {
-            "description": "Name is the name of the counter set, matching a SharedCounters entry.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "counters"
-        ],
-        "type": "object"
-      },
-      "io.k8s.api.resource.v1alpha3.CounterStatus": {
-        "description": "CounterStatus reports the capacity, consumption, and remaining availability of a single counter.",
-        "properties": {
-          "available": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-              }
-            ],
-            "description": "Available is Capacity minus Consumed, never negative."
-          },
-          "capacity": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-              }
-            ],
-            "description": "Capacity is the total value the counter provides."
-          },
-          "consumed": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-              }
-            ],
-            "description": "Consumed is the amount drawn by currently allocated devices."
-          }
-        },
-        "required": [
-          "capacity",
-          "consumed",
-          "available"
-        ],
-        "type": "object"
-      },
       "io.k8s.api.resource.v1alpha3.DeviceTaint": {
         "description": "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
         "properties": {
@@ -281,14 +225,6 @@
             "format": "int32",
             "type": "integer"
           },
-          "counterSets": {
-            "description": "CounterSets reports per-counter capacity, consumption, and availability for a partitionable pool that publishes SharedCounters without a PartitionTypeAttribute. Mutually exclusive with PartitionSummary.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.CounterSetStatus"
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
-          },
           "driver": {
             "description": "Driver is the DRA driver name for this pool. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
             "type": "string"
@@ -304,7 +240,7 @@
             "type": "string"
           },
           "partitionSummary": {
-            "description": "PartitionSummary reports allocatability per partition type for a partitionable pool. It is populated only when the pool's slices set PartitionTypeAttribute and publish SharedCounters. Mutually exclusive with CounterSets.",
+            "description": "PartitionSummary reports allocatability per partition type for a partitionable pool that publishes SharedCounters. It is populated only when a grouping attribute is resolved: the PartitionTypeAttribute declared on the pool's slices, or for a pool that declares none, the default named in the request. When neither names an attribute, the pool reports no partition summary.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.PartitionTypeStatus"
             },
@@ -454,6 +390,10 @@
             "description": "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated (i.e., len(status.pools) < status.poolCount).\n\nDefault: 100 Minimum: 1 Maximum: 1000",
             "format": "int32",
             "type": "integer"
+          },
+          "partitionTypeAttribute": {
+            "description": "PartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for pools which have not declared one themselves.\n\nA pool's own PartitionTypeAttribute always takes precedence. This default applies only to pools whose slices do not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the pool nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
+            "type": "string"
           },
           "poolName": {
             "description": "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",

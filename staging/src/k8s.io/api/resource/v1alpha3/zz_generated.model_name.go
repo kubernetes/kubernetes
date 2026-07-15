@@ -27,16 +27,6 @@ func (in CELDeviceSelector) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in CounterSetStatus) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha3.CounterSetStatus"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in CounterStatus) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha3.CounterStatus"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceSelector) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1alpha3.DeviceSelector"
 }

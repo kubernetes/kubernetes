@@ -561,11 +561,10 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				inUse:            inUse,
 				consumedCapacity: consumedCapacity[key],
 			}
-			resolvePartitionAttribute(info.partitionValues, info.slicesWithAttr, info.sliceCount, &viewInput)
+			resolvePartitionAttribute(request.Spec.PartitionTypeAttribute, info.partitionValues, info.slicesWithAttr, info.sliceCount, &viewInput)
 
-			partitionSummary, counterSets, shareable, viewErr := computePoolViews(viewInput)
+			partitionSummary, shareable, viewErr := computePoolViews(viewInput)
 			pool.PartitionSummary = partitionSummary
-			pool.CounterSets = counterSets
 			pool.ShareableSummary = shareable
 			if viewErr != "" {
 				if len(viewErr) > 256 {

@@ -69,6 +69,13 @@ func TestDeclarativeValidate(t *testing.T) {
 			input:        mkValidRPSR(setPoolName("invalid pool!")),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "poolName"), nil, "").WithOrigin("format=k8s-resource-pool-name")},
 		},
+		"invalid partitionTypeAttribute format": {
+			// +k8s:format=k8s-resource-fully-qualified-name (standard DV)
+			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
+				r.Spec.PartitionTypeAttribute = new("invalid attr!")
+			}),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
+		},
 		"limit zero": {
 			// +k8s:minimum=1 (standard DV)
 			input:        mkValidRPSR(setLimit(0)),
@@ -433,40 +440,6 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 				s.Pools = []resource.PoolStatus{pool}
 			})),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("allocatable"), "")},
-		},
-		"counterSets maxItems exceeded": {
-			// +k8s:maxItems=32
-			oldObj: mkValidRPSRForUpdate(),
-			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
-				pool := mkValidPoolStatus()
-				sets := make([]resource.CounterSetStatus, 33)
-				for i := range sets {
-					sets[i] = resource.CounterSetStatus{Name: "set", Counters: map[string]resource.CounterStatus{"c0": {}}}
-				}
-				pool.CounterSets = sets
-				s.Pools = []resource.PoolStatus{pool}
-			})),
-			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("status", "pools").Index(0).Child("counterSets"), 33, 32).WithOrigin("maxItems")},
-		},
-		"counterSets empty name": {
-			// +k8s:required (standard DV)
-			oldObj: mkValidRPSRForUpdate(),
-			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
-				pool := mkValidPoolStatus()
-				pool.CounterSets = []resource.CounterSetStatus{{Name: "", Counters: map[string]resource.CounterStatus{"c0": {}}}}
-				s.Pools = []resource.PoolStatus{pool}
-			})),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("counterSets").Index(0).Child("name"), "")},
-		},
-		"counterSets empty counters": {
-			// +k8s:required (standard DV)
-			oldObj: mkValidRPSRForUpdate(),
-			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
-				pool := mkValidPoolStatus()
-				pool.CounterSets = []resource.CounterSetStatus{{Name: "set", Counters: nil}}
-				s.Pools = []resource.PoolStatus{pool}
-			})),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("counterSets").Index(0).Child("counters"), "")},
 		},
 		"shareableSummary capacity maxItems exceeded": {
 			// +k8s:maxItems=32

@@ -41,7 +41,6 @@ const (
 	prefixPartitionTypeMissing    = "PartitionTypeMissing:"
 	prefixPartitionCostMismatch   = "PartitionCostMismatch:"
 	prefixPartitionSummaryOverCap = "PartitionSummaryOverCap:"
-	prefixCounterSetsOverCap      = "CounterSetsOverCap:"
 	prefixShareableOverCap        = "ShareableSummaryOverCap:"
 )
 
@@ -108,9 +107,9 @@ type poolViewInput struct {
 	devices  []deviceRecord
 	// sharedCounters merged from all slices in the pool (names are unique per pool).
 	sharedCounters []resourcev1.CounterSet
-	// partitionAttr is the pool's PartitionTypeAttribute; hasPartitionAttr is
-	// false when no slice declares it. partitionAttrConflict is true when slices
-	// declare differing values.
+	// partitionAttr is the resolved grouping attribute (from the request or the
+	// pool's slices); hasPartitionAttr is false when neither names one.
+	// partitionAttrConflict is true when slices declare differing values.
 	partitionAttr         string
 	hasPartitionAttr      bool
 	partitionAttrConflict bool
@@ -120,22 +119,27 @@ type poolViewInput struct {
 	consumedCapacity map[resourcev1.QualifiedName]resource.Quantity
 }
 
-// resolvePartitionAttribute settles the pool's PartitionTypeAttribute and, when
-// consistent, resolves each device's partition type. Differing values, or a value
-// on some but not all slices, is a conflict.
-func resolvePartitionAttribute(values map[string]struct{}, slicesWithAttr, sliceCount int32, in *poolViewInput) {
+// resolvePartitionAttribute settles the pool's grouping attribute and, when
+// consistent, resolves each device's partition type. The driver's slice
+// declaration takes precedence; differing values, or a value on some but not
+// all slices, is a conflict. The request's attribute is only a fallback for
+// drivers that have not been updated to declare one.
+func resolvePartitionAttribute(requestAttr *string, values map[string]struct{}, slicesWithAttr, sliceCount int32, in *poolViewInput) {
 	switch {
-	case len(values) == 0:
-		return // not declared: fall back to the counter view
 	case len(values) == 1 && slicesWithAttr == sliceCount:
 		for v := range values {
 			in.partitionAttr = v
 		}
 		in.hasPartitionAttr = true
-	default:
+	case len(values) > 0:
 		in.hasPartitionAttr = true
 		in.partitionAttrConflict = true
 		return
+	case requestAttr != nil:
+		in.partitionAttr = *requestAttr
+		in.hasPartitionAttr = true
+	default:
+		return // neither the driver nor the request named one: no partition view
 	}
 	for i := range in.devices {
 		value, ok := resolvePartitionType(in.driver, in.devices[i].attributes, in.partitionAttr)
@@ -144,10 +148,12 @@ func resolvePartitionAttribute(values map[string]struct{}, slicesWithAttr, slice
 	}
 }
 
-// computePoolViews returns the partition/counter/shareable views for a pool.
+// computePoolViews returns the partition and shareable views for a pool.
 // Uncomputable views are nil; validationError holds the first structural problem
 // (prefixed). Basic device counts stay valid regardless of validationError.
-func computePoolViews(in poolViewInput) (partitionSummary []resourcev1alpha3.PartitionTypeStatus, counterSets []resourcev1alpha3.CounterSetStatus, shareable *resourcev1alpha3.ShareableSummaryStatus, validationError string) {
+// A partitionable pool with no resolved grouping attribute reports no partition
+// view (neither the request nor the driver named one).
+func computePoolViews(in poolViewInput) (partitionSummary []resourcev1alpha3.PartitionTypeStatus, shareable *resourcev1alpha3.ShareableSummaryStatus, validationError string) {
 	hasCounters := len(in.sharedCounters) > 0
 
 	switch {
@@ -158,14 +164,10 @@ func computePoolViews(in poolViewInput) (partitionSummary []resourcev1alpha3.Par
 		validationError = fmt.Sprintf("%s pool %s/%s declares partitionTypeAttribute but publishes no sharedCounters",
 			prefixPartitionTypeMissing, in.driver, in.poolName)
 	case in.hasPartitionAttr:
-		// Typed view: partitionSummary and counterSets are mutually exclusive.
 		partitionSummary, validationError = computePartitionSummary(in)
-	case hasCounters:
-		// Fallback view for pools that publish counters without a partition type.
-		counterSets, validationError = computeCounterSets(in)
 	}
 
-	// shareableSummary is independent of the counter views. Keep the first error.
+	// shareableSummary is independent of the partition view. Keep the first error.
 	sh, shErr := computeShareableSummary(in)
 	if validationError == "" {
 		validationError = shErr
@@ -174,11 +176,10 @@ func computePoolViews(in poolViewInput) (partitionSummary []resourcev1alpha3.Par
 		shareable = sh
 	}
 	if validationError != "" {
-		// Drop any partially-built counter views; the pool is flagged instead.
+		// Drop any partially-built partition view; the pool is flagged instead.
 		partitionSummary = nil
-		counterSets = nil
 	}
-	return partitionSummary, counterSets, shareable, validationError
+	return partitionSummary, shareable, validationError
 }
 
 // computePartitionSummary groups devices by partition type and reports, per
@@ -242,39 +243,6 @@ func computePartitionSummary(in poolViewInput) ([]resourcev1alpha3.PartitionType
 			prefixPartitionSummaryOverCap, in.driver, in.poolName, len(result), maxStatusListItems)
 	}
 	return result, ""
-}
-
-// computeCounterSets reports capacity, consumption, and availability per counter
-// for pools that publish sharedCounters without a partition type.
-func computeCounterSets(in poolViewInput) ([]resourcev1alpha3.CounterSetStatus, string) {
-	consumed := consumedCounters(in.devices, in.inUse)
-
-	sets := make([]resourcev1alpha3.CounterSetStatus, 0, len(in.sharedCounters))
-	for _, cs := range in.sharedCounters {
-		counters := make(map[string]resourcev1alpha3.CounterStatus, len(cs.Counters))
-		for name, c := range cs.Counters {
-			capacity := c.Value.DeepCopy()
-			cons := resource.Quantity{}
-			if m := consumed[cs.Name]; m != nil {
-				if q, ok := m[name]; ok {
-					cons = q.DeepCopy()
-				}
-			}
-			counters[name] = resourcev1alpha3.CounterStatus{
-				Capacity:  capacity,
-				Consumed:  cons,
-				Available: nonNegativeDiff(capacity, cons),
-			}
-		}
-		sets = append(sets, resourcev1alpha3.CounterSetStatus{Name: cs.Name, Counters: counters})
-	}
-	sort.Slice(sets, func(i, j int) bool { return sets[i].Name < sets[j].Name })
-
-	if len(sets) > maxStatusListItems {
-		return nil, fmt.Sprintf("%s pool %s/%s has %d counter sets, exceeding the maximum of %d",
-			prefixCounterSetsOverCap, in.driver, in.poolName, len(sets), maxStatusListItems)
-	}
-	return sets, ""
 }
 
 // computeShareableSummary reports aggregate capacity for pools containing devices
@@ -354,31 +322,6 @@ func availableCounters(sharedCounters []resourcev1.CounterSet, devices []deviceR
 	}
 	deductInUse(avail, devices, inUse)
 	return avail
-}
-
-// consumedCounters sums per-counter consumption across unique in-use devices,
-// keyed by [counterSet][counter].
-func consumedCounters(devices []deviceRecord, inUse map[string]struct{}) map[string]map[string]resource.Quantity {
-	consumed := map[string]map[string]resource.Quantity{}
-	for i := range devices {
-		d := devices[i]
-		if _, used := inUse[d.name]; !used {
-			continue
-		}
-		for _, cc := range d.consumesCounters {
-			m := consumed[cc.CounterSet]
-			if m == nil {
-				m = map[string]resource.Quantity{}
-				consumed[cc.CounterSet] = m
-			}
-			for name, c := range cc.Counters {
-				cur := m[name].DeepCopy()
-				cur.Add(c.Value)
-				m[name] = cur
-			}
-		}
-	}
-	return consumed
 }
 
 // deductInUse subtracts each in-use device's counter consumption from avail.

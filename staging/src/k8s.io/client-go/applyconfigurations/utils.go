@@ -1670,10 +1670,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ResourceSliceSpecApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1alpha3
-	case v1alpha3.SchemeGroupVersion.WithKind("CounterSetStatus"):
-		return &resourcev1alpha3.CounterSetStatusApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("CounterStatus"):
-		return &resourcev1alpha3.CounterStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaint"):
 		return &resourcev1alpha3.DeviceTaintApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRule"):

@@ -64,14 +64,12 @@ type PoolStatusApplyConfiguration struct {
 	// count fields and ResourceSliceCount may be unset.
 	ValidationError *string `json:"validationError,omitempty"`
 	// PartitionSummary reports allocatability per partition type for a
-	// partitionable pool. It is populated only when the pool's slices set
-	// PartitionTypeAttribute and publish SharedCounters. Mutually exclusive
-	// with CounterSets.
+	// partitionable pool that publishes SharedCounters. It is populated only
+	// when a grouping attribute is resolved: the PartitionTypeAttribute
+	// declared on the pool's slices, or for a pool that declares none, the
+	// default named in the request. When neither names an attribute, the pool
+	// reports no partition summary.
 	PartitionSummary []PartitionTypeStatusApplyConfiguration `json:"partitionSummary,omitempty"`
-	// CounterSets reports per-counter capacity, consumption, and availability
-	// for a partitionable pool that publishes SharedCounters without a
-	// PartitionTypeAttribute. Mutually exclusive with PartitionSummary.
-	CounterSets []CounterSetStatusApplyConfiguration `json:"counterSets,omitempty"`
 	// ShareableSummary reports aggregate capacity for a pool that contains
 	// devices with AllowMultipleAllocations. It is populated only when at
 	// least one device in the pool is shareable.
@@ -173,19 +171,6 @@ func (b *PoolStatusApplyConfiguration) WithPartitionSummary(values ...*Partition
 			panic("nil value passed to WithPartitionSummary")
 		}
 		b.PartitionSummary = append(b.PartitionSummary, *values[i])
-	}
-	return b
-}
-
-// WithCounterSets adds the given value to the CounterSets field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the CounterSets field.
-func (b *PoolStatusApplyConfiguration) WithCounterSets(values ...*CounterSetStatusApplyConfiguration) *PoolStatusApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithCounterSets")
-		}
-		b.CounterSets = append(b.CounterSets, *values[i])
 	}
 	return b
 }

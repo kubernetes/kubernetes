@@ -1050,8 +1050,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.ResourceSliceList{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_ResourceSliceList(ref),
 		resourcev1.ResourceSliceSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_ResourceSliceSpec(ref),
 		v1alpha3.CELDeviceSelector{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref),
-		v1alpha3.CounterSetStatus{}.OpenAPIModelName():                                                                  schema_k8sio_api_resource_v1alpha3_CounterSetStatus(ref),
-		v1alpha3.CounterStatus{}.OpenAPIModelName():                                                                     schema_k8sio_api_resource_v1alpha3_CounterStatus(ref),
 		v1alpha3.DeviceSelector{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
 		v1alpha3.DeviceTaint{}.OpenAPIModelName():                                                                       schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref),
 		v1alpha3.DeviceTaintRule{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1alpha3_DeviceTaintRule(ref),
@@ -49273,7 +49271,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 					},
 					"partitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest; unset keeps the CounterSet fallback view. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest and takes precedence over the default attribute named in the ResourcePoolStatusRequest. When neither names an attribute, the pool reports no partitionSummary. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -49306,77 +49304,6 @@ func schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref common.ReferenceCa
 				Required: []string{"expression"},
 			},
 		},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_CounterSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "CounterSetStatus reports capacity, consumption, and availability for the counters of a single shared counter set.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name is the name of the counter set, matching a SharedCounters entry.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"counters": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Counters reports per-counter status, keyed by counter name.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref(v1alpha3.CounterStatus{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"name", "counters"},
-			},
-		},
-		Dependencies: []string{
-			v1alpha3.CounterStatus{}.OpenAPIModelName()},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_CounterStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "CounterStatus reports the capacity, consumption, and remaining availability of a single counter.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"capacity": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Capacity is the total value the counter provides.",
-							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
-						},
-					},
-					"consumed": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Consumed is the amount drawn by currently allocated devices.",
-							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
-						},
-					},
-					"available": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Available is Capacity minus Consumed, never negative.",
-							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
-						},
-					},
-				},
-				Required: []string{"capacity", "consumed", "available"},
-			},
-		},
-		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -49769,30 +49696,12 @@ func schema_k8sio_api_resource_v1alpha3_PoolStatus(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionSummary reports allocatability per partition type for a partitionable pool. It is populated only when the pool's slices set PartitionTypeAttribute and publish SharedCounters. Mutually exclusive with CounterSets.",
+							Description: "PartitionSummary reports allocatability per partition type for a partitionable pool that publishes SharedCounters. It is populated only when a grouping attribute is resolved: the PartitionTypeAttribute declared on the pool's slices, or for a pool that declares none, the default named in the request. When neither names an attribute, the pool reports no partition summary.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Ref: ref(v1alpha3.PartitionTypeStatus{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
-					"counterSets": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "CounterSets reports per-counter capacity, consumption, and availability for a partitionable pool that publishes SharedCounters without a PartitionTypeAttribute. Mutually exclusive with PartitionSummary.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref(v1alpha3.CounterSetStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49809,7 +49718,7 @@ func schema_k8sio_api_resource_v1alpha3_PoolStatus(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			v1alpha3.CounterSetStatus{}.OpenAPIModelName(), v1alpha3.PartitionTypeStatus{}.OpenAPIModelName(), v1alpha3.ShareableSummaryStatus{}.OpenAPIModelName()},
+			v1alpha3.PartitionTypeStatus{}.OpenAPIModelName(), v1alpha3.ShareableSummaryStatus{}.OpenAPIModelName()},
 	}
 }
 
@@ -49941,6 +49850,13 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestSpec(ref common
 							Default:     100,
 							Type:        []string{"integer"},
 							Format:      "int32",
+						},
+					},
+					"partitionTypeAttribute": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for pools which have not declared one themselves.\n\nA pool's own PartitionTypeAttribute always takes precedence. This default applies only to pools whose slices do not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the pool nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -52367,7 +52283,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 					},
 					"partitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest; unset keeps the CounterSet fallback view. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest and takes precedence over the default attribute named in the ResourcePoolStatusRequest. When neither names an attribute, the pool reports no partitionSummary. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -54848,7 +54764,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 					},
 					"partitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest; unset keeps the CounterSet fallback view. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest and takes precedence over the default attribute named in the ResourcePoolStatusRequest. When neither names an attribute, the pool reports no partitionSummary. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
