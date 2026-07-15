@@ -308,7 +308,6 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					requestNames:  sets.New(constraint.Requests...),
 					attributeName: distinctAttribute,
 					features:      a.features,
-					attributes:    make(map[string]resourceapi.DeviceAttribute),
 				}
 				constraints[i] = m
 			default:
