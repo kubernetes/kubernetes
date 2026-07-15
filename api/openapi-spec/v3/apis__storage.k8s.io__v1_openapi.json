@@ -154,7 +154,6 @@
           },
           "volumeAttributes": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "volumeAttributes of the volume to publish.",
@@ -178,7 +177,6 @@
           "monitors": {
             "description": "monitors is Required: Monitors is a collection of Ceph monitors More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -263,7 +261,6 @@
           "targetWWNs": {
             "description": "targetWWNs is Optional: FC target worldwide names (WWNs)",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -272,7 +269,6 @@
           "wwids": {
             "description": "wwids Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -295,7 +291,6 @@
           },
           "options": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "options is Optional: this field holds extra command options if any.",
@@ -444,7 +439,6 @@
           "portals": {
             "description": "portals is the iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -523,12 +517,7 @@
           "nodeSelectorTerms": {
             "description": "Required. A list of node selector terms. The terms are ORed.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorTerm"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorTerm"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -556,7 +545,6 @@
           "values": {
             "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -575,12 +563,7 @@
           "matchExpressions": {
             "description": "A list of node selector requirements by node's labels.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -588,12 +571,7 @@
           "matchFields": {
             "description": "A list of node selector requirements by node's fields.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -643,7 +621,6 @@
           "accessModes": {
             "description": "accessModes contains all ways the volume can be mounted. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -780,7 +757,6 @@
           "mountOptions": {
             "description": "mountOptions is the list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -973,7 +949,6 @@
           "monitors": {
             "description": "monitors is a collection of Ceph monitors. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1123,7 +1098,6 @@
           "values": {
             "description": "An array of string values. One value must match the label to be selected. Each entry in Values is ORed.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1142,12 +1116,7 @@
           "matchLabelExpressions": {
             "description": "A list of topology selector requirements by labels.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.TopologySelectorLabelRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.TopologySelectorLabelRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1248,12 +1217,7 @@
           "items": {
             "description": "items is the list of CSIDriver",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSIDriver"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSIDriver"
             },
             "type": "array"
           },
@@ -1326,12 +1290,7 @@
           "tokenRequests": {
             "description": "tokenRequests indicates the CSI driver needs pods' service account tokens it is mounting volume for to do necessary authentication. Kubelet will pass the tokens in VolumeContext in the CSI NodePublishVolume calls. The CSI driver should parse and validate the following VolumeContext: \"csi.storage.k8s.io/serviceAccount.tokens\": {\n  \"<audience>\": {\n    \"token\": <token>,\n    \"expirationTimestamp\": <expiration timestamp in RFC3339>,\n  },\n  ...\n}\n\nNote: Audience in each TokenRequest should be different and at most one token is empty string. To receive a new token after expiry, RequiresRepublish can be used to trigger NodePublishVolume periodically.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.storage.v1.TokenRequest"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.storage.v1.TokenRequest"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1339,7 +1298,6 @@
           "volumeLifecycleModes": {
             "description": "volumeLifecycleModes defines what kind of volumes this CSI volume driver supports. The default if the list is empty is \"Persistent\", which is the usage defined by the CSI specification and implemented in Kubernetes via the usual PV/PVC mechanism.\n\nThe other mode is \"Ephemeral\". In this mode, volumes are defined inline inside the pod spec with CSIVolumeSource and their lifecycle is tied to the lifecycle of that pod. A driver has to be aware of this because it is only going to get a NodePublishVolume call for such a volume.\n\nFor more information about implementing this mode, see https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html A driver can support one or more of these modes and more modes may be added in the future.\n\nThis field is beta. This field is immutable.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1414,7 +1372,6 @@
           "topologyKeys": {
             "description": "topologyKeys is the list of keys supported by the driver. When a driver is initialized on a cluster, it provides a set of topology keys that it understands (e.g. \"company.com/zone\", \"company.com/region\"). When a driver is initialized on a node, it provides the same topology keys along with values. Kubelet will expose these topology keys as labels on its own node object. When Kubernetes does topology aware provisioning, it can use this list to determine which labels it should retrieve from the node object and pass back to the driver. It is possible for different nodes to use different topology keys. This can be empty if driver does not support topology.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1437,12 +1394,7 @@
           "items": {
             "description": "items is the list of CSINode",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSINode"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSINode"
             },
             "type": "array"
           },
@@ -1478,12 +1430,7 @@
           "drivers": {
             "description": "drivers is a list of information of all CSI Drivers existing on a node. If all drivers in the list are uninstalled, this can become empty.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSINodeDriver"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSINodeDriver"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -1571,12 +1518,7 @@
           "items": {
             "description": "items is the list of CSIStorageCapacity objects.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSIStorageCapacity"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.storage.v1.CSIStorageCapacity"
             },
             "type": "array"
           },
@@ -1616,12 +1558,7 @@
           "allowedTopologies": {
             "description": "allowedTopologies restrict the node topologies where volumes can be dynamically provisioned. Each volume plugin defines its own supported topology specifications. An empty TopologySelectorTerm list means there is no topology restriction. This field is only honored by servers that enable the VolumeScheduling feature.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.TopologySelectorTerm"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.TopologySelectorTerm"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1646,7 +1583,6 @@
           "mountOptions": {
             "description": "mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class. e.g. [\"ro\", \"soft\"]. Not validated - mount of the PVs will simply fail if one is invalid.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1654,7 +1590,6 @@
           },
           "parameters": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "parameters holds the parameters for the provisioner that should create volumes of this storage class.",
@@ -1696,12 +1631,7 @@
           "items": {
             "description": "items is the list of StorageClasses",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.storage.v1.StorageClass"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.storage.v1.StorageClass"
             },
             "type": "array"
           },
@@ -1811,12 +1741,7 @@
           "items": {
             "description": "items is the list of VolumeAttachments",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.storage.v1.VolumeAttachment"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.storage.v1.VolumeAttachment"
             },
             "type": "array"
           },
@@ -1912,7 +1837,6 @@
           },
           "attachmentMetadata": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "attachmentMetadata is populated with any information returned by the attach operation, upon successful attach, that must be passed into subsequent WaitForAttach or Mount calls. This field must only be set by the entity completing the attach operation, i.e. the external-attacher.",
@@ -1959,7 +1883,6 @@
           },
           "parameters": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "parameters hold volume attributes defined by the CSI driver. These values are opaque to the Kubernetes and are passed directly to the CSI driver. The underlying storage provider supports changing these attributes on an existing volume, however the parameters field itself is immutable. To invoke a volume update, a new VolumeAttributesClass should be created with new parameters, and the PersistentVolumeClaim should be updated to reference the new VolumeAttributesClass.\n\nThis field is required and must contain at least one key/value pair. The keys cannot be empty, and the maximum number of parameters is 512, with a cumulative max size of 256K. If the CSI driver rejects invalid parameters, the target PersistentVolumeClaim will be set to an \"Infeasible\" state in the modifyVolumeStatus field.",
@@ -1988,12 +1911,7 @@
           "items": {
             "description": "items is the list of VolumeAttributesClass objects.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.storage.v1.VolumeAttributesClass"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.storage.v1.VolumeAttributesClass"
             },
             "type": "array"
           },
@@ -2074,7 +1992,6 @@
           "categories": {
             "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -2102,7 +2019,6 @@
           "shortNames": {
             "description": "shortNames is a list of suggested short names of the resource.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -2120,7 +2036,6 @@
           "verbs": {
             "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array"
@@ -2158,12 +2073,7 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -2192,7 +2102,6 @@
           "dryRun": {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -2252,19 +2161,13 @@
           "matchExpressions": {
             "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "matchLabels": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
@@ -2290,7 +2193,6 @@
           "values": {
             "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -2381,7 +2283,6 @@
         "properties": {
           "annotations": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
@@ -2411,7 +2312,6 @@
           "finalizers": {
             "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed. Finalizers may be processed and removed in any order.  Order is NOT enforced because it introduces significant risk of stuck finalizers. finalizers is a shared field, any actor with permission can reorder it. If the finalizer list is processed in order, then this can lead to a situation in which the component responsible for the first finalizer in the list is waiting for a signal (field value, external system, or other) produced by a component responsible for a finalizer later in the list, resulting in a deadlock. Without enforced ordering finalizers are free to order amongst themselves and are not vulnerable to ordering changes in the list.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -2429,7 +2329,6 @@
           },
           "labels": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
@@ -2438,12 +2337,7 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -2459,12 +2353,7 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -2641,12 +2530,7 @@
           "causes": {
             "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"

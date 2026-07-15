@@ -47,12 +47,7 @@
           "excludeResourceRules": {
             "description": "excludeResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy should not care about. The exclude rules take precedence over include rules (if a resource matches both, it is excluded)",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.NamedRuleWithOperations"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.NamedRuleWithOperations"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -80,12 +75,7 @@
           "resourceRules": {
             "description": "resourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy matches. The policy cares about an operation if it matches _any_ Rule.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.NamedRuleWithOperations"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.NamedRuleWithOperations"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -182,12 +172,7 @@
           "items": {
             "description": "List of PolicyBinding.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.MutatingAdmissionPolicyBinding"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.MutatingAdmissionPolicyBinding"
             },
             "type": "array"
           },
@@ -253,12 +238,7 @@
           "items": {
             "description": "List of ValidatingAdmissionPolicy.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.MutatingAdmissionPolicy"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.MutatingAdmissionPolicy"
             },
             "type": "array"
           },
@@ -298,12 +278,7 @@
           "matchConditions": {
             "description": "matchConditions is a list of conditions that must be met for a request to be validated. Match conditions filter requests that have already been matched by the matchConstraints. An empty list of matchConditions matches all requests. There are a maximum of 64 match conditions allowed.\n\nIf a parameter object is provided, it can be accessed via the `params` handle in the same manner as validation expressions.\n\nThe exact matching logic is (in order):\n  1. If ANY matchCondition evaluates to FALSE, the policy is skipped.\n  2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.\n  3. If any matchCondition evaluates to an error (but none are FALSE):\n     - If failurePolicy=Fail, reject the request\n     - If failurePolicy=Ignore, the policy is skipped",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.MatchCondition"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.MatchCondition"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -324,12 +299,7 @@
           "mutations": {
             "description": "mutations contain operations to perform on matching objects. mutations may not be empty; a minimum of one mutation is required. mutations are evaluated in order, and are reinvoked according to the reinvocationPolicy. The mutations of a policy are invoked for each binding of this policy and reinvocation of mutations occurs on a per binding basis.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.Mutation"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.Mutation"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -349,12 +319,7 @@
           "variables": {
             "description": "variables contain definitions of variables that can be used in composition of other expressions. Each variable is defined as a named CEL expression. The variables defined here will be available under `variables` in other expressions of the policy except matchConditions because matchConditions are evaluated before the rest of the policy.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after. Thus, variables must be sorted by the order of first appearance and acyclic.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.Variable"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1beta1.Variable"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -398,7 +363,6 @@
           "apiGroups": {
             "description": "apiGroups is the API groups the resources belong to. '*' is all groups. If '*' is present, the length of the slice must be one. Required.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -407,7 +371,6 @@
           "apiVersions": {
             "description": "apiVersions is the API versions the resources belong to. '*' is all versions. If '*' is present, the length of the slice must be one. Required.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -416,7 +379,6 @@
           "operations": {
             "description": "operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or * for all of those operations and any future admission operations that are added. If '*' is present, the length of the slice must be one. Required.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -425,7 +387,6 @@
           "resourceNames": {
             "description": "resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -434,7 +395,6 @@
           "resources": {
             "description": "resources is a list of resources this rule applies to.\n\nFor example: 'pods' means pods. 'pods/log' means the log subresource of pods. '*' means all resources, but not subresources. 'pods/*' means all subresources of pods. '*/scale' means all scale subresources. '*/*' means all resources and their subresources.\n\nIf wildcard is present, the validation rule will ensure resources do not overlap with each other.\n\nDepending on the enclosing object, subresources might not be allowed. Required.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -517,7 +477,6 @@
           "categories": {
             "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -545,7 +504,6 @@
           "shortNames": {
             "description": "shortNames is a list of suggested short names of the resource.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -563,7 +521,6 @@
           "verbs": {
             "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array"
@@ -601,12 +558,7 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -635,7 +587,6 @@
           "dryRun": {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -695,19 +646,13 @@
           "matchExpressions": {
             "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "matchLabels": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
@@ -733,7 +678,6 @@
           "values": {
             "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -824,7 +768,6 @@
         "properties": {
           "annotations": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
@@ -854,7 +797,6 @@
           "finalizers": {
             "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed. Finalizers may be processed and removed in any order.  Order is NOT enforced because it introduces significant risk of stuck finalizers. finalizers is a shared field, any actor with permission can reorder it. If the finalizer list is processed in order, then this can lead to a situation in which the component responsible for the first finalizer in the list is waiting for a signal (field value, external system, or other) produced by a component responsible for a finalizer later in the list, resulting in a deadlock. Without enforced ordering finalizers are free to order amongst themselves and are not vulnerable to ordering changes in the list.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -872,7 +814,6 @@
           },
           "labels": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
@@ -881,12 +822,7 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -902,12 +838,7 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -1084,12 +1015,7 @@
           "causes": {
             "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
