@@ -6706,6 +6706,19 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 		allErrs = append(allErrs, errs)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) && len(newPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+		v1Pod := &v1.Pod{}
+		if err := corev1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
+			allErrs = append(allErrs, field.InternalError(specPath, fmt.Errorf("failed to convert pod for DRA validation: %w", err)))
+		} else {
+			// TODO(pravk03): Explore optimization to avoid double aggregation of container resources
+			// in validatePodResourceConsistency and validatePodLevelResourcesCoverDRA.
+			if ok, msg := validatePodLevelResourcesCoverDRA(v1Pod); !ok {
+				allErrs = append(allErrs, field.Invalid(specPath.Child("resources"), newPod.Spec.Resources, msg))
+			}
+		}
+	}
+
 	return allErrs
 }
 
@@ -6772,6 +6785,88 @@ func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequiremen
 		}
 	}
 	return resources
+}
+
+func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
+	if pod.Spec.Resources == nil {
+		return true, ""
+	}
+
+	if pod.Spec.Resources.Requests != nil {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    true,
+			UseDRANodeAllocatableResourceClaimStatus: true,
+		}
+		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
+
+		for resName, podLevelReq := range pod.Spec.Resources.Requests {
+			if !resourcehelper.IsSupportedPodLevelResource(resName) {
+				continue
+			}
+			val, ok := requestWithoutPodLevel[resName]
+			if !ok {
+				continue
+			}
+			if val.Cmp(podLevelReq) > 0 {
+				return false, fmt.Sprintf("pod level request for %s is insufficient to cover the aggregated container and node-allocatable DRA requests", resName)
+			}
+		}
+	}
+
+	if pod.Spec.Resources.Limits != nil {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    true,
+			UseDRANodeAllocatableResourceClaimStatus: true,
+		}
+		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
+
+		// Pod level hugepage limits must be always equal or greater than the aggregated
+		// container level hugepage limits + DRA limits
+		for resourceName, ctrLims := range limitsWithoutPodLevel {
+			if !helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+				continue
+			}
+
+			podLevelResLimit, hasLimit := pod.Spec.Resources.Limits[resourceName]
+			if !hasLimit {
+				continue
+			}
+
+			if ctrLims.Cmp(podLevelResLimit) > 0 {
+				return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the aggregated container and node-allocatable DRA limits", resourceName)
+			}
+		}
+
+		// Individual Container limits + DRA overheads must be <= Pod-level limits.
+		containerDRAAllocations := make(map[string]v1.ResourceList, len(pod.Spec.Containers))
+		for _, ctr := range pod.Spec.Containers {
+			containerDRAAllocations[ctr.Name] = resourcehelper.GetContainerDRAAllocations(pod, ctr.Name)
+		}
+
+		for _, ctr := range pod.Spec.Containers {
+			for resourceName, ctrLimit := range ctr.Resources.Limits {
+				if helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+					continue
+				}
+
+				// Skip if the pod-level limit of the resource is not set.
+				podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
+				if !exists {
+					continue
+				}
+
+				draResAllocation := containerDRAAllocations[ctr.Name][resourceName]
+				effectiveLimit := ctrLimit.DeepCopy()
+				effectiveLimit.Add(draResAllocation)
+
+				if effectiveLimit.Cmp(podLevelResLimit) > 0 {
+					return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for container %s", resourceName, ctr.Name)
+				}
+			}
+		}
+	}
+
+	return true, ""
 }
 
 // isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.

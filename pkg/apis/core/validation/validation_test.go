@@ -29608,12 +29608,13 @@ func TestValidatePodResize(t *testing.T) {
 	}
 
 	tests := []struct {
-		test                            string
-		old                             *core.Pod
-		new                             *core.Pod
-		disableInitCtrResize            bool
-		enableMemoryBackedVolumesResize bool
-		err                             string
+		test                              string
+		old                               *core.Pod
+		new                               *core.Pod
+		disableInitCtrResize              bool
+		enableMemoryBackedVolumesResize   bool
+		enableDRANodeAllocatableResources bool
+		err                               string
 	}{
 		{
 			test: "pod-level resources resize with nil resources in old pod",
@@ -30290,15 +30291,18 @@ func TestValidatePodResize(t *testing.T) {
 			test: "Resize allowed for pod with NodeAllocatableResourceClaimStatuses",
 			old: func() *core.Pod {
 				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
 					podtest.SetContainers(podtest.MakeContainer("container",
 						podtest.SetContainerResources(core.ResourceRequirements{
 							Requests: getResources("100m", "200Mi", "", ""),
+							Claims:   []core.ResourceClaim{{Name: "claim-1"}},
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 				)
 				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"container"},
 						Mapping: []core.NodeAllocatableMappedResources{{
 							Name:     core.ResourceCPU,
 							Quantity: new(resource.MustParse("100m")),
@@ -30309,15 +30313,18 @@ func TestValidatePodResize(t *testing.T) {
 			}(),
 			new: func() *core.Pod {
 				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
 					podtest.SetContainers(podtest.MakeContainer("container",
 						podtest.SetContainerResources(core.ResourceRequirements{
 							Requests: getResources("200m", "200Mi", "", ""),
+							Claims:   []core.ResourceClaim{{Name: "claim-1"}},
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
 				)
 				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"container"},
 						Mapping: []core.NodeAllocatableMappedResources{{
 							Name:     core.ResourceCPU,
 							Quantity: new(resource.MustParse("100m")),
@@ -30711,6 +30718,164 @@ func TestValidatePodResize(t *testing.T) {
 			),
 			err: "only cpu and memory resources are mutable",
 		},
+		{
+			test:                              "pod level requests insufficient to cover container requests and DRA",
+			enableDRANodeAllocatableResources: true,
+			old: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Requests: getResources("100m", "200Mi", "", ""),
+							Claims:   []core.ResourceClaim{{Name: "claim-1"}},
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("200m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"container"},
+						Mapping: []core.NodeAllocatableMappedResources{{
+							Name:     core.ResourceCPU,
+							Quantity: new(resource.MustParse("100m")),
+						}},
+					},
+				}
+				return p
+			}(),
+			new: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Requests: getResources("100m", "200Mi", "", ""),
+							Claims:   []core.ResourceClaim{{Name: "claim-1"}},
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("150m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"container"},
+						Mapping: []core.NodeAllocatableMappedResources{{
+							Name:     core.ResourceCPU,
+							Quantity: new(resource.MustParse("100m")),
+						}},
+					},
+				}
+				return p
+			}(),
+			err: "pod level request for cpu is insufficient to cover the aggregated container and node-allocatable DRA requests",
+		},
+		{
+			test:                              "pod level limits insufficient to cover container limit and DRA",
+			enableDRANodeAllocatableResources: true,
+			old: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Limits: getResources("200m", "200Mi", "", ""),
+							Claims: []core.ResourceClaim{{Name: "claim-1"}},
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("300m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"container"},
+						Overhead: []core.NodeAllocatableOverheadResources{{
+							Name:         core.ResourceCPU,
+							PerPod:       new(resource.MustParse("50m")),
+							PerContainer: new(resource.MustParse("50m")),
+						}},
+					},
+				}
+				return p
+			}(),
+			new: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Limits: getResources("200m", "200Mi", "", ""),
+							Claims: []core.ResourceClaim{{Name: "claim-1"}},
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("250m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"container"},
+						Overhead: []core.NodeAllocatableOverheadResources{{
+							Name:         core.ResourceCPU,
+							PerPod:       new(resource.MustParse("50m")),
+							PerContainer: new(resource.MustParse("50m")),
+						}},
+					},
+				}
+				return p
+			}(),
+			err: "pod level limit for cpu is insufficient to cover the limit and DRA overhead for container container",
+		},
+		{
+			test:                              "pod level requests and limits cover container and DRA resources",
+			enableDRANodeAllocatableResources: true,
+			old: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Requests: getResources("100m", "200Mi", "", ""),
+							Limits:   getResources("200m", "400Mi", "", ""),
+							Claims:   []core.ResourceClaim{{Name: "claim-1"}},
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{
+						Requests: getResources("200m", "200Mi", "", ""),
+						Limits:   getResources("300m", "400Mi", "", ""),
+					}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"container"},
+						Overhead: []core.NodeAllocatableOverheadResources{{
+							Name:         core.ResourceCPU,
+							PerPod:       new(resource.MustParse("50m")),
+							PerContainer: new(resource.MustParse("50m")),
+						}},
+					},
+				}
+				return p
+			}(),
+			new: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Requests: getResources("200m", "200Mi", "", ""),
+							Limits:   getResources("300m", "400Mi", "", ""),
+							Claims:   []core.ResourceClaim{{Name: "claim-1"}},
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{
+						Requests: getResources("300m", "200Mi", "", ""),
+						Limits:   getResources("400m", "400Mi", "", ""),
+					}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"container"},
+						Overhead: []core.NodeAllocatableOverheadResources{{
+							Name:         core.ResourceCPU,
+							PerPod:       new(resource.MustParse("50m")),
+							PerContainer: new(resource.MustParse("50m")),
+						}},
+					},
+				}
+				return p
+			}(),
+		},
 	}
 
 	for _, test := range tests {
@@ -30723,6 +30888,8 @@ func TestValidatePodResize(t *testing.T) {
 				// when we are emulating v1.36 (which does not have it)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, test.enableMemoryBackedVolumesResize)
 			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
 
 			test.new.ObjectMeta.ResourceVersion = "1"
 			test.old.ObjectMeta.ResourceVersion = "1"
