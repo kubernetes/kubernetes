@@ -2504,6 +2504,7 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 		}
 		t.Run(testName, func(t *testing.T) {
 			if len(test.featureOverrides) > 0 {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, test.featureOverrides)
 			}
 
