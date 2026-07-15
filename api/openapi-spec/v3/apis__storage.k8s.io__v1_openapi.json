@@ -464,8 +464,7 @@
         },
         "required": [
           "targetPortal",
-          "iqn",
-          "lun"
+          "iqn"
         ],
         "type": "object"
       },
@@ -1038,7 +1037,7 @@
         "required": [
           "gateway",
           "system",
-          "secretRef"
+          "volumeName"
         ],
         "type": "object"
       },
@@ -1085,6 +1084,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "volumeName"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.TopologySelectorLabelRequirement": {
@@ -1137,6 +1139,9 @@
             "description": "required specifies hard node constraints that must be met."
           }
         },
+        "required": [
+          "required"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource": {

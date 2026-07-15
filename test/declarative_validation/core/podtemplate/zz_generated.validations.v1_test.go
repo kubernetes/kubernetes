@@ -64,6 +64,37 @@ func init() {
 			"template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.metadata.creationTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.metadata.deletionGracePeriodSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.metadata.deletionTimestamp": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.metadata.generation": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.metadata.managedFields[*].operation": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.metadata.ownerReferences[*].apiVersion": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.metadata.ownerReferences[*].kind": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.metadata.ownerReferences[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.metadata.ownerReferences[*].uid": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.volumes[*].ephemeral.volumeClaimTemplate.metadata.uid": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 		},
 	)
 }

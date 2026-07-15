@@ -39,6 +39,7 @@ option go_package = "k8s.io/api/core/v1";
 message AWSElasticBlockStoreVolumeSource {
   // volumeID is unique ID of the persistent disk resource in AWS (Amazon EBS volume).
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
+  // +required
   optional string volumeID = 1;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -119,9 +120,11 @@ message AvoidPods {
 // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 message AzureDiskVolumeSource {
   // diskName is the Name of the data disk in the blob storage
+  // +required
   optional string diskName = 1;
 
   // diskURI is the URI of data disk in the blob storage
+  // +required
   optional string diskURI = 2;
 
   // cachingMode is the Host Caching mode: None, Read Only, Read Write.
@@ -144,15 +147,18 @@ message AzureDiskVolumeSource {
 
   // kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
   // +default=ref(AzureSharedBlobDisk)
+  // +optional
   optional string kind = 6;
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFilePersistentVolumeSource {
   // secretName is the name of secret that contains Azure Storage Account Name and Key
+  // +required
   optional string secretName = 1;
 
   // shareName is the azure Share Name
+  // +required
   optional string shareName = 2;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -169,9 +175,11 @@ message AzureFilePersistentVolumeSource {
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFileVolumeSource {
   // secretName is the  name of secret that contains Azure Storage Account Name and Key
+  // +required
   optional string secretName = 1;
 
   // shareName is the azure share Name
+  // +required
   optional string shareName = 2;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -196,11 +204,13 @@ message Binding {
 message CSIPersistentVolumeSource {
   // driver is the name of the driver to use for this volume.
   // Required.
+  // +required
   optional string driver = 1;
 
   // volumeHandle is the unique volume name returned by the CSI volume
   // plugin’s CreateVolume to refer to the volume on all subsequent calls.
   // Required.
+  // +required
   optional string volumeHandle = 2;
 
   // readOnly value to pass to ControllerPublishVolumeRequest.
@@ -262,6 +272,7 @@ message CSIPersistentVolumeSource {
 message CSIVolumeSource {
   // driver is the name of the CSI driver that handles this volume.
   // Consult with your admin for the correct name as registered in the cluster.
+  // +required
   optional string driver = 1;
 
   // readOnly specifies a read-only configuration for the volume.
@@ -308,6 +319,7 @@ message CephFSPersistentVolumeSource {
   // monitors is Required: Monitors is a collection of Ceph monitors
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +listType=atomic
+  // +required
   repeated string monitors = 1;
 
   // path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -342,6 +354,7 @@ message CephFSVolumeSource {
   // monitors is Required: Monitors is a collection of Ceph monitors
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +listType=atomic
+  // +required
   repeated string monitors = 1;
 
   // path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -377,6 +390,7 @@ message CephFSVolumeSource {
 message CinderPersistentVolumeSource {
   // volumeID used to identify the volume in cinder.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
+  // +required
   optional string volumeID = 1;
 
   // fsType Filesystem type to mount.
@@ -405,6 +419,7 @@ message CinderPersistentVolumeSource {
 message CinderVolumeSource {
   // volumeID used to identify the volume in cinder.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
+  // +required
   optional string volumeID = 1;
 
   // fsType is the filesystem type to mount.
@@ -466,6 +481,7 @@ message ClusterTrustBundleProjection {
   optional bool optional = 5;
 
   // Relative path from the volume root to write the bundle.
+  // +required
   optional string path = 4;
 }
 
@@ -1203,6 +1219,7 @@ message DownwardAPIProjection {
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
 message DownwardAPIVolumeFile {
   // Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+  // +required
   optional string path = 1;
 
   // Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
@@ -1708,6 +1725,8 @@ message EphemeralVolumeSource {
   // to the PVC after it has been created.
   //
   // Required, must not be nil.
+  // +optional
+  // +k8s:optional
   optional PersistentVolumeClaimTemplate volumeClaimTemplate = 1;
 }
 
@@ -1891,6 +1910,7 @@ message FileKeySelector {
 // provisioned/attached using an exec based plugin.
 message FlexPersistentVolumeSource {
   // driver is the name of the driver to use for this volume.
+  // +required
   optional string driver = 1;
 
   // fsType is the Filesystem type to mount.
@@ -1921,6 +1941,7 @@ message FlexPersistentVolumeSource {
 // provisioned/attached using an exec based plugin.
 message FlexVolumeSource {
   // driver is the name of the driver to use for this volume.
+  // +required
   optional string driver = 1;
 
   // fsType is the filesystem type to mount.
@@ -1970,6 +1991,7 @@ message FlockerVolumeSource {
 message GCEPersistentDiskVolumeSource {
   // pdName is unique name of the PD resource in GCE. Used to identify the disk in GCE.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
+  // +required
   optional string pdName = 1;
 
   // fsType is filesystem type of the volume that you want to mount.
@@ -2018,6 +2040,7 @@ message GRPCAction {
 // into the Pod's container.
 message GitRepoVolumeSource {
   // repository is the URL
+  // +required
   optional string repository = 1;
 
   // revision is the commit hash for the specified revision.
@@ -2041,6 +2064,7 @@ message GlusterfsPersistentVolumeSource {
 
   // path is the Glusterfs volume path.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
+  // +required
   optional string path = 2;
 
   // readOnly here will force the Glusterfs volume to be mounted with read-only permissions.
@@ -2064,6 +2088,7 @@ message GlusterfsVolumeSource {
 
   // path is the Glusterfs volume path.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
+  // +required
   optional string path = 2;
 
   // readOnly here will force the Glusterfs volume to be mounted with read-only permissions.
@@ -2135,6 +2160,7 @@ message HostPathVolumeSource {
   // path of the directory on the host.
   // If the path is a symlink, it will follow the link to the real path.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+  // +required
   optional string path = 1;
 
   // type for HostPath Volume
@@ -2150,12 +2176,15 @@ message HostPathVolumeSource {
 message ISCSIPersistentVolumeSource {
   // targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
+  // +required
   optional string targetPortal = 1;
 
   // iqn is Target iSCSI Qualified Name.
+  // +required
   optional string iqn = 2;
 
   // lun is iSCSI Target Lun number.
+  // +optional
   optional int32 lun = 3;
 
   // iscsiInterface is the interface Name that uses an iSCSI transport.
@@ -2208,12 +2237,15 @@ message ISCSIPersistentVolumeSource {
 message ISCSIVolumeSource {
   // targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
+  // +required
   optional string targetPortal = 1;
 
   // iqn is the target iSCSI Qualified Name.
+  // +required
   optional string iqn = 2;
 
   // lun represents iSCSI Target Lun number.
+  // +optional
   optional int32 lun = 3;
 
   // iscsiInterface is the interface Name that uses an iSCSI transport.
@@ -2293,12 +2325,14 @@ message ImageVolumeStatus {
 // Maps a string key to a path within a volume.
 message KeyToPath {
   // key is the key to project.
+  // +required
   optional string key = 1;
 
   // path is the relative path of the file to map the key to.
   // May not be an absolute path.
   // May not contain the path element '..'.
   // May not start with the string '..'.
+  // +required
   optional string path = 2;
 
   // mode is Optional: mode bits used to set permissions on this file.
@@ -2515,6 +2549,7 @@ message LocalObjectReference {
 message LocalVolumeSource {
   // path of the full path to the volume on the node.
   // It can be either a directory or block device (disk, partition, ...).
+  // +required
   optional string path = 1;
 
   // fsType is the filesystem type to mount.
@@ -2528,6 +2563,7 @@ message LocalVolumeSource {
 // ModifyVolumeStatus represents the status object of ControllerModifyVolume operation
 message ModifyVolumeStatus {
   // targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled
+  // +optional
   optional string targetVolumeAttributesClassName = 1;
 
   // status is the status of the ControllerModifyVolume operation. It can be in any of following states:
@@ -2540,6 +2576,7 @@ message ModifyVolumeStatus {
   //   Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
   // 	  resolve the error, a valid VolumeAttributesClass needs to be specified.
   // Note: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.
+  // +optional
   optional string status = 2;
 }
 
@@ -2548,10 +2585,12 @@ message ModifyVolumeStatus {
 message NFSVolumeSource {
   // server is the hostname or IP address of the NFS server.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
+  // +required
   optional string server = 1;
 
   // path that is exported by the NFS server.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
+  // +required
   optional string path = 2;
 
   // readOnly here will force the NFS export to be mounted with read-only permissions.
@@ -3423,13 +3462,13 @@ message PersistentVolumeClaimTemplate {
   // validation.
   //
   // +optional
-  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The specification for the PersistentVolumeClaim. The entire content is
   // copied unchanged into the PVC that gets created from this
   // template. The same fields as in a PersistentVolumeClaim
   // are also valid here.
+  // +optional
   optional PersistentVolumeClaimSpec spec = 2;
 }
 
@@ -3440,6 +3479,7 @@ message PersistentVolumeClaimTemplate {
 message PersistentVolumeClaimVolumeSource {
   // claimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+  // +required
   optional string claimName = 1;
 
   // readOnly Will force the ReadOnly setting in VolumeMounts.
@@ -3562,6 +3602,7 @@ message PersistentVolumeSource {
 
   // photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
   // Deprecated: PhotonPersistentDisk is deprecated and the in-tree photonPersistentDisk type is no longer supported.
+  // +optional
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 17;
 
   // portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
@@ -3681,11 +3722,13 @@ message PersistentVolumeStatus {
 // Represents a Photon Controller persistent disk resource.
 message PhotonPersistentDiskVolumeSource {
   // pdID is the ID that identifies Photon Controller persistent disk
+  // +required
   optional string pdID = 1;
 
   // fsType is the filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
   optional string fsType = 2;
 }
 
@@ -3949,6 +3992,7 @@ message PodCertificateProjection {
   //
   // Signers should document the keys and values they support. Signers should
   // deny requests that contain keys they do not recognize.
+  // +optional
   map<string, string> userAnnotations = 7;
 }
 
@@ -4438,6 +4482,7 @@ message PodSpec {
   // +patchStrategy=merge,retainKeys
   // +listType=map
   // +listMapKey=name
+  // +k8s:optional
   repeated Volume volumes = 1;
 
   // List of initialization containers belonging to the pod.
@@ -5075,11 +5120,13 @@ message PortStatus {
 // PortworxVolumeSource represents a Portworx volume resource.
 message PortworxVolumeSource {
   // volumeID uniquely identifies a Portworx volume
+  // +required
   optional string volumeID = 1;
 
   // fSType represents the filesystem type to mount
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
   optional string fsType = 2;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -5214,9 +5261,11 @@ message QuobyteVolumeSource {
   // registry represents a single or multiple Quobyte Registry services
   // specified as a string as host:port pair (multiple entries are separated with commas)
   // which acts as the central registry for volumes
+  // +required
   optional string registry = 1;
 
   // volume is a string that references an already created Quobyte volume by name.
+  // +required
   optional string volume = 2;
 
   // readOnly here will force the Quobyte volume to be mounted with read-only permissions.
@@ -5246,10 +5295,12 @@ message RBDPersistentVolumeSource {
   // monitors is a collection of Ceph monitors.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +listType=atomic
+  // +required
   repeated string monitors = 1;
 
   // image is the rados image name.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+  // +required
   optional string image = 2;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -5301,10 +5352,12 @@ message RBDVolumeSource {
   // monitors is a collection of Ceph monitors.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +listType=atomic
+  // +required
   repeated string monitors = 1;
 
   // image is the rados image name.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+  // +required
   optional string image = 2;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -5679,13 +5732,16 @@ message SELinuxOptions {
 // ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume
 message ScaleIOPersistentVolumeSource {
   // gateway is the host address of the ScaleIO API Gateway.
+  // +required
   optional string gateway = 1;
 
   // system is the name of the storage system as configured in ScaleIO.
+  // +required
   optional string system = 2;
 
   // secretRef references to the secret for ScaleIO user and other
   // sensitive information. If this is not provided, Login operation will fail.
+  // +optional
   optional SecretReference secretRef = 3;
 
   // sslEnabled is the flag to enable/disable SSL communication with Gateway, default false
@@ -5708,6 +5764,7 @@ message ScaleIOPersistentVolumeSource {
 
   // volumeName is the name of a volume already created in the ScaleIO system
   // that is associated with this volume source.
+  // +required
   optional string volumeName = 8;
 
   // fsType is the filesystem type to mount.
@@ -5727,13 +5784,16 @@ message ScaleIOPersistentVolumeSource {
 // ScaleIOVolumeSource represents a persistent ScaleIO volume
 message ScaleIOVolumeSource {
   // gateway is the host address of the ScaleIO API Gateway.
+  // +required
   optional string gateway = 1;
 
   // system is the name of the storage system as configured in ScaleIO.
+  // +required
   optional string system = 2;
 
   // secretRef references to the secret for ScaleIO user and other
   // sensitive information. If this is not provided, Login operation will fail.
+  // +optional
   optional LocalObjectReference secretRef = 3;
 
   // sslEnabled Flag enable/disable SSL communication with Gateway, default false
@@ -5756,6 +5816,7 @@ message ScaleIOVolumeSource {
 
   // volumeName is the name of a volume already created in the ScaleIO system
   // that is associated with this volume source.
+  // +required
   optional string volumeName = 8;
 
   // fsType is the filesystem type to mount.
@@ -6173,6 +6234,7 @@ message ServiceAccountTokenProjection {
 
   // path is the path relative to the mount point of the file to project the
   // token into.
+  // +required
   optional string path = 3;
 }
 
@@ -6537,6 +6599,7 @@ message SleepAction {
 message StorageOSPersistentVolumeSource {
   // volumeName is the human-readable name of the StorageOS volume.  Volume
   // names are only unique within a namespace.
+  // +required
   optional string volumeName = 1;
 
   // volumeNamespace specifies the scope of the volume within StorageOS.  If no
@@ -6569,6 +6632,7 @@ message StorageOSPersistentVolumeSource {
 message StorageOSVolumeSource {
   // volumeName is the human-readable name of the StorageOS volume.  Volume
   // names are only unique within a namespace.
+  // +required
   optional string volumeName = 1;
 
   // volumeNamespace specifies the scope of the volume within StorageOS.  If no
@@ -6863,9 +6927,11 @@ message TypedObjectReference {
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced
+  // +required
   optional string kind = 2;
 
   // Name is the name of resource being referenced
+  // +required
   optional string name = 3;
 
   // Namespace is the namespace of resource being referenced
@@ -6881,6 +6947,7 @@ message Volume {
   // name of the volume.
   // Must be a DNS_LABEL and unique within the pod.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // +required
   optional string name = 1;
 
   // volumeSource represents the location and type of the mounted volume.
@@ -6892,15 +6959,18 @@ message Volume {
 // volumeDevice describes a mapping of a raw block device within a container.
 message VolumeDevice {
   // name must match the name of a persistentVolumeClaim in the pod
+  // +required
   optional string name = 1;
 
   // devicePath is the path inside of the container that the device will be mapped to.
+  // +required
   optional string devicePath = 2;
 }
 
 // VolumeMount describes a mounting of a Volume within a container.
 message VolumeMount {
   // This must match the Name of a Volume.
+  // +required
   optional string name = 1;
 
   // Mounted read-only if true, read-write otherwise (false or unspecified).
@@ -6927,7 +6997,9 @@ message VolumeMount {
   // +optional
   optional string recursiveReadOnly = 7;
 
-  // Path within the container at which the volume should be mounted.
+  // Path within the container at which the volume should be mounted.  Must
+  // not contain ':'.
+  // +required
   optional string mountPath = 3;
 
   // Path within the volume from which the container's volume should be mounted.
@@ -6979,6 +7051,7 @@ message VolumeMountStatus {
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 message VolumeNodeAffinity {
   // required specifies hard node constraints that must be met.
+  // +required
   optional NodeSelector required = 1;
 }
 
@@ -7208,9 +7281,11 @@ message VolumeSource {
 
   // photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
   // Deprecated: PhotonPersistentDisk is deprecated and the in-tree photonPersistentDisk type is no longer supported.
+  // +optional
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
 
   // projected items for all in one resources secrets, configmaps, and downward API
+  // +optional
   optional ProjectedVolumeSource projected = 26;
 
   // portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
@@ -7259,6 +7334,7 @@ message VolumeSource {
   // persistent volumes at the same time.
   //
   // +optional
+  // +k8s:optional
   optional EphemeralVolumeSource ephemeral = 29;
 
   // image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
@@ -7275,6 +7351,7 @@ message VolumeSource {
   // The volume will be mounted read-only (ro).
   // Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.
   // The field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.
+  // +featureGate=ImageVolume
   // +optional
   optional ImageVolumeSource image = 30;
 }
@@ -7291,6 +7368,7 @@ message VolumeStatus {
 // Represents a vSphere volume resource.
 message VsphereVirtualDiskVolumeSource {
   // volumePath is the path that identifies vSphere volume vmdk
+  // +required
   optional string volumePath = 1;
 
   // fsType is filesystem type to mount.
