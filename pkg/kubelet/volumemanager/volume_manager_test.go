@@ -323,12 +323,10 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 
 	require.Error(t, err, "Expected an error but got none")
 
-	var attachErr *VolumeAttachLimitExceededError
-	require.ErrorAs(t, err, &attachErr, "Error should be of type VolumeAttachLimitExceededError")
-	require.Equal(t, []string{"vol1"}, attachErr.UnmountedVolumes, "UnmountedVolumes mismatch")
-	require.Equal(t, []string{"vol1"}, attachErr.UnattachedVolumes, "UnattachedVolumes mismatch")
-	require.Empty(t, attachErr.VolumesNotInDSW, "VolumesNotInDSW should be empty")
-	require.ErrorIs(t, attachErr.OriginalError, context.DeadlineExceeded, "OriginalError should be context.DeadlineExceeded")
+	rejectErr, ok := errors.AsType[*RejectingPodError](err)
+	require.True(t, ok, "Error should be of type *RejectingPodError, got %v", err)
+	assert.Equal(t, VolumeAttachmentLimitExceededReason, rejectErr.Reason)
+	assert.Contains(t, rejectErr.Desc, "unattached volumes=[vol1]")
 }
 
 // TestWaitForAttachAndMountNodeAffinityMismatch exercises the full WaitForAttachAndMount

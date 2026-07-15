@@ -310,18 +310,6 @@ type volumeManager struct {
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
 
-type VolumeAttachLimitExceededError struct {
-	UnmountedVolumes  []string
-	UnattachedVolumes []string
-	VolumesNotInDSW   []string
-	OriginalError     error
-}
-
-func (e *VolumeAttachLimitExceededError) Error() string {
-	return fmt.Sprintf("Node has reached its volume attachment limit, rejecting pod. unmounted volumes=%v, unattached volumes=%v, failed to process volumes=%v: %v",
-		e.UnmountedVolumes, e.UnattachedVolumes, e.VolumesNotInDSW, e.OriginalError)
-}
-
 // RejectingPodError signals that a pod must be rejected (set to phase Failed)
 // rather than kept waiting for its volumes.
 type RejectingPodError struct {
@@ -497,12 +485,10 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 					continue
 				}
 				if attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec) {
-					// Return error to the kubelet, which will then trigger the pod termination logic.
-					return &VolumeAttachLimitExceededError{
-						UnmountedVolumes:  unmountedVolumes,
-						UnattachedVolumes: unattachedVolumes,
-						VolumesNotInDSW:   volumesNotInDSW,
-						OriginalError:     err,
+					// Reject the pod so the kubelet triggers pod termination logic.
+					return &RejectingPodError{
+						Reason: VolumeAttachmentLimitExceededReason,
+						Desc:   fmt.Sprintf("Node has reached its volume attachment limit, unattached volumes=%v", unattachedVolumes),
 					}
 				}
 			}
