@@ -3162,6 +3162,11 @@ func (m *EmptyDirVolumeSource) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Mode != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.Mode))
+		i--
+		dAtA[i] = 0x18
+	}
 	if m.SizeLimit != nil {
 		{
 			size, err := m.SizeLimit.MarshalToSizedBuffer(dAtA[:i])
@@ -16417,6 +16422,9 @@ func (m *EmptyDirVolumeSource) Size() (n int) {
 		l = m.SizeLimit.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.Mode != nil {
+		n += 1 + sovGenerated(uint64(*m.Mode))
+	}
 	return n
 }
 
@@ -21678,6 +21686,7 @@ func (this *EmptyDirVolumeSource) String() string {
 	s := strings.Join([]string{`&EmptyDirVolumeSource{`,
 		`Medium:` + fmt.Sprintf("%v", this.Medium) + `,`,
 		`SizeLimit:` + strings.Replace(fmt.Sprintf("%v", this.SizeLimit), "Quantity", "resource.Quantity", 1) + `,`,
+		`Mode:` + valueToStringGenerated(this.Mode) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -33484,6 +33493,26 @@ func (m *EmptyDirVolumeSource) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Mode", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Mode = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
