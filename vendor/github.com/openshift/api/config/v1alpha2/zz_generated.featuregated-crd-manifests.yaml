@@ -1,0 +1,23 @@
+insightsdatagathers.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/2195
+  CRDName: insightsdatagathers.config.openshift.io
+  Capability: Insights
+  Category: ""
+  FeatureGates:
+  - InsightsConfig
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: InsightsDataGather
+  Labels: {}
+  PluralName: insightsdatagathers
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates:
+  - InsightsConfig
+  Version: v1alpha2
+

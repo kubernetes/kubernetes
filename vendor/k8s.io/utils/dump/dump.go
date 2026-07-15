@@ -39,16 +39,16 @@ var prettyPrintConfigForHash = &spew.ConfigState{
 
 // Pretty wrap the spew.Sdump with Indent, and disabled methods like error() and String()
 // The output may change over time, so for guaranteed output please take more direct control
-func Pretty(a interface{}) string {
+func Pretty(a any) string {
 	return prettyPrintConfig.Sdump(a)
 }
 
 // ForHash keeps the original Spew.Sprintf format to ensure the same checksum
-func ForHash(a interface{}) string {
+func ForHash(a any) string {
 	return prettyPrintConfigForHash.Sprintf("%#v", a)
 }
 
 // OneLine outputs the object in one line
-func OneLine(a interface{}) string {
+func OneLine(a any) string {
 	return prettyPrintConfig.Sprintf("%#v", a)
 }

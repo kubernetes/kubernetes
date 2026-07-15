@@ -41,7 +41,7 @@ var IPv4 = stdnet.IPv4
 // Parse IPv4 address (d.d.d.d).
 func parseIPv4(s string) IP {
 	var p [IPv4len]byte
-	for i := 0; i < IPv4len; i++ {
+	for i := range IPv4len {
 		if len(s) == 0 {
 			// Missing octets.
 			return nil

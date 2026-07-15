@@ -1,0 +1,34 @@
+routes.route.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1228
+  CRDName: routes.route.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - RouteExternalCertificate
+  FilenameOperatorName: ""
+  FilenameOperatorOrdering: ""
+  FilenameRunLevel: ""
+  GroupName: route.openshift.io
+  HasStatus: true
+  KindName: Route
+  Labels: {}
+  PluralName: routes
+  PrinterColumns:
+  - jsonPath: .status.ingress[0].host
+    name: Host
+    type: string
+  - jsonPath: .status.ingress[0].conditions[?(@.type=="Admitted")].status
+    name: Admitted
+    type: string
+  - jsonPath: .spec.to.name
+    name: Service
+    type: string
+  - jsonPath: .spec.tls.type
+    name: TLS
+    type: string
+  Scope: Namespaced
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+

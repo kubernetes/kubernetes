@@ -27,18 +27,18 @@ type Cache struct {
 
 	// OnEvicted optionally specifies a callback function to be
 	// executed when an entry is purged from the cache.
-	OnEvicted func(key Key, value interface{})
+	OnEvicted func(key Key, value any)
 
 	ll    *list.List
-	cache map[interface{}]*list.Element
+	cache map[any]*list.Element
 }
 
 // A Key may be any value that is comparable. See http://golang.org/ref/spec#Comparison_operators
-type Key interface{}
+type Key any
 
 type entry struct {
 	key   Key
-	value interface{}
+	value any
 }
 
 // New creates a new Cache.
@@ -48,14 +48,14 @@ func New(maxEntries int) *Cache {
 	return &Cache{
 		MaxEntries: maxEntries,
 		ll:         list.New(),
-		cache:      make(map[interface{}]*list.Element),
+		cache:      make(map[any]*list.Element),
 	}
 }
 
 // Add adds a value to the cache.
-func (c *Cache) Add(key Key, value interface{}) {
+func (c *Cache) Add(key Key, value any) {
 	if c.cache == nil {
-		c.cache = make(map[interface{}]*list.Element)
+		c.cache = make(map[any]*list.Element)
 		c.ll = list.New()
 	}
 	if ee, ok := c.cache[key]; ok {
@@ -71,7 +71,7 @@ func (c *Cache) Add(key Key, value interface{}) {
 }
 
 // Get looks up a key's value from the cache.
-func (c *Cache) Get(key Key) (value interface{}, ok bool) {
+func (c *Cache) Get(key Key) (value any, ok bool) {
 	if c.cache == nil {
 		return
 	}

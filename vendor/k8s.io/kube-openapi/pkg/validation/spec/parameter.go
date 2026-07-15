@@ -20,6 +20,7 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // ParamProps describes the specific attributes of an operation parameter
@@ -107,14 +108,14 @@ func (p *Parameter) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &p.ParamProps)
 }
 
-func (p *Parameter) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (p *Parameter) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
 		CommonValidations
 		SimpleSchema
-		Extensions
+		Extensions Extensions `json:",inline"`
 		ParamProps
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	if err := p.Refable.Ref.fromMap(x.Extensions); err != nil {
@@ -155,18 +156,18 @@ func (p Parameter) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b3, b1, b2, b4, b5), nil
 }
 
-func (p Parameter) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (p Parameter) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
 		CommonValidations commonValidationsOmitZero `json:",inline"`
 		SimpleSchema      simpleSchemaOmitZero      `json:",inline"`
 		ParamProps        paramPropsOmitZero        `json:",inline"`
 		Ref               string                    `json:"$ref,omitempty"`
-		Extensions
+		Extensions        Extensions                `json:",inline"`
 	}
 	x.CommonValidations = commonValidationsOmitZero(p.CommonValidations)
 	x.SimpleSchema = simpleSchemaOmitZero(p.SimpleSchema)
 	x.Extensions = internal.SanitizeExtensions(p.Extensions)
 	x.ParamProps = paramPropsOmitZero(p.ParamProps)
 	x.Ref = p.Refable.Ref.String()
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }

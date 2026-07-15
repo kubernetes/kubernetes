@@ -1,0 +1,59 @@
+securitycontextconstraints.security.openshift.io:
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
+  ApprovedPRNumber: https://github.com/openshift/api/pull/470
+  CRDName: securitycontextconstraints.security.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_03"
+  GroupName: security.openshift.io
+  HasStatus: false
+  KindName: SecurityContextConstraints
+  Labels: {}
+  PluralName: securitycontextconstraints
+  PrinterColumns:
+  - description: Determines if a container can request to be run as privileged
+    jsonPath: .allowPrivilegedContainer
+    name: Priv
+    type: string
+  - description: A list of capabilities that can be requested to add to the container
+    jsonPath: .allowedCapabilities
+    name: Caps
+    type: string
+  - description: Strategy that will dictate what labels will be set in the SecurityContext
+    jsonPath: .seLinuxContext.type
+    name: SELinux
+    type: string
+  - description: Strategy that will dictate what RunAsUser is used in the SecurityContext
+    jsonPath: .runAsUser.type
+    name: RunAsUser
+    type: string
+  - description: Strategy that will dictate what fs group is used by the SecurityContext
+    jsonPath: .fsGroup.type
+    name: FSGroup
+    type: string
+  - description: Strategy that will dictate what supplemental groups are used by the
+      SecurityContext
+    jsonPath: .supplementalGroups.type
+    name: SupGroup
+    type: string
+  - description: Sort order of SCCs
+    jsonPath: .priority
+    name: Priority
+    type: string
+  - description: Force containers to run with a read only root file system
+    jsonPath: .readOnlyRootFilesystem
+    name: ReadOnlyRootFS
+    type: string
+  - description: White list of allowed volume plugins
+    jsonPath: .volumes
+    name: Volumes
+    type: string
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+

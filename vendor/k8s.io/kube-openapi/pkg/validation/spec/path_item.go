@@ -20,6 +20,7 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // PathItemProps the path item specific properties
@@ -61,13 +62,13 @@ func (p *PathItem) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &p.PathItemProps)
 }
 
-func (p *PathItem) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (p *PathItem) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		Extensions
+		Extensions Extensions `json:",inline"`
 		PathItemProps
 	}
 
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	if err := p.Refable.Ref.fromMap(x.Extensions); err != nil {
@@ -100,14 +101,14 @@ func (p PathItem) MarshalJSON() ([]byte, error) {
 	return concated, nil
 }
 
-func (p PathItem) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (p PathItem) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		Ref string `json:"$ref,omitempty"`
-		Extensions
+		Ref        string     `json:"$ref,omitempty"`
+		Extensions Extensions `json:",inline"`
 		PathItemProps
 	}
 	x.Ref = p.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(p.Extensions)
 	x.PathItemProps = p.PathItemProps
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }

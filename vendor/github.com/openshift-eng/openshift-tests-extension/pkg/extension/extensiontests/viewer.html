@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results for {{ .SuiteName }}</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --success: #238636;
+            --success-bg: #1a4721;
+            --failure: #da3633;
+            --failure-bg: #4a1d1d;
+            --skipped: #6e7681;
+            --skipped-bg: #2d333b;
+            --flaky: #d29922;
+            --flaky-bg: #3d2e0a;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        header {
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-info {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* File Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 48px;
+            text-align: center;
+            background: var(--bg-secondary);
+            transition: all 0.2s;
+            cursor: pointer;
+            margin-bottom: 24px;
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: var(--bg-tertiary);
+        }
+
+        .drop-zone h2 {
+            font-size: 20px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .drop-zone p {
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .drop-zone input[type="file"] {
+            display: none;
+        }
+
+        .drop-zone .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .drop-zone .btn:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Summary Cards */
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .summary-card:hover {
+            border-color: var(--accent);
+        }
+
+        .summary-card.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        .summary-card .count {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .summary-card .label {
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .summary-card.passed .count { color: var(--success); }
+        .summary-card.failed .count { color: var(--failure); }
+        .summary-card.skipped .count { color: var(--skipped); }
+        .summary-card.flaky .count { color: var(--flaky); }
+        .summary-card.total .count { color: var(--accent); }
+
+        /* Time Slider */
+        .time-slider-group {
+            grid-column: 1 / -1;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 8px;
+        }
+
+        .time-slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .time-slider-label {
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .time-slider-values {
+            font-size: 13px;
+            color: var(--text-primary);
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+        }
+
+        .time-slider-track {
+            position: relative;
+            height: 24px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .time-slider-range {
+            position: absolute;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0.3;
+            border-radius: 4px;
+        }
+
+        .time-slider-handle {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            background: var(--accent);
+            border: 2px solid var(--bg-primary);
+            border-radius: 50%;
+            cursor: grab;
+            z-index: 2;
+        }
+
+        .time-slider-handle:hover {
+            background: var(--accent-hover);
+        }
+
+        .time-slider-handle:active {
+            cursor: grabbing;
+        }
+
+        .time-slider-ticks {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4px;
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        /* Filters */
+        .filters {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .filter-group input:focus,
+        .filter-group select:focus {
+            border-color: var(--accent);
+        }
+
+        .filter-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .filter-actions {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        .btn-clear {
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-clear:hover {
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+
+        /* Results Count */
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 0 4px;
+        }
+
+        .results-count {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .sort-options {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .sort-options label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .sort-options select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+        }
+
+        /* Test List */
+        .test-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .test-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .test-item:hover {
+            border-color: var(--text-muted);
+        }
+
+        .test-header {
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .test-status {
+            flex-shrink: 0;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-top: 6px;
+        }
+
+        .test-status.passed { background: var(--success); }
+        .test-status.failed { background: var(--failure); }
+        .test-status.skipped { background: var(--skipped); }
+        .test-status.flaky { background: var(--flaky); }
+
+        .test-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .test-name {
+            font-size: 14px;
+            font-weight: 500;
+            word-break: break-word;
+            margin-bottom: 4px;
+        }
+
+        .test-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .test-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .tag.passed { background: var(--success-bg); color: #3fb950; }
+        .tag.failed { background: var(--failure-bg); color: #f85149; }
+        .tag.skipped { background: var(--skipped-bg); color: #8b949e; }
+        .tag.flaky { background: var(--flaky-bg); color: #d29922; }
+
+        .copy-btn {
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+
+        .copy-btn.copied {
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .test-toggle {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+
+        .test-item.expanded .test-toggle {
+            transform: rotate(90deg);
+        }
+
+        .test-output {
+            display: none;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-primary);
+        }
+
+        .test-item.expanded .test-output {
+            display: block;
+        }
+
+        .test-details-panel {
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .detail-label {
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+
+        .detail-value {
+            font-size: 13px;
+            color: var(--text-primary);
+            word-break: break-all;
+            overflow-wrap: break-word;
+        }
+
+        .detail-value.mono {
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+        }
+
+        .tag-subtle {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .output-section {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .output-section:last-child {
+            border-bottom: none;
+        }
+
+        .output-label {
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .output-section:first-child .output-label {
+            background: var(--failure-bg);
+            color: #f85149;
+        }
+
+        .output-content {
+            padding: 16px;
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .output-content.error-content {
+            background: rgba(248, 81, 73, 0.05);
+        }
+
+        .output-content .log-line {
+            padding: 1px 0;
+        }
+
+        .output-content .log-step {
+            color: #58a6ff;
+            font-weight: 500;
+        }
+
+        .output-content .log-info {
+            color: #8b949e;
+        }
+
+        .output-content .log-error {
+            color: #f85149;
+        }
+
+        .output-content .log-warning {
+            color: #d29922;
+        }
+
+        .output-content .log-success {
+            color: #3fb950;
+        }
+
+        .output-content .log-skip {
+            color: #a371f7;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 64px 24px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 24px;
+            padding: 16px;
+        }
+
+        .pagination button {
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            border-color: var(--accent);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            color: var(--text-secondary);
+            font-size: 14px;
+            padding: 0 16px;
+        }
+
+        /* Duration bar */
+        .duration-bar {
+            height: 3px;
+            background: var(--border-color);
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .duration-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        /* Search highlighting */
+        .search-highlight {
+            background: #5c4d1a;
+            color: #ffd700;
+            padding: 1px 2px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l3 3L22 4"/>
+                    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                </svg>
+                <span id="pageTitle">Results for {{ .SuiteName }}</span>
+            </h1>
+            <p class="file-info" id="fileInfo">No file loaded</p>
+        </header>
+
+        <div class="drop-zone" id="dropZone">
+            <h2>Load Test Results</h2>
+            <p>Drag and drop a JSON test results file here, or click to browse</p>
+            <label class="btn">
+                Choose File
+                <input type="file" id="fileInput" accept=".json">
+            </label>
+        </div>
+
+        <div id="resultsContainer" class="hidden">
+            <div class="summary" id="summary">
+                <div class="summary-card total" data-filter="all">
+                    <div class="count" id="totalCount">0</div>
+                    <div class="label">Total</div>
+                </div>
+                <div class="summary-card passed" data-filter="passed">
+                    <div class="count" id="passedCount">0</div>
+                    <div class="label">Passed</div>
+                </div>
+                <div class="summary-card failed" data-filter="failed">
+                    <div class="count" id="failedCount">0</div>
+                    <div class="label">Failed</div>
+                </div>
+                <div class="summary-card flaky" data-filter="flaky">
+                    <div class="count" id="flakyCount">0</div>
+                    <div class="label">Flaky</div>
+                </div>
+                <div class="summary-card skipped" data-filter="skipped">
+                    <div class="count" id="skippedCount">0</div>
+                    <div class="label">Skipped</div>
+                </div>
+            </div>
+
+            <div class="filters">
+                <div class="filter-group">
+                    <label for="nameFilter">Test Name</label>
+                    <input type="text" id="nameFilter" placeholder="Filter by name...">
+                </div>
+                <div class="filter-group">
+                    <label for="outputFilter">Output / Error</label>
+                    <input type="text" id="outputFilter" placeholder="Search (regex supported)...">
+                </div>
+                <div class="filter-group">
+                    <label for="lifecycleFilter">Lifecycle</label>
+                    <select id="lifecycleFilter">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="filter-group hidden" id="binaryFilterGroup">
+                    <label for="binaryFilter">Binary</label>
+                    <select id="binaryFilter">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="filter-group hidden" id="imageFilterGroup">
+                    <label for="imageFilter">Image</label>
+                    <select id="imageFilter">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="filter-actions">
+                    <button class="btn-clear" id="clearFilters">Clear Filters</button>
+                </div>
+                <div class="filter-group time-slider-group" id="timeSliderContainer">
+                    <div class="time-slider-header">
+                        <label class="time-slider-label">Time Range</label>
+                        <span class="time-slider-values" id="timeSliderValues">0ms - 0ms</span>
+                        <button class="btn-clear" id="resetTimeSlider">Reset</button>
+                    </div>
+                    <div class="time-slider-track" id="timeSliderTrack">
+                        <div class="time-slider-range" id="timeSliderRange"></div>
+                        <div class="time-slider-handle" id="timeSliderStart" data-handle="start"></div>
+                        <div class="time-slider-handle" id="timeSliderEnd" data-handle="end"></div>
+                    </div>
+                    <div class="time-slider-ticks">
+                        <span id="timeTickStart">0ms</span>
+                        <span id="timeTickEnd">0ms</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="results-header">
+                <span class="results-count" id="resultsCount">0 tests</span>
+                <div class="sort-options">
+                    <label for="sortBy">Sort by:</label>
+                    <select id="sortBy">
+                        <option value="startTime" selected>Start Time</option>
+                        <option value="name">Name</option>
+                        <option value="duration-desc">Duration (longest first)</option>
+                        <option value="duration-asc">Duration (shortest first)</option>
+                        <option value="status">Status</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="test-list" id="testList"></div>
+
+            <div class="pagination" id="pagination">
+                <button id="prevPage">Previous</button>
+                <span class="page-info" id="pageInfo">Page 1 of 1</span>
+                <button id="nextPage">Next</button>
+            </div>
+        </div>
+
+        <div class="empty-state hidden" id="emptyState">
+            <h3>No tests match your filters</h3>
+            <p>Try adjusting your search criteria</p>
+        </div>
+    </div>
+
+    <script id="test-data" type="application/json">{{ .Data }}</script>
+    <script>
+        // State
+        let rawData = null;
+        try {
+            const dataEl = document.getElementById('test-data');
+            // Check for unrendered Go template - but not just any double-braces which may appear in test output
+            const isUnrenderedTemplate = dataEl && dataEl.textContent.trim().startsWith('{' + '{ .Data }' + '}');
+            if (dataEl && dataEl.textContent.trim() && !isUnrenderedTemplate) {
+                rawData = JSON.parse(dataEl.textContent);
+            }
+        } catch(e) {
+            console.error('Failed to parse embedded test data:', e);
+        }
+        let allTests = [];
+        let filteredTests = [];
+        let currentPage = 1;
+        const pageSize = 50;
+        let activeStatusFilter = 'all';
+        let runStartTime = 0;
+        let runEndTime = 0;
+        let totalRunDuration = 0;
+        let timeFilterStart = 0;
+        let timeFilterEnd = 0;
+        let outputSearchTerm = '';
+        let hasBinaryField = false;
+        let hasImageField = false;
+
+        // DOM Elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const testList = document.getElementById('testList');
+        const emptyState = document.getElementById('emptyState');
+
+        // Initialize
+        function init() {
+            // Fix title if it contains template literal (no inline data)
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle && pageTitle.textContent.includes('{' + '{')) {
+                pageTitle.textContent = 'Test Results';
+                document.title = 'Test Results';
+            }
+
+            setupDragAndDrop();
+            setupFilters();
+            setupPagination();
+            setupSummaryCards();
+            setupTimeSlider();
+
+            if (rawData) {
+                processData(rawData, null);
+            }
+        }
+
+        // Drag and Drop
+        function setupDragAndDrop() {
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                const file = e.dataTransfer.files[0];
+                if (file) loadFile(file);
+            });
+
+            dropZone.addEventListener('click', (e) => {
+                // Avoid double-triggering when clicking the label/button
+                if (e.target.tagName !== 'LABEL' && !e.target.closest('label')) {
+                    fileInput.click();
+                }
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) loadFile(e.target.files[0]);
+            });
+        }
+
+        // Load File
+        function loadFile(file) {
+            if (!file.name.endsWith('.json')) {
+                alert('Please select a JSON file');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    processData(data, file.name);
+                } catch (err) {
+                    alert('Error parsing JSON file: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Process Data
+        function processData(data, filename) {
+            // Handle both array and object with tests property
+            allTests = Array.isArray(data) ? data : (data.tests || []);
+
+            // Detect flaky tests (tests with multiple runs where at least one passed and one didn't)
+            const testsByName = {};
+            allTests.forEach(test => {
+                if (!testsByName[test.name]) {
+                    testsByName[test.name] = [];
+                }
+                testsByName[test.name].push(test);
+            });
+
+            const flakyTestNames = new Set();
+            Object.entries(testsByName).forEach(([name, tests]) => {
+                if (tests.length > 1) {
+                    const hasPassed = tests.some(t => t.result === 'passed');
+                    const hasNonPassed = tests.some(t => t.result !== 'passed');
+                    if (hasPassed && hasNonPassed) {
+                        flakyTestNames.add(name);
+                    }
+                }
+            });
+
+            // Parse timestamps and extract metadata
+            allTests = allTests.map(test => {
+                const startMs = test.startTime ? new Date(test.startTime.replace(' UTC', 'Z').replace(' ', 'T')).getTime() : 0;
+                const endMs = test.endTime ? new Date(test.endTime.replace(' UTC', 'Z').replace(' ', 'T')).getTime() : 0;
+                return {
+                    ...test,
+                    durationMs: test.duration || 0,
+                    startMs: startMs,
+                    endMs: endMs,
+                    isFlaky: flakyTestNames.has(test.name),
+                    displayResult: flakyTestNames.has(test.name) ? 'flaky' : test.result
+                };
+            });
+
+            // Calculate overall run timespan
+            const validStartTimes = allTests.filter(t => t.startMs > 0).map(t => t.startMs);
+            const validEndTimes = allTests.filter(t => t.endMs > 0).map(t => t.endMs);
+            runStartTime = validStartTimes.length > 0 ? Math.min(...validStartTimes) : 0;
+            runEndTime = validEndTimes.length > 0 ? Math.max(...validEndTimes) : 0;
+            totalRunDuration = runEndTime - runStartTime;
+
+            // Initialize time filter to full range
+            timeFilterStart = runStartTime;
+            timeFilterEnd = runEndTime;
+
+            // Update time slider ticks and UI
+            document.getElementById('timeTickStart').textContent = formatTimestamp(runStartTime);
+            document.getElementById('timeTickEnd').textContent = formatTimestamp(runEndTime);
+            if (window.updateTimeSliderUI) window.updateTimeSliderUI();
+
+            // Update file info and title
+            fileInfo.textContent = filename ? `${filename} - ${allTests.length} tests` : `${allTests.length} tests`;
+
+            // Update title if it contains template literal (file was loaded via picker)
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle && pageTitle.textContent.includes('{' + '{')) {
+                pageTitle.textContent = 'Test Results';
+                document.title = 'Test Results';
+            }
+
+            // Populate filters
+            populateFilters();
+
+            // Update counts
+            updateCounts();
+
+            // Show results
+            dropZone.classList.add('hidden');
+            resultsContainer.classList.remove('hidden');
+
+            // Apply filters and render
+            applyFilters();
+        }
+
+        // Populate filter dropdowns
+        function populateFilters() {
+            const lifecycles = [...new Set(allTests.map(t => t.lifecycle).filter(Boolean))].sort();
+
+            const lifecycleFilter = document.getElementById('lifecycleFilter');
+            lifecycleFilter.innerHTML = '<option value="">All</option>' +
+                lifecycles.map(l => `<option value="${l}">${l}</option>`).join('');
+
+            // Check for binary/image fields and populate if present
+            const binaries = [...new Set(allTests.map(t => t.source?.source_binary).filter(Boolean))].sort();
+            const images = [...new Set(allTests.map(t => t.source?.source_image).filter(Boolean))].sort();
+
+            hasBinaryField = binaries.length > 0;
+            hasImageField = images.length > 0;
+
+            const binaryFilterGroup = document.getElementById('binaryFilterGroup');
+            const imageFilterGroup = document.getElementById('imageFilterGroup');
+
+            if (hasBinaryField) {
+                binaryFilterGroup.classList.remove('hidden');
+                const binaryFilter = document.getElementById('binaryFilter');
+                binaryFilter.innerHTML = '<option value="">All</option>' +
+                    binaries.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+            } else {
+                binaryFilterGroup.classList.add('hidden');
+            }
+
+            if (hasImageField) {
+                imageFilterGroup.classList.remove('hidden');
+                const imageFilter = document.getElementById('imageFilter');
+                imageFilter.innerHTML = '<option value="">All</option>' +
+                    images.map(i => `<option value="${escapeHtml(i)}">${escapeHtml(i)}</option>`).join('');
+            } else {
+                imageFilterGroup.classList.add('hidden');
+            }
+        }
+
+        // Update summary counts
+        function updateCounts() {
+            const counts = {
+                total: allTests.length,
+                passed: allTests.filter(t => t.displayResult === 'passed').length,
+                failed: allTests.filter(t => t.displayResult === 'failed').length,
+                skipped: allTests.filter(t => t.displayResult === 'skipped').length,
+                flaky: allTests.filter(t => t.displayResult === 'flaky').length
+            };
+
+            document.getElementById('totalCount').textContent = counts.total;
+            document.getElementById('passedCount').textContent = counts.passed;
+            document.getElementById('failedCount').textContent = counts.failed;
+            document.getElementById('skippedCount').textContent = counts.skipped;
+            document.getElementById('flakyCount').textContent = counts.flaky;
+        }
+
+        // Setup summary card clicks
+        function setupSummaryCards() {
+            document.querySelectorAll('.summary-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const filter = card.dataset.filter;
+
+                    // Toggle active state
+                    document.querySelectorAll('.summary-card').forEach(c => c.classList.remove('active'));
+
+                    if (activeStatusFilter === filter) {
+                        activeStatusFilter = 'all';
+                    } else {
+                        activeStatusFilter = filter;
+                        card.classList.add('active');
+                    }
+
+                    applyFilters();
+                });
+            });
+        }
+
+        // Setup time slider
+        function setupTimeSlider() {
+            const track = document.getElementById('timeSliderTrack');
+            const startHandle = document.getElementById('timeSliderStart');
+            const endHandle = document.getElementById('timeSliderEnd');
+            const range = document.getElementById('timeSliderRange');
+            let dragging = null;
+
+            function updateSliderUI() {
+                if (totalRunDuration <= 0) return;
+                const startPercent = ((timeFilterStart - runStartTime) / totalRunDuration) * 100;
+                const endPercent = ((timeFilterEnd - runStartTime) / totalRunDuration) * 100;
+                startHandle.style.left = startPercent + '%';
+                endHandle.style.left = endPercent + '%';
+                range.style.left = startPercent + '%';
+                range.style.width = (endPercent - startPercent) + '%';
+                document.getElementById('timeSliderValues').textContent =
+                    formatTimestamp(timeFilterStart) + ' - ' + formatTimestamp(timeFilterEnd);
+            }
+
+            function handleDrag(e) {
+                if (!dragging || totalRunDuration <= 0) return;
+                const rect = track.getBoundingClientRect();
+                let percent = (e.clientX - rect.left) / rect.width;
+                percent = Math.max(0, Math.min(1, percent));
+                const time = runStartTime + (percent * totalRunDuration);
+
+                if (dragging === 'start') {
+                    timeFilterStart = Math.min(time, timeFilterEnd - 1);
+                } else {
+                    timeFilterEnd = Math.max(time, timeFilterStart + 1);
+                }
+                updateSliderUI();
+            }
+
+            function stopDrag() {
+                if (dragging) {
+                    dragging = null;
+                    applyFilters();
+                }
+                document.removeEventListener('mousemove', handleDrag);
+                document.removeEventListener('mouseup', stopDrag);
+            }
+
+            startHandle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                dragging = 'start';
+                document.addEventListener('mousemove', handleDrag);
+                document.addEventListener('mouseup', stopDrag);
+            });
+
+            endHandle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                dragging = 'end';
+                document.addEventListener('mousemove', handleDrag);
+                document.addEventListener('mouseup', stopDrag);
+            });
+
+            // Click on track to move nearest handle
+            track.addEventListener('click', (e) => {
+                if (e.target === startHandle || e.target === endHandle) return;
+                const rect = track.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                const time = runStartTime + (percent * totalRunDuration);
+                const distToStart = Math.abs(time - timeFilterStart);
+                const distToEnd = Math.abs(time - timeFilterEnd);
+                if (distToStart < distToEnd) {
+                    timeFilterStart = Math.min(time, timeFilterEnd - 1);
+                } else {
+                    timeFilterEnd = Math.max(time, timeFilterStart + 1);
+                }
+                updateSliderUI();
+                applyFilters();
+            });
+
+            // Reset button
+            document.getElementById('resetTimeSlider').addEventListener('click', () => {
+                timeFilterStart = runStartTime;
+                timeFilterEnd = runEndTime;
+                updateSliderUI();
+                applyFilters();
+            });
+
+            // Expose update function globally
+            window.updateTimeSliderUI = updateSliderUI;
+        }
+
+        // Setup filters
+        function setupFilters() {
+            const nameFilter = document.getElementById('nameFilter');
+            const outputFilter = document.getElementById('outputFilter');
+            const lifecycleFilter = document.getElementById('lifecycleFilter');
+            const binaryFilter = document.getElementById('binaryFilter');
+            const imageFilter = document.getElementById('imageFilter');
+            const sortBy = document.getElementById('sortBy');
+            const clearFilters = document.getElementById('clearFilters');
+
+            let debounceTimer;
+            nameFilter.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => applyFilters(), 300);
+            });
+
+            outputFilter.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    outputSearchTerm = outputFilter.value;
+                    applyFilters();
+                }, 300);
+            });
+
+            [lifecycleFilter, binaryFilter, imageFilter, sortBy].forEach(el => {
+                el.addEventListener('change', () => applyFilters());
+            });
+
+            clearFilters.addEventListener('click', () => {
+                nameFilter.value = '';
+                outputFilter.value = '';
+                outputSearchTerm = '';
+                lifecycleFilter.value = '';
+                binaryFilter.value = '';
+                imageFilter.value = '';
+                activeStatusFilter = 'all';
+                document.querySelectorAll('.summary-card').forEach(c => c.classList.remove('active'));
+                applyFilters();
+            });
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const nameFilter = document.getElementById('nameFilter').value.toLowerCase();
+            const lifecycleFilter = document.getElementById('lifecycleFilter').value;
+            const binaryFilter = document.getElementById('binaryFilter').value;
+            const imageFilter = document.getElementById('imageFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+            const outputSearch = outputSearchTerm.toLowerCase();
+
+            filteredTests = allTests.filter(test => {
+                if (activeStatusFilter !== 'all' && test.displayResult !== activeStatusFilter) return false;
+                if (nameFilter && !test.name.toLowerCase().includes(nameFilter)) return false;
+                if (lifecycleFilter && test.lifecycle !== lifecycleFilter) return false;
+                if (binaryFilter && (test.source?.source_binary || '') !== binaryFilter) return false;
+                if (imageFilter && (test.source?.source_image || '') !== imageFilter) return false;
+                // Output/error search filter (supports regex)
+                if (outputSearch) {
+                    const output = test.output || '';
+                    const error = test.error || '';
+                    try {
+                        const regex = new RegExp(outputSearchTerm, 'i');
+                        if (!regex.test(output) && !regex.test(error)) return false;
+                    } catch (e) {
+                        // Invalid regex, fall back to literal search
+                        if (!output.toLowerCase().includes(outputSearch) && !error.toLowerCase().includes(outputSearch)) return false;
+                    }
+                }
+                // Time range filter: include test if it overlaps with the selected range
+                if (test.startMs > 0 && totalRunDuration > 0) {
+                    const testEnd = test.endMs || (test.startMs + test.durationMs);
+                    if (testEnd < timeFilterStart || test.startMs > timeFilterEnd) return false;
+                }
+                return true;
+            });
+
+            // Sort
+            filteredTests.sort((a, b) => {
+                switch (sortBy) {
+                    case 'duration-desc':
+                        return b.durationMs - a.durationMs;
+                    case 'duration-asc':
+                        return a.durationMs - b.durationMs;
+                    case 'status':
+                        const order = { failed: 0, flaky: 1, passed: 2, skipped: 3 };
+                        return (order[a.displayResult] || 4) - (order[b.displayResult] || 4);
+                    case 'startTime':
+                        return (a.startMs || 0) - (b.startMs || 0);
+                    default:
+                        return a.name.localeCompare(b.name);
+                }
+            });
+
+            currentPage = 1;
+            renderTests();
+            updatePagination();
+        }
+
+        // Render tests
+        function renderTests() {
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            const pageTests = filteredTests.slice(start, end);
+
+            document.getElementById('resultsCount').textContent =
+                `${filteredTests.length} test${filteredTests.length !== 1 ? 's' : ''}`;
+
+            if (pageTests.length === 0) {
+                testList.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                document.getElementById('pagination').classList.add('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            document.getElementById('pagination').classList.remove('hidden');
+
+            testList.innerHTML = pageTests.map((test, idx) => `
+                <div class="test-item" data-index="${start + idx}">
+                    <div class="test-header" onclick="toggleTest(this.parentElement)">
+                        <div class="test-status ${test.displayResult}"></div>
+                        <div class="test-info">
+                            <div class="test-name">${escapeHtml(test.name)}</div>
+                            <div class="test-meta">
+                                <span class="tag ${test.displayResult}">${test.displayResult}</span>
+                                ${test.isFlaky ? `<span class="test-meta-item">(${test.result})</span>` : ''}
+                                ${test.lifecycle ? `<span class="test-meta-item">${escapeHtml(test.lifecycle)}</span>` : ''}
+                                <span class="test-meta-item">${formatDuration(test.durationMs)}</span>
+                                ${test.startTime ? `<span class="test-meta-item">${escapeHtml(test.startTime)}</span>` : ''}
+                            </div>
+                            ${totalRunDuration > 0 && test.startMs > 0 ? `
+                            <div class="duration-bar">
+                                <div class="duration-bar-fill" style="margin-left: ${((test.startMs - runStartTime) / totalRunDuration) * 100}%; width: ${Math.max((test.durationMs / totalRunDuration) * 100, 0.5)}%"></div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <button class="copy-btn" onclick="event.stopPropagation(); copyTestJson(${start + idx})" title="Copy JSON to clipboard">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/>
+                                <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"/>
+                            </svg>
+                        </button>
+                        <div class="test-toggle">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M6 12l4-4-4-4"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="test-output">
+                        <div class="test-details-panel">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Status</span>
+                                    <span class="detail-value"><span class="tag ${test.displayResult}">${test.displayResult}</span>${test.isFlaky ? ` <span class="tag-subtle">(${test.result})</span>` : ''}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Duration</span>
+                                    <span class="detail-value">${formatDuration(test.durationMs)}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Start Time</span>
+                                    <span class="detail-value">${escapeHtml(test.startTime || 'N/A')}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">End Time</span>
+                                    <span class="detail-value">${escapeHtml(test.endTime || 'N/A')}</span>
+                                </div>
+                                ${test.lifecycle ? `
+                                <div class="detail-item">
+                                    <span class="detail-label">Lifecycle</span>
+                                    <span class="detail-value">${escapeHtml(test.lifecycle)}</span>
+                                </div>
+                                ` : ''}
+                                ${test.source ? `
+                                ${test.source.source_binary ? `
+                                <div class="detail-item">
+                                    <span class="detail-label">Binary</span>
+                                    <span class="detail-value mono">${escapeHtml(test.source.source_binary)}</span>
+                                </div>
+                                ` : ''}
+                                ${test.source.source_image ? `
+                                <div class="detail-item">
+                                    <span class="detail-label">Image</span>
+                                    <span class="detail-value mono">${escapeHtml(test.source.source_image)}</span>
+                                </div>
+                                ` : ''}
+                                ${test.source.commit ? `
+                                <div class="detail-item">
+                                    <span class="detail-label">Commit</span>
+                                    <span class="detail-value mono">${escapeHtml(test.source.commit)}</span>
+                                </div>
+                                ` : ''}
+                                ${test.source.build_date ? `
+                                <div class="detail-item">
+                                    <span class="detail-label">Build Date</span>
+                                    <span class="detail-value">${escapeHtml(test.source.build_date)}</span>
+                                </div>
+                                ` : ''}
+                                ${test.source.git_tree_state ? `
+                                <div class="detail-item">
+                                    <span class="detail-label">Git State</span>
+                                    <span class="detail-value">${escapeHtml(test.source.git_tree_state)}</span>
+                                </div>
+                                ` : ''}
+                                ` : ''}
+                            </div>
+                        </div>
+                        ${test.error ? `
+                        <div class="output-section">
+                            <div class="output-label">Error</div>
+                            <div class="output-content error-content">${formatOutput(test.error)}</div>
+                        </div>
+                        ` : ''}
+                        <div class="output-section">
+                            <div class="output-label">Output</div>
+                            <div class="output-content">${formatOutput(test.output || 'No output available')}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Toggle test expansion
+        window.toggleTest = function(element) {
+            element.classList.toggle('expanded');
+        }
+
+        // Copy test JSON to clipboard
+        window.copyTestJson = function(index) {
+            const test = filteredTests[index];
+            if (!test) return;
+
+            // Get original test data (without computed properties)
+            const originalTest = {
+                name: test.name,
+                lifecycle: test.lifecycle,
+                duration: test.duration,
+                startTime: test.startTime,
+                endTime: test.endTime,
+                result: test.result,
+                error: test.error,
+                output: test.output,
+                source: test.source
+            };
+
+            const json = JSON.stringify(originalTest, null, 2);
+
+            navigator.clipboard.writeText(json).then(() => {
+                // Show feedback
+                const btn = document.querySelector(`[data-index="${index}"] .copy-btn`);
+                if (btn) {
+                    btn.classList.add('copied');
+                    setTimeout(() => btn.classList.remove('copied'), 1500);
+                }
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
+
+        // Format duration
+        function formatDuration(ms) {
+            if (!ms) return '0ms';
+            if (ms < 1000) return `${ms}ms`;
+            if (ms < 60000) return `${(ms / 1000).toFixed(2)}s`;
+            const mins = Math.floor(ms / 60000);
+            const secs = ((ms % 60000) / 1000).toFixed(1);
+            return `${mins}m ${secs}s`;
+        }
+
+        // Format timestamp as HH:MM:SS
+        function formatTimestamp(ms) {
+            if (!ms) return '--:--:--';
+            const date = new Date(ms);
+            return date.toTimeString().split(' ')[0];
+        }
+
+        // Format output with syntax highlighting
+        function formatOutput(output) {
+            return escapeHtml(output)
+                .split('\n')
+                .map(line => {
+                    let className = '';
+                    if (line.includes('STEP:')) className = 'log-step';
+                    else if (line.match(/error|fail|panic/i)) className = 'log-error';
+                    else if (line.match(/warn/i)) className = 'log-warning';
+                    else if (line.match(/success|pass/i)) className = 'log-success';
+                    else if (line.match(/skip/i)) className = 'log-skip';
+                    else if (line.match(/^I\d{4}/)) className = 'log-info';
+
+                    // Highlight search matches (supports regex)
+                    let highlightedLine = line;
+                    if (outputSearchTerm) {
+                        try {
+                            const regex = new RegExp(`(${outputSearchTerm})`, 'gi');
+                            highlightedLine = line.replace(regex, '<span class="search-highlight">$1</span>');
+                        } catch (e) {
+                            // Invalid regex, fall back to literal search
+                            const escapedTerm = escapeHtml(outputSearchTerm).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const literalRegex = new RegExp(`(${escapedTerm})`, 'gi');
+                            highlightedLine = line.replace(literalRegex, '<span class="search-highlight">$1</span>');
+                        }
+                    }
+
+                    return `<div class="log-line ${className}">${highlightedLine}</div>`;
+                })
+                .join('');
+        }
+
+        // Escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Setup pagination
+        function setupPagination() {
+            document.getElementById('prevPage').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderTests();
+                    updatePagination();
+                    window.scrollTo(0, 0);
+                }
+            });
+
+            document.getElementById('nextPage').addEventListener('click', () => {
+                const totalPages = Math.ceil(filteredTests.length / pageSize);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderTests();
+                    updatePagination();
+                    window.scrollTo(0, 0);
+                }
+            });
+        }
+
+        // Update pagination
+        function updatePagination() {
+            const totalPages = Math.max(1, Math.ceil(filteredTests.length / pageSize));
+            document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+        }
+
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>

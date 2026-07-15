@@ -34,7 +34,7 @@ var klogV = func(lvl klog.Level) bool {
 // Field is a key value pair that provides additional details about the trace.
 type Field struct {
 	Key   string
-	Value interface{}
+	Value any
 }
 
 func (f Field) format() string {

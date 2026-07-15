@@ -1,0 +1,116 @@
+backups.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1482
+  CRDName: backups.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - AutomatedEtcdBackup
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: Backup
+  Labels: {}
+  PluralName: backups
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates:
+  - AutomatedEtcdBackup
+  Version: v1alpha1
+
+criocredentialproviderconfigs.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/2557
+  CRDName: criocredentialproviderconfigs.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - CRIOCredentialProviderConfig
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: CRIOCredentialProviderConfig
+  Labels: {}
+  PluralName: criocredentialproviderconfigs
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates:
+  - CRIOCredentialProviderConfig
+  Version: v1alpha1
+
+clustermonitorings.config.openshift.io:
+  Annotations:
+    description: Cluster Monitoring Operators configuration API
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1929
+  CRDName: clustermonitorings.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - ClusterMonitoringConfig
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: ClusterMonitoring
+  Labels: {}
+  PluralName: clustermonitorings
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates:
+  - ClusterMonitoringConfig
+  Version: v1alpha1
+
+insightsdatagathers.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1245
+  CRDName: insightsdatagathers.config.openshift.io
+  Capability: Insights
+  Category: ""
+  FeatureGates:
+  - InsightsConfig
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: true
+  KindName: InsightsDataGather
+  Labels: {}
+  PluralName: insightsdatagathers
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates:
+  - InsightsConfig
+  Version: v1alpha1
+
+pkis.config.openshift.io:
+  Annotations: {}
+  ApprovedPRNumber: https://github.com/openshift/api/pull/2645
+  CRDName: pkis.config.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates:
+  - ConfigurablePKI
+  FilenameOperatorName: config-operator
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: config.openshift.io
+  HasStatus: false
+  KindName: PKI
+  Labels: {}
+  PluralName: pkis
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates:
+  - ConfigurablePKI
+  Version: v1alpha1
+

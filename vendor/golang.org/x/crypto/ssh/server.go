@@ -34,15 +34,20 @@ type Permissions struct {
 	// or not supported.
 	CriticalOptions map[string]string
 
-	// Extensions are extra functionality that the server may
-	// offer on authenticated connections. Lack of support for an
-	// extension does not preclude authenticating a user. Common
-	// extensions are "permit-agent-forwarding",
-	// "permit-X11-forwarding". The Go SSH library currently does
-	// not act on any extension, and it is up to server
-	// implementations to honor them. Extensions can be used to
-	// pass data from the authentication callbacks to the server
-	// application layer.
+	// Extensions are extra functionality that the server may offer on
+	// authenticated connections. Lack of support for an extension does not
+	// preclude authenticating a user. Common extensions are
+	// "permit-agent-forwarding", "permit-X11-forwarding". In general the Go
+	// SSH library does not act on extensions and it is up to server
+	// implementations to honor them; extensions can also be used to pass data
+	// from the authentication callbacks to the server application layer.
+	//
+	// The one extension acted upon by this library is "no-touch-required",
+	// which applies only to security-key public keys
+	// (sk-ecdsa-sha2-nistp256@openssh.com and sk-ssh-ed25519@openssh.com).
+	// When present, it waives the default requirement that SK signatures
+	// assert user presence (i.e. a physical touch of the authenticator)
+	// during signature verification.
 	Extensions map[string]string
 
 	// ExtraData allows to store user defined data.
@@ -82,6 +87,79 @@ type ServerPreAuthConn interface {
 	// SendAuthBanner sends a banner message to the client.
 	// It returns an error once the authentication phase has ended.
 	SendAuthBanner(string) error
+}
+
+// noTouchRequiredExtension is the extension name used by OpenSSH in
+// authorized_keys options and certificate extensions to mark keys
+// whose signatures do not need to assert user presence (touch). See
+// ssh-keygen(1) and sshd(8).
+const noTouchRequiredExtension = "no-touch-required"
+
+// noTouchAllowed reports whether the user presence requirement on
+// SK signatures should be waived for this authentication attempt. The
+// requirement is waived when the "no-touch-required" extension is
+// present either in the Permissions returned by the auth callback
+// (authorized_keys-level opt-out) or in the certificate's own
+// Extensions (CA-level opt-out), matching OpenSSH behavior. OpenSSH
+// reads the per-key opt-out only from cert Extensions and
+// authorized_keys options (never from CriticalOptions); we follow the
+// same rule.
+func noTouchAllowed(pubKey PublicKey, perms *Permissions) bool {
+	if perms != nil {
+		if _, ok := perms.Extensions[noTouchRequiredExtension]; ok {
+			return true
+		}
+	}
+	if cert, ok := pubKey.(*Certificate); ok {
+		if _, ok := cert.Extensions[noTouchRequiredExtension]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// skKeyWithoutUP returns a PublicKey equivalent to pubKey but whose
+// Verify accepts SK signatures with the user-presence flag clear. If
+// pubKey is not (and does not wrap) an SK key, pubKey is returned
+// unchanged. The returned value never mutates pubKey: for SK keys a
+// shallow copy is made so that the noTouchRequired flag is set only on
+// the clone.
+//
+// The implementation is iterative rather than recursive. When pubKey
+// is a *Certificate we unwrap exactly one level to look at the inner
+// key. The SSH cert format forbids Certificate.Key from being another
+// Certificate (parseCert rejects it), but nothing stops callers from
+// constructing such a value directly in Go; a recursive descent could
+// otherwise be driven to unbounded depth by a hand-crafted or cyclic
+// Certificate. A malformed input of that shape simply returns
+// unchanged here.
+func skKeyWithoutUP(pubKey PublicKey) PublicKey {
+	cert, isCert := pubKey.(*Certificate)
+	target := pubKey
+	if isCert {
+		target = cert.Key
+	}
+	var cloned PublicKey
+	switch k := target.(type) {
+	case *skECDSAPublicKey:
+		c := *k
+		c.noTouchRequired = true
+		cloned = &c
+	case *skEd25519PublicKey:
+		c := *k
+		c.noTouchRequired = true
+		cloned = &c
+	default:
+		// Not an SK key (or a pathological *Certificate wrapping
+		// another *Certificate): pubKey is already usable for Verify.
+		return pubKey
+	}
+	if !isCert {
+		return cloned
+	}
+	c := *cert
+	c.Key = cloned
+	return &c
 }
 
 // ServerConfig holds server specific configuration data.
@@ -242,8 +320,10 @@ func (c *pubKeyCache) add(candidate cachedPubKey) {
 type ServerConn struct {
 	Conn
 
-	// If the succeeding authentication callback returned a
-	// non-nil Permissions pointer, it is stored here.
+	// If the succeeding authentication callback returned a non-nil Permissions
+	// pointer, it is stored here. These are the permissions from the final,
+	// successful authentication method. Permissions returned by callbacks that
+	// return PartialSuccessError are not preserved and must be nil.
 	Permissions *Permissions
 }
 
@@ -737,8 +817,15 @@ userAuthLoop:
 				}
 
 				signedData := buildDataSignedForAuth(sessionID, userAuthReq, algo, pubKeyData)
-
-				if err := pubKey.Verify(signedData, sig); err != nil {
+				// pubKey is reused below for VerifiedPublicKeyCallback and
+				// must remain the key as presented by the client; derive a
+				// separate value for Verify that carries any applicable
+				// no-touch-required opt-out.
+				pubKeyForVerify := pubKey
+				if noTouchAllowed(pubKey, candidate.perms) {
+					pubKeyForVerify = skKeyWithoutUP(pubKey)
+				}
+				if err := pubKeyForVerify.Verify(signedData, sig); err != nil {
 					return nil, err
 				}
 
@@ -749,6 +836,13 @@ userAuthLoop:
 					// and successfully verified. If authErr is non-nil, the key is not
 					// considered verified and the callback must not run.
 					perms, authErr = config.VerifiedPublicKeyCallback(s, pubKey, perms, algo)
+				}
+				if authErr == nil && perms != nil && perms.CriticalOptions != nil {
+					if saco := perms.CriticalOptions[sourceAddressCriticalOption]; saco != "" {
+						if err := checkSourceAddress(s.RemoteAddr(), saco); err != nil {
+							authErr = err
+						}
+					}
 				}
 			}
 		case "gssapi-with-mic":
@@ -824,6 +918,13 @@ userAuthLoop:
 		var failureMsg userAuthFailureMsg
 
 		if partialSuccess, ok := authErr.(*PartialSuccessError); ok {
+			// Permissions are not preserved between authentication steps. To
+			// avoid confusion about the final state of the connection, we
+			// disallow returning non-nil Permissions combined with
+			// PartialSuccessError.
+			if perms != nil {
+				return nil, errors.New("ssh: permissions must be nil when returning PartialSuccessError")
+			}
 			// After a partial success error we don't allow changing the user
 			// name and execute the NoClientAuthCallback.
 			partialSuccessReturned = true

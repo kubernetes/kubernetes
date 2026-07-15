@@ -27,19 +27,19 @@ import (
 //
 // This function is only valid for structs and pointers to structs.  Any other
 // type will cause a panic.  Passing a typed nil pointer will return true.
-func AllPtrFieldsNil(obj interface{}) bool {
+func AllPtrFieldsNil(obj any) bool {
 	v := reflect.ValueOf(obj)
 	if !v.IsValid() {
 		panic(fmt.Sprintf("reflect.ValueOf() produced a non-valid Value for %#v", obj))
 	}
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return true
 		}
 		v = v.Elem()
 	}
 	for i := 0; i < v.NumField(); i++ {
-		if v.Field(i).Kind() == reflect.Ptr && !v.Field(i).IsNil() {
+		if v.Field(i).Kind() == reflect.Pointer && !v.Field(i).IsNil() {
 			return false
 		}
 	}
@@ -51,7 +51,7 @@ func To[T any](v T) *T {
 	return &v
 }
 
-// Deref dereferences ptr and returns the value it points to if no nil, or else
+// Deref dereferences ptr and returns the value it points to if not nil, or else
 // returns def.
 func Deref[T any](ptr *T, def T) T {
 	if ptr != nil {
