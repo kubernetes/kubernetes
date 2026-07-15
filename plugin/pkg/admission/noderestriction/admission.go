@@ -723,14 +723,17 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		return fmt.Errorf("node may only request 0 or 1 audiences")
 	}
 
-	foundAudiencesInPodSpec, err := p.podReferencesAudience(ctx, pod, requestedAudience)
-	if err != nil {
-		return fmt.Errorf("error validating audience %q: %w", requestedAudience, err)
-	}
-	if foundAudiencesInPodSpec {
+	foundAudiencesInPodSpec, podRefErr := p.podReferencesAudience(ctx, pod, requestedAudience)
+	if podRefErr == nil && foundAudiencesInPodSpec {
 		return nil
 	}
 
+	// The pod spec does not reference the requested audience, or we could not
+	// determine whether it does because resolving the pod's volume sources failed
+	// (for example a referenced PVC, PV, or CSIDriver was not found). Either way,
+	// fall back to the authorizer so that an explicit grant of the
+	// request-serviceaccounts-token-audience verb still acts as an escape hatch,
+	// including on the error path.
 	attrs := buildAuthorizerAttributes(
 		a,
 		"request-serviceaccounts-token-audience",
@@ -738,14 +741,21 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		a.GetName(), // This API operation is on the service account, so this is the SA name.
 	)
 
-	authorized, _, err := p.authz.Authorize(ctx, attrs)
+	authorized, _, authzErr := p.authz.Authorize(ctx, attrs)
 	// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
 	// following the same pattern as withAuthorization (ref: https://github.com/kubernetes/kubernetes/blob/2b025e645975d6d51bf38c008f972c632cf49657/staging/src/k8s.io/apiserver/pkg/endpoints/filters/authorization.go#L71-L91)
 	if authorized == authorizer.DecisionAllow {
 		return nil
 	}
-	if err != nil {
-		return fmt.Errorf("error authorizing %s to request tokens for audience %q: %w", a.GetUserInfo().GetName(), requestedAudience, err)
+
+	// The authorizer did not allow the request. Surface the most actionable error:
+	// a failure to resolve the pod's audiences points at a real misconfiguration,
+	// so prefer it over the generic authorization errors.
+	if podRefErr != nil {
+		return fmt.Errorf("error validating audience %q: %w", requestedAudience, podRefErr)
+	}
+	if authzErr != nil {
+		return fmt.Errorf("error authorizing %s to request tokens for audience %q: %w", a.GetUserInfo().GetName(), requestedAudience, authzErr)
 	}
 
 	return fmt.Errorf("%s is not authorized to request tokens for audience %q", a.GetUserInfo().GetName(), requestedAudience)
