@@ -181,3 +181,25 @@ func TestValidateDeviceCapacity(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateRequestPolicyRangeStepLargeStep covers a positive validRange.step
+// that exceeds math.MaxInt64 (a multiple of 2^64), whose Value() truncates to 0.
+// The int64 modulo used to divide by zero and panic, bypassing the Sign() guard
+// from #139698. It must report a plain validation error instead.
+func TestValidateRequestPolicyRangeStepLargeStep(t *testing.T) {
+	step := apiresource.MustParse("18446744073709551616") // 2^64
+	if step.Sign() <= 0 || step.Value() != 0 {
+		t.Fatalf("precondition: 2^64 should have Sign()>0 and Value()==0, got Sign()=%d Value()=%d", step.Sign(), step.Value())
+	}
+	min := apiresource.MustParse("1")
+	stepPath := field.NewPath("step")
+
+	// value != min cannot be reached by such a step: expect one error, no panic.
+	if errs := validateRequestPolicyRangeStep(apiresource.MustParse("2"), min, step, stepPath); len(errs) != 1 {
+		t.Errorf("value != min with a 2^64 step: want 1 error, got %v", errs)
+	}
+	// value == min is valid (reachable with zero steps): expect no error, no panic.
+	if errs := validateRequestPolicyRangeStep(min, min, step, stepPath); len(errs) != 0 {
+		t.Errorf("value == min with a 2^64 step: want no error, got %v", errs)
+	}
+}

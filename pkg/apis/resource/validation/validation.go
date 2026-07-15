@@ -1194,11 +1194,18 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 
 func validateRequestPolicyRangeStep(value, min, step apiresource.Quantity, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	stepVal := step.Value()
-	minVal := min.Value()
-	val := value.Value()
-	added := (val - minVal)
-	if added%stepVal != 0 {
+	// A positive step (the caller checks Sign() > 0) can still exceed
+	// math.MaxInt64, in which case Value() truncates it: a multiple of 2^64
+	// truncates to 0. Handle that with an exact comparison so the int64 modulo
+	// never divides by zero. Such a step evenly divides only when value equals
+	// min (reachable with zero steps); any smaller difference is not a multiple.
+	var notMultiple bool
+	if stepVal := step.Value(); stepVal == 0 {
+		notMultiple = value.Cmp(min) != 0
+	} else {
+		notMultiple = (value.Value()-min.Value())%stepVal != 0
+	}
+	if notMultiple {
 		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), fmt.Sprintf("value is not a multiple of a given step (%s) from (%s)", step.String(), min.String())))
 	}
 	return allErrs
