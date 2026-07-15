@@ -3462,6 +3462,7 @@ message PersistentVolumeClaimTemplate {
   // validation.
   //
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The specification for the PersistentVolumeClaim. The entire content is

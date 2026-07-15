@@ -2411,6 +2411,7 @@ type PersistentVolumeClaimTemplate struct {
 	// validation.
 	//
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// The specification for the PersistentVolumeClaim. The entire content is

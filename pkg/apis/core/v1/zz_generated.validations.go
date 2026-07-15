@@ -364,8 +364,6 @@ func Validate_EphemeralVolumeSource(
 			if earlyReturn {
 				return // do not proceed
 			}
-			// call the type's validation function
-			errs = append(errs, Validate_PersistentVolumeClaimTemplate(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -665,38 +663,6 @@ func Validate_PersistentVolumeClaim(
 
 	// field corev1.PersistentVolumeClaim.Spec has no validation
 	// field corev1.PersistentVolumeClaim.Status has no validation
-	return errs
-}
-
-// Validate_PersistentVolumeClaimTemplate validates an instance of PersistentVolumeClaimTemplate according
-// to declarative validation rules in the API schema.
-func Validate_PersistentVolumeClaimTemplate(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *corev1.PersistentVolumeClaimTemplate) (errs field.ErrorList) {
-
-	{ // field corev1.PersistentVolumeClaimTemplate.ObjectMeta
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *metav1.ObjectMeta,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *corev1.PersistentVolumeClaimTemplate) *metav1.ObjectMeta {
-				return &oldObj.ObjectMeta
-			})
-		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
-	}
-
-	// field corev1.PersistentVolumeClaimTemplate.Spec has no validation
 	return errs
 }
 
