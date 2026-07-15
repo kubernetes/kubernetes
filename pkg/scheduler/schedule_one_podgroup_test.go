@@ -453,6 +453,104 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 	}
 }
 
+func TestScheduleOnePodGroup_FinishesAttemptWhenAllPoppedPodsAreAssumed(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+
+	tests := []struct {
+		name                       string
+		memberArrivesWhileInFlight bool
+	}{
+		{
+			name:                       "pending member is requeued",
+			memberArrivesWhileInFlight: true,
+		},
+		{
+			name:                       "later member starts a new queued PodGroup",
+			memberArrivesWhileInFlight: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			podGroup := st.MakePodGroup().Name("pg").Obj()
+			p1 := st.MakePod().Name("p1").UID("p1").PodGroupName(podGroup.Name).SchedulerName("test-scheduler").Obj()
+			p2 := st.MakePod().Name("p2").UID("p2").PodGroupName(podGroup.Name).SchedulerName("test-scheduler").Obj()
+
+			registry := frameworkruntime.Registry{
+				queuesort.Name:     queuesort.New,
+				defaultbinder.Name: defaultbinder.New,
+			}
+			profileCfg := config.KubeSchedulerProfile{
+				SchedulerName: "test-scheduler",
+				Plugins: &config.Plugins{
+					QueueSort: config.PluginSet{
+						Enabled: []config.Plugin{{Name: queuesort.Name}},
+					},
+					Bind: config.PluginSet{
+						Enabled: []config.Plugin{{Name: defaultbinder.Name}},
+					},
+				},
+			}
+			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
+				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create new framework: %v", err)
+			}
+
+			cache := internalcache.New(ctx, nil, true)
+			cache.AddPodGroup(podGroup)
+			cache.AddPodGroupMember(p1)
+			assumedP1 := p1.DeepCopy()
+			assumedP1.Spec.NodeName = "node1"
+			if err := cache.AssumePod(logger, assumedP1); err != nil {
+				t.Fatalf("Failed to assume pod: %v", err)
+			}
+
+			queue := internalqueue.NewTestQueue(ctx, schedFwk.QueueSortFunc())
+			queue.AddPodGroup(logger, podGroup)
+			queue.Add(ctx, p1)
+			entity, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatalf("Failed to pop pod group: %v", err)
+			}
+			podGroupInfo := entity.(*framework.QueuedPodGroupInfo)
+
+			if tt.memberArrivesWhileInFlight {
+				// A member arriving while its PodGroup is scheduling waits for
+				// that scheduling attempt to finish.
+				queue.Add(ctx, p2)
+				if pendingPods := queue.PendingPodGroupPods(); len(pendingPods) != 1 || pendingPods[0].UID != p2.UID {
+					t.Fatalf("Expected pod %q to be pending, got %v", p2.Name, pendingPods)
+				}
+			}
+
+			sched := &Scheduler{
+				Profiles:         profile.Map{"test-scheduler": schedFwk},
+				Cache:            cache,
+				nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+				SchedulingQueue:  queue,
+			}
+			sched.scheduleOnePodGroup(ctx, podGroupInfo)
+
+			if !tt.memberArrivesWhileInFlight {
+				queue.Add(ctx, p2)
+			}
+			if pendingPods := queue.PendingPodGroupPods(); len(pendingPods) != 0 {
+				t.Errorf("Expected no pending PodGroup members, got %v", pendingPods)
+			}
+			requeuedPodGroup, ok := queue.GetPodGroup(podGroup.Name, podGroup.Namespace)
+			if !ok {
+				t.Fatalf("Expected PodGroup to be queued")
+			}
+			if len(requeuedPodGroup.QueuedPodInfos) != 1 || requeuedPodGroup.QueuedPodInfos[0].Pod.UID != p2.UID {
+				t.Errorf("Expected queued PodGroup to contain pod %q, got %v", p2.Name, requeuedPodGroup.QueuedPodInfos)
+			}
+		})
+	}
+}
+
 func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 	p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
