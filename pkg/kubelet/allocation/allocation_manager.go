@@ -18,11 +18,6 @@ package allocation
 
 import (
 	"context"
-	"path/filepath"
-	"slices"
-	"sync"
-	"time"
-
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +36,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"path/filepath"
+	"slices"
+	"sync"
+	"time"
 )
 
 // podStatusManagerStateFile is the file name where status manager stores its state
@@ -595,7 +594,11 @@ func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod 
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
 			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation)
-			return false, result.Reason, result.Message
+			if result.Reason == "prohibitedCPUAllocationError" {
+				return false, v1.PodReasonInfeasible, result.Message
+			} else {
+				return false, result.Reason, result.Message
+			}
 		}
 	}
 
