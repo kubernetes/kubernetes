@@ -31,6 +31,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -92,6 +94,10 @@ const (
 	// VolumeAttachmentLimitExceededReason is the reason for rejecting a pod
 	// when the node has reached its volume attachment limit.
 	VolumeAttachmentLimitExceededReason = "VolumeAttachmentLimitExceeded"
+
+	// VolumeNodeAffinityReason is the reason for rejecting a pod when the node
+	// does not match the node affinity of one of the pod's persistent volumes.
+	VolumeNodeAffinityReason = "VolumeNodeAffinity"
 )
 
 // VolumeManager runs a set of asynchronous loops that figure out which volumes
@@ -316,6 +322,19 @@ func (e *VolumeAttachLimitExceededError) Error() string {
 		e.UnmountedVolumes, e.UnattachedVolumes, e.VolumesNotInDSW, e.OriginalError)
 }
 
+// RejectingPodError signals that a pod must be rejected (set to phase Failed)
+// rather than kept waiting for its volumes.
+type RejectingPodError struct {
+	// Reason is a short, low-cardinality label
+	Reason string
+	// Desc is the human-readable message.
+	Desc string
+}
+
+func (e *RejectingPodError) Error() string {
+	return e.Desc
+}
+
 func (vm *volumeManager) Run(ctx context.Context, sourcesReady config.SourcesReady) {
 	logger := klog.FromContext(ctx)
 	defer runtime.HandleCrashWithContext(ctx)
@@ -447,6 +466,11 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 		vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
 
 	if err != nil {
+		// A pod rejection already carries its own reason and message.
+		if _, ok := errors.AsType[*RejectingPodError](err); ok {
+			return err
+		}
+
 		unmountedVolumes :=
 			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
 		// Also get unattached volumes and volumes not in dsw for error message
@@ -578,11 +602,82 @@ func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName)
 // verifyVolumesMountedFunc returns a method that returns true when all expected
 // volumes are mounted.
 func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, expectedVolumes []string) wait.ConditionWithContextFunc {
-	return func(_ context.Context) (done bool, err error) {
+	getFreshNodeLabels := vm.newFreshNodeLabelsGetter()
+	return func(ctx context.Context) (done bool, err error) {
 		if errs := vm.desiredStateOfWorld.PopPodErrors(podName); len(errs) > 0 {
 			return true, errors.New(strings.Join(errs, "; "))
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutablePVNodeAffinity) {
+			if rejectErr := vm.checkVolumeNodeAffinity(ctx, podName, getFreshNodeLabels); rejectErr != nil {
+				return true, rejectErr
+			}
+		}
 		return len(vm.getUnmountedVolumes(podName, expectedVolumes)) == 0, nil
+	}
+}
+
+// checkVolumeNodeAffinity rejects the pod if any of its persistent volumes has a
+// node affinity that does not match this node, unless that volume has already been
+// mounted for the pod. It returns a *RejectingPodError to reject, or nil otherwise.
+func (vm *volumeManager) checkVolumeNodeAffinity(ctx context.Context, podName types.UniquePodName, getFreshNodeLabels func(context.Context) (map[string]string, error)) *RejectingPodError {
+	logger := klog.FromContext(ctx)
+	// Pre-check against the informer labels (no API call) on the happy path.
+	nodeLabels, err := vm.volumePluginMgr.Host.GetNodeLabels()
+	if err != nil {
+		logger.V(4).Info("Failed to get node labels, skipping volume node affinity check", "err", err)
+		return nil
+	}
+
+	for _, vtm := range vm.desiredStateOfWorld.GetVolumesToMount() {
+		if vtm.PodName != podName || vtm.VolumeSpec == nil || vtm.VolumeSpec.PersistentVolume == nil {
+			continue
+		}
+		if vm.actualStateOfWorld.GetVolumeMountState(vtm.VolumeName, podName) != operationexecutor.VolumeNotMounted {
+			// Don't interrupt already running pod
+			continue
+		}
+		pv := vtm.VolumeSpec.PersistentVolume
+		if storagehelpers.CheckNodeAffinity(pv, nodeLabels) == nil {
+			continue
+		}
+		// Node labels from the informer may lag a manual relabel,
+		// so a suspected mismatch is confirmed against a freshly-fetched node before rejecting.
+		freshLabels, err := getFreshNodeLabels(ctx)
+		if err != nil {
+			// The next poll tick retries.
+			logger.V(4).Info("Failed to get node to confirm volume node affinity mismatch", "err", err)
+			return nil
+		}
+		if affinityErr := storagehelpers.CheckNodeAffinity(pv, freshLabels); affinityErr != nil {
+			logger.V(1).Info("Rejecting pod because a volume's node affinity does not match the node",
+				"pod", podName, "pv", klog.KObj(pv), "err", affinityErr)
+			return &RejectingPodError{
+				Reason: VolumeNodeAffinityReason,
+				Desc:   fmt.Sprintf("volume %q node affinity does not match node: %v", pv.Name, affinityErr),
+			}
+		}
+	}
+	return nil
+}
+
+// newFreshNodeLabelsGetter returns a function that fetches this node's labels live
+// from the API server at most once, memoizing the result, which bounds the API calls a
+// burst of rejected pods can trigger.
+// It is built once per WaitForAttachAndMount so a node relabeled to a mismatch mid-wait (after a match
+// was cached) is only caught on the next SyncPod.
+func (vm *volumeManager) newFreshNodeLabelsGetter() func(context.Context) (map[string]string, error) {
+	var freshLabels map[string]string
+	fetched := false
+	return func(ctx context.Context) (map[string]string, error) {
+		if !fetched {
+			node, err := vm.kubeClient.CoreV1().Nodes().Get(ctx, string(vm.volumePluginMgr.Host.GetNodeName()), metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			freshLabels = node.Labels
+			fetched = true
+		}
+		return freshLabels, nil
 	}
 }
 

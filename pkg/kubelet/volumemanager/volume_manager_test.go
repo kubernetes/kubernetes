@@ -18,6 +18,7 @@ package volumemanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -41,16 +42,19 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
@@ -327,6 +331,263 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 	require.ErrorIs(t, attachErr.OriginalError, context.DeadlineExceeded, "OriginalError should be context.DeadlineExceeded")
 }
 
+// TestWaitForAttachAndMountNodeAffinityMismatch exercises the full WaitForAttachAndMount
+// path: a never-mounted PV whose node affinity does not match is rejected with a
+// *RejectingPodError, and only when the feature gate is enabled.
+func TestWaitForAttachAndMountNodeAffinityMismatch(t *testing.T) {
+	for _, gateEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("gate=%v", gateEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePVNodeAffinity, gateEnabled)
+
+			tmpDir := t.TempDir()
+			podManager := kubepod.NewBasicPodManager()
+
+			node, pod, pv, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
+			// Require a hostname the node does not have, so the affinity never matches.
+			pv.Spec.NodeAffinity = hostnameAffinity("some-other-node")
+
+			kubeClient := fake.NewClientset(node, pod, pv, claim)
+			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
+
+			tCtx := ktesting.Init(t)
+			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+			go manager.Run(tCtx, sourcesReady)
+			podManager.SetPods([]*v1.Pod{pod})
+
+			go simulateVolumeInUseUpdate(v1.UniqueVolumeName("fake/fake-device"), tCtx.Done(), manager)
+
+			ctx, cancel := context.WithTimeout(tCtx, 2*time.Second)
+			defer cancel()
+			err := manager.WaitForAttachAndMount(ctx, pod)
+			require.Error(t, err)
+
+			rejectErr, ok := errors.AsType[*RejectingPodError](err)
+			if gateEnabled {
+				require.True(t, ok, "expected a *RejectingPodError, got %v", err)
+				assert.Equal(t, VolumeNodeAffinityReason, rejectErr.Reason)
+			} else {
+				assert.False(t, ok, "must not reject when the feature gate is disabled, got %v", err)
+			}
+		})
+	}
+}
+
+// nodeAffinityMatching builds a PV node affinity that requires the given label
+// value on kubernetes.io/hostname.
+func hostnameAffinity(hostname string) *v1.VolumeNodeAffinity {
+	return &v1.VolumeNodeAffinity{
+		Required: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{{
+				MatchExpressions: []v1.NodeSelectorRequirement{{
+					Key:      "kubernetes.io/hostname",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{hostname},
+				}},
+			}},
+		},
+	}
+}
+
+// newAffinityCheckVM builds a volumeManager wired to exercise the node affinity
+// check: a fake host whose GetNodeLabels returns informerLabels (the cheap
+// pre-check) and a clientset Node carrying nodeLabels for the live confirm fetch.
+// Keeping the two label sets separate lets tests simulate a stale informer. It
+// returns the manager and a counter of live node fetches.
+func newAffinityCheckVM(t *testing.T, informerLabels, nodeLabels map[string]string) (*volumeManager, *int) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testHostname, Labels: nodeLabels},
+	}
+	kubeClient := fake.NewClientset(node)
+	nodeGets := new(int)
+	kubeClient.PrependReactor("get", "nodes", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		*nodeGets++
+		return false, nil, nil
+	})
+
+	plugins := volumetest.ProbeVolumePlugins(volume.VolumeConfig{})
+	host := volumetest.NewFakeKubeletVolumeHostWithCSINodeName(t, t.TempDir(), kubeClient, plugins, testHostname, nil, nil).
+		WithNodeLabels(informerLabels)
+	plugMgr := host.GetPluginMgr()
+
+	vm := &volumeManager{
+		kubeClient:          kubeClient,
+		volumePluginMgr:     plugMgr,
+		desiredStateOfWorld: cache.NewDesiredStateOfWorld(plugMgr, util.NewFakeSELinuxLabelTranslator()),
+		actualStateOfWorld:  cache.NewActualStateOfWorld(testHostname, plugMgr),
+	}
+	return vm, nodeGets
+}
+
+// affinityVolume describes one PV-backed volume to set up for a pod.
+type affinityVolume struct {
+	name        string
+	requireHost string                             // hostname the PV's nodeAffinity requires ("" = none)
+	mountState  operationexecutor.VolumeMountState // "" = never added to the actual state of world
+}
+
+// addPodVolumes builds a pod referencing the given volumes, adds each to the
+// desired state of world, and records its mount state in the actual state of world.
+// It returns the pod name and the outer volume names to wait on.
+func addPodVolumes(t *testing.T, vm *volumeManager, volumes []affinityVolume) (types.UniquePodName, []string) {
+	t.Helper()
+	logger, _ := ktesting.NewTestContext(t)
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "nsA", UID: "1234"}}
+	for _, v := range volumes {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+			Name:         v.name,
+			VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: v.name}},
+		})
+	}
+	podName := util.GetUniquePodName(pod)
+
+	names := make([]string, 0, len(volumes))
+	for _, v := range volumes {
+		names = append(names, v.name)
+		pv := &v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: v.name},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{RBD: &v1.RBDPersistentVolumeSource{RBDImage: v.name}},
+			},
+		}
+		if v.requireHost != "" {
+			pv.Spec.NodeAffinity = hostnameAffinity(v.requireHost)
+		}
+		spec := &volume.Spec{PersistentVolume: pv}
+		volumeName, err := vm.desiredStateOfWorld.AddPodToVolume(logger, podName, pod, spec, spec.Name(), "", nil)
+		require.NoError(t, err)
+		if v.mountState == "" {
+			continue
+		}
+		// A volume must be attached before it can be marked mounted/uncertain.
+		require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsAttached(logger, volumeName, spec, "", "fake/path"))
+		opts := operationexecutor.MarkVolumeOpts{
+			PodName:          podName,
+			PodUID:           pod.UID,
+			VolumeName:       volumeName,
+			VolumeSpec:       spec,
+			VolumeMountState: v.mountState,
+		}
+		switch v.mountState {
+		case operationexecutor.VolumeMounted:
+			require.NoError(t, vm.actualStateOfWorld.MarkVolumeAsMounted(opts))
+		case operationexecutor.VolumeMountUncertain:
+			require.NoError(t, vm.actualStateOfWorld.MarkVolumeMountAsUncertain(opts))
+		}
+	}
+	return podName, names
+}
+
+func TestCheckVolumeNodeAffinity(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePVNodeAffinity, true)
+	matching := map[string]string{"kubernetes.io/hostname": testHostname}
+	other := map[string]string{"kubernetes.io/hostname": "some-other-node"}
+
+	tests := []struct {
+		name           string
+		informerLabels map[string]string
+		nodeLabels     map[string]string
+		volumes        []affinityVolume
+		ticks          int // poll-loop iterations sharing one wait; 0 means 1
+
+		wantRejectContains string // non-empty: expect a reject whose Desc contains this
+		wantNodeGets       int
+	}{
+		{
+			name:               "never-mounted mismatch is rejected",
+			informerLabels:     other,
+			nodeLabels:         other,
+			volumes:            []affinityVolume{{name: "vol1", requireHost: testHostname}},
+			wantRejectContains: "vol1",
+			wantNodeGets:       1,
+		},
+		{
+			name:           "matching affinity is not rejected without a fresh Get",
+			informerLabels: matching,
+			nodeLabels:     matching,
+			volumes:        []affinityVolume{{name: "vol1", requireHost: testHostname}},
+			wantNodeGets:   0,
+		},
+		{
+			name:           "mounted volume is not rejected",
+			informerLabels: other,
+			nodeLabels:     other,
+			volumes:        []affinityVolume{{name: "vol1", requireHost: testHostname, mountState: operationexecutor.VolumeMounted}},
+			wantNodeGets:   0,
+		},
+		{
+			name:           "uncertain volume after restart is not rejected",
+			informerLabels: other,
+			nodeLabels:     other,
+			volumes:        []affinityVolume{{name: "vol1", requireHost: testHostname, mountState: operationexecutor.VolumeMountUncertain}},
+			wantNodeGets:   0,
+		},
+		{
+			name:           "multi-volume rejects the never-mounted mismatched one",
+			informerLabels: other,
+			nodeLabels:     other,
+			volumes: []affinityVolume{
+				// volA matches and is mounted; volB mismatches and was never mounted.
+				{name: "volA", requireHost: "some-other-node", mountState: operationexecutor.VolumeMounted},
+				{name: "volB", requireHost: testHostname},
+			},
+			wantRejectContains: "volB",
+			wantNodeGets:       1,
+		},
+		{
+			name:           "stale informer confirmed against fresh node is not rejected",
+			informerLabels: other, // stale: does not match
+			nodeLabels:     matching,
+			volumes:        []affinityVolume{{name: "vol1", requireHost: testHostname}},
+			wantNodeGets:   1,
+		},
+		{
+			name:           "fresh node Get is shared across volumes",
+			informerLabels: other, // stale: both volumes suspected, both confirmed by one Get
+			nodeLabels:     matching,
+			volumes: []affinityVolume{
+				{name: "vol1", requireHost: testHostname},
+				{name: "vol2", requireHost: testHostname},
+			},
+			wantNodeGets: 1,
+		},
+		{
+			name:           "fresh node Get is memoized across poll ticks of one wait",
+			informerLabels: other, // stale for the whole wait: every tick re-suspects
+			nodeLabels:     matching,
+			volumes:        []affinityVolume{{name: "vol1", requireHost: testHostname}},
+			ticks:          5,
+			wantNodeGets:   1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			vm, nodeGets := newAffinityCheckVM(t, tc.informerLabels, tc.nodeLabels)
+			podName, names := addPodVolumes(t, vm, tc.volumes)
+
+			// Drive the real per-wait entry point; one condition func per wait,
+			// invoked once per modeled poll tick.
+			condition := vm.verifyVolumesMountedFunc(podName, names)
+			tCtx := ktesting.Init(t)
+			ticks := max(tc.ticks, 1)
+			var err error
+			for range ticks {
+				_, err = condition(tCtx)
+			}
+
+			rejectErr, rejected := errors.AsType[*RejectingPodError](err)
+			if tc.wantRejectContains != "" {
+				require.True(t, rejected, "expected a *RejectingPodError, got %v", err)
+				assert.Equal(t, VolumeNodeAffinityReason, rejectErr.Reason)
+				assert.Contains(t, rejectErr.Desc, tc.wantRejectContains)
+			} else {
+				assert.False(t, rejected, "must not reject, got %v", err)
+			}
+			assert.Equal(t, tc.wantNodeGets, *nodeGets)
+		})
+	}
+}
+
 func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tmpDir := t.TempDir()
@@ -488,7 +749,7 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 	fakeRecorder := &record.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
 	// TODO (#51147) inject mock prober
-	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, kubeClient, nil)
+	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHostWithCSINodeName(t, tmpDir, kubeClient, nil, testHostname, nil, nil)
 	fakeVolumeHost.WithNode(node)
 
 	plugMgr.InitPlugins([]volume.VolumePlugin{attachablePlug, unattachablePlug}, nil /* prober */, fakeVolumeHost)
