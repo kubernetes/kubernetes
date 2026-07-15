@@ -218,11 +218,19 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 			// '(rpc error: code = Unknown desc = checkpoint/restore support not available)'
 			// if the container engine explicitly disabled the checkpoint/restore support
 			// or
+			// '(rpc error: code = Unknown desc = failed to checkpoint container "...": criu support is disabled by configuration)'
+			// if containerd explicitly disabled CRIU support
+			// or
 			// '(rpc error: code = Unknown desc = CRIU binary not found or too old (<31600). Failed to checkpoint container'
 			// if the CRIU binary was not found or it is too old (containerd < v2)
 			// or
 			// 'criu binary not found in shim path or system PATH'
 			// if CRIU is absent (containerd >= v2, see containerd/containerd#13664)
+			// if the CRIU binary was not found or is too old
+			// or
+			// '(rpc error: code = Unknown desc = failed to checkpoint container "...": criu binary not found in shim path or system PATH)'
+			// '(rpc error: code = Unknown desc = failed to checkpoint container "...": checkpoint/restore requires at least CRIU 31600, current version is ...)'
+			// for newer containerd CRIU preflight checks
 			if (int(statusError.ErrStatus.Code)) == http.StatusInternalServerError {
 				if strings.Contains(
 					statusError.ErrStatus.Message,
@@ -247,7 +255,20 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 				}
 				if strings.Contains(
 					statusError.ErrStatus.Message,
-					"(rpc error: code = Unknown desc = CRIU binary not found or too old (<31600). Failed to checkpoint container",
+					"criu support is disabled by configuration",
+				) {
+					ginkgo.Skip("Container engine reports CRIU support is disabled")
+					return
+				}
+				if strings.Contains(
+					statusError.ErrStatus.Message,
+					"CRIU binary not found or too old (<31600). Failed to checkpoint container",
+				) || strings.Contains(
+					statusError.ErrStatus.Message,
+					"criu binary not found in shim path or system PATH",
+				) || strings.Contains(
+					statusError.ErrStatus.Message,
+					"checkpoint/restore requires at least CRIU",
 				) {
 					ginkgo.Skip("Container engine reports missing or too old CRIU binary")
 					return

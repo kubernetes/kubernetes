@@ -52,17 +52,14 @@ func (workloadStrategy) Validate(ctx context.Context, obj runtime.Object) field.
 	return validation.ValidateWorkload(workloadScheduling)
 }
 
-// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
-// validation options to the generic BeforeCreate/BeforeUpdate code path.
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
 func (workloadStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
-	opts := []string{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
-		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
-		opts = append(opts, string(features.DRAWorkloadResourceClaims))
-	}
-	return rest.DeclarativeValidationConfig{Options: opts}
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.TopologyAwareWorkloadScheduling): utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling),
+		string(features.DRAWorkloadResourceClaims):       utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
+		string(features.PodGroupPreemptionPolicy):        utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
+	}}
 }
 
 func (workloadStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -124,6 +121,7 @@ func dropDisabledPodGroupTemplatesFields(templates, oldTemplates []scheduling.Po
 		template := &templates[i]
 		dropDisabledSchedulingConstraintsFields(template, oldTemplate)
 		dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate)
+		dropDisabledPreemptionPolicyFields(template, oldTemplate)
 	}
 }
 
@@ -145,10 +143,24 @@ func dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate *scheduli
 	template.ResourceClaims = nil
 }
 
+// dropDisabledPreemptionPolicyFields removes the PreemptionPolicy field
+// from the PodGroupTemplate if the PodGroupPreemptionPolicy feature gate is disabled,
+// unless the field already used in the old PodGroupTemplate.
+func dropDisabledPreemptionPolicyFields(template, oldTemplate *scheduling.PodGroupTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldTemplate) {
+		return
+	}
+	template.PreemptionPolicy = nil
+}
+
 func schedulingConstraintsInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && pgt.SchedulingConstraints != nil
 }
 
 func draWorkloadResourceClaimsInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && len(pgt.ResourceClaims) > 0
+}
+
+func preemptionPolicyInUse(pgt *scheduling.PodGroupTemplate) bool {
+	return pgt != nil && pgt.PreemptionPolicy != nil
 }

@@ -86,7 +86,7 @@ func TestNewMetadataWriterVersionValidation(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			_, err := newMetadataWriter(testDriverName, t.TempDir(), t.TempDir(), tc.versions)
+			_, err := newMetadataWriter(testDriverName, t.TempDir(), t.TempDir(), tc.versions, defaultMetadataFileOperations(MetadataFileOperations{}))
 			if tc.expectErr && err == nil {
 				t.Fatal("expected error but got nil")
 			}
@@ -101,7 +101,7 @@ func newTestWriter(t *testing.T) (*metadataWriter, string, string) {
 	t.Helper()
 	pluginDir := t.TempDir()
 	cdiDir := t.TempDir()
-	w, err := newMetadataWriter(testDriverName, pluginDir, cdiDir, []schema.GroupVersion{v1alpha1.SchemeGroupVersion})
+	w, err := newMetadataWriter(testDriverName, pluginDir, cdiDir, []schema.GroupVersion{v1alpha1.SchemeGroupVersion}, defaultMetadataFileOperations(MetadataFileOperations{}))
 	if err != nil {
 		t.Fatalf("newMetadataWriter: %v", err)
 	}

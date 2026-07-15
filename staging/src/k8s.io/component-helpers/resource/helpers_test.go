@@ -868,6 +868,45 @@ func TestPodResourceRequests(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "aggregate request resolves max of sums instead of sum of maxes",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("3"),
+			},
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			containerStatus: []v1.ContainerStatus{
+				{
+					Name: "c1",
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("2"),
+					},
+				},
+				{
+					Name: "c2",
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("1"),
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
@@ -1467,6 +1506,41 @@ func TestPodResourceLimits(t *testing.T) {
 						Limits: v1.ResourceList{
 							v1.ResourceMemory: resource.MustParse("2Gi"),
 						},
+					},
+				},
+			},
+		},
+		{
+			description: "aggregate limit resolves max of sums instead of sum of maxes",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("3"),
+			},
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{
+					Name: "c1",
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 					},
 				},
 			},
@@ -2417,6 +2491,8 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 		containerStatuses     []v1.ContainerStatus
 		initContainers        []v1.Container
 		initContainerStatuses []v1.ContainerStatus
+		podAllocatedResources v1.ResourceList
+		podResources          *v1.ResourceRequirements
 		name                  string
 		expectedRequests      v1.ResourceList
 		expectedLimits        v1.ResourceList
@@ -2632,13 +2708,184 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 			},
 			expectedLimits: v1.ResourceList{},
 		},
+		{
+			name:    "aggregate container request resolves max of sums instead of sum of maxes",
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				},
+				{
+					Name:               "c2",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("3"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			name:    "aggregate container limit resolves max of sums instead of sum of maxes",
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{
+					Name: "c1",
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+				},
+			},
+			expectedRequests: v1.ResourceList{},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("3"),
+			},
+		},
+		{
+			name: "aggregate container request/limit resolves directly from pod status when PLR vertical scaling enabled",
+			options: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					},
+				},
+			},
+			podAllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("5")},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("5"),
+			},
+		},
+		{
+			name: "falls back to container status aggregation when PLR vertical scaling enabled but podAllocatedResources is nil",
+			options: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("6")},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("7")},
+					},
+				},
+			},
+			podAllocatedResources: nil,
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("7")},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("6"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("7"),
+			},
+		},
+		{
+			name: "falls back to container status aggregation when PLR vertical scaling enabled but podResources is nil",
+			options: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("6")},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+					},
+				},
+			},
+			podAllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("6")},
+			podResources:          nil,
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("6"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("8"),
+			},
+		},
 	}
 
 	for idx, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			testPod := &v1.Pod{
-				Spec:   v1.PodSpec{Containers: tc.containers, InitContainers: tc.initContainers},
-				Status: v1.PodStatus{ContainerStatuses: tc.containerStatuses, InitContainerStatuses: tc.initContainerStatuses},
+				Spec: v1.PodSpec{Containers: tc.containers, InitContainers: tc.initContainers},
+				Status: v1.PodStatus{
+					ContainerStatuses:     tc.containerStatuses,
+					InitContainerStatuses: tc.initContainerStatuses,
+					AllocatedResources:    tc.podAllocatedResources,
+					Resources:             tc.podResources,
+				},
 			}
 			resRequests := AggregateContainerRequests(testPod, tc.options)
 			resLimits := AggregateContainerLimits(testPod, tc.options)
@@ -2713,5 +2960,217 @@ func getPod(cname string, resources podResources) *v1.Pod {
 			},
 			Overhead: overhead,
 		},
+	}
+}
+
+func TestPodRequestsAndLimitsVerticalScalingWrappers(t *testing.T) {
+	cases := []struct {
+		name             string
+		pod              *v1.Pod
+		opts             PodResourcesOptions
+		expectedRequests v1.ResourceList
+		expectedLimits   v1.ResourceList
+	}{
+		{
+			name: "pod level requests/limits with PLR vertical scaling enabled and status populated",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+								Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3.5")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("5")},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3.5")},
+			expectedLimits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("5")},
+		},
+		{
+			name: "pod level requests/limits with PLR vertical scaling enabled and infeasible resize",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("20")},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+								Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Status: v1.ConditionTrue,
+							Reason: v1.PodReasonInfeasible,
+						},
+					},
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+			expectedLimits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+		},
+		{
+			name: "container limits aggregation with infeasible resize",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Status: v1.ConditionTrue,
+							Reason: v1.PodReasonInfeasible,
+						},
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "c1",
+							Resources: &v1.ResourceRequirements{
+								Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("6")},
+							},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+			},
+			expectedRequests: v1.ResourceList{},
+			expectedLimits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("6")},
+		},
+		{
+			name: "non missing container requests applied to init container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "i1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+							},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				NonMissingContainerRequests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			name: "non missing container requests applied to regular container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+							},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				NonMissingContainerRequests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotReqs := PodRequests(tc.pod, tc.opts)
+			if !equality.Semantic.DeepEqual(gotReqs, tc.expectedRequests) {
+				t.Errorf("PodRequests() mismatch (-want +got):\n%s", diff.Diff(tc.expectedRequests, gotReqs))
+			}
+			gotLimits := PodLimits(tc.pod, tc.opts)
+			if !equality.Semantic.DeepEqual(gotLimits, tc.expectedLimits) {
+				t.Errorf("PodLimits() mismatch (-want +got):\n%s", diff.Diff(tc.expectedLimits, gotLimits))
+			}
+		})
+	}
+}
+
+func TestResizeConditionsAndSupportedResources(t *testing.T) {
+	pod := &v1.Pod{
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonDeferred,
+				},
+			},
+		},
+	}
+	if !IsPodResizeDeferred(pod) {
+		t.Errorf("expected IsPodResizeDeferred to be true")
+	}
+	if IsPodResizeInfeasible(pod) {
+		t.Errorf("expected IsPodResizeInfeasible to be false")
+	}
+	pod.Status.Conditions[0].Reason = "Other"
+	if IsPodResizeDeferred(pod) {
+		t.Errorf("expected IsPodResizeDeferred to be false")
+	}
+
+	if !SupportedPodLevelResources().Has(v1.ResourceCPU) {
+		t.Errorf("expected SupportedPodLevelResources to contain CPU")
 	}
 }

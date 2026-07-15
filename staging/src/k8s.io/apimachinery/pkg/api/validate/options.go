@@ -18,6 +18,7 @@ package validate
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -28,7 +29,11 @@ import (
 func IfOption[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue T,
 	optionName string, enabled bool, validator func(context.Context, operation.Operation, *field.Path, T, T) field.ErrorList,
 ) field.ErrorList {
-	if op.HasOption(optionName) == enabled {
+	on, defined := op.HasOption(optionName)
+	if !defined {
+		return field.ErrorList{field.InternalError(fldPath, fmt.Errorf("undefined validation option %q", optionName))}
+	}
+	if on == enabled {
 		return validator(ctx, op, fldPath, value, oldValue)
 	}
 	return nil

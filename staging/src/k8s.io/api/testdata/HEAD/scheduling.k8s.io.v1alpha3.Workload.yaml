@@ -42,6 +42,7 @@ spec:
       all: {}
       single: {}
     name: nameValue
+    preemptionPolicy: preemptionPolicyValue
     priority: 7
     priorityClassName: priorityClassNameValue
     resourceClaims:

@@ -631,7 +631,7 @@
     version: "1.35"
 - name: EtcdRangeStream
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
@@ -641,6 +641,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.26"
+- name: ExcludeAdmissionWebhookVirtualResources
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: ExecProbeTimeout
   versionedSpecs:
   - default: true
@@ -1065,6 +1071,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.36"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: MatchLabelKeysInPodAffinity
   versionedSpecs:
   - default: false

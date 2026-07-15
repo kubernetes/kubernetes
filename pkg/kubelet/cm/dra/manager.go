@@ -156,6 +156,15 @@ func (m *Manager) GetWatcherHandler() cache.PluginHandler {
 	return m.draPlugins
 }
 
+// Stop shuts down the DRA plugin manager and waits for all background
+// goroutines to finish. It should be called when the manager is no longer
+// needed to avoid leaking goroutines and racing on state file cleanup.
+func (m *Manager) Stop() {
+	if m.draPlugins != nil {
+		m.draPlugins.Stop()
+	}
+}
+
 // Start starts the reconcile loop of the manager.
 func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady) error {
 	m.initDRAPluginManager(ctx, getNode, defaultWipingDelay)

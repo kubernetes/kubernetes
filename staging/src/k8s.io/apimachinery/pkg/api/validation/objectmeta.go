@@ -71,20 +71,23 @@ func ValidateAnnotationsSize(annotations map[string]string) error {
 
 func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	gvk := schema.FromAPIVersionAndKind(ownerReference.APIVersion, ownerReference.Kind)
+	gv, err := schema.ParseGroupVersion(ownerReference.APIVersion)
 	// gvk.Group is empty for the legacy group.
-	if len(gvk.Version) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ownerReference.APIVersion, "version must not be empty"))
+	if len(ownerReference.APIVersion) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("apiVersion"), "must not be empty").MarkCoveredByDeclarative())
+	} else if err != nil || len(gv.Version) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ownerReference.APIVersion, "must be <group>/<version> or <version>"))
 	}
-	if len(gvk.Kind) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ownerReference.Kind, "must not be empty"))
+	if len(ownerReference.Kind) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "must not be empty").MarkCoveredByDeclarative())
 	}
 	if len(ownerReference.Name) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ownerReference.Name, "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must not be empty").MarkCoveredByDeclarative())
 	}
 	if len(ownerReference.UID) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), ownerReference.UID, "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("uid"), "must not be empty").MarkCoveredByDeclarative())
 	}
+	gvk := gv.WithKind(ownerReference.Kind)
 	if _, ok := BannedOwners[gvk]; ok {
 		allErrs = append(allErrs, field.Invalid(fldPath, ownerReference, fmt.Sprintf("%s is disallowed from being an owner", gvk)))
 	}
@@ -95,8 +98,8 @@ func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field
 func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	firstControllerName := ""
-	for _, ref := range ownerReferences {
-		allErrs = append(allErrs, validateOwnerReference(ref, fldPath)...)
+	for idx, ref := range ownerReferences {
+		allErrs = append(allErrs, validateOwnerReference(ref, fldPath.Index(idx))...)
 		if ref.Controller != nil && *ref.Controller {
 			curControllerName := ref.Kind + "/" + ref.Name
 			if firstControllerName != "" {
@@ -345,6 +348,7 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	}
 
 	// Generation shouldn't be decremented
+	allErrs = append(allErrs, ValidateNonnegativeField(newMeta.GetGeneration(), fldPath.Child("generation")).MarkCoveredByDeclarative()...)
 	if newMeta.GetGeneration() < oldMeta.GetGeneration() {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.GetGeneration(), "must not be decremented"))
 	}

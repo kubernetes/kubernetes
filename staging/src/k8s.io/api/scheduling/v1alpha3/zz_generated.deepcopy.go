@@ -360,6 +360,11 @@ func (in *PodGroupTemplate) DeepCopyInto(out *PodGroupTemplate) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.PreemptionPolicy != nil {
+		in, out := &in.PreemptionPolicy, &out.PreemptionPolicy
+		*out = new(PreemptionPolicy)
+		**out = **in
+	}
 	return
 }
 

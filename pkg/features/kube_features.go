@@ -749,6 +749,7 @@ const (
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
 	// owner: @wojtek-t @argh4k
+	// kep: https://kep.k8s.io/5710
 	//
 	// Enables specifying PreemptionPolicy at podgroup level.
 	PodGroupPreemptionPolicy featuregate.Feature = "PodGroupPreemptionPolicy"
@@ -2136,7 +2137,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	genericfeatures.EtcdRangeStream: {
-		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.ExcludeAdmissionWebhookVirtualResources: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	genericfeatures.KMSv1: {
@@ -2152,6 +2157,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	genericfeatures.ManifestBasedAdmissionControlConfig: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	genericfeatures.MutatingAdmissionPolicy: {
@@ -2641,6 +2647,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.DetectCacheInconsistency: {},
 
 	genericfeatures.EtcdRangeStream: {},
+
+	genericfeatures.ExcludeAdmissionWebhookVirtualResources: {},
 
 	genericfeatures.KMSv1: {},
 

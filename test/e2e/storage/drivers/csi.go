@@ -963,7 +963,7 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPatter
 		e2eskipper.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
 	for _, tag := range pattern.TestTags {
-		if framework.TagsEqual(tag, feature.Windows) {
+		if tag == feature.Windows {
 			e2eskipper.Skipf("Skipping tests for windows since CSI does not support it yet")
 		}
 	}

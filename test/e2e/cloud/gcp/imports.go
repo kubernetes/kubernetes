@@ -18,8 +18,5 @@ package gcp
 
 import (
 	// ensure these packages are scanned by ginkgo for e2e tests
-	_ "k8s.io/kubernetes/test/e2e/cloud/gcp/apps"
-	_ "k8s.io/kubernetes/test/e2e/cloud/gcp/auth"
-	_ "k8s.io/kubernetes/test/e2e/cloud/gcp/network"
 	_ "k8s.io/kubernetes/test/e2e/cloud/gcp/node"
 )

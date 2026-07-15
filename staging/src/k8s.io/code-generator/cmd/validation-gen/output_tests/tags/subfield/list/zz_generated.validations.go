@@ -30,7 +30,6 @@ import (
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 	testscheme "k8s.io/code-generator/cmd/validation-gen/testscheme"
 )
@@ -91,6 +90,22 @@ func Validate_Struct(
 				}
 			}()
 			func() { // cohort = "ownerReferences"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ownerReferences",
+					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, validate.SemanticDeepEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []v1.OwnerReference) field.ErrorList {
+						return validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+							func(a *v1.OwnerReference, b *v1.OwnerReference) bool { return a.UID == b.UID }, validate.SemanticDeepEqual,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *v1.OwnerReference) field.ErrorList {
+								return validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
+									func(o *v1.OwnerReference) *string { return &o.Name }, validate.DirectEqual, validate.RequiredValue)
+							})
+					}).MarkShortCircuit(); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ownerReferences",
 					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []v1.OwnerReference) field.ErrorList {
@@ -124,8 +139,6 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
-			// call the type's validation function
-			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,

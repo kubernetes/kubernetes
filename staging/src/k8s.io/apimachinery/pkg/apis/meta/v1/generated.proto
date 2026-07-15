@@ -902,6 +902,7 @@ message ObjectMeta {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=uid
+  // +k8s:alpha(since:"1.37")=+k8s:optional
   repeated OwnerReference ownerReferences = 13;
 
   // Must be empty before the object is deleted from the registry. Each entry
@@ -942,18 +943,22 @@ message ObjectMeta {
 // +structType=atomic
 message OwnerReference {
   // API version of the referent.
+  // +k8s:alpha(since:"1.37")=+k8s:required
   optional string apiVersion = 5;
 
   // Kind of the referent.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  // +k8s:alpha(since:"1.37")=+k8s:required
   optional string kind = 1;
 
   // Name of the referent.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names
+  // +k8s:alpha(since:"1.37")=+k8s:required
   optional string name = 3;
 
   // UID of the referent.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids
+  // +k8s:alpha(since:"1.37")=+k8s:required
   optional string uid = 4;
 
   // If true, this reference points to the managing controller.

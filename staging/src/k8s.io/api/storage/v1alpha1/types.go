@@ -37,7 +37,7 @@ import (
 type VolumeAttachment struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -191,7 +191,7 @@ type VolumeError struct {
 type CSIStorageCapacity struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata. The name has no particular meaning. It must be
+	// metadata is the standard object metadata. The name has no particular meaning. It must be
 	// be a DNS subdomain (dots allowed, 253 characters). To ensure that
 	// there are no conflicts with other CSI drivers on the cluster, the recommendation
 	// is to use csisc-<uuid>, a generated name, or a reverse-domain name which ends
@@ -278,12 +278,12 @@ type CSIStorageCapacityList struct {
 type VolumeAttributesClass struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Name of the CSI driver
+	// driverName is the name of the CSI driver
 	// This field is immutable.
 	DriverName string `json:"driverName" protobuf:"bytes,2,opt,name=driverName"`
 

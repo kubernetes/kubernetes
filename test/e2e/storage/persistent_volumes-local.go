@@ -182,7 +182,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 	})
 
 	for testVolType := range setupLocalVolumeMap {
-		args := []interface{}{fmt.Sprintf("[Volume type: %s]", testVolType)}
+		args := []interface{}{framework.WithLabel("LocalVolumeType: " + string(testVolType))}
 		if testVolType == GCELocalSSDVolumeType {
 			args = append(args, framework.WithSerial())
 		}

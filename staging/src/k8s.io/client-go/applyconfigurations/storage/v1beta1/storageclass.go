@@ -39,7 +39,7 @@ import (
 // according to etcd is in ObjectMeta.Name.
 type StorageClassApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// provisioner indicates the type of the provisioner.

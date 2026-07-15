@@ -196,6 +196,18 @@ type PodGroupTemplate struct {
 	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
 	// +k8s:immutable
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
+
+	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// This field is immutable.
+	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+	//
+	// +featureGate=PodGroupPreemptionPolicy
+	// +optional
+	// +k8s:immutable
+	// +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
+	// +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
+	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.

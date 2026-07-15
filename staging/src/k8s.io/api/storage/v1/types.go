@@ -35,7 +35,7 @@ import (
 type StorageClass struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -133,7 +133,7 @@ const (
 type VolumeAttachment struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -265,7 +265,7 @@ type VolumeError struct {
 type CSIDriver struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object metadata.
+	// metadata is the standard object metadata.
 	// metadata.Name indicates the name of the CSI driver that this object
 	// refers to; it MUST be the same name returned by the CSI GetPluginName()
 	// call for that driver.
@@ -486,7 +486,7 @@ type CSIDriverSpec struct {
 	// +optional
 	ServiceAccountTokenInSecrets *bool `json:"serviceAccountTokenInSecrets,omitempty" protobuf:"varint,10,opt,name=serviceAccountTokenInSecrets"`
 
-	// PreventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod
+	// preventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod
 	// scheduling if the CSI driver on the node is missing.
 	//
 	// Enabling this option will prevent the scheduler (or any other
@@ -595,7 +595,7 @@ const (
 type CSINode struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// metadata.name must be the Kubernetes node name.
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -709,7 +709,7 @@ type CSINodeList struct {
 type CSIStorageCapacity struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// The name has no particular meaning. It must be a DNS subdomain (dots allowed, 253 characters).
 	// To ensure that there are no conflicts with other CSI drivers on the cluster,
 	// the recommendation is to use csisc-<uuid>, a generated name, or a reverse-domain name
@@ -792,12 +792,12 @@ type CSIStorageCapacityList struct {
 type VolumeAttributesClass struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Name of the CSI driver
+	// driverName is the name of the CSI driver
 	// This field is immutable.
 	DriverName string `json:"driverName" protobuf:"bytes,2,opt,name=driverName"`
 

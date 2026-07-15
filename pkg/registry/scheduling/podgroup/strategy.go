@@ -75,18 +75,14 @@ func (*podGroupStrategy) Validate(ctx context.Context, obj runtime.Object) field
 	return validation.ValidatePodGroup(podGroup)
 }
 
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
 func (*podGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
-	opts := []string{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
-		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
-		opts = append(opts, string(features.DRAWorkloadResourceClaims))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
-		opts = append(opts, string(features.PodGroupPreemptionPolicy))
-	}
-	return rest.DeclarativeValidationConfig{Options: opts}
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.TopologyAwareWorkloadScheduling): utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling),
+		string(features.DRAWorkloadResourceClaims):       utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
+		string(features.PodGroupPreemptionPolicy):        utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
+	}}
 }
 
 func (*podGroupStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
