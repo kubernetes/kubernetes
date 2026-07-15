@@ -80,6 +80,7 @@ const resourceStatusClaimPrefix = "claim:"
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var fileModeErrorMsg = "must be a number between 0 and 0777 (octal), both inclusive"
+var emptyDirModeErrorMsg = "must be a number between 0 and 01777 (octal), both inclusive"
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = apimachineryvalidation.BannedOwners
@@ -555,6 +556,9 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 		numVolumes++
 		if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
+		}
+		if source.EmptyDir.Mode != nil && (*source.EmptyDir.Mode > 01777 || *source.EmptyDir.Mode < 0) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("emptyDir").Child("mode"), *source.EmptyDir.Mode, emptyDirModeErrorMsg))
 		}
 	}
 	if source.HostPath != nil {
