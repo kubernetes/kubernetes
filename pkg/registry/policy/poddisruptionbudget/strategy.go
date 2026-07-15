@@ -69,6 +69,8 @@ func (podDisruptionBudgetStrategy) PrepareForCreate(ctx context.Context, obj run
 	podDisruptionBudget.Status = policy.PodDisruptionBudgetStatus{}
 
 	podDisruptionBudget.Generation = 1
+
+	dropDisabledFields(podDisruptionBudget, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -83,6 +85,24 @@ func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 	// See metav1.ObjectMeta description for more information on Generation.
 	if !apiequality.Semantic.DeepEqual(oldPodDisruptionBudget.Spec, newPodDisruptionBudget.Spec) {
 		newPodDisruptionBudget.Generation = oldPodDisruptionBudget.Generation + 1
+	}
+
+	dropDisabledFields(newPodDisruptionBudget, oldPodDisruptionBudget)
+}
+
+func dropDisabledFields(pdb, oldPDB *policy.PodDisruptionBudget) {
+	if oldPDB != nil && apiequality.Semantic.DeepEqual(oldPDB.Spec.Selector, pdb.Spec.Selector) {
+		return
+	}
+	switch {
+	case apiequality.Semantic.DeepEqual(pdb.Spec.Selector, policy.NonV1beta1MatchNoneSelector):
+		// no-op, preserve
+	case apiequality.Semantic.DeepEqual(pdb.Spec.Selector, policy.NonV1beta1MatchAllSelector):
+		// no-op, preserve
+	default:
+		// otherwise, make sure the label intended to be used in a match-all or match-none selector
+		// never gets combined with user-specified fields
+		policy.StripPDBV1beta1Label(pdb.Spec.Selector)
 	}
 }
 
