@@ -155,8 +155,19 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
 		effectiveReqs := pod.Spec.Resources.Requests
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
-			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, pod.Status.Resources.Requests, pod.Status.AllocatedResources)
+		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && (pod.Status.Resources != nil || pod.Status.AllocatedResources != nil) {
+			var statusRequests, allocatedRequests v1.ResourceList
+			if pod.Status.Resources != nil {
+				statusRequests = pod.Status.Resources.Requests.DeepCopy()
+			}
+			if pod.Status.AllocatedResources != nil {
+				allocatedRequests = pod.Status.AllocatedResources.DeepCopy()
+			}
+			if pod.Spec.Overhead != nil {
+				subtractResourceList(statusRequests, pod.Spec.Overhead)
+				subtractResourceList(allocatedRequests, pod.Spec.Overhead)
+			}
+			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, statusRequests, allocatedRequests)
 		}
 
 		applyPodLevelResources(reqs, effectiveReqs)
@@ -391,7 +402,14 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
 		effectiveLims := pod.Spec.Resources.Limits
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
-			effectiveLims = effectivePodLevelResources(pod, pod.Spec.Resources.Limits, pod.Status.Resources.Limits)
+			var statusLimits v1.ResourceList
+			if pod.Status.Resources.Limits != nil {
+				statusLimits = pod.Status.Resources.Limits.DeepCopy()
+			}
+			if pod.Spec.Overhead != nil {
+				subtractResourceList(statusLimits, pod.Spec.Overhead)
+			}
+			effectiveLims = effectivePodLevelResources(pod, pod.Spec.Resources.Limits, statusLimits)
 		}
 		applyPodLevelResources(limits, effectiveLims)
 	}
@@ -450,6 +468,20 @@ func addResourceList(list, newList v1.ResourceList) {
 			list[name] = quantity.DeepCopy()
 		} else {
 			value.Add(quantity)
+			list[name] = value
+		}
+	}
+}
+
+// subtractResourceList subtracts the resources in newList from list.
+// If the subtraction results in a value less than zero, it sets it to zero.
+func subtractResourceList(list, newList v1.ResourceList) {
+	for name, quantity := range newList {
+		if value, ok := list[name]; ok {
+			value.Sub(quantity)
+			if value.Sign() < 0 {
+				value.Set(0)
+			}
 			list[name] = value
 		}
 	}
