@@ -219,7 +219,10 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 			// if the container engine explicitly disabled the checkpoint/restore support
 			// or
 			// '(rpc error: code = Unknown desc = CRIU binary not found or too old (<31600). Failed to checkpoint container'
-			// if the CRIU binary was not found if it is too old
+			// if the CRIU binary was not found or it is too old (containerd < v2)
+			// or
+			// 'criu binary not found in shim path or system PATH'
+			// if CRIU is absent (containerd >= v2, see containerd/containerd#13664)
 			if (int(statusError.ErrStatus.Code)) == http.StatusInternalServerError {
 				if strings.Contains(
 					statusError.ErrStatus.Message,
@@ -247,6 +250,16 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 					"(rpc error: code = Unknown desc = CRIU binary not found or too old (<31600). Failed to checkpoint container",
 				) {
 					ginkgo.Skip("Container engine reports missing or too old CRIU binary")
+					return
+				}
+				// containerd >= v2 changed the CRIU preflight error to a shim-level
+				// message; handle it so CI environments without CRIU still skip
+				// rather than fail (containerd/containerd#13664).
+				if strings.Contains(
+					statusError.ErrStatus.Message,
+					"criu binary not found in shim path or system PATH",
+				) {
+					ginkgo.Skip("Container engine reports CRIU binary not found")
 					return
 				}
 			}
