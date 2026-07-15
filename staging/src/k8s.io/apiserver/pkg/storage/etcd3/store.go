@@ -783,15 +783,18 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			return chunkErr
 		}
 		numFetched += len(chunk.kvs)
-		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(chunk.revision)); err != nil {
-			return err
+		if chunk.revision != nil {
+			if withRev == 0 {
+				if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(*chunk.revision)); err != nil {
+					return err
+				}
+				withRev = *chunk.revision
+			} else if *chunk.revision != withRev {
+				return fmt.Errorf("etcd returned revision %d for a list read at revision %d", *chunk.revision, withRev)
+			}
 		}
 		if len(chunk.kvs) == 0 && chunk.hasMore {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
-		}
-		// indicate to the client which resource version was returned, and use the same resource version for subsequent requests.
-		if withRev == 0 {
-			withRev = chunk.revision
 		}
 		count = chunk.count
 
@@ -825,7 +828,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 // listChunk is one batch of kvs from a list read.
 type listChunk struct {
 	kvs      []*mvccpb.KeyValue
-	revision int64
+	revision *int64
 	count    int64 // etcd's count of keys remaining in the range, including this batch
 	hasMore  bool
 }
@@ -851,7 +854,8 @@ func (s *store) pagedChunks(ctx context.Context, keyPrefix string, opts storage.
 			if len(getResp.Kvs) > 0 {
 				continueKey = string(getResp.Kvs[len(getResp.Kvs)-1].Key) + "\x00"
 			}
-			if !yield(listChunk{kvs: getResp.Kvs, revision: getResp.Revision, count: getResp.Count, hasMore: hasMore}, nil) {
+			revision := withRev
+			if !yield(listChunk{kvs: getResp.Kvs, revision: &revision, count: getResp.Count, hasMore: hasMore}, nil) {
 				return
 			}
 			if !hasMore {
