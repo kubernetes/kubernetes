@@ -165,12 +165,13 @@ func (mp *fakePlacementFeasiblePlugin) Permit(ctx context.Context, state fwk.Cyc
 
 func TestValidatePodGroup(t *testing.T) {
 	tests := []struct {
-		name          string
-		podGroup      *schedulingv1alpha3.PodGroup
-		scheduledPods []*v1.Pod
-		pods          []*v1.Pod
-		profiles      profile.Map
-		expectError   bool
+		name                           string
+		podGroup                       *schedulingv1alpha3.PodGroup
+		scheduledPods                  []*v1.Pod
+		pods                           []*v1.Pod
+		profiles                       profile.Map
+		expectError                    bool
+		enablePodGroupPreemptionPolicy bool
 	}{
 		{
 			name:     "failure when no pods to evaluate",
@@ -225,9 +226,6 @@ func TestValidatePodGroup(t *testing.T) {
 				st.MakePod().Name("p1").PodGroupName("pg").Priority(10).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg").Priority(10).Obj(),
 			},
-			profiles: profile.Map{
-				"": nil,
-			},
 			expectError: false,
 		},
 		{
@@ -237,9 +235,6 @@ func TestValidatePodGroup(t *testing.T) {
 				st.MakePod().Name("p1").PodGroupName("pg").Priority(9).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg").Priority(10).Obj(),
 			},
-			profiles: profile.Map{
-				"": nil,
-			},
 			expectError: true,
 		},
 		{
@@ -248,9 +243,6 @@ func TestValidatePodGroup(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").PodGroupName("pg").Priority(10).Obj(),
 				st.MakePod().Name("p2").PodGroupName("pg").Priority(10).Obj(),
-			},
-			profiles: profile.Map{
-				"": nil,
 			},
 			expectError: true,
 		},
@@ -296,16 +288,75 @@ func TestValidatePodGroup(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name:     "success when preemption policies match",
+			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").PreemptionPolicy(v1.PreemptNever).Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").PreemptionPolicy(v1.PreemptNever).Obj(),
+			},
+			enablePodGroupPreemptionPolicy: true,
+			expectError:                    false,
+		},
+		{
+			name:     "failure when different preemption policies across pods",
+			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").PreemptionPolicy(v1.PreemptNever).Obj(),
+			},
+			enablePodGroupPreemptionPolicy: true,
+			expectError:                    true,
+		},
+		{
+			name:     "failure when different preemption policies across pods and pod group",
+			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			},
+			enablePodGroupPreemptionPolicy: true,
+			expectError:                    true,
+		},
+		{
+			name:     "success when preemption policies between pods and podgroup do not match but PodGroupPreemptionPolicy is disabled",
+			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			},
+			enablePodGroupPreemptionPolicy: false,
+			expectError:                    false,
+		},
+		{
+			name:     "failure when preemption policies do not match across pods and PodGroupPreemptionPolicy is disabled",
+			podGroup: st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").PodGroupName("pg").PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+				st.MakePod().Name("p2").PodGroupName("pg").PreemptionPolicy(v1.PreemptNever).Obj(),
+			},
+			enablePodGroupPreemptionPolicy: false,
+			expectError:                    true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: true,
+				features.GenericWorkload:          true,
+				features.PodGroupPreemptionPolicy: tt.enablePodGroupPreemptionPolicy,
 			})
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.scheduledPods, nil, []*schedulingv1alpha3.PodGroup{tt.podGroup})
+			profilesOrDefault := func(p profile.Map) profile.Map {
+				if p == nil {
+					return profile.Map{
+						"": nil,
+					}
+				}
+				return p
+			}
 			sched := &Scheduler{
-				Profiles:         tt.profiles,
+				Profiles:         profilesOrDefault(tt.profiles),
 				nodeInfoSnapshot: snapshot,
 			}
 
