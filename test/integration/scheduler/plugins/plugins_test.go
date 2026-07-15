@@ -2236,6 +2236,15 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error while creating the first pod: %v", err)
 			}
+			// Wait for podA to enter the waiting state.
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
+				w := false
+				permitPlugin.fh.IterateOverWaitingPods(func(wp fwk.WaitingPod) { w = true })
+				return w, nil
+			})
+			if err != nil {
+				t.Errorf("Error while waiting for the first pod to wait: %v", err)
+			}
 			podB, err := testutils.CreatePausePod(testCtx.ClientSet,
 				testutils.InitPausePod(&testutils.PausePodConfig{Name: "pod-b", Namespace: testCtx.NS.Name}))
 			if err != nil {
@@ -2249,10 +2258,11 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, podB); err != nil {
 					t.Errorf("Didn't expect the second pod to be scheduled. error: %v", err)
 				}
-				if !((permitPlugin.waitingPod == podA.Name && permitPlugin.rejectingPod == podB.Name) ||
-					(permitPlugin.waitingPod == podB.Name && permitPlugin.rejectingPod == podA.Name)) {
-					t.Errorf("Expect one pod to wait and another pod to reject instead %s waited and %s rejected.",
-						permitPlugin.waitingPod, permitPlugin.rejectingPod)
+				// Create copy for safely reading the fields.
+				pp := permitPlugin.deepCopy()
+				if pp.waitingPod != podA.Name || pp.rejectingPod != podB.Name {
+					t.Errorf("Expect podA to wait and podB to reject instead %s waited and %s rejected.",
+						pp.waitingPod, pp.rejectingPod)
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podA); err != nil {
@@ -2261,10 +2271,11 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podB); err != nil {
 					t.Errorf("Expected the second pod to be scheduled. error: %v", err)
 				}
-				if !((permitPlugin.waitingPod == podA.Name && permitPlugin.allowingPod == podB.Name) ||
-					(permitPlugin.waitingPod == podB.Name && permitPlugin.allowingPod == podA.Name)) {
-					t.Errorf("Expect one pod to wait and another pod to allow instead %s waited and %s allowed.",
-						permitPlugin.waitingPod, permitPlugin.allowingPod)
+				// Create copy for safely reading the fields.
+				pp := permitPlugin.deepCopy()
+				if pp.waitingPod != podA.Name || pp.allowingPod != podB.Name {
+					t.Errorf("Expect podA to wait and podB to allow instead %s waited and %s allowed.",
+						pp.waitingPod, pp.allowingPod)
 				}
 			}
 
