@@ -2093,13 +2093,15 @@ func TestCSIDriverStorageCapacityEnablement(t *testing.T) {
 		requiresRepublish := true
 		storageCapacity := true
 		seLinuxMount := false
+		preventPodSchedulingIfMissing := false
 		csiDriver := storage.CSIDriver{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired:    &attachRequired,
-				PodInfoOnMount:    &podInfoOnMount,
-				RequiresRepublish: &requiresRepublish,
-				SELinuxMount:      &seLinuxMount,
+				AttachRequired:                &attachRequired,
+				PodInfoOnMount:                &podInfoOnMount,
+				RequiresRepublish:             &requiresRepublish,
+				SELinuxMount:                  &seLinuxMount,
+				PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 			},
 		}
 		if withField {
@@ -2286,6 +2288,7 @@ func TestCSIServiceAccountToken(t *testing.T) {
 		test.csiDriver.Spec.PodInfoOnMount = new(bool)
 		test.csiDriver.Spec.StorageCapacity = new(bool)
 		test.csiDriver.Spec.SELinuxMount = new(bool)
+		test.csiDriver.Spec.PreventPodSchedulingIfMissing = new(bool)
 		if errs := ValidateCSIDriver(test.csiDriver); test.wantErr != (len(errs) != 0) {
 			t.Errorf("ValidateCSIDriver = %v, want err: %v", errs, test.wantErr)
 		}
@@ -2328,11 +2331,12 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 			csiDriver := &storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:    ptr.To(true),
-					PodInfoOnMount:    ptr.To(true),
-					RequiresRepublish: ptr.To(true),
-					StorageCapacity:   ptr.To(true),
-					SELinuxMount:      test.seLinuxMountValue,
+					AttachRequired:                ptr.To(true),
+					PodInfoOnMount:                ptr.To(true),
+					RequiresRepublish:             ptr.To(true),
+					StorageCapacity:               ptr.To(true),
+					SELinuxMount:                  test.seLinuxMountValue,
+					PreventPodSchedulingIfMissing: new(false),
 				},
 			}
 			err := ValidateCSIDriver(csiDriver)
@@ -2409,11 +2413,12 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 			oldCSIDriver := &storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:    ptr.To(true),
-					PodInfoOnMount:    ptr.To(true),
-					RequiresRepublish: ptr.To(true),
-					StorageCapacity:   ptr.To(true),
-					SELinuxMount:      test.oldValue,
+					AttachRequired:                ptr.To(true),
+					PodInfoOnMount:                ptr.To(true),
+					RequiresRepublish:             ptr.To(true),
+					StorageCapacity:               ptr.To(true),
+					SELinuxMount:                  test.oldValue,
+					PreventPodSchedulingIfMissing: new(false),
 				},
 			}
 			newCSIDriver := oldCSIDriver.DeepCopy()
