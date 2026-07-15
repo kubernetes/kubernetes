@@ -1391,7 +1391,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// them. Every rejection path after a successful counter reservation calls
 	// rollbackDevice synchronously, and the success path returns a closure that
 	// calls the same helper during backtracking, so both undo routes stay
-	// identical. Passing the state by argument keeps it (and the flags) on the
+	// identical. Passing the state by value to rollbackDevice keeps it (and the flags) on the
 	// stack for the rejection paths; only the success closure escapes.
 	state := deviceRollbackState{
 		countersReserved:   countersReserved,
@@ -1507,11 +1507,7 @@ type deviceRollbackState struct {
 
 // rollbackDevice reverses the mutations recorded in state, in the opposite order
 // they were applied. It is called synchronously on the rejection paths and, via
-// the closure returned on success, during backtracking. Keeping the state in a
-// value passed by argument (rather than variables captured by a closure built
-// before the rejection checks) avoids a heap allocation for the rollback
-// bookkeeping on the rejection paths, since a closure built up front and
-// returned would escape.
+// the closure returned on success, during backtracking.
 func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, baseRequestName, subRequestName string, state deviceRollbackState) {
 	if state.resultAdded {
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:state.previousNumResults]
