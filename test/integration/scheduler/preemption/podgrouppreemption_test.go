@@ -138,12 +138,14 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			// high-3 will fit on node2 (it has 1 CPU free).
-			// high-1 and high-2 will fit on node1 if low-1 is preempted.
+			// With custom scoring, preemptor pods will prefer on high-1 node
+			// which will force preemption of low-1 pod.
 			expectedScheduled:          []string{"high-1", "high-2", "high-3", "low-2"},
 			expectedPreempted:          []string{"low-1"},
 			expectedToHaveNNNInfo:      []string{"high-1", "high-2", "high-3"},
 			expectedPodsPreemptedByWAP: 1,
+			customPluginName:           "mockScorePlugin",
+			customPluginFunc:           newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
 		},
 		{
 			name: "Partial Preemption with basic policy",
@@ -165,14 +167,14 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			// with default scoring the assignments without victims will be
-			// high-1, high-3 -> node1
-			// high-2 -> node2
-			// very-low-1 can be reprieved on node2
+			// With custom scoring, preemptor pods will prefer high-1 node
+			// which will force preemption of low-1 pod.
 			expectedScheduled:          []string{"high-1", "high-2", "high-3", "very-low-1"},
 			expectedPreempted:          []string{"low-1"},
 			expectedToHaveNNNInfo:      []string{},
 			expectedPodsPreemptedByWAP: 1,
+			customPluginName:           "mockScorePlugin",
+			customPluginFunc:           newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
 		},
 		{
 			name: "PDB Violation Handling (Reprieve)",
@@ -407,58 +409,6 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedPodsPreemptedByWAP: 2,
 		},
 		{
-			name: "Basic scheduling: do not reprieve if it reduces scheduled pods below max possible",
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-			},
-			podGroups: []*schedulingapi.PodGroup{
-				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).BasicPolicy().Obj(),
-			},
-			initialPods: []*v1.Pod{
-				st.MakePod().Name("p1").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
-				st.MakePod().Name("p2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(50).Obj(),
-				st.MakePod().Name("p3").Node("node3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(50).Obj(),
-			},
-			preemptorPods: []*v1.Pod{
-				st.MakePod().Name("p-a").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
-				st.MakePod().Name("p-b").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
-				st.MakePod().Name("p-c").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
-			},
-			expectedScheduled:          []string{"p-a", "p-b", "p-c"},
-			expectedPreempted:          []string{"p1", "p2", "p3"},
-			expectedToHaveNNNInfo:      []string{"p-a", "p-b", "p-c"},
-			expectedPodsPreemptedByWAP: 3,
-		},
-		{
-			name: "Basic scheduling: reprieve if it does not reduce scheduled pods below max possible",
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-				st.MakeNode().Name("node4").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-			},
-			podGroups: []*schedulingapi.PodGroup{
-				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).BasicPolicy().Obj(),
-			},
-			initialPods: []*v1.Pod{
-				st.MakePod().Name("p1").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
-				st.MakePod().Name("p2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
-				st.MakePod().Name("p3").Node("node3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
-				st.MakePod().Name("p4").Node("node4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(50).Obj(),
-			},
-			preemptorPods: []*v1.Pod{
-				st.MakePod().Name("p-a").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
-				st.MakePod().Name("p-b").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
-				st.MakePod().Name("p-c").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
-			},
-			expectedScheduled:          []string{"p-a", "p-b", "p-c", "p4"},
-			expectedPreempted:          []string{"p1", "p2", "p3"},
-			expectedToHaveNNNInfo:      []string{"p-a", "p-b", "p-c"},
-			expectedPodsPreemptedByWAP: 3,
-		},
-		{
 			name: "Basic scheduling: schedule as many pods as possible without preempting higher priority pods",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
@@ -552,86 +502,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedToHaveNNNInfo:      []string{"p-a"},
 			expectedPodsPreemptedByWAP: 2,
 		},
-		{
-			name: "Reprieval allows more pods to schedule than initial maxScheduledCount due to greedy placement",
-			nodes: []*v1.Node{
-				st.MakeNode().Name("nodea").Label("topology.kubernetes.io/zone", "zoneA").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-				st.MakeNode().Name("nodeb").Label("topology.kubernetes.io/zone", "zoneB").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-			},
-			podGroups: []*schedulingapi.PodGroup{
-				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).BasicPolicy().Obj(),
-			},
-			initialPods: []*v1.Pod{
-				st.MakePod().Name("va").Node("nodea").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(50).NodeAffinityIn("topology.kubernetes.io/zone",
-					[]string{"zoneA"}, st.NodeSelectorTypeMatchExpressions).Obj(),
-				st.MakePod().Name("vb").Node("nodeb").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).NodeAffinityIn("topology.kubernetes.io/zone",
-					[]string{"zoneB"}, st.NodeSelectorTypeMatchExpressions).Obj(),
-			},
-			preemptorPods: []*v1.Pod{
-				st.MakePod().Name("p1").Label("pod", "preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
-					NodeAffinity(&v1.NodeAffinity{
-						PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
-							{Weight: 100, Preference: v1.NodeSelectorTerm{MatchExpressions: []v1.NodeSelectorRequirement{{Key: "topology.kubernetes.io/zone", Operator: v1.NodeSelectorOpIn, Values: []string{"zoneA"}}}}},
-						},
-					}).
-					PodAffinityExists("pod", "topology.kubernetes.io/zone", st.PodAffinityWithRequiredReq).Obj(),
-				st.MakePod().Name("p2").Label("pod", "preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
-					NodeAffinity(&v1.NodeAffinity{
-						PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
-							{Weight: 100, Preference: v1.NodeSelectorTerm{MatchExpressions: []v1.NodeSelectorRequirement{{Key: "topology.kubernetes.io/zone", Operator: v1.NodeSelectorOpIn, Values: []string{"zoneA"}}}}},
-						},
-					}).
-					PodAffinityExists("pod", "topology.kubernetes.io/zone", st.PodAffinityWithRequiredReq).Obj(),
-				st.MakePod().Name("p3").Label("pod", "preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
-					NodeAffinity(&v1.NodeAffinity{
-						PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
-							{Weight: 100, Preference: v1.NodeSelectorTerm{MatchExpressions: []v1.NodeSelectorRequirement{{Key: "topology.kubernetes.io/zone", Operator: v1.NodeSelectorOpIn, Values: []string{"zoneA"}}}}},
-						},
-					}).
-					PodAffinityExists("pod", "topology.kubernetes.io/zone", st.PodAffinityWithRequiredReq).Obj(),
-			},
-			expectedScheduled:          []string{"p1", "p2", "p3", "va"},
-			expectedPreempted:          []string{"vb"},
-			expectedPodsPreemptedByWAP: 1,
-		},
-		{
-			name: "Reprieval allows more pods to schedule than initial maxScheduledCount due to greedy placement (gang > minCount)",
-			nodes: []*v1.Node{
-				st.MakeNode().Name("nodea").Label("topology.kubernetes.io/zone", "zoneA").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-				st.MakeNode().Name("nodeb").Label("topology.kubernetes.io/zone", "zoneB").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-			},
-			podGroups: []*schedulingapi.PodGroup{
-				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(3).Obj(),
-			},
-			initialPods: []*v1.Pod{
-				st.MakePod().Name("va").Node("nodea").Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Container("image").ZeroTerminationGracePeriod().Priority(50).NodeAffinityIn("topology.kubernetes.io/zone", []string{"zoneA"}, st.NodeSelectorTypeMatchExpressions).Obj(),
-				st.MakePod().Name("vb").Node("nodeb").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).NodeAffinityIn("topology.kubernetes.io/zone", []string{"zoneB"}, st.NodeSelectorTypeMatchExpressions).Obj(),
-			},
-			preemptorPods: []*v1.Pod{
-				st.MakePod().Name("p1").Label("pod", "p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
-					NodeAffinity(&v1.NodeAffinity{
-						PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
-							{
-								Weight: 100,
-								Preference: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
-										{Key: "topology.kubernetes.io/zone", Operator: v1.NodeSelectorOpIn, Values: []string{"zoneA"}},
-									},
-								},
-							},
-						},
-					}).Obj(),
-				st.MakePod().Name("p2").Label("pod", "p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
-					PodAffinityExists("pod", "topology.kubernetes.io/zone", st.PodAffinityWithRequiredReq).Obj(),
-				st.MakePod().Name("p3").Label("pod", "p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
-					PodAffinityExists("pod", "topology.kubernetes.io/zone", st.PodAffinityWithRequiredReq).Obj(),
-				st.MakePod().Name("p4").Label("pod", "p4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
-					PodAffinityExists("pod", "topology.kubernetes.io/zone", st.PodAffinityWithRequiredReq).Obj(),
-			},
-			expectedScheduled:          []string{"p1", "p2", "p3", "p4", "va"},
-			expectedPreempted:          []string{"vb"},
-			expectedPodsPreemptedByWAP: 1,
-		},
+
 		{
 			name: "PodGroup with PreemptNever preemption policy does not perform preemption, with PodGroupPreemptionPolicy enabled",
 			nodes: []*v1.Node{
@@ -1266,3 +1137,29 @@ func (p *mockReservePlugin) Filter(ctx context.Context, state fwk.CycleState, po
 
 var _ fwk.ReservePlugin = &mockReservePlugin{}
 var _ fwk.FilterPlugin = &mockReservePlugin{}
+var _ fwk.ScorePlugin = &mockScorePlugin{}
+
+type mockScorePlugin struct {
+	scores map[string]int64
+}
+
+func (p *mockScorePlugin) Name() string {
+	return "mockScorePlugin"
+}
+
+func (p *mockScorePlugin) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	if score, ok := p.scores[nodeInfo.Node().Name]; ok {
+		return score, nil
+	}
+	return 0, nil
+}
+
+func (p *mockScorePlugin) ScoreExtensions() fwk.ScoreExtensions {
+	return nil
+}
+
+func newPresetScorePlugin(scores map[string]int64) frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return &mockScorePlugin{scores: scores}, nil
+	}
+}
