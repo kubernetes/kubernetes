@@ -198,10 +198,12 @@ func SetDefaults_Pod(obj *v1.Pod) {
 
 	// Pod Requests default values must be applied after container-level default values
 	// have been populated.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
 		defaultHugePagePodLimits(obj)
 		defaultPodRequests(obj)
 	}
+
 
 	if obj.Spec.EnableServiceLinks == nil {
 		enableServiceLinks := v1.DefaultEnableServiceLinks
@@ -463,7 +465,12 @@ func SetDefaults_PodLogOptions(obj *v1.PodLogOptions) {
 // This defaulting behavior ensures consistent resource accounting at the pod-level
 // while maintaining compatibility with the container-level specifications, as detailed
 // in KEP-2837: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#proposed-validation--defaulting-rules
+func DefaultPodRequests(obj *v1.Pod) {
+	defaultPodRequests(obj)
+}
+
 func defaultPodRequests(obj *v1.Pod) {
+
 	// We only populate defaults when the pod-level resources are partly specified already.
 	if obj.Spec.Resources == nil {
 		return
@@ -516,7 +523,12 @@ func defaultPodRequests(obj *v1.Pod) {
 // limits set:
 // The pod-level limit becomes equal to the aggregated hugepages limit of all
 // the containers in the pod.
+func DefaultHugePagePodLimits(pod *v1.Pod) {
+	defaultHugePagePodLimits(pod)
+}
+
 func defaultHugePagePodLimits(pod *v1.Pod) {
+
 	// We only populate hugepage limit defaults when the pod-level resources are partly specified.
 	if pod.Spec.Resources == nil {
 		return

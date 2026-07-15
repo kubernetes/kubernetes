@@ -7034,3 +7034,188 @@ func TestHasRestartContainerForNonSidecarInitContainer(t *testing.T) {
 		})
 	}
 }
+
+
+
+func TestShouldDefaultPodLevelResourcesOnUpdate(t *testing.T) {
+	valCPU1 := resource.MustParse("1")
+	valMem100Mi := resource.MustParse("100Mi")
+
+	resHugepage2Mi := api.ResourceName("hugepages-2Mi")
+	valHugepage2Mi := resource.MustParse("2Mi")
+
+	tests := []struct {
+		name     string
+		newPod   *api.Pod
+		oldPod   *api.Pod
+		expected bool
+	}{
+		{
+			name:     "Case 1: newPod.Spec.Resources is nil - returns false",
+			newPod:   &api.Pod{Spec: api.PodSpec{}},
+			oldPod:   &api.Pod{Spec: api.PodSpec{Resources: &api.ResourceRequirements{Requests: api.ResourceList{api.ResourceCPU: valCPU1}}}},
+			expected: false,
+		},
+		{
+			name:     "Case 2: oldPod.Spec.Resources is nil and newPod introduces pod-level resources - returns true",
+			newPod:   &api.Pod{Spec: api.PodSpec{Resources: &api.ResourceRequirements{Limits: api.ResourceList{api.ResourceCPU: valCPU1}}}},
+			oldPod:   &api.Pod{Spec: api.PodSpec{}},
+			expected: true,
+		},
+		{
+			name:     "Case 3: newPod introduces cpu request when oldPod only specified memory request - returns true",
+			newPod:   &api.Pod{Spec: api.PodSpec{Resources: &api.ResourceRequirements{Requests: api.ResourceList{api.ResourceMemory: valMem100Mi, api.ResourceCPU: valCPU1}}}},
+			oldPod:   &api.Pod{Spec: api.PodSpec{Resources: &api.ResourceRequirements{Requests: api.ResourceList{api.ResourceMemory: valMem100Mi}}}},
+			expected: true,
+		},
+		{
+			name:     "Case 4: newPod introduces cpu limit when oldPod only specified memory request - returns true",
+			newPod:   &api.Pod{Spec: api.PodSpec{Resources: &api.ResourceRequirements{Requests: api.ResourceList{api.ResourceMemory: valMem100Mi}, Limits: api.ResourceList{api.ResourceCPU: valCPU1}}}},
+			oldPod:   &api.Pod{Spec: api.PodSpec{Resources: &api.ResourceRequirements{Requests: api.ResourceList{api.ResourceMemory: valMem100Mi}}}},
+			expected: true,
+		},
+		{
+			name:     "Case 5: newPod introduces hugepages-2Mi request when oldPod specified cpu and memory - returns true",
+			newPod:   &api.Pod{Spec: api.PodSpec{Resources: &api.ResourceRequirements{Requests: api.ResourceList{api.ResourceCPU: valCPU1, api.ResourceMemory: valMem100Mi, resHugepage2Mi: valHugepage2Mi}}}},
+			oldPod:   &api.Pod{Spec: api.PodSpec{Resources: &api.ResourceRequirements{Requests: api.ResourceList{api.ResourceCPU: valCPU1, api.ResourceMemory: valMem100Mi}}}},
+			expected: true,
+		},
+		{
+			name:     "Case 6: both oldPod and newPod specify identical cpu and memory resources - returns false",
+			newPod:   &api.Pod{Spec: api.PodSpec{Resources: &api.ResourceRequirements{Requests: api.ResourceList{api.ResourceCPU: valCPU1, api.ResourceMemory: valMem100Mi}}}},
+			oldPod:   &api.Pod{Spec: api.PodSpec{Resources: &api.ResourceRequirements{Requests: api.ResourceList{api.ResourceCPU: valCPU1, api.ResourceMemory: valMem100Mi}}}},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ShouldDefaultPodLevelResourcesOnUpdate(tt.newPod, tt.oldPod)
+			if got != tt.expected {
+				t.Errorf("ShouldDefaultPodLevelResourcesOnUpdate() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDefaultPodLevelResources(t *testing.T) {
+	valCPU1 := resource.MustParse("1")
+
+	podWithAllContainerLimits := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "c1",
+					Resources: api.ResourceRequirements{
+						Limits: api.ResourceList{api.ResourceCPU: valCPU1},
+					},
+				},
+			},
+			Resources: &api.ResourceRequirements{
+				Requests: api.ResourceList{api.ResourceCPU: valCPU1},
+			},
+		},
+	}
+
+	podWithMissingContainerLimit := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "c1",
+				},
+			},
+			Resources: &api.ResourceRequirements{
+				Requests: api.ResourceList{api.ResourceCPU: valCPU1},
+			},
+		},
+	}
+
+	t.Run("Case 1: all containers specify limits - pod-level limit defaulted to aggregated container limits", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+		p := podWithAllContainerLimits.DeepCopy()
+		DefaultPodLevelResources(p)
+
+		if p.Spec.Resources == nil || p.Spec.Resources.Limits == nil || p.Spec.Resources.Limits[api.ResourceCPU] != valCPU1 {
+			t.Errorf("expected pod-level limit for cpu to be defaulted to %v, got %v", valCPU1, p.Spec.Resources)
+		}
+	})
+
+	t.Run("Case 2: container limit missing - no pod-level limit defaulting", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+		p := podWithMissingContainerLimit.DeepCopy()
+		DefaultPodLevelResources(p)
+
+		if p.Spec.Resources.Limits != nil && len(p.Spec.Resources.Limits) > 0 {
+			t.Errorf("expected no pod-level limit defaulting when container limits are missing, got %v", p.Spec.Resources.Limits)
+		}
+	})
+}
+
+func TestMergePodLevelResources(t *testing.T) {
+	valCPU1 := resource.MustParse("1")
+	valCPU2 := resource.MustParse("2")
+	valMem100Mi := resource.MustParse("100Mi")
+
+	tests := []struct {
+		name     string
+		newRes   *api.ResourceRequirements
+		oldRes   *api.ResourceRequirements
+		expected *api.ResourceRequirements
+	}{
+		{
+			name:     "Case 1: newRes is nil and oldRes is nil - returns nil",
+			newRes:   nil,
+			oldRes:   nil,
+			expected: nil,
+		},
+		{
+			name:     "Case 2: newRes is nil and oldRes is present - returns nil so validation catches resource removal",
+			newRes:   nil,
+			oldRes:   &api.ResourceRequirements{
+				Requests: api.ResourceList{api.ResourceCPU: valCPU1},
+			},
+			expected: nil,
+		},
+		{
+			name: "Case 3: newRes specifies limits while oldRes specified requests - copies requests from oldRes",
+			newRes: &api.ResourceRequirements{
+				Limits: api.ResourceList{api.ResourceCPU: valCPU2},
+			},
+			oldRes: &api.ResourceRequirements{
+				Requests: api.ResourceList{api.ResourceCPU: valCPU1},
+			},
+			expected: &api.ResourceRequirements{
+				Requests: api.ResourceList{api.ResourceCPU: valCPU1},
+				Limits:   api.ResourceList{api.ResourceCPU: valCPU2},
+			},
+		},
+		{
+			name: "Case 4: newRes updates cpu limit while oldRes specified memory limit - preserves memory limit from oldRes",
+			newRes: &api.ResourceRequirements{
+				Limits: api.ResourceList{api.ResourceCPU: valCPU2},
+			},
+			oldRes: &api.ResourceRequirements{
+				Limits: api.ResourceList{api.ResourceCPU: valCPU1, api.ResourceMemory: valMem100Mi},
+			},
+			expected: &api.ResourceRequirements{
+				Limits: api.ResourceList{api.ResourceCPU: valCPU2, api.ResourceMemory: valMem100Mi},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MergePodLevelResources(tt.newRes, tt.oldRes)
+			if diff := cmp.Diff(tt.expected, got); diff != "" {
+				t.Errorf("MergePodLevelResources() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+
+

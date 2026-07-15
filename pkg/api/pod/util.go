@@ -21,16 +21,20 @@ import (
 	"iter"
 	"strings"
 
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
+
 
 // ContainerType signifies container type
 type ContainerType int
@@ -1922,3 +1926,176 @@ func DropInitContainerAnnotations(annotations map[string]string) {
 		delete(annotations, k)
 	}
 }
+
+// DefaultPodLevelResources orchestrates pod-level resource defaulting for internal Pod objects.
+func DefaultPodLevelResources(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+		return
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		v1Pod := &apiv1.Pod{}
+		if err := corev1.Convert_core_Pod_To_v1_Pod(pod, v1Pod, nil); err == nil {
+			corev1.DefaultHugePagePodLimits(v1Pod)
+			corev1.DefaultPodRequests(v1Pod)
+			_ = corev1.Convert_v1_Pod_To_core_Pod(v1Pod, pod, nil)
+		}
+		defaultPodLevelLimits(pod)
+	}
+}
+
+
+func defaultPodLevelLimits(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		return
+	}
+	if pod.Spec.Resources == nil {
+		return
+	}
+	if len(pod.Spec.Resources.Requests) == 0 && len(pod.Spec.Resources.Limits) == 0 {
+		return
+	}
+
+	candidates := sets.New[api.ResourceName]()
+	for resName := range pod.Spec.Resources.Requests {
+		if !resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
+			continue
+		}
+		if _, ok := pod.Spec.Resources.Limits[resName]; !ok {
+			candidates.Insert(resName)
+		}
+	}
+
+	if candidates.Len() == 0 {
+		return
+	}
+
+	aggrLimits := aggregateContainerLimits(&pod.Spec, candidates)
+	if aggrLimits == nil {
+		return
+	}
+
+	for resName := range candidates {
+		val, ok := aggrLimits[apiv1.ResourceName(resName)]
+		if !ok {
+			continue
+		}
+		podReq := pod.Spec.Resources.Requests[resName]
+		if podReq.Cmp(val) > 0 {
+			val = podReq
+		}
+		if pod.Spec.Resources.Limits == nil {
+			pod.Spec.Resources.Limits = make(api.ResourceList)
+		}
+		pod.Spec.Resources.Limits[resName] = val.DeepCopy()
+	}
+}
+
+func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.ResourceName]) apiv1.ResourceList {
+	VisitContainers(spec, AllContainers, func(ctr *api.Container, _ ContainerType) bool {
+		for resName := range candidates {
+			if _, ok := ctr.Resources.Limits[resName]; !ok {
+				candidates.Delete(resName)
+			}
+		}
+		return candidates.Len() > 0
+	})
+
+	if candidates.Len() == 0 {
+		return nil
+	}
+
+	v1PodSpec := &apiv1.PodSpec{}
+	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
+		Containers:     spec.Containers,
+		InitContainers: spec.InitContainers,
+	}, v1PodSpec, nil); err != nil {
+		return nil
+	}
+
+	return resourcehelper.AggregateContainerLimits(&apiv1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
+}
+
+// ShouldDefaultPodLevelResourcesOnUpdate determines whether pod-level resource defaulting
+// should be executed during a pod update.
+//
+// Defaulting is skipped when both oldPod and newPod specify identical resource types to avoid
+// overwriting explicit user resize values. Defaulting is triggered in the following scenarios:
+// 1. oldPod had no pod-level resources configured, but newPod introduces them.
+// 2. newPod introduces a new resource type (CPU, Memory, HugePages) that was not in oldPod.
+// 3. newPod omits an entire Requests or Limits map present on oldPod, requiring container aggregation or limit matching.
+func ShouldDefaultPodLevelResourcesOnUpdate(newPod, oldPod *api.Pod) bool {
+	if newPod.Spec.Resources == nil {
+		return false
+	}
+
+	if oldPod.Spec.Resources == nil || (len(oldPod.Spec.Resources.Requests) == 0 && len(oldPod.Spec.Resources.Limits) == 0) {
+		return true
+	}
+
+	hasResource := func(res *api.ResourceRequirements, name api.ResourceName) bool {
+
+		if res == nil {
+			return false
+		}
+		_, inReq := res.Requests[name]
+		_, inLim := res.Limits[name]
+		return inReq || inLim
+	}
+
+	for resName := range newPod.Spec.Resources.Requests {
+		if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
+			if !hasResource(oldPod.Spec.Resources, resName) {
+				return true
+			}
+		}
+	}
+	for resName := range newPod.Spec.Resources.Limits {
+		if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
+			if !hasResource(oldPod.Spec.Resources, resName) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// MergePodLevelResources copies missing resource entries from oldRes into newRes
+// so that partial updates retain unspecified fields from oldPod.
+func MergePodLevelResources(newRes, oldRes *api.ResourceRequirements) *api.ResourceRequirements {
+	if newRes == nil {
+		return nil
+	}
+	if oldRes == nil {
+		return newRes.DeepCopy()
+	}
+
+	merged := oldRes.DeepCopy()
+
+
+	if len(newRes.Requests) > 0 {
+		if merged.Requests == nil {
+			merged.Requests = make(api.ResourceList)
+		}
+		for k, v := range newRes.Requests {
+			merged.Requests[k] = v.DeepCopy()
+		}
+	}
+
+	if len(newRes.Limits) > 0 {
+		if merged.Limits == nil {
+			merged.Limits = make(api.ResourceList)
+		}
+		for k, v := range newRes.Limits {
+			merged.Limits[k] = v.DeepCopy()
+		}
+	}
+
+	return merged
+}
+
+
+
+
+

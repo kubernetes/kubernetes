@@ -4361,3 +4361,86 @@ func TestWarningsOnUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestPodLevelResourcesStrategyDefaulting(t *testing.T) {
+	valCPU1 := resource.MustParse("1")
+
+
+	t.Run("PrepareForCreate defaults pod-level resources", func(t *testing.T) {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.PodLevelResources:                  true,
+			features.PodLevelResourcesFixUpdateDefaulting: true,
+		})
+
+		pod := &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "c1",
+						Resources: api.ResourceRequirements{
+							Limits: api.ResourceList{api.ResourceCPU: valCPU1},
+						},
+					},
+				},
+				Resources: &api.ResourceRequirements{
+					Requests: api.ResourceList{api.ResourceCPU: valCPU1},
+				},
+			},
+		}
+
+		Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+		if pod.Spec.Resources == nil || pod.Spec.Resources.Limits == nil || pod.Spec.Resources.Limits[api.ResourceCPU] != valCPU1 {
+			t.Errorf("expected pod-level limit for cpu to be defaulted to %v, got %v", valCPU1, pod.Spec.Resources)
+		}
+	})
+
+	t.Run("PrepareForUpdate executes defaulting when pod-level resources added", func(t *testing.T) {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.PodLevelResources:                  true,
+			features.InPlacePodLevelResourcesVerticalScaling: true,
+			features.PodLevelResourcesFixUpdateDefaulting: true,
+		})
+
+		oldPod := &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "c1",
+						Resources: api.ResourceRequirements{
+							Limits: api.ResourceList{api.ResourceCPU: valCPU1},
+						},
+					},
+				},
+			},
+		}
+
+		newPod := &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "c1",
+						Resources: api.ResourceRequirements{
+							Limits: api.ResourceList{api.ResourceCPU: valCPU1},
+						},
+					},
+				},
+				Resources: &api.ResourceRequirements{
+					Requests: api.ResourceList{api.ResourceCPU: valCPU1},
+				},
+			},
+		}
+
+		ctx := context.Background()
+		ResizeStrategy.PrepareForUpdate(ctx, newPod, oldPod)
+
+		if newPod.Spec.Resources == nil || newPod.Spec.Resources.Limits == nil || newPod.Spec.Resources.Limits[api.ResourceCPU] != valCPU1 {
+			t.Errorf("expected pod-level limit for cpu to be defaulted to %v, got %v", valCPU1, newPod.Spec.Resources)
+		}
+	})
+}
+
+
