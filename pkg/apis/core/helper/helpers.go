@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -29,8 +30,36 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
+
+// IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
+// It returns true if either the Requests or Limits maps are non-empty.
+// Note: keep this in sync with k8s.io/component-helpers/resource.IsPodLevelResourcesSet
+func IsPodLevelResourcesSet(pod *core.Pod) bool {
+	if pod.Spec.Resources == nil {
+		return false
+	}
+
+	if (len(pod.Spec.Resources.Requests) + len(pod.Spec.Resources.Limits)) == 0 {
+		return false
+	}
+
+	for name := range pod.Spec.Resources.Requests {
+		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) {
+			return true
+		}
+	}
+
+	for name := range pod.Spec.Resources.Limits {
+		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) {
+			return true
+		}
+	}
+
+	return false
+}
 
 // IsHugePageResourceName returns true if the resource name has the huge page
 // resource prefix.

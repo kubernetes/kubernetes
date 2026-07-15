@@ -77,6 +77,7 @@ func IsSupportedPodLevelResource(name v1.ResourceName) bool {
 
 // IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
 // It returns true if either the Requests or Limits maps are non-empty.
+// Note: keep this in sync with k8s.io/kubernetes/pkg/apis/core/helper.IsPodLevelResourcesSet
 func IsPodLevelResourcesSet(pod *v1.Pod) bool {
 	if pod.Spec.Resources == nil {
 		return false
