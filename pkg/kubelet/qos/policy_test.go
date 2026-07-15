@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -1081,6 +1082,7 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 	}
 	for name, test := range oomTests {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesFeatureEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
 			listContainers := test.pod.Spec.InitContainers
