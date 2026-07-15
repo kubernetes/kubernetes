@@ -106,22 +106,12 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			},
 			requestOperation: v1.Create,
 			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
-			requestObject: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "basic-policy-object",
-					Namespace: "default",
-				},
-			},
-			expected: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "basic-policy-object",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"my-foo-annotation": "myAnnotationValue",
-					},
-				},
-			},
+			requestObject:    makeEndpoints("basic-policy-object"),
+			expected: withAnnotations(makeEndpoints("basic-policy-object"), map[string]string{
+				"my-foo-annotation": "myAnnotationValue",
+			}),
 		},
+
 		{
 			name: "jsonPatch with constant complex struct object as value",
 			policies: []*v1.MutatingAdmissionPolicy{
@@ -170,6 +160,340 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			},
 		},
 		{
+			name: "jsonPatch with complex struct as value",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-complex-struct", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: [object.subsets[0].notReadyAddresses[0]]}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-complex-struct", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: withSubsets(makeEndpoints("json-patch-complex-struct-object"), []corev1.EndpointSubset{
+				{
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+			expected: withSubsets(makeEndpoints("json-patch-complex-struct-object"), []corev1.EndpointSubset{
+				{
+					Addresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with slice of complex struct as value",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-slice-complex-struct", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: object.subsets[0].notReadyAddresses}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-slice-complex-struct", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: withSubsets(makeEndpoints("json-patch-slice-complex-struct-object"), []corev1.EndpointSubset{
+				{
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+			expected: withSubsets(makeEndpoints("json-patch-slice-complex-struct-object"), []corev1.EndpointSubset{
+				{
+					Addresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation operator",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-list-concat", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: object.subsets[0].notReadyAddresses + [object.subsets[0].notReadyAddresses[0]]}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-list-concat", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: withSubsets(makeEndpoints("json-patch-list-concat-object"), []corev1.EndpointSubset{
+				{
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+			expected: withSubsets(makeEndpoints("json-patch-list-concat-object"), []corev1.EndpointSubset{
+				{
+					Addresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+						{IP: "1.2.3.4"},
+					},
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between typed type and structured object (typed + structured)",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-concat-typed-struct", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: object.subsets[0].notReadyAddresses + [Object.subsets.addresses{ip: "10.0.0.1"}, Object.subsets.addresses{ip: "10.0.0.2"}]}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-concat-typed-struct", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: withSubsets(makeEndpoints("json-patch-concat-typed-struct-object"), []corev1.EndpointSubset{
+				{
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+			expected: withSubsets(makeEndpoints("json-patch-concat-typed-struct-object"), []corev1.EndpointSubset{
+				{
+					Addresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+						{IP: "10.0.0.1"},
+						{IP: "10.0.0.2"},
+					},
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between structured object and typed type (structured + typed)",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-concat-struct-typed", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: [Object.subsets.addresses{ip: "10.0.0.1"}, Object.subsets.addresses{ip: "10.0.0.2"}] + object.subsets[0].notReadyAddresses}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-concat-struct-typed", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: withSubsets(makeEndpoints("json-patch-concat-struct-typed-object"), []corev1.EndpointSubset{
+				{
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+			expected: withSubsets(makeEndpoints("json-patch-concat-struct-typed-object"), []corev1.EndpointSubset{
+				{
+					Addresses: []corev1.EndpointAddress{
+						{IP: "10.0.0.1"},
+						{IP: "10.0.0.2"},
+						{IP: "1.2.3.4"},
+					},
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+		},
+		{
+			name: "jsonPatch with list concatenation between two structured objects (structured + structured)",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-concat-struct-struct", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: [Object.subsets.addresses{ip: "10.0.0.1"}] + [Object.subsets.addresses{ip: "10.0.0.2"}]}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-concat-struct-struct", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: withSubsets(makeEndpoints("json-patch-concat-struct-struct-object"), []corev1.EndpointSubset{
+				{
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+			expected: withSubsets(makeEndpoints("json-patch-concat-struct-struct-object"), []corev1.EndpointSubset{
+				{
+					Addresses: []corev1.EndpointAddress{
+						{IP: "10.0.0.1"},
+						{IP: "10.0.0.2"},
+					},
+					NotReadyAddresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4"},
+					},
+				},
+			}),
+		},
+		{
+			name: "applyConfiguration with list concatenation between typed type and structured object (typed + structured)",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("apply-config-concat-typed-struct", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1.ApplyConfiguration{
+						Expression: `Object{
+							metadata: Object.metadata{
+								finalizers: object.metadata.finalizers + Object.metadata{finalizers: ["finalizer.k8s.io/new"]}.finalizers
+							}
+						}`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("apply-config-concat-typed-struct", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: withFinalizers(makeEndpoints("apply-config-concat-typed-struct-object"), []string{
+				"finalizer.k8s.io/original",
+			}),
+			expected: withFinalizers(makeEndpoints("apply-config-concat-typed-struct-object"), []string{
+				"finalizer.k8s.io/original",
+				"finalizer.k8s.io/new",
+			}),
+		},
+		{
+			name: "applyConfiguration with list concatenation between structured object and typed type (structured + typed)",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("apply-config-concat-struct-typed", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1.ApplyConfiguration{
+						Expression: `Object{
+							metadata: Object.metadata{
+								finalizers: Object.metadata{finalizers: ["finalizer.k8s.io/new"]}.finalizers + object.metadata.finalizers
+							}
+						}`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("apply-config-concat-struct-typed", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: withFinalizers(makeEndpoints("apply-config-concat-struct-typed-object"), []string{
+				"finalizer.k8s.io/original",
+			}),
+			expected: withFinalizers(makeEndpoints("apply-config-concat-struct-typed-object"), []string{
+				"finalizer.k8s.io/new",
+				"finalizer.k8s.io/original",
+			}),
+		},
+		{
+			name: "applyConfiguration with list concatenation between two structured objects (structured + structured)",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("apply-config-concat-struct-struct", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1.ApplyConfiguration{
+						Expression: `Object{
+							metadata: Object.metadata{
+								finalizers: Object.metadata{finalizers: ["finalizer.k8s.io/new1"]}.finalizers + Object.metadata{finalizers: ["finalizer.k8s.io/new2"]}.finalizers
+							}
+						}`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("apply-config-concat-struct-struct", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject:    makeEndpoints("apply-config-concat-struct-struct-object"),
+			expected: withFinalizers(makeEndpoints("apply-config-concat-struct-struct-object"), []string{
+				"finalizer.k8s.io/new1",
+				"finalizer.k8s.io/new2",
+			}),
+		},
+		{
+			name: "jsonPatch with map key comprehension all predicate",
+			policies: []*v1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-map-comprehension", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
+					PatchType: v1.PatchTypeJSONPatch,
+					JSONPatch: &v1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/metadata/labels/added", value: object.metadata.labels.all(k, k != "invalid") ? "true" : "false"}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-map-comprehension", nil, nil),
+			},
+			requestOperation: v1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-map-comprehension-object",
+					Namespace: "default",
+					Labels: map[string]string{
+						"env": "prod",
+						"app": "demo",
+					},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-map-comprehension-object",
+					Namespace: "default",
+					Labels: map[string]string{
+						"env":   "prod",
+						"app":   "demo",
+						"added": "true",
+					},
+				},
+			},
+		},
+		{
 			name: "multiple policies",
 			policies: []*v1.MutatingAdmissionPolicy{
 				mutatingPolicy("multi-policy-1", v1.NeverReinvocationPolicy, matchEndpointResources, nil, v1.Mutation{
@@ -205,22 +529,11 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			},
 			requestOperation: v1.Create,
 			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
-			requestObject: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "multi-policy-object",
-					Namespace: "default",
-				},
-			},
-			expected: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "multi-policy-object",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"foo1": "foo1Value",
-						"foo2": "foo2Value",
-					},
-				},
-			},
+			requestObject:    makeEndpoints("multi-policy-object"),
+			expected: withAnnotations(makeEndpoints("multi-policy-object"), map[string]string{
+				"foo1": "foo1Value",
+				"foo2": "foo2Value",
+			}),
 		},
 		{
 			name: "policy with native param",
@@ -262,21 +575,10 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			},
 			requestOperation: v1.Create,
 			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
-			requestObject: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "policy-with-native-object",
-					Namespace: "default",
-				},
-			},
-			expected: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "policy-with-native-object",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"myFooKey": "myFooValue",
-					},
-				},
-			},
+			requestObject:    makeEndpoints("policy-with-native-object"),
+			expected: withAnnotations(makeEndpoints("policy-with-native-object"), map[string]string{
+				"myFooKey": "myFooValue",
+			}),
 		},
 		{
 			name: "policy with multiple params quantified by single binding",
@@ -333,23 +635,12 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			},
 			requestOperation: v1.Create,
 			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
-			requestObject: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "multi-param-binding-object",
-					Namespace: "default",
-				},
-			},
-			expected: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "multi-param-binding-object",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"multi-param-binding-key1": "value1",
-						"multi-param-binding-key2": "value2",
-						"multi-param-binding-key3": "value3",
-					},
-				},
-			},
+			requestObject:    makeEndpoints("multi-param-binding-object"),
+			expected: withAnnotations(makeEndpoints("multi-param-binding-object"), map[string]string{
+				"multi-param-binding-key1": "value1",
+				"multi-param-binding-key2": "value2",
+				"multi-param-binding-key3": "value3",
+			}),
 		},
 		{
 			name: "policy with variables",
@@ -401,23 +692,12 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			},
 			requestOperation: v1.Create,
 			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
-			requestObject: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "policy-with-multiple-mutations-object",
-					Namespace: "default",
-				},
-			},
-			expected: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "policy-with-multiple-mutations-object",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"foo1": "foo1Value",
-						"foo2": "foo2Value",
-						"foo3": "foo3Value",
-					},
-				},
-			},
+			requestObject:    makeEndpoints("policy-with-multiple-mutations-object"),
+			expected: withAnnotations(makeEndpoints("policy-with-multiple-mutations-object"), map[string]string{
+				"foo1": "foo1Value",
+				"foo2": "foo2Value",
+				"foo3": "foo3Value",
+			}),
 		},
 		{
 			name: "match condition matches",
@@ -511,34 +791,22 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			},
 			requestOperation: v1.Create,
 			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
-			requestObject: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"foo": "0",
-					},
-				},
-			},
-			expected: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: "default",
-					Annotations: map[string]string{
-						// First mutation 0->1
-						// Second mutation 1->2
-						// Third Mutation 2->3
-						// First Mutation Reinvocation 3->4
-						// Second Mutation Reinvocation 4->5
-						// (Third Mutation is set to never reinvocation, so it's not reinvoked)
-						// No future reinvocation passes (we only do a single reinvocation)
-						"foo":           "5",
-						"firstApplied":  "true",
-						"secondApplied": "true",
-						"thirdApplied":  "true",
-					},
-				},
-			},
+			requestObject: withAnnotations(makeEndpoints("test-configmap"), map[string]string{
+				"foo": "0",
+			}),
+			expected: withAnnotations(makeEndpoints("test-configmap"), map[string]string{
+				// First mutation 0->1
+				// Second mutation 1->2
+				// Third Mutation 2->3
+				// First Mutation Reinvocation 3->4
+				// Second Mutation Reinvocation 4->5
+				// (Third Mutation is set to never reinvocation, so it's not reinvoked)
+				// No future reinvocation passes (we only do a single reinvocation)
+				"foo":           "5",
+				"firstApplied":  "true",
+				"secondApplied": "true",
+				"thirdApplied":  "true",
+			}),
 		},
 	}
 
@@ -563,6 +831,13 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
+
+			_, _ = client.CoreV1().ServiceAccounts("default").Create(ctx, &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default",
+					Namespace: "default",
+				},
+			}, metav1.CreateOptions{})
 
 			for i, tc := range cases {
 				t.Run(tc.name, func(t *testing.T) {
@@ -623,7 +898,85 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 					}
 				})
 			}
+
+			t.Run("ApplyConfiguration list concatenation on Native Resource", func(t *testing.T) {
+				policyName := "apply-config-list-concat"
+				policy := withMutatingFailurePolicy(v1.Fail, mutatingPolicy(policyName, v1.NeverReinvocationPolicy, v1.MatchResources{
+					ResourceRules: []v1.NamedRuleWithOperations{
+						{
+							ResourceNames: []string{"test-pod-list-concat"},
+							RuleWithOperations: v1.RuleWithOperations{
+								Operations: []v1.OperationType{v1.Create},
+								Rule: v1.Rule{
+									APIGroups:   []string{""},
+									APIVersions: []string{"v1"},
+									Resources:   []string{"pods"},
+								},
+							},
+						},
+					}},
+					nil,
+					v1.Mutation{
+						PatchType: v1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1.ApplyConfiguration{
+							Expression: `Object{
+								spec: Object.spec{
+									containers: object.spec.containers + [Object.spec.containers{name: "sidecar", image: "busybox:1.36"}]
+								}
+							}`,
+						},
+					},
+				))
+				policy = withMutatingWaitReadyConstraintAndExpression(policy, policyName)
+				if err := createPolicy(ctx, t, client, version, policy); err != nil {
+					t.Fatal(err)
+				}
+
+				policyBinding := mutatingBinding(policyName+"-binding", nil, nil)
+				policyBinding.Spec.PolicyName = policyName
+				if err := createAndWaitReadyMutating(ctx, t, client, version, policyBinding, policyName); err != nil {
+					t.Fatal(err)
+				}
+
+				defer func() {
+					if cleanupErr := cleanupMutatingPolicy(ctx, t, dynClient, version, []*v1.MutatingAdmissionPolicy{policy}, []*v1.MutatingAdmissionPolicyBinding{policyBinding}, nil); cleanupErr != nil {
+						t.Logf("error while cleaning up policy and its bindings: %v", cleanupErr)
+					}
+				}()
+
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-list-concat",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "main-app",
+								Image: "nginx:1.24",
+							},
+						},
+					},
+				}
+
+				err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					createdPod, createErr := client.CoreV1().Pods("default").Create(ctx, pod.DeepCopy(), metav1.CreateOptions{})
+					if createErr != nil {
+						return false, nil
+					}
+
+					if len(createdPod.Spec.Containers) != 2 || createdPod.Spec.Containers[1].Name != "sidecar" {
+						t.Errorf("expected 2 containers with sidecar at index 1, got %v", createdPod.Spec.Containers)
+					}
+					_ = client.CoreV1().Pods("default").Delete(ctx, pod.Name, metav1.DeleteOptions{})
+					return true, nil
+				})
+				if err != nil {
+					t.Fatalf("timed out waiting for Pod mutation by list concat: %v", err)
+				}
+			})
 		})
+
 	}
 }
 
@@ -680,18 +1033,8 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 			},
 			requestOperation: v1.Create,
 			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
-			requestObject: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: "default",
-				},
-			},
-			expected: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: "default",
-				},
-			},
+			requestObject:    makeEndpoints("test-configmap"),
+			expected:         makeEndpoints("test-configmap"),
 		},
 		{
 			name: "failure policy ignore",
@@ -709,18 +1052,8 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 			},
 			requestOperation: v1.Create,
 			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
-			requestObject: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: "default",
-				},
-			},
-			expected: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: "default",
-				},
-			},
+			requestObject:    makeEndpoints("test-configmap"),
+			expected:         makeEndpoints("test-configmap"),
 		},
 		{
 			name: "match condition does not match",
@@ -910,23 +1243,12 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 			},
 			requestOperation: v1.Create,
 			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
-			requestObject: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "multi-binding-object",
-					Namespace: "default",
-				},
-			},
-			expected: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "multi-binding-object",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"multi-binding-key1": "value1",
-						"multi-binding-key2": "value2",
-						"multi-binding-key3": "value3",
-					},
-				},
-			},
+			requestObject:    makeEndpoints("multi-binding-object"),
+			expected: withAnnotations(makeEndpoints("multi-binding-object"), map[string]string{
+				"multi-binding-key1": "value1",
+				"multi-binding-key2": "value2",
+				"multi-binding-key3": "value3",
+			}),
 		},
 		{
 			// Same as the other cases, but the reinvocation is caused by
@@ -1045,27 +1367,15 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 			},
 			requestOperation: v1.Create,
 			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
-			requestObject: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "multi-param-reinvocation-object",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"foo": "0",
-					},
-				},
-			},
-			expected: &corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "multi-param-reinvocation-object",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"firstApplied":  "true",
-						"secondApplied": "true",
-						"thirdApplied":  "true",
-						"foo":           "5",
-					},
-				},
-			},
+			requestObject: withAnnotations(makeEndpoints("multi-param-reinvocation-object"), map[string]string{
+				"foo": "0",
+			}),
+			expected: withAnnotations(makeEndpoints("multi-param-reinvocation-object"), map[string]string{
+				"firstApplied":  "true",
+				"secondApplied": "true",
+				"thirdApplied":  "true",
+				"foo":           "5",
+			}),
 		},
 	}
 	versions := []schema.GroupVersion{v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion}
@@ -1158,9 +1468,8 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 	}
 }
 
-// Test_MutatingAdmissionPolicy_CustomResources tests a custom resource mutation.
-// CRDs are also ideal for testing version conversion since old version are not removed, so version conversion is also
-// tested.
+// Test_MutatingAdmissionPolicy_CustomResources tests custom resource mutations across lists, maps, structs, and labels.
+// CRDs are also ideal for testing version conversion since old versions are not removed, so version conversion is also tested.
 func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 	versions := []schema.GroupVersion{v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion}
 	for _, version := range versions {
@@ -1187,104 +1496,500 @@ func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 
-			policy := withMutatingFailurePolicy(v1.Fail, mutatingPolicy("match-by-match-policy-equivalent", v1.IfNeededReinvocationPolicy, v1.MatchResources{
-				ResourceRules: []v1.NamedRuleWithOperations{
-					{
-						RuleWithOperations: v1.RuleWithOperations{
-							Operations: []v1.OperationType{
-								"*",
-							},
-							Rule: v1.Rule{
-								APIGroups: []string{
-									"awesome.bears.com",
-								},
-								APIVersions: []string{
-									"v1",
-								},
-								Resources: []string{
-									"pandas",
-								},
-							},
-						},
-					},
-				}},
-				nil,
-				v1.Mutation{
-					PatchType: v1.PatchTypeApplyConfiguration,
-					ApplyConfiguration: &v1.ApplyConfiguration{
-						Expression: `Object{ metadata: Object.metadata{ labels: {"mutated-panda": "true"} } }`,
-					},
-				},
-			))
-			testID := "policy-equivalent"
-			policy = withMutatingWaitReadyConstraintAndExpression(policy, testID)
-			if err := createPolicy(ctx, t, client, version, policy); err != nil {
-				t.Fatal(err)
-			}
-
-			policyBinding := mutatingBinding("match-by-match-policy-equivalent", nil, nil)
-			if err := createAndWaitReadyMutating(ctx, t, client, version, policyBinding, testID); err != nil {
-				t.Fatal(err)
-			}
-
-			v1Resource := &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "awesome.bears.com" + "/" + "v1",
-					"kind":       "Panda",
-					"metadata": map[string]interface{}{
-						"name": "v1-bears",
-					},
-				},
-			}
-
-			v2Resource := &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "awesome.bears.com" + "/" + "v2",
-					"kind":       "Panda",
-					"metadata": map[string]interface{}{
-						"name": "v2-bears",
-					},
-				},
-			}
-
 			dynamicClient, err := dynamic.NewForConfig(config)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			// Wait for CRDs to register
-			err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-				createdv1, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Create(ctx, v1Resource, metav1.CreateOptions{})
-				if err != nil {
-					if strings.Contains(err.Error(), "Resource kind awesome.bears.com/v1, Kind=Panda not found") {
+			t.Run("metadata labels and version conversion on CR", func(t *testing.T) {
+				policy := withMutatingFailurePolicy(v1.Fail, mutatingPolicy("match-by-match-policy-equivalent", v1.IfNeededReinvocationPolicy, v1.MatchResources{
+					ResourceRules: []v1.NamedRuleWithOperations{
+						{
+							ResourceNames: []string{"v1-bears", "v2-bears"},
+							RuleWithOperations: v1.RuleWithOperations{
+								Operations: []v1.OperationType{"*"},
+								Rule: v1.Rule{
+									APIGroups:   []string{"awesome.bears.com"},
+									APIVersions: []string{"v1"},
+									Resources:   []string{"pandas"},
+								},
+							},
+						},
+					}},
+					nil,
+					v1.Mutation{
+						PatchType: v1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1.ApplyConfiguration{
+							Expression: `Object{ metadata: Object.metadata{ labels: {"mutated-panda": "true"} } }`,
+						},
+					},
+				))
+				testID := "policy-equivalent"
+				policy = withMutatingWaitReadyConstraintAndExpression(policy, testID)
+				if err := createPolicy(ctx, t, client, version, policy); err != nil {
+					t.Fatal(err)
+				}
+
+				policyBinding := mutatingBinding("match-by-match-policy-equivalent", nil, nil)
+				if err := createAndWaitReadyMutating(ctx, t, client, version, policyBinding, testID); err != nil {
+					t.Fatal(err)
+				}
+
+				defer func() {
+					if cleanupErr := cleanupMutatingPolicy(ctx, t, dynamicClient, version, []*v1.MutatingAdmissionPolicy{policy}, []*v1.MutatingAdmissionPolicyBinding{policyBinding}, nil); cleanupErr != nil {
+						t.Logf("error while cleaning up policy and its bindings: %v", cleanupErr)
+					}
+				}()
+
+				v1Resource := makePanda("v1-bears", "v1", nil)
+
+				v2Resource := makePanda("v2-bears", "v2", nil)
+
+				// Wait for CRDs to register
+				err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					createdv1, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Create(ctx, v1Resource, metav1.CreateOptions{})
+					if err != nil {
+						if strings.Contains(err.Error(), "Resource kind awesome.bears.com/v1, Kind=Panda not found") {
+							return false, nil
+						}
 						return false, nil
 					}
-					return false, nil
+					if createdv1.GetLabels()["mutated-panda"] != "true" {
+						t.Errorf("expected mutated-panda to be true, got %s", createdv1.GetLabels())
+					}
+					return true, nil
+				})
+				if err != nil {
+					t.Fatal(err)
 				}
-				if createdv1.GetLabels()["mutated-panda"] != "true" {
-					t.Errorf("expected mutated-panda to be true, got %s", createdv1.GetLabels())
+
+				err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					createdv2, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v2", Resource: "pandas"}).Create(ctx, v2Resource, metav1.CreateOptions{})
+					if err != nil {
+						if strings.Contains(err.Error(), "Resource kind awesome.bears.com/v2, Kind=Panda not found") {
+							return false, nil
+						}
+						return false, nil
+					}
+					if createdv2.GetLabels()["mutated-panda"] != "true" {
+						t.Errorf("expected mutated-panda to be true, got %s", createdv2.GetLabels())
+					}
+					return true, nil
+				})
+				if err != nil {
+					t.Fatal(err)
 				}
-				return true, nil
 			})
+
+			tests := []struct {
+				name          string
+				mutation      v1.Mutation
+				requestObject *unstructured.Unstructured
+				expectedSpec  map[string]interface{}
+			}{
+				{
+					name: "JSONPatch list concatenation (unstructured + structured) on CR",
+					mutation: v1.Mutation{
+						PatchType: v1.PatchTypeJSONPatch,
+						JSONPatch: &v1.JSONPatch{
+							Expression: `[
+								JSONPatch{op: "add", path: "/spec/foods", value: object.spec.foods + [Object.spec.foods{item: "eucalyptus"}]}
+							]`,
+						},
+					},
+					requestObject: makePanda("cr-jsonpatch-concat-1", "v1", map[string]interface{}{
+						"foods": []interface{}{
+							map[string]interface{}{"item": "bamboo"},
+						},
+					}),
+					expectedSpec: map[string]interface{}{
+						"foods": []interface{}{
+							map[string]interface{}{"item": "bamboo"},
+							map[string]interface{}{"item": "eucalyptus"},
+						},
+					},
+				},
+				{
+					name: "ApplyConfiguration list concatenation (unstructured + structured) on CR",
+					mutation: v1.Mutation{
+						PatchType: v1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1.ApplyConfiguration{
+							Expression: `Object{ spec: Object.spec{ foods: object.spec.foods + Object.spec{foods: ["eucalyptus"]}.foods } }`,
+						},
+					},
+					requestObject: makePanda("cr-apply-concat-1", "v1", map[string]interface{}{
+						"foods": []interface{}{"bamboo"},
+					}),
+					expectedSpec: map[string]interface{}{
+						"foods": []interface{}{"bamboo", "eucalyptus"},
+					},
+				},
+				{
+					name: "JSONPatch list concatenation (structured + unstructured) on CR",
+					mutation: v1.Mutation{
+						PatchType: v1.PatchTypeJSONPatch,
+						JSONPatch: &v1.JSONPatch{
+							Expression: `[
+								JSONPatch{op: "add", path: "/spec/foods", value: [Object.spec.foods{item: "eucalyptus"}] + object.spec.foods}
+							]`,
+						},
+					},
+					requestObject: makePanda("cr-jsonpatch-concat-2", "v1", map[string]interface{}{
+						"foods": []interface{}{
+							map[string]interface{}{"item": "bamboo"},
+						},
+					}),
+					expectedSpec: map[string]interface{}{
+						"foods": []interface{}{
+							map[string]interface{}{"item": "eucalyptus"},
+							map[string]interface{}{"item": "bamboo"},
+						},
+					},
+				},
+				{
+					name: "ApplyConfiguration list concatenation (structured + unstructured) on CR",
+					mutation: v1.Mutation{
+						PatchType: v1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1.ApplyConfiguration{
+							Expression: `Object{ spec: Object.spec{ foods: Object.spec{foods: ["eucalyptus"]}.foods + object.spec.foods } }`,
+						},
+					},
+					requestObject: makePanda("cr-apply-concat-2", "v1", map[string]interface{}{
+						"foods": []interface{}{"bamboo"},
+					}),
+					expectedSpec: map[string]interface{}{
+						"foods": []interface{}{"eucalyptus", "bamboo"},
+					},
+				},
+				{
+					name: "ApplyConfiguration map merging (unstructured + structured map) on CR",
+					mutation: v1.Mutation{
+						PatchType: v1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1.ApplyConfiguration{
+							Expression: `Object{ spec: Object.spec{ habitat: Object.spec.habitat{ humidity: "85%", temperature: "20C" } } }`,
+						},
+					},
+					requestObject: makePanda("cr-apply-map-1", "v1", map[string]interface{}{
+						"habitat": map[string]interface{}{
+							"name":        "bamboo-forest",
+							"temperature": "22C",
+						},
+					}),
+					expectedSpec: map[string]interface{}{
+						"habitat": map[string]interface{}{
+							"name":        "bamboo-forest",
+							"temperature": "20C",
+							"humidity":    "85%",
+						},
+					},
+				},
+
+				{
+					name: "JSONPatch list concatenation (unstructured + literal list) on CR",
+					mutation: v1.Mutation{
+						PatchType: v1.PatchTypeJSONPatch,
+						JSONPatch: &v1.JSONPatch{
+							Expression: `[
+								JSONPatch{op: "add", path: "/spec/foods", value: object.spec.foods + ["eucalyptus"]}
+							]`,
+						},
+					},
+					requestObject: makePanda("cr-jsonpatch-concat-3", "v1", map[string]interface{}{
+						"foods": []interface{}{"bamboo"},
+					}),
+					expectedSpec: map[string]interface{}{
+						"foods": []interface{}{"bamboo", "eucalyptus"},
+					},
+				},
+				{
+					name: "ApplyConfiguration list concatenation (unstructured + literal list) on CR",
+					mutation: v1.Mutation{
+						PatchType: v1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1.ApplyConfiguration{
+							Expression: `Object{ spec: Object.spec{ foods: object.spec.foods + ["eucalyptus"] } }`,
+						},
+					},
+					requestObject: makePanda("cr-apply-concat-3", "v1", map[string]interface{}{
+						"foods": []interface{}{"bamboo"},
+					}),
+					expectedSpec: map[string]interface{}{
+						"foods": []interface{}{"bamboo", "eucalyptus"},
+					},
+				},
+				{
+					name: "JSONPatch struct field setting on CR",
+					mutation: v1.Mutation{
+						PatchType: v1.PatchTypeJSONPatch,
+						JSONPatch: &v1.JSONPatch{
+							Expression: `[
+								JSONPatch{op: "add", path: "/spec/diet/secondary", value: "eucalyptus"},
+								JSONPatch{op: "replace", path: "/spec/diet/dailyKg", value: "25"}
+							]`,
+						},
+					},
+					requestObject: makePanda("cr-jsonpatch-struct-1", "v1", map[string]interface{}{
+						"diet": map[string]interface{}{
+							"primary": "bamboo",
+							"dailyKg": "15",
+						},
+					}),
+					expectedSpec: map[string]interface{}{
+						"diet": map[string]interface{}{
+							"primary":   "bamboo",
+							"dailyKg":   "25",
+							"secondary": "eucalyptus",
+						},
+					},
+				},
+				{
+					name: "JSONPatch struct object insertion on CR",
+					mutation: v1.Mutation{
+						PatchType: v1.PatchTypeJSONPatch,
+						JSONPatch: &v1.JSONPatch{
+							Expression: `[
+								JSONPatch{op: "add", path: "/spec/habitat", value: Object.spec.habitat{ name: "mountain", protected: true }}
+							]`,
+						},
+					},
+					requestObject: makePanda("cr-jsonpatch-struct-2", "v1", map[string]interface{}{
+						"diet": map[string]interface{}{
+							"primary": "bamboo",
+						},
+					}),
+					expectedSpec: map[string]interface{}{
+						"diet": map[string]interface{}{
+							"primary": "bamboo",
+						},
+						"habitat": map[string]interface{}{
+							"name":      "mountain",
+							"protected": true,
+						},
+					},
+				},
+			}
+
+			for idx, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					policyName := fmt.Sprintf("cr-patch-policy-%d", idx)
+					policy := withMutatingFailurePolicy(v1.Fail, mutatingPolicy(policyName, v1.NeverReinvocationPolicy, v1.MatchResources{
+						ResourceRules: []v1.NamedRuleWithOperations{
+							{
+								ResourceNames: []string{tc.requestObject.GetName()},
+								RuleWithOperations: v1.RuleWithOperations{
+									Operations: []v1.OperationType{"*"},
+									Rule: v1.Rule{
+										APIGroups:   []string{"awesome.bears.com"},
+										APIVersions: []string{"v1"},
+										Resources:   []string{"pandas"},
+									},
+								},
+							},
+						}},
+						nil,
+						tc.mutation,
+					))
+					policy = withMutatingWaitReadyConstraintAndExpression(policy, policyName)
+					if err := createPolicy(ctx, t, client, version, policy); err != nil {
+						t.Fatal(err)
+					}
+
+					policyBinding := mutatingBinding(policyName+"-binding", nil, nil)
+					policyBinding.Spec.PolicyName = policyName
+					if err := createAndWaitReadyMutating(ctx, t, client, version, policyBinding, policyName); err != nil {
+						t.Fatal(err)
+					}
+
+					defer func() {
+						if cleanupErr := cleanupMutatingPolicy(ctx, t, dynamicClient, version, []*v1.MutatingAdmissionPolicy{policy}, []*v1.MutatingAdmissionPolicyBinding{policyBinding}, nil); cleanupErr != nil {
+							t.Logf("error while cleaning up policy and its bindings: %v", cleanupErr)
+						}
+					}()
+
+					var created *unstructured.Unstructured
+					err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+						var createErr error
+						created, createErr = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Create(ctx, tc.requestObject.DeepCopy(), metav1.CreateOptions{})
+						if createErr != nil {
+							if strings.Contains(createErr.Error(), "Resource kind awesome.bears.com/v1, Kind=Panda not found") {
+								return false, nil
+							}
+							return false, nil
+						}
+						if !reflect.DeepEqual(created.Object["spec"], tc.expectedSpec) {
+							t.Errorf("expected spec %v, got %v", tc.expectedSpec, created.Object["spec"])
+						}
+						return true, nil
+					})
+					if err != nil {
+						t.Fatalf("timed out waiting for CR mutation: %v", err)
+					}
+				})
+			}
+		})
+	}
+}
+
+// Test_MutatingAdmissionPolicy_CustomResourceParamRef tests mutating a native Pod based on fields read from a Custom Resource parameter via ParamRef/ParamKind, including map merging.
+func Test_MutatingAdmissionPolicy_CustomResourceParamRef(t *testing.T) {
+	versions := []schema.GroupVersion{v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion}
+	for _, version := range versions {
+		t.Run(version.Version, func(t *testing.T) {
+			var flags []string
+			if version == v1beta1.SchemeGroupVersion {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
+				flags = []string{fmt.Sprintf("--runtime-config=%s=true", version)}
+			}
+			server, err := apiservertesting.StartTestServer(t, nil, flags, framework.SharedEtcd())
+			etcd.CreateTestCRDs(t, apiextensions.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer server.TearDownFn()
+
+			config := server.ClientConfig
+			client, err := kubernetes.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dynamicClient, err := dynamic.NewForConfig(config)
 			if err != nil {
 				t.Fatal(err)
 			}
 
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			allow := v1.AllowAction
+			_, _ = client.CoreV1().ServiceAccounts("default").Create(ctx, &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default",
+					Namespace: "default",
+				},
+			}, metav1.CreateOptions{})
+
+			crParamName := "panda-param-for-pod"
+			crParam := makePanda(crParamName, "v1", map[string]interface{}{
+				"foods": []interface{}{"bamboo", "eucalyptus"},
+				"habitat": map[string]interface{}{
+					"name": "Sichuan",
+				},
+			})
+			crParam.SetLabels(map[string]string{"param-label": "param-value", "shared-label": "from-param"})
+
 			err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-				createdv2, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v2", Resource: "pandas"}).Create(ctx, v2Resource, metav1.CreateOptions{})
-				if err != nil {
-					if strings.Contains(err.Error(), "Resource kind awesome.bears.com/v2, Kind=Panda not found") {
+				var createErr error
+				_, createErr = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Create(ctx, crParam.DeepCopy(), metav1.CreateOptions{})
+				if createErr != nil {
+					if strings.Contains(createErr.Error(), "Resource kind awesome.bears.com/v1, Kind=Panda not found") {
 						return false, nil
 					}
 					return false, nil
 				}
-				if createdv2.GetLabels()["mutated-panda"] != "true" {
-					t.Errorf("expected mutated-panda to be true, got %s", createdv2.GetLabels())
-				}
 				return true, nil
 			})
 			if err != nil {
+				t.Fatalf("failed to create CR parameter: %v", err)
+			}
+			defer func() {
+				_ = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Delete(ctx, crParamName, metav1.DeleteOptions{})
+			}()
+
+			policyName := "cr-param-pod-policy"
+			policy := withMutatingFailurePolicy(v1.Fail, mutatingPolicy(policyName, v1.NeverReinvocationPolicy, v1.MatchResources{
+				ResourceRules: []v1.NamedRuleWithOperations{
+					{
+						ResourceNames: []string{"test-pod-modified-by-cr"},
+						RuleWithOperations: v1.RuleWithOperations{
+							Operations: []v1.OperationType{v1.Create},
+							Rule: v1.Rule{
+								APIGroups:   []string{""},
+								APIVersions: []string{"v1"},
+								Resources:   []string{"pods"},
+							},
+						},
+					},
+				}},
+				&v1.ParamKind{
+					APIVersion: "awesome.bears.com/v1",
+					Kind:       "Panda",
+				},
+				v1.Mutation{
+					PatchType: v1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1.ApplyConfiguration{
+						Expression: `Object{
+							metadata: Object.metadata{
+								annotations: {
+									"panda-food": params.spec.foods[0],
+									"panda-habitat": params.spec.habitat.name
+								},
+								labels: params.metadata.labels
+							}
+						}`,
+					},
+				},
+			))
+			policy = withMutatingWaitReadyConstraintAndExpression(policy, policyName)
+			if err := createPolicy(ctx, t, client, version, policy); err != nil {
 				t.Fatal(err)
+			}
+
+			policyBinding := mutatingBinding(policyName+"-binding", &v1.ParamRef{
+				Name:                    crParamName,
+				ParameterNotFoundAction: &allow,
+			}, nil)
+			policyBinding.Spec.PolicyName = policyName
+			if err := createAndWaitReadyMutating(ctx, t, client, version, policyBinding, policyName); err != nil {
+				t.Fatal(err)
+			}
+
+			defer func() {
+				if cleanupErr := cleanupMutatingPolicy(ctx, t, dynamicClient, version, []*v1.MutatingAdmissionPolicy{policy}, []*v1.MutatingAdmissionPolicyBinding{policyBinding}, nil); cleanupErr != nil {
+					t.Logf("error while cleaning up policy and its bindings: %v", cleanupErr)
+				}
+			}()
+
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod-modified-by-cr",
+					Namespace: "default",
+					Labels: map[string]string{
+						"pod-label":    "pod-value",
+						"shared-label": "from-pod",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test-container",
+							Image: "registry.k8s.io/pause:3.9",
+						},
+					},
+				},
+			}
+
+			err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+				createdPod, createErr := client.CoreV1().Pods("default").Create(ctx, pod.DeepCopy(), metav1.CreateOptions{})
+				if createErr != nil {
+					return false, nil
+				}
+				if createdPod.Annotations["panda-food"] != "bamboo" || createdPod.Annotations["panda-habitat"] != "Sichuan" {
+					t.Errorf("expected pod annotations to contain panda-food: bamboo and panda-habitat: Sichuan, got %v", createdPod.Annotations)
+				}
+
+				expectedLabels := map[string]string{
+					"pod-label":    "pod-value",
+					"param-label":  "param-value",
+					"shared-label": "from-param", // param map overwrites pod map in ApplyConfiguration
+				}
+
+				if !reflect.DeepEqual(createdPod.Labels, expectedLabels) {
+					t.Errorf("expected pod labels to be %v, got %v", expectedLabels, createdPod.Labels)
+				}
+				_ = client.CoreV1().Pods("default").Delete(ctx, pod.Name, metav1.DeleteOptions{})
+				return true, nil
+			})
+			if err != nil {
+				t.Fatalf("timed out waiting for Pod mutation by CR parameter: %v", err)
 			}
 		})
 	}
@@ -1530,4 +2235,44 @@ func createBinding(ctx context.Context, t *testing.T, client kubernetes.Interfac
 	}
 	_, err := client.AdmissionregistrationV1().MutatingAdmissionPolicyBindings().Create(ctx, binding, metav1.CreateOptions{FieldManager: "integration-test"})
 	return err
+}
+
+func makeEndpoints(name string) *corev1.Endpoints {
+	return &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "default",
+		},
+	}
+}
+
+func withAnnotations(ep *corev1.Endpoints, annotations map[string]string) *corev1.Endpoints {
+	ep.Annotations = annotations
+	return ep
+}
+
+func withSubsets(ep *corev1.Endpoints, subsets []corev1.EndpointSubset) *corev1.Endpoints {
+	ep.Subsets = subsets
+	return ep
+}
+
+func withFinalizers(ep *corev1.Endpoints, finalizers []string) *corev1.Endpoints {
+	ep.Finalizers = finalizers
+	return ep
+}
+
+func makePanda(name string, version string, spec map[string]interface{}) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "awesome.bears.com/" + version,
+			"kind":       "Panda",
+			"metadata": map[string]interface{}{
+				"name": name,
+			},
+		},
+	}
+	if spec != nil {
+		u.Object["spec"] = spec
+	}
+	return u
 }
