@@ -4793,6 +4793,68 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 		}, {
+			name: "assigned.cpuset ignored test with feature gate disable",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{{
+							Path: "cpuset_assigned",
+							ResourceFieldRef: &core.ResourceFieldSelector{
+								ContainerName: "test-container",
+								Resource:      "assigned.cpuset",
+							},
+						}},
+					},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowDownwardAPIAssignedResources: false,
+			},
+		}, {
+			name: "assigned.cpuset valid test with feature gate enabled",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{{
+							Path: "cpuset_assigned",
+							ResourceFieldRef: &core.ResourceFieldSelector{
+								ContainerName: "test-container",
+								Resource:      "assigned.cpuset",
+							},
+						}},
+					},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowDownwardAPIAssignedResources: true,
+			},
+		}, {
+			name: "assigned.cpuset invalid test with feature gate enabled",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{{
+							Path: "cpuset_assigned",
+							ResourceFieldRef: &core.ResourceFieldSelector{
+								ContainerName: "test-container",
+								Resource:      "assigned.cpuset",
+								Divisor:       resource.MustParse("1"),
+							},
+						}},
+					},
+				},
+			},
+			opts: PodValidationOptions{
+				AllowDownwardAPIAssignedResources: true,
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "field[0].downwardAPI.resourceFieldRef.divisor",
+			}},
+		}, {
 			name: "hugepages-downwardAPI-enabled",
 			vol: core.Volume{
 				Name: "downwardapi",

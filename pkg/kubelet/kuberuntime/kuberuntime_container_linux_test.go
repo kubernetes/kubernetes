@@ -402,6 +402,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 		expected             *runtimeapi.LinuxContainerResources
 		cgroupVersion        CgroupVersion
 		singleProcessOOMKill bool
+		hasExclusiveCPUs     bool
 	}{
 		{
 			name:   "Request128MBLimit256MB",
@@ -527,7 +528,8 @@ func TestCalculateLinuxResources(t *testing.T) {
 	for _, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
 		m.singleProcessOOMKill = ptr.To(test.singleProcessOOMKill)
-		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim, false)
+		disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && test.hasExclusiveCPUs
+		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim, disableCPUQuota)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
 }

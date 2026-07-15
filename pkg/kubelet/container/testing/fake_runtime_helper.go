@@ -32,15 +32,16 @@ import (
 
 // FakeRuntimeHelper implements RuntimeHelper interfaces for testing purposes.
 type FakeRuntimeHelper struct {
-	DNSServers      []string
-	DNSSearches     []string
-	DNSOptions      []string
-	HostName        string
-	HostDomain      string
-	PodContainerDir string
-	RuntimeHandlers map[string]kubecontainer.RuntimeHandler
-	Err             error
-	PodStats        map[kubetypes.UID]*statsapi.PodStats
+	DNSServers                []string
+	DNSSearches               []string
+	DNSOptions                []string
+	HostName                  string
+	HostDomain                string
+	PodContainerDir           string
+	RuntimeHandlers           map[string]kubecontainer.RuntimeHandler
+	Err                       error
+	PodStats                  map[kubetypes.UID]*statsapi.PodStats
+	RequestPodReinspectCalled bool
 }
 
 func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
@@ -119,7 +120,7 @@ func (f *FakeRuntimeHelper) UnprepareDynamicResources(ctx context.Context, pod *
 }
 
 func (f *FakeRuntimeHelper) RequestPodReinspect(_ kubetypes.UID) {
-	// Not implemented.
+	f.RequestPodReinspectCalled = true
 }
 
 func (f *FakeRuntimeHelper) RequestPodRelist(_ kubetypes.UID) {
