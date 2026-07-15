@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
@@ -485,6 +486,7 @@ func TestPodLimitFunc(t *testing.T) {
 	for i := range successCases {
 		test := successCases[i]
 		t.Run(test.pod.Name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
 			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
 			if err != nil {
@@ -698,6 +700,7 @@ func TestPodLimitFunc(t *testing.T) {
 	for i := range errorCases {
 		test := errorCases[i]
 		t.Run(test.pod.Name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
 			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
 			if err != nil {
