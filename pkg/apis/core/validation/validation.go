@@ -9544,7 +9544,26 @@ func validateContainerStatusUsers(containerStatuses []core.ContainerStatus, fldP
 				allErrors = append(allErrors, field.Forbidden(fldPath.Index(i).Child("user").Child("linux"), "cannot be set for a windows pod"))
 			}
 		case core.Linux:
-			allErrors = append(allErrors, validateLinuxContainerUser(containerUser.Linux, fldPath.Index(i).Child("user").Child("linux"))...)
+			// The linux container user validation is inlined here, rather than a
+			// shared helper, so the UID range below (which is wider than what we
+			// allow for a pod spec's runAsUser) can only ever be applied to
+			// container status validation.
+			if linuxUser := containerUser.Linux; linuxUser != nil {
+				userFldPath := fldPath.Index(i).Child("user").Child("linux")
+				// UID is reported by the container runtime and may be any valid
+				// Linux uid_t (0 to math.MaxUint32).
+				if linuxUser.UID < 0 || linuxUser.UID > math.MaxUint32 {
+					allErrors = append(allErrors, field.Invalid(userFldPath.Child("uid"), linuxUser.UID, fmt.Sprintf("must be between 0 and %d, inclusive", int64(math.MaxUint32))))
+				}
+				for _, msg := range validation.IsValidGroupID(linuxUser.GID) {
+					allErrors = append(allErrors, field.Invalid(userFldPath.Child("gid"), linuxUser.GID, msg))
+				}
+				for g, gid := range linuxUser.SupplementalGroups {
+					for _, msg := range validation.IsValidGroupID(gid) {
+						allErrors = append(allErrors, field.Invalid(userFldPath.Child("supplementalGroups").Index(g), gid, msg))
+					}
+				}
+			}
 		}
 	}
 	return allErrors
@@ -9656,26 +9675,6 @@ func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.Co
 		}
 	}
 
-	return allErrors
-}
-
-func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fldPath *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-	if linuxContainerUser == nil {
-		return allErrors
-	}
-	for _, msg := range validation.IsValidUserID(linuxContainerUser.UID) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("uid"), linuxContainerUser.UID, msg))
-	}
-
-	for _, msg := range validation.IsValidGroupID(linuxContainerUser.GID) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("gid"), linuxContainerUser.GID, msg))
-	}
-	for g, gid := range linuxContainerUser.SupplementalGroups {
-		for _, msg := range validation.IsValidGroupID(gid) {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
-		}
-	}
 	return allErrors
 }
 

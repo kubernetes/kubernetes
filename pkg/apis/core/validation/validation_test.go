@@ -14779,6 +14779,9 @@ func TestValidatePodUpdate(t *testing.T) {
 }
 
 func TestValidatePodStatusUpdate(t *testing.T) {
+	linuxContainerUserMaxUID := int64(math.MaxUint32)
+	linuxContainerUserInvalidUID := linuxContainerUserMaxUID + 1
+
 	tests := []struct {
 		test                                        string
 		new                                         core.Pod
@@ -15960,7 +15963,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 					podtest.SetContainerStatuses(core.ContainerStatus{
 						User: &core.ContainerUser{
 							Linux: &core.LinuxContainerUser{
-								UID:                0,
+								UID:                linuxContainerUserMaxUID,
 								GID:                0,
 								SupplementalGroups: []int64{0, 100},
 							},
@@ -15978,6 +15981,24 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 					podtest.SetContainerStatuses(core.ContainerStatus{
 						User: &core.ContainerUser{
 							Linux: &core.LinuxContainerUser{
+								UID: linuxContainerUserInvalidUID,
+								GID: 0,
+							},
+						},
+					}),
+				),
+			),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  `status.containerStatuses[0].user.linux.uid: Invalid value: 4294967296: must be between 0 and 4294967295, inclusive`,
+		test: "containerUser with uid above linux range in containerStatuses",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
 								UID:                -1,
 								GID:                -1,
 								SupplementalGroups: []int64{-1},
@@ -15988,7 +16009,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			),
 		),
 		old: *podtest.MakePod("foo"),
-		err: `status.containerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+		err: `status.containerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 4294967295, inclusive` +
 			`, status.containerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.containerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
 		test: "containerUser with invalid uids/gids/supplementalGroups in containerStatuses",
@@ -16039,7 +16060,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 					podtest.SetInitContainerStatuses(core.ContainerStatus{
 						User: &core.ContainerUser{
 							Linux: &core.LinuxContainerUser{
-								UID:                0,
+								UID:                linuxContainerUserMaxUID,
 								GID:                0,
 								SupplementalGroups: []int64{0, 100},
 							},
@@ -16067,7 +16088,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			),
 		),
 		old: *podtest.MakePod("foo"),
-		err: `status.initContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+		err: `status.initContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 4294967295, inclusive` +
 			`, status.initContainerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.initContainerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
 		test: "containerUser with invalid uids/gids/supplementalGroups in initContainerStatuses",
@@ -16118,7 +16139,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
 						User: &core.ContainerUser{
 							Linux: &core.LinuxContainerUser{
-								UID:                0,
+								UID:                linuxContainerUserMaxUID,
 								GID:                0,
 								SupplementalGroups: []int64{0, 100},
 							},
@@ -16146,7 +16167,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			),
 		),
 		old: *podtest.MakePod("foo"),
-		err: `status.ephemeralContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+		err: `status.ephemeralContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 4294967295, inclusive` +
 			`, status.ephemeralContainerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.ephemeralContainerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
 		test: "containerUser with invalid uids/gids/supplementalGroups in ephemeralContainerStatuses",
