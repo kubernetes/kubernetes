@@ -1133,10 +1133,10 @@ func TestVolumeBinding(t *testing.T) {
 
 func Test_PreBindPreFlight(t *testing.T) {
 	table := []struct {
-		name     string
-		nodeName string
-		state    *stateData
-		want     *fwk.Status
+		name       string
+		nodeName   string
+		state      *stateData
+		wantStatus *fwk.Status
 	}{
 		{
 			name:     "all bound",
@@ -1144,7 +1144,7 @@ func Test_PreBindPreFlight(t *testing.T) {
 			state: &stateData{
 				allBound: true,
 			},
-			want: fwk.NewStatus(fwk.Skip),
+			wantStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name:     "volume to be bound",
@@ -1154,12 +1154,12 @@ func Test_PreBindPreFlight(t *testing.T) {
 					"node-a": {},
 				},
 			},
-			want: nil,
+			wantStatus: nil,
 		},
 		{
-			name:     "error: state is nil",
-			nodeName: "node-a",
-			want:     fwk.AsStatus(fwk.ErrNotFound),
+			name:       "error: state is nil",
+			nodeName:   "node-a",
+			wantStatus: fwk.AsStatus(fwk.ErrNotFound),
 		},
 		{
 			name:     "error: node is not found in podVolumesByNode",
@@ -1169,7 +1169,7 @@ func Test_PreBindPreFlight(t *testing.T) {
 					"node-b": {},
 				},
 			},
-			want: fwk.AsStatus(errNoPodVolumeForNode),
+			wantStatus: fwk.AsStatus(errNoPodVolumeForNode),
 		},
 	}
 
@@ -1181,10 +1181,11 @@ func Test_PreBindPreFlight(t *testing.T) {
 			if item.state != nil {
 				state.Write(stateKey, item.state)
 			}
-			status := pl.PreBindPreFlight(ctx, state, &v1.Pod{}, item.nodeName)
-			if !status.Equal(item.want) {
-				t.Errorf("PreBindPreFlight failed - got: %v, want: %v", status, item.want)
+			result, status := pl.PreBindPreFlight(ctx, state, &v1.Pod{}, item.nodeName)
+			if !status.Equal(item.wantStatus) {
+				t.Errorf("PreBindPreFlight failed - got: %v, want: %v", status, item.wantStatus)
 			}
+			assert.Equal(t, &fwk.PreBindPreFlightResult{AllowParallel: true}, result)
 		})
 	}
 }

@@ -30,6 +30,7 @@ type IngressSpecApplyConfiguration struct {
 	// To determine the set of configurable Routes, look at namespace and name of entries in the
 	// .status.componentRoutes list, where participating operators write the status of
 	// configurable routes.
+	// A maximum of 250 component routes may be configured.
 	ComponentRoutes []ComponentRouteSpecApplyConfiguration `json:"componentRoutes,omitempty"`
 	// requiredHSTSPolicies specifies HSTS policies that are required to be set on newly created  or updated routes
 	// matching the domainPattern/s and namespaceSelector/s that are specified in the policy.

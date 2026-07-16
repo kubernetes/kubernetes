@@ -113,7 +113,7 @@ fi
 # Some of the later codegens depend on the results of this, so it needs to come
 # first in the case of regenerating everything.
 function codegen::protobuf() {
-    if [[ -n "${LINT:-}" ]]; then                                                             
+    if [[ -n "${LINT:-}" ]]; then
         if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
             kube::log::status "No linter for protobuf codegen"
         fi
@@ -202,7 +202,6 @@ function codegen::deepcopy() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
-        --bounding-dirs "k8s.io/kubernetes,k8s.io/api" \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -657,7 +656,8 @@ function codegen::openapi() {
     kube::util::read-array tag_files < <(
         k8s_tag_files_except \
             staging/src/k8s.io/code-generator \
-            staging/src/k8s.io/sample-apiserver
+            staging/src/k8s.io/sample-apiserver \
+            staging/src/k8s.io/sample-controller
         )
 
     local tag_dirs=()
@@ -928,6 +928,7 @@ function codegen::protobindings() {
         "staging/src/k8s.io/kubelet/pkg/apis/dra"
         "staging/src/k8s.io/kubelet/pkg/apis/deviceplugin"
         "staging/src/k8s.io/kubelet/pkg/apis/podresources"
+        "staging/src/k8s.io/kubelet/pkg/apis/pods"
         "staging/src/k8s.io/kms/apis"
         "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
         "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"

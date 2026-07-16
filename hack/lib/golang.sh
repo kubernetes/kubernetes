@@ -91,7 +91,11 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 # The set of server targets we build docker images for
 kube::golang::server_image_targets() {
   # NOTE: this contains cmd targets for kube::build::get_docker_wrapped_binaries
+  # NOTE: kube-log-runner should NOT be in kube::build::get_docker_wrapped_binaries
+  # This binary is used across all images
+  # kube-log-runner should be the first target so it can be skipped
   local targets=(
+    staging/src/k8s.io/component-base/logs/kube-log-runner
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/kube-scheduler
@@ -519,7 +523,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.25
+  minimum_go_version=go1.26
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.

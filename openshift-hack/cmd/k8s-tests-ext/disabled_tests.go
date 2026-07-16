@@ -173,6 +173,12 @@ func filterOutDisabledSpecs(specs et.ExtensionTestSpecs) et.ExtensionTestSpecs {
 
 			// https://issues.redhat.com/browse/OCPBUGS-61378
 			"[sig-network] Conntrack should be able to cleanup conntrack entries when UDP service target port changes for a NodePort service",
+
+			// https://redhat.atlassian.net/browse/OCPBUGS-85262
+			"[sig-cli] kubectl kuberc commands",
+
+			// https://redhat.atlassian.net/browse/OCPBUGS-64847
+			"[sig-node] [Serial] Pod InPlace Resize Container (deferred-resizes) [FeatureGate:InPlacePodVerticalScaling] pod-resize-retry-deferred-test-2",
 		},
 		// tests that may work, but we don't support them
 		"Unsupported": {

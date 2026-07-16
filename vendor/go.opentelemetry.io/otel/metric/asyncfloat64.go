@@ -211,6 +211,9 @@ type Float64Observer interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Observe(value float64, options ...ObserveOption)
 }
 
@@ -227,7 +230,11 @@ type Float64Observer interface {
 // attributes as another Float64Callbacks also registered for the same
 // instrument.
 //
-// The function needs to be concurrent safe.
+// The function needs to be reentrant and concurrent safe.
+//
+// Note that Go's mutexes are not reentrant, and locking a mutex takes
+// an indefinite amount of time. It is therefore advised to avoid
+// using mutexes inside callbacks.
 type Float64Callback func(context.Context, Float64Observer) error
 
 // Float64ObservableOption applies options to float64 Observer instruments.

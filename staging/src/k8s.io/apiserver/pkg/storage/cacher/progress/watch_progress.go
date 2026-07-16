@@ -71,7 +71,7 @@ func (pr *ConditionalProgressRequester) Run(stopCh <-chan struct{}) {
 		ctx = metadata.NewOutgoingContext(ctx, pr.contextMetadata)
 	}
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(ctx)
 		<-stopCh
 		pr.mux.Lock()
 		defer pr.mux.Unlock()

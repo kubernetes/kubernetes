@@ -256,6 +256,7 @@ struct ltchars {
 #include <linux/loop.h>
 #include <linux/lwtunnel.h>
 #include <linux/magic.h>
+#include <linux/mei.h>
 #include <linux/memfd.h>
 #include <linux/module.h>
 #include <linux/mount.h>
@@ -353,6 +354,9 @@ struct ltchars {
 // Renamed in v6.16, commit c6d732c38f93 ("net: ethtool: remove duplicate defines for family info")
 #define ETHTOOL_FAMILY_NAME	ETHTOOL_GENL_NAME
 #define ETHTOOL_FAMILY_VERSION	ETHTOOL_GENL_VERSION
+
+// Removed in v6.17, commit 760e6f7befba ("futex: Remove support for IMMUTABLE")
+#define PR_FUTEX_HASH_GET_IMMUTABLE 3
 '
 
 includes_NetBSD='
@@ -613,7 +617,7 @@ ccflags="$@"
 		$2 !~ /IOC_MAGIC/ &&
 		$2 ~ /^[A-Z][A-Z0-9_]+_MAGIC2?$/ ||
 		$2 ~ /^(VM|VMADDR)_/ ||
-		$2 ~ /^IOCTL_VM_SOCKETS_/ ||
+		$2 ~ /^(IOCTL_VM_SOCKETS_|IOCTL_MEI_)/ ||
 		$2 ~ /^(TASKSTATS|TS)_/ ||
 		$2 ~ /^CGROUPSTATS_/ ||
 		$2 ~ /^GENL_/ ||

@@ -9,6 +9,24 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// dupStdout creates a clone of stdout's file descriptor that can be used
+// to write to the original terminal even after stdout has been redirected.
+// Returns nil if the clone cannot be created.
+func dupStdout() *os.File {
+	stdoutCloneFD, err := unix.Dup(1)
+	if err != nil {
+		return nil
+	}
+
+	// Set FD_CLOEXEC to prevent leaking into child processes
+	flags, err := unix.FcntlInt(uintptr(stdoutCloneFD), unix.F_GETFD, 0)
+	if err == nil {
+		unix.FcntlInt(uintptr(stdoutCloneFD), unix.F_SETFD, flags|unix.FD_CLOEXEC)
+	}
+
+	return os.NewFile(uintptr(stdoutCloneFD), "stdout-clone-for-forwarding")
+}
+
 func NewOutputInterceptor() OutputInterceptor {
 	return &genericOutputInterceptor{
 		interceptedContent: make(chan string),

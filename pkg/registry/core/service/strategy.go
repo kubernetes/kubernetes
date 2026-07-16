@@ -30,12 +30,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	serviceapi "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
@@ -125,13 +123,7 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 //	if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
 //	    newSvc.Spec.MyFeature = nil
 //	}
-func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
-	// Drop condition for TrafficDistribution field.
-	isTrafficDistributionInUse := (oldSvc != nil && oldSvc.Spec.TrafficDistribution != nil)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution) && !isTrafficDistributionInUse {
-		newSvc.Spec.TrafficDistribution = nil
-	}
-}
+func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {}
 
 type serviceStatusStrategy struct {
 	svcStrategy

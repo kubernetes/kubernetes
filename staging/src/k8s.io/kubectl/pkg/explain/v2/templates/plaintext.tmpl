@@ -98,6 +98,9 @@ Takes dictionary as argument with keys:
     {{- if not $.FieldPath -}}
         DESCRIPTION:{{- "\n" -}}
         {{- or (include "description" (dict "schema" $resolved "Document" $.Document)) "<empty>" | wrap 76 | indent 4 -}}{{- "\n" -}}
+        {{- with include "externalDocs" (dict "schema" $resolved) -}}
+            {{- "\n" -}}{{- . -}}
+        {{- end -}}
         {{- with include "fieldList" (dict "schema" $resolved "level" 1 "Document" $.Document "Recursive" $.Recursive) -}}
             FIELDS:{{- "\n" -}}
             {{- . -}}
@@ -211,6 +214,16 @@ Takes dictionary as argument with keys:
     {{- "\n" -}}
     {{- if not $.short -}}
         {{- or $fieldSchema.description "<no description>" | wrap (sub 78 $indentAmount) | indent (add $indentAmount 2) -}}{{- "\n" -}}
+        {{- with $fieldSchema.externalDocs -}}
+            {{- "\n" -}}
+            {{- "EXTERNAL DOCS:" | indent (add $indentAmount 2) -}}{{- "\n" -}}
+            {{- with .description -}}
+                {{- . | wrap (sub 76 $indentAmount) | indent (add $indentAmount 4) -}}{{- "\n" -}}
+            {{- end -}}
+            {{- with .url -}}
+                {{- (print "URL: " .) | indent (add $indentAmount 4) -}}{{- "\n" -}}
+            {{- end -}}
+        {{- end -}}
         {{- "\n" -}}
     {{- end -}}
 {{- end -}}
@@ -239,6 +252,30 @@ Takes dictionary as argument with keys:
         {{- end -}}
         {{- if and .additionalProperties (not (eq "bool" (printf "%T" .additionalProperties))) -}}
             {{- template "description" (set $ "schema" .additionalProperties) -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /*
+Renders the externalDocs section of a schema if present.
+
+Prints:
+
+EXTERNAL DOCS:
+    <description>
+    URL: <url>
+
+Takes dictionary as argument with keys:
+    schema: openapiv3 JSON schema
+*/ -}}
+{{- define "externalDocs" -}}
+    {{- with $.schema.externalDocs -}}
+        EXTERNAL DOCS:{{- "\n" -}}
+        {{- with .description -}}
+            {{- . | wrap 76 | indent 4 -}}{{- "\n" -}}
+        {{- end -}}
+        {{- with .url -}}
+            {{- (print "URL: " .) | indent 4 -}}{{- "\n" -}}
         {{- end -}}
     {{- end -}}
 {{- end -}}

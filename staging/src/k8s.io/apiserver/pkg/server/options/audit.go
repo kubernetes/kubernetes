@@ -154,6 +154,10 @@ func NewAuditOptions() *AuditOptions {
 			GroupVersionString: "audit.k8s.io/v1",
 		},
 		LogOptions: AuditLogOptions{
+			MaxSize:    100,
+			MaxAge:     366,
+			MaxBackups: 100,
+
 			Format: pluginlog.FormatJson,
 			BatchOptions: AuditBatchOptions{
 				Mode:        ModeBlocking,
@@ -436,11 +440,11 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.Path, "audit-log-path", o.Path,
 		"If set, all requests coming to the apiserver will be logged to this file.  '-' means standard out.")
 	fs.IntVar(&o.MaxAge, "audit-log-maxage", o.MaxAge,
-		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename.")
+		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename. Setting a value of 0 means old audit log files are not removed based on age.")
 	fs.IntVar(&o.MaxBackups, "audit-log-maxbackup", o.MaxBackups,
 		"The maximum number of old audit log files to retain. Setting a value of 0 will mean there's no restriction on the number of files.")
 	fs.IntVar(&o.MaxSize, "audit-log-maxsize", o.MaxSize,
-		"The maximum size in megabytes of the audit log file before it gets rotated.")
+		"The maximum size in megabytes of the audit log file before it gets rotated. Setting to 0 disables rotation (not recommended).")
 	fs.StringVar(&o.Format, "audit-log-format", o.Format,
 		"Format of saved audits. \"legacy\" indicates 1-line text format for each event."+
 			" \"json\" indicates structured json format. Known formats are "+
@@ -504,6 +508,10 @@ func (o *AuditLogOptions) getWriter() (io.Writer, error) {
 
 	if err := o.ensureLogFile(); err != nil {
 		return nil, fmt.Errorf("ensureLogFile: %w", err)
+	}
+
+	if o.MaxSize == 0 {
+		return os.OpenFile(o.Path, os.O_APPEND|os.O_WRONLY, 0644)
 	}
 
 	return &lumberjack.Logger{

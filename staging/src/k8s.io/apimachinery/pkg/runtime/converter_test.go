@@ -964,7 +964,6 @@ func TestCustomToUnstructured(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.Data, func(t *testing.T) {
 			t.Parallel()
 			result, err := runtime.NewTestUnstructuredConverter(simpleEquality).ToUnstructured(&G{
@@ -989,7 +988,6 @@ func TestCustomToUnstructuredTopLevel(t *testing.T) {
 	}
 	expected := map[string]interface{}{"a": int64(1)}
 	for i, obj := range topLevelCases {
-		obj := obj
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
 			result, err := runtime.NewTestUnstructuredConverter(simpleEquality).ToUnstructured(obj)

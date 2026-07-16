@@ -575,7 +575,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		testListSize := 10
 		testUUID := string(uuid.NewUUID())
 
-		for i := 0; i < testListSize; i++ {
+		for i := range testListSize {
 			name := fmt.Sprintf("%s-%d", f.UniqueName, i)
 			_, err := createValidatingWebhookConfiguration(ctx, f, &admissionregistrationv1.ValidatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
@@ -649,7 +649,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		testListSize := 10
 		testUUID := string(uuid.NewUUID())
 
-		for i := 0; i < testListSize; i++ {
+		for i := range testListSize {
 			name := fmt.Sprintf("%s-%d", f.UniqueName, i)
 			_, err := createMutatingWebhookConfiguration(ctx, f, &admissionregistrationv1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{

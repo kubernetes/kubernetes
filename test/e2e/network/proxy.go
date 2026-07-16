@@ -84,13 +84,13 @@ var _ = common.SIGDescribe("Proxy", func() {
 			Test for Proxy, logs port endpoint
 			Select any node in the cluster to invoke /proxy/nodes/<nodeip>:10250/logs endpoint. This endpoint MUST be reachable.
 		*/
-		ginkgo.It("should proxy logs on node with explicit kubelet port using proxy subresource ", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", ":10250/proxy/logs/") })
+		ginkgo.It("should proxy logs on node with explicit kubelet port using proxy subresource", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", ":10250/proxy/logs/") })
 
 		/*
 			Test for Proxy, logs endpoint
 			Select any node in the cluster to invoke /proxy/nodes/<nodeip>//logs endpoint. This endpoint MUST be reachable.
 		*/
-		ginkgo.It("should proxy logs on node using proxy subresource ", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", "/proxy/logs/") })
+		ginkgo.It("should proxy logs on node using proxy subresource", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", "/proxy/logs/") })
 
 		/*
 			Release: v1.9
@@ -284,7 +284,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			totalAttempts := numberTestCases * proxyAttempts
 			ginkgo.By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
 
-			for i := 0; i < proxyAttempts; i++ {
+			for i := range proxyAttempts {
 				wg.Add(numberTestCases)
 				for path, val := range expectations {
 					go func(i int, path, val string) {
@@ -631,7 +631,7 @@ func nodeProxyTest(ctx context.Context, f *framework.Framework, prefix, nodeDest
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
-	for i := 0; i < proxyAttempts; i++ {
+	for i := range proxyAttempts {
 		_, status, d, err := doProxy(ctx, f, prefix+node.Name+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
 			framework.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)

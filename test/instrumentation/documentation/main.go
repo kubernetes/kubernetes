@@ -28,7 +28,8 @@ import (
 	flag "github.com/spf13/pflag"
 
 	yaml "go.yaml.in/yaml/v2"
-	"k8s.io/component-base/metrics"
+
+	"k8s.io/kubernetes/test/instrumentation/internal/metric"
 )
 
 var (
@@ -70,6 +71,7 @@ Stable metrics observe strict API contracts and no labels can be added or remove
 	<li data-type="{{$metric.Type | ToLower}}"><label class="metric_detail">Type:</label> <span class="metric_type">{{- $metric.Type -}}</span></li>
 	{{if $metric.Labels }}<li class="metric_labels_varying"><label class="metric_detail">Labels:</label>{{range $label := $metric.Labels}}<span class="metric_label">{{- $label -}}</span>{{- end -}}</li>{{- end -}}
 	{{if $metric.ConstLabels }}<li class="metric_labels_constant"><label class="metric_detail">Const Labels:</label>{{range $key, $value := $metric.ConstLabels}}<span class="metric_label">{{$key}}:{{$value}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.ComponentEndpoints }}<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul>{{range $ce := $metric.ComponentEndpoints}}<li>{{$ce.Component}} ({{$ce.Endpoint}})</li>{{- end -}}</ul></li>{{- end -}}
 	{{if $metric.DeprecatedVersion }}<li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>{{- $metric.DeprecatedVersion -}}</span></li>{{- end -}}
 	</ul>
 	</div>{{end}}
@@ -89,6 +91,7 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li data-type="{{$metric.Type | ToLower}}"><label class="metric_detail">Type:</label> <span class="metric_type">{{- $metric.Type -}}</span></li>
 	{{if $metric.Labels }}<li class="metric_labels_varying"><label class="metric_detail">Labels:</label>{{range $label := $metric.Labels}}<span class="metric_label">{{- $label -}}</span>{{- end -}}</li>{{- end -}}
 	{{if $metric.ConstLabels }}<li class="metric_labels_constant"><label class="metric_detail">Const Labels:</label>{{range $key, $value := $metric.ConstLabels}}<span class="metric_label">{{$key}}:{{$value}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.ComponentEndpoints }}<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul>{{range $ce := $metric.ComponentEndpoints}}<li>{{$ce.Component}} ({{$ce.Endpoint}})</li>{{- end -}}</ul></li>{{- end -}}
 	{{if $metric.DeprecatedVersion }}<li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>{{- $metric.DeprecatedVersion -}}</span></li>{{- end -}}
 	</ul>
 	</div>{{end}}
@@ -108,6 +111,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="{{$metric.Type | ToLower}}"><label class="metric_detail">Type:</label> <span class="metric_type">{{- $metric.Type -}}</span></li>
 	{{if $metric.Labels }}<li class="metric_labels_varying"><label class="metric_detail">Labels:</label>{{range $label := $metric.Labels}}<span class="metric_label">{{- $label -}}</span>{{- end -}}</li>{{- end -}}
 	{{if $metric.ConstLabels }}<li class="metric_labels_constant"><label class="metric_detail">Const Labels:</label>{{range $key, $value := $metric.ConstLabels}}<span class="metric_label">{{$key}}:{{$value}}</span>{{- end -}}</li>{{- end -}}
+	{{if $metric.ComponentEndpoints }}<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul>{{range $ce := $metric.ComponentEndpoints}}<li>{{$ce.Component}} ({{$ce.Endpoint}})</li>{{- end -}}</ul></li>{{- end -}}
 	{{if $metric.DeprecatedVersion }}<li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>{{- $metric.DeprecatedVersion -}}</span></li>{{- end -}}
 	</ul>
 	</div>{{end}}
@@ -116,9 +120,9 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 )
 
 type templateData struct {
-	AlphaMetrics     []metric
-	BetaMetrics      []metric
-	StableMetrics    []metric
+	AlphaMetrics     []metric.Metric
+	BetaMetrics      []metric.Metric
+	StableMetrics    []metric.Metric
 	GeneratedDate    time.Time
 	GeneratedVersion string
 }
@@ -132,12 +136,12 @@ func main() {
 	println(major, minor)
 	dat, err := os.ReadFile("test/instrumentation/documentation/documentation-list.yaml")
 	if err == nil {
-		var parsedMetrics []metric
+		var parsedMetrics []metric.Metric
 		err = yaml.Unmarshal(dat, &parsedMetrics)
 		if err != nil {
 			println("err", err)
 		}
-		sort.Sort(byFQName(parsedMetrics))
+		sort.Sort(metric.ByFQName(parsedMetrics))
 		t := template.New("t").Funcs(funcMap)
 		t, err := t.Parse(templ)
 		if err != nil {
@@ -168,47 +172,11 @@ func main() {
 
 }
 
-type metric struct {
-	Name              string              `yaml:"name" json:"name"`
-	Subsystem         string              `yaml:"subsystem,omitempty" json:"subsystem,omitempty"`
-	Namespace         string              `yaml:"namespace,omitempty" json:"namespace,omitempty"`
-	Help              string              `yaml:"help,omitempty" json:"help,omitempty"`
-	Type              string              `yaml:"type,omitempty" json:"type,omitempty"`
-	DeprecatedVersion string              `yaml:"deprecatedVersion,omitempty" json:"deprecatedVersion,omitempty"`
-	StabilityLevel    string              `yaml:"stabilityLevel,omitempty" json:"stabilityLevel,omitempty"`
-	Labels            []string            `yaml:"labels,omitempty" json:"labels,omitempty"`
-	Buckets           []float64           `yaml:"buckets,omitempty" json:"buckets,omitempty"`
-	Objectives        map[float64]float64 `yaml:"objectives,omitempty" json:"objectives,omitempty"`
-	AgeBuckets        uint32              `yaml:"ageBuckets,omitempty" json:"ageBuckets,omitempty"`
-	BufCap            uint32              `yaml:"bufCap,omitempty" json:"bufCap,omitempty"`
-	MaxAge            int64               `yaml:"maxAge,omitempty" json:"maxAge,omitempty"`
-	ConstLabels       map[string]string   `yaml:"constLabels,omitempty" json:"constLabels,omitempty"`
-}
-
-func (m metric) BuildFQName() string {
-	return metrics.BuildFQName(m.Namespace, m.Subsystem, m.Name)
-}
-
-type byFQName []metric
-
-func (ms byFQName) Len() int { return len(ms) }
-func (ms byFQName) Less(i, j int) bool {
-	if ms[i].StabilityLevel < ms[j].StabilityLevel {
-		return true
-	} else if ms[i].StabilityLevel > ms[j].StabilityLevel {
-		return false
-	}
-	return ms[i].BuildFQName() < ms[j].BuildFQName()
-}
-func (ms byFQName) Swap(i, j int) {
-	ms[i], ms[j] = ms[j], ms[i]
-}
-
-func byStabilityLevel(ms []metric) map[string][]metric {
-	res := map[string][]metric{}
+func byStabilityLevel(ms []metric.Metric) map[string][]metric.Metric {
+	res := map[string][]metric.Metric{}
 	for _, m := range ms {
 		if _, ok := res[m.StabilityLevel]; !ok {
-			res[m.StabilityLevel] = []metric{}
+			res[m.StabilityLevel] = []metric.Metric{}
 		}
 		res[m.StabilityLevel] = append(res[m.StabilityLevel], m)
 	}

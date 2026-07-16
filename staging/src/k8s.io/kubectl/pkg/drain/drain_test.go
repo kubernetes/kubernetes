@@ -536,7 +536,9 @@ func TestEvictDuringNamespaceTerminating(t *testing.T) {
 	testNamespace := "default"
 
 	retryDelay := 5 * time.Millisecond
-	globalTimeout := 2 * retryDelay
+	// Give the helper enough room for a retry plus scheduler jitter on loaded CI
+	// hosts. A 10ms total timeout is too small under -race.
+	globalTimeout := 20 * retryDelay
 
 	tests := []struct {
 		description string

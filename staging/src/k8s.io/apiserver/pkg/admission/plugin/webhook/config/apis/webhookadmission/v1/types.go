@@ -26,4 +26,14 @@ type WebhookAdmission struct {
 
 	// KubeConfigFile is the path to the kubeconfig file.
 	KubeConfigFile string `json:"kubeConfigFile"`
+
+	// StaticManifestsDir is the path to a directory containing static webhook
+	// configurations to be loaded at startup. Files with extensions .yaml,
+	// .yml, and .json are read. Only admissionregistration.k8s.io/v1
+	// ValidatingWebhookConfiguration and MutatingWebhookConfiguration
+	// resources are supported.
+	// Using this field requires the ManifestBasedAdmissionControlConfig
+	// feature gate to be enabled.
+	// +optional
+	StaticManifestsDir string `json:"staticManifestsDir,omitempty"`
 }

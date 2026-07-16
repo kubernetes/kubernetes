@@ -448,6 +448,10 @@ func rangeEventsWithReuse(lg *zap.Logger, b backend.Backend, evs []mvccpb.Event,
 
 // rangeEvents returns events in range [minRev, maxRev).
 func rangeEvents(lg *zap.Logger, b backend.Backend, minRev, maxRev int64) []mvccpb.Event {
+	if minRev < 0 {
+		lg.Warn("Unexpected negative revision range start", zap.Int64("minRev", minRev))
+		minRev = 0
+	}
 	minBytes, maxBytes := NewRevBytes(), NewRevBytes()
 	minBytes = RevToBytes(Revision{Main: minRev}, minBytes)
 	maxBytes = RevToBytes(Revision{Main: maxRev}, maxBytes)

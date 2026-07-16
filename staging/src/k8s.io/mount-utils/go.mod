@@ -2,16 +2,16 @@
 
 module k8s.io/mount-utils
 
-go 1.25.0
+go 1.26.0
 
-godebug default=go1.25
+godebug default=go1.26
 
 require (
 	github.com/moby/sys/mountinfo v0.7.2
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sys v0.38.0
-	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
+	golang.org/x/sys v0.45.0
+	k8s.io/klog/v2 v2.140.0
+	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 )
 
 require (

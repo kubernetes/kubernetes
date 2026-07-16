@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -37,26 +38,21 @@ import (
 //	|                                           |  |    | Update
 //	+      Assume                Add            v  v    |
 //
-// Initial +--------> Assumed +------------+---> Added <--+
+// Initial +--------> Assumed +----------- ---> Added <--+
 //
-//	^                +   +               |       +
-//	|                |   |               |       |
-//	|                |   |           Add |       | Remove
-//	|                |   |               |       |
-//	|                |   |               +       |
-//	+----------------+   +-----------> Expired   +----> Deleted
-//	      Forget             Expire
+//	^                    +                        +
+//	|                    |                        |
+//	|                    |                        | Remove
+//	|                    |                        |
+//	|                    |                        v
+//	+--------------------+                     Deleted
+//	      Forget
 //
-// Note that an assumed pod can expire, because if we haven't received Add event notifying us
-// for a while, there might be some problems and we shouldn't keep the pod in cache anymore.
-//
-// Note that "Initial", "Expired", and "Deleted" pods do not actually exist in cache.
+// Note that "Initial" and "Deleted" pods do not actually exist in cache.
 // Based on existing use cases, we are making the following assumptions:
 //   - No pod would be assumed twice
 //   - A pod could be added without going through scheduler. In this case, we will see Add but not Assume event.
 //   - If a pod wasn't added, it wouldn't be removed or updated.
-//   - Both "Expired" and "Deleted" are valid end states. In case of some problems, e.g. network issue,
-//     a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.
 type Cache interface {
 	// NodeCount returns the number of nodes in the cache.
 	// DO NOT use outside of tests.
@@ -66,19 +62,17 @@ type Cache interface {
 	// DO NOT use outside of tests.
 	PodCount() (int, error)
 
-	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
-	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
-	// After expiration, its information would be subtracted.
-	AssumePod(logger klog.Logger, pod *v1.Pod) error
+	// GetNode returns the copy of node stored in the cache.
+	// DO NOT use outside of tests.
+	GetNode(name string) (*framework.NodeInfo, error)
 
-	// FinishBinding signals that cache for assumed pod can be expired
-	FinishBinding(logger klog.Logger, pod *v1.Pod) error
+	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
+	AssumePod(logger klog.Logger, pod *v1.Pod) error
 
 	// ForgetPod removes an assumed pod from cache.
 	ForgetPod(logger klog.Logger, pod *v1.Pod) error
 
-	// AddPod either confirms a pod if it's assumed, or adds it back if it's expired.
-	// If added back, the pod's information would be added again.
+	// AddPod confirms an assumed pod, or adds a newly assigned pod to the cache.
 	AddPod(logger klog.Logger, pod *v1.Pod) error
 
 	// UpdatePod removes oldPod's information and adds newPod's information.
@@ -91,7 +85,7 @@ type Cache interface {
 	// same name of the specified pod.
 	GetPod(pod *v1.Pod) (*v1.Pod, error)
 
-	// IsAssumedPod returns true if the pod is assumed and not expired.
+	// IsAssumedPod returns true if the pod is assumed.
 	IsAssumedPod(pod *v1.Pod) (bool, error)
 
 	// AddNode adds overall information about node.
@@ -118,6 +112,18 @@ type Cache interface {
 	// BindPod handles the pod binding by adding a bind API call to the dispatcher.
 	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
 	BindPod(binding *v1.Binding) (<-chan error, error)
+
+	// PodGroupStates returns a PodGroupStateLister.
+	PodGroupStates() fwk.PodGroupStateLister
+
+	// AddPodGroupMember adds not assigned and not assumed pod to its pod group state.
+	AddPodGroupMember(pod *v1.Pod)
+
+	// UpdatePodGroupMember updates a pod in its pod group state.
+	UpdatePodGroupMember(logger klog.Logger, oldPod, newPod *v1.Pod)
+
+	// RemovePodGroupMember removes a pod from its pod group state.
+	RemovePodGroupMember(pod *v1.Pod)
 }
 
 // Dump is a dump of the cache state.

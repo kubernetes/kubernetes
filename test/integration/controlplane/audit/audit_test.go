@@ -99,6 +99,11 @@ rules:
     resources:
       - group: "apps"
         resources: ["deployments/scale"]
+  - level: Request
+    namespaces: ["wildcard-group-audit-request"]
+    resources:
+      - group: "*"
+        resources: ["deployments"]
 
 `
 	nonAdmissionWebhookNamespace       = "no-webhook-namespace"
@@ -371,6 +376,25 @@ func runTestWithVersion(t *testing.T, version string) {
 					Namespace:         "update-audit-response",
 					RequestObject:     true,
 					ResponseObject:    true,
+					AuthorizeDecision: "allow",
+				},
+			},
+		},
+		{
+			auditLevel: auditinternal.LevelRequest,
+			namespace:  "wildcard-group-audit-request",
+			expEvents: []utils.AuditEvent{
+				{
+					Level:             auditinternal.LevelRequest,
+					Stage:             auditinternal.StageResponseComplete,
+					RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", "wildcard-group-audit-request"),
+					Verb:              "create",
+					Code:              201,
+					User:              auditTestUser,
+					Resource:          "deployments",
+					Namespace:         "wildcard-group-audit-request",
+					RequestObject:     true,
+					ResponseObject:    false,
 					AuthorizeDecision: "allow",
 				},
 			},

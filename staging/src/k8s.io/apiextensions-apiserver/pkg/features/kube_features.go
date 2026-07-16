@@ -65,6 +65,7 @@ func init() {
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	CRDObservedGenerationTracking: {
 		{Version: version.MustParse("1.35"), PreRelease: featuregate.Beta, Default: false},
+		{Version: version.MustParse("1.36"), PreRelease: featuregate.Beta, Default: true},
 	},
 	CRDValidationRatcheting: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},

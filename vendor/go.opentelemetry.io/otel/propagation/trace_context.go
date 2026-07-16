@@ -36,7 +36,7 @@ var (
 )
 
 // Inject injects the trace context from ctx into carrier.
-func (tc TraceContext) Inject(ctx context.Context, carrier TextMapCarrier) {
+func (TraceContext) Inject(ctx context.Context, carrier TextMapCarrier) {
 	sc := trace.SpanContextFromContext(ctx)
 	if !sc.IsValid() {
 		return
@@ -77,7 +77,7 @@ func (tc TraceContext) Extract(ctx context.Context, carrier TextMapCarrier) cont
 	return trace.ContextWithRemoteSpanContext(ctx, sc)
 }
 
-func (tc TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
+func (TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 	h := carrier.Get(traceparentHeader)
 	if h == "" {
 		return trace.SpanContext{}
@@ -111,7 +111,7 @@ func (tc TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 	}
 
 	// Clear all flags other than the trace-context supported sampling bit.
-	scc.TraceFlags = trace.TraceFlags(opts[0]) & trace.FlagsSampled
+	scc.TraceFlags = trace.TraceFlags(opts[0]) & trace.FlagsSampled // nolint:gosec // slice size already checked.
 
 	// Ignore the error returned here. Failure to parse tracestate MUST NOT
 	// affect the parsing of traceparent according to the W3C tracecontext
@@ -151,6 +151,6 @@ func extractPart(dst []byte, h *string, n int) bool {
 }
 
 // Fields returns the keys who's values are set with Inject.
-func (tc TraceContext) Fields() []string {
+func (TraceContext) Fields() []string {
 	return []string{traceparentHeader, tracestateHeader}
 }

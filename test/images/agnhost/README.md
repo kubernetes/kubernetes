@@ -165,6 +165,35 @@ Usage:
 ```
 
 
+### external-metrics
+
+Starts an HTTPS server that implements the external metrics API for testing Horizontal Pod Autoscaler (HPA) with external metrics. The server provides a mock implementation of the `external.metrics.k8s.io` API group.
+
+The server comes with two pre-configured metrics:
+- `queue_messages_ready` (value: 100)
+- `http_requests_total` (value: 500)
+
+The server exposes the following endpoints:
+- `/apis/external.metrics.k8s.io/v1beta1/namespaces/{namespace}/{metric-name}`: Get external metric values (supports label selectors via query parameter)
+- `/healthz` and `/readyz`: Health check endpoints
+- `/create/{metric-name}?value={value}&labels={key1=value1,key2=value2}&fail={true|false}`: Create a new metric with optional labels
+- `/set/{metric-name}?value={value}&labels={key1=value1,key2=value2}`: Update an existing metric's value
+- `/fail/{metric-name}?fail={true|false}&labels={key1=value1,key2=value2}`: Configure a metric to return errors
+
+The subcommand can accept the following flags:
+- `port` (default: `6443`): Port number for the HTTPS server.
+- `service-name` (default: `external-metrics-server`): Name of the external metrics service.
+- `service-namespace` (default: `default`): Namespace of the external metrics service.
+
+The server generates self-signed TLS certificates automatically on startup.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost external-metrics [--port <port>] [--service-name <name>] [--service-namespace <namespace>]
+```
+
+
 ### fake-gitserver
 
 Fakes a git server. When doing `git clone http://localhost:8000`, you will clone an empty git
@@ -623,10 +652,11 @@ Usage:
 
 ### porter
 
-Serves requested data on ports specified in environment variables of the form `SERVE_{PORT,TLS_PORT,SCTP_PORT}_[NNNN]`. eg:
-    - `SERVE_PORT_9001` - serve TCP connections on port 9001
+Serves requested data on ports specified in environment variables of the form `SERVE_{PORT,TLS_PORT,SCTP_PORT,UDP_PORT}_[NNNN]`. eg:
+    - `SERVE_PORT_9001` (or `SERVE_TCP_PORT_9001`) - serve TCP connections on port 9001
     - `SERVE_TLS_PORT_9002` - serve TLS-encrypted TCP connections on port 9002
     - `SERVE_SCTP_PORT_9003` - serve SCTP connections on port 9003
+    - `SERVE_UDP_PORT_9004` - serve UDP connections on port 9004
 
 The included `localhost.crt` is a PEM-encoded TLS cert with SAN IPs `127.0.0.1` and `[::1]`,
 expiring in January 2084, generated from `src/crypto/tls`:

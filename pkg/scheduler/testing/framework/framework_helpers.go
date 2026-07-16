@@ -63,6 +63,11 @@ func RegisterFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Filter")
 }
 
+// RegisterPostFilterPlugin returns a function to register a PostFilter Plugin to a given registry.
+func RegisterPostFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PostFilter")
+}
+
 // RegisterReservePlugin returns a function to register a Reserve Plugin to a given registry.
 func RegisterReservePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Reserve")
@@ -91,6 +96,16 @@ func RegisterPreScorePlugin(pluginName string, pluginNewFunc runtime.PluginFacto
 // RegisterBindPlugin returns a function to register a Bind Plugin to a given registry.
 func RegisterBindPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Bind")
+}
+
+// RegisterPlacementGeneratePlugin returns a function to register a PlacementGenerate Plugin to a given registry.
+func RegisterPlacementGeneratePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PlacementGenerate")
+}
+
+// RegisterPlacementScorePlugin returns a function to register a PlacementScore Plugin to a given registry.
+func RegisterPlacementScorePlugin(pluginName string, pluginNewFunc runtime.PluginFactory, weight int32) RegisterPluginFunc {
+	return RegisterPluginAsExtensionsWithWeight(pluginName, weight, pluginNewFunc, "PlacementScore")
 }
 
 // RegisterPluginAsExtensions returns a function to register a Plugin as given extensionPoints to a given registry.
@@ -127,6 +142,8 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 		return &plugins.QueueSort
 	case "Filter":
 		return &plugins.Filter
+	case "PostFilter":
+		return &plugins.PostFilter
 	case "PreFilter":
 		return &plugins.PreFilter
 	case "PreScore":
@@ -143,6 +160,10 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 		return &plugins.PreBind
 	case "PostBind":
 		return &plugins.PostBind
+	case "PlacementGenerate":
+		return &plugins.PlacementGenerate
+	case "PlacementScore":
+		return &plugins.PlacementScore
 	default:
 		return nil
 	}

@@ -40,7 +40,7 @@ var key fwk.StateKey = "fakedata_key"
 
 // createCycleStateWithFakeData creates *CycleState with fakeData.
 // The given data is used in stored fakeData.
-func createCycleStateWithFakeData(data string, recordPluginMetrics bool, skipPlugins ...[]string) *CycleState {
+func createCycleStateWithFakeData(data string, recordPluginMetrics bool, skipAllPostFilterPlugins bool, skipPlugins ...[]string) *CycleState {
 	c := NewCycleState()
 	c.Write(key, &fakeData{
 		data: data,
@@ -52,6 +52,7 @@ func createCycleStateWithFakeData(data string, recordPluginMetrics bool, skipPlu
 	if len(skipPlugins) > 1 {
 		c.SetSkipScorePlugins(sets.New(skipPlugins[1]...))
 	}
+	c.SetSkipAllPostFilterPlugins(skipAllPostFilterPlugins)
 	return c
 }
 
@@ -73,6 +74,9 @@ func isCycleStateEqual(a, b *CycleState) (bool, string) {
 	}
 	if diff := cmp.Diff(a.skipScorePlugins, b.skipScorePlugins); diff != "" {
 		return false, fmt.Sprintf("CycleState A and B have different SkipScorePlugins sets. -wanted,+got:\n%s", diff)
+	}
+	if diff := cmp.Diff(a.skipAllPostFilterPlugins, b.skipAllPostFilterPlugins); diff != "" {
+		return false, fmt.Sprintf("CycleState A and B have different SkipAllPostFilterPlugins sets. -wanted,+got:\n%s", diff)
 	}
 
 	var msg string
@@ -129,28 +133,33 @@ func TestCycleStateClone(t *testing.T) {
 	}{
 		{
 			name:            "clone with recordPluginMetrics true",
-			state:           createCycleStateWithFakeData("data", true),
-			wantClonedState: createCycleStateWithFakeData("data", true),
+			state:           createCycleStateWithFakeData("data", true, false),
+			wantClonedState: createCycleStateWithFakeData("data", true, false),
 		},
 		{
 			name:            "clone with recordPluginMetrics false",
-			state:           createCycleStateWithFakeData("data", false),
-			wantClonedState: createCycleStateWithFakeData("data", false),
+			state:           createCycleStateWithFakeData("data", false, false),
+			wantClonedState: createCycleStateWithFakeData("data", false, false),
 		},
 		{
 			name:            "clone with SkipFilterPlugins",
-			state:           createCycleStateWithFakeData("data", true, []string{"p1", "p2", "p3"}),
-			wantClonedState: createCycleStateWithFakeData("data", true, []string{"p1", "p2", "p3"}),
+			state:           createCycleStateWithFakeData("data", true, false, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", true, false, []string{"p1", "p2", "p3"}),
 		},
 		{
 			name:            "clone with SkipScorePlugins",
-			state:           createCycleStateWithFakeData("data", false, []string{}, []string{"p1", "p2", "p3"}),
-			wantClonedState: createCycleStateWithFakeData("data", false, []string{}, []string{"p1", "p2", "p3"}),
+			state:           createCycleStateWithFakeData("data", false, false, []string{}, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", false, false, []string{}, []string{"p1", "p2", "p3"}),
 		},
 		{
 			name:            "clone with SkipScorePlugins and SkipFilterPlugins",
-			state:           createCycleStateWithFakeData("data", true, []string{"p0"}, []string{"p1", "p2", "p3"}),
-			wantClonedState: createCycleStateWithFakeData("data", true, []string{"p0"}, []string{"p1", "p2", "p3"}),
+			state:           createCycleStateWithFakeData("data", true, false, []string{"p0"}, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", true, false, []string{"p0"}, []string{"p1", "p2", "p3"}),
+		},
+		{
+			name:            "clone with SkipAllPostFilterPlugins",
+			state:           createCycleStateWithFakeData("data", true, true, []string{"p0"}, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", true, true, []string{"p0"}, []string{"p1", "p2", "p3"}),
 		},
 		{
 			name:            "clone with nil CycleState",

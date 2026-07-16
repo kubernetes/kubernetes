@@ -415,7 +415,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			keys := make(map[interface{}]types.GomegaMatcher)
 			idFn := makeCustomLabelID(metrics.AlignedNUMANode)
 
-			for i := 0; i < numaNodes; i++ {
+			for i := range numaNodes {
 				keys["kubelet_cpu_manager_allocation_per_numa"] = gstruct.MatchAllElements(idFn, gstruct.Elements{
 					fmt.Sprintf("%d", i): timelessSample(0),
 				})
@@ -491,7 +491,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			idFn := makeCustomLabelID(metrics.AlignedNUMANode)
 
 			// On a clean environment with no other pods running if distribute-across-numa policy option is enabled
-			for i := 0; i < numaNodes; i++ {
+			for i := range numaNodes {
 				keys["kubelet_cpu_manager_allocation_per_numa"] = gstruct.MatchAllElements(idFn, gstruct.Elements{
 					fmt.Sprintf("%d", i): timelessSample(2),
 				})

@@ -129,15 +129,7 @@ func (c *ClusterRoleAggregationController) syncClusterRole(ctx context.Context, 
 		return nil
 	}
 
-	err = c.applyClusterRoles(ctx, sharedClusterRole.Name, newPolicyRules)
-	if errors.IsUnsupportedMediaType(err) { // TODO: Remove this fallback at least one release after ServerSideApply GA
-		// When Server Side Apply is not enabled, fallback to Update. This is required when running
-		// 1.21 since api-server can be 1.20 during the upgrade/downgrade.
-		// Since Server Side Apply is enabled by default in Beta, this fallback only kicks in
-		// if the feature has been disabled using its feature flag.
-		err = c.updateClusterRoles(ctx, sharedClusterRole, newPolicyRules)
-	}
-	return err
+	return c.applyClusterRoles(ctx, sharedClusterRole.Name, newPolicyRules)
 }
 
 func (c *ClusterRoleAggregationController) applyClusterRoles(ctx context.Context, name string, newPolicyRules []rbacv1.PolicyRule) error {
@@ -146,16 +138,6 @@ func (c *ClusterRoleAggregationController) applyClusterRoles(ctx context.Context
 
 	opts := metav1.ApplyOptions{FieldManager: "clusterrole-aggregation-controller", Force: true}
 	_, err := c.clusterRoleClient.ClusterRoles().Apply(ctx, clusterRoleApply, opts)
-	return err
-}
-
-func (c *ClusterRoleAggregationController) updateClusterRoles(ctx context.Context, sharedClusterRole *rbacv1.ClusterRole, newPolicyRules []rbacv1.PolicyRule) error {
-	clusterRole := sharedClusterRole.DeepCopy()
-	clusterRole.Rules = nil
-	for _, rule := range newPolicyRules {
-		clusterRole.Rules = append(clusterRole.Rules, *rule.DeepCopy())
-	}
-	_, err := c.clusterRoleClient.ClusterRoles().Update(ctx, clusterRole, metav1.UpdateOptions{})
 	return err
 }
 

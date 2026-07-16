@@ -51,7 +51,7 @@ func S256ChallengeFromVerifier(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString(sha[:])
 }
 
-// S256ChallengeOption derives a PKCE code challenge derived from verifier with
+// S256ChallengeOption derives a PKCE code challenge from the verifier with
 // method S256. It should be passed to [Config.AuthCodeURL] or [Config.DeviceAuth]
 // only.
 func S256ChallengeOption(verifier string) AuthCodeOption {

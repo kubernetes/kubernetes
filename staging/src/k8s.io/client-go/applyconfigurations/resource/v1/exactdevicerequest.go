@@ -72,8 +72,7 @@ type ExactDeviceRequestApplyConfiguration struct {
 	// all ordinary claims to the device with respect to access modes and
 	// any resource allocations.
 	//
-	// This is an alpha field and requires enabling the DRAAdminAccess
-	// feature gate. Admin access is disabled if this field is unset or
+	// Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	AdminAccess *bool `json:"adminAccess,omitempty"`
 	// If specified, the request's tolerations.
@@ -91,7 +90,7 @@ type ExactDeviceRequestApplyConfiguration struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
 	// Capacity define resource requirements against each capacity.

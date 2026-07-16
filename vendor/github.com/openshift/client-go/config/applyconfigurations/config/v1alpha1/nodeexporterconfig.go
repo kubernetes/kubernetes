@@ -4,7 +4,6 @@ package v1alpha1
 
 import (
 	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
-	v1 "k8s.io/api/core/v1"
 )
 
 // NodeExporterConfigApplyConfiguration represents a declarative configuration of the NodeExporterConfig type for use
@@ -16,14 +15,6 @@ import (
 // network statistics.
 // At least one field must be specified.
 type NodeExporterConfigApplyConfiguration struct {
-	// nodeSelector defines the nodes on which the Pods are scheduled.
-	// nodeSelector is optional.
-	//
-	// When omitted, this means the user has no opinion and the platform is left
-	// to choose reasonable defaults. These defaults are subject to change over time.
-	// The current default value is `kubernetes.io/os: linux`.
-	// When specified, nodeSelector must contain at least 1 entry and must not contain more than 10 entries.
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// resources defines the compute resource requests and limits for the node-exporter container.
 	// This includes CPU, memory and HugePages constraints to help control scheduling and resource usage.
 	// When not specified, defaults are used by the platform. Requests cannot exceed limits.
@@ -44,16 +35,6 @@ type NodeExporterConfigApplyConfiguration struct {
 	// Minimum length for this list is 1.
 	// Each resource name must be unique within this list.
 	Resources []ContainerResourceApplyConfiguration `json:"resources,omitempty"`
-	// tolerations defines tolerations for the pods.
-	// tolerations is optional.
-	//
-	// When omitted, this means the user has no opinion and the platform is left
-	// to choose reasonable defaults. These defaults are subject to change over time.
-	// The current default is to tolerate all taints (operator: Exists without any key),
-	// which is typical for DaemonSets that must run on every node.
-	// Maximum length for this list is 10.
-	// Minimum length for this list is 1.
-	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 	// collectors configures which node-exporter metric collectors are enabled.
 	// collectors is optional.
 	// Each collector can be individually enabled or disabled. Some collectors may have
@@ -96,20 +77,6 @@ func NodeExporterConfig() *NodeExporterConfigApplyConfiguration {
 	return &NodeExporterConfigApplyConfiguration{}
 }
 
-// WithNodeSelector puts the entries into the NodeSelector field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the NodeSelector field,
-// overwriting an existing map entries in NodeSelector field with the same key.
-func (b *NodeExporterConfigApplyConfiguration) WithNodeSelector(entries map[string]string) *NodeExporterConfigApplyConfiguration {
-	if b.NodeSelector == nil && len(entries) > 0 {
-		b.NodeSelector = make(map[string]string, len(entries))
-	}
-	for k, v := range entries {
-		b.NodeSelector[k] = v
-	}
-	return b
-}
-
 // WithResources adds the given value to the Resources field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Resources field.
@@ -119,16 +86,6 @@ func (b *NodeExporterConfigApplyConfiguration) WithResources(values ...*Containe
 			panic("nil value passed to WithResources")
 		}
 		b.Resources = append(b.Resources, *values[i])
-	}
-	return b
-}
-
-// WithTolerations adds the given value to the Tolerations field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Tolerations field.
-func (b *NodeExporterConfigApplyConfiguration) WithTolerations(values ...v1.Toleration) *NodeExporterConfigApplyConfiguration {
-	for i := range values {
-		b.Tolerations = append(b.Tolerations, values[i])
 	}
 	return b
 }

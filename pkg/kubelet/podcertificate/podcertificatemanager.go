@@ -25,7 +25,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -337,7 +336,8 @@ func (m *IssuingManager) queueAllProjectionsForPod(uid types.UID) {
 }
 
 func (m *IssuingManager) Run(ctx context.Context) {
-	klog.InfoS("podcertificate.IssuingManager starting up")
+	logger := klog.FromContext(ctx)
+	logger.Info("podcertificate.IssuingManager starting up")
 	if !cache.WaitForCacheSync(ctx.Done(), m.pcrInformer.HasSynced, m.nodeInformer.HasSynced) {
 		return
 	}
@@ -348,7 +348,7 @@ func (m *IssuingManager) Run(ctx context.Context) {
 
 	m.projectionQueue.ShutDown()
 
-	klog.InfoS("podcertificate.IssuingManager shut down")
+	logger.Info("podcertificate.IssuingManager shut down")
 }
 
 func (m *IssuingManager) runProjectionProcessor(ctx context.Context) {
@@ -377,6 +377,8 @@ func (m *IssuingManager) processNextProjection(ctx context.Context) bool {
 func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey) error {
 	// Remember, returning nil from this function indicates that the work item
 	// was successfully processed, and should be dropped from the queue.
+
+	logger := klog.FromContext(ctx)
 
 	pod, ok := m.podManager.GetPodByUID(types.UID(key.PodUID))
 	if !ok {
@@ -462,7 +464,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// Return nil to remove the projection from the workqueue --- it will be
 		// readded once the PodCertificateRequest appears in the informer cache,
 		// and goes through status updates.
-		klog.V(4).InfoS("PodCertificateRequest created, moving to credStateWait", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+		logger.V(4).Info("PodCertificateRequest created, moving to credStateWait", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 		return nil
 
 	case *credStateWait:
@@ -495,7 +497,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
-				klog.V(4).InfoS("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s was denied, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
 				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, cond.Reason, eventMessage)
 				return nil
@@ -504,7 +506,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
-				klog.V(4).InfoS("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s failed, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
 				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, cond.Reason, eventMessage)
 				return nil
@@ -515,7 +517,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					beginRefreshAt: pcr.Status.BeginRefreshAt.Time.Add(jitterDuration()),
 					notAfter:       pcr.Status.NotAfter.Time,
 				}
-				klog.V(4).InfoS("PodCertificateRequest issued, moving to credStateFresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest issued, moving to credStateFresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				return nil
 			}
 		}
@@ -523,17 +525,17 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// Nothing -- the request is still pending.  Return nil to remove the
 		// projection from the workqueue.  It will be redriven when the
 		// PodCertificateRequest gets an update.
-		klog.V(4).InfoS("PodCertificateRequest not in terminal state, remaining in credStateWait", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+		logger.V(4).Info("PodCertificateRequest not in terminal state, remaining in credStateWait", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 		return nil
 
 	case *credStateDenied:
 		// Nothing to do; this is a permanent error state for the pod.
-		klog.V(4).InfoS("staying in credStateDenied", "key", key)
+		logger.V(4).Info("staying in credStateDenied", "key", key)
 		return nil
 
 	case *credStateFailed:
 		// Nothing to do; this is a permanent error state for the pod.
-		klog.V(4).InfoS("staying in credStateFailed", "key", key)
+		logger.V(4).Info("staying in credStateFailed", "key", key)
 		return nil
 
 	case *credStateFresh:
@@ -545,18 +547,18 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 			return nil
 		}
 
-		klog.V(4).InfoS("Time to refresh", "key", key)
+		logger.V(4).Info("Time to refresh", "key", key)
 
 		// The current time is more than 10 minutes past the most recently issued certificate's `beginRefreshAt` timestamp but the state has not been labeled with overdue for refresh.
 		if m.clock.Now().After(state.beginRefreshAt.Add(refreshOverdueDuration)) && !state.eventEmittedForOverdueForRefresh {
-			klog.V(4).InfoS("Refresh overdue", "key", key)
+			logger.V(4).Info("Refresh overdue", "key", key)
 			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateOverdueForRefresh", "PodCertificate refresh overdue")
 			state.eventEmittedForOverdueForRefresh = true
 		}
 
 		// The current time is past the most recently issued certificate's `notAfter` timestamp but the state has not been labelled with expired.
 		if m.clock.Now().After(state.notAfter) && !state.eventEmittedForExpiration {
-			klog.V(4).InfoS("Certificates expired", "key", key)
+			logger.V(4).Info("Certificates expired", "key", key)
 			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateExpired", "PodCertificate expired")
 			state.eventEmittedForExpiration = true
 		}
@@ -602,7 +604,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// Return nil to remove the projection from the workqueue --- it will be
 		// readded once the PodCertificateRequest appears in the informer cache,
 		// and goes through status updates.
-		klog.V(4).InfoS("PodCertificateRequest created, moving to credStateWaitRefresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+		logger.V(4).Info("PodCertificateRequest created, moving to credStateWaitRefresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 		return nil
 
 	case *credStateWaitRefresh:
@@ -640,7 +642,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
-				klog.V(4).InfoS("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s was denied, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
 				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, cond.Reason, eventMessage)
 				return nil
@@ -649,7 +651,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
-				klog.V(4).InfoS("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s failed, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
 				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, cond.Reason, eventMessage)
 				return nil
@@ -660,7 +662,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 					beginRefreshAt: pcr.Status.BeginRefreshAt.Time.Add(jitterDuration()),
 					notAfter:       pcr.Status.NotAfter.Time,
 				}
-				klog.V(4).InfoS("PodCertificateRequest issued, moving to credStateFresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+				logger.V(4).Info("PodCertificateRequest issued, moving to credStateFresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				return nil
 			}
 		}
@@ -668,18 +670,18 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// Nothing -- the request is still pending.  Return nil to remove the
 		// projection from the workqueue.  It will be redriven when the
 		// PodCertificateRequest gets an update.
-		klog.V(4).InfoS("PodCertificateRequest not in terminal state, remaining in credStateWaitRefresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
+		logger.V(4).Info("PodCertificateRequest not in terminal state, remaining in credStateWaitRefresh", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 
 		// The current time is more than 10 minutes past the most recently issued certificate's `beginRefreshAt` timestamp but the state has not been labeled with overdue for refresh.
 		if m.clock.Now().After(state.beginRefreshAt.Add(refreshOverdueDuration)) && !state.eventEmittedForOverdueForRefresh {
-			klog.V(4).InfoS("Refresh overdue", "key", key)
+			logger.V(4).Info("Refresh overdue", "key", key)
 			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateOverdueForRefresh", "PodCertificate refresh overdue")
 			state.eventEmittedForOverdueForRefresh = true
 		}
 
 		// The current time is past the most recently issued certificate's `notAfter` timestamp but the state has not been labeled with expired.
 		if m.clock.Now().After(state.notAfter) && !state.eventEmittedForExpiration {
-			klog.V(4).InfoS("Certificates expired", "key", key)
+			logger.V(4).Info("Certificates expired", "key", key)
 			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateExpired", "PodCertificate expired")
 			state.eventEmittedForExpiration = true
 		}
@@ -739,16 +741,12 @@ func (m *IssuingManager) createPodCertificateRequest(
 	podName string, podUID types.UID,
 	serviceAccountName string, serviceAccountUID types.UID,
 	nodeName types.NodeName, nodeUID types.UID,
-	signerName, keyType string, maxExpirationSeconds *int32, userAnnotations map[string]string) ([]byte, *certificatesv1beta1.PodCertificateRequest, error) {
-
-	privateKey, publicKey, proof, err := generateKeyAndProof(keyType, []byte(podUID))
+	signerName, keyType string, maxExpirationSeconds *int32,
+	userAnnotations map[string]string,
+) ([]byte, *certificatesv1beta1.PodCertificateRequest, error) {
+	privateKey, pkcs10Req, err := generateKeyAndProof(keyType)
 	if err != nil {
 		return nil, nil, fmt.Errorf("while generating keypair: %w", err)
-	}
-
-	pkixPublicKey, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("while marshaling public key: %w", err)
 	}
 
 	keyPEM, err := pemEncodeKey(privateKey)
@@ -762,7 +760,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 			GenerateName: "req-",
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: "core/v1",
+					APIVersion: "v1",
 					Kind:       "Pod",
 					Name:       podName,
 					UID:        podUID,
@@ -778,8 +776,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 			NodeName:                  nodeName,
 			NodeUID:                   nodeUID,
 			MaxExpirationSeconds:      maxExpirationSeconds,
-			PKIXPublicKey:             pkixPublicKey,
-			ProofOfPossession:         proof,
+			StubPKCS10Request:         pkcs10Req,
 			UnverifiedUserAnnotations: userAnnotations,
 		},
 	}
@@ -874,73 +871,57 @@ func (m *IssuingManager) MetricReport() *MetricReport {
 	return report
 }
 
-func hashBytes(in []byte) []byte {
-	out := sha256.Sum256(in)
-	return out[:]
-}
+func generateKeyAndProof(keyType string) (crypto.PrivateKey, []byte, error) {
+	var privKey crypto.PrivateKey
 
-func generateKeyAndProof(keyType string, toBeSigned []byte) (privKey crypto.PrivateKey, pubKey crypto.PublicKey, sig []byte, err error) {
 	switch keyType {
 	case "RSA3072":
-		key, err := rsa.GenerateKey(rand.Reader, 3072)
+		priv, err := rsa.GenerateKey(rand.Reader, 3072)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating RSA 3072 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating RSA 3072 key: %w", err)
 		}
-		sig, err := rsa.SignPSS(rand.Reader, key, crypto.SHA256, hashBytes(toBeSigned), nil)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while signing proof: %w", err)
-		}
-		return key, &key.PublicKey, sig, nil
+		privKey = priv
 	case "RSA4096":
-		key, err := rsa.GenerateKey(rand.Reader, 4096)
+		priv, err := rsa.GenerateKey(rand.Reader, 4096)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating RSA 4096 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating RSA 4096 key: %w", err)
 		}
-		sig, err := rsa.SignPSS(rand.Reader, key, crypto.SHA256, hashBytes(toBeSigned), nil)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while signing proof: %w", err)
-		}
-		return key, &key.PublicKey, sig, nil
+		privKey = priv
 	case "ECDSAP256":
-		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating ECDSA P256 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating ECDSA P256 key: %w", err)
 		}
-		sig, err := ecdsa.SignASN1(rand.Reader, key, hashBytes(toBeSigned))
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while signing proof: %w", err)
-		}
-		return key, &key.PublicKey, sig, nil
+		privKey = priv
 	case "ECDSAP384":
-		key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+		priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating ECDSA P384 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating ECDSA P384 key: %w", err)
 		}
-		sig, err := ecdsa.SignASN1(rand.Reader, key, hashBytes(toBeSigned))
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while signing proof: %w", err)
-		}
-		return key, &key.PublicKey, sig, nil
+		privKey = priv
 	case "ECDSAP521":
-		key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		priv, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating ECDSA P521 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating ECDSA P521 key: %w", err)
 		}
-		sig, err := ecdsa.SignASN1(rand.Reader, key, hashBytes(toBeSigned))
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while signing proof: %w", err)
-		}
-		return key, &key.PublicKey, sig, nil
+		privKey = priv
 	case "ED25519":
-		pub, priv, err := ed25519.GenerateKey(rand.Reader)
+		_, priv, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("while generating Ed25519 key: %w", err)
+			return nil, nil, fmt.Errorf("while generating Ed25519 key: %w", err)
 		}
-		sig := ed25519.Sign(priv, toBeSigned)
-		return priv, pub, sig, nil
+		privKey = priv
 	default:
-		return nil, nil, nil, fmt.Errorf("unknown key type %q", keyType)
+		return nil, nil, fmt.Errorf("unknown key type %q", keyType)
 	}
+
+	tmpl := &x509.CertificateRequest{}
+	pkcs10Req, err := x509.CreateCertificateRequest(rand.Reader, tmpl, privKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("while generating stub PKCS#10 request: %w", err)
+	}
+
+	return privKey, pkcs10Req, nil
 }
 
 func pemEncodeKey(key crypto.PrivateKey) ([]byte, error) {

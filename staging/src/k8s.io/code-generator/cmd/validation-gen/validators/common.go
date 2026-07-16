@@ -34,3 +34,12 @@ func rootTypeString(src, dst *types.Type) string {
 	}
 	return src.String() + " -> " + dst.String()
 }
+
+// isInt returns true if t is a uint type.
+func isUnsignedInt(t *types.Type) bool {
+	switch t {
+	case types.Uint, types.Uint64, types.Uint32, types.Uint16, types.Byte:
+		return true
+	}
+	return false
+}

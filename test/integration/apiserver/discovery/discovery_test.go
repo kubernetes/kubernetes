@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	kubernetes "k8s.io/client-go/kubernetes"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregator "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	aggregatorclientsetscheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
@@ -160,16 +161,22 @@ func setup(t *testing.T) (context.Context, testClientSet, context.CancelFunc) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
 
-	kubeClientSet, err := kubernetes.NewForConfig(server.ClientConfig)
+	cfg := rest.CopyConfig(server.ClientConfig)
+	// Discovery integration tests can poll very frequently and should not flake due to client-side throttling.
+	cfg.QPS = 50
+	cfg.Burst = 100
+	cfg.RateLimiter = nil
+
+	kubeClientSet, err := kubernetes.NewForConfig(cfg)
 	require.NoError(t, err)
 
-	aggegatorClientSet, err := aggregator.NewForConfig(server.ClientConfig)
+	aggegatorClientSet, err := aggregator.NewForConfig(cfg)
 	require.NoError(t, err)
 
-	apiextensionsClientSet, err := apiextensions.NewForConfig(server.ClientConfig)
+	apiextensionsClientSet, err := apiextensions.NewForConfig(cfg)
 	require.NoError(t, err)
 
-	dynamicClientset, err := dynamic.NewForConfig(server.ClientConfig)
+	dynamicClientset, err := dynamic.NewForConfig(cfg)
 	require.NoError(t, err)
 
 	client := testClientSet{

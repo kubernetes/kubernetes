@@ -132,6 +132,14 @@
   - 10
   - 15
   - 30
+- name: storage_events_received_total
+  subsystem: apiserver
+  help: Number of etcd events received split by kind.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
 - name: check_duration_seconds
   subsystem: validating_admission_policy
   namespace: apiserver
@@ -175,14 +183,206 @@
   help: Number of times declarative validation has panicked during validation.
   type: Counter
   stabilityLevel: BETA
+- name: watch_list_duration_seconds
+  subsystem: apiserver
+  help: Response latency distribution in seconds for watch list requests broken by
+    group, version, resource and scope.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - scope
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 2
+  - 4
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
 - name: disabled_metrics_total
   help: The count of disabled metrics.
   type: Counter
   stabilityLevel: BETA
+- name: desired_endpoint_slices
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices that would exist with perfect endpoint allocation
+  type: Gauge
+  stabilityLevel: BETA
+- name: endpoints_added_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints added on each Service sync
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+- name: endpoints_desired
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints desired
+  type: Gauge
+  stabilityLevel: BETA
+- name: endpoints_removed_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints removed on each Service sync
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+- name: num_endpoint_slices
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices
+  type: Gauge
+  stabilityLevel: BETA
+- name: services_count_by_traffic_distribution
+  subsystem: endpoint_slice_controller
+  help: Number of Services using some specific trafficDistribution
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - traffic_distribution
 - name: hidden_metrics_total
   help: The count of hidden metrics.
   type: Counter
   stabilityLevel: BETA
+- name: metric_computation_duration_seconds
+  subsystem: horizontal_pod_autoscaler_controller
+  help: The time(seconds) that the HPA controller takes to calculate one metric. The
+    label 'action' should be either 'scale_down', 'scale_up', or 'none'. The label
+    'error' should be either 'spec', 'internal', or 'none'. The label 'metric_type'
+    corresponds to HPA.spec.metrics[*].type
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - action
+  - error
+  - metric_type
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: metric_computation_total
+  subsystem: horizontal_pod_autoscaler_controller
+  help: Number of metric computations. The label 'action' should be either 'scale_down',
+    'scale_up', or 'none'. Also, the label 'error' should be either 'spec', 'internal',
+    or 'none'. The label 'metric_type' corresponds to HPA.spec.metrics[*].type
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - action
+  - error
+  - metric_type
+- name: reconciliation_duration_seconds
+  subsystem: horizontal_pod_autoscaler_controller
+  help: The time(seconds) that the HPA controller takes to reconcile once. The label
+    'action' should be either 'scale_down', 'scale_up', or 'none'. Also, the label
+    'error' should be either 'spec', 'internal', or 'none'. Note that if both spec
+    and internal errors happen during a reconciliation, the first one to occur is
+    reported in `error` label.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - action
+  - error
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: reconciliations_total
+  subsystem: horizontal_pod_autoscaler_controller
+  help: Number of reconciliations of HPA controller. The label 'action' should be
+    either 'scale_down', 'scale_up', or 'none'. Also, the label 'error' should be
+    either 'spec', 'internal', or 'none'. Note that if both spec and internal errors
+    happen during a reconciliation, the first one to occur is reported in `error`
+    label.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - action
+  - error
+- name: pod_failures_handled_by_failure_policy_total
+  subsystem: job_controller
+  help: "`The number of failed Pods handled by failure policy with\n\t\t\trespect
+    to the failure policy action applied based on the matched\n\t\t\trule. Possible
+    values of the action label correspond to the\n\t\t\tpossible values for the failure
+    policy rule action, which are:\n\t\t\t\"FailJob\", \"Ignore\" and \"Count\".`"
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - action
+- name: terminated_pods_tracking_finalizer_total
+  subsystem: job_controller
+  help: |-
+    `The number of terminated pods (phase=Failed|Succeeded)
+    that have the finalizer batch.kubernetes.io/job-tracking
+    The event label can be "add" or "delete".`
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - event
 - name: image_volume_mounted_errors_total
   subsystem: kubelet
   help: Number of failed image volume mounts.
@@ -198,6 +398,22 @@
   help: Number of requested image volumes.
   type: Counter
   stabilityLevel: BETA
+- name: kubernetes_build_info
+  help: A metric with a constant '1' value labeled by major, minor, git version, git
+    commit, git tree state, build date, Go version, and compiler from which Kubernetes
+    was built, and platform on which it is running.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - build_date
+  - compiler
+  - git_commit
+  - git_tree_state
+  - git_version
+  - go_version
+  - major
+  - minor
+  - platform
 - name: feature_enabled
   namespace: kubernetes
   help: This metric records the data about the stage and enablement of a k8s feature.
@@ -227,6 +443,53 @@
   labels:
   - deprecated_version
   - stability_level
+- name: running_managed_controllers
+  help: Indicates where instances of a controller are currently running
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - manager
+  - name
+- name: goroutines
+  subsystem: scheduler
+  help: Number of running goroutines split by the work they do such as binding.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - operation
+- name: permit_wait_duration_seconds
+  subsystem: scheduler
+  help: Duration of waiting on permit.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: plugin_evaluation_total
+  subsystem: scheduler
+  help: Number of attempts to schedule pods by each plugin and the extension point
+    (available only in PreFilter, Filter, PreScore, and Score).
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - extension_point
+  - plugin
+  - profile
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
@@ -256,6 +519,89 @@
   - 1310.72
   - 2621.44
   - 5242.88
+- name: unschedulable_pods
+  subsystem: scheduler
+  help: The number of unschedulable pods broken down by plugin name. A pod will increment
+    the gauge for all plugins that caused it to not schedule and so this metric have
+    meaning only when broken down by plugin.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - plugin
+  - profile
+- name: adds_total
+  subsystem: workqueue
+  help: Total number of adds handled by workqueue
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: depth
+  subsystem: workqueue
+  help: Current depth of workqueue
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: longest_running_processor_seconds
+  subsystem: workqueue
+  help: How many seconds has the longest running processor for workqueue been running.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: queue_duration_seconds
+  subsystem: workqueue
+  help: How long in seconds an item stays in workqueue before being requested.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - name
+  buckets:
+  - 1e-08
+  - 1e-07
+  - 1e-06
+  - 9.999999999999999e-06
+  - 9.999999999999999e-05
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+  - 10
+- name: retries_total
+  subsystem: workqueue
+  help: Total number of retries handled by workqueue
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: unfinished_work_seconds
+  subsystem: workqueue
+  help: How many seconds of work has done that is in progress and hasn't been observed
+    by work_duration. Large values indicate stuck threads. One can deduce the number
+    of stuck threads by observing the rate at which this increases.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+- name: work_duration_seconds
+  subsystem: workqueue
+  help: How long in seconds processing an item from workqueue takes.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - name
+  buckets:
+  - 1e-08
+  - 1e-07
+  - 1e-06
+  - 9.999999999999999e-06
+  - 9.999999999999999e-05
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+  - 10
 - name: controller_admission_duration_seconds
   subsystem: admission
   namespace: apiserver

@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"text/tabwriter"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/kubectl/pkg/apps"
 	"k8s.io/kubectl/pkg/describe"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
-	sliceutil "k8s.io/kubectl/pkg/util/slice"
 )
 
 const (
@@ -142,7 +142,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	for r := range historyInfo {
 		revisions = append(revisions, r)
 	}
-	sliceutil.SortInts64(revisions)
+	slices.Sort(revisions)
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "REVISION\tCHANGE-CAUSE\n")
@@ -255,7 +255,7 @@ func printHistory(history []*appsv1.ControllerRevision, revision int64, getPodTe
 	for r := range historyInfo {
 		revisions = append(revisions, r)
 	}
-	sliceutil.SortInts64(revisions)
+	slices.Sort(revisions)
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "REVISION\tCHANGE-CAUSE\n")

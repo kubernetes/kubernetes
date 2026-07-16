@@ -19,6 +19,7 @@ import (
 // +kubebuilder:resource:path=infrastructures,scope=Cluster
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:annotations=release.openshift.io/bootstrap-required=true
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=MutableTopology,rule="!has(self.spec.controlPlaneTopology) || (has(oldSelf.spec.controlPlaneTopology) && self.spec.controlPlaneTopology == oldSelf.spec.controlPlaneTopology) || (has(self.status.controlPlaneTopology) && self.spec.controlPlaneTopology == self.status.controlPlaneTopology) || (has(self.status.controlPlaneTopology) && self.status.controlPlaneTopology == 'SingleReplica' && self.spec.controlPlaneTopology == 'HighlyAvailable')",message="spec.controlPlaneTopology must match status.controlPlaneTopology or be set to HighlyAvailable when status.controlPlaneTopology is SingleReplica"
 type Infrastructure struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -55,6 +56,21 @@ type InfrastructureSpec struct {
 	// platformSpec holds desired information specific to the underlying
 	// infrastructure provider.
 	PlatformSpec PlatformSpec `json:"platformSpec,omitempty"`
+
+	// controlPlaneTopology expresses the desired topology configuration for control nodes.
+	//
+	// When status.controlPlaneTopology is 'SingleReplica' and spec.controlPlaneTopology is set to 'HighlyAvailable',
+	// a transition will be triggered to reconfigure the cluster from SingleReplica to HighlyAvailable.
+	//
+	// When left blank or status.controlPlaneTopology and spec.controlPlaneTopology are the same value,
+	// no changes are required and no transitions will be triggered.
+	//
+	// This value may be set to match status.controlPlaneTopology regardless of the current value.
+	//
+	// +openshift:enable:FeatureGate=MutableTopology
+	// +kubebuilder:validation:Enum=HighlyAvailable;SingleReplica
+	// +optional
+	ControlPlaneTopology TopologyMode `json:"controlPlaneTopology,omitempty"`
 }
 
 // InfrastructureStatus describes the infrastructure the cluster is leveraging.
@@ -644,7 +660,6 @@ type AzurePlatformStatus struct {
 	//
 	// +default={"dnsType": "PlatformDefault"}
 	// +kubebuilder:default={"dnsType": "PlatformDefault"}
-	// +openshift:enable:FeatureGate=AzureClusterHostedDNSInstall
 	// +optional
 	CloudLoadBalancerConfig *CloudLoadBalancerConfig `json:"cloudLoadBalancerConfig,omitempty"`
 

@@ -2788,6 +2788,7 @@ func TestUpdateNodeStatus(t *testing.T) {
 				recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 				nodeStatusUpdateFrequency: 1 * time.Second,
 				workerCount:               test.workers,
+				statusUpdateWorkerCount:   test.workers,
 			}
 
 			for _, n := range generateNodes(test.nodes) {

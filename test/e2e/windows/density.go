@@ -225,7 +225,7 @@ func newInformerWatchPod(ctx context.Context, f *framework.Framework, mutex *syn
 func newDensityTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod {
 	var pods []*v1.Pod
 
-	for i := 0; i < numPods; i++ {
+	for range numPods {
 
 		podName := "test-" + string(uuid.NewUUID())
 		pod := v1.Pod{

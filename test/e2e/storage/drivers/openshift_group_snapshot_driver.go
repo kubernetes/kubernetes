@@ -253,16 +253,34 @@ func (h *groupSnapshotHostpathCSIDriver) PrepareTest(ctx context.Context, f *fra
 		switch item := item.(type) {
 		case *appsv1.StatefulSet:
 			var containers []v1.Container
+			var volumes []v1.Volume
 			for _, container := range item.Spec.Template.Spec.Containers {
 				switch container.Name {
 				case "csi-external-health-monitor-agent", "csi-external-health-monitor-controller":
 					// Remove these containers.
+				case "csi-snapshot-metadata":
+					// Only keep the snapshot metadata sidecar when the feature is enabled.
+					if h.driverInfo.Capabilities[storageframework.CapSnapshotMetadata] {
+						containers = append(containers, container)
+					}
 				default:
 					// Keep the others.
 					containers = append(containers, container)
 				}
 			}
+			for _, volume := range item.Spec.Template.Spec.Volumes {
+				switch volume.Name {
+				case "csi-snapshot-metadata-server-certs":
+					// Only keep the snapshot metadata volume when the feature is enabled.
+					if h.driverInfo.Capabilities[storageframework.CapSnapshotMetadata] {
+						volumes = append(volumes, volume)
+					}
+				default:
+					volumes = append(volumes, volume)
+				}
+			}
 			item.Spec.Template.Spec.Containers = containers
+			item.Spec.Template.Spec.Volumes = volumes
 		}
 		return nil
 	}, h.manifests...)

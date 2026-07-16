@@ -43,7 +43,7 @@ func newTestPod(namespace string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "test-pod-hostname-override",
-					Image:   imageutils.GetE2EImage(imageutils.JessieDnsutils),
+					Image:   imageutils.GetE2EImage(imageutils.GlibcDnsTesting),
 					Command: []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"},
 				},
 			},
@@ -52,7 +52,7 @@ func newTestPod(namespace string) *v1.Pod {
 	}
 }
 
-var _ = SIGDescribe("Override hostname of Pod", framework.WithFeatureGate(features.HostnameOverride), func() {
+var _ = SIGDescribe("Override hostname of Pod", framework.WithNodeConformance(), framework.WithFeatureGate(features.HostnameOverride), func() {
 	f := framework.NewDefaultFramework("hostfqdn")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

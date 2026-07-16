@@ -19,6 +19,7 @@ package ipaddress
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -73,7 +74,7 @@ func (ipAddressStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 func (ipAddressStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	ipAddress := obj.(*networking.IPAddress)
 	err := validation.ValidateIPAddress(ipAddress)
-	return err
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, ipAddress, nil, err, operation.Create)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -91,7 +92,7 @@ func (ipAddressStrategy) ValidateUpdate(ctx context.Context, new, old runtime.Ob
 	oldIPAddress := old.(*networking.IPAddress)
 	errList := validation.ValidateIPAddress(newIPAddress)
 	errList = append(errList, validation.ValidateIPAddressUpdate(newIPAddress, oldIPAddress)...)
-	return errList
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newIPAddress, oldIPAddress, errList, operation.Update)
 }
 
 // AllowUnconditionalUpdate is the default update policy for IPAddress objects.

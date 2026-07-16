@@ -114,7 +114,7 @@ const (
 type VaultAppRoleAuthentication struct {
 	// secret references a secret in the openshift-config namespace containing
 	// the AppRole credentials used to authenticate with Vault.
-	// The secret must contain two keys: "role-id" for the AppRole Role ID and "secret-id" for the AppRole Secret ID.
+	// The referenced Secret must contain two keys: "role-id" for the AppRole Role ID and "secret-id" for the AppRole Secret ID.
 	//
 	// +required
 	Secret VaultSecretReference `json:"secret,omitzero"`
@@ -193,14 +193,10 @@ type VaultKMSPluginConfig struct {
 
 	// transitMount specifies the mount path of the Vault Transit engine.
 	//
-	// When omitted, this means the user has no opinion and the platform is left
-	// to choose a reasonable default. These defaults are subject to change over time.
-	// The current default is "transit".
-	//
-	// The transit mount must be between 1 and 1024 characters when specified, cannot start or
-	// end with a forward slash, cannot contain consecutive forward slashes, and must only contain
-	// RFC 3986 unreserved characters (alphanumeric, hyphen, period, underscore, tilde) and forward
-	// slashes as path separators.
+	// The transit mount must be between 1 and 1024 characters, cannot start or
+	// end with a forward slash, cannot contain consecutive forward slashes, and
+	// must only contain RFC 3986 unreserved characters (alphanumeric, hyphen,
+	// period, underscore, tilde) and forward slashes as path separators.
 	//
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=1024
@@ -208,7 +204,7 @@ type VaultKMSPluginConfig struct {
 	// +kubebuilder:validation:XValidation:rule="!self.endsWith('/')",message="transitMount cannot end with a forward slash"
 	// +kubebuilder:validation:XValidation:rule="!self.contains('//')",message="transitMount cannot contain consecutive forward slashes"
 	// +kubebuilder:validation:XValidation:rule="self.matches('^[a-zA-Z0-9._~/-]+$')",message="transitMount must only contain RFC 3986 unreserved characters (alphanumeric, hyphen, period, underscore, tilde) and forward slashes"
-	// +optional
+	// +required
 	TransitMount string `json:"transitMount,omitempty"`
 
 	// transitKey specifies the name of the encryption key in Vault's Transit engine.
@@ -230,7 +226,7 @@ type VaultKMSPluginConfig struct {
 type VaultTLSConfig struct {
 	// caBundle references a ConfigMap in the openshift-config namespace containing
 	// the CA certificate bundle used to verify the TLS connection to the Vault server.
-	// The ConfigMap must contain the CA bundle in the key "ca-bundle.crt".
+	// The referenced ConfigMap must contain the CA bundle in the key "ca-bundle.crt".
 	// When this field is not set, the system's trusted CA certificates are used.
 	//
 	// The namespace for the ConfigMap is openshift-config.

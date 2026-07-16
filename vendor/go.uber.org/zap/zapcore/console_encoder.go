@@ -105,7 +105,7 @@ func (c consoleEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, 
 		if i > 0 {
 			line.AppendString(c.ConsoleSeparator)
 		}
-		fmt.Fprint(line, arr.elems[i])
+		_, _ = fmt.Fprint(line, arr.elems[i])
 	}
 	putSliceEncoder(arr)
 

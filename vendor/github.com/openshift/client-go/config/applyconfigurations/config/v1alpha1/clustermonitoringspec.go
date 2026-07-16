@@ -78,6 +78,11 @@ type ClusterMonitoringSpecApplyConfiguration struct {
 	// or topology spread constraints.
 	// When set, at least one field must be specified within monitoringPluginConfig.
 	MonitoringPluginConfig *MonitoringPluginConfigApplyConfiguration `json:"monitoringPluginConfig,omitempty"`
+	// kubeStateMetricsConfig is an optional field that can be used to configure the kube-state-metrics
+	// agent that runs in the openshift-monitoring namespace. kube-state-metrics generates metrics about
+	// the state of Kubernetes objects such as Deployments, Nodes, and Pods.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
+	KubeStateMetricsConfig *KubeStateMetricsConfigApplyConfiguration `json:"kubeStateMetricsConfig,omitempty"`
 }
 
 // ClusterMonitoringSpecApplyConfiguration constructs a declarative configuration of the ClusterMonitoringSpec type for use with
@@ -171,5 +176,13 @@ func (b *ClusterMonitoringSpecApplyConfiguration) WithNodeExporterConfig(value *
 // If called multiple times, the MonitoringPluginConfig field is set to the value of the last call.
 func (b *ClusterMonitoringSpecApplyConfiguration) WithMonitoringPluginConfig(value *MonitoringPluginConfigApplyConfiguration) *ClusterMonitoringSpecApplyConfiguration {
 	b.MonitoringPluginConfig = value
+	return b
+}
+
+// WithKubeStateMetricsConfig sets the KubeStateMetricsConfig field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the KubeStateMetricsConfig field is set to the value of the last call.
+func (b *ClusterMonitoringSpecApplyConfiguration) WithKubeStateMetricsConfig(value *KubeStateMetricsConfigApplyConfiguration) *ClusterMonitoringSpecApplyConfiguration {
+	b.KubeStateMetricsConfig = value
 	return b
 }

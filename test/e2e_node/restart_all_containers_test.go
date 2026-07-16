@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright The Kubernetes Authors.
@@ -94,7 +93,7 @@ var _ = SIGDescribe("RestartAllContainersWithKubeletRestarts",
 				},
 			}
 			// Setting up extra containers so the cleanup takes more time to coordinate with kubelet restart.
-			for i := 0; i < containerCount; i++ {
+			for i := range containerCount {
 				pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
 					Name:    fmt.Sprintf("container-%d", i),
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
@@ -196,7 +195,7 @@ var _ = SIGDescribe("RestartAllContainersWithKubeletRestarts",
 				},
 			}
 			// Setting up extra containers so the cleanup takes more time to coordinate with kubelet restart.
-			for i := 0; i < containerCount; i++ {
+			for i := range containerCount {
 				pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
 					Name:    fmt.Sprintf("container-%d", i),
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),

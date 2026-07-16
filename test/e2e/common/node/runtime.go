@@ -376,7 +376,7 @@ func ImagePullTest(ctx context.Context, f *framework.Framework, image string, im
 
 	ginkgo.By("check the container status")
 	var latestErr error
-	err := wait.PollUntilContextCancel(ctx, ContainerStatusPollInterval, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, ContainerStatusPollInterval, ContainerStatusRetryTimeout, true, func(ctx context.Context) (bool, error) {
 		if latestErr = checkContainerStatus(ctx); latestErr != nil {
 			return false, nil
 		}

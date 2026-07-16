@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,7 +30,7 @@ import (
 )
 
 var (
-	pinnedManagementEnabled  bool
+	pinnedManagementEnabled  atomic.Bool
 	pinnedManagementFilename = "/etc/kubernetes/openshift-workload-pinning"
 )
 
@@ -62,18 +63,18 @@ func init() {
 
 func readEnablementFile() {
 	if _, err := os.Stat(pinnedManagementFilename); err == nil {
-		pinnedManagementEnabled = true
+		pinnedManagementEnabled.Store(true)
 	}
 }
 
 // TestOnlySetEnabled allows changing the state of management partition enablement
 // This method MUST NOT be used outside of test code
 func TestOnlySetEnabled(enabled bool) {
-	pinnedManagementEnabled = enabled
+	pinnedManagementEnabled.Store(enabled)
 }
 
 func IsEnabled() bool {
-	return pinnedManagementEnabled
+	return pinnedManagementEnabled.Load()
 }
 
 // IsPodManaged returns true and the name of the workload if enabled.

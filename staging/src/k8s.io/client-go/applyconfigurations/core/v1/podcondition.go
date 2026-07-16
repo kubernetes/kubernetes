@@ -32,7 +32,6 @@ type PodConditionApplyConfiguration struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
 	Type *corev1.PodConditionType `json:"type,omitempty"`
 	// If set, this represents the .metadata.generation that the pod condition was set based upon.
-	// The PodObservedGenerationTracking feature gate must be enabled to use this field.
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.

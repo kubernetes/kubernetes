@@ -23,11 +23,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/client-go/tools/cache"
 	ephemeral "k8s.io/component-helpers/storage/ephemeral"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
@@ -63,11 +64,11 @@ type CSILimits struct {
 	scLister        storagelisters.StorageClassLister
 	vaLister        storagelisters.VolumeAttachmentLister
 	csiDriverLister storagelisters.CSIDriverLister
+	vaIndexer       cache.Indexer
 
-	enableCSIMigrationPortworx bool
-	randomVolumeIDPrefix       string
-	enableVolumeLimitScaling   bool
-	translator                 InTreeToCSITranslator
+	randomVolumeIDPrefix     string
+	enableVolumeLimitScaling bool
+	translator               InTreeToCSITranslator
 }
 
 var _ fwk.PreFilterPlugin = &CSILimits{}
@@ -356,12 +357,18 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 func (pl *CSILimits) checkCSIDriverOnNode(pluginName string, csiNode *storagev1.CSINode) (bool, error) {
 	// the registered driver must be a CSI driver to enforce this limit, if we can't find the driver,
 	// we assume the driver may not be a CSI driver and allow the pod to be scheduled.
-	_, err := pl.csiDriverLister.Get(pluginName)
+	csiDriver, err := pl.csiDriverLister.Get(pluginName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		return false, fmt.Errorf("error getting CSIDriver for provider %s: %w", pluginName, err)
+	}
+
+	driverOptin := csiDriver.Spec.PreventPodSchedulingIfMissing
+
+	if driverOptin == nil || !*driverOptin {
+		return true, nil
 	}
 
 	if csiNode == nil {
@@ -458,7 +465,7 @@ func (pl *CSILimits) checkAttachableInlineVolume(logger klog.Logger, vol *v1.Vol
 	if err != nil {
 		return fmt.Errorf("looking up provisioner name for volume %s: %w", vol.Name, err)
 	}
-	if !isCSIMigrationOn(csiNode, inTreeProvisionerName, pl.enableCSIMigrationPortworx) {
+	if !isCSIMigrationOn(csiNode, inTreeProvisionerName) {
 		csiNodeName := ""
 		if csiNode != nil {
 			csiNodeName = csiNode.Name
@@ -519,7 +526,7 @@ func (pl *CSILimits) getCSIDriverInfo(logger klog.Logger, csiNode *storagev1.CSI
 			return "", ""
 		}
 
-		if !isCSIMigrationOn(csiNode, pluginName, pl.enableCSIMigrationPortworx) {
+		if !isCSIMigrationOn(csiNode, pluginName) {
 			logger.V(5).Info("CSI Migration of plugin is not enabled", "plugin", pluginName)
 			return "", ""
 		}
@@ -567,7 +574,7 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(logger klog.Logger, csiNode *storage
 
 	provisioner := storageClass.Provisioner
 	if pl.translator.IsMigratableIntreePluginByName(provisioner) {
-		if !isCSIMigrationOn(csiNode, provisioner, pl.enableCSIMigrationPortworx) {
+		if !isCSIMigrationOn(csiNode, provisioner) {
 			logger.V(5).Info("CSI Migration of provisioner is not enabled", "provisioner", provisioner)
 			return "", ""
 		}
@@ -583,6 +590,14 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(logger klog.Logger, csiNode *storage
 	return provisioner, volumeHandle
 }
 
+func volumeAttachmentIndexer(obj interface{}) ([]string, error) {
+	va, ok := obj.(*storagev1.VolumeAttachment)
+	if !ok {
+		return []string{}, nil
+	}
+	return []string{va.Spec.NodeName}, nil
+}
+
 // NewCSI initializes a new plugin and returns it.
 func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
@@ -591,19 +606,25 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
 	csiDriverLister := informerFactory.Storage().V1().CSIDrivers().Lister()
+	vaInformer := informerFactory.Storage().V1().VolumeAttachments().Informer()
+	if err := vaInformer.AddIndexers(cache.Indexers{vaIndexKey: volumeAttachmentIndexer}); err != nil {
+		if vaInformer.GetIndexer().GetIndexers()[vaIndexKey] == nil {
+			return nil, fmt.Errorf("failed to add index to VA informer: %w", err)
+		}
+	}
 	csiTranslator := csitrans.New()
 
 	return &CSILimits{
-		csiManager:                 handle.SharedCSIManager(),
-		pvLister:                   pvLister,
-		pvcLister:                  pvcLister,
-		scLister:                   scLister,
-		vaLister:                   vaLister,
-		csiDriverLister:            csiDriverLister,
-		enableCSIMigrationPortworx: fts.EnableCSIMigrationPortworx,
-		enableVolumeLimitScaling:   fts.EnableVolumeLimitScaling,
-		randomVolumeIDPrefix:       rand.String(32),
-		translator:                 csiTranslator,
+		csiManager:               handle.SharedCSIManager(),
+		pvLister:                 pvLister,
+		pvcLister:                pvcLister,
+		scLister:                 scLister,
+		vaLister:                 vaLister,
+		csiDriverLister:          csiDriverLister,
+		enableVolumeLimitScaling: fts.EnableVolumeLimitScaling,
+		randomVolumeIDPrefix:     rand.String(32),
+		translator:               csiTranslator,
+		vaIndexer:                vaInformer.GetIndexer(),
 	}, nil
 }
 
@@ -623,14 +644,22 @@ func getVolumeLimits(csiNode *storagev1.CSINode) map[string]int64 {
 	return nodeVolumeLimits
 }
 
+const vaIndexKey = "va.spec.nodename"
+
 // getNodeVolumeAttachmentInfo returns a map of volumeID to driver name for the given node.
 func (pl *CSILimits) getNodeVolumeAttachmentInfo(logger klog.Logger, nodeName string) (map[string]string, error) {
 	volumeAttachments := make(map[string]string)
-	vas, err := pl.vaLister.List(labels.Everything())
+	vas, err := pl.vaIndexer.ByIndex(vaIndexKey, nodeName)
 	if err != nil {
 		return nil, err
 	}
-	for _, va := range vas {
+	for _, vao := range vas {
+		va, ok := vao.(*storagev1.VolumeAttachment)
+		if !ok {
+			utilruntime.HandleErrorWithLogger(logger, fmt.Errorf("unexpected object type in volume attachment indexer: %v", vao),
+				"volume indexer not available")
+			continue
+		}
 		if va.Spec.NodeName == nodeName {
 			if va.Spec.Attacher == "" {
 				logger.V(5).Info("VolumeAttachment has no attacher", "VolumeAttachment", klog.KObj(va))

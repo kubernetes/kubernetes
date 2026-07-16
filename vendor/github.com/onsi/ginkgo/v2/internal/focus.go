@@ -56,7 +56,7 @@ This function sets the `Skip` property on specs by applying Ginkgo's focus polic
 
 *Note:* specs with pending nodes are Skipped when created by NewSpec.
 */
-func ApplyFocusToSpecs(specs Specs, description string, suiteLabels Labels, suiteSemVerConstraints SemVerConstraints, suiteConfig types.SuiteConfig) (Specs, bool) {
+func ApplyFocusToSpecs(specs Specs, description string, suiteLabels Labels, suiteSemVerConstraints SemVerConstraints, suiteComponentSemVerConstraints ComponentSemVerConstraints, suiteConfig types.SuiteConfig) (Specs, bool) {
 	focusString := strings.Join(suiteConfig.FocusStrings, "|")
 	skipString := strings.Join(suiteConfig.SkipStrings, "|")
 
@@ -87,7 +87,24 @@ func ApplyFocusToSpecs(specs Specs, description string, suiteLabels Labels, suit
 	if suiteConfig.SemVerFilter != "" {
 		semVerFilter, _ := types.ParseSemVerFilter(suiteConfig.SemVerFilter)
 		skipChecks = append(skipChecks, func(spec Spec) bool {
-			return !semVerFilter(UnionOfSemVerConstraints(suiteSemVerConstraints, spec.Nodes.UnionOfSemVerConstraints()))
+			noRun := false
+
+			// non-component-specific constraints
+			constraints := UnionOfSemVerConstraints(suiteSemVerConstraints, spec.Nodes.UnionOfSemVerConstraints())
+			if len(constraints) != 0 && semVerFilter("", constraints) == false {
+				noRun = true
+			}
+
+			// component-specific constraints
+			componentConstraints := UnionOfComponentSemVerConstraints(suiteComponentSemVerConstraints, spec.Nodes.UnionOfComponentSemVerConstraints())
+			for component, constraints := range componentConstraints {
+				if semVerFilter(component, constraints) == false {
+					noRun = true
+					break
+				}
+			}
+
+			return noRun
 		})
 	}
 

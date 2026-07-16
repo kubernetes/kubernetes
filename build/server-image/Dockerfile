@@ -20,3 +20,6 @@ ARG BINARY
 
 FROM "${BASEIMAGE}"
 COPY --chmod=755 ${BINARY} /usr/local/bin/${BINARY}
+# NOTE: /go-runner is used here for compatibility
+COPY --chmod=755 kube-log-runner /go-runner
+ENTRYPOINT ["/go-runner"]

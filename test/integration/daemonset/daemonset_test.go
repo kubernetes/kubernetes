@@ -1238,7 +1238,7 @@ func TestDaemonSetRollingUpdateWithTolerations(t *testing.T) {
 	}
 
 	// Add six nodes with zone-y, zone-z or common taint
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		if i < 2 {
 			taints = []v1.Taint{
 				{Key: "zone-y", Effect: v1.TaintEffectNoSchedule},

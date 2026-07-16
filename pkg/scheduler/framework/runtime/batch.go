@@ -31,10 +31,9 @@ import (
 // OpportunisticBatching caches results from filtering and scoring when possible to optimize
 // scheduling of common pods.
 type OpportunisticBatch struct {
-	state         *batchState
-	lastCycle     schedulingCycle
-	signatureFunc SignatureFunc
-	handle        fwk.Handle
+	state     *batchState
+	lastCycle schedulingCycle
+	handle    fwk.Handle
 
 	// Used primarily for tests, count the total pods we
 	// have successfully batched.
@@ -57,17 +56,11 @@ const (
 	maxBatchAge = 500 * time.Millisecond
 )
 
-type SignatureFunc func(h fwk.Handle, ctx context.Context, p *v1.Pod, recordPluginStats bool) fwk.PodSignature
-
-func signUsingFramework(h fwk.Handle, ctx context.Context, p *v1.Pod, recordPluginStats bool) fwk.PodSignature {
-	return h.SignPod(ctx, p, recordPluginStats)
-}
-
-// Provide a hint for the pod based on filtering an scoring results of previous cycles. Caching works only for consecutive pods
+// GetNodeHint provides a hint for the pod based on filtering a scoring results of previous cycles. Caching works only for consecutive pods
 // with the same signature that are scheduled in 1-pod-per-node manner (otherwise previous scores could not be reused).
-// It's assured by checking the top rated node is no longer feasible (meaning the previous pod was successfully scheduled and the
+// It's assured by checking the top-rated node is no longer feasible (meaning the previous pod was successfully scheduled and the
 // current one does not fit).
-func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64) (string, fwk.PodSignature) {
+func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature, state fwk.CycleState, cycleCount int64) string {
 	logger := klog.FromContext(ctx)
 	var hint string
 
@@ -80,16 +73,14 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state
 		metrics.GetNodeHintDuration.WithLabelValues(hinted, b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
-	signature := b.signatureFunc(b.handle, ctx, pod, state.ShouldRecordPluginMetrics())
-
 	nodeInfos := b.handle.SnapshotSharedLister().NodeInfos()
 
 	// If we don't have state that we can use, then return an empty hint.
-	if !b.batchStateCompatible(ctx, logger, pod, signature, cycleCount, state, nodeInfos) {
+	if !b.batchStateCompatible(ctx, pod, signature, cycleCount, state, nodeInfos) {
 		metrics.BatchAttemptStats.WithLabelValues(b.handle.ProfileName(), metrics.BatchAttemptNoHint).Inc()
 		logger.V(4).Info("OpportunisticBatch no node hint available for pod",
 			"profile", b.handle.ProfileName(), "pod", klog.KObj(pod), "cycleCount", cycleCount)
-		return "", signature
+		return ""
 	}
 
 	// Otherwise, pop the head of the list in our state and return it as
@@ -99,16 +90,14 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, state
 		"profile", b.handle.ProfileName(), "pod", klog.KObj(pod), "cycleCount", cycleCount, "hint", hint,
 		"remainingNodes", b.state.sortedNodes.Len())
 
-	return hint, signature
+	return hint
 }
 
-// Store results from scheduling for use as a batch later.
+// StoreScheduleResults stores results from scheduling for use as a batch later.
 func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
 	logger := klog.FromContext(ctx)
 
-	startTime := time.Now()
-	defer metrics.StoreScheduleResultsDuration.WithLabelValues(b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
-
+	defer metrics.StoreScheduleResultsDuration.ObserveSince(time.Now(), b.handle.ProfileName())()
 	// Set our cycle information for next time.
 	b.lastCycle = schedulingCycle{
 		cycleCount: cycleCount,
@@ -170,11 +159,12 @@ func (b *OpportunisticBatch) logUnusableState(logger klog.Logger, cycleCount int
 }
 
 // Update the batch state based on a the arrival of a new pod and the chosen node from the last pod.
-func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, logger klog.Logger, pod *v1.Pod, signature fwk.PodSignature, cycleCount int64, state fwk.CycleState, nodeInfos fwk.NodeInfoLister) bool {
+func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature, cycleCount int64, state fwk.CycleState, nodeInfos fwk.NodeInfoLister) bool {
 	// Just return if we don't have any state to use.
 	if b.stateEmpty() {
 		return false
 	}
+	logger := klog.FromContext(ctx)
 
 	// In this case, a previous pod was scheduled by another profile, meaning we can't use the state anymore.
 	if cycleCount != b.lastCycle.cycleCount+1 {
@@ -232,9 +222,8 @@ func (b *OpportunisticBatch) stateEmpty() bool {
 	return b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0
 }
 
-func newOpportunisticBatch(h fwk.Handle, signatureFunc SignatureFunc) *OpportunisticBatch {
+func newOpportunisticBatch(h fwk.Handle) *OpportunisticBatch {
 	return &OpportunisticBatch{
-		signatureFunc: signatureFunc,
-		handle:        h,
+		handle: h,
 	}
 }

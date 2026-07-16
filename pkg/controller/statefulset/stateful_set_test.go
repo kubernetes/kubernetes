@@ -271,7 +271,7 @@ func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
 	}
 
 	// It should not adopt revisions.
-	revisions, err := ssh.ListControllerRevisions(set, selector)
+	revisions, err := ssh.ListControllerRevisions(set, parentKind, selector)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -719,7 +719,9 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 			om.podsIndexer.Add(pod)
 			claims := getPersistentVolumeClaims(set, pod)
 			for _, claim := range claims {
-				om.CreateClaim(&claim)
+				if err := om.CreateClaim(&claim, set); err != nil {
+					t.Errorf("Failed to create claim %s: %v", claim.Name, err)
+				}
 			}
 		}
 
@@ -911,11 +913,11 @@ func TestStaleOwnerRefOnScaleup(t *testing.T) {
 }
 
 func TestStatefulSetAvailabilityCheck(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	set := setMinReadySeconds(newStatefulSet(4), int32(5)) // 5 seconds
 	set = setupPodManagementPolicy(apps.ParallelPodManagement, set)
-	ssc, _, om, _ := newFakeStatefulSetController(ctx, set)
+	ssc, _, om, _ := newFakeStatefulSetController(tCtx, set)
 	if err := om.setsIndexer.Add(set); err != nil {
 		t.Fatalf("could not add set to the cache: %v", err)
 	}
@@ -939,7 +941,7 @@ func TestStatefulSetAvailabilityCheck(t *testing.T) {
 			t.Fatalf("%d: %v", i, err)
 		}
 	}
-	err := ssc.syncStatefulSet(ctx, set, pods)
+	err := ssc.syncStatefulSet(tCtx, set, pods)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -963,9 +965,7 @@ func TestStatefulSetAvailabilityCheck(t *testing.T) {
 	}
 
 	// RS should be re-queued after 700ms to recompute .status.availableReplicas (200ms extra for the test).
-	ktesting.Eventually(ctx, func(tCtx ktesting.TContext) int {
-		return ssc.queue.Len()
-	}).WithTimeout(900*time.Millisecond).
+	tCtx.Eventually(ssc.queue.Len).WithTimeout(900*time.Millisecond).
 		WithPolling(10*time.Millisecond).
 		Should(gomega.Equal(1), " StatefulSet should be re-queued to recompute .status.availableReplicas")
 }

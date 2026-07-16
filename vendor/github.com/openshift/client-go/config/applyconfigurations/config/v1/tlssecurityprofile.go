@@ -15,10 +15,16 @@ type TLSSecurityProfileApplyConfiguration struct {
 	// type is one of Old, Intermediate, Modern or Custom. Custom provides the
 	// ability to specify individual TLS security profile parameters.
 	//
-	// The profiles are based on version 5.7 of the Mozilla Server Side TLS
-	// configuration guidelines. The cipher lists consist of the configuration's
-	// "ciphersuites" followed by the Go-specific "ciphers" from the guidelines.
-	// See: https://ssl-config.mozilla.org/guidelines/5.7.json
+	// The cipher and groups lists in these profiles are based on version 5.8 of the
+	// Mozilla Server Side TLS configuration guidelines.
+	// See: https://ssl-config.mozilla.org/guidelines/5.8.json
+	//
+	// The groups are listed in suggested preference order, with the most preferred group first.
+	// Note that not all platform components honor the ordering: Go-based components use Go's
+	// internal preference order and treat this list as a filter of allowed groups rather than
+	// an ordered preference.
+	// Note that X25519MLKEM768 is a post-quantum hybrid group that is not
+	// FIPS-approved and should be ignored by components running in FIPS mode.
 	//
 	// The profiles are intent based, so they may change over time as new ciphers are
 	// developed and existing ciphers are found to be insecure. Depending on
@@ -26,6 +32,10 @@ type TLSSecurityProfileApplyConfiguration struct {
 	Type *configv1.TLSProfileType `json:"type,omitempty"`
 	// old is a TLS profile for use when services need to be accessed by very old
 	// clients or libraries and should be used only as a last resort.
+	//
+	// The supported groups list includes by default the following groups
+	// in suggested preference order (ordering may not be honored by all implementations):
+	// X25519MLKEM768, X25519, secp256r1, secp384r1.
 	//
 	// This profile is equivalent to a Custom profile specified as:
 	// minTLSVersion: VersionTLS10
@@ -43,11 +53,14 @@ type TLSSecurityProfileApplyConfiguration struct {
 	// - ECDHE-RSA-AES128-SHA256
 	// - ECDHE-ECDSA-AES128-SHA
 	// - ECDHE-RSA-AES128-SHA
+	// - ECDHE-ECDSA-AES256-SHA384
+	// - ECDHE-RSA-AES256-SHA384
 	// - ECDHE-ECDSA-AES256-SHA
 	// - ECDHE-RSA-AES256-SHA
 	// - AES128-GCM-SHA256
 	// - AES256-GCM-SHA384
 	// - AES128-SHA256
+	// - AES256-SHA256
 	// - AES128-SHA
 	// - AES256-SHA
 	// - DES-CBC3-SHA
@@ -55,6 +68,10 @@ type TLSSecurityProfileApplyConfiguration struct {
 	// intermediate is a TLS profile for use when you do not need compatibility with
 	// legacy clients and want to remain highly secure while being compatible with
 	// most clients currently in use.
+	//
+	// The supported groups list includes by default the following groups
+	// in suggested preference order (ordering may not be honored by all implementations):
+	// X25519MLKEM768, X25519, secp256r1, secp384r1.
 	//
 	// This profile is equivalent to a Custom profile specified as:
 	// minTLSVersion: VersionTLS12
@@ -71,7 +88,9 @@ type TLSSecurityProfileApplyConfiguration struct {
 	Intermediate *configv1.IntermediateTLSProfile `json:"intermediate,omitempty"`
 	// modern is a TLS security profile for use with clients that support TLS 1.3 and
 	// do not need backward compatibility for older clients.
-	//
+	// The supported groups list includes by default the following groups
+	// in suggested preference order (ordering may not be honored by all implementations):
+	// X25519MLKEM768, X25519, secp256r1, secp384r1.
 	// This profile is equivalent to a Custom profile specified as:
 	// minTLSVersion: VersionTLS13
 	// ciphers:
@@ -80,8 +99,11 @@ type TLSSecurityProfileApplyConfiguration struct {
 	// - TLS_CHACHA20_POLY1305_SHA256
 	Modern *configv1.ModernTLSProfile `json:"modern,omitempty"`
 	// custom is a user-defined TLS security profile. Be extremely careful using a custom
-	// profile as invalid configurations can be catastrophic. An example custom profile
-	// looks like this:
+	// profile as invalid configurations can be catastrophic.
+	//
+	// The supported groups list for this profile is empty by default.
+	//
+	// An example custom profile looks like this:
 	//
 	// minTLSVersion: VersionTLS11
 	// ciphers:

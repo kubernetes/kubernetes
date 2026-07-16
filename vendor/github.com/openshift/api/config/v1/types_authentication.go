@@ -5,7 +5,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +openshift:validation:FeatureGateAwareXValidation:featureGate=ExternalOIDC;ExternalOIDCWithUIDAndExtraClaimMappings;ExternalOIDCWithUpstreamParity,rule="!has(self.spec.oidcProviders) || self.spec.oidcProviders.all(p, !has(p.oidcClients) || p.oidcClients.all(specC, self.status.oidcClients.exists(statusC, statusC.componentNamespace == specC.componentNamespace && statusC.componentName == specC.componentName) || (has(oldSelf.spec.oidcProviders) && oldSelf.spec.oidcProviders.exists(oldP, oldP.name == p.name && has(oldP.oidcClients) && oldP.oidcClients.exists(oldC, oldC.componentNamespace == specC.componentNamespace && oldC.componentName == specC.componentName)))))",message="all oidcClients in the oidcProviders must match their componentName and componentNamespace to either a previously configured oidcClient or they must exist in the status.oidcClients"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=ExternalOIDC;ExternalOIDCWithUIDAndExtraClaimMappings;ExternalOIDCWithUpstreamParity;ExternalOIDCExternalClaimsSourcing,rule="!has(self.spec.oidcProviders) || self.spec.oidcProviders.all(p, !has(p.oidcClients) || p.oidcClients.all(specC, self.status.oidcClients.exists(statusC, statusC.componentNamespace == specC.componentNamespace && statusC.componentName == specC.componentName) || (has(oldSelf.spec.oidcProviders) && oldSelf.spec.oidcProviders.exists(oldP, oldP.name == p.name && has(oldP.oidcClients) && oldP.oidcClients.exists(oldC, oldC.componentNamespace == specC.componentNamespace && oldC.componentName == specC.componentName)))))",message="all oidcClients in the oidcProviders must match their componentName and componentNamespace to either a previously configured oidcClient or they must exist in the status.oidcClients"
 
 // Authentication specifies cluster-wide settings for authentication (like OAuth and
 // webhook token authenticators). The canonical name of an instance is `cluster`.
@@ -91,6 +91,7 @@ type AuthenticationSpec struct {
 	// +openshift:enable:FeatureGate=ExternalOIDC
 	// +openshift:enable:FeatureGate=ExternalOIDCWithUIDAndExtraClaimMappings
 	// +openshift:enable:FeatureGate=ExternalOIDCWithUpstreamParity
+	// +openshift:enable:FeatureGate=ExternalOIDCExternalClaimsSourcing
 	// +optional
 	OIDCProviders []OIDCProvider `json:"oidcProviders,omitempty"`
 }
@@ -245,6 +246,36 @@ type OIDCProvider struct {
 	// +optional
 	// +openshift:enable:FeatureGate=ExternalOIDCWithUpstreamParity
 	UserValidationRules []TokenUserValidationRule `json:"userValidationRules,omitempty"`
+
+	// externalClaimsSources is an optional field that can be used to configure
+	// sources, external to the token provided in a request, in which claims
+	// should be fetched from and made available to the claim mapping process
+	// that is used to build the identity of a token holder.
+	//
+	// For example, fetching additional user metadata from an OIDC provider's UserInfo endpoint.
+	//
+	// When not specified, only claims present in the token itself will be available
+	// in the claim mapping process.
+	//
+	// When specified, at least one external claim source must be specified and no more than 5
+	// sources may be specified.
+	// All external claim sources must have unique claim mappings.
+	// When an external source responds and resolves additional claims successfully, they will
+	// be made available as claims during the claim mapping process.
+	// Externally sourced claims with the same name as a claim existing within the token will
+	// overwrite the claim data from the token with the externally sourced information.
+	// If an external source does not respond, responds with an error, or the additional
+	// claim data cannot be resolved from the response successfully it will not be
+	// included in the claim data passed to the claim mapping process.
+	//
+	// +openshift:enable:FeatureGate=ExternalOIDCExternalClaimsSourcing
+	//
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=5
+	// +kubebuilder:validation:XValidation:rule="self.all(s, s.mappings.all(m, self.filter(s2, s2.mappings.exists(m2, m2.name == m.name)).size() == 1))",message="mapping names must be unique across all external claim sources."
+	// +listType=atomic
+	ExternalClaimsSources []ExternalClaimsSource `json:"externalClaimsSources,omitempty"`
 }
 
 // +kubebuilder:validation:MinLength=1
@@ -830,4 +861,356 @@ type TokenUserValidationRule struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=256
 	Message string `json:"message,omitempty"`
+}
+
+// ExternalClaimsSource provides the configuration for a single external claim source.
+type ExternalClaimsSource struct {
+	// authentication is an optional field that configures how the apiserver authenticates with an external claims source.
+	// When not specified, anonymous authentication is used which means no 'Authorization' header
+	// is sent in the HTTP request to fetch the external claims.
+	//
+	// +optional
+	Authentication ExternalSourceAuthentication `json:"authentication,omitzero"`
+
+	// tls is an optional field that configures the http client TLS
+	// settings when fetching external claims from this source.
+	//
+	// When omitted, system default TLS settings will be used
+	// for fetching claims from the external source.
+	//
+	// +optional
+	TLS ExternalSourceTLS `json:"tls,omitzero"`
+
+	// url is a required configuration of the URL
+	// for which the external claims are located.
+	//
+	// +required
+	URL SourceURL `json:"url,omitzero"`
+
+	// mappings is a required list of the claim
+	// and response handling expression pairs
+	// that produces the claims from the external source.
+	// mappings must have at least 1 entry and must not exceed 16 entries.
+	// Entries must have a unique name across all external claim sources.
+	//
+	// +required
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=16
+	Mappings []SourcedClaimMapping `json:"mappings,omitempty"`
+
+	// predicates is an optional list of constraints in
+	// which claims should attempt to be fetched from this
+	// external source.
+	//
+	// When omitted, claims are always fetched
+	// from this external source.
+	//
+	// When specified, all predicates must evaluate to 'true'
+	// before claims are attempted to be fetched from this external source.
+	// predicates must have at least 1 entry and must not exceed 16 entries.
+	// Entries must have unique expressions.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=expression
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=16
+	Predicates []ExternalSourcePredicate `json:"predicates,omitempty"`
+}
+
+// ExternalSourceAuthenticationType is the type of authentication that should be used
+// when fetching claims from an external source.
+//
+// +enum
+// +kubebuilder:validation:Enum=RequestProvidedToken;ClientCredential
+type ExternalSourceAuthenticationType string
+
+const (
+	// ExternalSourceAuthenticationTypeRequestProvidedToken is an ExternalSourceAuthenticationType
+	// that represents that the token being evaluated for authentication
+	// should be used for authenticating with the external claims source.
+	// This is useful for scenarios where a token has multiple audiences
+	// and scopes so that it can be used to access both the cluster and
+	// the UserInfo endpoint that contains additional information about the
+	// user not present in the token.
+	ExternalSourceAuthenticationTypeRequestProvidedToken ExternalSourceAuthenticationType = "RequestProvidedToken"
+
+	// ExternalSourceAuthenticationTypeClientCredential is an ExternalSourceAuthenticationType
+	// that represents that the authenticator should use the OAuth2
+	// client credentials grant flow to obtain an access token for
+	// authenticating with the external claims source.
+	// This is useful for scenarios such as fetching user information
+	// from Microsoft's Graph API where a separate client credential
+	// is needed to access the API.
+	ExternalSourceAuthenticationTypeClientCredential ExternalSourceAuthenticationType = "ClientCredential"
+)
+
+// ExternalSourceAuthentication configures how the apiserver should attempt
+// to authenticate with an external claims source.
+//
+// +kubebuilder:validation:XValidation:rule="self.type == 'ClientCredential' ? has(self.clientCredential) : !has(self.clientCredential)",message="clientCredential is required when type is ClientCredential, and forbidden otherwise"
+type ExternalSourceAuthentication struct {
+	// type is a required field that sets the type of
+	// authentication method used by the authenticator
+	// when fetching external claims.
+	//
+	// Allowed values are 'RequestProvidedToken' and 'ClientCredential'.
+	//
+	// When set to 'RequestProvidedToken', the authenticator will
+	// use the token provided to the kube-apiserver as part of the
+	// request to authenticate with the external claims source.
+	//
+	// When set to 'ClientCredential', the authenticator will
+	// use the configured client-id, client-secret, and token endpoint
+	// to fetch an access token using the OAuth2 client credentials grant
+	// flow. The fetched access token will then be used to authenticate
+	// with the external claims source.
+	//
+	// +required
+	Type ExternalSourceAuthenticationType `json:"type,omitempty"`
+
+	// clientCredential configures the client credentials
+	// and token endpoint to use to get an access token.
+	// clientCredential is required when type is 'ClientCredential', and forbidden otherwise.
+	//
+	// +optional
+	ClientCredential ClientCredentialConfig `json:"clientCredential,omitzero"`
+}
+
+// ExternalSourceTLS configures the TLS options that the apiserver uses as a client
+// when making a request to the external claim source.
+type ExternalSourceTLS struct {
+	// certificateAuthority is a required reference to a ConfigMap in the openshift-config
+	// namespace that contains the CA certificate to use to validate TLS connections with the external claims source.
+	// The key "ca-bundle.crt" must be present in the referenced ConfigMap and must contain the CA certificate to be used
+	// to verify the external source's TLS certificate.
+	//
+	// +required
+	CertificateAuthority ExternalSourceCertificateAuthorityConfigMapReference `json:"certificateAuthority,omitzero"`
+}
+
+// ClientCredentialConfig configures the client credentials and token endpoint
+// to use to get an access token via the OAuth2 client credentials grant flow.
+type ClientCredentialConfig struct {
+	// clientID is a required client identifier to use during the OAuth2 client credentials flow.
+	// clientID must be at least 1 character in length, must not exceed 256 characters in length,
+	// and must only contain printable ASCII characters.
+	//
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	// +kubebuilder:validation:XValidation:rule="self.matches('^[[:print:]]+$')",message="clientID must only contain printable ASCII characters"
+	ClientID string `json:"clientID,omitempty"`
+
+	// clientSecret is a required reference to a Secret in the openshift-config namespace to be used
+	// as the client secret during the OAuth2 client credentials flow.
+	//
+	// The key 'client-secret' is used to locate the client secret data in the Secret.
+	//
+	// +required
+	ClientSecret ClientSecretSecretReference `json:"clientSecret,omitzero"`
+
+	// tokenEndpoint is a required URL to query for an access token using
+	// the client credential OAuth2 flow.
+	// tokenEndpoint must be at least 1 character in length and must not exceed 2048 characters in length.
+	// tokenEndpoint must be a valid HTTPS URL.
+	// tokenEndpoint must have a host and a path.
+	// tokenEndpoint must not contain query parameters, fragments,
+	// or user information (e.g., "user:password@host").
+	//
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=2048
+	// +kubebuilder:validation:XValidation:rule="isURL(self)",message="tokenEndpoint must be a valid HTTPS url"
+	// +kubebuilder:validation:XValidation:rule="isURL(self) && url(self).getScheme() == 'https'",message="tokenEndpoint must be a valid HTTPS url"
+	// +kubebuilder:validation:XValidation:rule="isURL(self) && url(self).getHost() != ''",message="tokenEndpoint must have a hostname"
+	// +kubebuilder:validation:XValidation:rule="isURL(self) && url(self).getEscapedPath() != ''",message="tokenEndpoint must have a path"
+	// +kubebuilder:validation:XValidation:rule="isURL(self) && url(self).getQuery() == {}",message="tokenEndpoint must not have query parameters"
+	// +kubebuilder:validation:XValidation:rule="isURL(self) && self.find('#(.+)$') == ''",message="tokenEndpoint must not have a fragment"
+	// +kubebuilder:validation:XValidation:rule="isURL(self) && !self.matches('^https://[^/]+@.+$')",message="tokenEndpoint must not have user info"
+	TokenEndpoint string `json:"tokenEndpoint,omitempty"`
+
+	// scopes is an optional list of OAuth2 scopes to request when obtaining
+	// an access token.
+	//
+	// If not specified, the token endpoint's default scopes
+	// will be used.
+	//
+	// When specified, there must be at least 1 entry and must not exceed 16 entries.
+	// Each entry must be at least 1 character in length and must not exceed 256 characters in length.
+	// Each entry must only contain printable ASCII characters, excluding spaces, double quotes and backslashes.
+	// Entries must be unique.
+	//
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=16
+	// +listType=set
+	Scopes []OAuth2Scope `json:"scopes,omitempty"`
+
+	// tls is an optional field that allows configuring the TLS
+	// settings used to interact with the identity provider
+	// as an OAuth2 client.
+	//
+	// When omitted, system default TLS settings will be used
+	// for the OAuth2 client.
+	//
+	// +optional
+	TLS ExternalSourceTLS `json:"tls,omitzero"`
+}
+
+// OAuth2Scope is a string alias that represents an OAuth2 Scope as defined by https://datatracker.ietf.org/doc/html/rfc6749#appendix-A.4
+// Must be at least 1 character in length, must not exceed 256 characters in length and must only contain printable ASCII characters, excluding spaces, double quotes and backslashes.
+//
+// +kubebuilder:validation:XValidation:rule="self.matches('^[!#-[\\\\]-~]+$')",message="scopes must only contain printable ASCII characters excluding spaces, double quotes and backslashes"
+// +kubebuilder:validation:MinLength=1
+// +kubebuilder:validation:MaxLength=256
+type OAuth2Scope string
+
+// SourceURL configures the options used to build the URL that is queried for external claims.
+type SourceURL struct {
+	// hostname is a required hostname for which the external claims are located.
+	//
+	// It must be a valid DNS subdomain name as per RFC1123.
+	//
+	// This means that it must start and end with a lowercase alphanumeric character,
+	// must only consist of lowercase alphanumeric characters, '-', and '.'.
+	// hostname may optionally specify a port in the format ':{port}'.
+	// If a port is specified it must not exceed 65535.
+	//
+	// hostname must be at least 1 character in length.
+	// When specifying a port, hostname must not exceed 259 characters in length.
+	// When not specifying a port, hostname must not exceed 253 characters in length.
+	//
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=259
+	// +kubebuilder:validation:XValidation:rule="isURL('https://'+self)",message="hostname must be a valid hostname"
+	// +kubebuilder:validation:XValidation:rule="!format.dns1123Subdomain().validate(self.split(':')[0]).hasValue()",message="hostname before port must start and end with a lowercase alphanumeric character, and must only contain lowercase alphanumeric characters, '-' or '.'"
+	// +kubebuilder:validation:XValidation:rule="self.split(':').size() > 1 ? int(self.split(':')[1]) <= 65535 : true",message="port must not exceed 65535"
+	Hostname string `json:"hostname,omitempty"`
+
+	// pathExpression is a required CEL expression that returns a list
+	// of string values used to construct the URL path.
+	// Claims from the token used for the request to the kube-apiserver
+	// are made available via the `claims` variable.
+	// expression must be at least 1 character in length and must not exceed 1024 characters in length.
+	//
+	// Values in the returned list will be joined with the hostname using a forward slash
+	// (`/`) as a separator. Values in the returned list do not need to include the forward slash.
+	// If a forward slash is included in a returned value, it will be encoded as `%2F`.
+	//
+	// Example of a static path configuration:
+	//
+	//     pathExpression: ['realms', 'k8s', 'protocol', 'openid-connect', 'userinfo']
+	//
+	// The above example would resolve to the path: '/realms/k8s/protocol/openid-connect/userinfo'
+	//
+	// Example of a dynamic path configuration:
+	//
+	//     pathExpression: "['admin', 'realms', 'k8s', 'users'] + [claims.sub] + ['groups']"
+	//
+	// Assuming 'claims.sub' is set to '12345', the above example would resolve to the path: '/admin/realms/k8s/users/12345/groups'
+	//
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=1024
+	PathExpression string `json:"pathExpression,omitempty"`
+}
+
+// SourcedClaimMapping configures the mapping behavior for a single external claim
+// from the response the apiserver received from the external claim source.
+type SourcedClaimMapping struct {
+	// name is a required name of the claim that
+	// will be produced and made available during
+	// the claim-to-identity mapping process.
+	// name must consist of only lowercase alpha characters and underscores ('_').
+	// name must be at least 1 character and must not exceed 256 characters in length.
+	//
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	// +kubebuilder:validation:XValidation:rule="self.matches('^[a-z_]+$')",message="name must consist of only lowercase alpha characters and underscores"
+	Name string `json:"name,omitempty"`
+
+	// expression is a required CEL expression that
+	// will produce a value to be assigned to the claim.
+	// The full response body from the request to the
+	// external claim source is provided via the
+	// `response.body` variable.
+	//
+	// The contents of the `response.body` variable varies based on the response received
+	// from the external source. It is the responsibility of those configuring
+	// this expression to understand what is returned from the external source.
+	//
+	// expression must be at least 1 character and must not exceed 1024 characters in length.
+	//
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=1024
+	Expression string `json:"expression,omitempty"`
+}
+
+// ExternalSourcePredicate configures a singular condition
+// that must return true before the external source is queried
+// to retrieve external claims.
+type ExternalSourcePredicate struct {
+	// expression is a required CEL expression that
+	// is used to determine whether or not an external
+	// source should be used to fetch external claims.
+	//
+	// The expression must return a boolean value,
+	// where true means that the source should be consulted
+	// and false means that it should not.
+	//
+	// Claims from the token used for the request to the kube-apiserver
+	// are made available via the `claims` variable.
+	//
+	// The contents of the `claims` variable varies based on the claims that are
+	// present in the token being validated. It is the responsibility of those configuring this
+	// field to understand what claims the identity provider includes when issuing tokens.
+	//
+	// expression must be at least 1 character and must not exceed 1024 characters in length.
+	//
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=1024
+	Expression string `json:"expression,omitempty"`
+}
+
+// ExternalSourceCertificateAuthorityConfigMapReference is a reference to a ConfigMap in the openshift-config
+// namespace that should be used for configuring the certificate authority to be
+// used when sourcing claims from external sources.
+type ExternalSourceCertificateAuthorityConfigMapReference struct {
+	// name is the required name of the ConfigMap that exists in the openshift-config namespace.
+	// The key "ca-bundle.crt" must be present and must contain the CA certificate to be used
+	// to verify the external source's TLS certificate.
+	//
+	// It must be at least 1 character in length, must not exceed 253 characters in length,
+	// must start and end with a lowercase alphanumeric character, and must only contain
+	// lowercase alphanumeric characters, '-' or '.'.
+	//
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:XValidation:rule="!format.dns1123Subdomain().validate(self).hasValue()",message="name must start and end with a lowercase alphanumeric character, and must only contain lowercase alphanumeric characters, '-' or '.'"
+	Name string `json:"name,omitempty"`
+}
+
+// ClientSecretSecretReference is a reference to a Secret in the openshift-config
+// namespace that should be used for configuring the client secret to be
+// used when sourcing claims from external sources with the client credential authentication flow.
+type ClientSecretSecretReference struct {
+	// name is the required name of the Secret that exists in the openshift-config namespace.
+	//
+	// It must be at least 1 character in length, must not exceed 253 characters in length,
+	// must start and end with a lowercase alphanumeric character, and must only contain
+	// lowercase alphanumeric characters, '-' or '.'.
+	//
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:XValidation:rule="!format.dns1123Subdomain().validate(self).hasValue()",message="name must start and end with a lowercase alphanumeric character, and must only contain lowercase alphanumeric characters, '-' or '.'"
+	Name string `json:"name,omitempty"`
 }

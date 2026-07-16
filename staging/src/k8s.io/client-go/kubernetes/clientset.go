@@ -37,8 +37,6 @@ import (
 	authorizationv1beta1 "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 	autoscalingv1 "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	autoscalingv2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
-	autoscalingv2beta1 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1"
-	autoscalingv2beta2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
 	batchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	batchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 	certificatesv1 "k8s.io/client-go/kubernetes/typed/certificates/v1"
@@ -72,7 +70,7 @@ import (
 	resourcev1beta1 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
 	resourcev1beta2 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 	schedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
-	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
+	schedulingv1alpha2 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha2"
 	schedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 	storagev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
@@ -98,8 +96,6 @@ type Interface interface {
 	AuthorizationV1beta1() authorizationv1beta1.AuthorizationV1beta1Interface
 	AutoscalingV1() autoscalingv1.AutoscalingV1Interface
 	AutoscalingV2() autoscalingv2.AutoscalingV2Interface
-	AutoscalingV2beta1() autoscalingv2beta1.AutoscalingV2beta1Interface
-	AutoscalingV2beta2() autoscalingv2beta2.AutoscalingV2beta2Interface
 	BatchV1() batchv1.BatchV1Interface
 	BatchV1beta1() batchv1beta1.BatchV1beta1Interface
 	CertificatesV1() certificatesv1.CertificatesV1Interface
@@ -132,7 +128,7 @@ type Interface interface {
 	ResourceV1beta2() resourcev1beta2.ResourceV1beta2Interface
 	ResourceV1beta1() resourcev1beta1.ResourceV1beta1Interface
 	ResourceV1alpha3() resourcev1alpha3.ResourceV1alpha3Interface
-	SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface
+	SchedulingV1alpha2() schedulingv1alpha2.SchedulingV1alpha2Interface
 	SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface
 	SchedulingV1() schedulingv1.SchedulingV1Interface
 	StorageV1beta1() storagev1beta1.StorageV1beta1Interface
@@ -158,8 +154,6 @@ type Clientset struct {
 	authorizationV1beta1          *authorizationv1beta1.AuthorizationV1beta1Client
 	autoscalingV1                 *autoscalingv1.AutoscalingV1Client
 	autoscalingV2                 *autoscalingv2.AutoscalingV2Client
-	autoscalingV2beta1            *autoscalingv2beta1.AutoscalingV2beta1Client
-	autoscalingV2beta2            *autoscalingv2beta2.AutoscalingV2beta2Client
 	batchV1                       *batchv1.BatchV1Client
 	batchV1beta1                  *batchv1beta1.BatchV1beta1Client
 	certificatesV1                *certificatesv1.CertificatesV1Client
@@ -192,7 +186,7 @@ type Clientset struct {
 	resourceV1beta2               *resourcev1beta2.ResourceV1beta2Client
 	resourceV1beta1               *resourcev1beta1.ResourceV1beta1Client
 	resourceV1alpha3              *resourcev1alpha3.ResourceV1alpha3Client
-	schedulingV1alpha1            *schedulingv1alpha1.SchedulingV1alpha1Client
+	schedulingV1alpha2            *schedulingv1alpha2.SchedulingV1alpha2Client
 	schedulingV1beta1             *schedulingv1beta1.SchedulingV1beta1Client
 	schedulingV1                  *schedulingv1.SchedulingV1Client
 	storageV1beta1                *storagev1beta1.StorageV1beta1Client
@@ -269,16 +263,6 @@ func (c *Clientset) AutoscalingV1() autoscalingv1.AutoscalingV1Interface {
 // AutoscalingV2 retrieves the AutoscalingV2Client
 func (c *Clientset) AutoscalingV2() autoscalingv2.AutoscalingV2Interface {
 	return c.autoscalingV2
-}
-
-// AutoscalingV2beta1 retrieves the AutoscalingV2beta1Client
-func (c *Clientset) AutoscalingV2beta1() autoscalingv2beta1.AutoscalingV2beta1Interface {
-	return c.autoscalingV2beta1
-}
-
-// AutoscalingV2beta2 retrieves the AutoscalingV2beta2Client
-func (c *Clientset) AutoscalingV2beta2() autoscalingv2beta2.AutoscalingV2beta2Interface {
-	return c.autoscalingV2beta2
 }
 
 // BatchV1 retrieves the BatchV1Client
@@ -441,9 +425,9 @@ func (c *Clientset) ResourceV1alpha3() resourcev1alpha3.ResourceV1alpha3Interfac
 	return c.resourceV1alpha3
 }
 
-// SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client
-func (c *Clientset) SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface {
-	return c.schedulingV1alpha1
+// SchedulingV1alpha2 retrieves the SchedulingV1alpha2Client
+func (c *Clientset) SchedulingV1alpha2() schedulingv1alpha2.SchedulingV1alpha2Interface {
+	return c.schedulingV1alpha2
 }
 
 // SchedulingV1beta1 retrieves the SchedulingV1beta1Client
@@ -576,14 +560,6 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
-	cs.autoscalingV2beta1, err = autoscalingv2beta1.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
-	cs.autoscalingV2beta2, err = autoscalingv2beta2.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
 	cs.batchV1, err = batchv1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -712,7 +688,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
-	cs.schedulingV1alpha1, err = schedulingv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	cs.schedulingV1alpha2, err = schedulingv1alpha2.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -775,8 +751,6 @@ func New(c rest.Interface) *Clientset {
 	cs.authorizationV1beta1 = authorizationv1beta1.New(c)
 	cs.autoscalingV1 = autoscalingv1.New(c)
 	cs.autoscalingV2 = autoscalingv2.New(c)
-	cs.autoscalingV2beta1 = autoscalingv2beta1.New(c)
-	cs.autoscalingV2beta2 = autoscalingv2beta2.New(c)
 	cs.batchV1 = batchv1.New(c)
 	cs.batchV1beta1 = batchv1beta1.New(c)
 	cs.certificatesV1 = certificatesv1.New(c)
@@ -809,7 +783,7 @@ func New(c rest.Interface) *Clientset {
 	cs.resourceV1beta2 = resourcev1beta2.New(c)
 	cs.resourceV1beta1 = resourcev1beta1.New(c)
 	cs.resourceV1alpha3 = resourcev1alpha3.New(c)
-	cs.schedulingV1alpha1 = schedulingv1alpha1.New(c)
+	cs.schedulingV1alpha2 = schedulingv1alpha2.New(c)
 	cs.schedulingV1beta1 = schedulingv1beta1.New(c)
 	cs.schedulingV1 = schedulingv1.New(c)
 	cs.storageV1beta1 = storagev1beta1.New(c)

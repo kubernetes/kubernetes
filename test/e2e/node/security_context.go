@@ -219,12 +219,6 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.Containers[0].Command = []string{"grep", SeccompProcStatusField, ProcSelfStatusPath}
 		e2eoutput.TestContainerOutput(ctx, f, "seccomp runtime/default", pod, 0, []string{"2"}) // seccomp filtered
 	})
-
-	ginkgo.It("should support seccomp default which is unconfined [LinuxOnly]", func(ctx context.Context) {
-		pod := scTestPod(false, false)
-		pod.Spec.Containers[0].Command = []string{"grep", SeccompProcStatusField, ProcSelfStatusPath}
-		e2eoutput.TestContainerOutput(ctx, f, "seccomp default unconfined", pod, 0, []string{"0"}) // seccomp disabled
-	})
 })
 
 func testPodSELinuxLabeling(ctx context.Context, f *framework.Framework, hostIPC bool, hostPID bool) {

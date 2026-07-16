@@ -27,7 +27,7 @@ import (
 //
 // NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.
 type NamedRuleWithOperationsApplyConfiguration struct {
-	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
+	// resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
 	ResourceNames []string `json:"resourceNames,omitempty"`
 	// RuleWithOperations is a tuple of Operations and Resources.
 	RuleWithOperationsApplyConfiguration `json:",inline"`

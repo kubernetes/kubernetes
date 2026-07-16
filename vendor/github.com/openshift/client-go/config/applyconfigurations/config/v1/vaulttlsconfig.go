@@ -9,7 +9,7 @@ package v1
 type VaultTLSConfigApplyConfiguration struct {
 	// caBundle references a ConfigMap in the openshift-config namespace containing
 	// the CA certificate bundle used to verify the TLS connection to the Vault server.
-	// The ConfigMap must contain the CA bundle in the key "ca-bundle.crt".
+	// The referenced ConfigMap must contain the CA bundle in the key "ca-bundle.crt".
 	// When this field is not set, the system's trusted CA certificates are used.
 	//
 	// The namespace for the ConfigMap is openshift-config.

@@ -23,7 +23,7 @@ func ParseRSAPrivateKeyFromPEM(key []byte) (*rsa.PrivateKey, error) {
 		return nil, ErrKeyMustBePEMEncoded
 	}
 
-	var parsedKey interface{}
+	var parsedKey any
 	if parsedKey, err = x509.ParsePKCS1PrivateKey(block.Bytes); err != nil {
 		if parsedKey, err = x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
 			return nil, err
@@ -53,7 +53,7 @@ func ParseRSAPrivateKeyFromPEMWithPassword(key []byte, password string) (*rsa.Pr
 		return nil, ErrKeyMustBePEMEncoded
 	}
 
-	var parsedKey interface{}
+	var parsedKey any
 
 	var blockDecrypted []byte
 	if blockDecrypted, err = x509.DecryptPEMBlock(block, []byte(password)); err != nil {
@@ -86,7 +86,7 @@ func ParseRSAPublicKeyFromPEM(key []byte) (*rsa.PublicKey, error) {
 	}
 
 	// Parse the key
-	var parsedKey interface{}
+	var parsedKey any
 	if parsedKey, err = x509.ParsePKIXPublicKey(block.Bytes); err != nil {
 		if cert, err := x509.ParseCertificate(block.Bytes); err == nil {
 			parsedKey = cert.PublicKey

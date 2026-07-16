@@ -52,7 +52,7 @@ func Map(key string, value ...Attr) Attr {
 	return Attr{key, MapValue(value...)}
 }
 
-// Equal returns if a is equal to b.
+// Equal reports whether a is equal to b.
 func (a Attr) Equal(b Attr) bool {
 	return a.Key == b.Key && a.Value.Equal(b.Value)
 }

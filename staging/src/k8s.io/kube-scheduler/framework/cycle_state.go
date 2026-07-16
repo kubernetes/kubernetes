@@ -65,6 +65,18 @@ type CycleState interface {
 	// SetSkipPreBindPlugins sets plugins that should be skipped in the PerBind extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	SetSkipPreBindPlugins(plugins sets.Set[string])
+	// GetParallelPreBindPlugins returns plugins that can be run in parallel with other plugins
+	// in the PreBind extension point.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	GetParallelPreBindPlugins() sets.Set[string]
+	// GetParallelPreBindPlugins returns plugins that can be run in parallel with other plugins
+	// in the PreBind extension point.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	SetParallelPreBindPlugins(plugins sets.Set[string])
+	// ShouldSkipAllPostFilterPlugins returns whether all plugins should be skipped in the PostFilter extension point.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldSkipAllPostFilterPlugins() bool
+
 	// Read retrieves data with the given "key" from CycleState. If the key is not
 	// present, ErrNotFound is returned.
 	//
@@ -81,4 +93,39 @@ type CycleState interface {
 	// Clone creates a copy of CycleState and returns its pointer. Clone returns
 	// nil if the context being cloned is nil.
 	Clone() CycleState
+	// IsPodGroupSchedulingCycle returns true if this cycle is a pod group scheduling cycle.
+	// If set to false, it means that the pod referencing this CycleState either passed the pod group cycle
+	// or doesn't belong to any pod group.
+	// This field can only be set to true when GenericWorkload feature flag is enabled.
+	IsPodGroupSchedulingCycle() bool
+	// GetPodGroupSchedulingCycle gets the cycle state of the PodGroup for a Pod.
+	// This should be only used when GenericWorkload feature flag is enabled.
+	GetPodGroupSchedulingCycle() PodGroupCycleState
+	// SetPodGroupSchedulingCycle sets the cycle state of the PodGroup for a Pod.
+	// This should be only used when GenericWorkload feature flag is enabled.
+	SetPodGroupSchedulingCycle(PodGroupCycleState)
+}
+
+// PodGroupCycleState provides a mechanism for plugins that operate on pod groups to store and retrieve arbitrary data.
+// StateData stored by one plugin can be read, altered, or deleted by another plugin that operates on a pod group.
+// PodGroupCycleState does not provide any data protection, as all plugins are assumed to be
+// trusted.
+type PodGroupCycleState interface {
+	// ShouldRecordPluginMetrics returns whether metrics.PluginExecutionDuration metrics
+	// should be recorded.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldRecordPluginMetrics() bool
+	// Read retrieves data with the given "key" from PodGroupCycleState. If the key is not
+	// present, ErrNotFound is returned.
+	//
+	// See PodGroupCycleState for notes on concurrency.
+	Read(key StateKey) (StateData, error)
+	// Write stores the given "val" in PodGroupCycleState with the given "key".
+	//
+	// See PodGroupCycleState for notes on concurrency.
+	Write(key StateKey, val StateData)
+	// Delete deletes data with the given key from PodGroupCycleState.
+	//
+	// See PodGroupCycleState for notes on concurrency.
+	Delete(key StateKey)
 }

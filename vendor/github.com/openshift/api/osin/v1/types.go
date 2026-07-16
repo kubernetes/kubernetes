@@ -80,6 +80,11 @@ type OAuthConfig struct {
 
 	// templates allow you to customize pages like the login page.
 	Templates *OAuthTemplates `json:"templates"`
+
+	// proxyTrustedCA is an optional path to a PEM-encoded CA bundle used to
+	// verify connections to an HTTPS proxy during outbound IdP requests.
+	// When omitted, proxy connections use the system trust roots only.
+	ProxyTrustedCA string `json:"proxyTrustedCA,omitempty"`
 }
 
 // OAuthTemplates allow for customization of pages like the login page

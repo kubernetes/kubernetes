@@ -47,10 +47,11 @@ func TestEnvVarFeatureGates(t *testing.T) {
 	}
 
 	scenarios := []struct {
-		name              string
-		features          map[Feature]FeatureSpec
-		envVariables      map[string]string
-		setMethodFeatures map[Feature]bool
+		name                  string
+		features              map[Feature]FeatureSpec
+		envVariables          map[string]string
+		setMethodFeatures     map[Feature]bool
+		setForTestingFeatures map[Feature]bool
 
 		expectedFeaturesState                           map[Feature]bool
 		expectedInternalEnabledViaEnvVarFeatureState    map[Feature]bool
@@ -134,6 +135,19 @@ func TestEnvVarFeatureGates(t *testing.T) {
 			expectedInternalEnabledViaEnvVarFeatureState:    map[Feature]bool{"TestAlpha": true},
 			expectedInternalEnabledViaSetMethodFeatureState: map[Feature]bool{"TestAlpha": false},
 		},
+		{
+			name: "setting a feature via the SetForTesting method works even when it is locked",
+			features: map[Feature]FeatureSpec{
+				"TestAlpha": {
+					Default:       true,
+					LockToDefault: true,
+					PreRelease:    "Alpha",
+				},
+			},
+			setForTestingFeatures:                           map[Feature]bool{"TestAlpha": false},
+			expectedFeaturesState:                           map[Feature]bool{"TestAlpha": false},
+			expectedInternalEnabledViaSetMethodFeatureState: map[Feature]bool{"TestAlpha": false},
+		},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -144,6 +158,10 @@ func TestEnvVarFeatureGates(t *testing.T) {
 
 			for k, v := range scenario.setMethodFeatures {
 				err := target.Set(k, v)
+				require.NoError(t, err)
+			}
+			for k, v := range scenario.setForTestingFeatures {
+				err := target.SetForTesting(k, v)
 				require.NoError(t, err)
 			}
 			for expectedFeature, expectedValue := range scenario.expectedFeaturesState {

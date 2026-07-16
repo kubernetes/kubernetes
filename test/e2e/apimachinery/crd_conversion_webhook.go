@@ -446,7 +446,7 @@ func testCRListConversion(ctx context.Context, f *framework.Framework, testCrd *
 	// Just retrying fixes that.
 	//
 	// TODO: we have to wait for the storage version to become effective. Storage version changes are not instant.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		_, err = customResourceClients["v1"].Create(ctx, crInstance, metav1.CreateOptions{})
 		if err == nil {
 			break

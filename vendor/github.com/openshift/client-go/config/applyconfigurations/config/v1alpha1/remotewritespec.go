@@ -23,7 +23,7 @@ type RemoteWriteSpecApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 	// authorization defines the authorization method for the remote write endpoint.
 	// When omitted, no authorization is performed.
-	// When set, type must be one of BearerToken, BasicAuth, OAuth2, SigV4, SafeAuthorization, or ServiceAccount; the corresponding nested config must be set (ServiceAccount has no config).
+	// When set, type must be one of Authorization, BasicAuth, OAuth2, SigV4, or ServiceAccount; the corresponding nested config must be set (ServiceAccount has no config).
 	AuthorizationConfig *RemoteWriteAuthorizationApplyConfiguration `json:"authorization,omitempty"`
 	// headers specifies the custom HTTP headers to be sent along with each remote write request.
 	// Sending custom headers makes the configuration of a proxy in between optional and helps the

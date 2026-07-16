@@ -2170,7 +2170,6 @@ function update-legacy-addon-node-labels() {
     sleep 5
   done
   update-node-label "beta.kubernetes.io/metadata-proxy-ready=true,cloud.google.com/metadata-proxy-ready!=true" "cloud.google.com/metadata-proxy-ready=true"
-  update-node-label "beta.kubernetes.io/kube-proxy-ds-ready=true,node.kubernetes.io/kube-proxy-ds-ready!=true" "node.kubernetes.io/kube-proxy-ds-ready=true"
   update-node-label "beta.kubernetes.io/masq-agent-ds-ready=true,node.kubernetes.io/masq-agent-ds-ready!=true" "node.kubernetes.io/masq-agent-ds-ready=true"
 }
 
@@ -2893,17 +2892,6 @@ function start-kube-addons {
   fi
 
   # Set up manifests of other addons.
-  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
-    if [ -n "${CUSTOM_KUBE_PROXY_YAML:-}" ]; then
-      # Replace with custom GKE kube proxy.
-      cat > "$src_dir/kube-proxy/kube-proxy-ds.yaml" <<EOF
-$CUSTOM_KUBE_PROXY_YAML
-EOF
-      update-daemon-set-prometheus-to-sd-parameters "$src_dir/kube-proxy/kube-proxy-ds.yaml"
-    fi
-    prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"
-    setup-addon-manifests "addons" "kube-proxy"
-  fi
   if [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
     if [[ "${ENABLE_METADATA_AGENT:-}" == "stackdriver" ]]; then
@@ -3297,7 +3285,7 @@ oom_score = -999
 [plugins."io.containerd.grpc.v1.cri"]
   stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
-  sandbox_image = "${CONTAINERD_INFRA_CONTAINER:-"registry.k8s.io/pause:3.10"}"
+  sandbox_image = "${CONTAINERD_INFRA_CONTAINER:-"registry.k8s.io/pause:3.10.2"}"
 [plugins."io.containerd.grpc.v1.cri".cni]
   bin_dir = "${KUBE_HOME}/bin"
   conf_dir = "/etc/cni/net.d"
@@ -3626,9 +3614,7 @@ function main() {
   else
     log-wrap 'CreateNodePKI' create-node-pki
     log-wrap 'CreateKubeletKubeconfig' create-kubelet-kubeconfig "${KUBERNETES_MASTER_NAME}"
-    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
-      log-wrap 'CreateKubeproxyUserKubeconfig' create-kubeproxy-user-kubeconfig
-    fi
+    log-wrap 'CreateKubeproxyUserKubeconfig' create-kubeproxy-user-kubeconfig
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
       if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
         log-wrap 'CreateNodeProblemDetectorKubeconfig' create-node-problem-detector-kubeconfig "${KUBERNETES_MASTER_NAME}"
@@ -3692,9 +3678,7 @@ function main() {
     log-wrap 'StartLBController' start-lb-controller
     log-wrap 'UpdateLegacyAddonNodeLabels' update-legacy-addon-node-labels &
   else
-    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
-      log-wrap 'StartKubeProxy' start-kube-proxy
-    fi
+    log-wrap 'StartKubeProxy' start-kube-proxy
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
       log-wrap 'StartNodeProblemDetector' start-node-problem-detector
     fi

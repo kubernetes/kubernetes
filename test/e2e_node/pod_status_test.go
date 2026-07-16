@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -81,7 +82,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pods status phase", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Getting the current pod sandbox ID")
-		rs, _, err := getCRIClient()
+		rs, _, err := getCRIClient(ctx)
 		framework.ExpectNoError(err)
 		sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
 			LabelSelector: podLabels,

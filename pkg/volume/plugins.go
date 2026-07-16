@@ -390,9 +390,6 @@ type VolumeHost interface {
 	// Get mounter interface.
 	GetMounter() mount.Interface
 
-	// Returns the hostname of the host kubelet is running on
-	GetHostName() string
-
 	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)
 

@@ -26,6 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	apiv1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -754,6 +755,76 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 	}
 }
 
+func TestPrintNodeArch(t *testing.T) {
+
+	table := []struct {
+		node     api.Node
+		expected []metav1.TableRow
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{KernelVersion: "fake-kernel-version", Architecture: "fake-arch-amd64"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
+			expected: []metav1.TableRow{
+				{
+					// case 1: KernelVersion with Arch
+					Cells: []interface{}{"foo", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "fake-kernel-version (fake-arch-amd64)", "<unknown>"},
+				},
+			},
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{Architecture: "fake-arch-arm64"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
+			expected: []metav1.TableRow{
+				{
+					// case 2: KernelVersion unknown with Arch
+					Cells: []interface{}{"foo", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "<unknown> (fake-arch-arm64)", "<unknown>"},
+				},
+			},
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{KernelVersion: "fake-kernel-version"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
+			expected: []metav1.TableRow{
+				{
+					// case 3: KernelVersion with Arch unknowngs
+					Cells: []interface{}{"foo", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "fake-kernel-version", "<unknown>"},
+				},
+			},
+		},
+	}
+
+	for i, test := range table {
+		rows, err := printNode(&test.node, printers.GenerateOptions{Wide: true})
+		if err != nil {
+			t.Fatalf("An error occurred generating table rows Node: %#v", err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
 func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 
 	table := []struct {
@@ -1055,6 +1126,21 @@ func TestPrintIngressClass(t *testing.T) {
 			},
 		},
 		expected: []metav1.TableRow{{Cells: []interface{}{"test2", "example.com/controller2", "<none>", "11y"}}},
+	}, {
+		name: "example with default annotation",
+		ingressClass: &networking.IngressClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "test-default",
+				CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Duration(-9 * 365 * 24 * time.Hour))},
+				Annotations: map[string]string{
+					networkingv1.AnnotationIsDefaultIngressClass: "true",
+				},
+			},
+			Spec: networking.IngressClassSpec{
+				Controller: "example.com/controller",
+			},
+		},
+		expected: []metav1.TableRow{{Cells: []interface{}{"test-default (default)", "example.com/controller", "<none>", "9y"}}},
 	}}
 
 	for _, testCase := range testCases {
@@ -7919,10 +8005,10 @@ func TestPrintWorkload(t *testing.T) {
 			Namespace: "ns1",
 		},
 		Spec: scheduling.WorkloadSpec{
-			PodGroups: []scheduling.PodGroup{
+			PodGroupTemplates: []scheduling.PodGroupTemplate{
 				{
 					Name: "foo",
-					Policy: scheduling.PodGroupPolicy{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 						Gang: &scheduling.GangSchedulingPolicy{
 							MinCount: 5,
 						},
@@ -7954,10 +8040,10 @@ func TestPrintWorkloadList(t *testing.T) {
 					Namespace: "ns1",
 				},
 				Spec: scheduling.WorkloadSpec{
-					PodGroups: []scheduling.PodGroup{
+					PodGroupTemplates: []scheduling.PodGroupTemplate{
 						{
 							Name: "foo",
-							Policy: scheduling.PodGroupPolicy{
+							SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 								Gang: &scheduling.GangSchedulingPolicy{
 									MinCount: 5,
 								},
@@ -7973,10 +8059,10 @@ func TestPrintWorkloadList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: scheduling.WorkloadSpec{
-					PodGroups: []scheduling.PodGroup{
+					PodGroupTemplates: []scheduling.PodGroupTemplate{
 						{
 							Name: "bar",
-							Policy: scheduling.PodGroupPolicy{
+							SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 								Gang: &scheduling.GangSchedulingPolicy{
 									MinCount: 5,
 								},
@@ -8005,5 +8091,403 @@ func TestPrintWorkloadList(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, rows) {
 		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintPodGroup(t *testing.T) {
+	podGroup := &scheduling.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "podgroup1",
+			Namespace: "ns1",
+		},
+		Spec: scheduling.PodGroupSpec{
+			PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
+				Workload: &scheduling.WorkloadPodGroupTemplateReference{
+					WorkloadName:         "w",
+					PodGroupTemplateName: "t1",
+				},
+			},
+			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+				Gang: &scheduling.GangSchedulingPolicy{
+					MinCount: 5,
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Policy, Workload, Status, Age
+	expected := []metav1.TableRow{{Cells: []interface{}{"podgroup1", "Gang", "w", "Pending", "<unknown>"}}}
+
+	rows, err := printPodGroup(podGroup, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for PodGroup: %#v", err)
+	}
+	rows[0].Object.Object = nil
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintPodGroupList(t *testing.T) {
+	podGroupList := &scheduling.PodGroupList{
+		Items: []scheduling.PodGroup{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "podgroup1",
+					Namespace: "ns1",
+				},
+				Spec: scheduling.PodGroupSpec{
+					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
+						Workload: &scheduling.WorkloadPodGroupTemplateReference{
+							WorkloadName:         "w1",
+							PodGroupTemplateName: "t1",
+						},
+					},
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 5,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup2",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
+						Workload: &scheduling.WorkloadPodGroupTemplateReference{
+							WorkloadName:         "w1",
+							PodGroupTemplateName: "t2",
+						},
+					},
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Gang: &scheduling.GangSchedulingPolicy{
+							MinCount: 5,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup3",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
+						Workload: &scheduling.WorkloadPodGroupTemplateReference{
+							WorkloadName:         "w2",
+							PodGroupTemplateName: "t1",
+						},
+					},
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup4",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup5",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				},
+				Status: scheduling.PodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   scheduling.PodGroupScheduled,
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup6",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				},
+				Status: scheduling.PodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   scheduling.PodGroupScheduled,
+							Status: metav1.ConditionFalse,
+							Reason: scheduling.PodGroupReasonUnschedulable,
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "podgroup7",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: scheduling.PodGroupSpec{
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+				},
+				Status: scheduling.PodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   scheduling.PodGroupScheduled,
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   scheduling.DisruptionTarget,
+							Status: metav1.ConditionTrue,
+							Reason: scheduling.PodGroupReasonPreemptionByScheduler,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Policy, Workload, Status, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"podgroup1", "Gang", "w1", "Pending", "<unknown>"}},
+		{Cells: []interface{}{"podgroup2", "Gang", "w1", "Pending", "0s"}},
+		{Cells: []interface{}{"podgroup3", "Basic", "w2", "Pending", "0s"}},
+		{Cells: []interface{}{"podgroup4", "Basic", "<none>", "Pending", "0s"}},
+		{Cells: []interface{}{"podgroup5", "Basic", "<none>", "Scheduled", "0s"}},
+		{Cells: []interface{}{"podgroup6", "Basic", "<none>", "Unschedulable", "0s"}},
+		{Cells: []interface{}{"podgroup7", "Basic", "<none>", "PreemptionByScheduler", "0s"}},
+	}
+
+	rows, err := printPodGroupList(podGroupList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for PodGroupList: %#v", err)
+	}
+
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintResourcePoolStatusRequest(t *testing.T) {
+	tests := []struct {
+		name     string
+		request  resourceapis.ResourcePoolStatusRequest
+		expected []metav1.TableRow
+	}{
+		{
+			name: "ResourcePoolStatusRequest with Pending status",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+			},
+			// Columns: Name, Driver, Total, Available, Allocated, Unavailable, Errors, Pools, Status, Completed
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "-", "-", "-", "-", "-", int32(0), "Pending", "<none>"}}},
+		},
+		{
+			name: "ResourcePoolStatusRequest with Complete status",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+				Status: &resourceapis.ResourcePoolStatusRequestStatus{
+					PoolCount: ptr.To[int32](3),
+					Pools: []resourceapis.PoolStatus{
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-1",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](10),
+							AvailableDevices:   ptr.To[int32](5),
+							AllocatedDevices:   ptr.To[int32](3),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-2",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](8),
+							AvailableDevices:   ptr.To[int32](4),
+							AllocatedDevices:   ptr.To[int32](2),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-3",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](6),
+							AvailableDevices:   ptr.To[int32](3),
+							AllocatedDevices:   ptr.To[int32](1),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               resourceapis.ResourcePoolStatusRequestConditionComplete,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-3e11)},
+						},
+					},
+				},
+			},
+			// Columns: Name, Driver, Total, Available, Allocated, Unavailable, Errors, Pools, Status, Completed
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "24", "12", "6", "6", "0", int32(3), "Complete", "5m"}}},
+		},
+		{
+			name: "ResourcePoolStatusRequest with Complete status and truncated pools",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+				Status: &resourceapis.ResourcePoolStatusRequestStatus{
+					PoolCount: ptr.To[int32](5),
+					Pools: []resourceapis.PoolStatus{
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-1",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](10),
+							AvailableDevices:   ptr.To[int32](5),
+							AllocatedDevices:   ptr.To[int32](3),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-2",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](8),
+							AvailableDevices:   ptr.To[int32](4),
+							AllocatedDevices:   ptr.To[int32](2),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               resourceapis.ResourcePoolStatusRequestConditionComplete,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-3e11)},
+						},
+					},
+				},
+			},
+			// Columns: Name, Driver, Total, Available, Allocated, Unavailable, Errors, Pools, Status, Completed
+			// Status shows truncation: "Complete (2/5 pools)" because len(Pools)=2 < PoolCount=5
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "18", "9", "5", "4", "0", int32(5), "Complete (2/5 pools)", "5m"}}},
+		},
+		{
+			name: "ResourcePoolStatusRequest with Failed status",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+				Status: &resourceapis.ResourcePoolStatusRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   resourceapis.ResourcePoolStatusRequestConditionFailed,
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			// Columns: Name, Driver, Total, Available, Allocated, Unavailable, Errors, Pools, Status, Completed
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "-", "-", "-", "-", "-", int32(0), "Failed", "<none>"}}},
+		},
+		{
+			name: "Complete with validation error pool",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+				Status: &resourceapis.ResourcePoolStatusRequestStatus{
+					PoolCount: ptr.To[int32](2),
+					Pools: []resourceapis.PoolStatus{
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-healthy",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](10),
+							AvailableDevices:   ptr.To[int32](5),
+							AllocatedDevices:   ptr.To[int32](3),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+						{
+							Driver:          "driver.example.com",
+							PoolName:        "pool-error",
+							Generation:      2,
+							ValidationError: ptr.To("pool data could not be validated"),
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               resourceapis.ResourcePoolStatusRequestConditionComplete,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-3e11)},
+						},
+					},
+				},
+			},
+			// Columns: Name, Driver, Total, Available, Allocated, Unavailable, Errors, Pools, Status, Completed
+			// Only the healthy pool's device counts are summed; the error pool has nil counts.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "10", "5", "3", "2", "1", int32(2), "Complete", "5m"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printResourcePoolStatusRequest(&test.request, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
 	}
 }

@@ -266,9 +266,7 @@ func (c *volumeCache) dump(logger klog.Logger) {
 	for volumeID := range c.volumes {
 		volumeIDs = append(volumeIDs, volumeID)
 	}
-	sort.Slice(volumeIDs, func(i, j int) bool {
-		return volumeIDs[i] < volumeIDs[j]
-	})
+	slices.Sort(volumeIDs)
 	for _, volumeID := range volumeIDs {
 		volume := c.volumes[volumeID]
 		logger.Info("Cached volume", "volume", volumeID, "csiDriver", volume.csiDriver)

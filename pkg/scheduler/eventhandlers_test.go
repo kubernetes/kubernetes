@@ -29,8 +29,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1alpha1"
+	resourcebetaapi "k8s.io/api/resource/v1beta2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -184,11 +184,11 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 					// disable backoff queue
 					internalqueue.WithPodInitialBackoffDuration(0),
 					internalqueue.WithPodMaxBackoffDuration(0))
-				schedulerCache := internalcache.New(ctx, 30*time.Second, nil)
+				schedulerCache := internalcache.New(ctx, nil, false)
 
 				// Put test pods into unschedulable queue
 				for _, pod := range unschedulablePods {
-					queue.Add(logger, pod)
+					queue.Add(ctx, pod)
 					poppedPod, err := queue.Pop(logger)
 					if err != nil {
 						t.Fatalf("Pop failed: %v", err)
@@ -230,7 +230,6 @@ func newDefaultQueueSort() fwk.LessFunc {
 }
 
 func TestUpdateAssignedPodInCache(t *testing.T) {
-	ttl := 10 * time.Second
 	nodeName := "node"
 
 	tests := []struct {
@@ -255,7 +254,7 @@ func TestUpdateAssignedPodInCache(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, ttl, nil),
+				Cache:           internalcache.New(ctx, nil, false),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
@@ -522,20 +521,20 @@ func TestAddAllEventHandlers(t *testing.T) {
 			enableDRADeviceTaints:     true,
 			enableDRADeviceTaintRules: true,
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                           true,
-				reflect.TypeOf(&v1.Node{}):                          true,
-				reflect.TypeOf(&v1.Namespace{}):                     true,
-				reflect.TypeOf(&resourceapi.ResourceClaim{}):        true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}):        true,
-				reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{}): true,
-				reflect.TypeOf(&resourceapi.DeviceClass{}):          true,
+				reflect.TypeOf(&v1.Pod{}):                          true,
+				reflect.TypeOf(&v1.Node{}):                         true,
+				reflect.TypeOf(&v1.Namespace{}):                    true,
+				reflect.TypeOf(&resourceapi.ResourceClaim{}):       true,
+				reflect.TypeOf(&resourceapi.ResourceSlice{}):       true,
+				reflect.TypeOf(&resourcebetaapi.DeviceTaintRule{}): true,
+				reflect.TypeOf(&resourceapi.DeviceClass{}):         true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "Workload events disabled",
+			name: "PodGroup events disabled",
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
-				fwk.Workload: fwk.Add,
+				fwk.PodGroup: fwk.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -545,9 +544,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "Workload events enabled",
+			name: "PodGroup events enabled",
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
-				fwk.Workload: fwk.Add,
+				fwk.PodGroup: fwk.Add,
 			},
 			enableDRA:             true,
 			enableGenericWorkload: true,
@@ -557,7 +556,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&v1.Namespace{}):              true,
 				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
 				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-				reflect.TypeOf(&schedulingapi.Workload{}):    true,
+				reflect.TypeOf(&schedulingapi.PodGroup{}):    true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -659,7 +658,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 					SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
 				}
 				if opts.EnableDeviceTaintRules {
-					opts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+					opts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
 					opts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 
 				}
@@ -697,13 +696,18 @@ func TestAdmissionCheck(t *testing.T) {
 	nodenameError := AdmissionResult{Name: nodename.Name, Reason: nodename.ErrReason}
 	nodeportsError := AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason}
 	podOverheadError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 2000, Used: 7000, Capacity: 8000}}
-	cpu := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
+	extendedResourceError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: "foo.com/bar", Reason: "Insufficient foo.com/bar", Requested: 1, Unresolvable: true}}
+	nodeCPUCapacity := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
+	extendedResource := map[v1.ResourceName]string{"foo.com/bar": "1"}
+	nodeAllocatableResourceError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 9000, Used: 0, Capacity: 8000, Unresolvable: true}}
 	tests := []struct {
-		name                 string
-		node                 *v1.Node
-		existingPods         []*v1.Pod
-		pod                  *v1.Pod
-		wantAdmissionResults [][]AdmissionResult
+		name                              string
+		node                              *v1.Node
+		existingPods                      []*v1.Pod
+		pod                               *v1.Pod
+		wantAdmissionResults              [][]AdmissionResult
+		enableDRAExtendedResource         bool
+		enableDRANodeAllocatableResources bool
 	}{
 		{
 			name: "check nodeAffinity and nodeports, nodeAffinity need fail quickly if includeAllFailures is false",
@@ -716,7 +720,7 @@ func TestAdmissionCheck(t *testing.T) {
 		},
 		{
 			name: "check PodOverhead and nodeAffinity, PodOverhead need fail quickly if includeAllFailures is false",
-			node: st.MakeNode().Name("fake-node").Label("foo", "bar").Capacity(cpu).Obj(),
+			node: st.MakeNode().Name("fake-node").Label("foo", "bar").Capacity(nodeCPUCapacity).Obj(),
 			pod:  st.MakePod().Name("pod2").Container("c").Overhead(v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).NodeSelector(map[string]string{"foo": "bar1"}).Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "7"}).Node("fake-node").Obj(),
@@ -732,9 +736,82 @@ func TestAdmissionCheck(t *testing.T) {
 			},
 			wantAdmissionResults: [][]AdmissionResult{{nodenameError, nodeportsError}, {nodenameError}},
 		},
+		{
+			name:                 "check extended resource handling when node Allocatable doesn't have the resource",
+			node:                 st.MakeNode().Name("fake-node").Obj(),
+			pod:                  st.MakePod().Name("pod1").Req(extendedResource).Obj(),
+			wantAdmissionResults: [][]AdmissionResult{{extendedResourceError}, {extendedResourceError}},
+		},
+		{
+			name:                      "check extended resource handling when node Allocatable doesn't have the resource and DRAExtendedResource is enabled",
+			node:                      st.MakeNode().Name("fake-node").Obj(),
+			pod:                       st.MakePod().Name("pod1").Req(extendedResource).Obj(),
+			wantAdmissionResults:      [][]AdmissionResult{{extendedResourceError}, {extendedResourceError}},
+			enableDRAExtendedResource: true,
+		},
+		{
+			name: "pod not rejected when DRANodeAllocatableResources flag is disabled",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Resources: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceCPU: resource.MustParse("8"),
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{nil, nil},
+			enableDRANodeAllocatableResources: false,
+		},
+		{
+			name: "pod rejected when DRANodeAllocatableResources flag is enabled and pod's resource request exceeds node capacity",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Resources: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceCPU: resource.MustParse(nodeCPUCapacity[v1.ResourceCPU]), // We should exceed node capacity since we also request 1 CPU in standard request.
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{{nodeAllocatableResourceError}, {nodeAllocatableResourceError}},
+			enableDRANodeAllocatableResources: true,
+		},
+		{
+			name: "pod not rejected when DRANodeAllocatableResources flag is enabled and pod's resource request fits within node capacity",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				cpuQty := resource.MustParse(nodeCPUCapacity[v1.ResourceCPU])
+				cpuQty.Sub(resource.MustParse("1"))
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Resources: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceCPU: cpuQty,
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{nil, nil},
+			enableDRANodeAllocatableResources: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAExtendedResource:         tt.enableDRAExtendedResource,
+				features.DRANodeAllocatableResources: tt.enableDRANodeAllocatableResources,
+			})
 			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
 			nodeInfo.SetNode(tt.node)
 
@@ -779,7 +856,7 @@ func TestAddPod(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, 0, nil),
+				Cache:           internalcache.New(ctx, nil, false),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -914,7 +991,7 @@ func TestUpdatePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, 0, nil),
+				Cache:           internalcache.New(ctx, nil, false),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -1033,7 +1110,7 @@ func TestDeletePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, 0, nil),
+				Cache:           internalcache.New(ctx, nil, false),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{

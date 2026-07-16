@@ -26,7 +26,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -107,15 +106,9 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
-	if !features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
-		klog.V(1).Infoln("[upgrade/upload-config] Preserving the CRISocket information for this control-plane node")
-		if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-			return errors.Wrap(err, "error writing CRISocket for this node")
-		}
-	} else {
-		if err := patchnodephase.RemoveCRISocketAnnotation(client, cfg.NodeRegistration.Name); err != nil {
-			return err
-		}
+	// TODO Remove once NodeLocalCRISocket is removed in 1.37.
+	if err := patchnodephase.RemoveCRISocketAnnotation(client, cfg.NodeRegistration.Name); err != nil {
+		return err
 	}
 
 	return nil

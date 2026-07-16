@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
@@ -170,7 +171,7 @@ const (
 	ResourceClaim         EventResource = "resource.k8s.io/ResourceClaim"
 	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
-	Workload              EventResource = "scheduling.k8s.io/Workload"
+	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
 
 	// WildCard is a special EventResource to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
@@ -287,6 +288,8 @@ type NodeInfo interface {
 	Snapshot() NodeInfo
 	// String returns representation of human readable format of this NodeInfo.
 	String() string
+	// GetNodeAllocatableDRAClaimState returns the node allocatable DRA claim allocation states on this node.
+	GetNodeAllocatableDRAClaimState() map[types.NamespacedName]*NodeAllocatableDRAClaimState
 
 	// AddPodInfo adds pod information to this NodeInfo.
 	// Consider using this instead of AddPod if a PodInfo is already computed.
@@ -634,5 +637,66 @@ func (h HostPortInfo) sanitize(ip, protocol *string) {
 	}
 	if len(*protocol) == 0 {
 		*protocol = string(v1.ProtocolTCP)
+	}
+}
+
+// PodGroupInfo is a wrapper around the PodGroup API object together with a list of unscheduled pods that belong to the pod group.
+// Typically used as an input to pod group scheduling cycle plugins.
+type PodGroupInfo interface {
+	// GetUnscheduledPods returns pods that are currently being considered for scheduling.
+	// The order of the pods is deterministic and based on signature, priority and timestamp.
+	// This structure only contains the pods considered for scheduling in the pod group scheduling cycle.
+	GetUnscheduledPods() []*v1.Pod
+
+	// GetName returns the PodGroup name that is used to identify the pod group.
+	GetName() string
+	// GetNamespace returns the namespace the pod group belongs to.
+	GetNamespace() string
+}
+
+// Placement determines the resources to be considered when scheduling a pod group.
+// Pod group scheduling cycle can check multiple placements and select the one that results
+// in the best pod assignments.
+type Placement struct {
+	// Name uniquely identifies the placement.
+	// This is used for diagnostics and debugability.
+	// The choice of the name is up to the PlacementGeneratePlugin.
+	Name string
+	// Nodes specifies the nodes that are valid for this placement.
+	// Scheduler will try to schedule the pod group using only those nodes.
+	Nodes []NodeInfo
+}
+
+// ProposedAssignment associates pod of a pod group with a proposed node assignment, determined in pod group scheduling cycle.
+type ProposedAssignment interface {
+	// GetPod returns the pod that has the proposed node assignment.
+	GetPod() *v1.Pod
+	// GetNodeName returns the name of the proposed node for the pod.
+	GetNodeName() string
+}
+
+// PodGroupAssignments holds the temporary assignments of pods in a pod group to nodes for a placement.
+// Can be used in the pod group scheduling cycle to determine the best placement for a pod group.
+type PodGroupAssignments struct {
+	*Placement
+	// ProposedAssignments associates pods with proposed nodes that were determined for a given placement
+	// during the pod group scheduling cycle.
+	// The pods are guaranteed to also be present in the PodGroupInfo.
+	ProposedAssignments []ProposedAssignment
+}
+
+// NodeAllocatableDRAClaimState holds information about a node allocatable resource DRA claim's allocation on a node.
+type NodeAllocatableDRAClaimState struct {
+	// ConsumerPods is a set of UIDs of pods that are consuming the DRA claim on this node.
+	ConsumerPods sets.Set[types.UID]
+}
+
+// Snapshot returns a copy of NodeAllocatableDRAClaimAllocationState with ConsumerPods cloned.
+func (s *NodeAllocatableDRAClaimState) Snapshot() *NodeAllocatableDRAClaimState {
+	if s == nil {
+		return nil
+	}
+	return &NodeAllocatableDRAClaimState{
+		ConsumerPods: s.ConsumerPods.Clone(),
 	}
 }

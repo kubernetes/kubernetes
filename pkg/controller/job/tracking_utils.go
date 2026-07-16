@@ -18,6 +18,7 @@ package job
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 
 	batch "k8s.io/api/batch/v1"
@@ -124,12 +125,7 @@ func newUIDTrackingExpectations() *uidTrackingExpectations {
 }
 
 func hasJobTrackingFinalizer(pod *v1.Pod) bool {
-	for _, fin := range pod.Finalizers {
-		if fin == batch.JobTrackingFinalizer {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(pod.Finalizers, batch.JobTrackingFinalizer)
 }
 
 func recordFinishedPodWithTrackingFinalizer(oldPod, newPod *v1.Pod) {

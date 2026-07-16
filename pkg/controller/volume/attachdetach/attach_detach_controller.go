@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -181,7 +180,7 @@ func NewAttachDetachController(
 
 	csiTranslator := csitrans.New()
 	adc.intreeToCSITranslator = csiTranslator
-	adc.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
+	adc.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -509,7 +508,6 @@ func (adc *attachDetachController) podAdd(logger klog.Logger, obj interface{}) {
 
 	volumeActionFlag := util.DetermineVolumeAction(
 		pod,
-		adc.desiredStateOfWorld,
 		true /* default volume action */)
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
@@ -533,7 +531,6 @@ func (adc *attachDetachController) podUpdate(logger klog.Logger, oldObj, newObj 
 
 	volumeActionFlag := util.DetermineVolumeAction(
 		pod,
-		adc.desiredStateOfWorld,
 		true /* default volume action */)
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
@@ -541,8 +538,12 @@ func (adc *attachDetachController) podUpdate(logger klog.Logger, oldObj, newObj 
 }
 
 func (adc *attachDetachController) podDelete(logger klog.Logger, obj interface{}) {
+	if tombstone, ok := obj.(kcache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
 	pod, ok := obj.(*v1.Pod)
-	if pod == nil || !ok {
+	if !ok {
+		runtime.HandleError(fmt.Errorf("unexpected object type: %T", obj))
 		return
 	}
 
@@ -665,7 +666,6 @@ func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) 
 		}
 		volumeActionFlag := util.DetermineVolumeAction(
 			pod,
-			adc.desiredStateOfWorld,
 			true /* default volume action */)
 
 		util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
@@ -715,9 +715,7 @@ func (adc *attachDetachController) processVolumeAttachments(logger klog.Logger) 
 		var plugin volume.AttachableVolumePlugin
 		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 
-		// Consult csiMigratedPluginManager first before querying the plugins registered during runtime in volumePluginMgr.
-		// In-tree plugins that provisioned PVs will not be registered anymore after migration to CSI, once the respective
-		// feature gate is enabled.
+		// If the PV has been migrated, translate the in-tree volumeSpec to CSI volumeSpec.
 		if inTreePluginName, err := adc.csiMigratedPluginManager.GetInTreePluginNameFromSpec(pv, nil); err == nil {
 			if adc.csiMigratedPluginManager.IsMigrationEnabledForPlugin(inTreePluginName) {
 				// PV is migrated and should be handled by the CSI plugin instead of the in-tree one
@@ -820,10 +818,6 @@ func (adc *attachDetachController) NewWrapperUnmounter(volName string, spec volu
 
 func (adc *attachDetachController) GetMounter() mount.Interface {
 	return nil
-}
-
-func (adc *attachDetachController) GetHostName() string {
-	return ""
 }
 
 func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {

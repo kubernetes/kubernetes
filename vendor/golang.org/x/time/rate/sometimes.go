@@ -61,7 +61,9 @@ func (s *Sometimes) Do(f func()) {
 		(s.Every > 0 && s.count%s.Every == 0) ||
 		(s.Interval > 0 && time.Since(s.last) >= s.Interval) {
 		f()
-		s.last = time.Now()
+		if s.Interval > 0 {
+			s.last = time.Now()
+		}
 	}
 	s.count++
 }

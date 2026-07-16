@@ -18,6 +18,7 @@ limitations under the License.
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // Package nonincluded contains test types for testing subfield field validation tags.
+// +k8s:validation-gen-nolint
 package nonincluded
 
 import (

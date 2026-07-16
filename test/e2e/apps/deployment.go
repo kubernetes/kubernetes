@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/resourceversion"
@@ -64,6 +63,7 @@ import (
 	testutil "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
 
@@ -1043,7 +1043,7 @@ func testIterativeDeployments(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	iterations := 20
-	for i := 0; i < iterations; i++ {
+	for i := range iterations {
 		if r := rand.Float32(); r < 0.6 {
 			time.Sleep(time.Duration(float32(i) * r * float32(time.Second)))
 		}

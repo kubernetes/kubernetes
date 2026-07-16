@@ -3,6 +3,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.27.1 (19 Nov 2025) 
+Enhancements:
+* [#1501][]: prevent `Object` from panicking on nils 
+* [#1511][]: Fix a race condition in `WithLazy`.
+
+Thanks to @rabbbit, @alshopov, @jquirke, @arukiidou for their contributions to this release.
+
+[#1501]: https://github.com/uber-go/zap/pull/1501
+[#1511]: https://github.com/uber-go/zap/pull/1511
+
 ## 1.27.0 (20 Feb 2024)
 Enhancements:
 * [#1378][]: Add `WithLazy` method for `SugaredLogger`.

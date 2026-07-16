@@ -504,25 +504,25 @@ type fakeGetter struct {
 	node           *v1.Node
 }
 
-func (f fakeGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
+func (f fakeGetter) GetServiceAccount(ctx context.Context, namespace, name string) (*v1.ServiceAccount, error) {
 	if f.serviceAccount == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "serviceaccounts"}, name)
 	}
 	return f.serviceAccount, nil
 }
-func (f fakeGetter) GetPod(namespace, name string) (*v1.Pod, error) {
+func (f fakeGetter) GetPod(ctx context.Context, namespace, name string) (*v1.Pod, error) {
 	if f.pod == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "pods"}, name)
 	}
 	return f.pod, nil
 }
-func (f fakeGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
+func (f fakeGetter) GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	if f.secret == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "secrets"}, name)
 	}
 	return f.secret, nil
 }
-func (f fakeGetter) GetNode(name string) (*v1.Node, error) {
+func (f fakeGetter) GetNode(ctx context.Context, name string) (*v1.Node, error) {
 	if f.node == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "nodes"}, name)
 	}

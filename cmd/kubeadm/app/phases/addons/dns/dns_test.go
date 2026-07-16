@@ -1679,7 +1679,7 @@ func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, imag
 		image = "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion
 	}
 	client := clientsetfake.NewSimpleClientset()
-	for i := 0; i < deploymentSize; i++ {
+	for i := range deploymentSize {
 		_, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Deployment",

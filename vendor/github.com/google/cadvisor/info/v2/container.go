@@ -192,6 +192,8 @@ type Percentiles struct {
 	Present bool `json:"present"`
 	// Average over the collected sample.
 	Mean uint64 `json:"mean"`
+	// Standard deviation of the collected sample.
+	Std uint64 `json:"std"`
 	// Max seen over the collected sample.
 	Max uint64 `json:"max"`
 	// 50th percentile over the collected sample.
@@ -200,6 +202,8 @@ type Percentiles struct {
 	Ninety uint64 `json:"ninety"`
 	// 95th percentile over the collected sample.
 	NinetyFive uint64 `json:"ninetyfive"`
+	// Number of samples used to calculate these percentiles.
+	Count uint64 `json:"count"`
 }
 
 type Usage struct {

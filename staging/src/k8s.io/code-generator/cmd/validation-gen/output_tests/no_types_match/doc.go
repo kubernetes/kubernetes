@@ -20,6 +20,7 @@ limitations under the License.
 // +k8s:validation-gen-test-fixture=validateFalse
 
 // This is a test package.
+// +k8s:validation-gen-nolint
 package notypesmatch
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"

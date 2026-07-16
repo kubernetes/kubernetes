@@ -24,6 +24,7 @@ import (
 	etcd3metrics "k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	flowcontrolmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	peerproxymetrics "k8s.io/apiserver/pkg/util/peerproxy/metrics"
+	proxymetrics "k8s.io/apiserver/pkg/util/proxy/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
@@ -54,4 +55,5 @@ func register() {
 	flowcontrolmetrics.Register()
 	peerproxymetrics.Register()
 	handlersmetrics.Register()
+	proxymetrics.Register()
 }

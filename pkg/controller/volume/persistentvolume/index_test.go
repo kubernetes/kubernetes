@@ -23,12 +23,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -78,9 +75,6 @@ func makeVolumeModePVC(size string, mode *v1.PersistentVolumeMode, modfn func(*v
 }
 
 func TestMatchVolume(t *testing.T) {
-	// Default enable the VolumeAttributesClass feature gate.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, true)
-
 	volList := newPersistentVolumeOrderedIndex()
 	for _, pv := range createTestVolumes() {
 		volList.store.Add(pv)

@@ -224,7 +224,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return err
 	}
 	if !exists {
-		logger.V(4).Error(err, "resource does not exist in our rest mapper", "gvr", gvr.String())
+		logger.V(4).Info("resource does not exist in our rest mapper", "gvr", gvr.String())
 		if toBeProcessedSVM.CreationTimestamp.Add(time.Minute).After(time.Now()) {
 			return fmt.Errorf("resource does not exist in rest mapper, requeuing to attempt again: %w", err)
 		}
@@ -241,7 +241,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return errMonitor
 	}
 	if !hasSynced {
-		logger.V(4).Error(errMonitor, "resource does not exist in GC", "gvr", gvr.String())
+		logger.V(4).Info("resource does not exist in GC", "gvr", gvr.String())
 
 		// our mapper could be missing a recently created custom resource, so give it some time to catch up
 		// we resync discovery every 30 seconds so twice that should be sufficient
@@ -262,18 +262,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return fmt.Errorf("GC cache is not up to date, requeuing to attempt again. gcListResourceVersion: %s, listResourceVersion: %s", gcListResourceVersion, listResourceVersion)
 	}
 
-	toBeProcessedSVM, err = svmc.kubeClient.StoragemigrationV1beta1().
-		StorageVersionMigrations().
-		UpdateStatus(
-			ctx,
-			setStatusConditions(toBeProcessedSVM, svmv1beta1.MigrationRunning, migrationRunningStatusReason, ""),
-			metav1.UpdateOptions{},
-		)
-	if err != nil {
-		return err
-	}
-
-	err, failedMigration := svmc.runMigration(ctx, logger, *gvr, resourceMonitor, toBeProcessedSVM, listResourceVersion)
+	err, failedMigration := svmc.runMigration(ctx, *gvr, resourceMonitor, toBeProcessedSVM, listResourceVersion)
 	if err != nil {
 		return err
 	}
@@ -296,11 +285,12 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 	return nil
 }
 
-func (svmc *SVMController) runMigration(ctx context.Context, logger klog.Logger, gvr schema.GroupVersionResource, resourceMonitor *garbagecollector.Monitor, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, listResourceVersion string) (err error, failed bool) {
+func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVersionResource, resourceMonitor *garbagecollector.Monitor, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, listResourceVersion string) (err error, failed bool) {
 	gvk, err := svmc.restMapper.KindFor(gvr)
 	if err != nil {
 		return svmc.failMigration(ctx, toBeProcessedSVM, err), true
 	}
+	logger := klog.FromContext(ctx)
 	for _, obj := range resourceMonitor.Store.List() {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
@@ -308,7 +298,7 @@ func (svmc *SVMController) runMigration(ctx context.Context, logger klog.Logger,
 		}
 		rvCmp, err := resourceversion.CompareResourceVersion(accessor.GetResourceVersion(), listResourceVersion)
 		if err != nil {
-			logger.V(4).Error(err, "Unable to compare the resource version of the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion, "error", err.Error())
+			logger.Error(err, "Unable to compare the resource version of the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion, "error", err.Error())
 			return svmc.failMigration(ctx, toBeProcessedSVM, err), true
 		}
 		if rvCmp == 1 {
@@ -358,7 +348,7 @@ func (svmc *SVMController) runMigration(ctx context.Context, logger klog.Logger,
 		}
 
 		if errPatch != nil {
-			logger.V(4).Error(errPatch, "Failed to migrate the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "reason", apierrors.ReasonForError(errPatch))
+			logger.Error(errPatch, "Failed to migrate the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "reason", apierrors.ReasonForError(errPatch))
 			errStatus := svmc.failMigration(ctx, toBeProcessedSVM, errPatch)
 			return errStatus, true
 		}

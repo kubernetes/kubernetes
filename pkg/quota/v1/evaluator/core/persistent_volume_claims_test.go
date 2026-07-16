@@ -146,7 +146,6 @@ func TestPersistentVolumeClaimEvaluatorMatchingScopes(t *testing.T) {
 	}
 
 	for testName, testCase := range testCases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, true)
 		t.Run(testName, func(t *testing.T) {
 			gotSelectors, err := evaluator.MatchingScopes(testCase.claim, testCase.selectors)
 			if err != nil {

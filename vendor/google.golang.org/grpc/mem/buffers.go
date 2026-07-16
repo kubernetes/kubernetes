@@ -62,7 +62,6 @@ var (
 	bufferPoolingThreshold = 1 << 10
 
 	bufferObjectPool = sync.Pool{New: func() any { return new(buffer) }}
-	refObjectPool    = sync.Pool{New: func() any { return new(atomic.Int32) }}
 )
 
 // IsBelowBufferPoolingThreshold returns true if the given size is less than or
@@ -73,9 +72,19 @@ func IsBelowBufferPoolingThreshold(size int) bool {
 }
 
 type buffer struct {
+	refs atomic.Int32
+	data []byte
+
+	// rootBuf is the buffer responsible for returning origData to the pool
+	// once the reference count drops to 0.
+	//
+	// When a buffer is split, the new buffer inherits the rootBuf of the
+	// original and increments the root's reference count. For the
+	// initial buffer (the root), this field points to itself.
+	rootBuf *buffer
+
+	// The following fields are only set for root buffers.
 	origData *[]byte
-	data     []byte
-	refs     *atomic.Int32
 	pool     BufferPool
 }
 
@@ -103,8 +112,8 @@ func NewBuffer(data *[]byte, pool BufferPool) Buffer {
 	b.origData = data
 	b.data = *data
 	b.pool = pool
-	b.refs = refObjectPool.Get().(*atomic.Int32)
-	b.refs.Add(1)
+	b.rootBuf = b
+	b.refs.Store(1)
 	return b
 }
 
@@ -127,42 +136,44 @@ func Copy(data []byte, pool BufferPool) Buffer {
 }
 
 func (b *buffer) ReadOnlyData() []byte {
-	if b.refs == nil {
+	if b.rootBuf == nil {
 		panic("Cannot read freed buffer")
 	}
 	return b.data
 }
 
 func (b *buffer) Ref() {
-	if b.refs == nil {
+	if b.refs.Add(1) <= 1 {
 		panic("Cannot ref freed buffer")
 	}
-	b.refs.Add(1)
 }
 
 func (b *buffer) Free() {
-	if b.refs == nil {
+	refs := b.refs.Add(-1)
+	if refs < 0 {
 		panic("Cannot free freed buffer")
 	}
-
-	refs := b.refs.Add(-1)
-	switch {
-	case refs > 0:
+	if refs > 0 {
 		return
-	case refs == 0:
+	}
+
+	b.data = nil
+	if b.rootBuf == b {
+		// This buffer is the owner of the data slice and its ref count reached
+		// 0, free the slice.
 		if b.pool != nil {
 			b.pool.Put(b.origData)
+			b.pool = nil
 		}
-
-		refObjectPool.Put(b.refs)
 		b.origData = nil
-		b.data = nil
-		b.refs = nil
-		b.pool = nil
-		bufferObjectPool.Put(b)
-	default:
-		panic("Cannot free freed buffer")
+	} else {
+		// This buffer doesn't own the data slice, decrement a ref on the root
+		// buffer.
+		b.rootBuf.Free()
 	}
+
+	b.rootBuf = nil
+	bufferObjectPool.Put(b)
 }
 
 func (b *buffer) Len() int {
@@ -170,16 +181,14 @@ func (b *buffer) Len() int {
 }
 
 func (b *buffer) split(n int) (Buffer, Buffer) {
-	if b.refs == nil {
+	if b.rootBuf == nil || b.rootBuf.refs.Add(1) <= 1 {
 		panic("Cannot split freed buffer")
 	}
 
-	b.refs.Add(1)
 	split := newBuffer()
-	split.origData = b.origData
 	split.data = b.data[n:]
-	split.refs = b.refs
-	split.pool = b.pool
+	split.rootBuf = b.rootBuf
+	split.refs.Store(1)
 
 	b.data = b.data[:n]
 
@@ -187,7 +196,7 @@ func (b *buffer) split(n int) (Buffer, Buffer) {
 }
 
 func (b *buffer) read(buf []byte) (int, Buffer) {
-	if b.refs == nil {
+	if b.rootBuf == nil {
 		panic("Cannot read freed buffer")
 	}
 

@@ -615,14 +615,19 @@ type EnsureRBACFunc func(context.Context, clientset.Interface, clientset.Interfa
 // constructs a client from super-admin.conf if the file exists. It then proceeds
 // to pass the clients to EnsureAdminClusterRoleBindingImpl. The function returns a
 // usable client from admin.conf with RBAC properly constructed or an error.
-func EnsureAdminClusterRoleBinding(outDir string, ensureRBACFunc EnsureRBACFunc) (clientset.Interface, error) {
+func EnsureAdminClusterRoleBinding(outDir string, lae *kubeadmapi.APIEndpoint, ensureRBACFunc EnsureRBACFunc) (clientset.Interface, error) {
 	var (
 		err                           error
 		adminClient, superAdminClient clientset.Interface
 	)
 
 	// Create a client from admin.conf.
-	adminClient, err = kubeconfigutil.ClientSetFromFile(filepath.Join(outDir, kubeadmconstants.AdminKubeConfigFileName))
+	kubeconfig, err := clientcmd.LoadFromFile(filepath.Join(outDir, kubeadmconstants.AdminKubeConfigFileName))
+	if err != nil {
+		return nil, err
+	}
+	kubeconfigutil.PointKubeConfigToLocalAPIEndpoint(kubeconfig, lae)
+	adminClient, err = kubeconfigutil.ToClientSet(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -630,7 +635,12 @@ func EnsureAdminClusterRoleBinding(outDir string, ensureRBACFunc EnsureRBACFunc)
 	// Create a client from super-admin.conf.
 	superAdminPath := filepath.Join(outDir, kubeadmconstants.SuperAdminKubeConfigFileName)
 	if _, err := os.Stat(superAdminPath); err == nil {
-		superAdminClient, err = kubeconfigutil.ClientSetFromFile(superAdminPath)
+		kubeconfig, err := clientcmd.LoadFromFile(superAdminPath)
+		if err != nil {
+			return nil, err
+		}
+		kubeconfigutil.PointKubeConfigToLocalAPIEndpoint(kubeconfig, lae)
+		superAdminClient, err = kubeconfigutil.ToClientSet(kubeconfig)
 		if err != nil {
 			return nil, err
 		}

@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -40,8 +41,8 @@ import (
 )
 
 // Run this single test locally using a running CRI-O instance by:
-// make test-e2e-node CONTAINER_RUNTIME_ENDPOINT="unix:///var/run/crio/crio.sock" TEST_ARGS='--ginkgo.focus="ImageVolume" --feature-gates=ImageVolume=true --service-feature-gates=ImageVolume=true --kubelet-flags="--cgroup-root=/ --runtime-cgroups=/system.slice/crio.service --kubelet-cgroups=/system.slice/kubelet.service --fail-swap-on=false"'
-var _ = SIGDescribe("ImageVolume", func() {
+// make test-e2e-node CONTAINER_RUNTIME_ENDPOINT="unix:///var/run/crio/crio.sock" TEST_ARGS='--ginkgo.focus="ImageVolume" --kubelet-flags="--cgroup-root=/ --runtime-cgroups=/system.slice/crio.service --kubelet-cgroups=/system.slice/kubelet.service --fail-swap-on=false"'
+var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 	f := framework.NewDefaultFramework("image-volume-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -60,11 +61,11 @@ var _ = SIGDescribe("ImageVolume", func() {
 	)
 
 	// TODO: remove when containerd 2.2 is available on all node e2e test platforms.
-	requireContainerdVersion := func(givenVersion string) {
-		runtime, _, err := getCRIClient()
+	requireContainerdVersion := func(ctx context.Context, givenVersion string) {
+		runtime, _, err := getCRIClient(ctx)
 		framework.ExpectNoError(err, "Failed to get CRI client")
 
-		resp, err := runtime.Version(context.Background(), "")
+		resp, err := runtime.Version(ctx, "")
 		framework.ExpectNoError(err, "Failed to get runtime version")
 
 		// Other runtimes like CRI-O do not need to enforce any version requirement.
@@ -125,7 +126,7 @@ var _ = SIGDescribe("ImageVolume", func() {
 	}
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		requireContainerdVersion("2.1")
+		requireContainerdVersion(ctx, "2.1")
 	})
 
 	f.It("should succeed with pod and pull policy of Always", func(ctx context.Context) {
@@ -302,7 +303,7 @@ var _ = SIGDescribe("ImageVolume", func() {
 
 	f.Context("subPath", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			requireContainerdVersion("2.2")
+			requireContainerdVersion(ctx, "2.2")
 		})
 
 		f.It("should succeed when using a valid subPath", func(ctx context.Context) {
@@ -329,8 +330,9 @@ var _ = SIGDescribe("ImageVolume", func() {
 			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name)
 			framework.ExpectNoError(err, "Failed to await for the pod to be running: (%s/%s)", f.Namespace.Name, podName)
 
-			fileContent := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "os-release"))
-			gomega.Expect(fileContent).To(gomega.ContainSubstring("Alpine Linux"))
+			// Using this file is intentional because it's generally available on Linux and will not expose any secret information.
+			fileContent := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "passwd"))
+			gomega.Expect(fileContent).To(gomega.ContainSubstring("root:"))
 		})
 
 		f.It("should fail if subPath in volume is not existing", func(ctx context.Context) {

@@ -18,7 +18,8 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:path=clusterversions,scope=Cluster
-// +kubebuilder:validation:XValidation:rule="has(self.spec.capabilities) && has(self.spec.capabilities.additionalEnabledCapabilities) && self.spec.capabilities.baselineCapabilitySet == 'None' && 'marketplace' in self.spec.capabilities.additionalEnabledCapabilities ? 'OperatorLifecycleManager' in self.spec.capabilities.additionalEnabledCapabilities || (has(self.status) && has(self.status.capabilities) && has(self.status.capabilities.enabledCapabilities) && 'OperatorLifecycleManager' in self.status.capabilities.enabledCapabilities) : true",message="the `marketplace` capability requires the `OperatorLifecycleManager` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `OperatorLifecycleManager` capability"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate="";CRDCompatibilityRequirementOperator;ClusterAPIMachineManagement,rule="has(self.spec.capabilities) && has(self.spec.capabilities.additionalEnabledCapabilities) && self.spec.capabilities.baselineCapabilitySet == 'None' && 'marketplace' in self.spec.capabilities.additionalEnabledCapabilities ? 'OperatorLifecycleManager' in self.spec.capabilities.additionalEnabledCapabilities || (has(self.status) && has(self.status.capabilities) && has(self.status.capabilities.enabledCapabilities) && 'OperatorLifecycleManager' in self.status.capabilities.enabledCapabilities) : true",message="the `marketplace` capability requires the `OperatorLifecycleManager` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `OperatorLifecycleManager` capability"
+// +openshift:validation:FeatureGateAwareXValidation:requiredFeatureGate=CRDCompatibilityRequirementOperator;ClusterAPIMachineManagement,rule="has(self.spec.capabilities) && has(self.spec.capabilities.additionalEnabledCapabilities) && 'ClusterAPI' in self.spec.capabilities.additionalEnabledCapabilities ? 'CompatibilityRequirements' in self.spec.capabilities.additionalEnabledCapabilities || (has(self.status) && has(self.status.capabilities) && has(self.status.capabilities.enabledCapabilities) && 'CompatibilityRequirements' in self.status.capabilities.enabledCapabilities) : true",message="the `ClusterAPI` capability requires the `CompatibilityRequirements` capability, which is neither explicitly or implicitly enabled in this cluster, please enable the `CompatibilityRequirements` capability"
 // +kubebuilder:printcolumn:name=Version,JSONPath=.status.history[?(@.state=="Completed")].version,type=string
 // +kubebuilder:printcolumn:name=Available,JSONPath=.status.conditions[?(@.type=="Available")].status,type=string
 // +kubebuilder:printcolumn:name=Progressing,JSONPath=.status.conditions[?(@.type=="Progressing")].status,type=string
@@ -304,7 +305,10 @@ const (
 )
 
 // ClusterVersionCapability enumerates optional, core cluster components.
-// +kubebuilder:validation:Enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage;CSISnapshot;NodeTuning;MachineAPI;Build;DeploymentConfig;ImageRegistry;OperatorLifecycleManager;CloudCredential;Ingress;CloudControllerManager;OperatorLifecycleManagerV1
+// +openshift:validation:FeatureGateAwareEnum:featureGate="",enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage;CSISnapshot;NodeTuning;MachineAPI;Build;DeploymentConfig;ImageRegistry;OperatorLifecycleManager;CloudCredential;Ingress;CloudControllerManager;OperatorLifecycleManagerV1
+// +openshift:validation:FeatureGateAwareEnum:featureGate=CRDCompatibilityRequirementOperator,enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage;CSISnapshot;NodeTuning;MachineAPI;Build;DeploymentConfig;ImageRegistry;OperatorLifecycleManager;CloudCredential;Ingress;CloudControllerManager;OperatorLifecycleManagerV1;CompatibilityRequirements
+// +openshift:validation:FeatureGateAwareEnum:featureGate=ClusterAPIMachineManagement,enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage;CSISnapshot;NodeTuning;MachineAPI;Build;DeploymentConfig;ImageRegistry;OperatorLifecycleManager;CloudCredential;Ingress;CloudControllerManager;OperatorLifecycleManagerV1;CompatibilityRequirements;ClusterAPI
+// +openshift:validation:FeatureGateAwareEnum:requiredFeatureGate=CRDCompatibilityRequirementOperator;ClusterAPIMachineManagement,enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage;CSISnapshot;NodeTuning;MachineAPI;Build;DeploymentConfig;ImageRegistry;OperatorLifecycleManager;CloudCredential;Ingress;CloudControllerManager;OperatorLifecycleManagerV1;CompatibilityRequirements;ClusterAPI
 type ClusterVersionCapability string
 
 const (
@@ -425,6 +429,19 @@ const (
 	// Managers deployed on top of OpenShift. They help you to work with cloud
 	// provider API and embeds cloud-specific control logic.
 	ClusterVersionCapabilityCloudControllerManager ClusterVersionCapability = "CloudControllerManager"
+
+	// ClusterVersionCapabilityCompatibilityRequirements manages the Compatibility
+	// Requirements operator which enforces CRD compatibility constraints via
+	// validating webhooks.
+	ClusterVersionCapabilityCompatibilityRequirements ClusterVersionCapability = "CompatibilityRequirements"
+
+	// ClusterVersionCapabilityClusterAPI manages the Cluster API operator and
+	// controllers which provide forward-compatible machine management for
+	// OpenShift clusters.
+	//
+	// Note that Cluster API has a hard requirement on CompatibilityRequirements.
+	// CompatibilityRequirements cannot be disabled while Cluster API is enabled.
+	ClusterVersionCapabilityClusterAPI ClusterVersionCapability = "ClusterAPI"
 )
 
 // KnownClusterVersionCapabilities includes all known optional, core cluster components.
@@ -446,6 +463,8 @@ var KnownClusterVersionCapabilities = []ClusterVersionCapability{
 	ClusterVersionCapabilityCloudCredential,
 	ClusterVersionCapabilityIngress,
 	ClusterVersionCapabilityCloudControllerManager,
+	ClusterVersionCapabilityCompatibilityRequirements,
+	ClusterVersionCapabilityClusterAPI,
 }
 
 // ClusterVersionCapabilitySet defines sets of cluster version capabilities.
@@ -644,6 +663,8 @@ var ClusterVersionCapabilitySets = map[ClusterVersionCapabilitySet][]ClusterVers
 		ClusterVersionCapabilityCloudCredential,
 		ClusterVersionCapabilityIngress,
 		ClusterVersionCapabilityCloudControllerManager,
+		ClusterVersionCapabilityCompatibilityRequirements,
+		ClusterVersionCapabilityClusterAPI,
 	},
 }
 

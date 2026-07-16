@@ -30,11 +30,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
-	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
 
-	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
-	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
@@ -51,6 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
@@ -69,11 +68,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
-	"k8s.io/kubernetes/pkg/controlplane/storageversionhashdata"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
+	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
 	batchrest "k8s.io/kubernetes/pkg/registry/batch/rest"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
@@ -82,6 +81,7 @@ import (
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
 	schedulingrest "k8s.io/kubernetes/pkg/registry/scheduling/rest"
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 )
@@ -366,7 +366,7 @@ func TestStorageVersionHashes(t *testing.T) {
 		for _, r := range g.APIResources {
 			apiResources.Insert(g.GroupVersion + "/" + r.Name)
 			if strings.Contains(r.Name, "/") ||
-				storageversionhashdata.NoStorageVersionHash.Has(g.GroupVersion+"/"+r.Name) {
+				noStorageVersionHash.Has(g.GroupVersion+"/"+r.Name) {
 				if r.StorageVersionHash != "" {
 					t.Errorf("expect resource %s/%s to have empty storageVersionHash, got hash %q", g.GroupVersion, r.Name, r.StorageVersionHash)
 				}
@@ -378,15 +378,15 @@ func TestStorageVersionHashes(t *testing.T) {
 			}
 			// Uncomment the following line if you want to update storageversionhash/data.go
 			// fmt.Printf("\"%s/%s\": \"%s\",\n", g.GroupVersion, r.Name, r.StorageVersionHash)
-			expected := storageversionhashdata.GVRToStorageVersionHash[g.GroupVersion+"/"+r.Name]
+			expected := gvrToStorageVersionHash[g.GroupVersion+"/"+r.Name]
 			if r.StorageVersionHash != expected {
 				t.Errorf("expect the storageVersionHash of %s/%s to be %q, got %q", g.GroupVersion, r.Name, expected, r.StorageVersionHash)
 			}
 			count++
 		}
 	}
-	if count != len(storageversionhashdata.GVRToStorageVersionHash) {
-		knownResources := sets.StringKeySet(storageversionhashdata.GVRToStorageVersionHash)
+	if count != len(gvrToStorageVersionHash) {
+		knownResources := sets.StringKeySet(gvrToStorageVersionHash)
 		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash: %v", knownResources.Difference(apiResources).List())
 	}
 }
@@ -467,15 +467,13 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 	// legacyEnabledBetaResources is nearly a duplication from elsewhere.  This is intentional.  These types already have
 	// GA equivalents available and should therefore never have a beta enabled by default again.
 	legacyEnabledBetaResources := map[schema.GroupVersionResource]bool{
-		autoscalingapiv2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"): true,
-		autoscalingapiv2beta2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"): true,
-		batchapiv1beta1.SchemeGroupVersion.WithResource("cronjobs"):                       true,
-		discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"):                true,
-		eventsv1beta1.SchemeGroupVersion.WithResource("events"):                           true,
-		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"):                     true,
-		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):          true,
-		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):           true,
-		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"):                     true,
+		batchapiv1beta1.SchemeGroupVersion.WithResource("cronjobs"):              true,
+		discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"):       true,
+		eventsv1beta1.SchemeGroupVersion.WithResource("events"):                  true,
+		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"):            true,
+		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"): true,
+		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):  true,
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"):            true,
 	}
 
 	config := DefaultAPIResourceConfigSource()
@@ -514,6 +512,23 @@ func TestGenericStorageProviders(t *testing.T) {
 	generic, err := completed.ControlPlane.GenericStorageProviders(client.Discovery())
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	genericStorageGroups := sets.New[string]()
+	for _, provider := range generic {
+		genericStorageGroups.Insert(provider.GroupName())
+	}
+
+	genericConfigGroups := sets.New[string]()
+	for gv := range DefaultGenericAPIResourceConfigSource().GroupVersionConfigs {
+		genericConfigGroups.Insert(gv.Group)
+	}
+
+	if extra := genericStorageGroups.Difference(genericConfigGroups); len(extra) > 0 {
+		t.Fatalf("GenericStorageProviders has providers for groups in DefaultGenericAPIResourceConfigSource: %v", sets.List(extra))
+	}
+	if extra := genericConfigGroups.Difference(genericStorageGroups); len(extra) > 0 {
+		t.Fatalf("DefaultGenericAPIResourceConfigSource has config for groups not in GenericStorageProviders: %v", sets.List(extra))
 	}
 
 	g := 0 // generic index
@@ -555,4 +570,169 @@ func TestGenericStorageProviders(t *testing.T) {
 	if g != len(generic) {
 		t.Errorf("Unexpected, generic APIs found: %#v", generic[g:])
 	}
+}
+
+// TestGetResetFieldsHasAllVersions verifies that every storage implementing
+// ResetFieldsStrategy or ResetFieldsFilterStrategy returns entries for all
+// served API versions of that resource.
+func TestGetResetFieldsHasAllVersions(t *testing.T) {
+	_, config, _ := setUp(t)
+
+	client, err := kubernetes.NewForConfig(config.ControlPlane.Generic.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providers, err := config.Complete().StorageProviders(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Enable all versions (including alpha and beta) to test comprehensively.
+	allVersionsConfig := DefaultAPIResourceConfigSource()
+	allVersionsConfig.EnableVersions(betaAPIGroupVersionsDisabledByDefault...)
+	allVersionsConfig.EnableVersions(alphaAPIGroupVersionsDisabledByDefault...)
+
+	for _, provider := range providers {
+		groupName := provider.GroupName()
+		apiGroupInfo, err := provider.NewRESTStorage(allVersionsConfig, config.ControlPlane.Generic.RESTOptionsGetter)
+		if err != nil {
+			t.Errorf("error creating REST storage for %s: %v", groupName, err)
+			continue
+		}
+
+		allServedVersionsByResource := map[string][]string{}
+		for v, resourcesInVersion := range apiGroupInfo.VersionedResourcesStorageMap {
+			for resource := range resourcesInVersion {
+				var apiVersion string
+				if len(groupName) == 0 {
+					apiVersion = v
+				} else {
+					apiVersion = groupName + "/" + v
+				}
+				allServedVersionsByResource[resource] = append(allServedVersionsByResource[resource], apiVersion)
+			}
+		}
+
+		// Check every storage that implements GetResetFields or GetResetFieldsFilter.
+		for v, resourcesInVersion := range apiGroupInfo.VersionedResourcesStorageMap {
+			for resource, storage := range resourcesInVersion {
+				servedVersions := allServedVersionsByResource[resource]
+				if len(servedVersions) <= 1 {
+					continue // only one version, nothing to check
+				}
+				if rfs, ok := storage.(rest.ResetFieldsStrategy); ok {
+					resetFields := rfs.GetResetFields()
+					if resetFields == nil {
+						continue // no reset fields, nothing to check
+					}
+					for _, sv := range servedVersions {
+						if _, exists := resetFields[fieldpath.APIVersion(sv)]; !exists {
+							t.Errorf("%s: GetResetFields() is missing version %q, has %v; all served versions: %v",
+								gvr(groupName, v, resource), sv, resetFields, servedVersions)
+						}
+					}
+				}
+
+				if rfs, ok := storage.(rest.ResetFieldsFilterStrategy); ok {
+					resetFieldsFilter := rfs.GetResetFieldsFilter()
+					if resetFieldsFilter == nil {
+						continue
+					}
+					for _, sv := range servedVersions {
+						if _, exists := resetFieldsFilter[fieldpath.APIVersion(sv)]; !exists {
+							t.Errorf("%s: GetResetFieldsFilter() is missing version %q, has %v; all served versions: %v",
+								gvr(groupName, v, resource), sv, resetFieldsFilter, servedVersions)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func gvr(g string, v string, r string) string {
+	var gvr string
+	if len(g) == 0 {
+		gvr = fmt.Sprintf("%s/%s", v, r)
+	} else {
+		gvr = fmt.Sprintf("%s/%s/%s", g, v, r)
+	}
+	return gvr
+}
+
+// noStorageVersionHash lists resources that legitimately with empty storage
+// version hash.
+var noStorageVersionHash = sets.NewString(
+	"v1/bindings",
+	"v1/componentstatuses",
+	"authentication.k8s.io/v1/selfsubjectreviews",
+	"authentication.k8s.io/v1/tokenreviews",
+	"authorization.k8s.io/v1/localsubjectaccessreviews",
+	"authorization.k8s.io/v1/selfsubjectaccessreviews",
+	"authorization.k8s.io/v1/selfsubjectrulesreviews",
+	"authorization.k8s.io/v1/subjectaccessreviews",
+)
+
+// gvrToStorageVersionHash shouldn't change unless we intentionally change the
+// storage version of a resource.
+var gvrToStorageVersionHash = map[string]string{
+	"v1/configmaps":             "qFsyl6wFWjQ=",
+	"v1/endpoints":              "fWeeMqaN/OA=",
+	"v1/events":                 "r2yiGXH7wu8=",
+	"v1/limitranges":            "EBKMFVe6cwo=",
+	"v1/namespaces":             "Q3oi5N2YM8M=",
+	"v1/nodes":                  "XwShjMxG9Fs=",
+	"v1/persistentvolumeclaims": "QWTyNDq0dC4=",
+	"v1/persistentvolumes":      "HN/zwEC+JgM=",
+	"v1/pods":                   "xPOwRZ+Yhw8=",
+	"v1/podtemplates":           "LIXB2x4IFpk=",
+	"v1/replicationcontrollers": "Jond2If31h0=",
+	"v1/resourcequotas":         "8uhSgffRX6w=",
+	"v1/secrets":                "S6u1pOWzb84=",
+	"v1/serviceaccounts":        "pbx9ZvyFpBE=",
+	"v1/services":               "0/CO1lhkEBI=",
+	"autoscaling/v1/horizontalpodautoscalers": "qwQve8ut294=",
+	"autoscaling/v2/horizontalpodautoscalers": "qwQve8ut294=",
+	"batch/v1/jobs":     "mudhfqk/qZY=",
+	"batch/v1/cronjobs": "sd5LIXh4Fjs=",
+	"certificates.k8s.io/v1/certificatesigningrequests":                 "95fRKMXA+00=",
+	"coordination.k8s.io/v1/leases":                                     "gqkMMb/YqFM=",
+	"discovery.k8s.io/v1/endpointslices":                                "qgS0xkrxYAI=",
+	"networking.k8s.io/v1/networkpolicies":                              "YpfwF18m1G8=",
+	"networking.k8s.io/v1/ingresses":                                    "39NQlfNR+bo=",
+	"networking.k8s.io/v1/ingressclasses":                               "l/iqIbDgFyQ=",
+	"networking.k8s.io/v1/ipaddresses":                                  "3f/plJFChNE=",
+	"networking.k8s.io/v1/servicecidrs":                                 "gNLvruQhW2g=",
+	"node.k8s.io/v1/runtimeclasses":                                     "WQTu1GL3T2Q=",
+	"policy/v1/poddisruptionbudgets":                                    "EVWiDmWqyJw=",
+	"rbac.authorization.k8s.io/v1/clusterrolebindings":                  "48tpQ8gZHFc=",
+	"rbac.authorization.k8s.io/v1/clusterroles":                         "bYE5ZWDrJ44=",
+	"rbac.authorization.k8s.io/v1/rolebindings":                         "eGsCzGH6b1g=",
+	"rbac.authorization.k8s.io/v1/roles":                                "7FuwZcIIItM=",
+	"resource.k8s.io/v1/deviceclasses":                                  "Yk2PTc1Ybxk=",
+	"resource.k8s.io/v1/resourceclaims":                                 "wgAZaHcZxUg=",
+	"resource.k8s.io/v1/resourceclaimtemplates":                         "TuzjC49aUfM=",
+	"resource.k8s.io/v1/resourceslices":                                 "KsC072WgaEY=",
+	"scheduling.k8s.io/v1/priorityclasses":                              "1QwjyaZjj3Y=",
+	"storage.k8s.io/v1/csidrivers":                                      "hL6j/rwBV5w=",
+	"storage.k8s.io/v1/csinodes":                                        "Pe62DkZtjuo=",
+	"storage.k8s.io/v1/storageclasses":                                  "K+m6uJwbjGY=",
+	"storage.k8s.io/v1/csistoragecapacities":                            "xeVl+2Ly1kE=",
+	"storage.k8s.io/v1/volumeattachments":                               "tJx/ezt6UDU=",
+	"storage.k8s.io/v1/volumeattributesclasses":                         "tIjydgKBC5w=",
+	"apps/v1/controllerrevisions":                                       "85nkx63pcBU=",
+	"apps/v1/daemonsets":                                                "dd7pWHUlMKQ=",
+	"apps/v1/deployments":                                               "8aSe+NMegvE=",
+	"apps/v1/replicasets":                                               "P1RzHs8/mWQ=",
+	"apps/v1/statefulsets":                                              "H+vl74LkKdo=",
+	"admissionregistration.k8s.io/v1/mutatingwebhookconfigurations":     "Sqi0GUgDaX0=",
+	"admissionregistration.k8s.io/v1/validatingwebhookconfigurations":   "B0wHjQmsGNk=",
+	"admissionregistration.k8s.io/v1/mutatingadmissionpolicies":         "LYmCf+UMVdg=",
+	"admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings":   "90V5FRZZ3Zg=",
+	"admissionregistration.k8s.io/v1/validatingadmissionpolicies":       "6OxvlMmQ6is=",
+	"admissionregistration.k8s.io/v1/validatingadmissionpolicybindings": "v9715VZqakg=",
+	"events.k8s.io/v1/events":                                           "r2yiGXH7wu8=",
+	"flowcontrol.apiserver.k8s.io/v1/flowschemas":                       "GJVAJZSZBIw=",
+	"flowcontrol.apiserver.k8s.io/v1/prioritylevelconfigurations":       "Kir5PVfvNeI=",
 }

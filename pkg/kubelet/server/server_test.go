@@ -17,8 +17,11 @@ limitations under the License.
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -36,39 +39,52 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	gwebsocket "github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/component-base/configz"
+	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/tools/remotecommand"
+	remotecommand "k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/streaming/pkg/httpstream"
+	"k8s.io/streaming/pkg/httpstream/spdy"
 
 	// Do some initialization to decode the query parameters correctly.
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	metricsfeatures "k8s.io/component-base/metrics/features"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/kubelet/pkg/cri/streaming"
-	"k8s.io/kubelet/pkg/cri/streaming/portforward"
-	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
+	"k8s.io/cri-streaming/pkg/streaming"
+	"k8s.io/cri-streaming/pkg/streaming/portforward"
+	remotecommandserver "k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -166,16 +182,16 @@ func (fk *fakeKubelet) SyncLoopHealthCheck(req *http.Request) error {
 }
 
 type fakeRuntime struct {
-	execFunc        func(string, []string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
-	attachFunc      func(string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
+	execFunc        func(string, []string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommandserver.TerminalSize) error
+	attachFunc      func(string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommandserver.TerminalSize) error
 	portForwardFunc func(string, int32, io.ReadWriteCloser) error
 }
 
-func (f *fakeRuntime) Exec(_ context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (f *fakeRuntime) Exec(_ context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
 	return f.execFunc(containerID, cmd, stdin, stdout, stderr, tty, resize)
 }
 
-func (f *fakeRuntime) Attach(_ context.Context, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (f *fakeRuntime) Attach(_ context.Context, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
 	return f.attachFunc(containerID, stdin, stdout, stderr, tty, resize)
 }
 
@@ -271,7 +287,7 @@ func (fk *fakeKubelet) GetPortForward(ctx context.Context, podName, podNamespace
 }
 
 // Unused functions
-func (*fakeKubelet) GetNode() (*v1.Node, error)                       { return nil, nil }
+func (*fakeKubelet) GetNode(context.Context) (*v1.Node, error)        { return nil, nil }
 func (*fakeKubelet) GetNodeConfig() cm.NodeConfig                     { return cm.NodeConfig{} }
 func (*fakeKubelet) GetPodCgroupRoot() string                         { return "" }
 func (*fakeKubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) { return nil, false }
@@ -301,9 +317,12 @@ func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bo
 }
 
 type fakeAuth struct {
-	authenticateFunc func(*http.Request) (*authenticator.Response, bool, error)
-	attributesFunc   func(user.Info, *http.Request) []authorizer.Attributes
-	authorizeFunc    func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
+	authenticateFunc       func(*http.Request) (*authenticator.Response, bool, error)
+	attributesFunc         func(user.Info, *http.Request) []authorizer.Attributes
+	authorizeFunc          func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
+	currentCABundleContent func() []byte
+	name                   string
+	verifyOptions          func() (x509.VerifyOptions, bool)
 }
 
 func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
@@ -314,6 +333,16 @@ func (f *fakeAuth) GetRequestAttributes(ctx context.Context, u user.Info, req *h
 }
 func (f *fakeAuth) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return f.authorizeFunc(a)
+}
+func (f *fakeAuth) AddListener(listener dynamiccertificates.Listener) {}
+func (f *fakeAuth) CurrentCABundleContent() []byte {
+	return f.currentCABundleContent()
+}
+func (f *fakeAuth) Name() string {
+	return f.name
+}
+func (f *fakeAuth) VerifyOptions() (x509.VerifyOptions, bool) {
+	return f.verifyOptions()
 }
 
 type serverTestFramework struct {
@@ -551,9 +580,72 @@ func TestStatusz(t *testing.T) {
 		t.Fatalf("Got error reading response body: %v", err)
 	}
 
-	reg := regexp.MustCompile(`Paths([:=\s]+)/configz /debug /healthz /metrics\n$`)
+	reg := regexp.MustCompile(`Paths([:=\s]+)/configz /debug /flagz /healthz /metrics\n$`)
 	if reg.FindStringSubmatch(string(resBody)) == nil {
-		t.Errorf("statusz paths missing: %s\n\nExpected: %q", string(resBody), "Paths<delimter> /configz /debug /healthz /metrics")
+		t.Errorf("statusz paths missing: %s\n\nExpected: %q", string(resBody), "Paths<delimter> /configz /debug /flagz /healthz /metrics")
+	}
+}
+
+func TestConfigz(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	configz.Delete("kubeletconfig")
+	cz, err := configz.New("kubeletconfig")
+	if err != nil {
+		t.Fatalf("unable to register configz: %v", err)
+	}
+	defer configz.Delete("kubeletconfig")
+	kc := &v1beta1.KubeletConfiguration{}
+	kc.TypeMeta.APIVersion = "kubelet.config.k8s.io/v1beta1"
+	kc.TypeMeta.Kind = "KubeletConfiguration"
+	if err := cz.Set(kc); err != nil {
+		t.Fatalf("unable to set configz: %v", err)
+	}
+
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	req, err := http.NewRequest(http.MethodGet, fw.testHTTPServer.URL+"/configz", nil)
+	if err != nil {
+		t.Fatalf("Got error creating request: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Got error reading response body: %v", err)
+	}
+
+	var configz map[string]unstructured.Unstructured
+	if err := json.Unmarshal(body, &configz); err != nil {
+		t.Fatalf("failed to unmarshal configz: %v", err)
+	}
+	cfg, ok := configz["kubeletconfig"]
+	if !ok {
+		t.Fatalf("configz missing 'kubeletconfig' key")
+	}
+	if cfg.GetAPIVersion() != "kubelet.config.k8s.io/v1beta1" {
+		t.Errorf("unexpected APIVersion: %s", cfg.GetAPIVersion())
+	}
+	if cfg.GetKind() != "KubeletConfiguration" {
+		t.Errorf("unexpected Kind: %s", cfg.GetKind())
+	}
+
+	// confirm that they expose public config type
+	var kubeletConfig v1beta1.KubeletConfiguration
+	err = json.Unmarshal(body, &struct {
+		ComponentConfig *v1beta1.KubeletConfiguration `json:"kubeletconfig"`
+	}{ComponentConfig: &kubeletConfig})
+	if err != nil {
+		t.Errorf("failed to deserialize into public config type: %v", err)
 	}
 }
 
@@ -564,6 +656,9 @@ func TestAuthzCoverage(t *testing.T) {
 	defer fw.testHTTPServer.Close()
 
 	for _, fineGrained := range []bool{false, true} {
+		if !fineGrained {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		t.Run(fmt.Sprintf("fineGrained=%v", fineGrained), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGrained)
 			// method:path -> has coverage
@@ -686,9 +781,12 @@ func TestAuthFilters(t *testing.T) {
 	attributesGetter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
 
 	for _, fineGraned := range []bool{false, true} {
+		if !fineGraned {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGraned)
 		for _, tc := range AuthzTestCases(fineGraned) {
-			t.Run(fmt.Sprintf("method=%v:path=%v:fineGrained=%v", tc.Method, tc.Method, fineGraned), func(t *testing.T) {
+			t.Run(fmt.Sprintf("method=%v:path=%v:fineGrained=%v", tc.Method, tc.Path, fineGraned), func(t *testing.T) {
 				var (
 					expectedUser = AuthzTestUser()
 
@@ -1448,12 +1546,12 @@ func testExecAttach(t *testing.T, verb string) {
 				return nil
 			}
 
-			ss.fakeRuntime.execFunc = func(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+			ss.fakeRuntime.execFunc = func(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
 				assert.Equal(t, expectedCommand, strings.Join(cmd, " "), "cmd")
 				return testStream(containerID, stdin, stdout, stderr, tty, done)
 			}
 
-			ss.fakeRuntime.attachFunc = func(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+			ss.fakeRuntime.attachFunc = func(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
 				return testStream(containerID, stdin, stdout, stderr, tty, done)
 			}
 
@@ -1569,6 +1667,63 @@ func TestServeExecInContainer(t *testing.T) {
 
 func TestServeAttachContainer(t *testing.T) {
 	testExecAttach(t, "attach")
+}
+
+func TestWebsocketExecAttach(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ss, err := newTestStreamingServer(0)
+	require.NoError(t, err)
+	defer ss.testHTTPServer.Close()
+	fw := newServerTestWithDebug(tCtx, true, ss)
+	defer fw.testHTTPServer.Close()
+
+	podNamespace := "other"
+	podName := "foo"
+	expectedContainerName := "baz"
+	expectedStdin := "stdin"
+	done := make(chan struct{})
+	attachInvoked := false
+
+	fw.fakeKubelet.getAttachCheck = func(podFullName string, uid types.UID, containerName string, streamOpts remotecommandserver.Options) {
+		attachInvoked = true
+	}
+
+	ss.fakeRuntime.attachFunc = func(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
+		defer close(done)
+		defer stdout.Close() //nolint:errcheck
+		_, err := io.Copy(stdout, stdin)
+		return err
+	}
+
+	requestURL := fw.testHTTPServer.URL + "/attach/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?input=1&output=1"
+
+	websocketLocation, err := url.Parse(fw.testHTTPServer.URL)
+	require.NoError(t, err)
+
+	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host}, "GET", requestURL)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	options := &remotecommand.StreamOptions{
+		Stdin:  bytes.NewReader([]byte(expectedStdin)),
+		Stdout: &stdout,
+	}
+
+	errorChan := make(chan error)
+	go func() {
+		errorChan <- exec.StreamWithContext(context.Background(), *options)
+	}()
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case err := <-errorChan:
+		require.NoError(t, err)
+	}
+
+	assert.Equal(t, expectedStdin, stdout.String())
+	assert.True(t, attachInvoked, "attach should be invoked")
+	<-done
 }
 
 func TestServePortForwardIdleTimeout(t *testing.T) {
@@ -2013,4 +2168,343 @@ func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
 	// Check if both servers registered the /metrics/slis endpoint
 	assert.Contains(t, server1.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "First server should register /metrics/slis")
 	assert.Contains(t, server2.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "Second server should register /metrics/slis")
+}
+
+// This test verifies that the HTTP request duration metric captures the actual
+// request handling time.
+func TestServeHTTPRequestDurationMetric(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	// Register and reset the metric before the test
+	servermetrics.Register()
+	servermetrics.HTTPRequestsDuration.Reset()
+
+	// Add a delay to the pods handler to simulate request processing time.
+	// We use 50ms which is long enough to be clearly distinguishable from
+	// the ~2 microsecond bug, but short enough to not slow down tests.
+	handlerDelay := 50 * time.Millisecond
+	fw.fakeKubelet.podsFunc = func() []*v1.Pod {
+		time.Sleep(handlerDelay)
+		return []*v1.Pod{}
+	}
+
+	// Make a request to the pods endpoint
+	resp, err := http.Get(fw.testHTTPServer.URL + "/pods/")
+	require.NoError(t, err)
+	defer resp.Body.Close() //nolint:errcheck
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Read the body to ensure the request is fully processed
+	_, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	// Get the recorded duration from the metric
+	observerMetric := servermetrics.HTTPRequestsDuration.WithLabelValues("GET", "pods", "readwrite", "false")
+	metricValue, err := testutil.GetHistogramMetricValue(observerMetric)
+	require.NoError(t, err)
+
+	// Use the handler delay as the minimum expected duration. This avoids any
+	// timing-sensitive percentage-based checks.
+	minExpectedDuration := handlerDelay.Seconds()
+	assert.GreaterOrEqual(t, metricValue, minExpectedDuration,
+		"HTTP request duration metric recorded %v seconds, expected at least %v seconds. ",
+		metricValue, minExpectedDuration,
+	)
+}
+
+// TestGetExecWebSocketHandlerSelection verifies that getExec selects the
+// translating handler (WebSocket v5 ↔ SPDY) when ExtendWebSocketsToKubelet
+// is enabled and a v5 request arrives, and the plain UpgradeAwareHandler
+// otherwise.
+//
+// Observable difference: the translating handler accepts v5 WebSocket directly
+// and echoes "v5.channel.k8s.io" back in the 101 response. Without it, the
+// kubelet proxies the v5 request to the streaming server whose wsstream layer
+// only lists v4/legacy subprotocols and rejects the v5 upgrade entirely
+// (gorilla receives a non-101 response → "bad handshake").
+// When the client uses v4, the UpgradeAwareHandler proxies the upgrade to the
+// streaming server which accepts v4, so the connection succeeds even when the
+// gate is enabled.
+func TestGetExecWebSocketHandlerSelection(t *testing.T) {
+	tests := []struct {
+		name                   string
+		enableExtendWebSockets bool
+		subprotocols           []string // defaults to v5 if nil
+		expectDialError        bool
+		expectedSubprotocol    string
+		expectMetricInc        bool
+	}{
+		{
+			name:                   "feature gate enabled uses translating handler, v5 negotiated",
+			enableExtendWebSockets: true,
+			expectDialError:        false,
+			expectedSubprotocol:    "v5.channel.k8s.io",
+			expectMetricInc:        true,
+		},
+		{
+			name:                   "feature gate disabled uses UpgradeAwareHandler, v5 rejected",
+			enableExtendWebSockets: false,
+			expectDialError:        true,
+		},
+		{
+			// When the gate is enabled but the request is not v5, IsWebSocketRequestWithStreamCloseProtocol
+			// returns false so getExec falls through to the plain UpgradeAwareHandler, which proxies the
+			// request to the streaming server. The streaming server understands v4 and accepts it.
+			name:                   "feature gate enabled, v4 request uses UpgradeAwareHandler, v4 negotiated",
+			enableExtendWebSockets: true,
+			subprotocols:           []string{"v4.channel.k8s.io"},
+			expectDialError:        false,
+			expectedSubprotocol:    "v4.channel.k8s.io",
+		},
+	}
+
+	servermetrics.Register()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			servermetrics.ResetForTest()
+			tCtx := ktesting.Init(t)
+			ss, err := newTestStreamingServer(0)
+			require.NoError(t, err)
+			defer ss.testHTTPServer.Close()
+			fw := newServerTestWithDebug(tCtx, true, ss)
+			defer fw.testHTTPServer.Close()
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableExtendWebSockets)
+
+			ss.fakeRuntime.execFunc = func(_ string, _ []string, _ io.Reader, stdout, _ io.WriteCloser, _ bool, _ <-chan remotecommandserver.TerminalSize) error {
+				stdout.Close() //nolint:errcheck
+				return nil
+			}
+
+			execURL := strings.Replace(fw.testHTTPServer.URL, "http://", "ws://", 1) +
+				"/exec/default/foo/baz?command=echo&output=1"
+
+			subprotocols := tt.subprotocols
+			if len(subprotocols) == 0 {
+				subprotocols = []string{"v5.channel.k8s.io"}
+			}
+			dialer := gwebsocket.Dialer{
+				Subprotocols: subprotocols,
+			}
+			conn, resp, err := dialer.Dial(execURL, nil)
+			if tt.expectDialError {
+				require.Error(t, err, "expected dial to fail when feature gate is disabled")
+				return
+			}
+			require.NoError(t, err)
+			defer conn.Close() //nolint:errcheck
+
+			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
+			assert.Equal(t, tt.expectedSubprotocol, conn.Subprotocol())
+
+			if tt.expectMetricInc {
+				expected := `
+# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# TYPE kubelet_websocket_streaming_requests_total counter
+kubelet_websocket_streaming_requests_total{subresource="exec"} 1
+`
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+					"kubelet_websocket_streaming_requests_total"); err != nil {
+					t.Errorf("unexpected metric output: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// TestGetAttachWebSocketHandlerSelection verifies that getAttach selects the
+// translating handler when ExtendWebSocketsToKubelet is enabled and a v5
+// request arrives, analogous to TestGetExecWebSocketHandlerSelection.
+func TestGetAttachWebSocketHandlerSelection(t *testing.T) {
+	tests := []struct {
+		name                   string
+		enableExtendWebSockets bool
+		subprotocols           []string // defaults to v5 if nil
+		expectDialError        bool
+		expectedSubprotocol    string
+		expectMetricInc        bool
+	}{
+		{
+			name:                   "feature gate enabled uses translating handler, v5 negotiated",
+			enableExtendWebSockets: true,
+			expectDialError:        false,
+			expectedSubprotocol:    "v5.channel.k8s.io",
+			expectMetricInc:        true,
+		},
+		{
+			name:                   "feature gate disabled uses UpgradeAwareHandler, v5 rejected",
+			enableExtendWebSockets: false,
+			expectDialError:        true,
+		},
+		{
+			// When the gate is enabled but the request is not v5, IsWebSocketRequestWithStreamCloseProtocol
+			// returns false so getAttach falls through to the plain UpgradeAwareHandler, which proxies the
+			// request to the streaming server. The streaming server understands v4 and accepts it.
+			name:                   "feature gate enabled, v4 request uses UpgradeAwareHandler, v4 negotiated",
+			enableExtendWebSockets: true,
+			subprotocols:           []string{"v4.channel.k8s.io"},
+			expectDialError:        false,
+			expectedSubprotocol:    "v4.channel.k8s.io",
+		},
+	}
+
+	servermetrics.Register()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			servermetrics.ResetForTest()
+			tCtx := ktesting.Init(t)
+			ss, err := newTestStreamingServer(0)
+			require.NoError(t, err)
+			defer ss.testHTTPServer.Close()
+			fw := newServerTestWithDebug(tCtx, true, ss)
+			defer fw.testHTTPServer.Close()
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableExtendWebSockets)
+
+			ss.fakeRuntime.attachFunc = func(_ string, _ io.Reader, stdout, _ io.WriteCloser, _ bool, _ <-chan remotecommandserver.TerminalSize) error {
+				stdout.Close() //nolint:errcheck
+				return nil
+			}
+
+			attachURL := strings.Replace(fw.testHTTPServer.URL, "http://", "ws://", 1) +
+				"/attach/default/foo/baz?output=1"
+
+			subprotocols := tt.subprotocols
+			if len(subprotocols) == 0 {
+				subprotocols = []string{"v5.channel.k8s.io"}
+			}
+			dialer := gwebsocket.Dialer{
+				Subprotocols: subprotocols,
+			}
+			conn, resp, err := dialer.Dial(attachURL, nil)
+			if tt.expectDialError {
+				require.Error(t, err, "expected dial to fail when feature gate is disabled")
+				return
+			}
+			require.NoError(t, err)
+			defer conn.Close() //nolint:errcheck
+
+			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
+			assert.Equal(t, tt.expectedSubprotocol, conn.Subprotocol())
+
+			if tt.expectMetricInc {
+				expected := `
+# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# TYPE kubelet_websocket_streaming_requests_total counter
+kubelet_websocket_streaming_requests_total{subresource="attach"} 1
+`
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+					"kubelet_websocket_streaming_requests_total"); err != nil {
+					t.Errorf("unexpected metric output: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// TestGetPortForwardWebSocketHandlerSelection verifies that getPortForward
+// selects the tunneling handler when ExtendWebSocketsToKubelet is enabled and
+// the client sends the WebSocket tunneling subprotocol ("SPDY/3.1+portforward.k8s.io"),
+// and the plain UpgradeAwareHandler otherwise.
+//
+// When the gate is enabled, getPortForward skips portforward.NewV4Options (which
+// would reject a request with no port parameter) and wraps the proxy with a
+// TunnelingHandler that translates the WebSocket tunneling protocol to SPDY.
+// The streaming server speaks SPDY portforward and responds with 101; the
+// tunneling handler translates that back to a WebSocket 101 with the tunneling
+// subprotocol.
+//
+// When the gate is disabled, portforward.NewV4Options is called on the WebSocket
+// request, which has no port query parameter, causing a 400 Bad Request before
+// the WebSocket upgrade is attempted.
+func TestGetPortForwardWebSocketHandlerSelection(t *testing.T) {
+	tests := []struct {
+		name                   string
+		enableExtendWebSockets bool
+		expectDialError        bool
+		expectedSubprotocol    string
+		expectMetricInc        bool
+	}{
+		{
+			name:                   "feature gate enabled uses tunneling handler, tunneling subprotocol negotiated",
+			enableExtendWebSockets: true,
+			expectDialError:        false,
+			expectedSubprotocol:    "SPDY/3.1+portforward.k8s.io",
+			expectMetricInc:        true,
+		},
+		{
+			name:                   "feature gate disabled rejects tunneling request (no port parameter)",
+			enableExtendWebSockets: false,
+			expectDialError:        true,
+		},
+	}
+
+	servermetrics.Register()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			servermetrics.ResetForTest()
+			tCtx := ktesting.Init(t)
+			ss, err := newTestStreamingServer(0)
+			require.NoError(t, err)
+			defer ss.testHTTPServer.Close()
+			fw := newServerTestWithDebug(tCtx, true, ss)
+			defer fw.testHTTPServer.Close()
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableExtendWebSockets)
+
+			portForwardURL := strings.Replace(fw.testHTTPServer.URL, "http://", "ws://", 1) +
+				"/portForward/default/foo"
+
+			dialer := gwebsocket.Dialer{
+				Subprotocols: []string{"SPDY/3.1+portforward.k8s.io"},
+			}
+			conn, resp, err := dialer.Dial(portForwardURL, nil)
+			if tt.expectDialError {
+				require.Error(t, err, "expected dial to fail when feature gate is disabled")
+				return
+			}
+			require.NoError(t, err)
+			defer conn.Close() //nolint:errcheck
+
+			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
+			assert.Equal(t, tt.expectedSubprotocol, conn.Subprotocol())
+
+			if tt.expectMetricInc {
+				expected := `
+# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# TYPE kubelet_websocket_streaming_requests_total counter
+kubelet_websocket_streaming_requests_total{subresource="portforward"} 1
+`
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+					"kubelet_websocket_streaming_requests_total"); err != nil {
+					t.Errorf("unexpected metric output: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestKubeletNativeHistogramMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, true)
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+	kubeletmetrics.Register()
+
+	tCtx := ktesting.Init(t)
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	histogramMetric := "kubelet_pod_start_duration_seconds"
+	metrics, err := testutil.ScrapeMetricsProto(fw.testHTTPServer.URL+"/metrics", fw.testHTTPServer.Client())
+	if err != nil {
+		t.Fatalf("failed to scrape metrics: %v", err)
+	}
+
+	mf, ok := metrics[histogramMetric]
+	if !ok {
+		t.Fatalf("metric %q not found in kubelet metrics endpoint", histogramMetric)
+	}
+
+	testutil.AssertHasNativeHistogram(t, mf, nil)
 }

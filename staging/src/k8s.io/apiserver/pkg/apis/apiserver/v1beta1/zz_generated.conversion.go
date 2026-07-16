@@ -753,6 +753,7 @@ func autoConvert_v1beta1_TLSConfig_To_apiserver_TLSConfig(in *TLSConfig, out *ap
 	out.CABundle = in.CABundle
 	out.ClientKey = in.ClientKey
 	out.ClientCert = in.ClientCert
+	out.TLSServerName = in.TLSServerName
 	return nil
 }
 
@@ -765,6 +766,7 @@ func autoConvert_apiserver_TLSConfig_To_v1beta1_TLSConfig(in *apiserver.TLSConfi
 	out.CABundle = in.CABundle
 	out.ClientKey = in.ClientKey
 	out.ClientCert = in.ClientCert
+	out.TLSServerName = in.TLSServerName
 	return nil
 }
 

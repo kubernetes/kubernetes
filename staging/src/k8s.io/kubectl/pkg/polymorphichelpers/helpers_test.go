@@ -50,6 +50,9 @@ func TestGetPodList(t *testing.T) {
 			podList: newPodList(2, -1, -1, labelSet),
 			sortBy:  func(pods []*corev1.Pod) sort.Interface { return podutils.ByLogging(pods) },
 			expected: &corev1.PodList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "3", // Two objects created, initial value is 1.
+				},
 				Items: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{

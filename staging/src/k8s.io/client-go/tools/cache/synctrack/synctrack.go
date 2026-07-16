@@ -20,6 +20,7 @@ limitations under the License.
 package synctrack
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
@@ -27,11 +28,32 @@ import (
 )
 
 // AsyncTracker helps propagate HasSynced in the face of multiple worker threads.
+// The user has to monitor the upstream "has synced"
+// and notify the tracker when that changes from false to true.
 type AsyncTracker[T comparable] struct {
-	UpstreamHasSynced func() bool
+	// name describes the instance.
+	name string
+
+	// upstreamHasSynced is changed from false (initial value) to true
+	// when UpstreamHasSynced is called.
+	upstreamHasSynced atomic.Bool
 
 	lock    sync.Mutex
 	waiting sets.Set[T]
+
+	// synced gets canceled once both the tracker and upstream are synced.
+	// A context is convenient for this because it gives us a channel
+	// and handles thread-safety.
+	synced context.Context
+	cancel func()
+}
+
+func NewAsyncTracker[T comparable](name string) *AsyncTracker[T] {
+	t := &AsyncTracker[T]{
+		name: name,
+	}
+	t.synced, t.cancel = context.WithCancel(context.Background())
+	return t
 }
 
 // Start should be called prior to processing each key which is part of the
@@ -57,6 +79,28 @@ func (t *AsyncTracker[T]) Finished(key T) {
 	if t.waiting != nil {
 		t.waiting.Delete(key)
 	}
+
+	// Maybe synced now?
+	if t.upstreamHasSynced.Load() && len(t.waiting) == 0 {
+		// Mark as synced.
+		t.cancel()
+	}
+}
+
+// UpstreamHasSynced needs to be called at least once as soon as
+// the upstream "has synced" becomes true. It tells AsyncTracker
+// that the source is synced.
+//
+// Must be called after handing over the initial list to Start.
+func (t *AsyncTracker[T]) UpstreamHasSynced() {
+	// Upstream is done, but we might not be yet.
+	t.upstreamHasSynced.Store(true)
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if len(t.waiting) == 0 {
+		// Mark as synced.
+		t.cancel()
+	}
 }
 
 // HasSynced returns true if the source is synced and every key present in the
@@ -64,27 +108,51 @@ func (t *AsyncTracker[T]) Finished(key T) {
 // itself synced until *after* it has delivered the notification for the last
 // key, and that notification handler must have called Start.
 func (t *AsyncTracker[T]) HasSynced() bool {
-	// Call UpstreamHasSynced first: it might take a lock, which might take
-	// a significant amount of time, and we can't hold our lock while
-	// waiting on that or a user is likely to get a deadlock.
-	if !t.UpstreamHasSynced() {
-		return false
-	}
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	return t.waiting.Len() == 0
+	return t.synced.Err() != nil
+}
+
+// Done returns a channel that is closed if the source is synced and every key present in the
+// initial list has been processed. This relies on the source not considering
+// itself synced until *after* it has delivered the notification for the last
+// key, and that notification handler must have called Start.
+func (t *AsyncTracker[T]) Done() <-chan struct{} {
+	return t.synced.Done()
+}
+
+func (t *AsyncTracker[T]) Name() string {
+	return t.name
 }
 
 // SingleFileTracker helps propagate HasSynced when events are processed in
-// order (i.e. via a queue).
+// order (i.e. via a queue). The user has to monitor the upstream "has synced"
+// and notify the tracker when that changes from false to true.
 type SingleFileTracker struct {
+	// name describes the instance.
+	name string
+
 	// Important: count is used with atomic operations so it must be 64-bit
 	// aligned, otherwise atomic operations will panic. Having it at the top of
 	// the struct will guarantee that, even on 32-bit arches.
 	// See https://pkg.go.dev/sync/atomic#pkg-note-BUG for more information.
 	count int64
 
-	UpstreamHasSynced func() bool
+	// upstreamHasSynced is changed from false (initial value) to true
+	// when UpstreamHasSynced is called.
+	upstreamHasSynced atomic.Bool
+
+	// synced gets canceled once both the tracker and upstream are synced.
+	// A context is convenient for this because it gives us a channel
+	// and handles thread-safety.
+	synced context.Context
+	cancel func()
+}
+
+func NewSingleFileTracker(name string) *SingleFileTracker {
+	t := &SingleFileTracker{
+		name: name,
+	}
+	t.synced, t.cancel = context.WithCancel(context.Background())
+	return t
 }
 
 // Start should be called prior to processing each key which is part of the
@@ -103,6 +171,26 @@ func (t *SingleFileTracker) Finished() {
 	if result < 0 {
 		panic("synctrack: negative counter; this logic error means HasSynced may return incorrect value")
 	}
+
+	// Maybe synced now?
+	if result == 0 && t.upstreamHasSynced.Load() {
+		// Mark as synced.
+		t.cancel()
+	}
+}
+
+// UpstreamHasSynced needs to be called at least once as soon as
+// the upstream "has synced" becomes true. It tells SingleFileTracker
+// that the source is synced.
+//
+// Must be called after handing over the initial list to Start.
+func (t *SingleFileTracker) UpstreamHasSynced() {
+	// Upstream is done, but we might not be yet.
+	t.upstreamHasSynced.Store(true)
+	if atomic.LoadInt64(&t.count) == 0 {
+		// Mark as synced.
+		t.cancel()
+	}
 }
 
 // HasSynced returns true if the source is synced and every key present in the
@@ -110,11 +198,17 @@ func (t *SingleFileTracker) Finished() {
 // itself synced until *after* it has delivered the notification for the last
 // key, and that notification handler must have called Start.
 func (t *SingleFileTracker) HasSynced() bool {
-	// Call UpstreamHasSynced first: it might take a lock, which might take
-	// a significant amount of time, and we don't want to then act on a
-	// stale count value.
-	if !t.UpstreamHasSynced() {
-		return false
-	}
-	return atomic.LoadInt64(&t.count) <= 0
+	return t.synced.Err() != nil
+}
+
+// Done returns a channel that is closed if the source is synced and every key present in the
+// initial list has been processed. This relies on the source not considering
+// itself synced until *after* it has delivered the notification for the last
+// key, and that notification handler must have called Start.
+func (t *SingleFileTracker) Done() <-chan struct{} {
+	return t.synced.Done()
+}
+
+func (t *SingleFileTracker) Name() string {
+	return t.name
 }

@@ -22,6 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -67,6 +68,9 @@ func TestIsSubPath(t *testing.T) {
 func TestGetRequestAttributes(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	for _, fineGrained := range []bool{false, true} {
+		if !fineGrained {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGrained)
 		for _, test := range AuthzTestCases(fineGrained) {
 			t.Run(test.Method+":"+test.Path, func(t *testing.T) {

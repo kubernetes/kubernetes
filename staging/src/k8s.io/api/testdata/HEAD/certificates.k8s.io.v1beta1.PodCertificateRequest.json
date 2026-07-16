@@ -54,6 +54,7 @@
     "maxExpirationSeconds": 8,
     "pkixPublicKey": "CQ==",
     "proofOfPossession": "Cg==",
+    "stubPKCS10Request": "DA==",
     "unverifiedUserAnnotations": {
       "unverifiedUserAnnotationsKey": "unverifiedUserAnnotationsValue"
     }

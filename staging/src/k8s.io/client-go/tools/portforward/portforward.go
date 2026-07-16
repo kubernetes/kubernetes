@@ -26,10 +26,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog/v2"
+	streamhttp "k8s.io/streaming/pkg/httpstream"
 	netutils "k8s.io/utils/net"
 )
 
@@ -164,6 +167,12 @@ func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, rea
 	return NewOnAddresses(dialer, []string{"localhost"}, ports, stopChan, readyChan, out, errOut)
 }
 
+// NewForStreaming creates a new PortForwarder with localhost listen addresses
+// for in-tree callers that use k8s.io/streaming/pkg/httpstream types.
+func NewForStreaming(dialer streamhttp.Dialer, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
+	return NewOnAddressesForStreaming(dialer, []string{"localhost"}, ports, stopChan, readyChan, out, errOut)
+}
+
 // NewOnAddresses creates a new PortForwarder with custom listen addresses.
 func NewOnAddresses(dialer httpstream.Dialer, addresses []string, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
 	if len(addresses) == 0 {
@@ -189,6 +198,95 @@ func NewOnAddresses(dialer httpstream.Dialer, addresses []string, ports []string
 		out:       out,
 		errOut:    errOut,
 	}, nil
+}
+
+// NewOnAddressesForStreaming creates a new PortForwarder with custom listen
+// addresses for in-tree callers that use k8s.io/streaming/pkg/httpstream types.
+func NewOnAddressesForStreaming(dialer streamhttp.Dialer, addresses []string, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
+	return NewOnAddresses(&compatDialerAdapter{delegate: dialer}, addresses, ports, stopChan, readyChan, out, errOut)
+}
+
+type compatDialerAdapter struct {
+	delegate streamhttp.Dialer
+}
+
+func (d *compatDialerAdapter) Dial(protocols ...string) (httpstream.Connection, string, error) {
+	conn, protocol, err := d.delegate.Dial(protocols...)
+	if err != nil {
+		return nil, "", err
+	}
+	return &compatConnectionAdapter{delegate: conn}, protocol, nil
+}
+
+type compatConnectionAdapter struct {
+	delegate streamhttp.Connection
+}
+
+func (c *compatConnectionAdapter) CreateStream(headers http.Header) (httpstream.Stream, error) {
+	stream, err := c.delegate.CreateStream(headers)
+	if err != nil {
+		return nil, err
+	}
+	return &compatStreamAdapter{delegate: stream}, nil
+}
+
+func (c *compatConnectionAdapter) Close() error {
+	return c.delegate.Close()
+}
+
+func (c *compatConnectionAdapter) CloseChan() <-chan bool {
+	return c.delegate.CloseChan()
+}
+
+func (c *compatConnectionAdapter) SetIdleTimeout(timeout time.Duration) {
+	c.delegate.SetIdleTimeout(timeout)
+}
+
+func (c *compatConnectionAdapter) RemoveStreams(streams ...httpstream.Stream) {
+	streamingStreams := make([]streamhttp.Stream, 0, len(streams))
+	for _, stream := range streams {
+		if stream == nil {
+			continue
+		}
+		if s, ok := stream.(*compatStreamAdapter); ok {
+			streamingStreams = append(streamingStreams, s.delegate)
+			continue
+		}
+		if s, ok := stream.(streamhttp.Stream); ok {
+			streamingStreams = append(streamingStreams, s)
+			continue
+		}
+		klog.V(5).Infof("dropping unadaptable stream %T in portforward RemoveStreams", stream)
+	}
+	c.delegate.RemoveStreams(streamingStreams...)
+}
+
+type compatStreamAdapter struct {
+	delegate streamhttp.Stream
+}
+
+func (s *compatStreamAdapter) Read(p []byte) (int, error) {
+	return s.delegate.Read(p)
+}
+
+func (s *compatStreamAdapter) Write(p []byte) (int, error) {
+	return s.delegate.Write(p)
+}
+
+func (s *compatStreamAdapter) Close() error {
+	return s.delegate.Close()
+}
+
+func (s *compatStreamAdapter) Reset() error {
+	return s.delegate.Reset()
+}
+
+func (s *compatStreamAdapter) Headers() http.Header {
+	return s.delegate.Headers()
+}
+
+func (s *compatStreamAdapter) Identifier() uint32 {
+	return s.delegate.Identifier()
 }
 
 // ForwardPorts formats and executes a port forwarding request. The connection will remain

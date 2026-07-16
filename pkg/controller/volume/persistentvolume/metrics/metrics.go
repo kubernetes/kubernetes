@@ -68,6 +68,7 @@ func Register(pvLister PVLister, pvcLister PVCLister, pluginMgr *volume.VolumePl
 	registerMetrics.Do(func() {
 		legacyregistry.CustomMustRegister(newPVAndPVCCountCollector(pvLister, pvcLister, pluginMgr))
 		legacyregistry.MustRegister(volumeOperationErrorsMetric)
+		legacyregistry.MustRegister(volumeOperationErrorMetric)
 		legacyregistry.MustRegister(retroactiveStorageClassMetric)
 		legacyregistry.MustRegister(retroactiveStorageClassErrorMetric)
 	})
@@ -135,7 +136,16 @@ var (
 
 	volumeOperationErrorsMetric = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Name:           "volume_operation_total_errors",
+			Name:              "volume_operation_total_errors",
+			Help:              "Total volume operation errors",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.36.0",
+		},
+		[]string{"plugin_name", "operation_name"})
+
+	volumeOperationErrorMetric = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "volume_operation_errors_total",
 			Help:           "Total volume operation errors",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -282,6 +292,7 @@ func RecordVolumeOperationErrorMetric(pluginName, opName string) {
 		pluginName = "N/A"
 	}
 	volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
+	volumeOperationErrorMetric.WithLabelValues(pluginName, opName).Inc()
 }
 
 // operationTimestamp stores the start time of an operation by a plugin

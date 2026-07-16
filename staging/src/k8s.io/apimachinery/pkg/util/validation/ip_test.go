@@ -284,7 +284,7 @@ func TestGetWarningsForIP(t *testing.T) {
 			address:   "192.012.2.2",
 			fieldPath: field.NewPath("spec").Child("clusterIPs").Index(0),
 			want: []string{
-				`spec.clusterIPs[0]: non-standard IP address "192.012.2.2" will be considered invalid in a future Kubernetes release: use "192.12.2.2"`,
+				`spec.clusterIPs[0]: non-standard IP address "192.012.2.2" is invalid: use "192.12.2.2"`,
 			},
 		},
 		{
@@ -292,7 +292,7 @@ func TestGetWarningsForIP(t *testing.T) {
 			address:   "::ffff:192.12.2.2",
 			fieldPath: field.NewPath("spec").Child("clusterIPs").Index(0),
 			want: []string{
-				`spec.clusterIPs[0]: non-standard IP address "::ffff:192.12.2.2" will be considered invalid in a future Kubernetes release: use "192.12.2.2"`,
+				`spec.clusterIPs[0]: non-standard IP address "::ffff:192.12.2.2" is invalid: use "192.12.2.2"`,
 			},
 		},
 		{
@@ -551,7 +551,7 @@ func TestGetWarningsForCIDR(t *testing.T) {
 			cidr:      "192.012.2.0/24",
 			fieldPath: field.NewPath("spec").Child("loadBalancerSourceRanges").Index(0),
 			want: []string{
-				`spec.loadBalancerSourceRanges[0]: non-standard CIDR value "192.012.2.0/24" will be considered invalid in a future Kubernetes release: use "192.12.2.0/24"`,
+				`spec.loadBalancerSourceRanges[0]: non-standard CIDR value "192.012.2.0/24" is invalid: use "192.12.2.0/24"`,
 			},
 		},
 		{
@@ -559,7 +559,7 @@ func TestGetWarningsForCIDR(t *testing.T) {
 			cidr:      "192.12.2.0/024",
 			fieldPath: field.NewPath("spec").Child("loadBalancerSourceRanges").Index(0),
 			want: []string{
-				`spec.loadBalancerSourceRanges[0]: non-standard CIDR value "192.12.2.0/024" will be considered invalid in a future Kubernetes release: use "192.12.2.0/24"`,
+				`spec.loadBalancerSourceRanges[0]: non-standard CIDR value "192.12.2.0/024" is invalid: use "192.12.2.0/24"`,
 			},
 		},
 		{
@@ -567,7 +567,7 @@ func TestGetWarningsForCIDR(t *testing.T) {
 			cidr:      "::ffff:192.12.2.0/120",
 			fieldPath: field.NewPath("spec").Child("loadBalancerSourceRanges").Index(0),
 			want: []string{
-				`spec.loadBalancerSourceRanges[0]: non-standard CIDR value "::ffff:192.12.2.0/120" will be considered invalid in a future Kubernetes release: use "192.12.2.0/24"`,
+				`spec.loadBalancerSourceRanges[0]: non-standard CIDR value "::ffff:192.12.2.0/120" is invalid: use "192.12.2.0/24"`,
 			},
 		},
 		{
@@ -584,7 +584,7 @@ func TestGetWarningsForCIDR(t *testing.T) {
 			fieldPath: field.NewPath("spec").Child("loadBalancerSourceRanges").Index(0),
 			want: []string{
 				`spec.loadBalancerSourceRanges[0]: CIDR value "192.012.2.8/24" is ambiguous in this context (should be "192.12.2.0/24" or "192.12.2.8/32"?)`,
-				`spec.loadBalancerSourceRanges[0]: non-standard CIDR value "192.012.2.8/24" will be considered invalid in a future Kubernetes release: use "192.12.2.0/24"`,
+				`spec.loadBalancerSourceRanges[0]: non-standard CIDR value "192.012.2.8/24" is invalid: use "192.12.2.0/24"`,
 			},
 		},
 		{

@@ -17,7 +17,6 @@ limitations under the License.
 package drain
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -33,7 +32,7 @@ const (
 	daemonSetWarning    = "ignoring DaemonSet-managed Pods"
 	localStorageFatal   = "Pods with local storage (use --delete-emptydir-data to override)"
 	localStorageWarning = "deleting Pods with local storage"
-	unmanagedFatal      = "cannot delete Pods that declare no controller (use --force to override)"
+	unmanagedFatal      = "Pods that declare no controller (use --force to override)"
 	unmanagedWarning    = "deleting Pods that declare no controller"
 )
 
@@ -193,7 +192,7 @@ func (d *Helper) daemonSetFilter(pod corev1.Pod) PodDeleteStatus {
 		return MakePodDeleteStatusOkay()
 	}
 
-	if _, err := d.Client.AppsV1().DaemonSets(pod.Namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{}); err != nil {
+	if _, err := d.Client.AppsV1().DaemonSets(pod.Namespace).Get(d.getContext(), controllerRef.Name, metav1.GetOptions{}); err != nil {
 		// remove orphaned pods with a warning if --force is used
 		if apierrors.IsNotFound(err) && d.Force {
 			return MakePodDeleteStatusWithWarning(true, err.Error())

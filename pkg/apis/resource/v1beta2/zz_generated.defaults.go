@@ -30,6 +30,10 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&resourcev1beta2.DeviceTaintRule{}, func(obj interface{}) { SetObjectDefaults_DeviceTaintRule(obj.(*resourcev1beta2.DeviceTaintRule)) })
+	scheme.AddTypeDefaultingFunc(&resourcev1beta2.DeviceTaintRuleList{}, func(obj interface{}) {
+		SetObjectDefaults_DeviceTaintRuleList(obj.(*resourcev1beta2.DeviceTaintRuleList))
+	})
 	scheme.AddTypeDefaultingFunc(&resourcev1beta2.ResourceClaim{}, func(obj interface{}) { SetObjectDefaults_ResourceClaim(obj.(*resourcev1beta2.ResourceClaim)) })
 	scheme.AddTypeDefaultingFunc(&resourcev1beta2.ResourceClaimList{}, func(obj interface{}) { SetObjectDefaults_ResourceClaimList(obj.(*resourcev1beta2.ResourceClaimList)) })
 	scheme.AddTypeDefaultingFunc(&resourcev1beta2.ResourceClaimTemplate{}, func(obj interface{}) {
@@ -41,6 +45,17 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&resourcev1beta2.ResourceSlice{}, func(obj interface{}) { SetObjectDefaults_ResourceSlice(obj.(*resourcev1beta2.ResourceSlice)) })
 	scheme.AddTypeDefaultingFunc(&resourcev1beta2.ResourceSliceList{}, func(obj interface{}) { SetObjectDefaults_ResourceSliceList(obj.(*resourcev1beta2.ResourceSliceList)) })
 	return nil
+}
+
+func SetObjectDefaults_DeviceTaintRule(in *resourcev1beta2.DeviceTaintRule) {
+	SetDefaults_DeviceTaint(&in.Spec.Taint)
+}
+
+func SetObjectDefaults_DeviceTaintRuleList(in *resourcev1beta2.DeviceTaintRuleList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_DeviceTaintRule(a)
+	}
 }
 
 func SetObjectDefaults_ResourceClaim(in *resourcev1beta2.ResourceClaim) {
@@ -121,6 +136,7 @@ func SetObjectDefaults_ResourceClaimTemplateList(in *resourcev1beta2.ResourceCla
 func SetObjectDefaults_ResourceSlice(in *resourcev1beta2.ResourceSlice) {
 	for i := range in.Spec.Devices {
 		a := &in.Spec.Devices[i]
+		SetDefaults_Device(a)
 		for j := range a.Taints {
 			b := &a.Taints[j]
 			SetDefaults_DeviceTaint(b)

@@ -48,7 +48,6 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 	return internal.MakeDeviceID(driver, pool, device)
 }
 
-// types_experimental
 type SharedDeviceID = internal.SharedDeviceID
 type DeviceConsumedCapacity = internal.DeviceConsumedCapacity
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
@@ -82,13 +81,16 @@ var SupportedFeatures = internal.Features{
 	DeviceTaints:           true,
 	DeviceBindingAndStatus: true,
 	ConsumableCapacity:     true,
+	ListTypeAttributes:     true,
 }
 
 type Allocator struct {
 	features       Features
 	allocatedState AllocatedState
 	classLister    DeviceClassLister
-	slices         []*resourceapi.ResourceSlice
+	slicesOnNode   map[string][]*resourceapi.ResourceSlice
+	slicesShared   []*resourceapi.ResourceSlice
+	allSlices      []*resourceapi.ResourceSlice
 	celCache       *cel.Cache
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
@@ -121,14 +123,30 @@ func NewAllocator(ctx context.Context,
 	slices []*resourceapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
+	slicesOnNode := make(map[string][]*resourceapi.ResourceSlice)
+	slicesShared := make([]*resourceapi.ResourceSlice, 0)
+	for _, slice := range slices {
+		nodeName := ptr.Deref(slice.Spec.NodeName, "")
+		if nodeName == "" || len(slice.Spec.SharedCounters) > 0 {
+			slicesShared = append(slicesShared, slice)
+		} else {
+			slicesOnNode[nodeName] = append(slicesOnNode[nodeName], slice)
+		}
+	}
 	return &Allocator{
 		features:          features,
 		allocatedState:    allocatedState,
 		classLister:       classLister,
-		slices:            slices,
+		slicesOnNode:      slicesOnNode,
+		slicesShared:      slicesShared,
+		allSlices:         slices,
 		celCache:          celCache,
 		availableCounters: make(map[draapi.UniqueString]counterSets),
 	}, nil
+}
+
+func (a *Allocator) Channel() internal.AllocatorChannel {
+	return internal.Experimental
 }
 
 func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error) {
@@ -145,23 +163,19 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		result:               make([]internalAllocationResult, len(claims)),
 		allocatingCapacity:   NewConsumedCapacityCollection(),
 	}
-	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate), "numSlices", len(alloc.slices))
+	slicesForNode := slices.Concat(alloc.slicesOnNode[node.Name], alloc.slicesShared)
+	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate), "numSlicesForNode", len(slicesForNode))
 	defer func() {
 		alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
 	}()
 
-	alloc.logger.V(5).Info("Gathering pools", "slices", alloc.slices)
 	// First determine all eligible pools.
-	pools, err := GatherPools(ctx, alloc.slices, node, a.features)
+	pools, err := GatherPools(ctx, slicesForNode, node, a.features, alloc.allSlices)
 	if err != nil {
 		return nil, fmt.Errorf("gather pool information: %w", err)
 	}
 	alloc.pools = pools
-	if loggerV := alloc.logger.V(7); loggerV.Enabled() {
-		loggerV.Info("Gathered pool information", "numPools", len(pools), "pools", pools)
-	} else {
-		alloc.logger.V(5).Info("Gathered pool information", "numPools", len(pools))
-	}
+	alloc.logger.V(5).Info("Gathered pool information", "pools", logPools(alloc.logger, pools))
 
 	// We allocate one claim after the other and for each claim, all of
 	// its requests. For each individual device we pick one possible
@@ -229,12 +243,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				// We can only predict a lower number of devices because it depends on which
 				// subrequest gets chosen.
 				for i, subReq := range request.FirstAvailable {
+					requestKey.subRequestIndex = i
 					reqData, err := alloc.validateDeviceRequest(&deviceSubRequestAccessor{subRequest: &subReq},
 						&exactDeviceRequestAccessor{request: request}, requestKey, pools)
 					if err != nil {
 						return nil, err
 					}
-					requestKey.subRequestIndex = i
 					alloc.requestData[requestKey] = reqData
 					if reqData.numDevices < minDevicesPerRequest {
 						minDevicesPerRequest = reqData.numDevices
@@ -279,6 +293,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					logger:        logger,
 					requestNames:  sets.New(constraint.Requests...),
 					attributeName: matchAttribute,
+					features:      a.features,
 				}
 				constraints[i] = m
 			case constraint.DistinctAttribute != nil:
@@ -292,6 +307,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					logger:        logger,
 					requestNames:  sets.New(constraint.Requests...),
 					attributeName: distinctAttribute,
+					features:      a.features,
 					attributes:    make(map[string]resourceapi.DeviceAttribute),
 				}
 				constraints[i] = m
@@ -314,7 +330,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 	// We can estimate the size based on what we need to allocate.
 	alloc.allocatingDevices = make(map[DeviceID]sets.Set[int], minDevicesTotal)
 
-	alloc.logger.V(6).Info("Gathered information about devices", "numAllocated", len(alloc.allocatedState.AllocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
+	alloc.logger.V(6).Info("Gathered information about devices", "numAllocatedDevices", len(alloc.allocatedState.AllocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
 
 	// In practice, there aren't going to be many different CEL
 	// expressions. Most likely, there is going to be handful of different
@@ -329,7 +345,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 
 	// All errors get created such that they can be returned by Allocate
 	// without further wrapping.
-	done, err := alloc.allocateOne(deviceIndices{}, false)
+	done, err := alloc.allocateOne(deviceIndices{}, false, deviceLocation{})
 	if errors.Is(err, errStop) {
 		return nil, nil
 	}
@@ -552,6 +568,7 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 							id:     DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name},
 							Device: &slice.Spec.Devices[deviceIndex],
 							slice:  slice,
+							pool:   pool,
 						}
 						if alloc.features.ConsumableCapacity {
 							// Next validate whether resource request over capacity
@@ -651,6 +668,13 @@ type deviceIndices struct {
 	deviceIndex     int // The index of a device within a request or subrequest.
 }
 
+// deviceLocation identifies a device by its position in the allocator's pools.
+type deviceLocation struct {
+	poolIndex   int
+	sliceIndex  int
+	deviceIndex int
+}
+
 type requestData struct {
 	// The request or subrequest which needs to be allocated.
 	// Never nil.
@@ -740,6 +764,97 @@ type constraint interface {
 	remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID)
 }
 
+// deviceAttributeListAsSet is set-based representation of DeviceAttributeListType.
+// This has the same structure as DeviceAttributeListType, but uses sets.Set instead of slices.
+type deviceAttributeListAsSet struct {
+	intValue     sets.Set[int64]
+	boolValue    sets.Set[bool]
+	stringValue  sets.Set[string]
+	versionValue sets.Set[string]
+}
+
+// hasIntersection checks if two attribute sets have common elements.
+// Returns true if there is at least one common element.
+func (s *deviceAttributeListAsSet) hasIntersection(other *deviceAttributeListAsSet) bool {
+	if s == nil || other == nil {
+		return false
+	}
+
+	switch {
+	case s.intValue != nil && other.intValue != nil:
+		return s.intValue.Intersection(other.intValue).Len() > 0
+	case s.boolValue != nil && other.boolValue != nil:
+		return s.boolValue.Intersection(other.boolValue).Len() > 0
+	case s.stringValue != nil && other.stringValue != nil:
+		return s.stringValue.Intersection(other.stringValue).Len() > 0
+	case s.versionValue != nil && other.versionValue != nil:
+		return s.versionValue.Intersection(other.versionValue).Len() > 0
+	default:
+		// Type mismatch
+		return false
+	}
+}
+
+// updateToIntersection updates current set to intersection with the given set.
+func (s *deviceAttributeListAsSet) updateToIntersection(other *deviceAttributeListAsSet) {
+	if s == nil || other == nil {
+		return
+	}
+
+	switch {
+	case s.intValue != nil && other.intValue != nil:
+		s.intValue = s.intValue.Intersection(other.intValue)
+	case s.boolValue != nil && other.boolValue != nil:
+		s.boolValue = s.boolValue.Intersection(other.boolValue)
+	case s.stringValue != nil && other.stringValue != nil:
+		s.stringValue = s.stringValue.Intersection(other.stringValue)
+	case s.versionValue != nil && other.versionValue != nil:
+		s.versionValue = s.versionValue.Intersection(other.versionValue)
+	}
+}
+
+// attributeAsSet creates deviceAttributeListAsSet from DeviceAttribute.
+// Both scalar and list attributes are converted to set representation.
+// For scalar values, creates a single-element set.
+// For list values, creates a set from all elements.
+// Returns nil if the attribute type is unknown or empty.
+func attributeAsSet(attribute *resourceapi.DeviceAttribute) *deviceAttributeListAsSet {
+	if attribute == nil {
+		return nil
+	}
+
+	result := &deviceAttributeListAsSet{}
+
+	switch {
+	case len(attribute.IntValues) > 0:
+		result.intValue = sets.New(attribute.IntValues...)
+		return result
+	case len(attribute.BoolValues) > 0:
+		result.boolValue = sets.New(attribute.BoolValues...)
+		return result
+	case len(attribute.StringValues) > 0:
+		result.stringValue = sets.New(attribute.StringValues...)
+		return result
+	case len(attribute.VersionValues) > 0:
+		result.versionValue = sets.New(attribute.VersionValues...)
+		return result
+	case attribute.IntValue != nil:
+		result.intValue = sets.New(*attribute.IntValue)
+		return result
+	case attribute.BoolValue != nil:
+		result.boolValue = sets.New(*attribute.BoolValue)
+		return result
+	case attribute.StringValue != nil:
+		result.stringValue = sets.New(*attribute.StringValue)
+		return result
+	case attribute.VersionValue != nil:
+		result.versionValue = sets.New(*attribute.VersionValue)
+		return result
+	default:
+		return nil
+	}
+}
+
 // matchAttributeConstraint compares an attribute value across devices.
 // All devices must share the same value. When the set of devices is
 // empty, any device that has the attribute can be added. After that,
@@ -751,8 +866,14 @@ type matchAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
 	attributeName resourceapi.FullyQualifiedName
+	features      Features
 
-	attribute  *resourceapi.DeviceAttribute
+	// For scalar values (existing behavior)
+	attribute *resourceapi.DeviceAttribute
+
+	// For list values (when DRAListTypeAttributes feature gate is enabled)
+	intersection *deviceAttributeListAsSet
+
 	numDevices int
 }
 
@@ -772,40 +893,68 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 
 	if m.numDevices == 0 {
 		// The first device can always get picked.
-		m.attribute = attribute
+		// Initialize either scalar attribute or list set based on the attribute type.
+		if m.features.ListTypeAttributes {
+			// Convert attribute to set representation (both scalar and list)
+			m.intersection = attributeAsSet(attribute)
+			if m.intersection == nil {
+				m.logger.V(7).Info("Attribute type unknown")
+				return false
+			}
+		} else {
+			// Scalar attribute: use existing behavior
+			m.attribute = attribute
+		}
 		m.numDevices = 1
 		m.logger.V(7).Info("First in set")
 		return true
 	}
 
-	switch {
-	case attribute.StringValue != nil:
-		if m.attribute.StringValue == nil || *attribute.StringValue != *m.attribute.StringValue {
-			m.logger.V(7).Info("String values different")
+	// Check if we are matching with set-based logic or scalar-based logic
+	if m.features.ListTypeAttributes {
+		// Set-based matching: check if there is non-empty intersection
+		newSet := attributeAsSet(attribute)
+		if newSet == nil {
+			m.logger.V(7).Info("Unknown attribute type")
 			return false
 		}
-	case attribute.IntValue != nil:
-		if m.attribute.IntValue == nil || *attribute.IntValue != *m.attribute.IntValue {
-			m.logger.V(7).Info("Int values different")
+		if !m.intersection.hasIntersection(newSet) {
+			m.logger.V(7).Info("Attribute values have no common elements")
 			return false
 		}
-	case attribute.BoolValue != nil:
-		if m.attribute.BoolValue == nil || *attribute.BoolValue != *m.attribute.BoolValue {
-			m.logger.V(7).Info("Bool values different")
+		// Update to intersection
+		m.intersection.updateToIntersection(newSet)
+	} else {
+		// Scalar matching: use existing behavior
+		switch {
+		case attribute.StringValue != nil:
+			if m.attribute.StringValue == nil || *attribute.StringValue != *m.attribute.StringValue {
+				m.logger.V(7).Info("String values different")
+				return false
+			}
+		case attribute.IntValue != nil:
+			if m.attribute.IntValue == nil || *attribute.IntValue != *m.attribute.IntValue {
+				m.logger.V(7).Info("Int values different")
+				return false
+			}
+		case attribute.BoolValue != nil:
+			if m.attribute.BoolValue == nil || *attribute.BoolValue != *m.attribute.BoolValue {
+				m.logger.V(7).Info("Bool values different")
+				return false
+			}
+		case attribute.VersionValue != nil:
+			// semver 2.0.0 requires that version strings are in their
+			// minimal form (in particular, no leading zeros). Therefore a
+			// strict "exact equal" check can do a string comparison.
+			if m.attribute.VersionValue == nil || *attribute.VersionValue != *m.attribute.VersionValue {
+				m.logger.V(7).Info("Version values different")
+				return false
+			}
+		default:
+			// Unknown value type, cannot match.
+			m.logger.V(7).Info("Unknown attribute type")
 			return false
 		}
-	case attribute.VersionValue != nil:
-		// semver 2.0.0 requires that version strings are in their
-		// minimal form (in particular, no leading zeros). Therefore a
-		// strict "exact equal" check can do a string comparison.
-		if m.attribute.VersionValue == nil || *attribute.VersionValue != *m.attribute.VersionValue {
-			m.logger.V(7).Info("Version values different")
-			return false
-		}
-	default:
-		// Unknown value type, cannot match.
-		m.logger.V(7).Info("Match attribute type unknown")
-		return false
 	}
 
 	m.numDevices++
@@ -864,7 +1013,24 @@ func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName res
 // allocateSubRequest is true when trying to allocate one particular subrequest.
 // This allows the logic for subrequests to call allocateOne with the same
 // device index without causing infinite recursion.
-func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (bool, error) {
+//
+// startLocation provides the starting point when searching for the next device to
+// allocate. Since we have a list of pools, each with a list of slices which again
+// contains a list of devices, we have defined an order in which the devices will
+// be attempted for allocation. Since the order of devices doesn't matter within a
+// single request, we want to make sure we only attempt all combinations of devices,
+// and not search through all permutations (since many of them will have the same set
+// of devices and therefore be identical allocations). Note that the order of devices
+// does matter across requests and claims. So by providing the startLocation, we
+// make sure that the allocator only attempts allocations that follows the order
+// of the available devices, thereby avoiding different permutations. For example,
+// this means that for the devices [1, 2, 3], we will only attempt the following
+// possible allocations [1], [2], [3], [1, 2], [1, 3], [2, 3], and [1, 2, 3].
+//
+// The null startLocation (= all indices zero) means that all devices are considered.
+// The only situation where a non-null startLocation is used is when looking for the
+// next device within the same request.
+func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool, startLocation deviceLocation) (bool, error) {
 	alloc.numAllocateOneInvocations.Add(1)
 
 	if alloc.ctx.Err() != nil {
@@ -882,7 +1048,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 	claim := alloc.claimsToAllocate[r.claimIndex]
 	if r.requestIndex >= len(claim.Spec.Devices.Requests) {
 		// Done with the claim, continue with the next one.
-		success, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex + 1}, false)
+		success, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex + 1}, false, deviceLocation{})
 		if errors.Is(err, errAllocationResultMaxSizeExceeded) {
 			// We don't need to propagate this further because
 			// this is not a fatal error. Retrying the claim under
@@ -929,7 +1095,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 			}
 
 			r.subRequestIndex = subRequestIndex
-			success, err := alloc.allocateOne(r, true /* prevent infinite recusion */)
+			success, err := alloc.allocateOne(r, true /* prevent infinite recusion */, deviceLocation{})
 			// If we reached the allocation result limit, we can try
 			// with the next subrequest if there is one. It might request
 			// fewer devices, so it might succeed.
@@ -970,7 +1136,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 		// Done with request, continue with next one. We have completed the work for
 		// the request or subrequest, so we can no longer be allocating devices for
 		// a subrequest.
-		success, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex + 1}, false)
+		success, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex + 1}, false, deviceLocation{})
 		// We want to propagate any errAllocationResultMaxSizeExceeded to the caller. If
 		// that error is returned here, it means none of the requests/subrequests after this one
 		// could be allocated while staying within the limit on the number of devices, so there
@@ -1009,7 +1175,8 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 			// get all of them, then there is no solution and we have to stop.
 			return false, nil
 		}
-		done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, deviceIndex: r.deviceIndex + 1}, allocateSubRequest)
+		// No need to propagate the startLocation here since we only try one combination of devices.
+		done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, subRequestIndex: r.subRequestIndex, deviceIndex: r.deviceIndex + 1}, allocateSubRequest, deviceLocation{})
 		if err != nil || !done {
 			// If we get an error or didn't complete, we need to backtrack. Depending
 			// on the situation we might be able to retry, so we make sure we
@@ -1021,15 +1188,33 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 	}
 
 	// We need to find suitable devices.
-	for _, pool := range alloc.pools {
+	for poolIndex := startLocation.poolIndex; poolIndex < len(alloc.pools); poolIndex++ {
+		pool := alloc.pools[poolIndex]
 		// We don't allocate devices from invalid or incomplete pools, but
 		// don't error out here since there might be available devices in other
 		// pools.
 		if pool.IsIncomplete || pool.IsInvalid {
 			continue
 		}
-		for _, slice := range pool.DeviceSlicesTargetingNode {
-			for deviceIndex := range slice.Spec.Devices {
+		// We should start at the slice provided by startLocation unless we searched through
+		// all devices in the previous pool and have started at the next pool. When this happens,
+		//  we should start at the first slice in the pool.
+		sliceStart := 0
+		if poolIndex == startLocation.poolIndex {
+			sliceStart = startLocation.sliceIndex
+		}
+		for sliceIndex := sliceStart; sliceIndex < len(pool.DeviceSlicesTargetingNode); sliceIndex++ {
+			slice := pool.DeviceSlicesTargetingNode[sliceIndex]
+
+			// We should start at the device provided by startLocation unless we searched through
+			// all devices in the previous slice and have started at the next slice. When this happens,
+			//  we should start at the first device in the pool.
+			deviceStart := 0
+			if poolIndex == startLocation.poolIndex &&
+				sliceIndex == startLocation.sliceIndex {
+				deviceStart = startLocation.deviceIndex
+			}
+			for deviceIndex := deviceStart; deviceIndex < len(slice.Spec.Devices); deviceIndex++ {
 				deviceID := DeviceID{Driver: pool.Driver, Pool: pool.Pool, Device: slice.Spec.Devices[deviceIndex].Name}
 
 				// Checking for "in use" is cheap and thus gets done first.
@@ -1089,7 +1274,16 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 					subRequestIndex: r.subRequestIndex,
 					deviceIndex:     r.deviceIndex + 1,
 				}
-				done, err := alloc.allocateOne(deviceKey, allocateSubRequest)
+				nextLocation := deviceLocation{
+					poolIndex:   poolIndex,
+					sliceIndex:  sliceIndex,
+					deviceIndex: deviceIndex + 1,
+				}
+				// This is the allocation attempt for the next device in the same request.
+				// If allocateOne finds out that it is done with the request, it moves to
+				// the next without setting a start location, so each request is free to try
+				// all devices.
+				done, err := alloc.allocateOne(deviceKey, allocateSubRequest, nextLocation)
 				// If we found a solution, we can stop.
 				if err == nil && done {
 					return done, nil
@@ -1456,7 +1650,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 					}
 					// Devices that aren't allocated doesn't consume any counters, so we don't
 					// need to consider them.
-					if !alloc.allocatedState.AllocatedDevices.Has(deviceID) {
+					if !internal.IsDeviceAllocated(deviceID, &alloc.allocatedState) {
 						continue
 					}
 					for _, deviceCounterConsumption := range device.ConsumesCounters {

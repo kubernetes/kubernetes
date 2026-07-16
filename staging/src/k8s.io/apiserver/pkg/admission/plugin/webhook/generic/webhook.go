@@ -22,6 +22,7 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/cel/environment"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -39,8 +40,10 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/rules"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/features"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -48,28 +51,63 @@ import (
 type Webhook struct {
 	*admission.Handler
 
-	sourceFactory sourceFactory
+	// Factories for creating webhook sources.
+	apiSourceFactory    sourceFactory
+	staticSourceFactory StaticSourceFactory
 
-	hookSource       Source
-	clientManager    *webhookutil.ClientManager
-	namespaceMatcher *namespace.Matcher
-	objectMatcher    *object.Matcher
-	dispatcher       Dispatcher
-	filterCompiler   cel.ConditionCompiler
-	authorizer       authorizer.Authorizer
+	// Configuration provided via admission config file and initializers.
+	staticManifestsDir string // path to static webhook manifest directory (optional)
+	apiServerID        string // identity of this API server instance, used for metrics
+
+	// hookSource is the webhook source used at admission time. When staticManifestsDir
+	// is configured, this is a composite source combining staticSource (loaded from disk)
+	// with apiSource (from the API). Otherwise, it points directly to apiSource.
+	hookSource Source
+	// apiSource provides webhook configurations from the Kubernetes API (informer-based).
+	apiSource Source
+	// staticSource holds a reference to only the static (manifest-based) webhook source.
+	// This can be used to route requests for excluded resources to static hooks only.
+	staticSource ReloadableSource
+
+	// Admission-time dependencies.
+	namespaceInformer coreinformers.NamespaceInformer
+	clientManager     *webhookutil.ClientManager
+	namespaceMatcher  *namespace.Matcher
+	objectMatcher     *object.Matcher
+	dispatcher        Dispatcher
+	filterCompiler    cel.ConditionCompiler
+	authorizer        authorizer.Authorizer
+
+	// Lifecycle.
+	stopCh <-chan struct{}
 }
 
 var (
 	_ genericadmissioninit.WantsExternalKubeClientSet = &Webhook{}
+	_ genericadmissioninit.WantsDrainedNotification   = &Webhook{}
+	_ genericadmissioninit.WantsAPIServerID           = &Webhook{}
 	_ admission.Interface                             = &Webhook{}
 )
 
 type sourceFactory func(f informers.SharedInformerFactory) Source
 type dispatcherFactory func(cm *webhookutil.ClientManager) Dispatcher
 
+// ReloadableSource extends Source with a method to run a reload loop
+// that watches for configuration changes and blocks until the context is canceled.
+type ReloadableSource interface {
+	Source
+	// RunReloadLoop watches for configuration changes and reloads when detected.
+	// It blocks until ctx is canceled.
+	RunReloadLoop(ctx context.Context)
+}
+
+// StaticSourceFactory creates a static webhook source from a manifest directory.
+// The returned Source should have LoadInitial() already called.
+type StaticSourceFactory func(manifestsDir string) (ReloadableSource, error)
+
 // NewWebhook creates a new generic admission webhook.
 func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
-	kubeconfigFile, err := config.LoadConfig(configFile)
+	cfg, err := config.LoadConfig(configFile)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +123,7 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 	if err != nil {
 		return nil, err
 	}
-	authInfoResolver, err := webhookutil.NewDefaultAuthenticationInfoResolver(kubeconfigFile)
+	authInfoResolver, err := webhookutil.NewDefaultAuthenticationInfoResolver(cfg.KubeConfigFile)
 	if err != nil {
 		return nil, err
 	}
@@ -94,13 +132,14 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 	cm.SetServiceResolver(webhookutil.NewDefaultServiceResolver())
 
 	return &Webhook{
-		Handler:          handler,
-		sourceFactory:    sourceFactory,
-		clientManager:    &cm,
-		namespaceMatcher: &namespace.Matcher{},
-		objectMatcher:    &object.Matcher{},
-		dispatcher:       dispatcherFactory(&cm),
-		filterCompiler:   cel.NewConditionCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())),
+		Handler:            handler,
+		apiSourceFactory:   sourceFactory,
+		staticManifestsDir: cfg.StaticManifestsDir,
+		clientManager:      &cm,
+		namespaceMatcher:   &namespace.Matcher{},
+		objectMatcher:      &object.Matcher{},
+		dispatcher:         dispatcherFactory(&cm),
+		filterCompiler:     cel.NewConditionCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())),
 	}, nil
 }
 
@@ -117,6 +156,29 @@ func (a *Webhook) SetServiceResolver(sr webhookutil.ServiceResolver) {
 	a.clientManager.SetServiceResolver(sr)
 }
 
+// SetStaticSourceFactory sets the factory for creating static webhook sources.
+// This should be called before SetExternalKubeInformerFactory.
+func (a *Webhook) SetStaticSourceFactory(factory StaticSourceFactory) {
+	a.staticSourceFactory = factory
+}
+
+// SetAPIServerID implements the WantsAPIServerID interface.
+// The API server ID is used for metrics labeling and must be set before
+// SetExternalKubeInformerFactory is called.
+func (a *Webhook) SetAPIServerID(id string) {
+	a.apiServerID = id
+}
+
+// GetAPIServerID returns the stored API server ID.
+func (a *Webhook) GetAPIServerID() string {
+	return a.apiServerID
+}
+
+// SetDrainedNotification implements the WantsDrainedNotification interface.
+func (a *Webhook) SetDrainedNotification(stopCh <-chan struct{}) {
+	a.stopCh = stopCh
+}
+
 // SetExternalKubeClientSet implements the WantsExternalKubeInformerFactory interface.
 // It sets external ClientSet for admission plugins that need it
 func (a *Webhook) SetExternalKubeClientSet(client clientset.Interface) {
@@ -127,10 +189,10 @@ func (a *Webhook) SetExternalKubeClientSet(client clientset.Interface) {
 func (a *Webhook) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	a.namespaceMatcher.NamespaceLister = namespaceInformer.Lister()
-	a.hookSource = a.sourceFactory(f)
-	a.SetReadyFunc(func() bool {
-		return namespaceInformer.Informer().HasSynced() && a.hookSource.HasSynced()
-	})
+	a.namespaceInformer = namespaceInformer
+
+	// Create the API-based source (stored for later use in ValidateInitialization)
+	a.apiSource = a.apiSourceFactory(f)
 }
 
 func (a *Webhook) SetAuthorizer(authorizer authorizer.Authorizer) {
@@ -138,8 +200,10 @@ func (a *Webhook) SetAuthorizer(authorizer authorizer.Authorizer) {
 }
 
 // ValidateInitialization implements the InitializationValidator interface.
+// Static source creation happens here (after all initializers have run) because
+// SetManifestLoaders may be called after SetExternalKubeInformerFactory.
 func (a *Webhook) ValidateInitialization() error {
-	if a.hookSource == nil {
+	if a.apiSource == nil {
 		return fmt.Errorf("kubernetes client is not properly setup")
 	}
 	if err := a.namespaceMatcher.Validate(); err != nil {
@@ -148,6 +212,46 @@ func (a *Webhook) ValidateInitialization() error {
 	if err := a.clientManager.Validate(); err != nil {
 		return fmt.Errorf("clientManager is not properly setup: %v", err)
 	}
+
+	// Guard: if static manifests dir is set but feature gate is off, return an error
+	if len(a.staticManifestsDir) > 0 && !utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
+		return fmt.Errorf("static webhook manifests dir %q configured but %s feature gate is not enabled", a.staticManifestsDir, features.ManifestBasedAdmissionControlConfig)
+	}
+
+	// Construct hookSource. The static source path (which starts goroutines)
+	// is guarded to avoid duplicate construction. The API-only path is a cheap
+	// pointer assignment that must reflect the latest apiSource.
+	if len(a.staticManifestsDir) > 0 {
+		if a.hookSource == nil {
+			if a.staticSourceFactory == nil {
+				return fmt.Errorf("static webhook manifests configured in %q but no static source factory is set", a.staticManifestsDir)
+			}
+			if a.stopCh == nil {
+				return fmt.Errorf("stopCh not set: WantsDrainedNotification must be called before ValidateInitialization")
+			}
+			staticSource, err := a.staticSourceFactory(a.staticManifestsDir)
+			if err != nil {
+				return fmt.Errorf("failed to load static webhook manifests from %q: %w", a.staticManifestsDir, err)
+			}
+			a.staticSource = staticSource
+			// Start the file watcher in a background goroutine, tied to server shutdown
+			staticCtx, staticCancel := context.WithCancel(context.Background())
+			go func() {
+				defer staticCancel()
+				<-a.stopCh
+			}()
+			go staticSource.RunReloadLoop(staticCtx)
+			// Use composite source that combines static + API sources
+			a.hookSource = NewCompositeWebhookSource(staticSource, a.apiSource)
+		}
+	} else {
+		a.hookSource = a.apiSource
+	}
+
+	a.SetReadyFunc(func() bool {
+		return a.namespaceInformer.Informer().HasSynced() && a.hookSource.HasSynced()
+	})
+
 	return nil
 }
 
@@ -252,6 +356,16 @@ func (a *attrWithResourceOverride) GetResource() schema.GroupVersionResource { r
 // Dispatch is called by the downstream Validate or Admit methods.
 func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
 	if rules.IsExemptAdmissionConfigurationResource(attr) {
+		// Admission config resources are excluded from API-based webhooks to
+		// prevent circular dependencies. However, static (manifest-based) webhooks
+		// are safe to evaluate since they don't have self-referential concerns.
+		if a.staticSource != nil {
+			if !a.staticSource.HasSynced() {
+				return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
+			}
+			hooks := a.staticSource.Webhooks()
+			return a.dispatcher.Dispatch(ctx, attr, o, hooks)
+		}
 		return nil
 	}
 	if !a.WaitForReady() {

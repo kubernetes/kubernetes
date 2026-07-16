@@ -69,6 +69,7 @@ import (
 	podgcconfig "k8s.io/kubernetes/pkg/controller/podgc/config"
 	replicasetconfig "k8s.io/kubernetes/pkg/controller/replicaset/config"
 	replicationconfig "k8s.io/kubernetes/pkg/controller/replication/config"
+	resourceclaimconfig "k8s.io/kubernetes/pkg/controller/resourceclaim/config"
 	resourcequotaconfig "k8s.io/kubernetes/pkg/controller/resourcequota/config"
 	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
 	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
@@ -100,6 +101,7 @@ var args = []string{
 	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
 	"--concurrent-device-taint-eviction-syncs=10",
+	"--concurrent-resourceclaim-syncs=10",
 	"--concurrent-daemonset-syncs=10",
 	"--concurrent-horizontal-pod-autoscaler-syncs=10",
 	"--concurrent-statefulset-syncs=15",
@@ -277,6 +279,11 @@ func TestAddFlags(t *testing.T) {
 		},
 		DeviceTaintEvictionController: &DeviceTaintEvictionControllerOptions{
 			&devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration{
+				ConcurrentSyncs: 10,
+			},
+		},
+		ResourceClaimController: &ResourceClaimControllerOptions{
+			&resourceclaimconfig.ResourceClaimControllerConfiguration{
 				ConcurrentSyncs: 10,
 			},
 		},
@@ -632,6 +639,9 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentDeploymentSyncs: 10,
 			},
 			DeviceTaintEvictionController: devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration{
+				ConcurrentSyncs: 10,
+			},
+			ResourceClaimController: resourceclaimconfig.ResourceClaimControllerConfiguration{
 				ConcurrentSyncs: 10,
 			},
 			StatefulSetController: statefulsetconfig.StatefulSetControllerConfiguration{
@@ -1277,6 +1287,15 @@ func TestValidateControllersOptions(t *testing.T) {
 			expectErrors: false,
 			options: &DeviceTaintEvictionControllerOptions{
 				&devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration{
+					ConcurrentSyncs: 10,
+				},
+			},
+		},
+		{
+			name:         "ResourceClaimControllerOptions",
+			expectErrors: false,
+			options: &ResourceClaimControllerOptions{
+				&resourceclaimconfig.ResourceClaimControllerConfiguration{
 					ConcurrentSyncs: 10,
 				},
 			},

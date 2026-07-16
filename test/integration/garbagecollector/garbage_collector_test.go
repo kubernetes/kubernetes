@@ -105,7 +105,7 @@ W6CzB7pZ9Nj1YLpgzc1r6oONHLokMJJIz/IvkQ==
 -----END CERTIFICATE-----`)
 
 func newPod(podName, podNamespace string, ownerReferences []metav1.OwnerReference) *v1.Pod {
-	for i := 0; i < len(ownerReferences); i++ {
+	for i := range ownerReferences {
 		if len(ownerReferences[i].Kind) == 0 {
 			ownerReferences[i].Kind = "ReplicationController"
 		}
@@ -379,7 +379,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < validChildrenCount; i++ {
+	for range validChildrenCount {
 		_, err := clientSet.CoreV1().Secrets(namespaceB).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "child-", OwnerReferences: []metav1.OwnerReference{
 			{Name: "parent", Kind: "ConfigMap", APIVersion: "v1", UID: parent.UID, Controller: ptr.To(false)},
 		}}}, metav1.CreateOptions{})
@@ -392,12 +392,12 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 
 	// Construct invalid owner references:
 	invalidOwnerReferences := []metav1.OwnerReference{}
-	for i := 0; i < 25; i++ {
+	for i := range 25 {
 		invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: types.UID(fmt.Sprintf("invalid-%d", i)), APIVersion: "test/v1", Kind: fmt.Sprintf("invalid%d", i)})
 	}
 	invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: ptr.To(false)})
 
-	for i := 0; i < workers; i++ {
+	for range workers {
 		_, err := clientSet.CoreV1().ConfigMaps(namespaceA).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
@@ -617,7 +617,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	rcUIDs <- rc.ObjectMeta.UID
 	// create pods.
 	var podUIDs []types.UID
-	for j := 0; j < 3; j++ {
+	for j := range 3 {
 		podName := "test.pod." + nameSuffix + "-" + strconv.Itoa(j)
 		pod := newPod(podName, namespace, []metav1.OwnerReference{{UID: rc.ObjectMeta.UID, Name: rc.ObjectMeta.Name}})
 		createdPod, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
@@ -706,7 +706,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	wg.Add(collections * 5)
 	rcUIDs := make(chan types.UID, collections*5)
 	errs := make(chan string, 5)
-	for i := 0; i < collections; i++ {
+	for i := range collections {
 		// rc is created with empty finalizers, deleted with nil delete options, pods will remain.
 		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), ns.Name, []string{}, metav1.DeleteOptions{}, &wg, rcUIDs, errs)
 		// rc is created with the orphan finalizer, deleted with nil options, pods will remain.
@@ -748,7 +748,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	}
 
 	// verify there is no node representing replication controllers in the gc's graph
-	for i := 0; i < collections; i++ {
+	for range collections {
 		uid := <-rcUIDs
 		if gc.GraphHasUID(uid) {
 			t.Errorf("Expect all nodes representing replication controllers are removed from the Propagator's graph")
@@ -777,7 +777,7 @@ func TestOrphaning(t *testing.T) {
 	// these pods should be orphaned.
 	var podUIDs []types.UID
 	podsNum := 3
-	for i := 0; i < podsNum; i++ {
+	for i := range podsNum {
 		podName := garbageCollectedPodName + strconv.Itoa(i)
 		pod := newPod(podName, ns.Name, []metav1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName}})
 		createdPod, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{})

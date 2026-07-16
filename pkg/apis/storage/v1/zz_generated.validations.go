@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -47,11 +48,11 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	// type StorageClassList
-	scheme.AddValidationFunc((*storagev1.StorageClassList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+	// type VolumeAttachment
+	scheme.AddValidationFunc((*storagev1.VolumeAttachment)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_StorageClassList(ctx, op, nil /* fldPath */, obj.(*storagev1.StorageClassList), safe.Cast[*storagev1.StorageClassList](oldObj))
+		case "/", "/status":
+			return Validate_VolumeAttachment(ctx, op, nil /* fldPath */, obj.(*storagev1.VolumeAttachment), safe.Cast[*storagev1.VolumeAttachment](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
@@ -73,7 +74,11 @@ func Validate_StorageClass(ctx context.Context, op operation.Operation, fldPath 
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -83,32 +88,137 @@ func Validate_StorageClass(ctx context.Context, op operation.Operation, fldPath 
 			return
 		}(fldPath.Child("provisioner"), &obj.Provisioner, safe.Field(oldObj, func(oldObj *storagev1.StorageClass) *string { return &oldObj.Provisioner }), oldObj != nil)...)
 
-	// field storagev1.StorageClass.Parameters has no validation
-	// field storagev1.StorageClass.ReclaimPolicy has no validation
-	// field storagev1.StorageClass.MountOptions has no validation
-	// field storagev1.StorageClass.AllowVolumeExpansion has no validation
-	// field storagev1.StorageClass.VolumeBindingMode has no validation
-	// field storagev1.StorageClass.AllowedTopologies has no validation
-	return errs
-}
-
-// Validate_StorageClassList validates an instance of StorageClassList according
-// to declarative validation rules in the API schema.
-func Validate_StorageClassList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.StorageClassList) (errs field.ErrorList) {
-	// field storagev1.StorageClassList.TypeMeta has no validation
-	// field storagev1.StorageClassList.ListMeta has no validation
-
-	// field storagev1.StorageClassList.Items
+	// field storagev1.StorageClass.Parameters
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []storagev1.StorageClass, oldValueCorrelated bool) (errs field.ErrorList) {
+		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_StorageClass)...)
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *storagev1.StorageClassList) []storagev1.StorageClass { return oldObj.Items }), oldObj != nil)...)
+		}(fldPath.Child("parameters"), obj.Parameters, safe.Field(oldObj, func(oldObj *storagev1.StorageClass) map[string]string { return oldObj.Parameters }), oldObj != nil)...)
 
+	// field storagev1.StorageClass.ReclaimPolicy
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *corev1.PersistentVolumeReclaimPolicy, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("reclaimPolicy"), obj.ReclaimPolicy, safe.Field(oldObj, func(oldObj *storagev1.StorageClass) *corev1.PersistentVolumeReclaimPolicy {
+			return oldObj.ReclaimPolicy
+		}), oldObj != nil)...)
+
+	// field storagev1.StorageClass.MountOptions has no validation
+	// field storagev1.StorageClass.AllowVolumeExpansion has no validation
+
+	// field storagev1.StorageClass.VolumeBindingMode
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *storagev1.VolumeBindingMode, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("volumeBindingMode"), obj.VolumeBindingMode, safe.Field(oldObj, func(oldObj *storagev1.StorageClass) *storagev1.VolumeBindingMode { return oldObj.VolumeBindingMode }), oldObj != nil)...)
+
+	// field storagev1.StorageClass.AllowedTopologies has no validation
+	return errs
+}
+
+// Validate_VolumeAttachment validates an instance of VolumeAttachment according
+// to declarative validation rules in the API schema.
+func Validate_VolumeAttachment(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.VolumeAttachment) (errs field.ErrorList) {
+	// field storagev1.VolumeAttachment.TypeMeta has no validation
+	// field storagev1.VolumeAttachment.ObjectMeta has no validation
+
+	// field storagev1.VolumeAttachment.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *storagev1.VolumeAttachmentSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_VolumeAttachmentSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *storagev1.VolumeAttachment) *storagev1.VolumeAttachmentSpec { return &oldObj.Spec }), oldObj != nil)...)
+
+	// field storagev1.VolumeAttachment.Status has no validation
+	return errs
+}
+
+// Validate_VolumeAttachmentSpec validates an instance of VolumeAttachmentSpec according
+// to declarative validation rules in the API schema.
+func Validate_VolumeAttachmentSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1.VolumeAttachmentSpec) (errs field.ErrorList) {
+	// field storagev1.VolumeAttachmentSpec.Attacher
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63).MarkAlpha()...)
+			return
+		}(fldPath.Child("attacher"), &obj.Attacher, safe.Field(oldObj, func(oldObj *storagev1.VolumeAttachmentSpec) *string { return &oldObj.Attacher }), oldObj != nil)...)
+
+	// field storagev1.VolumeAttachmentSpec.Source has no validation
+	// field storagev1.VolumeAttachmentSpec.NodeName has no validation
 	return errs
 }

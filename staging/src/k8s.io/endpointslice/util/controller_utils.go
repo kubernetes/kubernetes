@@ -28,11 +28,11 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/dump"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/dump"
 )
 
 // semanticIgnoreResourceVersion does semantic deep equality checks for objects
@@ -159,6 +159,10 @@ type PortMapKey string
 
 // NewPortMapKey generates a PortMapKey from endpoint ports.
 func NewPortMapKey(endpointPorts []discovery.EndpointPort) PortMapKey {
+	// Normalize nil to empty slice so they hash the same.
+	if endpointPorts == nil {
+		endpointPorts = []discovery.EndpointPort{}
+	}
 	sort.Sort(portsInOrder(endpointPorts))
 	return PortMapKey(deepHashObjectToString(endpointPorts))
 }

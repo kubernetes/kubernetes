@@ -108,7 +108,8 @@ type RuntimeHandlerResolver interface {
 
 // namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
 // An empty or nil pod can be used to get the namespace defaults for v1.Pod.
-func NamespacesForPod(pod *v1.Pod, runtimeHelper kubecontainer.RuntimeHelper, rcManager RuntimeHandlerResolver) (*runtimeapi.NamespaceOption, error) {
+func NamespacesForPod(ctx context.Context, pod *v1.Pod, runtimeHelper kubecontainer.RuntimeHelper, rcManager RuntimeHandlerResolver) (*runtimeapi.NamespaceOption, error) {
+	logger := klog.FromContext(ctx)
 	runtimeHandler := ""
 	if pod != nil && rcManager != nil {
 		var err error
@@ -117,7 +118,7 @@ func NamespacesForPod(pod *v1.Pod, runtimeHelper kubecontainer.RuntimeHelper, rc
 			return nil, err
 		}
 	}
-	userNs, err := runtimeHelper.GetOrCreateUserNamespaceMappings(pod, runtimeHandler)
+	userNs, err := runtimeHelper.GetOrCreateUserNamespaceMappings(logger, pod, runtimeHandler)
 	if err != nil {
 		return nil, err
 	}

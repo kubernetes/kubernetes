@@ -22,7 +22,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"k8s.io/apimachinery/pkg/util/dump"
+	"k8s.io/utils/dump"
 )
 
 // ObjectGoPrintSideBySide prints a and b as textual dumps side by side,

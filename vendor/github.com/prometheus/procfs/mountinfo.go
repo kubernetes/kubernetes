@@ -1,4 +1,4 @@
-// Copyright 2019 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -147,8 +147,7 @@ func mountOptionsParseOptionalFields(o []string) (map[string]string, error) {
 // mountOptionsParser parses the mount options, superblock options.
 func mountOptionsParser(mountOptions string) map[string]string {
 	opts := make(map[string]string)
-	options := strings.Split(mountOptions, ",")
-	for _, opt := range options {
+	for opt := range strings.SplitSeq(mountOptions, ",") {
 		splitOption := strings.Split(opt, "=")
 		if len(splitOption) < 2 {
 			key := splitOption[0]
@@ -173,6 +172,24 @@ func GetMounts() ([]*MountInfo, error) {
 // GetProcMounts retrieves mountinfo information from a processes' `/proc/<pid>/mountinfo`.
 func GetProcMounts(pid int) ([]*MountInfo, error) {
 	data, err := util.ReadFileNoStat(fmt.Sprintf("/proc/%d/mountinfo", pid))
+	if err != nil {
+		return nil, err
+	}
+	return parseMountInfo(data)
+}
+
+// GetMounts retrieves mountinfo information from `/proc/self/mountinfo`.
+func (fs FS) GetMounts() ([]*MountInfo, error) {
+	data, err := util.ReadFileNoStat(fs.proc.Path("self/mountinfo"))
+	if err != nil {
+		return nil, err
+	}
+	return parseMountInfo(data)
+}
+
+// GetProcMounts retrieves mountinfo information from a processes' `/proc/<pid>/mountinfo`.
+func (fs FS) GetProcMounts(pid int) ([]*MountInfo, error) {
+	data, err := util.ReadFileNoStat(fs.proc.Path(fmt.Sprintf("%d/mountinfo", pid)))
 	if err != nil {
 		return nil, err
 	}

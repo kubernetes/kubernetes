@@ -173,11 +173,6 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 	return plug.NewUnmounter(spec.Name(), podUID)
 }
 
-// Returns the hostname of the host kubelet is running on
-func (f *fakeVolumeHost) GetHostName() string {
-	return "fakeHostName"
-}
-
 func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }

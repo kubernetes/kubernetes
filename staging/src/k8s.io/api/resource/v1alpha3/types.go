@@ -140,6 +140,7 @@ type DeviceTaint struct {
 	// Consumers must treat unknown effects like None.
 	//
 	// +required
+	// +k8s:required
 	Effect DeviceTaintEffect `json:"effect" protobuf:"bytes,3,name=effect,casttype=DeviceTaintEffect"`
 
 	// ^^^^
@@ -155,8 +156,17 @@ type DeviceTaint struct {
 	// which will enable adding new enums within a single release without
 	// ratcheting.
 
-	// TimeAdded represents the time at which the taint was added.
+	// TimeAdded represents the time at which the taint was added or
+	// (only in a DeviceTaintRule) the effect was modified.
 	// Added automatically during create or update if not set.
+	//
+	// In addition, in a DeviceTaintRule a value provided during
+	// an update gets replaced with the current time if the provided
+	// value is the same as the old one and the new effect is different.
+	// Changing the key and/or value while keeping the effect unchanged
+	// is possible and does not update the time stamp because the eviction
+	// which uses it is either already started (NoExecute) or
+	// not started yet (NoEffect, NoSchedule).
 	//
 	// +optional
 	TimeAdded *metav1.Time `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
@@ -169,6 +179,7 @@ type DeviceTaint struct {
 }
 
 // +enum
+// +k8s:enum
 type DeviceTaintEffect string
 
 const (
@@ -201,6 +212,7 @@ type DeviceTaintRule struct {
 	// Spec specifies the selector and one taint.
 	//
 	// Changing the spec automatically increments the metadata.generation number.
+	// +required
 	Spec DeviceTaintRuleSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
 	// Status provides information about what was requested in the spec.
@@ -331,4 +343,234 @@ type DeviceTaintRuleList struct {
 
 	// Items is the list of DeviceTaintRules.
 	Items []DeviceTaintRule `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.36
+// +k8s:supportsSubresource="/status"
+
+// ResourcePoolStatusRequest triggers a one-time calculation of resource pool status
+// based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed.
+// Users should delete and recreate requests to get updated information.
+type ResourcePoolStatusRequest struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +required
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec defines the filters for which pools to include in the status.
+	// The spec is immutable once created.
+	//
+	// +required
+	// +k8s:immutable
+	Spec ResourcePoolStatusRequestSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+
+	// Status is populated by the controller with the calculated pool status.
+	// When status is non-nil, the request is considered complete and the
+	// entire object becomes immutable.
+	//
+	// +optional
+	// +k8s:optional
+	Status *ResourcePoolStatusRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// ResourcePoolStatusRequestSpec defines the filters for the pool status request.
+type ResourcePoolStatusRequestSpec struct {
+	// Driver specifies the DRA driver name to filter pools.
+	// Only pools from ResourceSlices with this driver will be included.
+	// Must be a DNS subdomain (e.g., "gpu.example.com").
+	//
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-long-name-caseless
+	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
+
+	// PoolName optionally filters to a specific pool name.
+	// If not specified, all pools from the specified driver are included.
+	// When specified, must be a non-empty valid resource pool name
+	// (DNS subdomains separated by "/").
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-resource-pool-name
+	PoolName *string `json:"poolName,omitempty" protobuf:"bytes,2,opt,name=poolName"`
+
+	// Limit optionally specifies the maximum number of pools to return in the status.
+	// If more pools match the filter criteria, the response will be truncated
+	// (i.e., len(status.pools) < status.poolCount).
+	//
+	// Default: 100
+	// Minimum: 1
+	// Maximum: 1000
+	//
+	// +optional
+	// +k8s:optional
+	// +default=100
+	// +k8s:minimum=1
+	// +k8s:maximum=1000
+	Limit *int32 `json:"limit,omitempty" protobuf:"varint,3,opt,name=limit"`
+}
+
+// ResourcePoolStatusRequestLimitDefault is the default value for spec.limit.
+const ResourcePoolStatusRequestLimitDefault int32 = 100
+
+// ResourcePoolStatusRequestLimitMax is the maximum allowed value for spec.limit.
+const ResourcePoolStatusRequestLimitMax int32 = 1000
+
+// ResourcePoolStatusRequestStatus contains the calculated pool status information.
+type ResourcePoolStatusRequestStatus struct {
+	// PoolCount is the total number of pools that matched the filter criteria,
+	// regardless of truncation. This helps users understand how many pools exist
+	// even when the response is truncated. A value of 0 means no pools matched
+	// the filter criteria.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:minimum=0
+	PoolCount *int32 `json:"poolCount,omitempty" protobuf:"varint,6,opt,name=poolCount"`
+
+	// Pools contains the first `spec.limit` matching pools, sorted by driver
+	// then pool name. If `len(pools) < poolCount`, the list was truncated.
+	// When omitted, no pools matched the request filters.
+	//
+	// +optional
+	// +k8s:optional
+	// +listType=atomic
+	// +k8s:listType=atomic
+	// +k8s:maxItems=1000
+	Pools []PoolStatus `json:"pools,omitempty" protobuf:"bytes,2,rep,name=pools"`
+
+	// Conditions provide information about the state of the request.
+	// A condition with type=Complete or type=Failed will always be set
+	// when the status is populated.
+	//
+	// Known condition types:
+	// - "Complete": True when the request has been processed successfully
+	// - "Failed": True when the request could not be processed
+	//
+	// +optional
+	// +k8s:optional
+	// +listType=map
+	// +k8s:listType=map
+	// +listMapKey=type
+	// +k8s:listMapKey=type
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +k8s:maxItems=10
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,3,rep,name=conditions"`
+}
+
+// PoolStatus contains status information for a single resource pool.
+type PoolStatus struct {
+	// Driver is the DRA driver name for this pool.
+	// Must be a DNS subdomain (e.g., "gpu.example.com").
+	//
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-long-name-caseless
+	Driver string `json:"driver,omitempty" protobuf:"bytes,1,name=driver"`
+
+	// PoolName is the name of the pool.
+	// Must be a valid resource pool name (DNS subdomains separated by "/").
+	//
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-resource-pool-name
+	PoolName string `json:"poolName,omitempty" protobuf:"bytes,2,name=poolName"`
+
+	// Generation is the pool generation observed across all ResourceSlices
+	// in this pool. Only the latest generation is reported. During a generation
+	// rollout, if not all slices at the latest generation have been published,
+	// the pool is included with a validationError and device counts unset.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:minimum=0
+	Generation int64 `json:"generation" protobuf:"varint,9,opt,name=generation"`
+
+	// ResourceSliceCount is the number of ResourceSlices that make up this pool.
+	// May be unset when validationError is set.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=1
+	ResourceSliceCount *int32 `json:"resourceSliceCount,omitempty" protobuf:"varint,8,opt,name=resourceSliceCount"`
+
+	// TotalDevices is the total number of devices in the pool across all slices.
+	// A value of 0 means the pool has no devices.
+	// May be unset when validationError is set.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=0
+	TotalDevices *int32 `json:"totalDevices,omitempty" protobuf:"varint,4,opt,name=totalDevices"`
+
+	// AllocatedDevices is the number of devices currently allocated to claims.
+	// A value of 0 means no devices are allocated.
+	// May be unset when validationError is set.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=0
+	AllocatedDevices *int32 `json:"allocatedDevices,omitempty" protobuf:"varint,5,opt,name=allocatedDevices"`
+
+	// AvailableDevices is the number of devices available for allocation.
+	// This equals TotalDevices - AllocatedDevices - UnavailableDevices.
+	// A value of 0 means no devices are currently available.
+	// May be unset when validationError is set.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=0
+	AvailableDevices *int32 `json:"availableDevices,omitempty" protobuf:"varint,6,opt,name=availableDevices"`
+
+	// UnavailableDevices is the number of devices that are not available
+	// due to taints or other conditions, but are not allocated.
+	// A value of 0 means all unallocated devices are available.
+	// May be unset when validationError is set.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=0
+	UnavailableDevices *int32 `json:"unavailableDevices,omitempty" protobuf:"varint,7,opt,name=unavailableDevices"`
+
+	// NodeName is the node this pool is associated with.
+	// When omitted, the pool is not associated with a specific node.
+	// Must be a valid DNS subdomain name (RFC1123).
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-long-name
+	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
+
+	// ValidationError is set when the pool's data could not be fully
+	// validated (e.g., incomplete slice publication). When set, device
+	// count fields and ResourceSliceCount may be unset.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:maxBytes=256
+	ValidationError *string `json:"validationError,omitempty" protobuf:"bytes,10,opt,name=validationError"`
+}
+
+// ResourcePoolStatusRequestConditionComplete is the condition type for completed requests.
+const ResourcePoolStatusRequestConditionComplete = "Complete"
+
+// ResourcePoolStatusRequestConditionFailed is the condition type for failed requests.
+const ResourcePoolStatusRequestConditionFailed = "Failed"
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.36
+
+// ResourcePoolStatusRequestList is a collection of ResourcePoolStatusRequests.
+type ResourcePoolStatusRequestList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of ResourcePoolStatusRequests.
+	Items []ResourcePoolStatusRequest `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

@@ -71,7 +71,7 @@ func runBootstrapToken(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-	kubeconfig, err := data.KubeConfig()
+	kubeconfig, err := data.KubeConfigOriginal()
 	if err != nil {
 		return err
 	}
@@ -106,6 +106,11 @@ func runBootstrapToken(c workflow.RunData) error {
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
 	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client); err != nil {
 		return err
+	}
+
+	// Create RBAC rules that allow the API server kubelet client to access the kubelet API
+	if err := nodebootstraptokenphase.AllowAPIServerToAccessKubeletAPI(client); err != nil {
+		return errors.Wrap(err, "error allowing API server to access kubelet API")
 	}
 
 	// Create the cluster-info ConfigMap with the associated RBAC rules

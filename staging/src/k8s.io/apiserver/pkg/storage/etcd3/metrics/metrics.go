@@ -112,13 +112,22 @@ var (
 			Subsystem:      "apiserver",
 			Name:           "storage_events_received_total",
 			Help:           "Number of etcd events received split by kind.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
 	etcdBookmarkCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "etcd_bookmark_counts",
+			Name:              "etcd_bookmark_counts",
+			Help:              "Number of etcd bookmarks (progress notify events) split by kind.",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.36.0",
+		},
+		[]string{"group", "resource"},
+	)
+	etcdBookmarkTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "etcd_bookmark_total",
 			Help:           "Number of etcd bookmarks (progress notify events) split by kind.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
@@ -200,6 +209,7 @@ func Register() {
 		legacyregistry.CustomMustRegister(storageMonitor)
 		legacyregistry.MustRegister(etcdEventsReceivedCounts)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
+		legacyregistry.MustRegister(etcdBookmarkTotal)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
 		legacyregistry.MustRegister(listStorageCount)
 		legacyregistry.MustRegister(listStorageNumFetched)
@@ -255,9 +265,10 @@ func RecordEtcdEvent(groupResource schema.GroupResource) {
 	etcdEventsReceivedCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
 }
 
-// RecordEtcdBookmark updates the etcd_bookmark_counts metric.
+// RecordEtcdBookmark updates the etcd_bookmark_total metric.
 func RecordEtcdBookmark(groupResource schema.GroupResource) {
 	etcdBookmarkCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+	etcdBookmarkTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
 }
 
 // RecordDecodeError sets the storage_decode_errors metrics.
@@ -300,7 +311,7 @@ func UpdateEtcdRequestRetry(errorCode string) {
 	etcdRequestRetry.WithLabelValues(errorCode).Inc()
 }
 
-// RecordListEtcd3Metrics notes various metrics of the cost to serve a LIST request
+// RecordStorageListMetrics notes various metrics of the cost to serve a LIST request
 func RecordStorageListMetrics(groupResource schema.GroupResource, numFetched, numEvald, numReturned int) {
 	listStorageCount.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
 	listStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numFetched))

@@ -22,13 +22,13 @@ import (
 	"io"
 
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/service"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type PodDirIO struct {
-	F             *framework.Framework
+	TCtx          ktesting.TContext
 	Namespace     string
 	PodName       string
 	ContainerName string
@@ -105,7 +105,7 @@ func (p PodDirIO) RemoveAll(path string) error {
 }
 
 func (p PodDirIO) execute(command []string, stdin io.Reader) (string, string, error) {
-	stdout, stderr, err := e2epod.ExecWithOptions(p.F, e2epod.ExecOptions{
+	stdout, stderr, err := e2epod.ExecWithOptionsTCtx(p.TCtx, e2epod.ExecOptions{
 		Command:       command,
 		Namespace:     p.Namespace,
 		PodName:       p.PodName,

@@ -4,19 +4,19 @@ package v1alpha1
 
 import (
 	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
-	v1 "k8s.io/api/core/v1"
 )
 
 // RemoteWriteAuthorizationApplyConfiguration represents a declarative configuration of the RemoteWriteAuthorization type for use
 // with apply.
 //
 // RemoteWriteAuthorization defines the authorization method for a remote write endpoint.
-// Exactly one of the nested configs must be set according to the type discriminator.
+// Nested config requirements depend on the type discriminator: Authorization requires authorization,
+// BasicAuth requires basicAuth, OAuth2 requires oauth2, SigV4 requires sigv4, and ServiceAccount forbids all nested configs.
 type RemoteWriteAuthorizationApplyConfiguration struct {
 	// type specifies the authorization method to use.
-	// Allowed values are BearerToken, BasicAuth, OAuth2, SigV4, SafeAuthorization, ServiceAccount.
+	// Allowed values are Authorization, BasicAuth, OAuth2, SigV4, and ServiceAccount.
 	//
-	// When set to BearerToken, the bearer token is read from a Secret referenced by the bearerToken field.
+	// When set to Authorization, credentials are read from a single Secret key. The secret key typically contains a Bearer token. Use the authorization field.
 	//
 	// When set to BasicAuth, HTTP basic authentication is used; the basicAuth field (username and password from Secrets) must be set.
 	//
@@ -24,16 +24,12 @@ type RemoteWriteAuthorizationApplyConfiguration struct {
 	//
 	// When set to SigV4, AWS Signature Version 4 is used for authentication; the sigv4 field must be set.
 	//
-	// When set to SafeAuthorization, credentials are read from a single Secret key (Prometheus SafeAuthorization pattern). The secret key typically contains a Bearer token. Use the safeAuthorization field.
-	//
 	// When set to ServiceAccount, the pod's service account token is used for machine identity. No additional field is required; the operator configures the token path.
 	Type *configv1alpha1.RemoteWriteAuthorizationType `json:"type,omitempty"`
-	// safeAuthorization defines the secret reference containing the credentials for authentication (e.g. Bearer token).
-	// Required when type is "SafeAuthorization", and forbidden otherwise. Maps to Prometheus SafeAuthorization. The secret must exist in the openshift-monitoring namespace.
-	SafeAuthorization *v1.SecretKeySelector `json:"safeAuthorization,omitempty"`
-	// bearerToken defines the secret reference containing the bearer token.
-	// Required when type is "BearerToken", and forbidden otherwise.
-	BearerToken *SecretKeySelectorApplyConfiguration `json:"bearerToken,omitempty"`
+	// authorization defines the secret reference containing the authorization credentials (e.g. Bearer token).
+	// Required when type is "Authorization", and forbidden otherwise.
+	// The secret must exist in the openshift-monitoring namespace.
+	Authorization *SecretKeySelectorApplyConfiguration `json:"authorization,omitempty"`
 	// basicAuth defines HTTP basic authentication credentials.
 	// Required when type is "BasicAuth", and forbidden otherwise.
 	BasicAuth *BasicAuthApplyConfiguration `json:"basicAuth,omitempty"`
@@ -59,19 +55,11 @@ func (b *RemoteWriteAuthorizationApplyConfiguration) WithType(value configv1alph
 	return b
 }
 
-// WithSafeAuthorization sets the SafeAuthorization field in the declarative configuration to the given value
+// WithAuthorization sets the Authorization field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SafeAuthorization field is set to the value of the last call.
-func (b *RemoteWriteAuthorizationApplyConfiguration) WithSafeAuthorization(value v1.SecretKeySelector) *RemoteWriteAuthorizationApplyConfiguration {
-	b.SafeAuthorization = &value
-	return b
-}
-
-// WithBearerToken sets the BearerToken field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the BearerToken field is set to the value of the last call.
-func (b *RemoteWriteAuthorizationApplyConfiguration) WithBearerToken(value *SecretKeySelectorApplyConfiguration) *RemoteWriteAuthorizationApplyConfiguration {
-	b.BearerToken = value
+// If called multiple times, the Authorization field is set to the value of the last call.
+func (b *RemoteWriteAuthorizationApplyConfiguration) WithAuthorization(value *SecretKeySelectorApplyConfiguration) *RemoteWriteAuthorizationApplyConfiguration {
+	b.Authorization = value
 	return b
 }
 

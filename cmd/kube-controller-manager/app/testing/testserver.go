@@ -30,6 +30,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/compatibility"
+	"k8s.io/component-base/configz"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -78,6 +79,7 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 				logger.Error(err, "Failed to shutdown test server cleanly")
 			}
 		}
+		configz.Delete(app.ConfigzName)
 	}
 	defer func() {
 		if result.TearDownFn == nil {

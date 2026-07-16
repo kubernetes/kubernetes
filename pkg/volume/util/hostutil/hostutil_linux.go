@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -24,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -245,17 +245,7 @@ func GetSELinux(path string, mountInfoFilename string, selinuxEnabled seLinuxEna
 	}
 
 	// "seclabel" can be both in mount options and super options.
-	for _, opt := range info.SuperOptions {
-		if opt == "seclabel" {
-			return true, nil
-		}
-	}
-	for _, opt := range info.MountOptions {
-		if opt == "seclabel" {
-			return true, nil
-		}
-	}
-	return false, nil
+	return slices.Contains(info.SuperOptions, "seclabel") || slices.Contains(info.MountOptions, "seclabel"), nil
 }
 
 // GetSELinuxSupport returns true if given path is on a mount that supports

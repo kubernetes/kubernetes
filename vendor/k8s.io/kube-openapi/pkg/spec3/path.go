@@ -24,6 +24,7 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -57,7 +58,7 @@ func (p *Paths) MarshalJSON() ([]byte, error) {
 	return concated, nil
 }
 
-func (p *Paths) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (p *Paths) MarshalJSONTo(enc *jsontext.Encoder) error {
 	m := make(map[string]any, len(p.Extensions)+len(p.Paths))
 	for k, v := range p.Extensions {
 		if internal.IsExtensionKey(k) {
@@ -69,7 +70,7 @@ func (p *Paths) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder)
 			m[k] = v
 		}
 	}
-	return opts.MarshalNext(enc, m)
+	return jsonv2.MarshalEncode(enc, m)
 }
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
@@ -106,7 +107,7 @@ func (p *Paths) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (p *Paths) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (p *Paths) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	tok, err := dec.ReadToken()
 	if err != nil {
 		return err
@@ -129,7 +130,7 @@ func (p *Paths) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Deco
 			switch k := tok.String(); {
 			case internal.IsExtensionKey(k):
 				var ext any
-				if err := opts.UnmarshalNext(dec, &ext); err != nil {
+				if err := jsonv2.UnmarshalDecode(dec, &ext); err != nil {
 					return err
 				}
 
@@ -139,7 +140,7 @@ func (p *Paths) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Deco
 				p.Extensions[k] = ext
 			case len(k) > 0 && k[0] == '/':
 				pi := Path{}
-				if err := opts.UnmarshalNext(dec, &pi); err != nil {
+				if err := jsonv2.UnmarshalDecode(dec, &pi); err != nil {
 					return err
 				}
 
@@ -188,16 +189,16 @@ func (p *Path) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3), nil
 }
 
-func (p *Path) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (p *Path) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		Ref string `json:"$ref,omitempty"`
-		spec.Extensions
+		Ref        string          `json:"$ref,omitempty"`
+		Extensions spec.Extensions `json:",inline"`
 		PathProps
 	}
 	x.Ref = p.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(p.Extensions)
 	x.PathProps = p.PathProps
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (p *Path) UnmarshalJSON(data []byte) error {
@@ -216,13 +217,13 @@ func (p *Path) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (p *Path) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (p *Path) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		spec.Extensions
+		Extensions spec.Extensions `json:",inline"`
 		PathProps
 	}
 
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	if err := internal.JSONRefFromMap(&p.Ref.Ref, x.Extensions); err != nil {

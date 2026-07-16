@@ -21,6 +21,34 @@
       ]
     },
     {
+      "kind": "DeviceTaintRule",
+      "name": "devicetaintrules",
+      "namespaced": false,
+      "singularName": "devicetaintrule",
+      "storageVersionHash": "DJ3UJ0fj8MI=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "DeviceTaintRule",
+      "name": "devicetaintrules/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
       "kind": "ResourceClaim",
       "name": "resourceclaims",
       "namespaced": true,

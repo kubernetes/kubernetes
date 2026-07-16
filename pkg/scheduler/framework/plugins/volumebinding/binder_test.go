@@ -2104,7 +2104,6 @@ func TestBindPodVolumes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		scenario := scenario
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			run(t, scenario)

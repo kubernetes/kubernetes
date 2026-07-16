@@ -23,7 +23,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -159,78 +158,58 @@ func TestSyncClusterRole(t *testing.T) {
 			expectedClusterRoleApply: nil,
 		}}
 
-	for _, serverSideApplyEnabled := range []bool{true, false} {
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				indexer := cache.NewIndexer(controller.KeyFunc, cache.Indexers{})
-				objs := []runtime.Object{}
-				for _, obj := range test.startingClusterRoles {
-					objs = append(objs, obj)
-					indexer.Add(obj)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			indexer := cache.NewIndexer(controller.KeyFunc, cache.Indexers{})
+			objs := []runtime.Object{}
+			for _, obj := range test.startingClusterRoles {
+				objs = append(objs, obj)
+				if err := indexer.Add(obj); err != nil {
+					t.Fatalf("failed to add object to indexer: %v", err)
 				}
-				fakeClient := fakeclient.NewSimpleClientset(objs...)
+			}
+			fakeClient := fakeclient.NewClientset(objs...)
 
-				// The default reactor doesn't support apply, so we need our own (trivial) reactor
-				fakeClient.PrependReactor("patch", "clusterroles", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					if serverSideApplyEnabled == false {
-						// UnsupportedMediaType
-						return true, nil, errors.NewGenericServerResponse(415, "get", action.GetResource().GroupResource(), "test", "Apply not supported", 0, true)
-					}
-					return true, nil, nil // clusterroleaggregator drops returned objects so no point in constructing them
-				})
-				c := ClusterRoleAggregationController{
-					clusterRoleClient: fakeClient.RbacV1(),
-					clusterRoleLister: rbaclisters.NewClusterRoleLister(indexer),
-				}
-				err := c.syncClusterRole(context.TODO(), test.clusterRoleToSync)
-				if err != nil {
-					t.Fatal(err)
-				}
+			// The default reactor doesn't support apply, so we need our own (trivial) reactor
+			fakeClient.PrependReactor("patch", "clusterroles", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, nil // clusterroleaggregator drops returned objects so no point in constructing them
+			})
+			c := ClusterRoleAggregationController{
+				clusterRoleClient: fakeClient.RbacV1(),
+				clusterRoleLister: rbaclisters.NewClusterRoleLister(indexer),
+			}
+			err := c.syncClusterRole(context.TODO(), test.clusterRoleToSync)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-				if test.expectedClusterRoleApply == nil {
-					if len(fakeClient.Actions()) != 0 {
-						t.Fatalf("unexpected actions %#v", fakeClient.Actions())
-					}
-					return
-				}
-
-				expectedActions := 1
-				if !serverSideApplyEnabled {
-					expectedActions = 2
-				}
-				if len(fakeClient.Actions()) != expectedActions {
+			if test.expectedClusterRoleApply == nil {
+				if len(fakeClient.Actions()) != 0 {
 					t.Fatalf("unexpected actions %#v", fakeClient.Actions())
 				}
+				return
+			}
 
-				action := fakeClient.Actions()[0]
-				if !action.Matches("patch", "clusterroles") {
-					t.Fatalf("unexpected action %#v", action)
-				}
-				applyAction, ok := action.(clienttesting.PatchAction)
-				if !ok {
-					t.Fatalf("unexpected action %#v", action)
-				}
-				ac := &rbacv1ac.ClusterRoleApplyConfiguration{}
-				if err := yaml.Unmarshal(applyAction.GetPatch(), ac); err != nil {
-					t.Fatalf("error unmarshalling apply request: %v", err)
-				}
-				if !equality.Semantic.DeepEqual(ac, test.expectedClusterRoleApply) {
-					t.Fatalf("%v", cmp.Diff(test.expectedClusterRoleApply, ac))
-				}
-				if expectedActions == 2 {
-					action := fakeClient.Actions()[1]
-					if !action.Matches("update", "clusterroles") {
-						t.Fatalf("unexpected action %#v", action)
-					}
-					updateAction, ok := action.(clienttesting.UpdateAction)
-					if !ok {
-						t.Fatalf("unexpected action %#v", action)
-					}
-					if !equality.Semantic.DeepEqual(updateAction.GetObject().(*rbacv1.ClusterRole), test.expectedClusterRole) {
-						t.Fatalf("%v", cmp.Diff(test.expectedClusterRole, updateAction.GetObject().(*rbacv1.ClusterRole)))
-					}
-				}
-			})
-		}
+			expectedActions := 1
+			if len(fakeClient.Actions()) != expectedActions {
+				t.Fatalf("unexpected actions %#v", fakeClient.Actions())
+			}
+
+			action := fakeClient.Actions()[0]
+			if !action.Matches("patch", "clusterroles") {
+				t.Fatalf("unexpected action %#v", action)
+			}
+			applyAction, ok := action.(clienttesting.PatchAction)
+			if !ok {
+				t.Fatalf("unexpected action %#v", action)
+			}
+			ac := &rbacv1ac.ClusterRoleApplyConfiguration{}
+			if err := yaml.Unmarshal(applyAction.GetPatch(), ac); err != nil {
+				t.Fatalf("error unmarshalling apply request: %v", err)
+			}
+			if !equality.Semantic.DeepEqual(ac, test.expectedClusterRoleApply) {
+				t.Fatalf("%v", cmp.Diff(test.expectedClusterRoleApply, ac))
+			}
+		})
 	}
 }

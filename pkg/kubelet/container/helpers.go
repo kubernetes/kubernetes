@@ -50,19 +50,19 @@ type HandlerRunner interface {
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
 	GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes ImageVolumes) (contOpts *RunContainerOptions, cleanupAction func(), err error)
-	GetPodDNS(pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
+	GetPodDNS(ctx context.Context, pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
 	// GetPodCgroupParent returns the CgroupName identifier, and its literal cgroupfs form on the host
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
-	GeneratePodHostNameAndDomain(pod *v1.Pod) (hostname string, hostDomain string, err error)
+	GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (hostname string, hostDomain string, err error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
 	// from annotations on persistent volumes that the pod depends on.
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 
 	// GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-	GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error)
+	GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error)
 
 	// PrepareDynamicResources prepares resources for a pod.
 	PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error
@@ -70,11 +70,15 @@ type RuntimeHelper interface {
 	// UnprepareDynamicResources unprepares resources for a a pod.
 	UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error
 
-	// SetPodWatchCondition flags a pod to be inspected until the condition is met.
-	SetPodWatchCondition(types.UID, string, func(*PodStatus) bool)
+	// RequestPodReinspect flags a pod to be inspected on the next relist.
+	RequestPodReinspect(types.UID)
 
 	// PodCPUAndMemoryStats reads the latest CPU & memory usage stats.
 	PodCPUAndMemoryStats(context.Context, *v1.Pod, *PodStatus) (*statsapi.PodStats, error)
+
+	// OnPodSandboxReady callback is invoked after pod sandbox, networking, volume are ready.
+	// This is used to update the PodReadyToStartContainers condition.
+	OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
@@ -277,14 +281,20 @@ func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (comm
 }
 
 // FilterEventRecorder creates an event recorder to record object's event except implicitly required container's, like infra container.
-func FilterEventRecorder(recorder record.EventRecorder) record.EventRecorder {
+func FilterEventRecorder(recorder record.EventRecorderLogger) record.EventRecorderLogger {
 	return &innerEventRecorder{
 		recorder: recorder,
 	}
 }
 
 type innerEventRecorder struct {
-	recorder record.EventRecorder
+	recorder record.EventRecorderLogger
+}
+
+func (irecorder *innerEventRecorder) WithLogger(logger klog.Logger) record.EventRecorderLogger {
+	return &innerEventRecorder{
+		recorder: irecorder.recorder.WithLogger(logger),
+	}
 }
 
 func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {

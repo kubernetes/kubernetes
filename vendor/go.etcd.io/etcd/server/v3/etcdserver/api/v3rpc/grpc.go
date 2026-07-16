@@ -17,6 +17,7 @@ package v3rpc
 import (
 	"crypto/tls"
 	"math"
+	"sync"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -35,6 +36,11 @@ const (
 	maxSendBytes = math.MaxInt32
 )
 
+var (
+	metricsServerLock   sync.Mutex
+	metricsServerCached *grpc_prometheus.ServerMetrics
+)
+
 func Server(s *etcdserver.EtcdServer, tls *tls.Config, interceptor grpc.UnaryServerInterceptor, gopts ...grpc.ServerOption) *grpc.Server {
 	var opts []grpc.ServerOption
 	opts = append(opts, grpc.CustomCodec(&codec{}))
@@ -42,15 +48,7 @@ func Server(s *etcdserver.EtcdServer, tls *tls.Config, interceptor grpc.UnarySer
 		opts = append(opts, grpc.Creds(credentials.NewTransportCredential(tls)))
 	}
 
-	var mopts []grpc_prometheus.ServerMetricsOption
-	if s.Cfg.Metrics == "extensive" {
-		mopts = append(mopts, grpc_prometheus.WithServerHandlingTimeHistogram())
-	}
-	serverMetrics := grpc_prometheus.NewServerMetrics(mopts...)
-	err := prometheus.Register(serverMetrics)
-	if err != nil {
-		s.Cfg.Logger.Warn("etcdserver: failed to register grpc metrics", zap.Error(err))
-	}
+	serverMetrics := getServerMetrics(s.Cfg.Metrics, s.Cfg.Logger)
 
 	chainUnaryInterceptors := []grpc.UnaryServerInterceptor{
 		newLogUnaryInterceptor(s),
@@ -94,4 +92,23 @@ func Server(s *etcdserver.EtcdServer, tls *tls.Config, interceptor grpc.UnarySer
 	serverMetrics.InitializeMetrics(grpcServer)
 
 	return grpcServer
+}
+
+func getServerMetrics(metricType string, lg *zap.Logger) *grpc_prometheus.ServerMetrics {
+	metricsServerLock.Lock()
+	defer metricsServerLock.Unlock()
+
+	if metricsServerCached == nil {
+		var mopts []grpc_prometheus.ServerMetricsOption
+		if metricType == "extensive" {
+			mopts = append(mopts, grpc_prometheus.WithServerHandlingTimeHistogram())
+		}
+		metricsServerCached = grpc_prometheus.NewServerMetrics(mopts...)
+		err := prometheus.Register(metricsServerCached)
+		if err != nil {
+			lg.Warn("etcdserver: failed to register grpc metrics", zap.Error(err))
+		}
+	}
+
+	return metricsServerCached
 }

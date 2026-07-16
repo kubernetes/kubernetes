@@ -19,6 +19,7 @@ package leaderelection
 import (
 	"context"
 	"reflect"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
@@ -34,6 +35,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+
+	coordinationv1beta1listers "k8s.io/client-go/listers/coordination/v1beta1"
 )
 
 const requeueInterval = 5 * time.Minute
@@ -45,6 +48,7 @@ type CacheSyncWaiter interface {
 type LeaseCandidate struct {
 	leaseClient            coordinationv1beta1client.LeaseCandidateInterface
 	leaseCandidateInformer cache.SharedIndexInformer
+	leaseCandidateLister   coordinationv1beta1listers.LeaseCandidateLister
 	informerFactory        informers.SharedInformerFactory
 	hasSynced              cache.InformerSynced
 
@@ -80,15 +84,18 @@ func NewCandidate(clientset kubernetes.Interface,
 	// are started for leader elected components
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(
 		clientset, 5*time.Minute,
+		informers.WithNamespace(candidateNamespace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.FieldSelector = fieldSelector
 		}),
 	)
 	leaseCandidateInformer := informerFactory.Coordination().V1beta1().LeaseCandidates().Informer()
+	leaseCandidateLister := informerFactory.Coordination().V1beta1().LeaseCandidates().Lister()
 
 	lc := &LeaseCandidate{
 		leaseClient:            clientset.CoordinationV1beta1().LeaseCandidates(candidateNamespace),
 		leaseCandidateInformer: leaseCandidateInformer,
+		leaseCandidateLister:   leaseCandidateLister,
 		informerFactory:        informerFactory,
 		name:                   candidateName,
 		namespace:              candidateNamespace,
@@ -118,11 +125,15 @@ func NewCandidate(clientset kubernetes.Interface,
 }
 
 func (c *LeaseCandidate) Run(ctx context.Context) {
-	defer c.queue.ShutDown()
-
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithName(logger, "leasecandidate")
 	ctx = klog.NewContext(ctx, logger)
+
+	var wg sync.WaitGroup
+	defer func() {
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
 
 	c.informerFactory.Start(ctx.Done())
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.hasSynced) {
@@ -130,7 +141,9 @@ func (c *LeaseCandidate) Run(ctx context.Context) {
 	}
 
 	c.enqueueLease()
-	go c.runWorker(ctx)
+	wg.Go(func() {
+		c.runWorker(ctx)
+	})
 	<-ctx.Done()
 }
 
@@ -166,7 +179,7 @@ func (c *LeaseCandidate) enqueueLease() {
 // a bool (true if this call created the lease), or any error that occurs.
 func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
-	lease, err := c.leaseClient.Get(ctx, c.name, metav1.GetOptions{})
+	lease, err := c.leaseCandidateLister.LeaseCandidates(c.namespace).Get(c.name)
 	if apierrors.IsNotFound(err) {
 		logger.V(2).Info("Creating lease candidate")
 		// lease does not exist, create it.

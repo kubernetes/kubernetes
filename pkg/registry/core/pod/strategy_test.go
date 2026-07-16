@@ -644,13 +644,16 @@ func (g mockConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeNam
 func TestPortForwardLocation(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	tcs := []struct {
-		in          *api.Pod
-		info        *client.ConnectionInfo
-		opts        *api.PodPortForwardOptions
-		expectedErr error
-		expectedURL *url.URL
+		name             string
+		in               *api.Pod
+		info             *client.ConnectionInfo
+		opts             *api.PodPortForwardOptions
+		expectedErr      error
+		expectedURL      *url.URL
+		expectedConnInfo *client.ConnectionInfo
 	}{
 		{
+			name: "pod without host returns error",
 			in: &api.Pod{
 				Spec: api.PodSpec{},
 			},
@@ -658,6 +661,7 @@ func TestPortForwardLocation(t *testing.T) {
 			expectedErr: errors.NewBadRequest("pod test does not have a host assigned"),
 		},
 		{
+			name: "valid pod with no ports",
 			in: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
@@ -667,11 +671,13 @@ func TestPortForwardLocation(t *testing.T) {
 					NodeName: "node1",
 				},
 			},
-			info:        &client.ConnectionInfo{},
-			opts:        &api.PodPortForwardOptions{},
-			expectedURL: &url.URL{Host: ":", Path: "/portForward/ns/pod1"},
+			info:             &client.ConnectionInfo{},
+			opts:             &api.PodPortForwardOptions{},
+			expectedURL:      &url.URL{Host: ":", Path: "/portForward/ns/pod1"},
+			expectedConnInfo: &client.ConnectionInfo{},
 		},
 		{
+			name: "valid pod with port",
 			in: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
@@ -681,21 +687,201 @@ func TestPortForwardLocation(t *testing.T) {
 					NodeName: "node1",
 				},
 			},
-			info:        &client.ConnectionInfo{},
-			opts:        &api.PodPortForwardOptions{Ports: []int32{80}},
-			expectedURL: &url.URL{Host: ":", Path: "/portForward/ns/pod1", RawQuery: "port=80"},
+			info:             &client.ConnectionInfo{},
+			opts:             &api.PodPortForwardOptions{Ports: []int32{80}},
+			expectedURL:      &url.URL{Host: ":", Path: "/portForward/ns/pod1", RawQuery: "port=80"},
+			expectedConnInfo: &client.ConnectionInfo{},
+		},
+		{
+			name: "node features propagated through connection info",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod1",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1",
+				},
+			},
+			info: &client.ConnectionInfo{
+				NodeFeatures: []string{"ExtendWebSocketsToKubelet"},
+			},
+			opts:        &api.PodPortForwardOptions{},
+			expectedURL: &url.URL{Host: ":", Path: "/portForward/ns/pod1"},
+			expectedConnInfo: &client.ConnectionInfo{
+				NodeFeatures: []string{"ExtendWebSocketsToKubelet"},
+			},
 		},
 	}
 	for _, tc := range tcs {
-		getter := &mockPodGetter{tc.in}
-		connectionGetter := &mockConnectionInfoGetter{tc.info}
-		loc, _, err := PortForwardLocation(ctx, getter, connectionGetter, "test", tc.opts)
-		if !reflect.DeepEqual(err, tc.expectedErr) {
-			t.Errorf("expected %v, got %v", tc.expectedErr, err)
-		}
-		if !reflect.DeepEqual(loc, tc.expectedURL) {
-			t.Errorf("expected %v, got %v", tc.expectedURL, loc)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			getter := &mockPodGetter{tc.in}
+			connectionGetter := &mockConnectionInfoGetter{tc.info}
+			loc, connInfo, err := PortForwardLocation(ctx, getter, connectionGetter, "test", tc.opts)
+			if !reflect.DeepEqual(err, tc.expectedErr) {
+				t.Errorf("expected err %v, got %v", tc.expectedErr, err)
+			}
+			if !reflect.DeepEqual(loc, tc.expectedURL) {
+				t.Errorf("expected URL %v, got %v", tc.expectedURL, loc)
+			}
+			if !reflect.DeepEqual(connInfo, tc.expectedConnInfo) {
+				t.Errorf("expected connInfo %+v, got %+v", tc.expectedConnInfo, connInfo)
+			}
+		})
+	}
+}
+
+func TestExecLocation(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	tcs := []struct {
+		name             string
+		in               *api.Pod
+		info             *client.ConnectionInfo
+		opts             *api.PodExecOptions
+		expectedErr      error
+		expectedURL      *url.URL
+		expectedConnInfo *client.ConnectionInfo
+	}{
+		{
+			// Container validation runs before the host check, so the pod must have
+			// a matching container. The "no host assigned" error uses the name
+			// argument ("test"), not pod.Name.
+			name: "pod without host returns error",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "c1"}},
+					// NodeName intentionally absent
+				},
+			},
+			opts:        &api.PodExecOptions{Container: "c1"},
+			expectedErr: errors.NewBadRequest("pod test does not have a host assigned"),
+		},
+		{
+			// validateContainer uses pod.Name ("pod1") in its error, not the name argument.
+			name: "invalid container returns error",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec: api.PodSpec{
+					NodeName:   "node1",
+					Containers: []api.Container{{Name: "c1"}},
+				},
+			},
+			info:        &client.ConnectionInfo{},
+			opts:        &api.PodExecOptions{Container: "unknown"},
+			expectedErr: errors.NewBadRequest("container unknown is not valid for pod pod1"),
+		},
+		{
+			name: "valid exec location with node features propagated",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec: api.PodSpec{
+					NodeName:   "node1",
+					Containers: []api.Container{{Name: "c1"}},
+				},
+			},
+			info: &client.ConnectionInfo{
+				NodeFeatures: []string{"ExtendWebSocketsToKubelet"},
+			},
+			opts:        &api.PodExecOptions{Container: "c1"},
+			expectedURL: &url.URL{Host: ":", Path: "/exec/ns/pod1/c1"},
+			expectedConnInfo: &client.ConnectionInfo{
+				NodeFeatures: []string{"ExtendWebSocketsToKubelet"},
+			},
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			getter := &mockPodGetter{tc.in}
+			connectionGetter := &mockConnectionInfoGetter{tc.info}
+			loc, connInfo, err := ExecLocation(ctx, getter, connectionGetter, "test", tc.opts)
+			if !reflect.DeepEqual(err, tc.expectedErr) {
+				t.Errorf("expected err %v, got %v", tc.expectedErr, err)
+			}
+			if !reflect.DeepEqual(loc, tc.expectedURL) {
+				t.Errorf("expected URL %v, got %v", tc.expectedURL, loc)
+			}
+			if !reflect.DeepEqual(connInfo, tc.expectedConnInfo) {
+				t.Errorf("expected connInfo %+v, got %+v", tc.expectedConnInfo, connInfo)
+			}
+		})
+	}
+}
+
+func TestAttachLocation(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	tcs := []struct {
+		name             string
+		in               *api.Pod
+		info             *client.ConnectionInfo
+		opts             *api.PodAttachOptions
+		expectedErr      error
+		expectedURL      *url.URL
+		expectedConnInfo *client.ConnectionInfo
+	}{
+		{
+			// Container validation runs before the host check, so the pod must have
+			// a matching container. The "no host assigned" error uses the name
+			// argument ("test"), not pod.Name.
+			name: "pod without host returns error",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "c1"}},
+					// NodeName intentionally absent
+				},
+			},
+			opts:        &api.PodAttachOptions{Container: "c1"},
+			expectedErr: errors.NewBadRequest("pod test does not have a host assigned"),
+		},
+		{
+			// validateContainer uses pod.Name ("pod1") in its error, not the name argument.
+			name: "invalid container returns error",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec: api.PodSpec{
+					NodeName:   "node1",
+					Containers: []api.Container{{Name: "c1"}},
+				},
+			},
+			info:        &client.ConnectionInfo{},
+			opts:        &api.PodAttachOptions{Container: "unknown"},
+			expectedErr: errors.NewBadRequest("container unknown is not valid for pod pod1"),
+		},
+		{
+			name: "valid attach location with node features propagated",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec: api.PodSpec{
+					NodeName:   "node1",
+					Containers: []api.Container{{Name: "c1"}},
+				},
+			},
+			info: &client.ConnectionInfo{
+				NodeFeatures: []string{"ExtendWebSocketsToKubelet"},
+			},
+			opts:        &api.PodAttachOptions{Container: "c1"},
+			expectedURL: &url.URL{Host: ":", Path: "/attach/ns/pod1/c1"},
+			expectedConnInfo: &client.ConnectionInfo{
+				NodeFeatures: []string{"ExtendWebSocketsToKubelet"},
+			},
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			getter := &mockPodGetter{tc.in}
+			connectionGetter := &mockConnectionInfoGetter{tc.info}
+			loc, connInfo, err := AttachLocation(ctx, getter, connectionGetter, "test", tc.opts)
+			if !reflect.DeepEqual(err, tc.expectedErr) {
+				t.Errorf("expected err %v, got %v", tc.expectedErr, err)
+			}
+			if !reflect.DeepEqual(loc, tc.expectedURL) {
+				t.Errorf("expected URL %v, got %v", tc.expectedURL, loc)
+			}
+			if !reflect.DeepEqual(connInfo, tc.expectedConnInfo) {
+				t.Errorf("expected connInfo %+v, got %+v", tc.expectedConnInfo, connInfo)
+			}
+		})
 	}
 }
 
@@ -3713,6 +3899,68 @@ func TestEphemeralContainersPrepareForUpdate(t *testing.T) {
 				t.Errorf("invalid generation for pod %s, expected: %d, actual: %d", tc.oldPod.Name, tc.expectedGeneration, actual)
 			}
 		})
+	}
+}
+
+func TestSchedulingGroupEnablement(t *testing.T) {
+	var (
+		ctx    = genericapirequest.NewDefaultContext()
+		pgName = "pg"
+		pod    = podtest.MakePod("pod",
+			podtest.SetSchedulingGroup(&api.PodSchedulingGroup{
+				PodGroupName: new(pgName),
+			}),
+		)
+	)
+
+	// Enable the Feature Gate during the Pod creation.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+
+	errs := Strategy.Validate(ctx, pod)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error: %v", errs.ToAggregate())
+	}
+
+	createdPod := pod.DeepCopy()
+	Strategy.PrepareForCreate(ctx, createdPod)
+
+	if sg := createdPod.Spec.SchedulingGroup; sg == nil || ptr.Deref(sg.PodGroupName, "") != pgName {
+		t.Error("SchedulingGroup created with unexpected result")
+	}
+
+	// Disable the Feature Gate and check that the SchedulingGroup field still exists after updating.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, false)
+
+	updatedPod := createdPod.DeepCopy()
+	updatedPod.Labels = map[string]string{"foo": "bar"}
+	updatedPod.ResourceVersion = "2"
+
+	errs = Strategy.ValidateUpdate(ctx, updatedPod, createdPod)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error: %v", errs.ToAggregate())
+	}
+
+	Strategy.PrepareForUpdate(ctx, updatedPod, createdPod)
+
+	if sg := createdPod.Spec.SchedulingGroup; sg == nil || ptr.Deref(sg.PodGroupName, "") != pgName {
+		t.Error("SchedulingGroup updated with unexpected result")
+	}
+
+	// Enable the Feature Gate again to check that the SchedulingGroup field still exist after updating.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+
+	updatedPod2 := updatedPod.DeepCopy()
+	updatedPod2.Labels = map[string]string{"foo": "baz"}
+	updatedPod2.ResourceVersion = "3"
+
+	errs = Strategy.ValidateUpdate(ctx, updatedPod2, updatedPod)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error: %v", errs.ToAggregate())
+	}
+
+	Strategy.PrepareForUpdate(ctx, updatedPod2, updatedPod)
+	if sg := createdPod.Spec.SchedulingGroup; sg == nil || ptr.Deref(sg.PodGroupName, "") != pgName {
+		t.Error("SchedulingGroup updated with unexpected result")
 	}
 }
 

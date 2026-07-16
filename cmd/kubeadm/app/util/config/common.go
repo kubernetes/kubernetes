@@ -322,12 +322,28 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool, mutators migrate
 		newConfig = append(newConfig, b)
 	}
 
+	// Migrate UpgradeConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasUpgradeConfiguration(gvks...) {
+		o, err := documentMapToUpgradeConfiguration(gvkmap, true, allowExperimental, true)
+		if err != nil {
+			return []byte{}, err
+		}
+		if err := mutators.mutate([]any{o}); err != nil {
+			return []byte{}, err
+		}
+		b, err := MarshalKubeadmConfigObject(o, gv)
+		if err != nil {
+			return []byte{}, err
+		}
+		newConfig = append(newConfig, b)
+	}
+
 	return bytes.Join(newConfig, []byte(constants.YAMLDocumentSeparator)), nil
 }
 
 // ValidateConfig takes a byte slice containing a kubeadm configuration and performs conversion
 // to internal types and validation.
-func ValidateConfig(config []byte, allowExperimental bool) error {
+func ValidateConfig(config []byte, allowDeprecated, allowExperimental bool) error {
 	gvkmap, err := kubeadmutil.SplitConfigDocuments(config)
 	if err != nil {
 		return err
@@ -344,21 +360,28 @@ func ValidateConfig(config []byte, allowExperimental bool) error {
 
 	// Validate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
-		if _, err := documentMapToInitConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
+		if _, err := documentMapToInitConfiguration(gvkmap, allowDeprecated, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
 
 	// Validate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		if _, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
+		if _, err := documentMapToJoinConfiguration(gvkmap, allowDeprecated, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
 
 	// Validate ResetConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
-		if _, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
+		if _, err := documentMapToResetConfiguration(gvkmap, allowDeprecated, allowExperimental, true, true); err != nil {
+			return err
+		}
+	}
+
+	// Validate UpgradeConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasUpgradeConfiguration(gvks...) {
+		if _, err := documentMapToUpgradeConfiguration(gvkmap, allowDeprecated, allowExperimental, true); err != nil {
 			return err
 		}
 	}

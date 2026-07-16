@@ -164,8 +164,8 @@ func TestSandboxGC(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			podStateProvider.removed = make(map[types.UID]struct{})
 			podStateProvider.terminated = make(map[types.UID]struct{})
-			fakeSandboxes := makeFakePodSandboxes(t, m, test.sandboxes)
-			fakeContainers := makeFakeContainers(t, m, test.containers)
+			fakeSandboxes := makeFakePodSandboxes(tCtx, m, test.sandboxes)
+			fakeContainers := makeFakeContainers(tCtx, m, test.containers)
 			for _, s := range test.sandboxes {
 				if !s.running && s.pod.Name == "deleted" {
 					podStateProvider.removed[s.pod.UID] = struct{}{}
@@ -393,7 +393,7 @@ func TestContainerGC(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			podStateProvider.removed = make(map[types.UID]struct{})
 			podStateProvider.terminated = make(map[types.UID]struct{})
-			fakeContainers := makeFakeContainers(t, m, test.containers)
+			fakeContainers := makeFakeContainers(tCtx, m, test.containers)
 			for _, s := range test.containers {
 				if s.pod.Name == "deleted" {
 					podStateProvider.removed[s.pod.UID] = struct{}{}
@@ -471,7 +471,7 @@ func TestUnknownStateContainerGC(t *testing.T) {
 	// podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
 	defaultGCPolicy := kubecontainer.GCPolicy{MinAge: time.Hour, MaxPerPodContainer: 0, MaxContainers: 0}
 
-	fakeContainers := makeFakeContainers(t, m, []containerTemplate{
+	fakeContainers := makeFakeContainers(tCtx, m, []containerTemplate{
 		makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_UNKNOWN),
 	})
 	fakeRuntime.SetFakeContainers(fakeContainers)

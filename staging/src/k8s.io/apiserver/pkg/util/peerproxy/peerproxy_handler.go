@@ -79,36 +79,17 @@ type peerProxyHandler struct {
 	localDiscoveryCacheTicker            *time.Ticker
 	localDiscoveryInfoCachePopulated     chan struct{}
 	localDiscoveryInfoCachePopulatedOnce sync.Once
-	// Cache that stores resources and groups served by peer apiservers.
-	// The map is from string to PeerDiscoveryCacheEntry where the string
-	// is the serverID of the peer apiserver.
-	// Refreshed if a new apiserver identity lease is added, deleted or
-	// holderIndentity change is observed in the lease.
-	peerDiscoveryInfoCache atomic.Value // map[string]struct{GVRs map[schema.GroupVersionResource]bool; Groups []apidiscoveryv2.APIGroupDiscovery}
-	proxyTransport         http.RoundTripper
-	// Worker queue that keeps the peerDiscoveryInfoCache up-to-date.
+	// rawPeerDiscoveryCache stores unfiltered resources and groups served by peer apiservers.
+	// The map is from string (serverID) to PeerDiscoveryCacheEntry.
+	// Written ONLY by peerLeaseQueue worker when peer leases change.
+	rawPeerDiscoveryCache atomic.Value // map[string]PeerDiscoveryCacheEntry
+	proxyTransport        http.RoundTripper
+	// Worker queue that keeps the rawPeerDiscoveryCache up-to-date.
 	peerLeaseQueue            workqueue.TypedRateLimitingInterface[string]
 	serializer                runtime.NegotiatedSerializer
 	cacheInvalidationCallback atomic.Pointer[func()]
-	// Exclusion set for groups that should not be included in peer proxying
-	// or peer-aggregated discovery (e.g., CRDs/APIServices)
-	//
-	// This map has three states for a group:
-	// - Not in map: Group is not excluded.
-	// - In map, value is nil: Group is actively excluded.
-	// - In map, value is non-nil: Group is pending deletion (grace period).
-	excludedGVs         map[schema.GroupVersion]*time.Time
-	excludedGVsMu       sync.RWMutex
-	crdInformer         cache.SharedIndexInformer
-	crdExtractor        GVExtractor
-	apiServiceInformer  cache.SharedIndexInformer
-	apiServiceExtractor GVExtractor
-
-	exclusionGracePeriod time.Duration
-	reaperCheckInterval  time.Duration
-
-	// Worker queue for processing GV deletions asynchronously
-	gvDeletionQueue workqueue.TypedRateLimitingInterface[string]
+	// Manager for GV exclusions (CRDs/APIServices)
+	gvExclusionManager *GVExclusionManager
 }
 
 // PeerDiscoveryCacheEntry holds the GVRs and group-level discovery info for a peer.
@@ -141,12 +122,10 @@ func (h *peerProxyHandler) WaitForCacheSync(stopCh <-chan struct{}) error {
 		return fmt.Errorf("error while waiting for peer-identity-lease event handler registration sync")
 	}
 
-	if h.crdInformer != nil && !cache.WaitForNamedCacheSync("peer-discovery-crd-informer", stopCh, h.crdInformer.HasSynced) {
-		return fmt.Errorf("error while waiting for crd informer sync")
-	}
-
-	if h.apiServiceInformer != nil && !cache.WaitForNamedCacheSync("peer-discovery-api-service-informer", stopCh, h.apiServiceInformer.HasSynced) {
-		return fmt.Errorf("error while waiting for apiservice informer sync")
+	if h.gvExclusionManager != nil {
+		if !h.gvExclusionManager.WaitForCacheSync(stopCh) {
+			return fmt.Errorf("error while waiting for gv exclusion manager cache sync")
+		}
 	}
 
 	// Wait for localDiscoveryInfoCache to be populated.
@@ -203,22 +182,23 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 		// find servers that are capable of serving this request
 		peerServerIDs := h.findServiceableByPeerFromPeerDiscoveryCache(gvr)
 		if len(peerServerIDs) == 0 {
-			klog.Errorf("gvr %v is not served by anything in this cluster", gvr)
+			klog.V(3).Infof("gvr %v is not served by anything in this cluster", gvr)
 			handler.ServeHTTP(w, r)
 			return
 		}
 
 		peerEndpoints, err := h.resolveServingLocation(peerServerIDs)
 		if err != nil {
+			metrics.IncPeerProxyError(ctx, metrics.ProxyErrorEndpointResolution, gvr.Group, gvr.Version, gvr.Resource)
 			gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}
 			klog.ErrorS(err, "error finding serviceable-by apiservers for the requested resource", "gvr", gvr)
 			responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable("Error getting ip and port info of the remote server while proxying"), h.serializer, gv, w, r)
 			return
 		}
 
-		rand := rand.Intn(len(peerEndpoints))
-		peerEndpoint := peerEndpoints[rand]
-		h.proxyRequestToDestinationAPIServer(r, w, peerEndpoint)
+		endpointIndex := rand.Intn(len(peerEndpoints))
+		peerEndpoint := peerEndpoints[endpointIndex]
+		h.proxyRequestToDestinationAPIServer(r, w, peerEndpoint, gvr)
 	})
 }
 
@@ -259,7 +239,7 @@ func (h *peerProxyHandler) hostportInfo(apiserverKey string) (string, error) {
 	return hostPort, nil
 }
 
-func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request, rw http.ResponseWriter, host string) {
+func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request, rw http.ResponseWriter, host string, gvr schema.GroupVersionResource) {
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
@@ -273,6 +253,7 @@ func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request,
 
 	proxyRoundTripper, err := h.buildProxyRoundtripper(req)
 	if err != nil {
+		metrics.IncPeerProxyError(req.Context(), metrics.ProxyErrorTransport, gvr.Group, gvr.Version, gvr.Resource)
 		klog.Errorf("failed to build proxy round tripper: %v", err)
 		return
 	}
@@ -282,7 +263,7 @@ func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request,
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, false, &responder{w: w, ctx: req.Context()})
 	klog.Infof("Proxying request for %s from %s to %s", req.URL.Path, req.Host, location.Host)
 	handler.ServeHTTP(w, newReq)
-	metrics.IncPeerProxiedRequest(req.Context(), strconv.Itoa(delegate.Status()))
+	metrics.IncPeerProxiedRequest(req.Context(), strconv.Itoa(delegate.Status()), gvr.Group, gvr.Version, gvr.Resource)
 }
 
 func (h *peerProxyHandler) buildProxyRoundtripper(req *http.Request) (http.RoundTripper, error) {
@@ -303,16 +284,9 @@ func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 // Returns a map of serverID -> []apidiscoveryv2.APIGroupDiscovery served by peer servers
 func (h *peerProxyHandler) GetPeerResources() map[string][]apidiscoveryv2.APIGroupDiscovery {
 	result := make(map[string][]apidiscoveryv2.APIGroupDiscovery)
-
-	peerCache := h.peerDiscoveryInfoCache.Load()
-	if peerCache == nil {
-		klog.V(4).Infof("GetPeerResources: peer cache is nil")
-		return result
-	}
-
-	cacheMap, ok := peerCache.(map[string]PeerDiscoveryCacheEntry)
-	if !ok {
-		klog.Warning("Invalid cache type in peerDiscoveryGVRCache")
+	cacheMap := h.gvExclusionManager.GetFilteredPeerDiscoveryCache()
+	if len(cacheMap) == 0 {
+		klog.V(4).Infof("GetPeerResources: peer cache is empty")
 		return result
 	}
 

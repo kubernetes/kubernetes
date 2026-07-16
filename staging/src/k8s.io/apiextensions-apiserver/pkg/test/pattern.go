@@ -69,7 +69,6 @@ func findPattern(t *testing.T, s *schema.Structural, pth *field.Path) (map[strin
 	}
 
 	for k, v := range s.Properties {
-		v := v
 		sub, err := findPattern(t, &v, pth.Child("properties").Child(k))
 		if err != nil {
 			return nil, err

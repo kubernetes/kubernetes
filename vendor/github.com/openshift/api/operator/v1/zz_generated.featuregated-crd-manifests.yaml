@@ -5,7 +5,9 @@ authentications.operator.openshift.io:
   CRDName: authentications.operator.openshift.io
   Capability: ""
   Category: ""
-  FeatureGates: []
+  FeatureGates:
+  - AuthenticationComponentProxy
+  - KMSEncryption
   FilenameOperatorName: authentication
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_50"
@@ -178,6 +180,8 @@ ingresscontrollers.operator.openshift.io:
   Category: ""
   FeatureGates:
   - IngressControllerDynamicConfigurationManager
+  - IngressControllerMultipleHAProxyVersions
+  - TLSGroupPreferences
   FilenameOperatorName: ingress
   FilenameOperatorOrdering: "00"
   FilenameRunLevel: "0000_50"
@@ -221,6 +225,7 @@ kubeapiservers.operator.openshift.io:
   Category: coreoperators
   FeatureGates:
   - EventTTL
+  - KMSEncryption
   FilenameOperatorName: kube-apiserver
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_20"
@@ -375,7 +380,8 @@ openshiftapiservers.operator.openshift.io:
   CRDName: openshiftapiservers.operator.openshift.io
   Capability: ""
   Category: coreoperators
-  FeatureGates: []
+  FeatureGates:
+  - KMSEncryption
   FilenameOperatorName: openshift-apiserver
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_30"

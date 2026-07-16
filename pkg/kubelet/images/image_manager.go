@@ -315,11 +315,12 @@ func (m *imageManager) makeLookupPullCredentialsFunc(image string, pod *v1.Pod, 
 }
 
 func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *v1.ObjectReference, podUID types.UID, image string, imgSpec kubecontainer.ImageSpec, pullCredentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (imageRef, message string, err error) {
+	logger := klog.FromContext(ctx)
 	var pullSucceeded bool
 	var finalPullCredentials *credentialprovider.TrackedAuthConfig
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
-		if err := m.imagePullManager.RecordPullIntent(image); err != nil {
+		if err := m.imagePullManager.RecordPullIntent(logger, image); err != nil {
 			return "", fmt.Sprintf("Failed to record image pull intent for container image %q: %v", image, err), err
 		}
 

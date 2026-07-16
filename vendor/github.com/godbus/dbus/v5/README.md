@@ -14,7 +14,7 @@ D-Bus message bus system.
 
 ### Installation
 
-This packages requires Go 1.12 or later. It can be installed by running the command below:
+This packages requires Go 1.20 or later. It can be installed by running the command below:
 
 ```
 go get github.com/godbus/dbus/v5
@@ -23,7 +23,7 @@ go get github.com/godbus/dbus/v5
 ### Usage
 
 The complete package documentation and some simple examples are available at
-[godoc.org](http://godoc.org/github.com/godbus/dbus). Also, the
+[pkg.go.dev](https://pkg.go.dev/github.com/godbus/dbus/v5). Also, the
 [_examples](https://github.com/godbus/dbus/tree/master/_examples) directory
 gives a short overview over the basic usage. 
 
@@ -34,6 +34,7 @@ gives a short overview over the basic usage.
 - [iwd](https://github.com/shibumi/iwd) go bindings for the internet wireless daemon "iwd".
 - [notify](https://github.com/esiqveland/notify) provides desktop notifications over dbus into a library.
 - [playerbm](https://github.com/altdesktop/playerbm) a bookmark utility for media players.
+- [rpic](https://github.com/stephenhu/rpic) lightweight web app and RESTful API for managing a Raspberry Pi
 
 Please note that the API is considered unstable for now and may change without
 further notice.

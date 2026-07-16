@@ -65,7 +65,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -89,7 +89,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -112,7 +112,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, hostEntries, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -134,7 +134,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(nil, hostEntries, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -187,7 +187,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -242,7 +242,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -284,7 +284,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(nil, hostNames, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostNames, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -329,7 +329,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -366,7 +366,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "agnhost")
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "jessie")
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -385,7 +385,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "agnhost")
 		agnhostProber = dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "jessie")
-		jessieProber = dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber = dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -413,7 +413,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileName = createTargetedProbeCommand(hostFQDN, targetRecord, "agnhost")
 		agnhostProber = dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, targetRecord, "jessie")
-		jessieProber = dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber = dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -599,7 +599,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, hostEntries, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -639,7 +639,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, hostEntries, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -676,7 +676,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -720,7 +720,7 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.GlibcDnsTesting, cmd: jessieProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 

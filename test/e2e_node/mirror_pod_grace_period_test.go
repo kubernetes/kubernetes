@@ -26,12 +26,12 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
-	"github.com/prometheus/common/model"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -42,7 +42,7 @@ import (
 var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 	f := framework.NewDefaultFramework("mirror-pod-with-grace-period")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
-	ginkgo.Context("when create a mirror pod ", func() {
+	ginkgo.Context("when create a mirror pod", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ns = f.Namespace.Name
@@ -114,7 +114,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			uid := pod.UID
 
 			ginkgo.By("update the pod manifest multiple times during the graceful termination period")
-			for i := 0; i < 300; i++ {
+			for i := range 300 {
 				err = createStaticPod(podPath, staticPodName, ns,
 					fmt.Sprintf("image-%d", i), v1.RestartPolicyAlways)
 				framework.ExpectNoError(err)
@@ -209,7 +209,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 				ginkgo.By("waiting for the container runtime to be stopped")
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					_, _, err := getCRIClient()
+					_, _, err := getCRIClient(ctx)
 					return err
 				}, 2*time.Minute, time.Second*5).ShouldNot(gomega.Succeed())
 
@@ -256,7 +256,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 				framework.ExpectNoError(err, "expected no error starting the container runtime")
 				ginkgo.By("waiting for the container runtime to start")
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					r, _, err := getCRIClient()
+					r, _, err := getCRIClient(ctx)
 					if err != nil {
 						return fmt.Errorf("error getting CRI client: %w", err)
 					}
@@ -318,7 +318,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 				framework.ExpectNoError(err, "expected no error starting the container runtime")
 				ginkgo.By("waiting for the container runtime to start")
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					_, _, err := getCRIClient()
+					_, _, err := getCRIClient(ctx)
 					if err != nil {
 						return fmt.Errorf("error getting cri client: %v", err)
 					}
@@ -378,6 +378,6 @@ func checkMirrorPodRunningWithUID(ctx context.Context, cl clientset.Interface, n
 }
 
 func sampleLabelID(element interface{}) string {
-	el := element.(*model.Sample)
+	el := element.(*testutil.Sample)
 	return el.Metric.String()
 }

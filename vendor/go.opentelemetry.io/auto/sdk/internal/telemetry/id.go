@@ -82,7 +82,7 @@ func marshalJSON(id []byte) ([]byte, error) {
 }
 
 // unmarshalJSON inflates trace id from hex string, possibly enclosed in quotes.
-func unmarshalJSON(dst []byte, src []byte) error {
+func unmarshalJSON(dst, src []byte) error {
 	if l := len(src); l >= 2 && src[0] == '"' && src[l-1] == '"' {
 		src = src[1 : l-1]
 	}

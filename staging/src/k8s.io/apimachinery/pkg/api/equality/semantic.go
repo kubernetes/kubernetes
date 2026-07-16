@@ -40,6 +40,9 @@ var Semantic = conversion.EqualitiesOrDie(
 	func(a, b metav1.Time) bool {
 		return a.UTC() == b.UTC()
 	},
+	func(a, b metav1.FieldsV1) bool {
+		return a.Equal(b)
+	},
 	func(a, b labels.Selector) bool {
 		return a.String() == b.String()
 	},

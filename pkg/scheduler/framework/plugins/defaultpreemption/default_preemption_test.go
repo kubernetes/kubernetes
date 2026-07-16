@@ -34,6 +34,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	"k8s.io/api/scheduling/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -52,12 +53,12 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -172,7 +173,9 @@ func TestPostFilter(t *testing.T) {
 		pods                  []*v1.Pod
 		pdbs                  []*policy.PodDisruptionBudget
 		nodes                 []*v1.Node
+		podGroups             []*v1alpha2.PodGroup
 		filteredNodesStatuses *framework.NodeToStatus
+		features              feature.Features
 		extender              fwk.Extender
 		wantResult            *fwk.PostFilterResult
 		wantStatus            *fwk.Status
@@ -391,6 +394,114 @@ func TestPostFilter(t *testing.T) {
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
 			wantStatus: fwk.NewStatus(fwk.Success),
 		},
+		{
+			name: "pod with SchedulingGroup with TAS with scheduling constraint enabled should not preempt",
+			pod:  st.MakePod().Name("p-with-podgroup").Namespace(v1.NamespaceDefault).PodGroupName("foo").Priority(highPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			podGroups: []*v1alpha2.PodGroup{
+				st.MakePodGroup().Name("foo").Namespace(v1.NamespaceDefault).TopologyKey("rack").Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features:   feature.Features{EnableTopologyAwareWorkloadScheduling: true},
+			wantResult: nil,
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to placement-based pod group scheduling limitation"),
+		},
+		{
+			name: "pod with SchedulingGroup with TAS with scheduling constraint enabled should not preempt even when WAP is enabled",
+			pod:  st.MakePod().Name("p-with-podgroup").Namespace(v1.NamespaceDefault).PodGroupName("foo").Priority(highPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			podGroups: []*v1alpha2.PodGroup{
+				st.MakePodGroup().Name("foo").Namespace(v1.NamespaceDefault).TopologyKey("rack").Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features:   feature.Features{EnableTopologyAwareWorkloadScheduling: true, EnableWorkloadAwarePreemption: true},
+			wantResult: nil,
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to placement-based pod group scheduling limitation"),
+		},
+		{
+			name: "pod with SchedulingGroup with TAS without scheduling constraint enabled should preempt",
+			pod:  st.MakePod().Name("p-with-podgroup").Namespace(v1.NamespaceDefault).PodGroupName("foo").Priority(highPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			podGroups: []*v1alpha2.PodGroup{
+				st.MakePodGroup().Name("foo").Namespace(v1.NamespaceDefault).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features:   feature.Features{EnableTopologyAwareWorkloadScheduling: true},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name: "pod with SchedulingGroup with TAS with WAP enabled should not preempt",
+			pod:  st.MakePod().Name("p-with-podgroup").Namespace(v1.NamespaceDefault).PodGroupName("foo").Priority(highPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			podGroups: []*v1alpha2.PodGroup{
+				st.MakePodGroup().Name("foo").Namespace(v1.NamespaceDefault).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features:   feature.Features{EnableTopologyAwareWorkloadScheduling: true, EnableWorkloadAwarePreemption: true},
+			wantResult: nil,
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to workload aware preemption enabled"),
+		},
+		{
+			name: "pod with SchedulingGroup with WAP enabled should not preempt",
+			pod:  st.MakePod().Name("p-with-podgroup").PodGroupName("foo").Priority(highPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features:   feature.Features{EnableWorkloadAwarePreemption: true},
+			wantResult: nil,
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to workload aware preemption enabled"),
+		},
+		{
+			name: "pod with SchedulingGroup with TAS and WAP disabled should preempt",
+			pod:  st.MakePod().Name("p-with-podgroup").PodGroupName("foo").Priority(highPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features:   feature.Features{EnableTopologyAwareWorkloadScheduling: false, EnableWorkloadAwarePreemption: false},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
 	}
 
 	for _, asyncAPICallsEnabled := range []bool{true, false} {
@@ -415,6 +526,12 @@ func TestPostFilter(t *testing.T) {
 				pdbInformer := informerFactory.Policy().V1().PodDisruptionBudgets().Informer()
 				for i := range tt.pdbs {
 					if err := pdbInformer.GetStore().Add(tt.pdbs[i]); err != nil {
+						t.Fatal(err)
+					}
+				}
+				pgInformer := informerFactory.Scheduling().V1alpha2().PodGroups().Informer()
+				for i := range tt.podGroups {
+					if err := pgInformer.GetStore().Add(tt.podGroups[i]); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -450,16 +567,17 @@ func TestPostFilter(t *testing.T) {
 					frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
 					frameworkruntime.WithLogger(logger),
 					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+					frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 				)
 				if err != nil {
 					t.Fatal(err)
 				}
 				if asyncAPICallsEnabled {
-					cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
+					cache := internalcache.New(ctx, apiDispatcher, false)
 					f.SetAPICacher(apicache.New(nil, cache))
 				}
 
-				p, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{})
+				p, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, tt.features)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -2169,7 +2287,7 @@ func TestPreempt(t *testing.T) {
 						defer apiDispatcher.Close()
 					}
 
-					cache := internalcache.New(ctx, time.Duration(0), apiDispatcher)
+					cache := internalcache.New(ctx, apiDispatcher, false)
 					for _, pod := range testPods {
 						if err := cache.AddPod(logger, pod.DeepCopy()); err != nil {
 							t.Fatalf("Failed to add pod %s: %v", pod.Name, err)
@@ -2217,6 +2335,7 @@ func TestPreempt(t *testing.T) {
 						frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(testPods, nodes)),
 						frameworkruntime.WithInformerFactory(informerFactory),
 						frameworkruntime.WithWaitingPods(waitingPods),
+						frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 						frameworkruntime.WithLogger(logger),
 						frameworkruntime.WithPodActivator(&fakePodActivator{}),
 					)
@@ -2339,3 +2458,190 @@ type fakePodActivator struct {
 }
 
 func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {}
+
+func TestPreEnqueue(t *testing.T) {
+	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
+	tests := []struct {
+		name                   string
+		podToTriggerPreemption *v1.Pod
+		podToCheck             *v1.Pod
+		pgs                    []*v1alpha2.PodGroup
+		features               feature.Features
+		expectPreemption       bool
+		wantStatus             *fwk.Status
+	}{
+		{
+			name:                   "AsyncPreemption disabled, returns nil",
+			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			podToCheck:             st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			features:               feature.Features{EnableAsyncPreemption: false},
+			expectPreemption:       false,
+			wantStatus:             nil,
+		},
+		{
+			name:                   "AsyncPreemption enabled, same pod, returns UnschedulableAndUnresolvable",
+			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			podToCheck:             st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			features:               feature.Features{EnableAsyncPreemption: true},
+			expectPreemption:       true,
+			wantStatus:             fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished"),
+		},
+		{
+			name:                   "AsyncPreemption enabled, different pod, returns nil",
+			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			podToCheck:             st.MakePod().Name("p_other").UID("p_other").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			features:               feature.Features{EnableAsyncPreemption: true},
+			expectPreemption:       true,
+			wantStatus:             nil,
+		},
+		{
+			name:                   "WAP enabled, pod in same PodGroup, returns UnschedulableAndUnresolvable",
+			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
+			podToCheck:             st.MakePod().Name("p_other").UID("p_other").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
+			pgs: []*v1alpha2.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			},
+			features:         feature.Features{EnableAsyncPreemption: true, EnableWorkloadAwarePreemption: true},
+			expectPreemption: true,
+			wantStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod group to be finished"),
+		},
+		{
+			name:                   "WAP disabled, pod in same PodGroup, returns nil",
+			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
+			podToCheck:             st.MakePod().Name("p_other").UID("p_other").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
+			pgs: []*v1alpha2.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Obj(),
+			},
+			features:         feature.Features{EnableAsyncPreemption: true, EnableWorkloadAwarePreemption: false},
+			expectPreemption: true,
+			wantStatus:       nil,
+		},
+		{
+			name:                   "WAP enabled, pod in different PodGroup, returns nil",
+			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
+			podToCheck:             st.MakePod().Name("p_other").UID("p_other").Namespace(v1.NamespaceDefault).PodGroupName("pg2").Priority(highPriority).Obj(),
+			pgs: []*v1alpha2.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+				st.MakePodGroup().Name("pg2").UID("pg2").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			},
+			features:         feature.Features{EnableAsyncPreemption: true, EnableWorkloadAwarePreemption: true},
+			expectPreemption: true,
+			wantStatus:       nil,
+		},
+		{
+			name:                   "WAP enabled, pod group not found, returns nil",
+			podToTriggerPreemption: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).PodGroupName("pg1").Priority(highPriority).Obj(),
+			podToCheck:             st.MakePod().Name("p_other").UID("p_other").Namespace(v1.NamespaceDefault).PodGroupName("pg_missing").Priority(highPriority).Obj(),
+			pgs: []*v1alpha2.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			},
+			features:         feature.Features{EnableAsyncPreemption: true, EnableWorkloadAwarePreemption: true},
+			expectPreemption: false,
+			wantStatus:       nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pods := []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			}
+			filteredNodesStatuses := framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable))
+
+			podItems := []v1.Pod{}
+			for _, pod := range pods {
+				podItems = append(podItems, *pod)
+			}
+			cs := clientsetfake.NewClientset(&v1.PodList{Items: podItems})
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			podInformer := informerFactory.Core().V1().Pods().Informer()
+			if err := podInformer.GetStore().Add(tt.podToTriggerPreemption); err != nil {
+				t.Fatal(err)
+			}
+			for i := range pods {
+				if err := podInformer.GetStore().Add(pods[i]); err != nil {
+					t.Fatal(err)
+				}
+			}
+			pgInformer := informerFactory.Scheduling().V1alpha2().PodGroups().Informer()
+			for i := range tt.pgs {
+				if err := pgInformer.GetStore().Add(tt.pgs[i]); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			f, err := tf.NewFramework(ctx, registeredPlugins, "",
+				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(pods, []*v1.Node{st.MakeNode().Name("node1").Capacity(onePodRes).Obj()})),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			p, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, tt.features)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			finishPreemption := make(chan struct{})
+
+			p.Executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) error {
+				if !tt.features.EnableAsyncPreemption {
+					return nil
+				}
+				<-finishPreemption
+				return nil
+			}
+
+			// Fill the cycle state
+			state := framework.NewCycleState()
+			if _, status, _ := f.RunPreFilterPlugins(ctx, state, tt.podToTriggerPreemption); !status.IsSuccess() {
+				t.Errorf("Unexpected PreFilter Status: %v", status)
+			}
+
+			// Trigger preemption. Given custom PreemptPod implementation, the async preemption will not finish until
+			// finishPreemption is closed.
+			if tt.features.EnableWorkloadAwarePreemption && tt.podToTriggerPreemption.Spec.SchedulingGroup != nil {
+				pg, err := informerFactory.Scheduling().V1alpha2().PodGroups().Lister().PodGroups(tt.podToTriggerPreemption.Namespace).Get(*tt.podToTriggerPreemption.Spec.SchedulingGroup.PodGroupName)
+				if err != nil {
+					t.Fatalf("could not find pg: %v", err)
+				}
+				podsToPreempt := []*v1.Pod{tt.podToTriggerPreemption}
+				pgSchedulingFunc := func(ctx context.Context) *fwk.Status {
+					nodeInfo, _ := f.SnapshotSharedLister().NodeInfos().Get("node1")
+					if len(nodeInfo.GetPods()) == 0 {
+						return fwk.NewStatus(fwk.Success)
+					}
+					return fwk.NewStatus(fwk.Unschedulable, "need to preempt")
+				}
+				p.PodGroupPostFilter(ctx, pg, podsToPreempt, pgSchedulingFunc)
+			} else {
+				p.PostFilter(ctx, state, tt.podToTriggerPreemption, filteredNodesStatuses)
+			}
+
+			status := p.PreEnqueue(ctx, tt.podToCheck)
+			close(finishPreemption)
+
+			if diff := cmp.Diff(tt.wantStatus, status); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}

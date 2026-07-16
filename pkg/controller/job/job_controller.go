@@ -18,8 +18,10 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -27,9 +29,11 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -38,11 +42,13 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	batchinformers "k8s.io/client-go/informers/batch/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -51,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/controller/job/util"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -112,6 +119,19 @@ type Controller struct {
 	// podIndexer allows looking up pods by ControllerRef UID
 	podIndexer cache.Indexer
 
+	// workloadIndexer allows looking up workloads by Job name
+	workloadIndexer cache.Indexer
+	// podGroupIndexer allows looking up pod groups by Workload name
+	podGroupIndexer cache.Indexer
+
+	// Workload/PodGroup listers and synced checks for workload APIs.
+	// These are nil when the feature gate is disabled.
+	workloadLister schedulinglisters.WorkloadLister
+	podGroupLister schedulinglisters.PodGroupLister
+
+	workloadStoreSynced cache.InformerSynced
+	podGroupStoreSynced cache.InformerSynced
+
 	// Jobs that need to be updated
 	queue workqueue.TypedRateLimitingInterface[string]
 
@@ -130,6 +150,9 @@ type Controller struct {
 	// finishedJobExpectations contains the job ids for which the job status is finished
 	// but the corresponding event is not yet received.
 	finishedJobExpectations sync.Map
+
+	// consistencyStore stores information about the consistency of the job.
+	consistencyStore consistencyutil.ConsistencyStore
 }
 
 type syncJobCtx struct {
@@ -148,6 +171,10 @@ type syncJobCtx struct {
 	podsWithDelayedDeletionPerIndex map[int]*v1.Pod
 	terminating                     *int32
 	ready                           int32
+
+	// Set only when the Job is eligible for workload integration, as
+	// determined by shouldManageWorkloadForJob function.
+	podGroup *schedulingv1alpha2.PodGroup
 }
 
 type orphanPodKeyKind int
@@ -167,21 +194,69 @@ type orphanPodKey struct {
 	value string
 }
 
+var (
+	jobGroupResource = schema.GroupResource{
+		Group:    "batch",
+		Resource: "jobs",
+	}
+	podGroupResource = schema.GroupResource{
+		Group:    "",
+		Resource: "pods",
+	}
+)
+
 // NewController creates a new Job controller that keeps the relevant pods
 // in sync with their corresponding Job objects.
-func NewController(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) (*Controller, error) {
-	return newControllerWithClock(ctx, podInformer, jobInformer, kubeClient, &clock.RealClock{})
+// workloadInformer and podGroupInformer may be nil when the WorkloadWithJob
+// feature gate is disabled; they are required when the gate is enabled.
+func NewController(ctx context.Context, kubeClient clientset.Interface,
+	podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer,
+	workloadInformer schedulinginformers.WorkloadInformer,
+	podGroupInformer schedulinginformers.PodGroupInformer) (*Controller, error) {
+
+	return newControllerWithClock(ctx, kubeClient, &clock.RealClock{},
+		podInformer, jobInformer, workloadInformer, podGroupInformer)
 }
 
-func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, clock clock.WithTicker) (*Controller, error) {
+func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface, clock clock.WithTicker,
+	podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer,
+	workloadInformer schedulinginformers.WorkloadInformer,
+	podGroupInformer schedulinginformers.PodGroupInformer,
+) (*Controller, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
+
+	var consistencyStore consistencyutil.ConsistencyStore
+	var podWriteCallback func(pod *v1.Pod, ds *metav1.OwnerReference)
+	if feature.DefaultFeatureGate.Enabled(features.StaleControllerConsistencyJob) {
+		consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
+			podGroupResource: podInformer.Informer().GetStore(),
+			jobGroupResource: jobInformer.Informer().GetStore(),
+		})
+		podWriteCallback = func(pod *v1.Pod, job *metav1.OwnerReference) {
+			if job == nil {
+				return
+			}
+			consistencyStore.WroteAt(
+				types.NamespacedName{
+					Namespace: pod.Namespace,
+					Name:      job.Name,
+				},
+				job.UID,
+				podGroupResource,
+				pod.ResourceVersion,
+			)
+		}
+	} else {
+		consistencyStore = consistencyutil.NewNoopConsistencyStore()
+	}
 
 	jm := &Controller{
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+			OnWrite:    podWriteCallback,
 		},
 		expectations:            controller.NewControllerExpectations(),
 		finalizerExpectations:   newUIDTrackingExpectations(),
@@ -192,6 +267,7 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 		clock:                   clock,
 		podBackoffStore:         newBackoffStore(),
 		finishedJobExpectations: sync.Map{},
+		consistencyStore:        consistencyStore,
 	}
 
 	if _, err := jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -236,6 +312,12 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 	jm.patchJobHandler = jm.patchJob
 	jm.syncHandler = jm.syncJob
 
+	if feature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
+		if err := jm.addSchedulingInformers(logger, workloadInformer, podGroupInformer); err != nil {
+			return nil, err
+		}
+	}
+
 	metrics.Register()
 
 	return jm, nil
@@ -261,7 +343,11 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 		wg.Wait()
 	}()
 
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, jm.podStoreSynced, jm.jobStoreSynced) {
+	syncFuncs := []cache.InformerSynced{jm.podStoreSynced, jm.jobStoreSynced}
+	if feature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
+		syncFuncs = append(syncFuncs, jm.workloadStoreSynced, jm.podGroupStoreSynced)
+	}
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, syncFuncs...) {
 		return
 	}
 
@@ -557,6 +643,10 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 			return
 		}
 	}
+	jm.consistencyStore.Clear(types.NamespacedName{
+		Namespace: jobObj.Namespace,
+		Name:      jobObj.Name,
+	}, jobObj.UID)
 	jm.finishedJobExpectations.Delete(jobObj.UID)
 	jm.enqueueLabelSelector(jobObj)
 
@@ -832,12 +922,28 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	if len(ns) == 0 || len(name) == 0 {
 		return fmt.Errorf("invalid job key %q: either namespace or name is missing", key)
 	}
+	jobNamespacedName := types.NamespacedName{Namespace: ns, Name: name}
+	// If our writes have not yet been observed by our informers, we should not
+	// continue since our reads will not be in sync with our previously enacted
+	// state.
+	if err := jm.consistencyStore.EnsureReady(jobNamespacedName); err != nil {
+		var consistencyErr *consistencyutil.ConsistencyError
+		if errors.As(err, &consistencyErr) {
+			metrics.JobRequeueSkips.WithLabelValues(
+				consistencyErr.GroupResource.Group,
+				consistencyErr.GroupResource.Resource,
+			).Inc()
+		}
+		return err
+	}
+
 	sharedJob, err := jm.jobLister.Jobs(ns).Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.V(4).Info("Job has been deleted", "key", key)
 			jm.expectations.DeleteExpectations(logger, key)
 			jm.finalizerExpectations.deleteExpectations(logger, key)
+			jm.consistencyStore.Clear(jobNamespacedName, "")
 
 			err := jm.podBackoffStore.removeBackoffRecord(key)
 			if err != nil {
@@ -869,6 +975,10 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			// re-syncing here as the record has to be removed for finished/deleted jobs
 			return fmt.Errorf("error removing backoff record %w", err)
 		}
+		jm.consistencyStore.Clear(types.NamespacedName{
+			Namespace: job.Namespace,
+			Name:      job.Name,
+		}, job.UID)
 		jm.finishedJobExpectations.Delete(job.UID)
 		return nil
 	}
@@ -908,6 +1018,17 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	if err != nil {
 		return err
 	}
+
+	// ensure Workload and PodGroup exist for eligible Jobs.
+	// This must happen before pod management so that pods can reference the PodGroup.
+	var podGroup *schedulingv1alpha2.PodGroup
+	if shouldManageWorkloadForJob(&job) {
+		_, podGroup, err = jm.ensureWorkloadAndPodGroup(ctx, &job, pods)
+		if err != nil {
+			return fmt.Errorf("ensuring Workload and PodGroup for Job %s/%s: %w", job.Namespace, job.Name, err)
+		}
+	}
+
 	activePods := controller.FilterActivePods(logger, pods)
 	jobCtx := &syncJobCtx{
 		job:                  &job,
@@ -916,6 +1037,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		ready:                countReadyPods(activePods),
 		uncounted:            newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods),
 		expectedRmFinalizers: jm.finalizerExpectations.getExpectedUIDs(key),
+		podGroup:             podGroup,
 	}
 	if trackTerminatingPods(&job) {
 		jobCtx.terminating = ptr.To(controller.CountTerminatingPods(pods))
@@ -1766,6 +1888,25 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 		podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
 
+		if jobCtx.podGroup != nil {
+			pg := jobCtx.podGroup
+			podTemplate.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+				PodGroupName: &pg.Name,
+			}
+			podTemplate.OwnerReferences = append(podTemplate.OwnerReferences,
+				// Non-controller ownerRef to PodGroup (the controller ownerRef
+				// points to the Job and is set by CreatePodsWithGenerateName).
+				// BlockOwnerDeletion is intentionally left nil (false) so that
+				// PodGroup deletion is not blocked by surviving pods, because
+				// the Job's cascading GC already ensures proper cleanup ordering.
+				metav1.OwnerReference{
+					APIVersion: schedulingv1alpha2.SchemeGroupVersion.String(),
+					Kind:       "PodGroup",
+					Name:       pg.Name,
+					UID:        pg.UID,
+				})
+		}
+
 		// Counters for pod creation status (used by the job_pods_creation_total metric)
 		var creationsSucceeded, creationsFailed int32 = 0, 0
 
@@ -1889,12 +2030,31 @@ func activePodsForRemoval(job *batch.Job, pods []*v1.Pod, rmAtLeast int) []*v1.P
 
 // updateJobStatus calls the API to update the job status.
 func (jm *Controller) updateJobStatus(ctx context.Context, job *batch.Job) (*batch.Job, error) {
-	return jm.kubeClient.BatchV1().Jobs(job.Namespace).UpdateStatus(ctx, job, metav1.UpdateOptions{})
+	job, err := jm.kubeClient.BatchV1().Jobs(job.Namespace).UpdateStatus(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	jm.consistencyStore.WroteAt(
+		types.NamespacedName{Name: job.Name, Namespace: job.Namespace},
+		job.UID,
+		jobGroupResource,
+		job.ResourceVersion,
+	)
+	return job, err
 }
 
 func (jm *Controller) patchJob(ctx context.Context, job *batch.Job, data []byte) error {
-	_, err := jm.kubeClient.BatchV1().Jobs(job.Namespace).Patch(
+	job, err := jm.kubeClient.BatchV1().Jobs(job.Namespace).Patch(
 		ctx, job.Name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
+	if err != nil {
+		return err
+	}
+	jm.consistencyStore.WroteAt(
+		types.NamespacedName{Name: job.Name, Namespace: job.Namespace},
+		job.UID,
+		jobGroupResource,
+		job.ResourceVersion,
+	)
 	return err
 }
 
@@ -1931,10 +2091,8 @@ func getCompletionMode(job *batch.Job) string {
 }
 
 func appendJobCompletionFinalizerIfNotFound(finalizers []string) []string {
-	for _, fin := range finalizers {
-		if fin == batch.JobTrackingFinalizer {
-			return finalizers
-		}
+	if slices.Contains(finalizers, batch.JobTrackingFinalizer) {
+		return finalizers
 	}
 	return append(finalizers, batch.JobTrackingFinalizer)
 }

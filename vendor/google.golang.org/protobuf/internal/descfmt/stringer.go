@@ -83,12 +83,13 @@ func formatListOpt(vs list, isRoot, allowMulti bool) string {
 	case protoreflect.FileImports:
 		for i := 0; i < vs.Len(); i++ {
 			var rs records
-			rv := reflect.ValueOf(vs.Get(i))
-			rs.Append(rv, []methodAndName{
-				{rv.MethodByName("Path"), "Path"},
-				{rv.MethodByName("Package"), "Package"},
-				{rv.MethodByName("IsPublic"), "IsPublic"},
-				{rv.MethodByName("IsWeak"), "IsWeak"},
+			fi := vs.Get(i)
+			rv := reflect.ValueOf(fi)
+			rs.Append(rv, []attrAndName{
+				{fi.Path(), "Path"},
+				{fi.Package(), "Package"},
+				{fi.IsPublic, "IsPublic"},
+				{fi.IsWeak, "IsWeak"},
 			}...)
 			ss = append(ss, "{"+rs.Join()+"}")
 		}
@@ -104,9 +105,9 @@ func formatListOpt(vs list, isRoot, allowMulti bool) string {
 	}
 }
 
-type methodAndName struct {
-	method reflect.Value
-	name   string
+type attrAndName struct {
+	attr any
+	name string
 }
 
 func FormatDesc(s fmt.State, r rune, t protoreflect.Descriptor) {
@@ -126,58 +127,58 @@ func formatDescOpt(t protoreflect.Descriptor, isRoot, allowMulti bool, record fu
 		start = rt.Name() + "{"
 	}
 
-	_, isFile := t.(protoreflect.FileDescriptor)
+	fd, isFile := t.(protoreflect.FileDescriptor)
 	rs := records{
 		allowMulti: allowMulti,
 		record:     record,
 	}
 	if t.IsPlaceholder() {
 		if isFile {
-			rs.Append(rv, []methodAndName{
-				{rv.MethodByName("Path"), "Path"},
-				{rv.MethodByName("Package"), "Package"},
-				{rv.MethodByName("IsPlaceholder"), "IsPlaceholder"},
+			rs.Append(rv, []attrAndName{
+				{fd.Path(), "Path"},
+				{fd.Package(), "Package"},
+				{fd.IsPlaceholder(), "IsPlaceholder"},
 			}...)
 		} else {
-			rs.Append(rv, []methodAndName{
-				{rv.MethodByName("FullName"), "FullName"},
-				{rv.MethodByName("IsPlaceholder"), "IsPlaceholder"},
+			rs.Append(rv, []attrAndName{
+				{t.FullName(), "FullName"},
+				{t.IsPlaceholder(), "IsPlaceholder"},
 			}...)
 		}
 	} else {
 		switch {
 		case isFile:
-			rs.Append(rv, methodAndName{rv.MethodByName("Syntax"), "Syntax"})
+			rs.Append(rv, attrAndName{fd.Syntax(), "Syntax"})
 		case isRoot:
-			rs.Append(rv, []methodAndName{
-				{rv.MethodByName("Syntax"), "Syntax"},
-				{rv.MethodByName("FullName"), "FullName"},
+			rs.Append(rv, []attrAndName{
+				{t.Syntax(), "Syntax"},
+				{t.FullName(), "FullName"},
 			}...)
 		default:
-			rs.Append(rv, methodAndName{rv.MethodByName("Name"), "Name"})
+			rs.Append(rv, attrAndName{t.Name(), "Name"})
 		}
 		switch t := t.(type) {
 		case protoreflect.FieldDescriptor:
-			accessors := []methodAndName{
-				{rv.MethodByName("Number"), "Number"},
-				{rv.MethodByName("Cardinality"), "Cardinality"},
-				{rv.MethodByName("Kind"), "Kind"},
-				{rv.MethodByName("HasJSONName"), "HasJSONName"},
-				{rv.MethodByName("JSONName"), "JSONName"},
-				{rv.MethodByName("HasPresence"), "HasPresence"},
-				{rv.MethodByName("IsExtension"), "IsExtension"},
-				{rv.MethodByName("IsPacked"), "IsPacked"},
-				{rv.MethodByName("IsWeak"), "IsWeak"},
-				{rv.MethodByName("IsList"), "IsList"},
-				{rv.MethodByName("IsMap"), "IsMap"},
-				{rv.MethodByName("MapKey"), "MapKey"},
-				{rv.MethodByName("MapValue"), "MapValue"},
-				{rv.MethodByName("HasDefault"), "HasDefault"},
-				{rv.MethodByName("Default"), "Default"},
-				{rv.MethodByName("ContainingOneof"), "ContainingOneof"},
-				{rv.MethodByName("ContainingMessage"), "ContainingMessage"},
-				{rv.MethodByName("Message"), "Message"},
-				{rv.MethodByName("Enum"), "Enum"},
+			accessors := []attrAndName{
+				{t.Number(), "Number"},
+				{t.Cardinality(), "Cardinality"},
+				{t.Kind(), "Kind"},
+				{t.HasJSONName(), "HasJSONName"},
+				{t.JSONName(), "JSONName"},
+				{t.HasPresence(), "HasPresence"},
+				{t.IsExtension(), "IsExtension"},
+				{t.IsPacked(), "IsPacked"},
+				{t.IsWeak(), "IsWeak"},
+				{t.IsList(), "IsList"},
+				{t.IsMap(), "IsMap"},
+				{t.MapKey(), "MapKey"},
+				{t.MapValue(), "MapValue"},
+				{t.HasDefault(), "HasDefault"},
+				{t.Default(), "Default"},
+				{t.ContainingOneof(), "ContainingOneof"},
+				{t.ContainingMessage(), "ContainingMessage"},
+				{t.Message(), "Message"},
+				{t.Enum(), "Enum"},
 			}
 			for _, s := range accessors {
 				switch s.name {
@@ -223,58 +224,54 @@ func formatDescOpt(t protoreflect.Descriptor, isRoot, allowMulti bool, record fu
 			}
 
 		case protoreflect.FileDescriptor:
-			rs.Append(rv, []methodAndName{
-				{rv.MethodByName("Path"), "Path"},
-				{rv.MethodByName("Package"), "Package"},
-				{rv.MethodByName("Imports"), "Imports"},
-				{rv.MethodByName("Messages"), "Messages"},
-				{rv.MethodByName("Enums"), "Enums"},
-				{rv.MethodByName("Extensions"), "Extensions"},
-				{rv.MethodByName("Services"), "Services"},
+			rs.Append(rv, []attrAndName{
+				{t.Path(), "Path"},
+				{t.Package(), "Package"},
+				{t.Imports(), "Imports"},
+				{t.Messages(), "Messages"},
+				{t.Enums(), "Enums"},
+				{t.Extensions(), "Extensions"},
+				{t.Services(), "Services"},
 			}...)
 
 		case protoreflect.MessageDescriptor:
-			rs.Append(rv, []methodAndName{
-				{rv.MethodByName("IsMapEntry"), "IsMapEntry"},
-				{rv.MethodByName("Fields"), "Fields"},
-				{rv.MethodByName("Oneofs"), "Oneofs"},
-				{rv.MethodByName("ReservedNames"), "ReservedNames"},
-				{rv.MethodByName("ReservedRanges"), "ReservedRanges"},
-				{rv.MethodByName("RequiredNumbers"), "RequiredNumbers"},
-				{rv.MethodByName("ExtensionRanges"), "ExtensionRanges"},
-				{rv.MethodByName("Messages"), "Messages"},
-				{rv.MethodByName("Enums"), "Enums"},
-				{rv.MethodByName("Extensions"), "Extensions"},
+			rs.Append(rv, []attrAndName{
+				{t.IsMapEntry(), "IsMapEntry"},
+				{t.Fields(), "Fields"},
+				{t.Oneofs(), "Oneofs"},
+				{t.ReservedNames(), "ReservedNames"},
+				{t.ReservedRanges(), "ReservedRanges"},
+				{t.RequiredNumbers(), "RequiredNumbers"},
+				{t.ExtensionRanges(), "ExtensionRanges"},
+				{t.Messages(), "Messages"},
+				{t.Enums(), "Enums"},
+				{t.Extensions(), "Extensions"},
 			}...)
 
 		case protoreflect.EnumDescriptor:
-			rs.Append(rv, []methodAndName{
-				{rv.MethodByName("Values"), "Values"},
-				{rv.MethodByName("ReservedNames"), "ReservedNames"},
-				{rv.MethodByName("ReservedRanges"), "ReservedRanges"},
-				{rv.MethodByName("IsClosed"), "IsClosed"},
+			rs.Append(rv, []attrAndName{
+				{t.Values(), "Values"},
+				{t.ReservedNames(), "ReservedNames"},
+				{t.ReservedRanges(), "ReservedRanges"},
+				{t.IsClosed(), "IsClosed"},
 			}...)
 
 		case protoreflect.EnumValueDescriptor:
-			rs.Append(rv, []methodAndName{
-				{rv.MethodByName("Number"), "Number"},
-			}...)
+			rs.Append(rv, attrAndName{t.Number(), "Number"})
 
 		case protoreflect.ServiceDescriptor:
-			rs.Append(rv, []methodAndName{
-				{rv.MethodByName("Methods"), "Methods"},
-			}...)
+			rs.Append(rv, attrAndName{t.Methods(), "Methods"})
 
 		case protoreflect.MethodDescriptor:
-			rs.Append(rv, []methodAndName{
-				{rv.MethodByName("Input"), "Input"},
-				{rv.MethodByName("Output"), "Output"},
-				{rv.MethodByName("IsStreamingClient"), "IsStreamingClient"},
-				{rv.MethodByName("IsStreamingServer"), "IsStreamingServer"},
+			rs.Append(rv, []attrAndName{
+				{t.Input(), "Input"},
+				{t.Output(), "Output"},
+				{t.IsStreamingClient(), "IsStreamingClient"},
+				{t.IsStreamingServer(), "IsStreamingServer"},
 			}...)
 		}
-		if m := rv.MethodByName("GoType"); m.IsValid() {
-			rs.Append(rv, methodAndName{m, "GoType"})
+		if m, ok := t.(interface{ GoType() reflect.Type }); ok {
+			rs.Append(rv, attrAndName{m.GoType(), "GoType"})
 		}
 	}
 	return start + rs.Join() + end
@@ -297,68 +294,66 @@ func (rs *records) AppendRecs(fieldName string, newRecs [2]string) {
 	rs.recs = append(rs.recs, newRecs)
 }
 
-func (rs *records) Append(v reflect.Value, accessors ...methodAndName) {
-	for _, a := range accessors {
-		if rs.record != nil {
-			rs.record(a.name)
-		}
-		var rv reflect.Value
-		if a.method.IsValid() {
-			rv = a.method.Call(nil)[0]
-		}
-		if v.Kind() == reflect.Struct && !rv.IsValid() {
-			rv = v.FieldByName(a.name)
-		}
-		if !rv.IsValid() {
-			panic(fmt.Sprintf("unknown accessor: %v.%s", v.Type(), a.name))
-		}
-		if _, ok := rv.Interface().(protoreflect.Value); ok {
-			rv = rv.MethodByName("Interface").Call(nil)[0]
-			if !rv.IsNil() {
-				rv = rv.Elem()
-			}
-		}
-
-		// Ignore zero values.
-		var isZero bool
-		switch rv.Kind() {
-		case reflect.Interface, reflect.Slice:
-			isZero = rv.IsNil()
-		case reflect.Bool:
-			isZero = rv.Bool() == false
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			isZero = rv.Int() == 0
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			isZero = rv.Uint() == 0
-		case reflect.String:
-			isZero = rv.String() == ""
-		}
-		if n, ok := rv.Interface().(list); ok {
-			isZero = n.Len() == 0
-		}
-		if isZero {
-			continue
-		}
-
-		// Format the value.
-		var s string
-		v := rv.Interface()
-		switch v := v.(type) {
-		case list:
-			s = formatListOpt(v, false, rs.allowMulti)
-		case protoreflect.FieldDescriptor, protoreflect.OneofDescriptor, protoreflect.EnumValueDescriptor, protoreflect.MethodDescriptor:
-			s = string(v.(protoreflect.Descriptor).Name())
-		case protoreflect.Descriptor:
-			s = string(v.FullName())
-		case string:
-			s = strconv.Quote(v)
-		case []byte:
-			s = fmt.Sprintf("%q", v)
-		default:
-			s = fmt.Sprint(v)
-		}
-		rs.recs = append(rs.recs, [2]string{a.name, s})
+func (rs *records) Append(v reflect.Value, results ...attrAndName) {
+	for _, r := range results {
+		rs.appendAttribute(v, r.name, r.attr)
 	}
+}
+
+func (rs *records) appendAttribute(val reflect.Value, name string, attrVal any) {
+	if rs.record != nil {
+		rs.record(name)
+	}
+	if attrVal == nil {
+		return
+	}
+	rv := reflect.ValueOf(attrVal)
+	if _, ok := rv.Interface().(protoreflect.Value); ok {
+		rv = rv.MethodByName("Interface").Call(nil)[0]
+		if !rv.IsNil() {
+			rv = rv.Elem()
+		}
+	}
+
+	// Ignore zero values.
+	var isZero bool
+	switch rv.Kind() {
+	case reflect.Interface, reflect.Slice:
+		isZero = rv.IsNil()
+	case reflect.Bool:
+		isZero = rv.Bool() == false
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		isZero = rv.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		isZero = rv.Uint() == 0
+	case reflect.String:
+		isZero = rv.String() == ""
+	}
+	if n, ok := rv.Interface().(list); ok {
+		isZero = n.Len() == 0
+	}
+	if isZero {
+		return
+	}
+
+	// Format the value.
+	var s string
+	v := rv.Interface()
+	switch v := v.(type) {
+	case list:
+		s = formatListOpt(v, false, rs.allowMulti)
+	case protoreflect.FieldDescriptor, protoreflect.OneofDescriptor, protoreflect.EnumValueDescriptor, protoreflect.MethodDescriptor:
+		s = string(v.(protoreflect.Descriptor).Name())
+	case protoreflect.Descriptor:
+		s = string(v.FullName())
+	case string:
+		s = strconv.Quote(v)
+	case []byte:
+		s = fmt.Sprintf("%q", v)
+	default:
+		s = fmt.Sprint(v)
+	}
+	rs.recs = append(rs.recs, [2]string{name, s})
 }
 
 func (rs *records) Join() string {

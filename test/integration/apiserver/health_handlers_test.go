@@ -59,6 +59,28 @@ func TestHealthHandler(t *testing.T) {
 	}
 }
 
+func TestHealthHandlerLoopbackServingCertificate(t *testing.T) {
+	_, c, _, teardownFn := setup(t)
+	defer teardownFn()
+
+	paths := []string{
+		"/healthz",
+		"/livez",
+	}
+
+	for _, path := range paths {
+		raw := readinessCheck(t, c, path, "")
+		if !strings.Contains(string(raw), "[+]loopback-serving-certificate ok") {
+			t.Errorf("%s result should contain loopback-serving-certificate ok. Raw: %v", path, string(raw))
+		}
+	}
+
+	raw := readinessCheck(t, c, "/readyz", "")
+	if strings.Contains(string(raw), "[+]loopback-serving-certificate ok") {
+		t.Errorf("/readyz result should not contain loopback-serving-certificate ok. Raw: %v", string(raw))
+	}
+}
+
 func readinessCheck(t *testing.T, c kubernetes.Interface, path string, exclude string) []byte {
 	var statusCode int
 	req := c.CoreV1().RESTClient().Get().AbsPath(path)

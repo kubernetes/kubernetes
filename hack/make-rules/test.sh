@@ -102,7 +102,7 @@ isnum() {
   [[ "$1" =~ ^[0-9]+$ ]]
 }
 
-PARALLEL="${PARALLEL:-1}"
+PARALLEL="${PARALLEL:--1}"
 while getopts "hp:i:" opt ; do
   case ${opt} in
     h)
@@ -174,6 +174,10 @@ set -- "${testcases[@]+${testcases[@]}}"
 
 if [[ -n "${KUBE_RACE}" ]] ; then
   goflags+=("${KUBE_RACE}")
+fi
+
+if [[ "${PARALLEL}" -gt 0 ]]; then
+  goflags+=(-p "${PARALLEL}")
 fi
 
 junitFilenamePrefix() {
@@ -269,7 +273,7 @@ checkFDs() {
   # due to the low default files limit on OS X.  Warn about low limit.
   local fileslimit
   fileslimit="$(ulimit -n)"
-  if [[ ${fileslimit} -lt 1000 ]]; then
+  if [[ "${fileslimit}" != "unlimited" && "${fileslimit}" -lt 1000 ]]; then
     echo "WARNING: ulimit -n (files) should be at least 1000, is ${fileslimit}, may cause test failure";
   fi
 }

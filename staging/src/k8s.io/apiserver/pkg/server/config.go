@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base32"
 	"fmt"
 	"net"
@@ -382,6 +383,13 @@ type SecureServingInfo struct {
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	CipherSuites []uint16
 
+	// CurvePreferences optionally specifies the set of allowed key exchange mechanisms for the server.
+	// The order of the list is ignored, and key exchange mechanisms
+	// are chosen by Go from this list using an internal preference order.
+	// If empty, the default Go curves will be used.
+	// Values are from the Go crypto/tls CurveID constants (https://golang.org/pkg/crypto/tls/#CurveID).
+	CurvePreferences []tls.CurveID
+
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
@@ -588,6 +596,18 @@ func (c *Config) AddHealthChecks(healthChecks ...healthz.HealthChecker) {
 	c.HealthzChecks = append(c.HealthzChecks, healthChecks...)
 	c.LivezChecks = append(c.LivezChecks, healthChecks...)
 	c.AddReadyzChecks(healthChecks...)
+}
+
+// AddHealthzChecks adds the provided health checks to our config to be exposed by the
+// healthz endpoint of our configured apiserver.
+func (c *Config) AddHealthzChecks(healthChecks ...healthz.HealthChecker) {
+	c.HealthzChecks = append(c.HealthzChecks, healthChecks...)
+}
+
+// AddLivezChecks adds the provided health checks to our config to be exposed by the
+// livez endpoint of our configured apiserver.
+func (c *Config) AddLivezChecks(healthChecks ...healthz.HealthChecker) {
+	c.LivezChecks = append(c.LivezChecks, healthChecks...)
 }
 
 // AddReadyzChecks adds a health check to our config to be exposed by the readyz endpoint
@@ -874,6 +894,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		UnprotectedDebugSocket:         debugSocket,
 
 		listedPathProvider: apiServerHandler,
+		Flagz:              c.Flagz,
 
 		minRequestTimeout:                   time.Duration(c.MinRequestTimeout) * time.Second,
 		ShutdownTimeout:                     c.RequestTimeout,

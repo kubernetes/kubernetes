@@ -48,11 +48,7 @@ func runPostUpgrade(c workflow.RunData) error {
 	// Rewrite the kubelet env file without unwanted flags to disk and print the remaining flags instead of dry-running.
 	// If not dry-running, the kubelet env file will be backed up to the /etc/kubernetes/tmp/ dir, so that it could be
 	// recovered if anything goes wrong.
-	unwantedFlags := []string{
-		// The flag has been deprecated and no longer served a purpose in the kubelet as the logic was migrated to CRI.
-		// TODO: Remove it from this list in 1.36: https://github.com/kubernetes/kubeadm/issues/3108
-		"pod-infra-container-image",
-	}
+	unwantedFlags := []string{}
 	err := upgrade.RemoveKubeletArgsFromFile(data.KubeletDir(), data.KubeConfigDir(), unwantedFlags, data.DryRun(), data.OutputWriter())
 	if err != nil {
 		return err

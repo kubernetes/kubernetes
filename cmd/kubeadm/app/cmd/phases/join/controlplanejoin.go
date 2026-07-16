@@ -72,7 +72,6 @@ func NewControlPlaneJoinPhase() workflow.Phase {
 				RunAllSiblings: true,
 				ArgsValidator:  cobra.NoArgs,
 			},
-			newEtcdLocalSubphase(),
 			newMarkControlPlaneSubphase(),
 		},
 	}
@@ -87,22 +86,6 @@ func NewEtcdJoinPhase() workflow.Phase {
 		Example:       etcdJoinExample,
 		InheritFlags:  getControlPlaneJoinPhaseFlags("etcd"),
 		ArgsValidator: cobra.NoArgs,
-	}
-}
-
-// TODO: Deprecated. Remove once ControlPlaneKubeletLocalMode is removed in 1.36.
-// https://github.com/kubernetes/kubeadm/issues/2271
-func newEtcdLocalSubphase() workflow.Phase {
-	return workflow.Phase{
-		Name:          "etcd",
-		Short:         "[DEPRECATED] Add a new local etcd member. Deprecated in favor of 'etcd-join' and will be removed in 1.36",
-		Run:           runEtcdPhase,
-		InheritFlags:  getControlPlaneJoinPhaseFlags("etcd"),
-		ArgsValidator: cobra.NoArgs,
-		Hidden:        true,
-		RunIf: func(c workflow.RunData) (bool, error) {
-			return false, nil
-		},
 	}
 }
 

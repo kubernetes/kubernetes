@@ -42,6 +42,10 @@ type NetworkSpecApplyConfiguration struct {
 	// and the spec.disableNetworkDiagnostics flag in network.operator.openshift.io is set to true,
 	// the network diagnostics feature will be disabled.
 	NetworkDiagnostics *NetworkDiagnosticsApplyConfiguration `json:"networkDiagnostics,omitempty"`
+	// networkObservability is an optional field that configures network observability installation
+	// during cluster deployment (day-0).
+	// When omitted, unless this is a SNO cluster, network observability will be installed if not already present, after that, no action taken.
+	NetworkObservability *NetworkObservabilitySpecApplyConfiguration `json:"networkObservability,omitempty"`
 }
 
 // NetworkSpecApplyConfiguration constructs a declarative configuration of the NetworkSpec type for use with
@@ -102,5 +106,13 @@ func (b *NetworkSpecApplyConfiguration) WithServiceNodePortRange(value string) *
 // If called multiple times, the NetworkDiagnostics field is set to the value of the last call.
 func (b *NetworkSpecApplyConfiguration) WithNetworkDiagnostics(value *NetworkDiagnosticsApplyConfiguration) *NetworkSpecApplyConfiguration {
 	b.NetworkDiagnostics = value
+	return b
+}
+
+// WithNetworkObservability sets the NetworkObservability field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NetworkObservability field is set to the value of the last call.
+func (b *NetworkSpecApplyConfiguration) WithNetworkObservability(value *NetworkObservabilitySpecApplyConfiguration) *NetworkSpecApplyConfiguration {
+	b.NetworkObservability = value
 	return b
 }

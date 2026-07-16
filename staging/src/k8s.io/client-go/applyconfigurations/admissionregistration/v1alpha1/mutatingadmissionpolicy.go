@@ -33,9 +33,9 @@ import (
 // MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
 type MutatingAdmissionPolicyApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the MutatingAdmissionPolicy.
+	// spec defines the desired behavior of the MutatingAdmissionPolicy.
 	Spec *MutatingAdmissionPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 

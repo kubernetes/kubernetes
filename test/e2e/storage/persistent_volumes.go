@@ -180,7 +180,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Create an nfs PV, then a claim that matches the PV, and a pod that
 			// contains the claim. Verify that the PV and PVC bind correctly, and
 			// that the pod can write to the nfs volume.
-			ginkgo.It("should create a non-pre-bound PV and PVC: test write access ", func(ctx context.Context) {
+			ginkgo.It("should create a non-pre-bound PV and PVC: test write access", func(ctx context.Context) {
 				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 				framework.ExpectNoError(err)
 				completeTest(ctx, f, c, ns, pv, pvc)
@@ -831,7 +831,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				ginkgo.By("Creating a StatefulSet pod to initialize data")
 				writeCmd := "true"
-				for i := 0; i < numVols; i++ {
+				for i := range numVols {
 					writeCmd += fmt.Sprintf("&& touch %v", getVolumeFile(i))
 				}
 				writeCmd += "&& sleep 10000"
@@ -850,7 +850,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				mounts := []v1.VolumeMount{}
 				claims := []v1.PersistentVolumeClaim{}
 
-				for i := 0; i < numVols; i++ {
+				for i := range numVols {
 					pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{}, ns)
 					pvc.Name = getVolName(i)
 					mounts = append(mounts, v1.VolumeMount{Name: pvc.Name, MountPath: getMountPath(i)})
@@ -872,7 +872,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				ginkgo.By("Creating a new Statefulset and validating the data")
 				validateCmd := "true"
-				for i := 0; i < numVols; i++ {
+				for i := range numVols {
 					validateCmd += fmt.Sprintf("&& test -f %v", getVolumeFile(i))
 				}
 				validateCmd += "&& sleep 10000"

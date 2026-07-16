@@ -210,6 +210,9 @@ type Int64Observer interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Observe(value int64, options ...ObserveOption)
 }
 
@@ -225,7 +228,11 @@ type Int64Observer interface {
 // attributes as another Int64Callbacks also registered for the same
 // instrument.
 //
-// The function needs to be concurrent safe.
+// The function needs to be reentrant and concurrent safe.
+//
+// Note that Go's mutexes are not reentrant, and locking a mutex takes
+// an indefinite amount of time. It is therefore advised to avoid
+// using mutexes inside callbacks.
 type Int64Callback func(context.Context, Int64Observer) error
 
 // Int64ObservableOption applies options to int64 Observer instruments.

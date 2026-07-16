@@ -18,18 +18,23 @@ package mutating
 
 import (
 	"context"
-	celgo "github.com/google/cel-go/cel"
 	"io"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	celgo "github.com/google/cel-go/cel"
+
+	v1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/manifest/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/config"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/manifest/source"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
@@ -49,13 +54,13 @@ const (
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(configFile io.Reader) (admission.Interface, error) {
-		return NewPlugin(configFile), nil
+		return NewPlugin(configFile)
 	})
 }
 
-type Policy = v1beta1.MutatingAdmissionPolicy
-type PolicyBinding = v1beta1.MutatingAdmissionPolicyBinding
-type PolicyMutation = v1beta1.Mutation
+type Policy = v1.MutatingAdmissionPolicy
+type PolicyBinding = v1.MutatingAdmissionPolicyBinding
+
 type PolicyHook = generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]
 
 type Mutator struct {
@@ -73,10 +78,10 @@ type MutationEvaluationFunc func(
 ) (runtime.Object, error)
 
 type PolicyEvaluator struct {
-	Matcher        matchconditions.Matcher
-	Mutators       []patch.Patcher
-	CompositionEnv *cel.CompositionEnv
-	Error          error
+	Matcher            matchconditions.Matcher
+	Mutators           []patch.Patcher
+	CompositedCompiler *cel.CompositedCompiler
+	Error              error
 }
 
 // Plugin is an implementation of admission.Interface.
@@ -86,9 +91,43 @@ type Plugin struct {
 
 var _ admission.Interface = &Plugin{}
 var _ admission.MutationInterface = &Plugin{}
+var _ initializer.WantsManifestLoaders = &Plugin{}
+
+// SetManifestLoaders provides the manifest load functions for scheme-based defaulting and validation.
+func (a *Plugin) SetManifestLoaders(loaders *initializer.ManifestLoaders) {
+	if loaders == nil || loaders.LoadMutatingPolicyManifests == nil {
+		return
+	}
+	loadFunc := loaders.LoadMutatingPolicyManifests
+	a.SetStaticSourceFactory(func(manifestsDir string) (generic.ReloadableSource[PolicyHook], error) {
+		staticSource := source.NewStaticPolicySource(manifestsDir, a.GetAPIServerID(),
+			func(p *v1.MutatingAdmissionPolicy) (PolicyEvaluator, error) {
+				e := compilePolicy(p)
+				if e.Error != nil {
+					return PolicyEvaluator{}, e.Error
+				}
+				return e, nil
+			},
+			func(dir string) ([]*v1.MutatingAdmissionPolicy, []*v1.MutatingAdmissionPolicyBinding, string, error) {
+				return loadFunc(dir)
+			},
+			func(b *v1.MutatingAdmissionPolicyBinding) string { return b.Spec.PolicyName },
+			metrics.MAPManifestType,
+		)
+		if err := staticSource.LoadInitial(); err != nil {
+			return nil, err
+		}
+		return staticSource, nil
+	})
+}
 
 // NewPlugin returns a generic admission webhook plugin.
-func NewPlugin(_ io.Reader) *Plugin {
+func NewPlugin(configFile io.Reader) (*Plugin, error) {
+	cfg, err := config.LoadMutatingConfig(configFile)
+	if err != nil {
+		return nil, err
+	}
+
 	// There is no request body to mutate for DELETE, so this plugin never handles that operation.
 	handler := admission.NewHandler(admission.Create, admission.Update, admission.Connect)
 	res := &Plugin{}
@@ -96,8 +135,8 @@ func NewPlugin(_ io.Reader) *Plugin {
 		handler,
 		func(f informers.SharedInformerFactory, client kubernetes.Interface, dynamicClient dynamic.Interface, restMapper meta.RESTMapper) generic.Source[PolicyHook] {
 			return generic.NewPolicySource(
-				f.Admissionregistration().V1beta1().MutatingAdmissionPolicies().Informer(),
-				f.Admissionregistration().V1beta1().MutatingAdmissionPolicyBindings().Informer(),
+				f.Admissionregistration().V1().MutatingAdmissionPolicies().Informer(),
+				f.Admissionregistration().V1().MutatingAdmissionPolicyBindings().Informer(),
 				NewMutatingAdmissionPolicyAccessor,
 				NewMutatingAdmissionPolicyBindingAccessor,
 				compilePolicy,
@@ -112,7 +151,8 @@ func NewPlugin(_ io.Reader) *Plugin {
 			return NewDispatcher(a, m, patch.NewTypeConverterManager(nil, client.Discovery().OpenAPIV3()))
 		},
 	)
-	return res
+	res.SetStaticManifestsDir(cfg.StaticManifestsDir)
+	return res, nil
 }
 
 // Admit makes an admission decision based on the request attributes.
@@ -140,12 +180,4 @@ func (v *Variable) ReturnTypes() []*celgo.Type {
 
 func (v *Variable) GetName() string {
 	return v.Name
-}
-
-func convertv1alpha1Variables(variables []v1beta1.Variable) []cel.NamedExpressionAccessor {
-	namedExpressions := make([]cel.NamedExpressionAccessor, len(variables))
-	for i, variable := range variables {
-		namedExpressions[i] = &Variable{Name: variable.Name, Expression: variable.Expression}
-	}
-	return namedExpressions
 }

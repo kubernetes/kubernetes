@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -159,6 +160,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("resource.k8s.io", "v1beta1", "resourceclaims"):                            `{"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "other-class"}]}}}`, // spec is immutable, but that doesn't matter for the test.
 	gvr("resource.k8s.io", "v1beta1", "resourceclaimtemplates"):                    `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
 	gvr("resource.k8s.io", "v1beta2", "deviceclasses"):                             `{"metadata": {"labels":{"a":"c"}}}`,
+	gvr("resource.k8s.io", "v1beta2", "devicetaintrules"):                          `{"metadata": {"labels":{"a":"c"}}}`,
 	gvr("resource.k8s.io", "v1beta2", "resourceclaims"):                            `{"spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "other-class"}}]}}}`, // spec is immutable, but that doesn't matter for the test.
 	gvr("resource.k8s.io", "v1beta2", "resourceclaimtemplates"):                    `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
 	gvr("resource.k8s.io", "v1", "deviceclasses"):                                  `{"metadata": {"labels":{"a":"c"}}}`,
@@ -322,6 +324,317 @@ func TestApplyResetFields(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestFieldsWipingConsistency verifies that field wiping is applied consistently across the API
+// and that field wiping is consistent GetResetFields.
+func TestFieldsWipingConsistency(t *testing.T) {
+	// DO NOT ADD NEW ENTRIES HERE.
+	// This tracks pre-existing APIs where status is allowed to update metadata.
+	// All new APIs should use ResetObjectMetaForStatus.
+	statusDoesNotWipeMetadataAllowed := sets.New(
+		// https://github.com/kubernetes/kubernetes/issues/137681
+		"apiextensions.k8s.io/customresourcedefinitions",
+
+		// APIs that do not use ResetObjectMetaForStatus:
+		"apps/daemonsets",
+		"apps/replicasets",
+		"apps/statefulsets",
+		"batch/cronjobs",
+		"batch/jobs",
+		"autoscaling/horizontalpodautoscalers",
+		"networking.k8s.io/ingresses",
+		"nodes",
+		"persistentvolumes",
+		"persistentvolumeclaims",
+		"pods",
+		"replicationcontrollers",
+		"resourcequotas",
+		"services",
+		"policy/poddisruptionbudgets",
+		"namespaces",
+		"certificates.k8s.io/certificatesigningrequests",
+	)
+
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+
+	ns := "field-wiping-consistency-ns"
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	storageData := etcd.GetEtcdStorageDataForNamespace(ns)
+
+	_, resourceLists, err := client.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		t.Fatalf("Failed to get ServerGroupsAndResources: %v", err)
+	}
+
+	for _, resourceList := range resourceLists {
+		for _, resource := range resourceList.APIResources {
+
+			// Only test resources that have a /status subresource, since the
+			// test verifies consistency between / and /status strategies.
+			if !strings.HasSuffix(resource.Name, "/status") {
+				continue
+			}
+			mapping, err := createMapping(resourceList.GroupVersion, resource)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			t.Run(mapping.Resource.String(), func(t *testing.T) {
+				if _, ok := resetFieldsSkippedResources[mapping.Resource.Resource]; ok {
+					t.Skip()
+				}
+
+				resourceStub, ok := storageData[mapping.Resource]
+				if !ok {
+					t.Fatalf("no test data for %s for type in etcd.GetEtcdStorageData", mapping.Resource)
+				}
+
+				status, ok := statusData[mapping.Resource]
+				if !ok {
+					status = statusDefault
+				}
+
+				obj := testObj(t, resourceStub.Stub, status, mapping.GroupVersionKind)
+				name := obj.GetName()
+
+				namespace := ns
+				if mapping.Scope == meta.RESTScopeRoot {
+					namespace = ""
+				}
+				rsc := dynamicClient.Resource(mapping.Resource).Namespace(namespace)
+
+				// Step 1: Create the resource
+				_, err = rsc.Apply(context.TODO(), name, obj, metav1.ApplyOptions{FieldManager: "spec-manager"})
+				if err != nil {
+					t.Fatalf("Failed to create via SSA: %v", err)
+				}
+
+				// Step 2: Apply to /status endpoint with spec, status and metadata field changes.
+				statusObj := testObj(t, resourceStub.Stub, status, mapping.GroupVersionKind)
+				statusObj.SetName(name)
+				statusLabels := statusObj.GetLabels()
+				if statusLabels == nil {
+					statusLabels = map[string]string{}
+				}
+				statusLabels["test-status-ssa"] = "true"
+				statusObj.SetLabels(statusLabels)
+				_, err = rsc.ApplyStatus(context.TODO(), name, statusObj, metav1.ApplyOptions{FieldManager: "status-manager", Force: true})
+				if err != nil {
+					t.Fatalf("Failed to apply status via SSA: %v", err)
+				}
+
+				// Step 3: Read after writing to observe field wiping behavior and managedField state
+				baseline, err := rsc.Get(context.TODO(), name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get baseline: %v", err)
+				}
+				baselineStatus := baseline.Object["status"]
+				baselineSpec := baseline.Object["spec"]
+
+				// Infer GetResetFields behavior from managedFields.
+				ssaMainResetsStatus := true
+				ssaStatusResetsSpec := true
+				ssaStatusResetsMetadata := true
+				for _, mf := range baseline.GetManagedFields() {
+					if mf.Manager == "spec-manager" && mf.Subresource == "" {
+						ssaMainResetsStatus = !managedFieldsOwnTopLevelField(t, mf.FieldsV1, "status")
+					}
+					if mf.Manager == "status-manager" && mf.Subresource == "status" {
+						ssaStatusResetsSpec = !managedFieldsOwnTopLevelField(t, mf.FieldsV1, "spec")
+						ssaStatusResetsMetadata = !managedFieldsOwnLabel(t, mf.FieldsV1, "test-status-ssa")
+					}
+				}
+
+				// Check / PrepareForUpdate status wiping
+				var mainWipesStatus bool
+				if baselineStatus != nil {
+					differentStatus, ok := resetFieldsStatusData[mapping.Resource]
+					if !ok {
+						differentStatus = resetFieldsStatusDefault
+					}
+					result, err := rsc.Patch(context.TODO(), name, types.MergePatchType, []byte(differentStatus), metav1.PatchOptions{})
+					if err != nil {
+						t.Fatalf("Failed to patch main endpoint with different status: %v", err)
+					}
+					mainWipesStatus = !checkPatch(t, differentStatus, "status", result.Object)
+				} else {
+					mainWipesStatus = true
+				}
+
+				// Check /status PrepareForUpdate spec wiping
+				var statusWipesSpec bool
+				differentSpec, hasSpecData := resetFieldsSpecData[mapping.Resource]
+				if baselineSpec != nil && hasSpecData {
+					result, err := rsc.Patch(context.TODO(), name, types.MergePatchType, []byte(differentSpec), metav1.PatchOptions{}, "status")
+					if err != nil {
+						statusWipesSpec = true
+						t.Logf("Patch to status endpoint with different spec returned an error (OK if validation rejects it): %v", err)
+					} else {
+						statusWipesSpec = !checkPatch(t, differentSpec, "spec", result.Object)
+					}
+				} else {
+					statusWipesSpec = true
+				}
+
+				// Check /status PrepareForUpdate metadata wiping
+				var statusWipesMetadata bool
+				labelPatch := []byte(`{"metadata": {"labels": {"test-wipe-label": "test-value"}}}`)
+				result, err := rsc.Patch(context.TODO(), name, types.MergePatchType, labelPatch, metav1.PatchOptions{}, "status")
+				if err != nil {
+					t.Logf("Label patch to status endpoint failed: %v", err)
+					statusWipesMetadata = false
+				} else {
+					statusWipesMetadata = result.GetLabels()["test-wipe-label"] != "test-value"
+				}
+
+				// Check consistency between field wiping and field resetting
+				checkConsistency := func(endpoint, field string, wipes, resets bool) {
+					if wipes == resets {
+						return
+					}
+					direction := "PrepareForUpdate wipes the field but GetResetFields does not declare it"
+					if resets && !wipes {
+						direction = "GetResetFields declares the field but PrepareForUpdate does not wipe it"
+					}
+					t.Errorf("Mismatch between PrepareForUpdate and GetResetFields (%s endpoint, %s field): %s (wipes=%v, resets=%v)",
+						endpoint, field, direction, wipes, resets)
+				}
+				checkConsistency("/", "status", mainWipesStatus, ssaMainResetsStatus)
+				checkConsistency("/status", "spec", statusWipesSpec, ssaStatusResetsSpec)
+				checkConsistency("/status", "metadata", statusWipesMetadata, ssaStatusResetsMetadata)
+
+				requireWiped := func(wipes bool, endpoint, field string) {
+					if wipes {
+						return
+					}
+					t.Errorf("%s did NOT wipe %s via PrepareForUpdate", endpoint, field)
+				}
+				requireWiped(mainWipesStatus, "/", "status")
+				requireWiped(statusWipesSpec, "/status", "spec")
+
+				if !statusWipesMetadata && !statusDoesNotWipeMetadataAllowed.Has(groupResource(mapping.Resource)) {
+					t.Errorf("/status does not wipe metadata. Add ResetObjectMetaForStatus to status strategy, or add %q to statusDoesNotWipeMetadataAllowed", groupResource(mapping.Resource))
+				}
+
+				if err := rsc.Delete(context.TODO(), name, *metav1.NewDeleteOptions(0)); err != nil {
+					t.Fatalf("deleting final object failed: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func testObj(t *testing.T, stub, status string, gvk schema.GroupVersionKind) *unstructured.Unstructured {
+	t.Helper()
+	obj := &unstructured.Unstructured{}
+	if err := json.Unmarshal([]byte(stub), &obj.Object); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(status), &obj.Object); err != nil {
+		t.Fatal(err)
+	}
+	obj.SetAPIVersion(gvk.GroupVersion().String())
+	obj.SetKind(gvk.Kind)
+	return obj
+}
+
+func groupResource(gvr schema.GroupVersionResource) string {
+	if gvr.Group == "" {
+		return gvr.Resource
+	}
+	return gvr.Group + "/" + gvr.Resource
+}
+
+// checkPatch checks if field values under fieldScope (e.g. spec, status, metdata) in objData match the values
+// in the applyManifest.
+func checkPatch(t *testing.T, applyManifest string, fieldScope string, objData map[string]interface{}) bool {
+	t.Helper()
+	var applyObj map[string]interface{}
+	if err := json.Unmarshal([]byte(applyManifest), &applyObj); err != nil {
+		t.Fatalf("Failed to parse apply JSON: %v", err)
+	}
+	applyValue, ok := applyObj[fieldScope]
+	if !ok {
+		return false
+	}
+	objValue, ok := objData[fieldScope]
+	if !ok {
+		return false
+	}
+	return containsAll(applyValue, objValue)
+}
+
+// containsAll checks if all keys in want are present in got and if the values of those keys are equal.
+func containsAll(want, got any) bool {
+	wantMap, wantIsMap := want.(map[string]any)
+	gotMap, gotIsMap := got.(map[string]any)
+	if wantIsMap && gotIsMap {
+		for k, wv := range wantMap {
+			gv, exists := gotMap[k]
+			if !exists || !containsAll(wv, gv) {
+				return false
+			}
+		}
+		return true
+	}
+	return reflect.DeepEqual(want, got)
+}
+
+// managedFieldsOwnTopLevelField checks whether a FieldsV1 set contains a given top-level field.
+func managedFieldsOwnTopLevelField(t *testing.T, fieldsV1 *metav1.FieldsV1, field string) bool {
+	t.Helper()
+	if fieldsV1 == nil {
+		return false
+	}
+	var fields map[string]interface{}
+	if err := json.Unmarshal(fieldsV1.GetRawBytes(), &fields); err != nil {
+		t.Logf("Failed to unmarshal FieldsV1: %v", err)
+		return false
+	}
+	_, ok := fields["f:"+field]
+	return ok
+}
+
+// managedFieldsOwnLabel checks whether a FieldsV1 set contains a metadata label.
+func managedFieldsOwnLabel(t *testing.T, fieldsV1 *metav1.FieldsV1, labelKey string) bool {
+	t.Helper()
+	if fieldsV1 == nil {
+		return false
+	}
+	var fields map[string]interface{}
+	if err := json.Unmarshal(fieldsV1.GetRawBytes(), &fields); err != nil {
+		t.Logf("Failed to unmarshal FieldsV1: %v", err)
+		return false
+	}
+	metadata, ok := fields["f:metadata"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	labels, ok := metadata["f:labels"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	_, ok = labels["f:"+labelKey]
+	return ok
 }
 
 // TestUpdateStatusWithOldVersion tests that apply with resetFields works correctly when updating

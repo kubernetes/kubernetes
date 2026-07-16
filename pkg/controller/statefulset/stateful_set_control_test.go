@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"reflect"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -886,7 +887,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if len(revisions) != test.expectedCount {
 			t.Errorf("%s: want %d revisions got %d", test.name, test.expectedCount, len(revisions))
 		}
-		if test.err && err == nil {
+		if test.err {
 			t.Errorf("%s: expected error", test.name)
 		}
 		if !test.err && !history.EqualRevision(current, test.expectedCurrent) {
@@ -2092,9 +2093,6 @@ func TestStatefulSetControlRollback(t *testing.T) {
 		if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		if err != nil {
-			t.Fatalf("%s: %s", test.name, err)
-		}
 		pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
@@ -2514,7 +2512,7 @@ func newFakeObjectManager(informerFactory informers.SharedInformerFactory) *fake
 	}
 }
 
-func (om *fakeObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
+func (om *fakeObjectManager) CreatePod(ctx context.Context, pod *v1.Pod, ss *apps.StatefulSet) error {
 	defer om.createPodTracker.trackParallelRequests()
 	if err := om.createPodTracker.incWithOptionalError(); err != nil {
 		return err
@@ -2527,7 +2525,7 @@ func (om *fakeObjectManager) GetPod(namespace, podName string) (*v1.Pod, error) 
 	return om.podsLister.Pods(namespace).Get(podName)
 }
 
-func (om *fakeObjectManager) UpdatePod(pod *v1.Pod) error {
+func (om *fakeObjectManager) UpdatePod(pod *v1.Pod, ss *apps.StatefulSet) error {
 	defer om.updatePodTracker.trackParallelRequests()
 	if err := om.updatePodTracker.incWithOptionalError(); err != nil {
 		return err
@@ -2550,7 +2548,7 @@ func (om *fakeObjectManager) DeletePod(pod *v1.Pod) error {
 	return nil // Not found, no error in deleting.
 }
 
-func (om *fakeObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim) error {
+func (om *fakeObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim, ss *apps.StatefulSet) error {
 	om.claimsIndexer.Update(claim)
 	return nil
 }
@@ -2559,7 +2557,7 @@ func (om *fakeObjectManager) GetClaim(namespace, claimName string) (*v1.Persiste
 	return om.claimsLister.PersistentVolumeClaims(namespace).Get(claimName)
 }
 
-func (om *fakeObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim) error {
+func (om *fakeObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim, ss *apps.StatefulSet) error {
 	// Validate ownerRefs.
 	refs := claim.GetOwnerReferences()
 	for _, ref := range refs {
@@ -3407,10 +3405,8 @@ func isOrHasInternalError(err error) bool {
 	}
 	var agg utilerrors.Aggregate
 	if errors.As(err, &agg) {
-		for _, e := range agg.Errors() {
-			if apierrors.IsInternalError(e) {
-				return true
-			}
+		if slices.ContainsFunc(agg.Errors(), apierrors.IsInternalError) {
+			return true
 		}
 	}
 	return apierrors.IsInternalError(err)

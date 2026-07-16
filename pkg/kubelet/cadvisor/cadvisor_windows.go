@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -24,7 +23,6 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
@@ -37,7 +35,7 @@ type cadvisorClient struct {
 var _ Interface = new(cadvisorClient)
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
+func New(_ klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
 	client, err := winstats.NewPerfCounterClient(klog.TODO())
 	return &cadvisorClient{
 		rootPath:       rootPath,
@@ -80,4 +78,8 @@ func (cu *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 
 func (cu *cadvisorClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 	return cu.winStatsClient.GetDirFsInfo(path)
+}
+
+func IsPsiEnabled(_ klog.Logger) bool {
+	return false
 }

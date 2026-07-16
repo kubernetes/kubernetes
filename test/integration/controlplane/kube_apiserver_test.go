@@ -27,7 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -39,6 +38,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	apiserverfeat "k8s.io/apiserver/pkg/features"
+	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
+	flagzv1beta1 "k8s.io/apiserver/pkg/server/flagz/api/v1beta1"
+	flagztesting "k8s.io/apiserver/pkg/server/flagz/testing"
+	statuszv1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	statuszv1beta1 "k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
+	statusztesting "k8s.io/apiserver/pkg/server/statusz/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -48,9 +54,6 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
-
-	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
-	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
 )
 
 const (
@@ -136,6 +139,7 @@ func TestLivezAndReadyz(t *testing.T) {
 
 func TestFlagz(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiserverfeat.CBORServingAndStorage, true)
 	testServerFlags := append(framework.DefaultTestServerFlags(), "--v=2")
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, testServerFlags, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -145,41 +149,57 @@ func TestFlagz(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	wantBodyStr := "kube-apiserver flagz\nWarning: This endpoint is not meant to be machine parseable"
-	wantBodyJSON := &flagzv1alpha1.Flagz{
+	wantBodyStr := "apiserver flagz\nWarning: This endpoint is not meant to be machine parseable"
+	wantBodyAlpha := &flagzv1alpha1.Flagz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Flagz",
 			APIVersion: "config.k8s.io/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "kube-apiserver",
+			Name: "apiserver",
+		},
+		Flags: map[string]string{
+			"v": "2",
+		},
+	}
+	wantBodyBeta := &flagzv1beta1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Flagz",
+			APIVersion: "config.k8s.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "apiserver",
+		},
+		Flags: map[string]string{
+			"v": "2",
 		},
 	}
 
 	for _, tc := range []struct {
-		name         string
-		acceptHeader string
-		wantStatus   int
-		wantBodySub  string               // for text/plain
-		wantJSON     *flagzv1alpha1.Flagz // for application/json
+		name                  string
+		acceptHeader          string
+		wantStatus            int
+		wantBodyText          string      // for text/plain
+		wantBodyStructured    interface{} // for structured responses (JSON/YAML/CBOR)
+		wantDeprecationHeader bool
 	}{
 		{
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodyText: wantBodyStr,
 		},
 		{
-			name:         "structured json response",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
-			wantStatus:   http.StatusOK,
-			wantJSON:     wantBodyJSON,
+			name:               "structured json response",
+			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: wantBodyBeta,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodyText: wantBodyStr,
 		},
 		{
 			name:         "invalid accept header",
@@ -193,20 +213,46 @@ func TestFlagz(t *testing.T) {
 		},
 		{
 			name:         "application/json with missing as",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
 			wantStatus:   http.StatusNotAcceptable,
 		},
 		{
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodyText: wantBodyStr,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Flagz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodyText: wantBodyStr,
+		},
+		{
+			name:               "structured cbor response",
+			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: wantBodyBeta,
+		},
+		{
+			name:               "structured yaml response",
+			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: wantBodyBeta,
+		},
+		{
+			name:                  "alpha specified before beta, should show warning",
+			acceptHeader:          "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz,application/json;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    wantBodyAlpha,
+			wantDeprecationHeader: true,
+		},
+		{
+			name:                  "beta specified before alpha, no warning",
+			acceptHeader:          "application/json;v=v1beta1;g=config.k8s.io;as=Flagz,application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    wantBodyBeta,
+			wantDeprecationHeader: false,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -223,26 +269,17 @@ func TestFlagz(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if tc.wantStatus == http.StatusOK {
-				if tc.wantBodySub != "" {
-					if !bytes.Contains(raw, []byte(tc.wantBodySub)) {
-						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(raw))
+				if tc.wantBodyText != "" {
+					if !bytes.Contains(raw, []byte(tc.wantBodyText)) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodyText, string(raw))
 					}
 				}
-				if tc.wantJSON != nil {
-					var got flagzv1alpha1.Flagz
-					if err := json.Unmarshal(raw, &got); err != nil {
-						t.Fatalf("error unmarshalling JSON: %v", err)
-					}
-					// Only check static fields, since others are dynamic
-					if got.TypeMeta != tc.wantJSON.TypeMeta {
-						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
-					}
-					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
-						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
-					}
-					if got.Flags["v"] != "2" {
-						t.Errorf("v mismatch: want %q, got %q", "2", got.Flags["v"])
-					}
+				var warnings []string
+				for _, w := range res.Warnings() {
+					warnings = append(warnings, w.Text)
+				}
+				if tc.wantBodyStructured != nil {
+					flagztesting.VerifyStructuredResponse(t, tc.acceptHeader, raw, warnings, tc.wantBodyStructured, tc.wantDeprecationHeader)
 				}
 			}
 		})
@@ -251,6 +288,7 @@ func TestFlagz(t *testing.T) {
 
 func TestStatusz(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentStatusz, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiserverfeat.CBORServingAndStorage, true)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -259,8 +297,8 @@ func TestStatusz(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	wantBodyStr := "statusz\nWarning: This endpoint is not meant to be machine parseable"
-	wantBodyJSON := &v1alpha1.Statusz{
+	wantBodyString := "statusz\nWarning: This endpoint is not meant to be machine parseable"
+	wantBodyAlpha := &statuszv1alpha1.Statusz{
 		// StartTime, UptimeSeconds, GoVersion, BinaryVersion,
 		// EmulationVersion, Paths are dynamic, so we only check
 		// static fields
@@ -271,33 +309,44 @@ func TestStatusz(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "apiserver",
 		},
-		Paths: []string{"/healthz", "/livez", "/metrics", "/readyz", "/statusz", "/version"},
+		Paths: []string{"/flagz", "/healthz", "/livez", "/metrics", "/readyz", "/statusz", "/version"},
+	}
+	wantBodyBeta := &statuszv1beta1.Statusz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Statusz",
+			APIVersion: "config.k8s.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "apiserver",
+		},
+		Paths: []string{"/flagz", "/healthz", "/livez", "/metrics", "/readyz", "/statusz", "/version"},
 	}
 
 	for _, tc := range []struct {
-		name         string
-		acceptHeader string
-		wantStatus   int
-		wantBodySub  string            // for text/plain responses
-		wantJSON     *v1alpha1.Statusz // for structured response
+		name                  string
+		acceptHeader          string
+		wantStatus            int
+		wantBodyText          string
+		wantBodyStructured    interface{}
+		wantDeprecationHeader bool
 	}{
 		{
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodyText: wantBodyString,
 		},
 		{
-			name:         "structured json response",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
-			wantStatus:   http.StatusOK,
-			wantJSON:     wantBodyJSON,
+			name:               "structured json response",
+			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: wantBodyBeta,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodyText: wantBodyString,
 		},
 		{
 			name:         "invalid accept header",
@@ -311,20 +360,45 @@ func TestStatusz(t *testing.T) {
 		},
 		{
 			name:         "application/json with missing as",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
 			wantStatus:   http.StatusNotAcceptable,
 		},
 		{
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodyText: wantBodyString,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  wantBodyStr,
+			wantBodyText: wantBodyString,
+		},
+		{
+			name:               "structured yaml response",
+			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: wantBodyBeta,
+		},
+		{
+			name:               "structured cbor response",
+			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: wantBodyBeta,
+		},
+		{
+			name:                  "alpha specified before beta, should show warning",
+			acceptHeader:          "application/json;g=config.k8s.io;v=v1alpha1;as=Statusz,application/json;g=config.k8s.io;v=v1beta1;as=Statusz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    wantBodyAlpha,
+			wantDeprecationHeader: true,
+		},
+		{
+			name:               "beta specified before alpha, no warning",
+			acceptHeader:       "application/json;g=config.k8s.io;v=v1beta1;as=Statusz,application/json;g=config.k8s.io;v=v1alpha1;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: wantBodyBeta,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -341,26 +415,17 @@ func TestStatusz(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if tc.wantStatus == http.StatusOK {
-				if tc.wantBodySub != "" {
-					if !bytes.Contains(raw, []byte(tc.wantBodySub)) {
-						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(raw))
+				if tc.wantBodyText != "" {
+					if !bytes.Contains(raw, []byte(tc.wantBodyText)) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodyText, string(raw))
 					}
 				}
-				if tc.wantJSON != nil {
-					var got v1alpha1.Statusz
-					if err := json.Unmarshal(raw, &got); err != nil {
-						t.Fatalf("error unmarshalling JSON: %v", err)
+				if tc.wantBodyStructured != nil {
+					var warnings []string
+					for _, w := range res.Warnings() {
+						warnings = append(warnings, w.Text)
 					}
-					// Only check static fields, since others are dynamic
-					if got.TypeMeta != tc.wantJSON.TypeMeta {
-						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
-					}
-					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
-						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
-					}
-					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
-						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
-					}
+					statusztesting.VerifyStructuredResponse(t, tc.acceptHeader, raw, warnings, tc.wantBodyStructured, tc.wantDeprecationHeader)
 				}
 			}
 		})
@@ -680,7 +745,7 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 
 	// 1. start apiServerCount api servers
-	for i := 0; i < apiServerCount; i++ {
+	for i := range apiServerCount {
 		// start count api server
 		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
 			"--endpoint-reconciler-type", "master-count",
@@ -708,7 +773,7 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 	}
 
 	// 3. start lease api servers
-	for i := 0; i < leaseCount; i++ {
+	for i := range leaseCount {
 		options := []string{
 			"--endpoint-reconciler-type", "lease",
 			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+10),
@@ -718,7 +783,7 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 	}
 
 	defer func() {
-		for i := 0; i < leaseCount; i++ {
+		for i := range leaseCount {
 			leaseServers[i].TearDownFn()
 		}
 	}()
@@ -768,7 +833,7 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 
 	// create 2 api servers and 2 clients
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		// start count api server
 		t.Logf("starting api server: %d", i)
 		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
@@ -817,7 +882,7 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 
 	// create and delete the same nodePortservice using different APIservers
 	// to check that API servers are using the same port allocation bitmap
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		// Create the service using the first API server
 		_, err := clientAPIServers[0].CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), serviceObject, metav1.CreateOptions{})
 		if err != nil {

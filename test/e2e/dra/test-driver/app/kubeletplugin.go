@@ -54,6 +54,12 @@ type DeviceHealthUpdate struct {
 	PoolName   string
 	DeviceName string
 	Health     string
+	Message    string
+}
+
+type deviceHealthInfo struct {
+	status  string
+	message string
 }
 
 type ExamplePlugin struct {
@@ -76,7 +82,7 @@ type ExamplePlugin struct {
 	gRPCCalls []GRPCCall
 
 	healthMutex       sync.Mutex
-	deviceHealth      map[string]string
+	deviceHealth      map[string]deviceHealthInfo
 	HealthControlChan chan DeviceHealthUpdate
 
 	blockPrepareResourcesMutex   sync.Mutex
@@ -205,7 +211,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		nodeName:          nodeName,
 		prepared:          make(map[ClaimID][]kubeletplugin.Device),
 		cancelMainContext: testOpts.cancelMainContext,
-		deviceHealth:      make(map[string]string),
+		deviceHealth:      make(map[string]deviceHealthInfo),
 		HealthControlChan: make(chan DeviceHealthUpdate, 10),
 	}
 
@@ -404,6 +410,13 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourc
 			ShareID:      result.ShareID,
 			Requests:     []string{result.Request}, // May also return baseRequestName here.
 			CDIDeviceIDs: []string{cdiDeviceID},
+			Metadata: &kubeletplugin.DeviceMetadata{
+				Attributes: map[string]resourceapi.DeviceAttribute{
+					"driverName": {StringValue: &ex.driverName},
+					"pool":       {StringValue: &result.Pool},
+					"device":     {StringValue: &result.Device},
+				},
+			},
 		}
 		devices = append(devices, device)
 	}
@@ -462,6 +475,8 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimRef kub
 
 	logger := klog.FromContext(ctx)
 
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
 	claimID := ClaimID{Name: claimRef.Name, UID: claimRef.UID}
 	devices, ok := ex.prepared[claimID]
 	if !ok {
@@ -595,6 +610,17 @@ func (ex *ExamplePlugin) SetGetInfoError(err error) {
 	ex.d.SetGetInfoError(err)
 }
 
+// SetNotifyRegistrationStatusError sets an error to be returned by the
+// plugin's NotifyRegistrationStatus call.
+// This can be used in tests to simulate a registration failure scenario,
+// allowing verification that the kubelet plugin manager retries registration
+// when NotifyRegistrationStatus fails.
+//
+// To restore normal NotifyRegistrationStatus behavior, call SetNotifyRegistrationStatusError(nil).
+func (ex *ExamplePlugin) SetNotifyRegistrationStatusError(err error) {
+	ex.d.SetNotifyRegistrationStatusError(err)
+}
+
 func (ex *ExamplePlugin) NodeWatchResources(req *drahealthv1alpha1.NodeWatchResourcesRequest, srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
 	logger := klog.FromContext(srv.Context())
 	logger.V(3).Info("Starting dynamic NodeWatchResources stream")
@@ -620,7 +646,10 @@ func (ex *ExamplePlugin) NodeWatchResources(req *drahealthv1alpha1.NodeWatchReso
 			logger.V(3).Info("Received health update from control channel", "update", update)
 			ex.healthMutex.Lock()
 			key := update.PoolName + "/" + update.DeviceName
-			ex.deviceHealth[key] = update.Health
+			ex.deviceHealth[key] = deviceHealthInfo{
+				status:  update.Health,
+				message: update.Message,
+			}
 			ex.healthMutex.Unlock()
 
 			if err := ex.sendHealthUpdate(srv); err != nil {
@@ -644,7 +673,7 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealt
 	healthUpdates := []*drahealthv1alpha1.DeviceHealth{}
 
 	ex.healthMutex.Lock()
-	for key, health := range ex.deviceHealth {
+	for key, healthInfo := range ex.deviceHealth {
 		parts := strings.SplitN(key, "/", 2)
 		if len(parts) != 2 {
 			continue
@@ -653,7 +682,7 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealt
 		deviceName := parts[1]
 
 		var healthEnum drahealthv1alpha1.HealthStatus
-		switch health {
+		switch healthInfo.status {
 		case "Healthy":
 			healthEnum = drahealthv1alpha1.HealthStatus_HEALTHY
 		case "Unhealthy":
@@ -669,6 +698,7 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealt
 			},
 			Health:          healthEnum,
 			LastUpdatedTime: time.Now().Unix(),
+			Message:         healthInfo.message,
 		})
 	}
 	ex.healthMutex.Unlock()

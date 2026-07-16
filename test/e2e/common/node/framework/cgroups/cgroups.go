@@ -216,7 +216,7 @@ func getExpectedMemLimitString(memLimit *resource.Quantity, podOnCgroupv2 bool) 
 	return expectedMemLimitString
 }
 
-func verifyContainerCPUWeight(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
+func verifyContainerCPUWeight(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	cpuWeightCgPath := getCgroupCPURequestPath(cgroupFsPath, podOnCgroupv2)
 	cpuLim := expectedResources.Limits.Cpu()
 	if cpuLim.IsZero() && pod.Spec.Resources != nil {
@@ -232,26 +232,26 @@ func verifyContainerCPUWeight(f *framework.Framework, pod *v1.Pod, containerName
 	}
 
 	expectedCPUShares := getExpectedCPUShares(cpuReq, cpuLim, podOnCgroupv2)
-	if err := VerifyCgroupValue(f, pod, containerName, cpuWeightCgPath, expectedCPUShares...); err != nil {
+	if err := VerifyCgroupValue(ctx, f, pod, containerName, cpuWeightCgPath, expectedCPUShares...); err != nil {
 		return fmt.Errorf("failed to verify cpu request cgroup value: %w", err)
 	}
 	return nil
 }
 
-func VerifyContainerCPULimit(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
+func VerifyContainerCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	cpuLimCgPath := getCgroupCPULimitPath(cgroupFsPath, podOnCgroupv2)
 	cpuLim := expectedResources.Limits.Cpu()
 	if cpuLim.IsZero() && pod.Spec.Resources != nil {
 		cpuLim = pod.Spec.Resources.Limits.Cpu()
 	}
 	expectedCPULimits := getCPULimitCgroupExpectations(cpuLim, podOnCgroupv2)
-	if err := VerifyCgroupValue(f, pod, containerName, cpuLimCgPath, expectedCPULimits...); err != nil {
+	if err := VerifyCgroupValue(ctx, f, pod, containerName, cpuLimCgPath, expectedCPULimits...); err != nil {
 		return fmt.Errorf("failed to verify cpu limit cgroup value: %w", err)
 	}
 	return nil
 }
 
-func VerifyContainerMemoryLimit(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
+func VerifyContainerMemoryLimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	memLimCgPath := getCgroupMemLimitPath(cgroupFsPath, podOnCgroupv2)
 	memLim := expectedResources.Limits.Memory()
 	if memLim.IsZero() && pod.Spec.Resources != nil {
@@ -261,21 +261,21 @@ func VerifyContainerMemoryLimit(f *framework.Framework, pod *v1.Pod, containerNa
 	if expectedMemLim == "0" {
 		return nil
 	}
-	if err := VerifyCgroupValue(f, pod, containerName, memLimCgPath, expectedMemLim); err != nil {
+	if err := VerifyCgroupValue(ctx, f, pod, containerName, memLimCgPath, expectedMemLim); err != nil {
 		return fmt.Errorf("failed to verify memory limit cgroup value: %w", err)
 	}
 	return nil
 }
 
-func VerifyContainerCgroupValues(f *framework.Framework, pod *v1.Pod, tc *v1.Container, podOnCgroupv2 bool) error {
+func VerifyContainerCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tc *v1.Container, podOnCgroupv2 bool) error {
 	var errs []error
-	errs = append(errs, VerifyContainerMemoryLimit(f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
-	errs = append(errs, VerifyContainerCPULimit(f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
-	errs = append(errs, verifyContainerCPUWeight(f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
+	errs = append(errs, VerifyContainerMemoryLimit(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
+	errs = append(errs, VerifyContainerCPULimit(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
+	errs = append(errs, verifyContainerCPUWeight(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
 	return utilerrors.NewAggregate(errs)
 }
 
-func verifyPodCPUWeight(f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
+func verifyPodCPUWeight(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	podCgPath, err := getPodCgroupPath(f, pod, podOnCgroupv2, "cpu")
 	if err != nil {
 		if podCgPath, err = getPodCgroupPath(f, pod, podOnCgroupv2, "cpu,cpuacct"); err != nil {
@@ -290,13 +290,13 @@ func verifyPodCPUWeight(f *framework.Framework, pod *v1.Pod, expectedResources *
 		cpuWeightCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupCPUSharesFile)
 	}
 	expectedCPUShares := getExpectedCPUShares(expectedResources.Requests.Cpu(), expectedResources.Limits.Cpu(), podOnCgroupv2)
-	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuWeightCgPath, expectedCPUShares...); err != nil {
+	if err := VerifyCgroupValue(ctx, f, pod, pod.Spec.Containers[0].Name, cpuWeightCgPath, expectedCPUShares...); err != nil {
 		return fmt.Errorf("pod cgroup cpu weight verification failed: %w", err)
 	}
 	return nil
 }
 
-func verifyPodCPULimit(f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
+func verifyPodCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	podCgPath, err := getPodCgroupPath(f, pod, podOnCgroupv2, "cpu")
 	if err != nil {
 		if podCgPath, err = getPodCgroupPath(f, pod, podOnCgroupv2, "cpu,cpuacct"); err != nil {
@@ -311,13 +311,13 @@ func verifyPodCPULimit(f *framework.Framework, pod *v1.Pod, expectedResources *v
 		cpuLimCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupCPUQuotaFile)
 	}
 	expectedCPULimits := getCPULimitCgroupExpectations(expectedResources.Limits.Cpu(), podOnCgroupv2)
-	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuLimCgPath, expectedCPULimits...); err != nil {
+	if err := VerifyCgroupValue(ctx, f, pod, pod.Spec.Containers[0].Name, cpuLimCgPath, expectedCPULimits...); err != nil {
 		return fmt.Errorf("pod cgroup cpu limit verification failed: %w", err)
 	}
 	return nil
 }
 
-func verifyPodMemoryLimit(f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
+func verifyPodMemoryLimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	podCgPath, err := getPodCgroupPath(f, pod, podOnCgroupv2, "memory")
 	if err != nil {
 		return err
@@ -334,7 +334,7 @@ func verifyPodMemoryLimit(f *framework.Framework, pod *v1.Pod, expectedResources
 		return nil
 	}
 
-	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, memLimCgPath, expectedMemLim); err != nil {
+	if err := VerifyCgroupValue(ctx, f, pod, pod.Spec.Containers[0].Name, memLimCgPath, expectedMemLim); err != nil {
 		return fmt.Errorf("pod cgroup memory limit verification failed: %w", err)
 	}
 	return nil
@@ -344,14 +344,14 @@ func verifyPodMemoryLimit(f *framework.Framework, pod *v1.Pod, expectedResources
 func VerifyPodCgroups(ctx context.Context, f *framework.Framework, pod *v1.Pod, info *ContainerResources) error {
 	ginkgo.GinkgoHelper()
 
-	onCgroupV2 := IsPodOnCgroupv2Node(f, pod)
+	onCgroupV2 := IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
 
 	// Verify cgroup values
 	expectedResources := info.ResourceRequirements()
 	var errs []error
-	errs = append(errs, verifyPodCPUWeight(f, pod, expectedResources, onCgroupV2))
-	errs = append(errs, verifyPodCPULimit(f, pod, expectedResources, onCgroupV2))
-	errs = append(errs, verifyPodMemoryLimit(f, pod, expectedResources, onCgroupV2))
+	errs = append(errs, verifyPodCPUWeight(ctx, f, pod, expectedResources, onCgroupV2))
+	errs = append(errs, verifyPodCPULimit(ctx, f, pod, expectedResources, onCgroupV2))
+	errs = append(errs, verifyPodMemoryLimit(ctx, f, pod, expectedResources, onCgroupV2))
 
 	return utilerrors.NewAggregate(errs)
 }
@@ -374,32 +374,22 @@ func BuildPodResourceInfo(podCPURequestMilliValue, podCPULimitMilliValue, podMem
 // the specified container of the pod. It execs into the container to retrieve the
 // cgroup value, and ensures that the retrieved cgroup value is equivalent to at
 // least one of the values in expectedCgValues.
-func VerifyCgroupValue(f *framework.Framework, pod *v1.Pod, cName, cgPath string, expectedCgValues ...string) error {
+func VerifyCgroupValue(ctx context.Context, f *framework.Framework, pod *v1.Pod, cName, cgPath string, expectedCgValues ...string) error {
 	cmd := fmt.Sprintf("head -n 1 %s", cgPath)
 	framework.Logf("Namespace %s Pod %s Container %s - looking for one of the expected cgroup values %s in path %s",
 		pod.Namespace, pod.Name, cName, expectedCgValues, cgPath)
 
-	const maxRetries = 3
-	var cgValue string
-	var err error
-	for i := range maxRetries {
-		cgValue, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
-		if err == nil {
-			cgValue = strings.Trim(cgValue, "\n")
-			break
-		} else {
-			framework.Logf("[Attempt %d of %d] Failed to read cgroup value %q for container %q: %v", i+1, maxRetries, cgPath, cName, err)
+	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (error, error) {
+		cgValue, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
+		if err != nil {
+			return fmt.Errorf("failed to read cgroup value %q for container %q: %w", cgPath, cName, err), nil
 		}
-	}
-	if err != nil {
-		return fmt.Errorf("failed to read cgroup value %q for container %q after %d attempts: %w", cgPath, cName, maxRetries, err)
-	}
-
-	if err := framework.Gomega().Expect(cgValue).To(gomega.BeElementOf(expectedCgValues)); err != nil {
-		return fmt.Errorf("value of cgroup %q for container %q was %q; expected one of %q", cgPath, cName, cgValue, expectedCgValues)
-	}
-
-	return nil
+		cgValue = strings.Trim(cgValue, "\n")
+		if err := framework.Gomega().Expect(cgValue).To(gomega.BeElementOf(expectedCgValues)); err != nil {
+			return nil, fmt.Errorf("value of cgroup %q for container %q was %q; expected one of %q: %w", cgPath, cName, cgValue, expectedCgValues, err)
+		}
+		return nil, nil
+	})).WithTimeout(framework.PollShortTimeout).Should(gomega.Succeed())
 }
 
 // VerifyOomScoreAdjValue verifies that oom_score_adj for pid 1 (pidof init/systemd -> app)
@@ -411,11 +401,11 @@ func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expected
 		pod.Namespace, pod.Name, cName, expectedOomScoreAdj)
 	oomScoreAdj, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
 	if err != nil {
-		return fmt.Errorf("failed to find expected value %s for container app process", expectedOomScoreAdj)
+		return fmt.Errorf("failed to find expected oom_score_adj value %s for container %s in pod %s", expectedOomScoreAdj, cName, pod.Name)
 	}
 	oomScoreAdj = strings.Trim(oomScoreAdj, "\n")
 	if oomScoreAdj != expectedOomScoreAdj {
-		return fmt.Errorf("oom_score_adj value %s not equal to expected %s", oomScoreAdj, expectedOomScoreAdj)
+		return fmt.Errorf("oom_score_adj value %s not equal to expected %s for container %s in pod %s", oomScoreAdj, expectedOomScoreAdj, cName, pod.Name)
 	}
 	return nil
 }
@@ -423,7 +413,7 @@ func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expected
 // IsPodOnCgroupv2Node checks whether the pod is running on cgroupv2 node.
 // TODO: Deduplicate this function with NPD cluster e2e test:
 // https://github.com/kubernetes/kubernetes/blob/2049360379bcc5d6467769cef112e6e492d3d2f0/test/e2e/node/node_problem_detector.go#L369
-func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) (result bool) {
+func IsPodOnCgroupv2Node(f *framework.Framework, podName, containerName string) (result bool) {
 	podOnCgroupv2NodeMutex.Lock()
 	defer podOnCgroupv2NodeMutex.Unlock()
 	if podOnCgroupv2Node != nil {
@@ -434,7 +424,7 @@ func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) (result bool) {
 	}()
 
 	cmd := "mount -t cgroup2"
-	out, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
+	out, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, containerName, "/bin/sh", "-c", cmd)
 	if err != nil {
 		return false
 	}

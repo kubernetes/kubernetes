@@ -115,7 +115,7 @@ func GetWarningsForIP(fldPath *field.Path, value string) []string {
 		// ParseAddr() doesn't) or IPv4-mapped IPv6 (.Is4In6()). Either way,
 		// re-stringifying the net.IP value will give the preferred form.
 		return []string{
-			fmt.Sprintf("%s: non-standard IP address %q will be considered invalid in a future Kubernetes release: use %q", fldPath, value, ip.String()),
+			fmt.Sprintf("%s: non-standard IP address %q is invalid: use %q", fldPath, value, ip.String()),
 		}
 	}
 
@@ -233,7 +233,7 @@ func GetWarningsForCIDR(fldPath *field.Path, value string) []string {
 		// ParsePrefix() doesn't) or IPv4-mapped IPv6 (.Is4In6()). Either way,
 		// re-stringifying the net.IPNet value will give the preferred form.
 		warnings = append(warnings,
-			fmt.Sprintf("%s: non-standard CIDR value %q will be considered invalid in a future Kubernetes release: use %q", fldPath, value, ipnet.String()),
+			fmt.Sprintf("%s: non-standard CIDR value %q is invalid: use %q", fldPath, value, ipnet.String()),
 		)
 	}
 

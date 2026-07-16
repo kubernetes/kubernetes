@@ -22,10 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
-	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	configv1 "k8s.io/kube-scheduler/config/v1"
@@ -87,6 +85,8 @@ type CoreResourceEnqueueTestCase struct {
 	InitialDeviceClasses []*resourceapi.DeviceClass
 	// InitialWorkloads is the list of Workloads to be created at first.
 	InitialWorkloads []*schedulingapi.Workload
+	// InitialPodGroups is the list of PodGroups to be created at first.
+	InitialPodGroups []*schedulingapi.PodGroup
 	// Pods are the list of Pods to be created.
 	// All of them are expected to be unschedulable at first.
 	Pods []*v1.Pod
@@ -680,6 +680,54 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
 		},
 		WantRequeuedPods:          sets.New("pod2"),
+		EnableSchedulingQueueHint: sets.New(true),
+	},
+	{
+		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when deleting the existing pod that matches the target podAntiAffinity",
+		EnablePlugins: []string{names.InterPodAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		InitialPods: []*v1.Pod{
+			st.MakePod().Name("pod1").Label("anti1", "anti1").Container("image").Node("fake-node").Obj(),
+			st.MakePod().Name("pod2").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod3 and pod4 will be rejected by the PodAffinity plugin.
+			st.MakePod().Name("pod3").Label("anti1", "anti1").PodAntiAffinityExists("anti1", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+			st.MakePod().Name("pod4").Label("anti2", "anti2").PodAntiAffinityExists("anti2", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+		},
+
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Delete pod1 which will make pod3 schedulable because pod3's antiAffinity won't match pod1 anymore.
+			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+				return nil, fmt.Errorf("failed to delete pod1: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.Delete}: 1}, nil
+		},
+		WantRequeuedPods:          sets.New("pod3"),
+		EnableSchedulingQueueHint: sets.New(true),
+	},
+	{
+		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when deleting the existing pod with podAntiAffinity that matches the target pod",
+		EnablePlugins: []string{names.InterPodAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		InitialPods: []*v1.Pod{
+			st.MakePod().Name("pod1").PodAntiAffinityExists("anti1", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Node("fake-node").Obj(),
+			st.MakePod().Name("pod2").PodAntiAffinityExists("anti2", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Node("fake-node").Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod3 and pod4 will be rejected by the PodAffinity plugin.
+			st.MakePod().Name("pod3").Label("anti1", "anti1").Container("image").Obj(),
+			st.MakePod().Name("pod4").Label("anti2", "anti2").Container("image").Obj(),
+		},
+
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Delete pod1 which will make pod3 schedulable because pod1's antiAffinity won't match pod3 anymore.
+			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+				return nil, fmt.Errorf("failed to delete pod1: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.Delete}: 1}, nil
+		},
+		WantRequeuedPods:          sets.New("pod3"),
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
@@ -2604,20 +2652,23 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.Set[string]{},
 	},
 	{
-		Name:          "Pod rejected by the GangScheduling plugin is requeued when a new pod with matching workload reference is created",
+		Name:          "Pod rejected by the GangScheduling plugin is requeued when a new pod with matching scheduling group is created",
 		EnablePlugins: []string{names.GangScheduling},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
 		InitialWorkloads: []*schedulingapi.Workload{
-			st.MakeWorkload().Name("w1").PodGroup(st.MakePodGroup().Name("pg1").MinCount(2).Obj()).Obj(),
+			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(2).Obj()).Obj(),
+		},
+		InitialPodGroups: []*schedulingapi.PodGroup{
+			st.MakePodGroup().Name("pg1").MinCount(2).TemplateRef("t", "w").Obj(),
 		},
 		Pods: []*v1.Pod{
-			st.MakePod().Name("pod1").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj(),
-			st.MakePod().Name("pod2").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg2"}).Obj(),
+			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
+			st.MakePod().Name("pod2").Container("image").PodGroupName("pg2").Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			pod := st.MakePod().Name("pod3").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+			pod := st.MakePod().Name("pod3").Container("image").PodGroupName("pg1").Obj()
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create Pod %q: %w", pod.Name, err)
 			}
@@ -2629,21 +2680,24 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableGangScheduling:          true,
 	},
 	{
-		Name:          "Pod rejected by the GangScheduling plugin is requeued when a matching workload is created",
+		Name:          "Pod rejected by the GangScheduling plugin is requeued when a matching pod group is created",
 		EnablePlugins: []string{names.GangScheduling},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
+		InitialWorkloads: []*schedulingapi.Workload{
+			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(1).Obj()).Obj(),
+		},
 		Pods: []*v1.Pod{
-			st.MakePod().Name("pod1").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj(),
-			st.MakePod().Name("pod2").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg2"}).Obj(),
+			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
+			st.MakePod().Name("pod2").Container("image").PodGroupName("pg2").Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			workload := st.MakeWorkload().Name("w1").PodGroup(st.MakePodGroup().Name("pg1").MinCount(1).Obj()).Obj()
-			if _, err := testCtx.ClientSet.SchedulingV1alpha1().Workloads(testCtx.NS.Name).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
-				return nil, fmt.Errorf("failed to create Workload %q: %w", workload.Name, err)
+			pg := st.MakePodGroup().Name("pg1").MinCount(1).TemplateRef("t", "w").Obj()
+			if _, err := testCtx.ClientSet.SchedulingV1alpha2().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to create PodGroup %q: %w", pg.Name, err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Workload, ActionType: fwk.Add}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PodGroup, ActionType: fwk.Add}: 1}, nil
 		},
 		ExpectedInitialRejectingPhase: rejectingPhasePreEnqueue,
 		WantRequeuedPods:              sets.New("pod1"),
@@ -2664,18 +2718,15 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 
 		mockFeature := ndftesting.NewMockFeature(t)
-		mockFeature.EXPECT().Name().Return("FeatureA").Maybe()
-		mockFeature.EXPECT().InferForScheduling(mock.Anything).RunAndReturn(func(podInfo *ndf.PodInfo) bool {
+		mockFeature.SetName("FeatureA")
+		mockFeature.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool {
 			return len(podInfo.Spec.Tolerations) > 0 && podInfo.Spec.Tolerations[0].TolerationSeconds != nil &&
 				*podInfo.Spec.Tolerations[0].TolerationSeconds > 0
 		})
-		mockFeature.EXPECT().MaxVersion().Return(nil).Maybe()
+		mockFeature.SetMaxVersion(nil)
 
-		originalAllFeatures := ndffeatures.AllFeatures
-		ndffeatures.AllFeatures = []ndf.Feature{mockFeature}
-		defer func() {
-			ndffeatures.AllFeatures = originalAllFeatures
-		}()
+		ndfFramework := ndf.New([]ndf.Feature{mockFeature})
+		ndftesting.SetFrameworkDuringTest(t, *ndfFramework)
 	}
 	if tt.EnableGangScheduling {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -2783,10 +2834,17 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		}
 	}
 
-	for _, wl := range tt.InitialWorkloads {
-		wl.Namespace = ns
-		if _, err := cs.SchedulingV1alpha1().Workloads(ns).Create(testCtx.Ctx, wl, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create a Workload %q: %v", wl.Name, err)
+	for _, w := range tt.InitialWorkloads {
+		w.Namespace = ns
+		if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, w, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create a Workload %q: %v", w.Name, err)
+		}
+	}
+
+	for _, pg := range tt.InitialPodGroups {
+		pg.Namespace = ns
+		if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create a PodGroup %q: %v", pg.Name, err)
 		}
 	}
 

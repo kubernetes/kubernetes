@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -29,6 +28,11 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
+
+// Some of these tests capture log output. Don't reduce the verbosity or they will fail!
+func init() {
+	ktesting.SetDefaultVerbosity(5)
+}
 
 // Mock syncLoopHealthChecker
 type mockSyncLoopHealthChecker struct {

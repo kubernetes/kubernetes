@@ -3,6 +3,7 @@
 package v1alpha1
 
 import (
+	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -13,6 +14,31 @@ import (
 // that runs in the `openshift-monitoring` namespace.
 // At least one field must be specified; an empty thanosQuerierConfig object is not allowed.
 type ThanosQuerierConfigApplyConfiguration struct {
+	// logLevel defines the verbosity of logs emitted by Thanos Querier.
+	// logLevel is optional.
+	// Allowed values are Error, Warn, Info, and Debug.
+	// When set to Error, only errors will be logged.
+	// When set to Warn, both warnings and errors will be logged.
+	// When set to Info, general information, warnings, and errors will all be logged.
+	// When set to Debug, detailed debugging information will be logged.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time.
+	// The current default value is `Info`.
+	LogLevel *configv1alpha1.LogLevel `json:"logLevel,omitempty"`
+	// requestLogging configures request logging for Thanos Querier.
+	// requestLogging is optional.
+	// When provided, the policy field within is required.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time.
+	// The current default behavior is to not log any requests.
+	RequestLogging *ThanosQuerierRequestLoggingConfigApplyConfiguration `json:"requestLogging,omitempty"`
+	// crossOriginRequestPolicy configures the CORS (Cross-Origin Resource Sharing) policy
+	// for Thanos Querier's HTTP endpoints.
+	// crossOriginRequestPolicy is optional.
+	// Valid values are "AllowAll" and "DenyAll".
+	// When set to "AllowAll", CORS headers are added to responses, allowing cross-origin requests from any domain.
+	// When set to "DenyAll", no CORS headers are added and cross-origin requests are rejected by the browser.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, that is subject to change over time.
+	// The current default value is "DenyAll".
+	CrossOriginRequestPolicy *configv1alpha1.CrossOriginRequestPolicy `json:"crossOriginRequestPolicy,omitempty"`
 	// nodeSelector defines the nodes on which the Pods are scheduled.
 	// nodeSelector is optional.
 	//
@@ -67,6 +93,30 @@ type ThanosQuerierConfigApplyConfiguration struct {
 // apply.
 func ThanosQuerierConfig() *ThanosQuerierConfigApplyConfiguration {
 	return &ThanosQuerierConfigApplyConfiguration{}
+}
+
+// WithLogLevel sets the LogLevel field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LogLevel field is set to the value of the last call.
+func (b *ThanosQuerierConfigApplyConfiguration) WithLogLevel(value configv1alpha1.LogLevel) *ThanosQuerierConfigApplyConfiguration {
+	b.LogLevel = &value
+	return b
+}
+
+// WithRequestLogging sets the RequestLogging field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RequestLogging field is set to the value of the last call.
+func (b *ThanosQuerierConfigApplyConfiguration) WithRequestLogging(value *ThanosQuerierRequestLoggingConfigApplyConfiguration) *ThanosQuerierConfigApplyConfiguration {
+	b.RequestLogging = value
+	return b
+}
+
+// WithCrossOriginRequestPolicy sets the CrossOriginRequestPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CrossOriginRequestPolicy field is set to the value of the last call.
+func (b *ThanosQuerierConfigApplyConfiguration) WithCrossOriginRequestPolicy(value configv1alpha1.CrossOriginRequestPolicy) *ThanosQuerierConfigApplyConfiguration {
+	b.CrossOriginRequestPolicy = &value
+	return b
 }
 
 // WithNodeSelector puts the entries into the NodeSelector field in the declarative configuration

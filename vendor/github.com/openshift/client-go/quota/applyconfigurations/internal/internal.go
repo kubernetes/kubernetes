@@ -23,7 +23,133 @@ func Parser() *typed.Parser {
 var parserOnce sync.Once
 var parser *typed.Parser
 var schemaYAML = typed.YAMLObject(`types:
-- name: FieldsV1.v1.meta.apis.pkg.apimachinery.k8s.io
+- name: com.github.openshift.api.quota.v1.ClusterResourceQuota
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: com.github.openshift.api.quota.v1.ClusterResourceQuotaSpec
+      default: {}
+    - name: status
+      type:
+        namedType: com.github.openshift.api.quota.v1.ClusterResourceQuotaStatus
+      default: {}
+- name: com.github.openshift.api.quota.v1.ClusterResourceQuotaSelector
+  map:
+    fields:
+    - name: annotations
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: labels
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+- name: com.github.openshift.api.quota.v1.ClusterResourceQuotaSpec
+  map:
+    fields:
+    - name: quota
+      type:
+        namedType: io.k8s.api.core.v1.ResourceQuotaSpec
+      default: {}
+    - name: selector
+      type:
+        namedType: com.github.openshift.api.quota.v1.ClusterResourceQuotaSelector
+      default: {}
+- name: com.github.openshift.api.quota.v1.ClusterResourceQuotaStatus
+  map:
+    fields:
+    - name: namespaces
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.quota.v1.ResourceQuotaStatusByNamespace
+          elementRelationship: atomic
+    - name: total
+      type:
+        namedType: io.k8s.api.core.v1.ResourceQuotaStatus
+      default: {}
+- name: com.github.openshift.api.quota.v1.ResourceQuotaStatusByNamespace
+  map:
+    fields:
+    - name: namespace
+      type:
+        scalar: string
+      default: ""
+    - name: status
+      type:
+        namedType: io.k8s.api.core.v1.ResourceQuotaStatus
+      default: {}
+- name: io.k8s.api.core.v1.ResourceQuotaSpec
+  map:
+    fields:
+    - name: hard
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: scopeSelector
+      type:
+        namedType: io.k8s.api.core.v1.ScopeSelector
+    - name: scopes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.core.v1.ResourceQuotaStatus
+  map:
+    fields:
+    - name: hard
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: used
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.core.v1.ScopeSelector
+  map:
+    fields:
+    - name: matchExpressions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.ScopedResourceSelectorRequirement
+          elementRelationship: atomic
+    elementRelationship: atomic
+- name: io.k8s.api.core.v1.ScopedResourceSelectorRequirement
+  map:
+    fields:
+    - name: operator
+      type:
+        scalar: string
+      default: ""
+    - name: scopeName
+      type:
+        scalar: string
+      default: ""
+    - name: values
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.apimachinery.pkg.api.resource.Quantity
+  scalar: untyped
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
   map:
     elementType:
       scalar: untyped
@@ -35,14 +161,14 @@ var schemaYAML = typed.YAMLObject(`types:
         elementType:
           namedType: __untyped_deduced_
         elementRelationship: separable
-- name: LabelSelector.v1.meta.apis.pkg.apimachinery.k8s.io
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
   map:
     fields:
     - name: matchExpressions
       type:
         list:
           elementType:
-            namedType: LabelSelectorRequirement.v1.meta.apis.pkg.apimachinery.k8s.io
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement
           elementRelationship: atomic
     - name: matchLabels
       type:
@@ -50,7 +176,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
     elementRelationship: atomic
-- name: LabelSelectorRequirement.v1.meta.apis.pkg.apimachinery.k8s.io
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement
   map:
     fields:
     - name: key
@@ -67,7 +193,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
-- name: ManagedFieldsEntry.v1.meta.apis.pkg.apimachinery.k8s.io
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
   map:
     fields:
     - name: apiVersion
@@ -78,7 +204,7 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
     - name: fieldsV1
       type:
-        namedType: FieldsV1.v1.meta.apis.pkg.apimachinery.k8s.io
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
     - name: manager
       type:
         scalar: string
@@ -90,8 +216,8 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
     - name: time
       type:
-        namedType: Time.v1.meta.apis.pkg.apimachinery.k8s.io
-- name: ObjectMeta.v1.meta.apis.pkg.apimachinery.k8s.io
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
   map:
     fields:
     - name: annotations
@@ -101,13 +227,13 @@ var schemaYAML = typed.YAMLObject(`types:
             scalar: string
     - name: creationTimestamp
       type:
-        namedType: Time.v1.meta.apis.pkg.apimachinery.k8s.io
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: deletionGracePeriodSeconds
       type:
         scalar: numeric
     - name: deletionTimestamp
       type:
-        namedType: Time.v1.meta.apis.pkg.apimachinery.k8s.io
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: finalizers
       type:
         list:
@@ -129,7 +255,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         list:
           elementType:
-            namedType: ManagedFieldsEntry.v1.meta.apis.pkg.apimachinery.k8s.io
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
           elementRelationship: atomic
     - name: name
       type:
@@ -141,7 +267,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         list:
           elementType:
-            namedType: OwnerReference.v1.meta.apis.pkg.apimachinery.k8s.io
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference
           elementRelationship: associative
           keys:
           - uid
@@ -154,7 +280,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: uid
       type:
         scalar: string
-- name: OwnerReference.v1.meta.apis.pkg.apimachinery.k8s.io
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference
   map:
     fields:
     - name: apiVersion
@@ -180,134 +306,8 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
       default: ""
     elementRelationship: atomic
-- name: Quantity.resource.api.pkg.apimachinery.k8s.io
-  scalar: string
-- name: ResourceQuotaSpec.v1.core.api.k8s.io
-  map:
-    fields:
-    - name: hard
-      type:
-        map:
-          elementType:
-            namedType: Quantity.resource.api.pkg.apimachinery.k8s.io
-    - name: scopeSelector
-      type:
-        namedType: ScopeSelector.v1.core.api.k8s.io
-    - name: scopes
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-- name: ResourceQuotaStatus.v1.core.api.k8s.io
-  map:
-    fields:
-    - name: hard
-      type:
-        map:
-          elementType:
-            namedType: Quantity.resource.api.pkg.apimachinery.k8s.io
-    - name: used
-      type:
-        map:
-          elementType:
-            namedType: Quantity.resource.api.pkg.apimachinery.k8s.io
-- name: ScopeSelector.v1.core.api.k8s.io
-  map:
-    fields:
-    - name: matchExpressions
-      type:
-        list:
-          elementType:
-            namedType: ScopedResourceSelectorRequirement.v1.core.api.k8s.io
-          elementRelationship: atomic
-    elementRelationship: atomic
-- name: ScopedResourceSelectorRequirement.v1.core.api.k8s.io
-  map:
-    fields:
-    - name: operator
-      type:
-        scalar: string
-      default: ""
-    - name: scopeName
-      type:
-        scalar: string
-      default: ""
-    - name: values
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-- name: Time.v1.meta.apis.pkg.apimachinery.k8s.io
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.Time
   scalar: untyped
-- name: com.github.openshift.api.quota.v1.ClusterResourceQuota
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: ObjectMeta.v1.meta.apis.pkg.apimachinery.k8s.io
-      default: {}
-    - name: spec
-      type:
-        namedType: com.github.openshift.api.quota.v1.ClusterResourceQuotaSpec
-      default: {}
-    - name: status
-      type:
-        namedType: com.github.openshift.api.quota.v1.ClusterResourceQuotaStatus
-      default: {}
-- name: com.github.openshift.api.quota.v1.ClusterResourceQuotaSelector
-  map:
-    fields:
-    - name: annotations
-      type:
-        map:
-          elementType:
-            scalar: string
-    - name: labels
-      type:
-        namedType: LabelSelector.v1.meta.apis.pkg.apimachinery.k8s.io
-- name: com.github.openshift.api.quota.v1.ClusterResourceQuotaSpec
-  map:
-    fields:
-    - name: quota
-      type:
-        namedType: ResourceQuotaSpec.v1.core.api.k8s.io
-      default: {}
-    - name: selector
-      type:
-        namedType: com.github.openshift.api.quota.v1.ClusterResourceQuotaSelector
-      default: {}
-- name: com.github.openshift.api.quota.v1.ClusterResourceQuotaStatus
-  map:
-    fields:
-    - name: namespaces
-      type:
-        list:
-          elementType:
-            namedType: com.github.openshift.api.quota.v1.ResourceQuotaStatusByNamespace
-          elementRelationship: atomic
-    - name: total
-      type:
-        namedType: ResourceQuotaStatus.v1.core.api.k8s.io
-      default: {}
-- name: com.github.openshift.api.quota.v1.ResourceQuotaStatusByNamespace
-  map:
-    fields:
-    - name: namespace
-      type:
-        scalar: string
-      default: ""
-    - name: status
-      type:
-        namedType: ResourceQuotaStatus.v1.core.api.k8s.io
-      default: {}
 - name: __untyped_atomic_
   scalar: untyped
   list:

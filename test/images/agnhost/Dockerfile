@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASEIMAGE
+ARG BASEIMAGE=alpine
 ARG GOLANG_VERSION
 
 FROM golang:$GOLANG_VERSION AS preparer
@@ -40,11 +40,12 @@ CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 # install necessary packages:
 # - curl, nc: used by a lot of e2e tests
 # - iproute2: includes ss used in NodePort tests
+# - util-linux-misc: includes ipcs used in SELinux tests
 # from iperf image
 # install necessary packages: iperf, bash
-RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash && rm -rf /var/cache/apk/* \
-  && ln -s /usr/bin/iperf /usr/local/bin/iperf \
-  && ls -altrh /usr/local/bin/iperf
+RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash util-linux-misc && rm -rf /var/cache/apk/* \
+    && ln -s /usr/bin/iperf /usr/local/bin/iperf \
+    && ls -altrh /usr/local/bin/iperf
 
 ADD https://github.com/coredns/coredns/releases/download/v1.6.2/coredns_1.6.2_linux_BASEARCH.tgz /coredns.tgz
 RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz

@@ -84,6 +84,10 @@ func (f *FieldCacheEntry) CanOmit(fieldVal reflect.Value) bool {
 func (f *FieldCacheEntry) GetFrom(structVal reflect.Value) reflect.Value {
 	// field might be nested within 'inline' structs
 	for _, elem := range f.fieldPath {
+		if safeIsNil(structVal) {
+			// if any part of the path is nil, return the zero value for the field type
+			return reflect.Zero(f.fieldType)
+		}
 		structVal = dereference(structVal).FieldByIndex(elem)
 	}
 	return structVal

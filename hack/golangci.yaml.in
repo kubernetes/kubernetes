@@ -133,11 +133,15 @@ linters:
 
       - linters:
           - govet
-        text: "lostcancel|printf"
+        text: "lostcancel"
 
       - linters:
           - ginkgolinter
         text: "wrong error assertion. Consider using `gomega.(Eventually|Consistently)|wrong comparison assertion|wrong length assertion"
+
+      - linters:
+          - ginkgolinter
+        text: "Success matcher only support a single error value, or function with Gomega as its first parameter"
 
       - linters:
           - gocritic
@@ -149,8 +153,12 @@ linters:
       - linters:
         - kubeapilinter
         path-except: staging/src/k8s.io/api/.*
-        
+
       {{include "hack/kube-api-linter/exceptions.yaml" | indent 6 | trim}}
+
+      - linters:
+        - forbidigo
+        path: test/e2e/e2e_test\.go|test/e2e/framework/internal/.*|test/e2e/framework/[^/]*\.go|test/e2e/invariants/.*
 
   default: {{if .Base -}} none {{- else -}} standard {{- end}}
   enable: # please keep this alphabetized
@@ -165,6 +173,7 @@ linters:
     - ineffassign
     - kubeapilinter
     - logcheck
+    - modernize
     - revive
     - sorted
     - staticcheck
@@ -199,6 +208,12 @@ linters:
           {{include "hack/kube-api-linter/kube-api-linter.yaml" | indent 10 | trim}}
     depguard:
       rules:
+        utils:
+          files:
+            - $all
+          deny:
+            - pkg: "k8s.io/utils/pointer"
+              desc: "k8s.io/utils/pointer shall no longer be used, please use k8s.io/utils/ptr."
         go-cmp:
           files:
             - $all
@@ -224,15 +239,19 @@ linters:
           pkg: ^k8s\.io/client-go/applyconfigurations/
           msg: should not be used because managedFields was removed
         - pattern: \.Add$
-          pkg: ^k8s\.io/component-base/featuregate$         
-          msg: should not use Add, use AddVersioned instead 
+          pkg: ^k8s\.io/component-base/featuregate$
+          msg: should not use Add, use AddVersioned instead
+        - pattern: \.(ReportBeforeSuite|ReportAfterSuite)
+          pkg: ^github\.com/onsi/ginkgo/v2$
+          msg: usage is restricted to code under control of SIG Testing
+          # Exceptions are listed above under rules.
       {{- if .Hints}}
         - pattern: ^gomega\.BeTrue$
           pkg: ^github.com/onsi/gomega$
           msg: "it does not produce a good failure message - use BeTrueBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
         - pattern: ^gomega\.BeFalse$
           pkg: ^github.com/onsi/gomega$
-          msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"        
+          msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
       {{- end}}
       {{- if .Base }}
     gocritic:
@@ -253,8 +272,105 @@ linters:
         - typeSwitchVar
         - underef
         - unslice
-        - valSwap
     {{- end}}
+    modernize:
+      # List of analyzers to disable.
+      # By default, all analyzers are enabled but in
+      # Kubernetes we want to be more selective and
+      # disable those which are not useful for it.
+      #
+      # Analyzers which are kept enabled are not
+      # called out here, see https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/modernize#section-documentation
+      # for the full list.
+      disable:
+        # Replace interface{} with any.
+        #
+        # Disabled because developers may
+        # prefer to use `interface{}` for
+        # consistency with existing code
+        # and it's just syntactic sugar.
+        - any
+        {{- if .Base }}
+        # Replace []byte(fmt.Sprintf) with fmt.Appendf.
+        #
+        # A useful hint for new code, but
+        # should only be updated in old code
+        # where it really matters.
+        - fmtappendf
+        # Replace explicit loops over maps with calls to maps package.
+        #
+        # Completely disabled because the benefit
+        # isn't immediately obvious.
+        - mapsloop
+        # Replace if/else statements with calls to min or max.
+        #
+        # A useful hint for new code.
+        - minmax
+        {{- end }}
+        # simplify code by using go1.26's new(expr)
+        # should only be updated in old code where it really matters (= always disable in base)
+        # and needs to remain disabled as hint until Go 1.26 is also available for backported code (https://github.com/kubernetes/kubernetes/issues/137595)
+        - newexpr
+        {{- if .Base }}
+        # use iterators instead of Len/At-style APIs
+        # should only be updated in old code where it really matters.
+        - stditerators
+        {{- end }}
+        # Suggest replacing omitempty with omitzero for struct fields.
+        #
+        # Disabled because might interfere
+        # with encoding of API structs.
+        - omitzero
+        {{- if .Base }}
+        # Replace 3-clause for loops with for-range over integers.
+        #
+        # A useful hint for new code (makes it shorter).
+        - rangeint
+        # Replace reflect.TypeOf(x) with TypeFor[T]().
+        #
+        # A useful hint for new code, it could be more efficient.
+        - reflecttypefor
+        # Replace loops with slices.Contains or slices.ContainsFunc.
+        #
+        # A useful hint because it can make code more obvious
+        # and/or avoid helper functions.
+        - slicescontains
+        # Replace strings.Index etc. with strings.Cut
+        #
+        # A useful hint because it can make code more obvious.
+        - stringscut
+        # Replace HasPrefix/TrimPrefix with CutPrefix.
+        #
+        # A useful hint because the code becomes shorter.
+        - stringscutprefix
+        # Replace ranging over Split/Fields with SplitSeq/FieldsSeq.
+        #
+        # A useful hint because it's more efficient.
+        - stringsseq
+        {{- end }}
+        # Replace += with strings.Builder.
+        #
+        # Disabled because in code which
+        # isn't performance-sensitive +=
+        # can be a bit more readable.
+        - stringsbuilder
+        # Replace context.WithCancel with t.Context in tests.
+        #
+        # Disabled because in Kubernetes,
+        # test/utils/ktesting handles
+        # context cancellation and also
+        # addresses other pain points.
+        - testingcontext
+        # Replace wg.Add(1)/go/wg.Done() with wg.Go.
+        #
+        # A useful hint leading to shorter code.
+        # Makes wait.Group obsolete.
+        {{- if .Hints }}
+        # Please enable when all supported Kubernetes versions
+        # are on GoLang 1.25+
+        {{- end }}
+        - waitgroup
+
     revive:
       # Only these rules are enabled.
       rules:

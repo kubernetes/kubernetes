@@ -62,8 +62,8 @@ func (*enumExcludeTagValidator) GetValidations(_ Context, _ codetags.Tag) (Valid
 func (eetv *enumExcludeTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            eetv.TagName(),
-		StabilityLevel: Alpha,
-		Scopes:         eetv.ValidScopes().UnsortedList(),
+		StabilityLevel: TagStabilityLevelAlpha,
+		Scopes:         sets.List(eetv.ValidScopes()),
 		Description: `Indicates that an constant value is not part of an enum, even if the constant's type is tagged with k8s:enum.
 May be conditionally excluded via +k8s:ifEnabled(Option)=+k8s:enumExclude or +k8s:ifDisabled(Option)=+k8s:enumExclude.
 If multiple +k8s:ifEnabled/+k8s:ifDisabled tags are used, the value is excluded if any of the exclude conditions are met.`,
@@ -71,11 +71,11 @@ If multiple +k8s:ifEnabled/+k8s:ifDisabled tags are used, the value is excluded 
 }
 
 type enumTagValidator struct {
-	validator Validator
+	validator TagValidationExtractor
 }
 
 func (etv *enumTagValidator) Init(cfg Config) {
-	etv.validator = cfg.Validator
+	etv.validator = cfg.TagValidator
 }
 
 func (enumTagValidator) TagName() string {
@@ -194,8 +194,8 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 func (etv *enumTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            etv.TagName(),
-		StabilityLevel: Beta,
-		Scopes:         etv.ValidScopes().UnsortedList(),
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         sets.List(etv.ValidScopes()),
 		Description:    "Indicates that a string type is an enum. All constant values of this type are considered values in the enum unless excluded using +k8s:enumExclude.",
 	}
 }

@@ -91,8 +91,8 @@ func (pp *RunForeverPreBindPlugin) Name() string {
 }
 
 // PreBindPreFlight is a test function that returns nil for testing.
-func (pp *RunForeverPreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
-	return nil
+func (pp *RunForeverPreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	return &fwk.PreBindPreFlightResult{AllowParallel: false}, nil
 }
 
 // PreBind is a test function that returns (true, nil) or errors for testing.
@@ -491,11 +491,11 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 							return nil, fmt.Errorf("unexpected plugin type %T", p)
 						}
 
-						preemptPodFn := preemptionPlugin.Evaluator.PreemptPod
-						preemptionPlugin.Evaluator.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor, victim *v1.Pod, pluginName string) error {
+						preemptPodFn := preemptionPlugin.Executor.PreemptPod
+						preemptionPlugin.Executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) error {
 							// block the preemption goroutine to complete until the test case allows it to proceed.
 							lock.Lock()
-							ch, ok := preemptionDoneChannels[preemptor.Name]
+							ch, ok := preemptionDoneChannels[preemptor.GetName()]
 							lock.Unlock()
 							if ok {
 								<-ch

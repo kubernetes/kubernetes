@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -192,6 +193,11 @@ func (s *Status) IsRejected() bool {
 	return code == Unschedulable || code == UnschedulableAndUnresolvable || code == Pending
 }
 
+// IsError returns true if and only if "Status" is non-nil and its Code is "Error".
+func (s *Status) IsError() bool {
+	return s.Code() == Error
+}
+
 // AsError returns nil if the status is a success, a wait or a skip; otherwise returns an "error" object
 // with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
@@ -224,6 +230,16 @@ func (s *Status) Equal(x *Status) bool {
 
 func (s *Status) String() string {
 	return s.Message()
+}
+
+// Clone clones the entire Status and returns a copy.
+func (s *Status) Clone() *Status {
+	return &Status{
+		code:    s.code,
+		reasons: slices.Clone(s.reasons),
+		err:     s.err,
+		plugin:  s.plugin,
+	}
 }
 
 // NewStatus makes a Status out of the given arguments and returns its pointer.
@@ -285,12 +301,35 @@ type PluginScore struct {
 	Score int64
 }
 
+// PlacementPluginScores stores scores for a given placement.
+type PlacementPluginScores struct {
+	// Placement is the placement info that can be used to identify a specific placement.
+	Placement *Placement
+	// Scores is scores from plugins and extenders.
+	Scores []PluginScore
+	// TotalScore is the total score in Scores.
+	TotalScore int64
+	// Randomizer is used to provide randomness
+	// when randomizing placements within a common score.
+	Randomizer int
+}
+
 const (
 	// MaxNodeScore is the maximum score a Score plugin is expected to return.
-	MaxNodeScore int64 = 100
+	//
+	// Deprecated: use MaxScore instead.
+	MaxNodeScore int64 = MaxScore
 
 	// MinNodeScore is the minimum score a Score plugin is expected to return.
-	MinNodeScore int64 = 0
+	//
+	// Deprecated: use MinScore instead.
+	MinNodeScore int64 = MinScore
+
+	// MaxScore is the maximum score a Score or PlacementScore plugin is expected to return.
+	MaxScore int64 = 100
+
+	// MinScore is the minimum score a Score or PlacementScore plugin is expected to return.
+	MinScore int64 = 0
 
 	// MaxTotalScore is the maximum total score.
 	MaxTotalScore int64 = math.MaxInt64
@@ -326,7 +365,23 @@ type WaitingPod interface {
 	// to unblock the pod.
 	Allow(pluginName string)
 	// Reject declares the waiting pod unschedulable.
-	Reject(pluginName, msg string)
+	Reject(pluginName, msg string) bool
+	// Preempt preempts the waiting pod. Compared to reject it does not mark the pod as unschedulable,
+	// allowing it to be rescheduled.
+	Preempt(pluginName, msg string) bool
+}
+
+// PodInPreBind represents a pod currently in preBind phase.
+type PodInPreBind interface {
+	// CancelPod cancels the context attached to a goroutine running binding cycle of this pod
+	// if the pod is not marked as prebound.
+	// Returns true if the cancel was successfully run.
+	CancelPod(reason string) bool
+
+	// MarkPrebound marks the pod as prebound, making it impossible to cancel the context of binding cycle
+	// via PodInPreBind
+	// Returns false if the context was already canceled.
+	MarkPrebound() bool
 }
 
 // PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
@@ -362,6 +417,19 @@ func (p *PreFilterResult) Merge(in *PreFilterResult) *PreFilterResult {
 // PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.
 type PostFilterResult struct {
 	*NominatingInfo
+}
+
+// PreBindPreFlightResult wraps needed info for scheduler framework to act upon PreBindPreFlight phase.
+type PreBindPreFlightResult struct {
+	// AllowParallel indicates whether this plugin's PreBind method can be run
+	// in parallel with other plugins during PreBind phase.
+	// The scheduler groups consecutive plugins that return AllowParallel: true
+	// and runs them in parallel.
+	// A plugin that returns AllowParallel: false breaks the parallel group
+	// and runs sequentially.
+	// Note: skipped plugins are effectively ignored, but if a skipped plugin returns
+	// AllowParallel: false, it still breaks the parallel group of adjacent plugins.
+	AllowParallel bool
 }
 
 // Plugin is the parent type for all the scheduling framework plugins.
@@ -581,11 +649,13 @@ type ReservePlugin interface {
 // These plugins are called before a pod being scheduled.
 type PreBindPlugin interface {
 	Plugin
-	// PreBindPreFlight is called before PreBind, and the plugin is supposed to return Success, Skip, or Error status.
+	// PreBindPreFlight is called before PreBind, and the plugin is supposed to return two values:
+	// - PreBindPreFlightResult (nil is valid, and means results with the zero values on all fields).
+	// - Success, Skip, or Error status.
 	// If it returns Success, it means this PreBind plugin will handle this pod.
 	// If it returns Skip, it means this PreBind plugin has nothing to do with the pod, and PreBind will be skipped.
 	// This function should be lightweight, and shouldn't do any actual operation, e.g., creating a volume etc.
-	PreBindPreFlight(ctx context.Context, state CycleState, p *v1.Pod, nodeName string) *Status
+	PreBindPreFlight(ctx context.Context, state CycleState, p *v1.Pod, nodeName string) (*PreBindPreFlightResult, *Status)
 
 	// PreBind is called before binding a pod. All prebind plugins must return
 	// success or the pod will be rejected and won't be sent for binding.
@@ -682,6 +752,55 @@ type SignPlugin interface {
 	SignPod(ctx context.Context, pod *v1.Pod) ([]SignFragment, *Status)
 }
 
+// GeneratePlacementsResult represents the result of the PlacementGeneratePlugin.
+type GeneratePlacementsResult struct {
+	// Placements is the set of placements that the plugin wants to partition the resources into.
+	// The partitions can overlap.
+	//
+	// To represent no valid partitions, set the array to nil or empty.
+	Placements []*Placement
+}
+
+// PlacementGeneratePlugin is an interface for plugins that generate candidate Placements.
+type PlacementGeneratePlugin interface {
+	Plugin
+
+	// GeneratePlacements generates a list of potential Placements for the given PodGroup within the parent placement.
+	// Each Placement represents a candidate set of resources, e.g., nodes matching a selector.
+	GeneratePlacements(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, parentPlacement *Placement) (*GeneratePlacementsResult, *Status)
+}
+
+// PlacementScore stores result of a placement score plugin to be later used for normalization.
+type PlacementScore struct {
+	// Placement is the placement for which the score was computed
+	Placement *Placement
+	// Score is the score for a given placement, which is used to rank the placements and pick the best one.
+	Score int64
+}
+
+// PlacementScoreExtensions is an interface for PlacementScore extended functionality.
+type PlacementScoreExtensions interface {
+	// NormalizePlacementScore is called for all placement scores produced by the same plugin's "ScorePlacement"
+	// method. A successful run of NormalizePlacementScore will update the scores list and return
+	// a success status.
+	NormalizePlacementScore(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, placementScores []PlacementScore) *Status
+}
+
+// PlacementScorePlugin is an interface for plugins that score feasible Placements.
+type PlacementScorePlugin interface {
+	Plugin
+
+	// ScorePlacement calculates a score for a given Placement.
+	// This function is called only for Placements that have been deemed feasible for the sufficient number of pods in the PodGroup scheduling cycle.
+	// The PodGroupAssignments indicates the node assigned to each pod within this Placement.
+	// The returned score is a int64 with higher scores generally indicating more preferable Placements.
+	// Plugins can implement various scoring strategies, such as bin packing to minimize resource fragmentation.
+	ScorePlacement(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, placement *PodGroupAssignments) (int64, *Status)
+
+	// PlacementScoreExtensions returns a PlacementScoreExtensions interface if it implements one, or nil if does not.
+	PlacementScoreExtensions() PlacementScoreExtensions
+}
+
 // Handle provides data and some tools that plugins can use. It is
 // passed to the plugin factories at the time of plugin initialization. Plugins
 // must store and use this handle to call framework functions.
@@ -717,6 +836,15 @@ type Handle interface {
 	// The return value indicates if the pod is waiting or not.
 	RejectWaitingPod(uid types.UID) bool
 
+	// AddPodInPreBind adds a pod to the pods in preBind list.
+	AddPodInPreBind(uid types.UID, cancel context.CancelCauseFunc)
+
+	// GetPodInPreBind returns a pod that is in the binding cycle but before it is bound given its UID.
+	GetPodInPreBind(uid types.UID) PodInPreBind
+
+	// RemovePodInPreBind removes a pod from the pods in preBind list.
+	RemovePodInPreBind(uid types.UID)
+
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface
 
@@ -724,7 +852,7 @@ type Handle interface {
 	KubeConfig() *restclient.Config
 
 	// EventRecorder returns an event recorder.
-	EventRecorder() events.EventRecorder
+	EventRecorder() events.EventRecorderLogger
 
 	SharedInformerFactory() informers.SharedInformerFactory
 
@@ -757,11 +885,11 @@ type Handle interface {
 	// ProfileName returns the profile name associated to a profile.
 	ProfileName() string
 
-	// WorkloadManager can be used to provide workload-aware scheduling.
-	WorkloadManager() WorkloadManager
+	// PodGroupManager provides an interface for runtime information about pod groups from scheduler's cache.
+	PodGroupManager() PodGroupManager
 
-	// Sign a pod.
-	SignPod(ctx context.Context, pod *v1.Pod, recordPluginStats bool) PodSignature
+	// SignPod creates a PodSignature for a pod.
+	SignPod(ctx context.Context, pod *v1.Pod) PodSignature
 }
 
 // Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.

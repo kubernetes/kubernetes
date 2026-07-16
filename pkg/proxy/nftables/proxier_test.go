@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -120,6 +119,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		needFullSync:        true,
 		nftables:            nft,
 		masqueradeMark:      "0x4000",
+		masqueradeRule:      "mark set mark or 0x4000",
 		conntrack:           conntrack.NewFake(),
 		localDetector:       detectLocal,
 		nodeName:            testNodeName,
@@ -136,6 +136,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		noEndpointServices:  newNFTElementStorage("map", noEndpointServicesMap),
 		noEndpointNodePorts: newNFTElementStorage("map", noEndpointNodePortsMap),
 		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
+		hairpinConnections:  newNFTElementStorage("set", hairpinConnectionsSet),
 	}
 	p.setInitialized(true)
 	p.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, 30*time.Second, time.Minute)
@@ -148,6 +149,7 @@ var baseRules = dedent.Dedent(`
 
 	add set ip kube-proxy cluster-ips { type ipv4_addr ; comment "Active ClusterIPs" ; }
 	add set ip kube-proxy nodeport-ips { type ipv4_addr ; comment "IPs that accept NodePort traffic" ; }
+	add set ip kube-proxy hairpin-connections { type ipv4_addr . ipv4_addr . inet_proto . inet_service ; comment "service hairpin connections" ; }
 
 	add map ip kube-proxy firewall-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
 	add map ip kube-proxy no-endpoint-nodeports { type inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to service nodeports with no endpoints" ; }
@@ -162,7 +164,6 @@ var baseRules = dedent.Dedent(`
 	add chain ip kube-proxy filter-input { type filter hook input priority 0 ; }
 	add chain ip kube-proxy filter-output { type filter hook output priority 0 ; }
 	add chain ip kube-proxy firewall-check
-	add chain ip kube-proxy mark-for-masquerade
 	add chain ip kube-proxy masquerading
 	add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
 	add chain ip kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
@@ -183,15 +184,14 @@ var baseRules = dedent.Dedent(`
 	add rule ip kube-proxy filter-output-pre-dnat ct state new jump firewall-check
 	add rule ip kube-proxy filter-output ct state new jump cluster-ips-check
 	add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips
-	add rule ip kube-proxy mark-for-masquerade mark set mark or 0x4000
-	add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
-	add rule ip kube-proxy masquerading mark set mark xor 0x4000
-	add rule ip kube-proxy masquerading masquerade fully-random
+	add rule ip kube-proxy masquerading mark and 0x4000 != 0 mark set mark xor 0x4000 masquerade fully-random
+	add rule ip kube-proxy masquerading ct status dnat ip saddr . ip daddr . meta l4proto . th dport @hairpin-connections masquerade fully-random
 	add rule ip kube-proxy nat-output jump services
 	add rule ip kube-proxy nat-postrouting jump masquerading
 	add rule ip kube-proxy nat-prerouting jump services
 	add rule ip kube-proxy nodeport-endpoints-check ip daddr @nodeport-ips meta l4proto . th dport vmap @no-endpoint-nodeports
 	add rule ip kube-proxy reject-chain reject
+	add rule ip kube-proxy services ip daddr @cluster-ips ip saddr != 10.0.0.0/8 mark set mark or 0x4000 comment "masquerade clusterIP traffic from outside cluster"
 	add rule ip kube-proxy services ip daddr . meta l4proto . th dport vmap @service-ips
 	add rule ip kube-proxy services ip daddr @nodeport-ips meta l4proto . th dport vmap @service-nodeports
 	
@@ -300,6 +300,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.180.0.1"},
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
@@ -307,12 +308,14 @@ func TestOverallNFTablesRules(t *testing.T) {
 				Protocol: ptr.To(v1.ProtocolTCP),
 			}}
 		}),
-		// create Local LoadBalancer endpoints. Note that since we aren't setting
-		// its NodeName, this endpoint will be considered non-local and ignored.
+		// create Local LoadBalancer endpoints. Note that we set NodeName to the
+		// "wrong" value, so this endpoint will be considered non-local and
+		// ignored.
 		makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.180.0.2"},
+				NodeName:  ptr.To("other-node"),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
@@ -325,6 +328,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.180.0.3"},
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
@@ -337,6 +341,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.180.0.4"},
+				NodeName:  ptr.To("other-node"),
 			}, {
 				Addresses: []string{"10.180.0.5"},
 				NodeName:  ptr.To(testNodeName),
@@ -352,6 +357,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.180.0.3"},
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
@@ -366,27 +372,19 @@ func TestOverallNFTablesRules(t *testing.T) {
 	expected := baseRules + dedent.Dedent(`
 		# svc1
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 }
-
-		add chain ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80
-		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 ip saddr 10.180.0.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 meta l4proto tcp dnat to 10.180.0.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.180.0.1 . 80 }
 
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.180.0.1 . 10.180.0.1 . tcp . 80 }
 
 		# svc2
 		add chain ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80
-		add rule ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80 ip daddr 172.30.0.42 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 }
+		add rule ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.180.0.2 . 80 }
 		add chain ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80
 		add rule ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 ip saddr 10.0.0.0/8 goto service-42NFTM6N-ns2/svc2/tcp/p80 comment "short-circuit pod traffic"
-		add rule ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local jump mark-for-masquerade comment "masquerade local traffic"
+		add rule ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local mark set mark or 0x4000 comment "masquerade local traffic"
 		add rule ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local goto service-42NFTM6N-ns2/svc2/tcp/p80 comment "short-circuit local traffic"
-		add chain ip kube-proxy endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80
-		add rule ip kube-proxy endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 ip saddr 10.180.0.2 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80 meta l4proto tcp dnat to 10.180.0.2:80
 
 		add element ip kube-proxy cluster-ips { 172.30.0.42 }
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 80 : goto service-42NFTM6N-ns2/svc2/tcp/p80 }
@@ -400,49 +398,38 @@ func TestOverallNFTablesRules(t *testing.T) {
 
 		# svc3
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-UEIP74TE-ns3/svc3/tcp/p80__10.180.0.3/80 }
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.180.0.3 . 80 }
 		add chain ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80 jump mark-for-masquerade
+		add rule ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80 mark set mark or 0x4000 comment "masquerade"
 		add rule ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80 goto service-4AT6LBPK-ns3/svc3/tcp/p80
-		add chain ip kube-proxy endpoint-UEIP74TE-ns3/svc3/tcp/p80__10.180.0.3/80
-		add rule ip kube-proxy endpoint-UEIP74TE-ns3/svc3/tcp/p80__10.180.0.3/80 ip saddr 10.180.0.3 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-UEIP74TE-ns3/svc3/tcp/p80__10.180.0.3/80 meta l4proto tcp dnat to 10.180.0.3:80
 
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-nodeports { tcp . 3003 : goto external-4AT6LBPK-ns3/svc3/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.180.0.3 . 10.180.0.3 . tcp . 80 }
 
 		# svc4
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 2 vmap { 0 : goto endpoint-UNZV3OEC-ns4/svc4/tcp/p80__10.180.0.4/80 , 1 : goto endpoint-5RFCDDV7-ns4/svc4/tcp/p80__10.180.0.5/80 }
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 2 map { 0 : 10.180.0.4 . 80 , 1 : 10.180.0.5 . 80 }
 		add chain ip kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80 jump mark-for-masquerade
+		add rule ip kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80 mark set mark or 0x4000 comment "masquerade"
 		add rule ip kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80 goto service-LAUZTJTB-ns4/svc4/tcp/p80
-		add chain ip kube-proxy endpoint-5RFCDDV7-ns4/svc4/tcp/p80__10.180.0.5/80
-		add rule ip kube-proxy endpoint-5RFCDDV7-ns4/svc4/tcp/p80__10.180.0.5/80 ip saddr 10.180.0.5 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5RFCDDV7-ns4/svc4/tcp/p80__10.180.0.5/80 meta l4proto tcp dnat to 10.180.0.5:80
-		add chain ip kube-proxy endpoint-UNZV3OEC-ns4/svc4/tcp/p80__10.180.0.4/80
-		add rule ip kube-proxy endpoint-UNZV3OEC-ns4/svc4/tcp/p80__10.180.0.4/80 ip saddr 10.180.0.4 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-UNZV3OEC-ns4/svc4/tcp/p80__10.180.0.4/80 meta l4proto tcp dnat to 10.180.0.4:80
 
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
 		add element ip kube-proxy service-ips { 192.168.99.33 . tcp . 80 : goto external-LAUZTJTB-ns4/svc4/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.180.0.5 . 10.180.0.5 . tcp . 80 }
 
 		# svc5
 		add set ip kube-proxy affinity-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 { type ipv4_addr ; flags dynamic,timeout ; timeout 10800s ; }
 		add chain ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80
-		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 ip daddr 172.30.0.45 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
 		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 ip saddr @affinity-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 goto endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80
 		add rule ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 }
 		add chain ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80
-		add rule ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80 jump mark-for-masquerade
+		add rule ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80 mark set mark or 0x4000 comment "masquerade"
 		add rule ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80 goto service-HVFWP5L3-ns5/svc5/tcp/p80
 
 		add chain ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80
-		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 ip saddr 10.180.0.3 jump mark-for-masquerade
 		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 update @affinity-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 { ip saddr }
 		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 meta l4proto tcp dnat to 10.180.0.3:80
 
@@ -454,6 +441,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy service-ips { 5.6.7.8 . tcp . 80 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
 		add element ip kube-proxy service-nodeports { tcp . 3002 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
 		add element ip kube-proxy firewall-ips { 5.6.7.8 . tcp . 80 : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
+		# 10.180.0.3:80 is already in hairpin-connections, so we don't want another "add element" line...
 
 		# svc6
 		add element ip kube-proxy cluster-ips { 172.30.0.46 }
@@ -774,6 +762,7 @@ func TestLoadBalancer(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -984,7 +973,7 @@ func TestNodePorts(t *testing.T) {
 					}
 					eps.Endpoints = []discovery.Endpoint{{
 						Addresses: []string{epIP1},
-						NodeName:  nil,
+						NodeName:  ptr.To("other-node"),
 					}, {
 						Addresses: []string{epIP2},
 						NodeName:  ptr.To(testNodeName),
@@ -1110,6 +1099,7 @@ func TestExternalTrafficPolicyLocal(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP1},
+				NodeName:  ptr.To("other-node"),
 			}, {
 				Addresses: []string{epIP2},
 				NodeName:  ptr.To(testNodeName),
@@ -1225,7 +1215,7 @@ func TestExternalTrafficPolicyCluster(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP1},
-				NodeName:  nil,
+				NodeName:  ptr.To("other-node"),
 			}, {
 				Addresses: []string{epIP2},
 				NodeName:  ptr.To(testNodeName),
@@ -1607,6 +1597,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.1"},
+			NodeName:  ptr.To("other-node"),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -1618,6 +1609,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.2"},
+			NodeName:  ptr.To("other-node"),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
@@ -1649,6 +1641,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
 					Addresses: []string{"10.1.1.1"},
+					NodeName:  ptr.To("other-node"),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11-2"),
@@ -1663,6 +1656,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
 					Addresses: []string{"10.1.1.1"},
+					NodeName:  ptr.To("other-node"),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -1677,6 +1671,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
 					Addresses: []string{"10.1.1.1"},
+					NodeName:  ptr.To("other-node"),
 				}, {
 					Addresses: []string{"10.1.1.2"},
 					NodeName:  ptr.To(testNodeName),
@@ -1732,6 +1727,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.3"},
+			NodeName:  ptr.To("other-node"),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
@@ -1747,6 +1743,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.1"},
+			NodeName:  ptr.To("other-node"),
 		}, {
 			Addresses: []string{"10.1.1.2"},
 			NodeName:  ptr.To(testNodeName),
@@ -1765,6 +1762,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.3"},
+			NodeName:  ptr.To("other-node"),
 		}, {
 			Addresses: []string{"10.1.1.4"},
 			NodeName:  ptr.To(testNodeName),
@@ -1783,6 +1781,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.2.2.1"},
+			NodeName:  ptr.To("other-node"),
 		}, {
 			Addresses: []string{"10.2.2.2"},
 			NodeName:  ptr.To(testNodeName),
@@ -1860,8 +1859,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.1"},
+			NodeName:  ptr.To("other-node"),
 		}, {
 			Addresses: []string{"10.1.1.11"},
+			NodeName:  ptr.To("other-node"),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -1873,6 +1874,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.2"},
+			NodeName:  ptr.To("other-node"),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
@@ -1888,6 +1890,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.3.3.3"},
+			NodeName:  ptr.To("other-node"),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p33"),
@@ -3812,6 +3815,20 @@ func TestInternalExternalMasquerade(t *testing.T) {
 	}
 }
 
+// assertNumOperations asserts that the last transaction on nft had a number of operations
+// equal to the sum of the values in ops[]. (ops is multiple values just for ease of
+// explaining the math; see the callers below.)
+func assertNumOperations(t *testing.T, nft *knftables.Fake, ops ...int) {
+	t.Helper()
+	expectedOps := 0
+	for _, n := range ops {
+		expectedOps += n
+	}
+	if nft.LastTransaction.NumOperations() != expectedOps {
+		t.Errorf("Expected transaction with %d operations, got %d", expectedOps, nft.LastTransaction.NumOperations())
+	}
+}
+
 // Test calling syncProxyRules() multiple times with various changes
 func TestSyncProxyRulesRepeated(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv4Protocol)
@@ -3854,6 +3871,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.0.1.1"},
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
@@ -3865,6 +3883,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.0.2.1"},
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p8080"),
@@ -3881,20 +3900,14 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.42 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 8080 : goto service-MHHHYRWA-ns2/svc2/tcp/p8080 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.2.1 . 10.0.2.1 . tcp . 8080 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 ip daddr 172.30.0.42 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 numgen random mod 1 vmap { 0 : goto endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 }
-		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
-		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 ip saddr 10.0.2.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 meta l4proto tcp dnat to 10.0.2.1:8080
+		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.2.1 . 8080 }
                 `)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 
@@ -3917,6 +3930,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.0.3.1"},
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
@@ -3934,35 +3948,24 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 8080 : goto service-MHHHYRWA-ns2/svc2/tcp/p8080 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.2.1 . 10.0.2.1 . tcp . 8080 }
+		add element ip kube-proxy hairpin-connections { 10.0.3.1 . 10.0.3.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 ip daddr 172.30.0.42 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 numgen random mod 1 vmap { 0 : goto endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 }
-		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
-		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 ip saddr 10.0.2.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 meta l4proto tcp dnat to 10.0.2.1:8080
+		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.2.1 . 8080 }
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 }
-		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
-		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 ip saddr 10.0.3.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 meta l4proto tcp dnat to 10.0.3.1:80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.3.1 . 80 }
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add 1 element to cluster-ips and service-ips = 2 operations
-	// add+flush 2 chains for service and endpoint, add 2 rules in each = 8 operations
-	// 10 operations total.
-	if nft.LastTransaction.NumOperations() != 10 {
-		t.Errorf("Expected 10 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		3, // add 1 element each to cluster-ips, service-ips, and hairpin-connections
+		3, // add+flush service chain, add 1 rule
+	)
 
 	// Delete a service; its chains will be flushed, but not immediately deleted.
 	fp.OnServiceDelete(svc2)
@@ -3972,31 +3975,22 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.3.1 . 10.0.3.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 }
-		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
-		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 ip saddr 10.0.3.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 meta l4proto tcp dnat to 10.0.3.1:80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.3.1 . 80 }
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// delete 1 element from cluster-ips and service-ips = 2 operations
-	// flush 2 chains for service and endpoint = 2 operations
-	// 4 operations total.
-	if nft.LastTransaction.NumOperations() != 4 {
-		t.Errorf("Expected 4 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		3, // delete 1 element each from cluster-ips, service-ips, hairpin-connections
+		1, // flush service chain
+	)
 
 	// Fake the passage of time and confirm that the stale chains get deleted.
 	ageStaleChains()
@@ -4006,26 +4000,18 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.43 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.3.1 . 10.0.3.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 }
-		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
-		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 ip saddr 10.0.3.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 meta l4proto tcp dnat to 10.0.3.1:80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.3.1 . 80 }
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// delete stale chains happens in a separate transaction, nothing else changed => last transaction will have 0 operations.
-	if nft.LastTransaction.NumOperations() != 0 {
-		t.Errorf("Expected 0 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	// delete stale chains happens in a separate transaction, nothing else changed
+	assertNumOperations(t, nft, 0)
 
 	// Add a service, sync, then add its endpoints.
 	makeServiceMap(fp,
@@ -4046,34 +4032,28 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy cluster-ips { 172.30.0.44 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.3.1 . 10.0.3.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 }
-		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
-		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 ip saddr 10.0.3.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 meta l4proto tcp dnat to 10.0.3.1:80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.3.1 . 80 }
 
 		add element ip kube-proxy no-endpoint-services { 172.30.0.44 . tcp . 80 comment "ns4/svc4:p80" : goto reject-chain }
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add 1 element to cluster-ips and no-endpoint-services = 2 operations
-	if nft.LastTransaction.NumOperations() != 2 {
-		t.Errorf("Expected 2 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // add 1 element each to cluster-ips and no-endpoint-services
+	)
 
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns4", "svc4", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.0.4.1"},
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
@@ -4090,34 +4070,25 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.3.1 . 10.0.3.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.4.1 . 10.0.4.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 }
-		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
-		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 ip saddr 10.0.3.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80 meta l4proto tcp dnat to 10.0.3.1:80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.3.1 . 80 }
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 }
-		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
-		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 ip saddr 10.0.4.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.4.1 . 80 }
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add 1 element to service-ips, remove 1 element from no-endpoint-services = 2 operations
-	// add+flush 2 chains for service and endpoint, add 2 rules in each = 8 operations
-	if nft.LastTransaction.NumOperations() != 10 {
-		t.Errorf("Expected 10 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // add 1 element to service-ips, remove 1 element from no-endpoint-services
+		1, // add 1 element to hairpin-connections
+		3, // add+flush service chain, add 1 rule
+	)
 
 	// Change an endpoint of an existing service.
 	eps3update := eps3.DeepCopy()
@@ -4133,42 +4104,34 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.3.2 . 10.0.3.2 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.4.1 . 10.0.4.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 }
-		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
-		add chain ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80
-		add rule ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 ip saddr 10.0.3.2 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 meta l4proto tcp dnat to 10.0.3.2:80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.3.2 . 80 }
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 }
-		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
-		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 ip saddr 10.0.4.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.4.1 . 80 }
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add+flush 2 chains for service and endpoint, add 2 rules in each = 8 operations
-	// flush old endpoint chain = 1 operation
-	if nft.LastTransaction.NumOperations() != 9 {
-		t.Errorf("Expected 9 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // remove 1 old element from hairpin-connections, add 1 new one
+		3, // add+flush service chain, add 1 rule
+	)
 
 	// (Ensure the old svc3 chain gets deleted in the next sync.)
 	ageStaleChains()
 
 	// Add an endpoint to a service.
 	eps3update2 := eps3update.DeepCopy()
-	eps3update2.Endpoints = append(eps3update2.Endpoints, discovery.Endpoint{Addresses: []string{"10.0.3.3"}})
+	eps3update2.Endpoints = append(eps3update2.Endpoints, discovery.Endpoint{
+		Addresses: []string{"10.0.3.3"},
+		NodeName:  ptr.To(testNodeName),
+	})
 	fp.OnEndpointSliceUpdate(eps3update, eps3update2)
 	fp.syncProxyRules()
 
@@ -4179,36 +4142,26 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.3.2 . 10.0.3.2 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.3.3 . 10.0.3.3 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.4.1 . 10.0.4.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 2 vmap { 0 : goto endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 , 1 : goto endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80 }
-		add chain ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80
-		add rule ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 ip saddr 10.0.3.2 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 meta l4proto tcp dnat to 10.0.3.2:80
-		add chain ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80
-		add rule ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80 ip saddr 10.0.3.3 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80 meta l4proto tcp dnat to 10.0.3.3:80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 2 map { 0 : 10.0.3.2 . 80 , 1 : 10.0.3.3 . 80 }
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 }
-		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
-		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 ip saddr 10.0.4.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.4.1 . 80 }
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add+flush 3 chains for 1 service and 2 endpoints, add 2 rules in each = 12 operations
-	if nft.LastTransaction.NumOperations() != 12 {
-		t.Errorf("Expected 12 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	// (The first endpoint chain is unchanged, but the code recreates it anyway.)
+	assertNumOperations(t, nft,
+		1, // add 1 element to hairpin-connections
+		3, // add+flush service chain, add 1 rule
+	)
 
 	// Empty a service's endpoints; its chains will be flushed, but not immediately deleted.
 	eps3update3 := eps3update2.DeepCopy()
@@ -4222,33 +4175,25 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy no-endpoint-services { 172.30.0.43 . tcp . 80 comment "ns3/svc3:p80" : goto reject-chain }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.4.1 . 10.0.4.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add chain ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80
-		add chain ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 }
-		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
-		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 ip saddr 10.0.4.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.4.1 . 80 }
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// remove 1 element from service-ips, add 1 element to no-endpoint-services = 2 operations
-	// flush 3 chains = 3 operations
-	if nft.LastTransaction.NumOperations() != 5 {
-		t.Errorf("Expected 5 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // remove 1 element from service-ips, add 1 element to no-endpoint-services
+		2, // remove 2 elements from hairpin-connections
+		1, // flush service chain
+	)
 
-	expectedStaleChains := sets.NewString("service-4AT6LBPK-ns3/svc3/tcp/p80", "endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80", "endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80")
+	expectedStaleChains := sets.NewString("service-4AT6LBPK-ns3/svc3/tcp/p80")
 	gotStaleChains := sets.StringKeySet(fp.staleChains)
 	if !expectedStaleChains.Equal(gotStaleChains) {
 		t.Errorf("expected stale chains %v, got %v", expectedStaleChains, gotStaleChains)
@@ -4263,37 +4208,26 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.3.2 . 10.0.3.2 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.3.3 . 10.0.3.3 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.4.1 . 10.0.4.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 ip daddr 172.30.0.43 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 numgen random mod 2 vmap { 0 : goto endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 , 1 : goto endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80 }
-		add chain ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80
-		add rule ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 ip saddr 10.0.3.2 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80 meta l4proto tcp dnat to 10.0.3.2:80
-		add chain ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80
-		add rule ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80 ip saddr 10.0.3.3 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80 meta l4proto tcp dnat to 10.0.3.3:80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 2 map { 0 : 10.0.3.2 . 80 , 1 : 10.0.3.3 . 80 }
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 ip daddr 172.30.0.44 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 }
-		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
-		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 ip saddr 10.0.4.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.4.1 . 80 }
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// remove 1 element from no-endpoint-services, add 1 element to service-ips = 2 operations
-	// add+flush 3 chains for 1 service and 2 endpoints, add 2 rules in each = 12 operations
-	if nft.LastTransaction.NumOperations() != 14 {
-		t.Errorf("Expected 14 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		2, // remove 1 element from no-endpoint-services, add 1 element to service-ips
+		2, // add 2 elements to hairpin-connections
+		3, // add+flush service chain, add 1 rule
+	)
 
 	if len(fp.staleChains) != 0 {
 		t.Errorf("unexpected stale chains: %v", fp.staleChains)
@@ -4313,9 +4247,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// Sync with no new changes, so same expected rules as last time
 	fp.syncProxyRules()
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	if nft.LastTransaction.NumOperations() != 0 {
-		t.Errorf("Expected 0 trasaction operations, got %d", nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft, 0)
 }
 
 func TestSyncProxyRulesStartup(t *testing.T) {
@@ -4330,24 +4262,18 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 	// put a part of desired state to nftables
 	err := nft.ParseDump(baseRules + dedent.Dedent(`
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
 		
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 }
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.1.1 . 80 }
 
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 ip daddr 172.30.0.42 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 numgen random mod 1 vmap { 0 : goto endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 }
-		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 ip saddr 10.0.2.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 meta l4proto tcp dnat to 10.0.2.1:8080
+		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.2.1 . 8080 }
 
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.42 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 8080 : goto service-MHHHYRWA-ns2/svc2/tcp/p8080 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.2.1 . 10.0.2.1 . tcp . 8080 }
 	`))
 
 	if err != nil {
@@ -4391,8 +4317,14 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{
-				{Addresses: []string{"10.0.1.1"}},
-				{Addresses: []string{"10.0.1.2"}},
+				{
+					Addresses: []string{"10.0.1.1"},
+					NodeName:  ptr.To(testNodeName),
+				},
+				{
+					Addresses: []string{"10.0.1.2"},
+					NodeName:  ptr.To(testNodeName),
+				},
 			}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
@@ -4404,6 +4336,7 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.0.2.1"},
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p8080"),
@@ -4422,36 +4355,23 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-ips { 172.30.0.42 . tcp . 8080 : goto service-MHHHYRWA-ns2/svc2/tcp/p8080 }
 		add element ip kube-proxy no-endpoint-services { 172.30.0.43 . tcp . 80 comment "ns3/svc3:p80" : goto reject-chain }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.2 . 10.0.1.2 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.2.1 . 10.0.2.1 . tcp . 8080 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 2 vmap { 0 : goto endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 , 1 : goto endpoint-ZCZBVNAZ-ns1/svc1/tcp/p80__10.0.1.2/80 }
-		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 ip saddr 10.0.1.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80 meta l4proto tcp dnat to 10.0.1.1:80
-		add chain ip kube-proxy endpoint-ZCZBVNAZ-ns1/svc1/tcp/p80__10.0.1.2/80
-		add rule ip kube-proxy endpoint-ZCZBVNAZ-ns1/svc1/tcp/p80__10.0.1.2/80 ip saddr 10.0.1.2 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-ZCZBVNAZ-ns1/svc1/tcp/p80__10.0.1.2/80 meta l4proto tcp dnat to 10.0.1.2:80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 2 map { 0 : 10.0.1.1 . 80 , 1 : 10.0.1.2 . 80 }
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 ip daddr 172.30.0.42 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 numgen random mod 1 vmap { 0 : goto endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 }
-		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
-		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 ip saddr 10.0.2.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080 meta l4proto tcp dnat to 10.0.2.1:8080
+		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.2.1 . 8080 }
 	`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// initial transaction consists of:
-	// 1. nft setup, total ops = setupOps
-	// 2. services setup (should skip adding existing set/map elements and endpoint chains+rules)
-	//    - add svc3 IP to the cluster-ips, and to the no-endpoint-services set = 2 ops
-	//    - add+flush 2 service chains + 2 rules each = 8 ops
-	//    - add+flush svc1 endpoint chain + 2 rules = 4 ops
-	//    total: 14 ops
-	if nft.LastTransaction.NumOperations() != setupOps+14 {
-		fmt.Println(nft.LastTransaction)
-		t.Errorf("Expected %v trasaction operations, got %d", setupOps+14, nft.LastTransaction.NumOperations())
-	}
+	assertNumOperations(t, nft,
+		setupOps, // nft setup
+		1,        // add new svc1 endpoint to hairpin-connections
+		2,        // add svc3 IP to the cluster-ips, and to the no-endpoint-services set
+		6,        // add+flush 2 service chains + 1 rule each
+	)
 }
 
 func TestNoEndpointsMetric(t *testing.T) {
@@ -4674,6 +4594,7 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 					eps.AddressType = discovery.AddressTypeIPv4
 					eps.Endpoints = []discovery.Endpoint{{
 						Addresses: []string{"10.180.0.1"},
+						NodeName:  ptr.To(testNodeName),
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
@@ -4893,6 +4814,7 @@ func TestBadIPs(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.180.00.001"},
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
@@ -4907,16 +4829,12 @@ func TestBadIPs(t *testing.T) {
 	expected := baseRules + dedent.Dedent(`
 		# svc1
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 }
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.180.0.1 . 80 }
 
 		add chain ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80 jump mark-for-masquerade
+		add rule ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80 mark set mark or 0x4000 comment "masquerade"
 		add rule ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80 goto service-ULMVA6XW-ns1/svc1/tcp/p80
 
-		add chain ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80
-		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 ip saddr 10.180.0.1 jump mark-for-masquerade
-		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 meta l4proto tcp dnat to 10.180.0.1:80
 
 		add chain ip kube-proxy firewall-ULMVA6XW-ns1/svc1/tcp/p80
 		add rule ip kube-proxy firewall-ULMVA6XW-ns1/svc1/tcp/p80 ip saddr != { 203.0.113.0/25 } drop
@@ -4927,6 +4845,7 @@ func TestBadIPs(t *testing.T) {
 		add element ip kube-proxy service-ips { 1.2.3.4 . tcp . 80 : goto external-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy service-nodeports { tcp . 3001 : goto external-ULMVA6XW-ns1/svc1/tcp/p80 }
 		add element ip kube-proxy firewall-ips { 1.2.3.4 . tcp . 80 : goto firewall-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip kube-proxy hairpin-connections { 10.180.0.1 . 10.180.0.1 . tcp . 80 }
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())

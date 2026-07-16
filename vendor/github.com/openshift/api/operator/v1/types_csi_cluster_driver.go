@@ -21,6 +21,9 @@ import (
 // +kubebuilder:subresource:status
 // +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/701
 // +openshift:file-pattern=cvoRunLevel=0000_50,operatorName=csi-driver,operatorOrdering=01
+// +kubebuilder:validation:XValidation:rule="self.spec.?driverConfig.driverType.orValue('') == 'SecretsStore' ? self.metadata.name == 'secrets-store.csi.k8s.io' : true",message="driverType 'SecretsStore' requires metadata.name 'secrets-store.csi.k8s.io'"
+// +kubebuilder:validation:XValidation:rule="self.metadata.name == 'secrets-store.csi.k8s.io' ? (!has(self.spec.driverConfig) || self.spec.driverConfig.driverType == 'SecretsStore') : true",message="metadata.name 'secrets-store.csi.k8s.io' requires driverType 'SecretsStore'"
+// +kubebuilder:validation:XValidation:rule="oldSelf.spec.?driverConfig.?secretsStore.?tokenRequests.?type.orValue('') != 'Managed' || self.spec.?driverConfig.?secretsStore.?tokenRequests.?type.orValue('') == 'Managed'",message="tokenRequests type cannot be changed from Managed"
 
 // ClusterCSIDriver object allows management and configuration of a CSI driver operator
 // installed by default in OpenShift. Name of the object must be name of the CSI driver
@@ -113,25 +116,27 @@ type ClusterCSIDriverSpec struct {
 }
 
 // CSIDriverType indicates type of CSI driver being configured.
-// +kubebuilder:validation:Enum="";AWS;Azure;GCP;IBMCloud;vSphere
+// +kubebuilder:validation:Enum="";AWS;Azure;GCP;IBMCloud;vSphere;SecretsStore
 type CSIDriverType string
 
 const (
-	AWSDriverType      CSIDriverType = "AWS"
-	AzureDriverType    CSIDriverType = "Azure"
-	GCPDriverType      CSIDriverType = "GCP"
-	IBMCloudDriverType CSIDriverType = "IBMCloud"
-	VSphereDriverType  CSIDriverType = "vSphere"
+	AWSDriverType          CSIDriverType = "AWS"
+	AzureDriverType        CSIDriverType = "Azure"
+	GCPDriverType          CSIDriverType = "GCP"
+	IBMCloudDriverType     CSIDriverType = "IBMCloud"
+	VSphereDriverType      CSIDriverType = "vSphere"
+	SecretsStoreDriverType CSIDriverType = "SecretsStore"
 )
 
 // CSIDriverConfigSpec defines configuration spec that can be
 // used to optionally configure a specific CSI Driver.
 // +kubebuilder:validation:XValidation:rule="has(self.driverType) && self.driverType == 'IBMCloud' ? has(self.ibmcloud) : !has(self.ibmcloud)",message="ibmcloud must be set if driverType is 'IBMCloud', but remain unset otherwise"
+// +kubebuilder:validation:XValidation:rule="has(self.driverType) && self.driverType == 'SecretsStore' ? has(self.secretsStore) : !has(self.secretsStore)",message="secretsStore must be set if driverType is 'SecretsStore', but remain unset otherwise"
 // +union
 type CSIDriverConfigSpec struct {
 	// driverType indicates type of CSI driver for which the
 	// driverConfig is being applied to.
-	// Valid values are: AWS, Azure, GCP, IBMCloud, vSphere and omitted.
+	// Valid values are: AWS, Azure, GCP, IBMCloud, vSphere, SecretsStore and omitted.
 	// Consumers should treat unknown values as a NO-OP.
 	// +required
 	// +unionDiscriminator
@@ -156,6 +161,10 @@ type CSIDriverConfigSpec struct {
 	// vSphere is used to configure the vsphere CSI driver.
 	// +optional
 	VSphere *VSphereCSIDriverConfigSpec `json:"vSphere,omitempty"`
+
+	// secretsStore is used to configure the Secrets Store CSI driver.
+	// +optional
+	SecretsStore SecretsStoreCSIDriverConfigSpec `json:"secretsStore,omitzero"`
 }
 
 // AWSCSIDriverConfigSpec defines properties that can be configured for the AWS CSI driver.
@@ -387,6 +396,158 @@ type VSphereCSIDriverConfigSpec struct {
 	// +openshift:enable:FeatureGate=VSphereConfigurableMaxAllowedBlockVolumesPerNode
 	// +optional
 	MaxAllowedBlockVolumesPerNode int32 `json:"maxAllowedBlockVolumesPerNode,omitempty"`
+}
+
+// SecretsStoreCSIDriverConfigSpec defines properties that can be configured for the Secrets Store CSI driver.
+// +kubebuilder:validation:MinProperties=1
+type SecretsStoreCSIDriverConfigSpec struct {
+	// secretRotation controls automatic secret rotation behavior.
+	// When omitted, secret rotation is enabled with a default poll interval of 2 minutes.
+	// +optional
+	SecretRotation SecretsStoreSecretRotation `json:"secretRotation,omitzero"`
+
+	// tokenRequests controls service account token configuration for
+	// workload identity federation (WIF) with cloud providers.
+	// When omitted, the operator preserves any existing tokenRequests
+	// already configured on the CSIDriver object without modification.
+	// +optional
+	TokenRequests SecretsStoreTokenRequests `json:"tokenRequests,omitzero"`
+}
+
+// TokenRequestsType determines how the operator manages the tokenRequests
+// field on the storage.k8s.io CSIDriver object.
+// +kubebuilder:validation:Enum=Managed;Unmanaged
+type TokenRequestsType string
+
+const (
+	// TokenRequestsManaged means the operator uses the audiences list
+	// as the sole source of truth for the CSIDriver.spec.tokenRequests field.
+	TokenRequestsManaged TokenRequestsType = "Managed"
+
+	// TokenRequestsUnmanaged means the operator preserves any existing
+	// tokenRequests already configured on the CSIDriver object and does not
+	// overwrite them.
+	TokenRequestsUnmanaged TokenRequestsType = "Unmanaged"
+)
+
+// SecretsStoreTokenRequests configures how service account tokens are
+// provided to the Secrets Store CSI driver for workload identity federation.
+// +kubebuilder:validation:XValidation:rule="has(self.type) && self.type == 'Managed' ? has(self.managed) : !has(self.managed)",message="managed must be set when type is 'Managed', and must not be set otherwise"
+// +union
+type SecretsStoreTokenRequests struct {
+	// type determines how the operator manages tokenRequests on the CSIDriver object.
+	// When "Unmanaged", existing tokenRequests on the CSIDriver are preserved
+	// and the managed field is not used.
+	// When "Managed", the operator sets tokenRequests from the audiences
+	// specified in the managed field, replacing any previously configured values.
+	// Once set to "Managed", type cannot be reverted back to "Unmanaged".
+	// +unionDiscriminator
+	// +required
+	Type TokenRequestsType `json:"type,omitempty"`
+
+	// managed holds configuration for operator-managed tokenRequests.
+	// Only valid when type is "Managed".
+	// +optional
+	Managed ManagedTokenRequests `json:"managed,omitzero"`
+}
+
+// ManagedTokenRequests holds the configuration for operator-managed
+// service account token requests.
+// +kubebuilder:validation:MinProperties=1
+type ManagedTokenRequests struct {
+	// audiences specifies service account token audiences that kubelet will
+	// provide to the CSI driver during NodePublishVolume calls. These tokens
+	// enable workload identity federation (WIF) with cloud providers such as
+	// AWS, Azure, and GCP.
+	// When empty, the operator clears all tokenRequests from the CSIDriver object.
+	// +optional
+	// +listType=map
+	// +listMapKey=audience
+	// +kubebuilder:validation:MinItems=0
+	// +kubebuilder:validation:MaxItems=10
+	Audiences *[]SecretsStoreTokenRequest `json:"audiences,omitempty"`
+}
+
+// SecretRotationType determines the secret rotation behavior for the
+// Secrets Store CSI driver.
+// +kubebuilder:validation:Enum=None;Custom
+type SecretRotationType string
+
+const (
+	// SecretRotationNone disables automatic secret rotation. Secrets are only
+	// fetched at initial pod mount time.
+	SecretRotationNone SecretRotationType = "None"
+
+	// SecretRotationCustom enables automatic secret rotation with the
+	// configuration specified in the custom field.
+	SecretRotationCustom SecretRotationType = "Custom"
+)
+
+// SecretsStoreSecretRotation configures the automatic secret rotation behavior
+// for the Secrets Store CSI driver.
+// +kubebuilder:validation:XValidation:rule="has(self.type) && self.type == 'Custom' ? has(self.custom) : !has(self.custom)",message="custom must be set when type is 'Custom', and must not be set otherwise"
+// +union
+type SecretsStoreSecretRotation struct {
+	// type determines the secret rotation behavior.
+	// When "None", secret rotation is disabled and secrets are only fetched at
+	// initial pod mount time.
+	// When "Custom", secret rotation is enabled with the configuration specified
+	// in the custom field.
+	// +unionDiscriminator
+	// +required
+	Type SecretRotationType `json:"type,omitempty"`
+
+	// custom holds the custom rotation configuration.
+	// Only valid when type is "Custom".
+	// +optional
+	Custom CustomSecretRotation `json:"custom,omitzero"`
+}
+
+// CustomSecretRotation holds configuration for custom secret rotation behavior.
+// +kubebuilder:validation:MinProperties=1
+type CustomSecretRotation struct {
+	// minimumRefreshAge is the minimum time in seconds between secret
+	// rotation attempts. Each time kubelet calls NodePublishVolume, the driver
+	// checks whether this interval has elapsed since the last successful provider
+	// call. If it has, the driver contacts the secret provider to fetch the latest
+	// secret values and updates the mounted volume.
+	// Setting this value below the kubelet syncFrequency (default: 1 minute)
+	// has no additional effect on the actual rotation cadence.
+	// Must be at least 1 second and no more than 31560000 seconds (~1 year).
+	// When omitted, this means no opinion and the platform is left to choose a
+	// reasonable default, which is subject to change over time.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=31560000
+	// +optional
+	MinimumRefreshAge int32 `json:"minimumRefreshAge,omitempty"`
+
+	// --- TOMBSTONE ---
+	// rotationPollIntervalSeconds was the previous name for minimumRefreshAge.
+	// The field has been renamed to better reflect its semantics.
+	// The JSON key is reserved to prevent reuse.
+	//
+	// +optional
+	// RotationPollIntervalSeconds int32 `json:"rotationPollIntervalSeconds,omitempty"`
+}
+
+// SecretsStoreTokenRequest specifies a service account token audience configuration
+// for workload identity federation (WIF) with the Secrets Store CSI driver.
+type SecretsStoreTokenRequest struct {
+	// audience is the intended audience of the service account token.
+	// An empty string means the issued token will use the kube-apiserver's default APIAudiences.
+	// +kubebuilder:validation:MinLength=0
+	// +kubebuilder:validation:MaxLength=253
+	// +required
+	Audience *string `json:"audience,omitempty"`
+
+	// expirationSeconds is the requested duration of validity of the service account token.
+	// The token issuer may return a token with a different validity duration.
+	// When omitted, the token expiration is determined by the kube-apiserver.
+	// Must be at least 600 seconds (10 minutes) and no more than 315360000 seconds (~10 years).
+	// +kubebuilder:validation:Minimum=600
+	// +kubebuilder:validation:Maximum=315360000
+	// +optional
+	ExpirationSeconds int32 `json:"expirationSeconds,omitempty"`
 }
 
 // ClusterCSIDriverStatus is the observed status of CSI driver operator

@@ -60,18 +60,19 @@ type ResourcePool struct {
 }
 
 type Device struct {
-	Name                     UniqueString
-	Attributes               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute `json:",omitempty"`
-	Capacity                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity  `json:",omitempty"`
-	ConsumesCounters         []DeviceCounterConsumption                                `json:",omitempty"`
-	NodeName                 *string                                                   `json:",omitempty"`
-	NodeSelector             *v1.NodeSelector                                          `json:",omitempty"`
-	AllNodes                 *bool                                                     `json:",omitempty"`
-	Taints                   []resourceapi.DeviceTaint                                 `json:",omitempty"`
-	BindsToNode              bool                                                      `json:",omitempty"`
-	BindingConditions        []string                                                  `json:",omitempty"`
-	BindingFailureConditions []string                                                  `json:",omitempty"`
-	AllowMultipleAllocations *bool                                                     `json:",omitempty"`
+	Name                            UniqueString
+	Attributes                      map[resourceapi.QualifiedName]resourceapi.DeviceAttribute      `json:",omitempty"`
+	Capacity                        map[resourceapi.QualifiedName]resourceapi.DeviceCapacity       `json:",omitempty"`
+	ConsumesCounters                []DeviceCounterConsumption                                     `json:",omitempty"`
+	NodeName                        *string                                                        `json:",omitempty"`
+	NodeSelector                    *v1.NodeSelector                                               `json:",omitempty"`
+	AllNodes                        *bool                                                          `json:",omitempty"`
+	Taints                          []resourceapi.DeviceTaint                                      `json:",omitempty"`
+	BindsToNode                     bool                                                           `json:",omitempty"`
+	BindingConditions               []string                                                       `json:",omitempty"`
+	BindingFailureConditions        []string                                                       `json:",omitempty"`
+	AllowMultipleAllocations        *bool                                                          `json:",omitempty"`
+	NodeAllocatableResourceMappings map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping `json:",omitempty"`
 }
 
 type DeviceCounterConsumption struct {

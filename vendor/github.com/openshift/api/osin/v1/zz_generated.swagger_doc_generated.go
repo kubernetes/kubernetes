@@ -154,6 +154,7 @@ var map_OAuthConfig = map[string]string{
 	"sessionConfig":               "sessionConfig hold information about configuring sessions.",
 	"tokenConfig":                 "tokenConfig contains options for authorization and access tokens",
 	"templates":                   "templates allow you to customize pages like the login page.",
+	"proxyTrustedCA":              "proxyTrustedCA is an optional path to a PEM-encoded CA bundle used to verify connections to an HTTPS proxy during outbound IdP requests. When omitted, proxy connections use the system trust roots only.",
 }
 
 func (OAuthConfig) SwaggerDoc() map[string]string {

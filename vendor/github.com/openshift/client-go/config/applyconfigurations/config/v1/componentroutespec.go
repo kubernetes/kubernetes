@@ -28,6 +28,24 @@ type ComponentRouteSpecApplyConfiguration struct {
 	// If the custom hostname uses the default routing suffix of the cluster,
 	// the Secret specification for a serving certificate will not be needed.
 	ServingCertKeyPairSecret *SecretNameReferenceApplyConfiguration `json:"servingCertKeyPairSecret,omitempty"`
+	// labels defines additional labels to be applied to the route created
+	// for the component. These labels are used by the IngressController to
+	// determine which routes it should manage. Changing labels may cause the
+	// route to be reassigned to a different IngressController.
+	// When omitted, no additional labels are applied to the component route.
+	// When specified, labels must contain at least one entry, up to a maximum of 8.
+	// Label keys must be valid qualified names, consisting of a name segment and
+	// an optional prefix separated by a slash (/). The name segment must be at most
+	// 63 characters in length and must consist only of alphanumeric characters,
+	// dashes (-), underscores (_), and dots (.), and must start and end with
+	// alphanumeric characters. The prefix, if specified, must be a DNS subdomain:
+	// at most 253 characters in length, consisting of dot-separated segments where
+	// each segment starts and ends with an alphanumeric character.
+	// Label values must be either empty or 1-63 characters, consisting of
+	// alphanumeric characters, dashes (-), underscores (_), or dots (.),
+	// starting and ending with an alphanumeric character.
+	// Keys with the "kubernetes.io/", "k8s.io/", and "openshift.io/" prefixes are reserved and may not be used.
+	Labels map[string]configv1.LabelValue `json:"labels,omitempty"`
 }
 
 // ComponentRouteSpecApplyConfiguration constructs a declarative configuration of the ComponentRouteSpec type for use with
@@ -65,5 +83,19 @@ func (b *ComponentRouteSpecApplyConfiguration) WithHostname(value configv1.Hostn
 // If called multiple times, the ServingCertKeyPairSecret field is set to the value of the last call.
 func (b *ComponentRouteSpecApplyConfiguration) WithServingCertKeyPairSecret(value *SecretNameReferenceApplyConfiguration) *ComponentRouteSpecApplyConfiguration {
 	b.ServingCertKeyPairSecret = value
+	return b
+}
+
+// WithLabels puts the entries into the Labels field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the Labels field,
+// overwriting an existing map entries in Labels field with the same key.
+func (b *ComponentRouteSpecApplyConfiguration) WithLabels(entries map[string]configv1.LabelValue) *ComponentRouteSpecApplyConfiguration {
+	if b.Labels == nil && len(entries) > 0 {
+		b.Labels = make(map[string]configv1.LabelValue, len(entries))
+	}
+	for k, v := range entries {
+		b.Labels[k] = v
+	}
 	return b
 }

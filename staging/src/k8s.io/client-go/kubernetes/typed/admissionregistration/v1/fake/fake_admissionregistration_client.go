@@ -28,6 +28,14 @@ type FakeAdmissionregistrationV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAdmissionregistrationV1) MutatingAdmissionPolicies() v1.MutatingAdmissionPolicyInterface {
+	return newFakeMutatingAdmissionPolicies(c)
+}
+
+func (c *FakeAdmissionregistrationV1) MutatingAdmissionPolicyBindings() v1.MutatingAdmissionPolicyBindingInterface {
+	return newFakeMutatingAdmissionPolicyBindings(c)
+}
+
 func (c *FakeAdmissionregistrationV1) MutatingWebhookConfigurations() v1.MutatingWebhookConfigurationInterface {
 	return newFakeMutatingWebhookConfigurations(c)
 }

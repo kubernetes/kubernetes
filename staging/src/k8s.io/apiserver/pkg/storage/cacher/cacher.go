@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
@@ -246,7 +248,7 @@ func (t *watcherBookmarkTimeBuckets) popExpiredWatchersThreadUnsafe() [][]*cache
 	return expiredWatchers
 }
 
-type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set) bool
+type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set, obj runtime.Object) bool
 
 type indexedTriggerFunc struct {
 	indexName   string
@@ -505,6 +507,10 @@ type namespacedName struct {
 }
 
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	ctx, span := tracing.Start(ctx, "cacher.Watch",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.Stringer("type", c.groupResource))
+	defer span.End(500 * time.Millisecond)
 	key, err := c.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return nil, err
@@ -597,7 +603,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// to compute watcher.forget function (which has to happen under lock).
 	watcher := newCacheWatcher(
 		chanSize,
-		filterWithAttrsAndPrefixFunction(key, pred),
+		filterWithAttrsAndPrefixFunction(key, pred, c.groupResource),
 		emptyFunc,
 		c.versioner,
 		deadline,
@@ -671,6 +677,15 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return newImmediateCloseWatcher(), nil
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && pred.ShardSelector != nil && !pred.ShardSelector.Empty() {
+		metrics.RecordShardedWatchStarted(c.groupResource)
+		originalForget := watcher.forget
+		watcher.forget = func(drainWatcher bool) {
+			metrics.RecordShardedWatchStopped(c.groupResource)
+			originalForget(drainWatcher)
+		}
+	}
+
 	go watcher.processInterval(ctx, cacheInterval, requiredResourceVersion)
 	return watcher, nil
 }
@@ -696,9 +711,9 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	}
 
 	if exists {
-		elem, ok := obj.(*storeElement)
+		elem, ok := obj.(*store.Element)
 		if !ok {
-			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
+			return fmt.Errorf("non *store.Element returned from storage: %v", obj)
 		}
 		objVal.Set(reflect.ValueOf(elem.Object).Elem())
 	} else {
@@ -785,11 +800,19 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	var hasMoreListItems bool
 	limit := computeListLimit(opts)
 	for i, obj := range resp.Items {
-		elem, ok := obj.(*storeElement)
+		elem, ok := obj.(*store.Element)
 		if !ok {
-			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
+			return fmt.Errorf("non *store.Element returned from storage: %v", obj)
 		}
-		if opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
+		shardMatch := true
+		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+			var err error
+			shardMatch, err = opts.Predicate.MatchesSharding(elem.Object)
+			if err != nil {
+				return fmt.Errorf("shard matching failed: %w", err)
+			}
+		}
+		if shardMatch && opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
 			selectedObjects = append(selectedObjects, elem.Object)
 			lastSelectedObjectKey = elem.Key
 		}
@@ -819,6 +842,9 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
 			return err
 		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+		opts.Predicate.SetShardInfoOnList(listObj)
 	}
 	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, len(resp.Items), listVal.Len())
 	return nil
@@ -1198,10 +1224,22 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 	}
 }
 
-func filterWithAttrsAndPrefixFunction(key string, p storage.SelectionPredicate) filterWithAttrsFunc {
-	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
+func filterWithAttrsAndPrefixFunction(key string, p storage.SelectionPredicate, groupResource schema.GroupResource) filterWithAttrsFunc {
+	isSharded := utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && p.ShardSelector != nil && !p.ShardSelector.Empty()
+	filterFunc := func(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
+		}
+		if isSharded {
+			matches, err := p.MatchesSharding(obj)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("shard matching failed for %v: %w", groupResource, err))
+				return false
+			}
+			if !matches {
+				metrics.RecordWatchFilteredEvent(groupResource)
+				return false
+			}
 		}
 		return p.MatchesObjectAttributes(label, field)
 	}
@@ -1238,6 +1276,7 @@ func (c *Cacher) getBookmarkAfterResourceVersionLockedFunc(parsedResourceVersion
 	}
 }
 
+// isListWatchRequest is mirrored in staging/src/k8s.io/apiserver/pkg/endpoints/handlers/get.go
 func isListWatchRequest(opts storage.ListOptions) bool {
 	return opts.SendInitialEvents != nil && *opts.SendInitialEvents && opts.Predicate.AllowWatchBookmarks
 }
@@ -1258,7 +1297,7 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
 		return parsedWatchResourceVersion, nil
 	}
 	// legacy case
-	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutResourceVersion) && opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
+	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
 		return 0, nil
 	}
 	rv, err := c.storage.GetCurrentResourceVersion(ctx)

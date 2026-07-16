@@ -155,7 +155,7 @@ stored in base64 encoded form, which was redundant with the information in the
 type Token struct {
 	Raw       string                 // Raw contains the raw token
 	Method    SigningMethod          // Method is the signing method used or to be used
-	Header    map[string]interface{} // Header is the first segment of the token in decoded form
+	Header    map[string]any         // Header is the first segment of the token in decoded form
 	Claims    Claims                 // Claims is the second segment of the token in decoded form
 	Signature []byte                 // Signature is the third segment of the token in decoded form
 	Valid     bool                   // Valid specifies if the token is valid

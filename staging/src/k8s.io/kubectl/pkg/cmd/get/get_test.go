@@ -2587,6 +2587,98 @@ type: DELETED
 `,
 		},
 		{
+			format: "kyaml",
+			expected: `---
+{
+  type: "ADDED",
+  object: {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: {
+      name: "bar",
+      namespace: "test",
+      resourceVersion: "9",
+    },
+    spec: {
+      containers: null,
+      dnsPolicy: "ClusterFirst",
+      enableServiceLinks: true,
+      restartPolicy: "Always",
+      securityContext: {},
+      terminationGracePeriodSeconds: 30,
+    },
+    status: {},
+  },
+}
+---
+{
+  type: "ADDED",
+  object: {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: {
+      name: "foo",
+      namespace: "test",
+      resourceVersion: "10",
+    },
+    spec: {
+      containers: null,
+      dnsPolicy: "ClusterFirst",
+      enableServiceLinks: true,
+      restartPolicy: "Always",
+      securityContext: {},
+      terminationGracePeriodSeconds: 30,
+    },
+    status: {},
+  },
+}
+---
+{
+  type: "MODIFIED",
+  object: {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: {
+      name: "foo",
+      namespace: "test",
+      resourceVersion: "11",
+    },
+    spec: {
+      containers: null,
+      dnsPolicy: "ClusterFirst",
+      enableServiceLinks: true,
+      restartPolicy: "Always",
+      securityContext: {},
+      terminationGracePeriodSeconds: 30,
+    },
+    status: {},
+  },
+}
+---
+{
+  type: "DELETED",
+  object: {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: {
+      name: "foo",
+      namespace: "test",
+      resourceVersion: "12",
+    },
+    spec: {
+      containers: null,
+      dnsPolicy: "ClusterFirst",
+      enableServiceLinks: true,
+      restartPolicy: "Always",
+      securityContext: {},
+      terminationGracePeriodSeconds: 30,
+    },
+    status: {},
+  },
+}
+`,
+		},
+		{
 			format: `jsonpath={.type},{.object.metadata.name},{.object.metadata.resourceVersion}{"\n"}`,
 			expected: `ADDED,bar,9
 ADDED,foo,10

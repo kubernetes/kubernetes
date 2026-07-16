@@ -29,7 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -71,17 +73,20 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 			expectedContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, true, desiredCtrCPU, desiredCtrMem)
 			for i, c := range expectedContainers {
 				// If the pod has init containers, but we are not resizing them, keep the original resources.
-				if c.InitCtr && !resizeInitCtrs {
+				podLevelOnly := (desiredCtrCPU == "" && desiredPodCPU != originalCPU) || (desiredCtrMem == "" && desiredPodMem != originalMem)
+
+				if c.InitCtr && !resizeInitCtrs && !podLevelOnly {
 					c.Resources = originalContainers[i].Resources
 					expectedContainers[i] = c
 					continue
 				}
 				// For containers where the resize policy is "restart", we expect a restart.
 				expectRestart := int32(0)
-				if cpuPolicy == v1.RestartContainer && desiredCtrCPU != originalCtrCPU {
+
+				if cpuPolicy == v1.RestartContainer && (desiredCtrCPU != originalCtrCPU || (desiredCtrCPU == "" && desiredPodCPU != originalCPU)) {
 					expectRestart = 1
 				}
-				if memPolicy == v1.RestartContainer && desiredCtrMem != originalCtrMem {
+				if memPolicy == v1.RestartContainer && (desiredCtrMem != originalCtrMem || (desiredCtrMem == "" && desiredPodMem != originalMem)) {
 					expectRestart = 1
 				}
 				c.RestartCount = expectRestart
@@ -90,8 +95,8 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 
 			var originalPodResources, desiredPodResources *v1.ResourceRequirements
 			if desiredPodCPU != "" || desiredPodMem != "" {
-				originalPodResources = makePodResources(offsetCPU(15, originalCPU), offsetCPU(15, originalCPU), offsetMemory(15, originalMem), offsetMemory(15, originalMem))
-				desiredPodResources = makePodResources(offsetCPU(15, desiredPodCPU), offsetCPU(15, desiredPodCPU), offsetMemory(15, desiredPodMem), offsetMemory(15, desiredPodMem))
+				originalPodResources = makePodResources(offsetCPU(30, originalCPU), offsetCPU(30, originalCPU), offsetMemory(30, originalMem), offsetMemory(30, originalMem))
+				desiredPodResources = makePodResources(offsetCPU(30, desiredPodCPU), offsetCPU(30, desiredPodCPU), offsetMemory(30, desiredPodMem), offsetMemory(30, desiredPodMem))
 			}
 
 			doPatchAndRollbackPLR(ctx, f, originalContainers, expectedContainers, originalPodResources, desiredPodResources, true, true)
@@ -445,6 +450,7 @@ var _ = SIGDescribe("PLR Pod InPlace Resize", framework.WithFeatureGate(features
 	doGuaranteedPodLevelResizeTests(f)
 	doBurstablePodLevelResizeTests(f)
 	doPodLevelResourcesMemoryLimitDecreaseTest(f)
+	doInitialCreationNoResizeEventTest(f)
 })
 
 func makePodResources(cpuReq, cpuLim, memReq, memLim string) *v1.ResourceRequirements {
@@ -636,6 +642,39 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 
 		ginkgo.By("deleting pod")
 		podClient.DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+	})
+}
+
+func doInitialCreationNoResizeEventTest(f *framework.Framework) {
+	framework.It("should not emit ResizeCompleted event on initial creation", framework.WithKubeletMinVersion("1.36"), func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		originalPLR := &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		}
+
+		containers := []podresize.ResizableContainerInfo{{
+			Name: "c1",
+		}}
+
+		ginkgo.By("creating and verifying pod")
+		testPod := createAndVerifyPodPLR(ctx, f, podClient, containers, originalPLR, true)
+
+		ginkgo.By("verifying no ResizeCompleted event was emitted")
+		events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).SearchWithContext(ctx, scheme.Scheme, testPod)
+		framework.ExpectNoError(err, "failed to list events")
+
+		for _, event := range events.Items {
+			if event.Reason == kubeletevents.ResizeCompleted {
+				framework.Failf("Unexpected ResizeCompleted event found for pod %s: %v", testPod.Name, event)
+			}
+		}
 	})
 }
 

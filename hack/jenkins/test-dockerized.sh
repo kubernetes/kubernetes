@@ -23,10 +23,6 @@ set -o pipefail
 # TODO: make test-integration should handle this automatically
 source ./hack/install-etcd.sh
 
-# TODO: drop KUBE_INTEGRATION_TEST_MAX_CONCURRENCY later when we've figured out 
-# stabilizing the tests / CI Setting this to a hardcoded value is fragile.
-export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
-
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 export LOG_LEVEL=4

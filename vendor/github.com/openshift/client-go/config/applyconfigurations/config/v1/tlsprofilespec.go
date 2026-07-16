@@ -21,6 +21,24 @@ type TLSProfileSpecApplyConfiguration struct {
 	// TLS 1.3 cipher suites (e.g. TLS_AES_128_GCM_SHA256) are not configurable
 	// and are always enabled when TLS 1.3 is negotiated.
 	Ciphers []string `json:"ciphers,omitempty"`
+	// groups is an optional, ordered field used to specify the supported groups (formerly known as
+	// elliptic curves) that are used during the TLS handshake.  The order of the groups represents
+	// a suggested preference, with the most preferred group first. Note that not all platform
+	// components honor the ordering: Go-based components use Go's internal preference order and
+	// treat this list as a filter of allowed groups rather than an ordered preference.
+	// Operators may remove entries their operands do not support.
+	//
+	// When omitted, this means no opinion and the platform is left to choose reasonable defaults which are
+	// subject to change over time and may be different per platform component depending on the underlying TLS
+	// libraries they use. If specified, the list must contain at least one and at most 7 groups,
+	// and each group must be unique.
+	//
+	// For example, to use X25519 and secp256r1 (yaml):
+	//
+	// groups:
+	// - X25519
+	// - secp256r1
+	Groups []configv1.TLSGroup `json:"groups,omitempty"`
 	// minTLSVersion is used to specify the minimal version of the TLS protocol
 	// that is negotiated during the TLS handshake. For example, to use TLS
 	// versions 1.1, 1.2 and 1.3 (yaml):
@@ -41,6 +59,16 @@ func TLSProfileSpec() *TLSProfileSpecApplyConfiguration {
 func (b *TLSProfileSpecApplyConfiguration) WithCiphers(values ...string) *TLSProfileSpecApplyConfiguration {
 	for i := range values {
 		b.Ciphers = append(b.Ciphers, values[i])
+	}
+	return b
+}
+
+// WithGroups adds the given value to the Groups field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Groups field.
+func (b *TLSProfileSpecApplyConfiguration) WithGroups(values ...configv1.TLSGroup) *TLSProfileSpecApplyConfiguration {
+	for i := range values {
+		b.Groups = append(b.Groups, values[i])
 	}
 	return b
 }

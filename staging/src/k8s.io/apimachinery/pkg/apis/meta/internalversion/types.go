@@ -89,6 +89,11 @@ type ListOptions struct {
 	// Defaults to true if `resourceVersion=""` or `resourceVersion="0"` (for backward
 	// compatibility reasons) and to false otherwise.
 	SendInitialEvents *bool
+
+	// ShardSelector is the raw shard selector string from the request.
+	// Parsing is deferred to the apiserver storage layer where the CEL
+	// parser dependency is available.
+	ShardSelector string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

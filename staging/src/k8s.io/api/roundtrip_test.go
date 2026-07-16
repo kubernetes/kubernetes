@@ -37,8 +37,6 @@ import (
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
-	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -73,7 +71,7 @@ import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
@@ -105,8 +103,6 @@ var groups = []runtime.SchemeBuilder{
 	authorizationv1.SchemeBuilder,
 	autoscalingv1.SchemeBuilder,
 	autoscalingv2.SchemeBuilder,
-	autoscalingv2beta1.SchemeBuilder,
-	autoscalingv2beta2.SchemeBuilder,
 	batchv1beta1.SchemeBuilder,
 	batchv1.SchemeBuilder,
 	certificatesv1.SchemeBuilder,
@@ -140,7 +136,7 @@ var groups = []runtime.SchemeBuilder{
 	resourcev1beta1.SchemeBuilder,
 	resourcev1beta2.SchemeBuilder,
 	resourcev1.SchemeBuilder,
-	schedulingv1alpha1.SchemeBuilder,
+	schedulingv1alpha2.SchemeBuilder,
 	schedulingv1beta1.SchemeBuilder,
 	schedulingv1.SchemeBuilder,
 	storagev1alpha1.SchemeBuilder,

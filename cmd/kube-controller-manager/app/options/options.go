@@ -26,12 +26,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/server/flagz"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	clientgofeaturegate "k8s.io/client-go/features"
 	clientset "k8s.io/client-go/kubernetes"
 	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
@@ -42,10 +40,10 @@ import (
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	basecompatibility "k8s.io/component-base/compatibility"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	cmoptions "k8s.io/controller-manager/options"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
@@ -80,6 +78,7 @@ type KubeControllerManagerOptions struct {
 	DaemonSetController                       *DaemonSetControllerOptions
 	DeploymentController                      *DeploymentControllerOptions
 	DeviceTaintEvictionController             *DeviceTaintEvictionControllerOptions
+	ResourceClaimController                   *ResourceClaimControllerOptions
 	StatefulSetController                     *StatefulSetControllerOptions
 	DeprecatedFlags                           *DeprecatedControllerOptions
 	EndpointController                        *EndpointControllerOptions
@@ -158,6 +157,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		DeviceTaintEvictionController: &DeviceTaintEvictionControllerOptions{
 			&componentConfig.DeviceTaintEvictionController,
+		},
+		ResourceClaimController: &ResourceClaimControllerOptions{
+			&componentConfig.ResourceClaimController,
 		},
 		StatefulSetController: &StatefulSetControllerOptions{
 			&componentConfig.StatefulSetController,
@@ -281,6 +283,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.CSRSigningController.AddFlags(fss.FlagSet(names.CertificateSigningRequestSigningController))
 	s.DeploymentController.AddFlags(fss.FlagSet(names.DeploymentController))
 	s.DeviceTaintEvictionController.AddFlags(fss.FlagSet(names.DeviceTaintEvictionController))
+	s.ResourceClaimController.AddFlags(fss.FlagSet(names.ResourceClaimController))
 	s.StatefulSetController.AddFlags(fss.FlagSet(names.StatefulSetController))
 	s.DaemonSetController.AddFlags(fss.FlagSet(names.DaemonSetController))
 	s.DeprecatedFlags.AddFlags(fss.FlagSet("deprecated"))
@@ -315,13 +318,6 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fss.FlagSet("generic").DurationVar(&s.ControllerShutdownTimeout, "controller-shutdown-timeout",
 		s.ControllerShutdownTimeout, "Time to wait for the controllers to shut down before terminating the executable")
 
-	if !utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient)) {
-		ver := version.MustParse("1.34")
-		if err := utilfeature.DefaultMutableFeatureGate.OverrideDefaultAtVersion(featuregate.Feature(clientgofeaturegate.WatchListClient), true, ver); err != nil {
-			panic(fmt.Sprintf("unable to set %s feature gate, err: %v", clientgofeaturegate.WatchListClient, err))
-		}
-	}
-
 	s.ComponentGlobalsRegistry.AddFlags(fss.FlagSet("generic"))
 	fs.StringVar(&s.OpenShiftContext.OpenShiftConfig, "openshift-config", s.OpenShiftContext.OpenShiftConfig, "indicates that this process should be compatible with openshift start master")
 	fs.MarkHidden("openshift-config")
@@ -354,6 +350,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 		return err
 	}
 	if err := s.DeviceTaintEvictionController.ApplyTo(&c.ComponentConfig.DeviceTaintEvictionController); err != nil {
+		return err
+	}
+	if err := s.ResourceClaimController.ApplyTo(&c.ComponentConfig.ResourceClaimController); err != nil {
 		return err
 	}
 	if err := s.StatefulSetController.ApplyTo(&c.ComponentConfig.StatefulSetController); err != nil {
@@ -459,6 +458,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.DaemonSetController.Validate()...)
 	errs = append(errs, s.DeploymentController.Validate()...)
 	errs = append(errs, s.DeviceTaintEvictionController.Validate()...)
+	errs = append(errs, s.ResourceClaimController.Validate()...)
 	errs = append(errs, s.StatefulSetController.Validate()...)
 	errs = append(errs, s.DeprecatedFlags.Validate()...)
 	errs = append(errs, s.EndpointController.Validate()...)
@@ -548,6 +548,7 @@ func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers
 	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
 	}
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultMutableFeatureGate)
 	s.Metrics.Apply()
 
 	if s.ParsedFlags != nil {

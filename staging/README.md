@@ -20,6 +20,7 @@ Repositories currently staged here:
 - [`k8s.io/controller-manager`](https://github.com/kubernetes/controller-manager)
 - [`k8s.io/cri-api`](https://github.com/kubernetes/cri-api)
 - [`k8s.io/cri-client`](https://github.com/kubernetes/cri-client)
+- [`k8s.io/cri-streaming`](https://github.com/kubernetes/cri-streaming)
 - [`k8s.io/csi-translation-lib`](https://github.com/kubernetes/csi-translation-lib)
 - [`k8s.io/dynamic-resource-allocation`](https://github.com/kubernetes/dynamic-resource-allocation)
 - [`k8s.io/endpointslice`](https://github.com/kubernetes/endpointslice)
@@ -62,7 +63,7 @@ import (
 ### Adding the staging repository in `kubernetes/kubernetes`:
 
 1. Send an email to the SIG Architecture [mailing
-   list](https://groups.google.com/forum/#!forum/kubernetes-sig-architecture)
+   list](https://groups.google.com/a/kubernetes.io/g/sig-architecture)
    and the mailing list of the SIG which would own the repo requesting approval
    for creating the staging repository.
 

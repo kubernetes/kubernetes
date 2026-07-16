@@ -12,39 +12,35 @@ import (
 )
 
 // BoolSliceValue converts a bool slice into an array with same elements as slice.
-func BoolSliceValue(v []bool) interface{} {
-	var zero bool
-	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero))).Elem()
+func BoolSliceValue(v []bool) any {
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[bool]())).Elem()
 	reflect.Copy(cp, reflect.ValueOf(v))
 	return cp.Interface()
 }
 
 // Int64SliceValue converts an int64 slice into an array with same elements as slice.
-func Int64SliceValue(v []int64) interface{} {
-	var zero int64
-	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero))).Elem()
+func Int64SliceValue(v []int64) any {
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[int64]())).Elem()
 	reflect.Copy(cp, reflect.ValueOf(v))
 	return cp.Interface()
 }
 
 // Float64SliceValue converts a float64 slice into an array with same elements as slice.
-func Float64SliceValue(v []float64) interface{} {
-	var zero float64
-	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero))).Elem()
+func Float64SliceValue(v []float64) any {
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[float64]())).Elem()
 	reflect.Copy(cp, reflect.ValueOf(v))
 	return cp.Interface()
 }
 
 // StringSliceValue converts a string slice into an array with same elements as slice.
-func StringSliceValue(v []string) interface{} {
-	var zero string
-	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero))).Elem()
+func StringSliceValue(v []string) any {
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[string]())).Elem()
 	reflect.Copy(cp, reflect.ValueOf(v))
 	return cp.Interface()
 }
 
 // AsBoolSlice converts a bool array into a slice into with same elements as array.
-func AsBoolSlice(v interface{}) []bool {
+func AsBoolSlice(v any) []bool {
 	rv := reflect.ValueOf(v)
 	if rv.Type().Kind() != reflect.Array {
 		return nil
@@ -57,7 +53,7 @@ func AsBoolSlice(v interface{}) []bool {
 }
 
 // AsInt64Slice converts an int64 array into a slice into with same elements as array.
-func AsInt64Slice(v interface{}) []int64 {
+func AsInt64Slice(v any) []int64 {
 	rv := reflect.ValueOf(v)
 	if rv.Type().Kind() != reflect.Array {
 		return nil
@@ -70,7 +66,7 @@ func AsInt64Slice(v interface{}) []int64 {
 }
 
 // AsFloat64Slice converts a float64 array into a slice into with same elements as array.
-func AsFloat64Slice(v interface{}) []float64 {
+func AsFloat64Slice(v any) []float64 {
 	rv := reflect.ValueOf(v)
 	if rv.Type().Kind() != reflect.Array {
 		return nil
@@ -83,7 +79,7 @@ func AsFloat64Slice(v interface{}) []float64 {
 }
 
 // AsStringSlice converts a string array into a slice into with same elements as array.
-func AsStringSlice(v interface{}) []string {
+func AsStringSlice(v any) []string {
 	rv := reflect.ValueOf(v)
 	if rv.Type().Kind() != reflect.Array {
 		return nil

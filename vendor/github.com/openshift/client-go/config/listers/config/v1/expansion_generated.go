@@ -14,6 +14,10 @@ type AuthenticationListerExpansion interface{}
 // BuildLister.
 type BuildListerExpansion interface{}
 
+// CRIOCredentialProviderConfigListerExpansion allows custom methods to be added to
+// CRIOCredentialProviderConfigLister.
+type CRIOCredentialProviderConfigListerExpansion interface{}
+
 // ClusterImagePolicyListerExpansion allows custom methods to be added to
 // ClusterImagePolicyLister.
 type ClusterImagePolicyListerExpansion interface{}

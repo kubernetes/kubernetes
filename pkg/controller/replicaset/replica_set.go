@@ -29,6 +29,7 @@ package replicaset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -61,6 +62,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -77,6 +79,17 @@ const (
 	// controllerUIDIndex is the name for the ReplicaSet store's index function,
 	// which is to index by ReplicaSet's controllerUID.
 	controllerUIDIndex = "controllerUID"
+)
+
+var (
+	replicaSetGroupResource = schema.GroupResource{
+		Group:    "apps",
+		Resource: "replicasets",
+	}
+	podGroupResource = schema.GroupResource{
+		Group:    "",
+		Resource: "pods",
+	}
 )
 
 // ReplicaSetController is responsible for synchronizing ReplicaSet objects stored
@@ -120,6 +133,8 @@ type ReplicaSetController struct {
 
 	clock clock.PassiveClock
 
+	consistencyStore consistencyutil.ConsistencyStore
+
 	// Controller specific features; see ReplicaSetControllerFeatures for details.
 	controllerFeatures ReplicaSetControllerFeatures
 }
@@ -143,6 +158,32 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 	if err := metrics.Register(legacyregistry.Register); err != nil {
 		logger.Error(err, "unable to register metrics")
 	}
+
+	var consistencyStore consistencyutil.ConsistencyStore
+	var podWriteCallback func(pod *v1.Pod, rs *metav1.OwnerReference)
+	if utilfeature.DefaultFeatureGate.Enabled(features.StaleControllerConsistencyReplicaSet) {
+		consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
+			podGroupResource:        podInformer.Informer().GetStore(),
+			replicaSetGroupResource: rsInformer.Informer().GetStore(),
+		})
+		podWriteCallback = func(pod *v1.Pod, rs *metav1.OwnerReference) {
+			if rs == nil {
+				return
+			}
+			consistencyStore.WroteAt(
+				types.NamespacedName{
+					Namespace: pod.Namespace,
+					Name:      rs.Name,
+				},
+				rs.UID,
+				podGroupResource,
+				pod.ResourceVersion,
+			)
+		}
+	} else {
+		consistencyStore = consistencyutil.NewNoopConsistencyStore()
+	}
+
 	return NewBaseController(logger, rsInformer, podInformer, kubeClient, burstReplicas,
 		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
@@ -150,16 +191,18 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 		controller.RealPodControl{
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
+			OnWrite:    podWriteCallback,
 		},
 		eventBroadcaster,
 		DefaultReplicaSetControllerFeatures(),
+		consistencyStore,
 	)
 }
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
 func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
-	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster, controllerFeatures ReplicaSetControllerFeatures) *ReplicaSetController {
+	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster, controllerFeatures ReplicaSetControllerFeatures, consistencyStore consistencyutil.ConsistencyStore) *ReplicaSetController {
 
 	rsc := &ReplicaSetController{
 		GroupVersionKind: gvk,
@@ -174,6 +217,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		),
 		clock:              clock.RealClock{},
 		controllerFeatures: controllerFeatures,
+		consistencyStore:   consistencyStore,
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -405,6 +449,10 @@ func (rsc *ReplicaSetController) deleteRS(logger klog.Logger, obj interface{}) {
 
 	logger.V(4).Info("Deleting", "replicaSet", klog.KObj(rs))
 
+	rsc.consistencyStore.Clear(types.NamespacedName{
+		Namespace: rs.Namespace,
+		Name:      rs.Name,
+	}, rs.UID)
 	// Delete expectations for the ReplicaSet so if we create a new one with the same name it starts clean
 	rsc.expectations.DeleteExpectations(logger, key)
 
@@ -715,9 +763,22 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	if err != nil {
 		return err
 	}
+	rsNamespacedName := types.NamespacedName{Namespace: namespace, Name: name}
+	if err := rsc.consistencyStore.EnsureReady(rsNamespacedName); err != nil {
+		var consistencyErr *consistencyutil.ConsistencyError
+		if errors.As(err, &consistencyErr) {
+			metrics.ReplicaSetRequeueSkips.WithLabelValues(
+				consistencyErr.GroupResource.Group,
+				consistencyErr.GroupResource.Resource,
+			).Inc()
+		}
+		return err
+	}
+
 	rs, err := rsc.rsLister.ReplicaSets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
 		logger.V(4).Info("deleted", "kind", rsc.Kind, "key", key)
+		rsc.consistencyStore.Clear(rsNamespacedName, "")
 		rsc.expectations.DeleteExpectations(logger, key)
 		return nil
 	}
@@ -769,6 +830,12 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		// Returning an error causes a requeue without forcing a hotloop
 		return err
 	}
+	rsc.consistencyStore.WroteAt(
+		types.NamespacedName{Name: rs.Name, Namespace: rs.Namespace},
+		rs.UID,
+		replicaSetGroupResource,
+		updatedRS.ResourceVersion,
+	)
 	if manageReplicasErr != nil {
 		return manageReplicasErr
 	}

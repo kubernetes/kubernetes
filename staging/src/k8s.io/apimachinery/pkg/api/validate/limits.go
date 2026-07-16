@@ -18,6 +18,8 @@ package validate
 
 import (
 	"context"
+	"math"
+	"unicode/utf8"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
@@ -31,9 +33,40 @@ func MaxLength[T ~string](_ context.Context, _ operation.Operation, fldPath *fie
 	if value == nil {
 		return nil
 	}
-	if len(*value) > max {
-		return field.ErrorList{field.TooLong(fldPath, *value, max).WithOrigin("maxLength")}
+
+	// if the length of the value in bytes is less
+	// than the maximum size then we can confidently
+	// say that this value is within the bounds
+	// enforced by the maximum value regardless
+	// of the actual makeup of characters in the value
+	byteLength := len(*value)
+	if byteLength <= max {
+		return nil
 	}
+
+	// because runes are up to 4 byte characters, if we assume all characters
+	// in the input are runes, the minimum number of characters that
+	// are specified is len(value)/4. If the minimum multi-byte
+	// character count is greater than our enforced maximum, we
+	// can confidently say that the value is invalid without having
+	// to actually perform the more expensive rune counting step
+	minimum := int(math.Ceil(float64(byteLength) / 4.0))
+	if minimum > max || utf8.RuneCountInString(string(*value)) > max {
+		return field.ErrorList{field.TooLongCharacters(fldPath, *value, max).WithOrigin("maxLength")}
+	}
+	return nil
+}
+
+// MaxBytes verifies that the specified value is not longer than max bytes.
+func MaxBytes[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, max int) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+
+	if len(*value) > max {
+		return field.ErrorList{field.TooLong(fldPath, *value, max).WithOrigin("maxBytes")}
+	}
+
 	return nil
 }
 
@@ -45,6 +78,14 @@ func MaxItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Pa
 	return nil
 }
 
+// MinItems verifies that the specified slice is not shorter than min items.
+func MinItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, min int) field.ErrorList {
+	if len(value) < min {
+		return field.ErrorList{field.TooFew(fldPath, len(value), min).WithOrigin("minItems")}
+	}
+	return nil
+}
+
 // Minimum verifies that the specified value is greater than or equal to min.
 func Minimum[T constraints.Integer](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, min T) field.ErrorList {
 	if value == nil {
@@ -52,6 +93,48 @@ func Minimum[T constraints.Integer](_ context.Context, _ operation.Operation, fl
 	}
 	if *value < min {
 		return field.ErrorList{field.Invalid(fldPath, *value, content.MinError(min)).WithOrigin("minimum")}
+	}
+	return nil
+}
+
+// Maximum verifies that the specified value is less than or equal to max.
+func Maximum[T constraints.Integer](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, max T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	if *value > max {
+		return field.ErrorList{field.Invalid(fldPath, *value, content.MaxError(max)).WithOrigin("maximum")}
+	}
+	return nil
+}
+
+// MinLength verifies that the specified value is at least min characters, if non-nil.
+func MinLength[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, min int) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+
+	byteLength := len(*value)
+
+	// because runes are up to 4 byte characters, if we assume all characters
+	// in the input are 4 byte runes, the minimum number of characters that
+	// are specified is len(value)/4. If the minimum multi-byte
+	// character count is greater than or equal to our enforced minimum, we
+	// can confidently say that the value is valid without having
+	// to actually perform the more expensive rune counting step
+	if int(math.Ceil(float64(byteLength)/4.0)) >= min {
+		return nil
+	}
+
+	// if the length of the value in bytes is less
+	// than the minimum size then we can confidently
+	// say that this value is not within the bounds
+	// enforced by the maximum value regardless
+	// of the actual makeup of characters in the value.
+	// Otherwise, perform a rune count to determine if the
+	// number of characters is less than the minimum.
+	if byteLength < min || utf8.RuneCountInString(string(*value)) < min {
+		return field.ErrorList{field.TooShort(fldPath, *value, min).WithOrigin("minLength")}
 	}
 	return nil
 }

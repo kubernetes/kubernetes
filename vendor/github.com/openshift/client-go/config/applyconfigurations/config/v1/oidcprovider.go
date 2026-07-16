@@ -26,6 +26,27 @@ type OIDCProviderApplyConfiguration struct {
 	// If any rule in the chain of rules evaluates to 'false', authentication will fail.
 	// When specified, at least one rule must be specified and no more than 64 rules may be specified.
 	UserValidationRules []TokenUserValidationRuleApplyConfiguration `json:"userValidationRules,omitempty"`
+	// externalClaimsSources is an optional field that can be used to configure
+	// sources, external to the token provided in a request, in which claims
+	// should be fetched from and made available to the claim mapping process
+	// that is used to build the identity of a token holder.
+	//
+	// For example, fetching additional user metadata from an OIDC provider's UserInfo endpoint.
+	//
+	// When not specified, only claims present in the token itself will be available
+	// in the claim mapping process.
+	//
+	// When specified, at least one external claim source must be specified and no more than 5
+	// sources may be specified.
+	// All external claim sources must have unique claim mappings.
+	// When an external source responds and resolves additional claims successfully, they will
+	// be made available as claims during the claim mapping process.
+	// Externally sourced claims with the same name as a claim existing within the token will
+	// overwrite the claim data from the token with the externally sourced information.
+	// If an external source does not respond, responds with an error, or the additional
+	// claim data cannot be resolved from the response successfully it will not be
+	// included in the claim data passed to the claim mapping process.
+	ExternalClaimsSources []ExternalClaimsSourceApplyConfiguration `json:"externalClaimsSources,omitempty"`
 }
 
 // OIDCProviderApplyConfiguration constructs a declarative configuration of the OIDCProvider type for use with
@@ -93,6 +114,19 @@ func (b *OIDCProviderApplyConfiguration) WithUserValidationRules(values ...*Toke
 			panic("nil value passed to WithUserValidationRules")
 		}
 		b.UserValidationRules = append(b.UserValidationRules, *values[i])
+	}
+	return b
+}
+
+// WithExternalClaimsSources adds the given value to the ExternalClaimsSources field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ExternalClaimsSources field.
+func (b *OIDCProviderApplyConfiguration) WithExternalClaimsSources(values ...*ExternalClaimsSourceApplyConfiguration) *OIDCProviderApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithExternalClaimsSources")
+		}
+		b.ExternalClaimsSources = append(b.ExternalClaimsSources, *values[i])
 	}
 	return b
 }

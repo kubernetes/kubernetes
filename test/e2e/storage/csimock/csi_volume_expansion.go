@@ -172,7 +172,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					framework.ExpectNoError(err, "while waiting for PVC resize to finish")
 
 					pvcConditions := pvc.Status.Conditions
-					gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+					testsuites.ExpectNoResizeConditions(pvcConditions)
 				}
 
 				// if node expansion is not required PVC should be resized as well
@@ -331,7 +331,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
 
 				pvcConditions := pvc.Status.Conditions
-				gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+				testsuites.ExpectNoResizeConditions(pvcConditions)
 			})
 		}
 	})
@@ -392,7 +392,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 				pvcConditions := pvc.Status.Conditions
-				gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+				testsuites.ExpectNoResizeConditions(pvcConditions)
 
 			})
 		}
@@ -699,7 +699,7 @@ func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim
 	framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 	pvcConditions := pvc.Status.Conditions
-	gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+	testsuites.ExpectNoResizeConditions(pvcConditions)
 	allocatedResource := pvc.Status.AllocatedResources.Storage()
 	gomega.Expect(allocatedResource).NotTo(gomega.BeNil())
 	expectedAllocatedResource := resource.MustParse(expectedAllocatedSize)

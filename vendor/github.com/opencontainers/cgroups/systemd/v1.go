@@ -2,6 +2,7 @@ package systemd
 
 import (
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,9 +98,17 @@ func genV1ResourcesProperties(r *cgroups.Resources, cm *dbusConnManager) ([]syst
 			newProp("BlockIOWeight", uint64(r.BlkioWeight)))
 	}
 
-	if r.PidsLimit > 0 || r.PidsLimit == -1 {
+	if r.PidsLimit != nil {
+		var tasksMax uint64
+		if limit := *r.PidsLimit; limit < 0 {
+			tasksMax = math.MaxUint64 // "infinity"
+		} else if limit == 0 {
+			tasksMax = 1 // systemd does not accept "0" for TasksMax
+		} else {
+			tasksMax = uint64(limit)
+		}
 		properties = append(properties,
-			newProp("TasksMax", uint64(r.PidsLimit)))
+			newProp("TasksMax", tasksMax))
 	}
 
 	err = addCpuset(cm, &properties, r.CpusetCpus, r.CpusetMems)
@@ -213,6 +222,25 @@ func (m *LegacyManager) Apply(pid int) error {
 	}
 
 	return nil
+}
+
+// AddPid adds a process with a given pid to an existing cgroup.
+// The subcgroup argument is either empty, or a path relative to
+// a cgroup under under the manager's cgroup.
+func (m *LegacyManager) AddPid(subcgroup string, pid int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if err := addPid(m.dbus, getUnitName(m.cgroups), subcgroup, pid); err != nil {
+		return err
+	}
+
+	// Since systemd only joins controllers it knows, use cgroupfs for the rest.
+	fsMgr, err := fs.NewManager(m.cgroups, m.paths)
+	if err != nil {
+		return err
+	}
+	return fsMgr.AddPid(subcgroup, pid)
 }
 
 func (m *LegacyManager) Destroy() error {

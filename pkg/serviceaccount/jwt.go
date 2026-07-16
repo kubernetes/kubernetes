@@ -40,10 +40,10 @@ import (
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
 type ServiceAccountTokenGetter interface {
-	GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error)
-	GetPod(namespace, name string) (*v1.Pod, error)
-	GetSecret(namespace, name string) (*v1.Secret, error)
-	GetNode(name string) (*v1.Node, error)
+	GetServiceAccount(ctx context.Context, namespace, name string) (*v1.ServiceAccount, error)
+	GetPod(ctx context.Context, namespace, name string) (*v1.Pod, error)
+	GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error)
+	GetNode(ctx context.Context, name string) (*v1.Node, error)
 }
 
 type TokenGenerator interface {

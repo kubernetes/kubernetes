@@ -17,7 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -189,8 +188,8 @@ func TestValidateWorkload(t *testing.T) {
 		"no controllerRef": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.ControllerRef = nil
 		}),
-		"no controllerRef apiGroup": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.ControllerRef.APIGroup = ""
+		"no scheduling constraints": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroupTemplates[1].SchedulingConstraints = nil
 		}),
 	}
 	for name, workload := range successCases {
@@ -200,89 +199,74 @@ func TestValidateWorkload(t *testing.T) {
 		}
 	}
 
-	failureCases := map[string]*scheduling.Workload{
-		"no name": mkWorkload(func(w *scheduling.Workload) {
-			w.Name = ""
-		}),
-		"invalid name": mkWorkload(func(w *scheduling.Workload) {
-			w.Name = ".workload"
-		}),
-		"too long name": mkWorkload(func(w *scheduling.Workload) {
-			w.Name = strings.Repeat("w", 254)
-		}),
-		"no namespace": mkWorkload(func(w *scheduling.Workload) {
-			w.Namespace = ""
-		}),
-		"invalid namespace": mkWorkload(func(w *scheduling.Workload) {
-			w.Namespace = ".ns"
-		}),
-		"too long namespace": mkWorkload(func(w *scheduling.Workload) {
-			w.Namespace = strings.Repeat("n", 64)
-		}),
-		"invalid controllerRef apiGroup": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.ControllerRef.APIGroup = ".group"
-		}),
-		"too long controllerRef apiGroup": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.ControllerRef.APIGroup = strings.Repeat("g", 254)
-		}),
-		"no controllerRef kind": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.ControllerRef.Kind = ""
-		}),
-		"invalid controllerRef kind": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.ControllerRef.Kind = "/foo"
-		}),
-		"no controllerRef name": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.ControllerRef.Name = ""
-		}),
-		"invalid controllerRef name": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.ControllerRef.Name = "/baz"
-		}),
-		"no pod groups": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups = nil
-		}),
-		"too many pod groups": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups = nil
-			for i := 0; i < scheduling.WorkloadMaxPodGroups+1; i++ {
-				w.Spec.PodGroups = append(w.Spec.PodGroups, scheduling.PodGroup{
-					Name: fmt.Sprintf("group-%v", i),
-					Policy: scheduling.PodGroupPolicy{
-						Basic: &scheduling.BasicSchedulingPolicy{},
-					},
-				})
-			}
-		}),
-		"no pod group name": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups[0].Name = ""
-		}),
-		"invalid pod group name": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups[0].Name = ".group1"
-		}),
-		"too long pod group name": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups[0].Name = strings.Repeat("g", 64)
-		}),
-		"no policy set": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups[0].Policy = scheduling.PodGroupPolicy{}
-		}),
-		"two policies": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups[0].Policy.Gang = &scheduling.GangSchedulingPolicy{
-				MinCount: 2,
-			}
-		}),
-		"zero min count in gang": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups[1].Policy.Gang.MinCount = 0
-		}),
-		"negative min count in gang": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups[1].Policy.Gang.MinCount = -1
-		}),
-		"two pod groups with the same name": mkWorkload(func(w *scheduling.Workload) {
-			w.Spec.PodGroups[1].Name = w.Spec.PodGroups[0].Name
-		}),
+	failureCases := map[string]struct {
+		workload     *scheduling.Workload
+		expectedErrs field.ErrorList
+	}{
+		"no name": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Name = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata", "name"), "name or generateName is required"),
+			},
+		},
+		"invalid name": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Name = ".workload"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), ".workload", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"too long name": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Name = strings.Repeat("w", 254)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), ".name", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"no namespace": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Namespace = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata", "namespace"), "Required value"),
+			},
+		},
+		"invalid namespace": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Namespace = ".ns"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "namespace"), ".ns", "a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"too long namespace": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Namespace = strings.Repeat("n", 64)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "namespace"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
 	}
-	for name, workload := range failureCases {
-		errs := ValidateWorkload(workload)
-		if len(errs) == 0 {
-			t.Errorf("Expected failure for %q", name)
-		}
+
+	for name, tc := range failureCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateWorkload(tc.workload)
+			if len(errs) == 0 {
+				t.Errorf("Expected failure")
+				return
+			}
+			if len(errs) != len(tc.expectedErrs) {
+				t.Errorf("Expected %d errors, got %d: %v", len(tc.expectedErrs), len(errs), errs)
+				return
+			}
+			matcher := field.ErrorMatcher{}.ByType().ByField()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
 	}
 }
 
@@ -293,12 +277,6 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 	}{
 		"no change": {
 			old:    mkWorkload(),
-			update: mkWorkload(),
-		},
-		"set controller ref": {
-			old: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef = nil
-			}),
 			update: mkWorkload(),
 		},
 	}
@@ -327,47 +305,6 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 				w.Namespace += "bar"
 			}),
 		},
-		"change pod group name": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[0].Name += "bar"
-			}),
-		},
-		"add pod group": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups = append(w.Spec.PodGroups, scheduling.PodGroup{
-					Name: "group3",
-					Policy: scheduling.PodGroupPolicy{
-						Basic: &scheduling.BasicSchedulingPolicy{},
-					},
-				})
-			}),
-		},
-		"delete pod group": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups = w.Spec.PodGroups[:1]
-			}),
-		},
-		"change gang min count": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroups[1].Policy.Gang.MinCount = 5
-			}),
-		},
-		"change controllerRef": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef.Kind += "bar"
-			}),
-		},
-		"delete controllerRef": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef = nil
-			}),
-		},
 	}
 	for name, tc := range failureCases {
 		tc.old.ResourceVersion = "0"
@@ -389,16 +326,26 @@ func mkWorkload(tweaks ...func(w *scheduling.Workload)) *scheduling.Workload {
 				Kind:     "foo",
 				Name:     "baz",
 			},
-			PodGroups: []scheduling.PodGroup{{
+			PodGroupTemplates: []scheduling.PodGroupTemplate{{
 				Name: "group1",
-				Policy: scheduling.PodGroupPolicy{
+				SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 					Basic: &scheduling.BasicSchedulingPolicy{},
+				},
+				SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{
+						{Key: "foo"},
+					},
 				},
 			}, {
 				Name: "group2",
-				Policy: scheduling.PodGroupPolicy{
+				SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 					Gang: &scheduling.GangSchedulingPolicy{
 						MinCount: 2,
+					},
+				},
+				SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{
+						{Key: "foo"},
 					},
 				},
 			}},
@@ -408,4 +355,348 @@ func mkWorkload(tweaks ...func(w *scheduling.Workload)) *scheduling.Workload {
 		tweak(w)
 	}
 	return w
+}
+
+func TestValidatePodGroup(t *testing.T) {
+	successCases := map[string]*scheduling.PodGroup{
+		"gang policy": mkPodGroup(),
+		"no scheduling constraints": mkPodGroup(func(pg *scheduling.PodGroup) {
+			pg.Spec.SchedulingConstraints = nil
+		}),
+	}
+	for name, podGroup := range successCases {
+		errs := ValidatePodGroup(podGroup)
+		if len(errs) != 0 {
+			t.Errorf("Expected success for %q: %v", name, errs)
+		}
+	}
+
+	failureCases := map[string]struct {
+		podGroup     *scheduling.PodGroup
+		expectedErrs field.ErrorList
+	}{
+		"no name": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Name = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata", "name"), "name or generateName is required"),
+			},
+		},
+		"invalid name": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Name = ".podGroup"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), ".podGroup", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"too long name": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Name = strings.Repeat("w", 254)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), ".name", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"no namespace": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Namespace = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata", "namespace"), "Required value"),
+			},
+		},
+		"invalid namespace": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Namespace = ".ns"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "namespace"), ".ns", "a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"too long namespace": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Namespace = strings.Repeat("n", 64)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "namespace"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+	}
+
+	for name, tc := range failureCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidatePodGroup(tc.podGroup)
+			if len(errs) == 0 {
+				t.Errorf("Expected failure")
+				return
+			}
+			if len(errs) != len(tc.expectedErrs) {
+				t.Errorf("Expected %d errors, got %d: %v", len(tc.expectedErrs), len(errs), errs)
+				return
+			}
+			matcher := field.ErrorMatcher{}.ByType().ByField()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
+func TestValidatePodGroupUpdate(t *testing.T) {
+	successCases := map[string]struct {
+		old    *scheduling.PodGroup
+		update *scheduling.PodGroup
+	}{
+		"no change": {
+			old:    mkPodGroup(),
+			update: mkPodGroup(),
+		},
+		"status update": {
+			old: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Status.Conditions = append(pg.Status.Conditions, metav1.Condition{
+					Type:               scheduling.PodGroupScheduled,
+					Status:             metav1.ConditionFalse,
+					Reason:             scheduling.PodGroupReasonUnschedulable,
+					Message:            "Test status condition message",
+					LastTransitionTime: metav1.Now(),
+				})
+			}),
+			update: mkPodGroup(),
+		},
+	}
+	for name, tc := range successCases {
+		tc.old.ResourceVersion = "0"
+		tc.update.ResourceVersion = "1"
+		errs := ValidatePodGroupUpdate(tc.update, tc.old)
+		if len(errs) != 0 {
+			t.Errorf("Expected success for %q: %v", name, errs)
+		}
+	}
+
+	failureCases := map[string]struct {
+		old    *scheduling.PodGroup
+		update *scheduling.PodGroup
+	}{
+		"change name": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Name += "bar"
+			}),
+		},
+		"change namespace": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Namespace += "bar"
+			}),
+		},
+	}
+	for name, tc := range failureCases {
+		tc.old.ResourceVersion = "0"
+		tc.update.ResourceVersion = "1"
+		errs := ValidatePodGroupUpdate(tc.update, tc.old)
+		if len(errs) == 0 {
+			t.Errorf("Expected failure for %q", name)
+		}
+	}
+}
+
+func TestValidatePodGroupStatusUpdate(t *testing.T) {
+	now := metav1.Now()
+	successCases := map[string]struct {
+		old    *scheduling.PodGroup
+		update *scheduling.PodGroup
+	}{
+		"no change": {
+			old:    mkPodGroup(),
+			update: mkPodGroup(),
+		},
+		"status update": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Status.Conditions = append(pg.Status.Conditions, metav1.Condition{
+					Type:               scheduling.PodGroupScheduled,
+					Status:             metav1.ConditionFalse,
+					Reason:             scheduling.PodGroupReasonUnschedulable,
+					Message:            "Test status condition message",
+					LastTransitionTime: now,
+				})
+			}),
+		},
+		"ok resource claim status": {
+			old: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.ResourceClaims = []scheduling.PodGroupResourceClaim{
+					{Name: "my-claim", ResourceClaimName: new("a-claim")},
+					{Name: "my-other-claim", ResourceClaimName: new("a-claim")},
+				}
+			}),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.ResourceClaims = []scheduling.PodGroupResourceClaim{
+					{Name: "my-claim", ResourceClaimName: new("a-claim")},
+					{Name: "my-other-claim", ResourceClaimName: new("a-claim")},
+				}
+				pg.Status.ResourceClaimStatuses = []scheduling.PodGroupResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: new("foo-my-claim-12345")},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+				}
+			}),
+		},
+	}
+	for name, tc := range successCases {
+		tc.old.ResourceVersion = "0"
+		tc.update.ResourceVersion = "1"
+		errs := ValidatePodGroupUpdate(tc.update, tc.old)
+		if len(errs) != 0 {
+			t.Errorf("Expected success for %q: %v", name, errs)
+		}
+	}
+
+	failureCases := map[string]struct {
+		old    *scheduling.PodGroup
+		update *scheduling.PodGroup
+	}{
+		"change name": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Name += "bar"
+			}),
+		},
+		"change namespace": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Namespace += "bar"
+			}),
+		},
+		"two conditions with the same type": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				condition := metav1.Condition{
+					Type:               scheduling.PodGroupScheduled,
+					Status:             metav1.ConditionFalse,
+					Reason:             scheduling.PodGroupReasonUnschedulable,
+					Message:            "Test status condition message",
+					LastTransitionTime: now,
+				}
+				pg.Status.Conditions = append(pg.Status.Conditions, condition, condition)
+			}),
+		},
+		"unrecognized condition status": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				conditions := []metav1.Condition{
+					{
+						Type:               scheduling.PodGroupScheduled,
+						Status:             metav1.ConditionStatus("TrueOrFalse"),
+						Reason:             scheduling.PodGroupReasonUnschedulable,
+						Message:            "Test status condition message",
+						LastTransitionTime: now,
+					},
+				}
+				pg.Status.Conditions = append(pg.Status.Conditions, conditions...)
+			}),
+		},
+		"empty condition reason": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				conditions := []metav1.Condition{
+					{
+						Type:               scheduling.PodGroupScheduled,
+						Status:             metav1.ConditionFalse,
+						Message:            "Test status condition message",
+						LastTransitionTime: now,
+					},
+				}
+				pg.Status.Conditions = append(pg.Status.Conditions, conditions...)
+			}),
+		},
+		"improper condition reason format": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				conditions := []metav1.Condition{
+					{
+						Type:               scheduling.PodGroupScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             "Sche duled",
+						Message:            "Test status condition message",
+						LastTransitionTime: now,
+					},
+				}
+				pg.Status.Conditions = append(pg.Status.Conditions, conditions...)
+			}),
+		},
+		"too long condition reason": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				conditions := []metav1.Condition{
+					{
+						Type:               scheduling.PodGroupScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             strings.Repeat("a", 1024+1),
+						Message:            "Test status condition message",
+						LastTransitionTime: now,
+					},
+				}
+				pg.Status.Conditions = append(pg.Status.Conditions, conditions...)
+			}),
+		},
+		"too long condition message": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				conditions := []metav1.Condition{
+					{
+						Type:               scheduling.PodGroupScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             scheduling.PodGroupReasonUnschedulable,
+						Message:            strings.Repeat("a", 32*1024+1),
+						LastTransitionTime: now,
+					},
+				}
+				pg.Status.Conditions = append(pg.Status.Conditions, conditions...)
+			}),
+		},
+		"non-existent resource claim in status": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Status.ResourceClaimStatuses = []scheduling.PodGroupResourceClaimStatus{
+					{Name: "no-such-claim", ResourceClaimName: new("my-claim")},
+				}
+			}),
+		},
+	}
+	for name, tc := range failureCases {
+		tc.old.ResourceVersion = "0"
+		tc.update.ResourceVersion = "1"
+		errs := ValidatePodGroupStatusUpdate(tc.update, tc.old)
+		if len(errs) == 0 {
+			t.Errorf("Expected failure for %q", name)
+		}
+	}
+}
+
+// mkPodGroup produces a PodGroup which passes validation with no tweaks.
+func mkPodGroup(tweaks ...func(pg *scheduling.PodGroup)) *scheduling.PodGroup {
+	pg := &scheduling.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
+		Spec: scheduling.PodGroupSpec{
+			PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
+				Workload: &scheduling.WorkloadPodGroupTemplateReference{
+					WorkloadName:         "w",
+					PodGroupTemplateName: "t1",
+				},
+			},
+			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+				Gang: &scheduling.GangSchedulingPolicy{
+					MinCount: 5,
+				},
+			},
+			SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+				Topology: []scheduling.TopologyConstraint{
+					{Key: "foo"},
+				},
+			},
+		},
+	}
+	for _, tweak := range tweaks {
+		tweak(pg)
+	}
+	return pg
 }

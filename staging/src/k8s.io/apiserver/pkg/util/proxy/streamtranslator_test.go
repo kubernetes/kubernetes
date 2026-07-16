@@ -28,6 +28,7 @@ import (
 	mrand "math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"net/url"
 	"reflect"
 	"strings"
@@ -37,8 +38,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	rcconstants "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/proxy/metrics"
@@ -47,6 +46,8 @@ import (
 	"k8s.io/client-go/transport"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/streaming/pkg/httpstream"
+	"k8s.io/streaming/pkg/httpstream/spdy"
 )
 
 // TestStreamTranslator_LoopbackStdinToStdout returns random data sent on the client's
@@ -61,7 +62,7 @@ func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
 	t.Cleanup(metrics.ResetForTest)
 	// Create upstream fake SPDY server which copies STDIN back onto STDOUT stream.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
+		ctx, err := createSPDYServerStreams(t, w, req, Options{
 			Stdin:  true,
 			Stdout: true,
 		})
@@ -162,7 +163,7 @@ func TestStreamTranslator_LoopbackStdinToStderr(t *testing.T) {
 	t.Cleanup(metrics.ResetForTest)
 	// Create upstream fake SPDY server which copies STDIN back onto STDERR stream.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
+		ctx, err := createSPDYServerStreams(t, w, req, Options{
 			Stdin:  true,
 			Stderr: true,
 		})
@@ -267,7 +268,7 @@ func TestStreamTranslator_ErrorStream(t *testing.T) {
 	// Create upstream fake SPDY server, returning a non-zero exit code
 	// on error stream within the structured error.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
+		ctx, err := createSPDYServerStreams(t, w, req, Options{
 			Stdout: true,
 		})
 		if err != nil {
@@ -373,7 +374,7 @@ func TestStreamTranslator_MultipleReadChannels(t *testing.T) {
 	t.Cleanup(metrics.ResetForTest)
 	// Create upstream fake SPDY server which copies STDIN back onto STDOUT and STDERR stream.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
+		ctx, err := createSPDYServerStreams(t, w, req, Options{
 			Stdin:  true,
 			Stdout: true,
 			Stderr: true,
@@ -478,7 +479,7 @@ apiserver_stream_translator_requests_total{code="200"} 1
 func TestStreamTranslator_ThrottleReadChannels(t *testing.T) {
 	// Create upstream fake SPDY server which copies STDIN back onto STDOUT and STDERR stream.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
+		ctx, err := createSPDYServerStreams(t, w, req, Options{
 			Stdin:  true,
 			Stdout: true,
 			Stderr: true,
@@ -621,7 +622,7 @@ func TestStreamTranslator_TTYResizeChannel(t *testing.T) {
 	actualTerminalSizes := make([]remotecommand.TerminalSize, 0, numSizeQueue)
 	// Create upstream fake SPDY server which copies STDIN back onto STDERR stream.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
+		ctx, err := createSPDYServerStreams(t, w, req, Options{
 			Tty: true,
 		})
 		if err != nil {
@@ -871,9 +872,23 @@ type streamAndReply struct {
 // connection with remote command streams defined in passed options. Returns a streamContext
 // structure containing the Reader/Writer streams to communicate through the SDPY connection.
 // Returns an error if unable to upgrade the HTTP connection to a SPDY connection.
-func createSPDYServerStreams(w http.ResponseWriter, req *http.Request, opts Options) (*streamContext, error) {
+func createSPDYServerStreams(t *testing.T, w http.ResponseWriter, req *http.Request, opts Options) (*streamContext, error) {
 	_, err := httpstream.Handshake(req, w, []string{rcconstants.StreamProtocolV4Name})
 	if err != nil {
+		t.Log("------------------- [DEBUG] HANDSHAKE FAILED -------------------")
+		t.Logf("Method:        %s", req.Method)
+		t.Logf("URL:           %s", req.URL.String())
+		t.Logf("Proto:         %s", req.Proto)
+		t.Logf("Header Count:  %d", len(req.Header))
+		t.Logf("ContentLength: %d", req.ContentLength) // Should be zero for upgrade request
+		// Dump the request in its entirety.
+		dump, err := httputil.DumpRequest(req, true)
+		if err != nil {
+			t.Logf("DumpRequest failed: %v", err)
+		} else {
+			t.Logf("Full HTTP Request Dump:\n%s", dump)
+		}
+
 		return nil, err
 	}
 
@@ -956,20 +971,11 @@ func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) err
 	}
 }
 
-func fakeTransport() (*http.Transport, error) {
+func fakeTransport() (http.RoundTripper, error) {
 	cfg := &transport.Config{
 		TLS: transport.TLSConfig{
 			Insecure: true,
-			CAFile:   "",
 		},
 	}
-	rt, err := transport.New(cfg)
-	if err != nil {
-		return nil, err
-	}
-	t, ok := rt.(*http.Transport)
-	if !ok {
-		return nil, fmt.Errorf("unknown transport type: %T", rt)
-	}
-	return t, nil
+	return transport.New(cfg)
 }

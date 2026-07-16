@@ -27,6 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgofeaturegate "k8s.io/client-go/features"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -141,6 +142,11 @@ type Controller interface {
 	// HasSynced delegates to the Config's Queue
 	HasSynced() bool
 
+	// HasSyncedChecker enables waiting for syncing without polling.
+	// The returned DoneChecker can be passed to WaitFor.
+	// It delegates to the Config's Queue.
+	HasSyncedChecker() DoneChecker
+
 	// LastSyncResourceVersion delegates to the Reflector when there
 	// is one, otherwise returns the empty string
 	LastSyncResourceVersion() string
@@ -167,11 +173,13 @@ func (c *controller) RunWithContext(ctx context.Context) {
 		<-ctx.Done()
 		c.config.Queue.Close()
 	}()
+	logger := klog.FromContext(ctx)
 	r := NewReflectorWithOptions(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
+			Logger:          &logger,
 			ResyncPeriod:    c.config.FullResyncPeriod,
 			MinWatchTimeout: c.config.MinWatchTimeout,
 			TypeDescription: c.config.ObjectDescription,
@@ -205,6 +213,13 @@ func (c *controller) HasSynced() bool {
 	return c.config.Queue.HasSynced()
 }
 
+// HasSyncedChecker enables waiting for syncing without polling.
+// The returned DoneChecker can be passed to [WaitFor].
+// It delegates to the Config's Queue.
+func (c *controller) HasSyncedChecker() DoneChecker {
+	return c.config.Queue.HasSyncedChecker()
+}
+
 func (c *controller) LastSyncResourceVersion() string {
 	c.reflectorMutex.RLock()
 	defer c.reflectorMutex.RUnlock()
@@ -231,7 +246,7 @@ func (c *controller) processLoop(ctx context.Context) {
 		default:
 			var err error
 			if useBatchProcess {
-				err = batchQueue.PopBatch(c.config.ProcessBatch)
+				err = batchQueue.PopBatch(c.config.ProcessBatch, PopProcessFunc(c.config.Process))
 			} else {
 				// otherwise fallback to non-batch process behavior
 				_, err = c.config.Pop(PopProcessFunc(c.config.Process))
@@ -395,6 +410,9 @@ func DeletionHandlingObjectToName(obj interface{}) (ObjectName, error) {
 
 // InformerOptions configure a Reflector.
 type InformerOptions struct {
+	// Logger, if not nil, is used instead of klog.Background() for logging.
+	Logger *klog.Logger
+
 	// ListerWatcher implements List and Watch functions for the source of the resource
 	// the informer will be informing about.
 	ListerWatcher ListerWatcher
@@ -429,6 +447,14 @@ type InformerOptions struct {
 	// for them.
 	// Optional - if unset no additional transforming is happening.
 	Transform TransformFunc
+
+	// Identifier is used to identify the FIFO for metrics and logging purposes.
+	// If not set, metrics will not be published.
+	Identifier InformerNameAndResource
+
+	// InformerMetricsProvider is the metrics provider for the informer.
+	// If not set, metrics will be no-ops.
+	InformerMetricsProvider InformerMetricsProvider
 }
 
 // NewInformerWithOptions returns a Store and a controller for populating the store
@@ -438,11 +464,11 @@ type InformerOptions struct {
 func NewInformerWithOptions(options InformerOptions) (Store, Controller) {
 	var clientState Store
 	if options.Indexers == nil {
-		clientState = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		clientState = NewStore(DeletionHandlingMetaNamespaceKeyFunc, WithStoreMetrics(options.Identifier, options.InformerMetricsProvider))
 	} else {
-		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers)
+		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers, WithStoreMetrics(options.Identifier, options.InformerMetricsProvider))
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewInformer returns a Store and a controller for populating the store
@@ -476,7 +502,7 @@ func NewInformer(
 		Handler:       h,
 		ResyncPeriod:  resyncPeriod,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewIndexerInformer returns an Indexer and a Controller for populating the index
@@ -513,7 +539,7 @@ func NewIndexerInformer(
 		ResyncPeriod:  resyncPeriod,
 		Indexers:      indexers,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewTransformingInformer returns a Store and a controller for populating
@@ -542,7 +568,7 @@ func NewTransformingInformer(
 		ResyncPeriod:  resyncPeriod,
 		Transform:     transformer,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // NewTransformingIndexerInformer returns an Indexer and a controller for
@@ -573,23 +599,43 @@ func NewTransformingIndexerInformer(
 		Indexers:      indexers,
 		Transform:     transformer,
 	}
-	return clientState, newInformer(clientState, options)
+	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
 
 // Multiplexes updates in the form of a list of Deltas into a Store, and informs
 // a given handler of events OnUpdate, OnAdd, OnDelete
 func processDeltas(
+	logger klog.Logger,
 	// Object which receives event notifications from the given deltas
 	handler ResourceEventHandler,
 	clientState Store,
 	deltas Deltas,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	for _, d := range deltas {
 		obj := d.Object
 
 		switch d.Type {
+		case ReplacedAll:
+			info, ok := obj.(ReplacedAllInfo)
+			if !ok {
+				return fmt.Errorf("ReplacedAll did not contain ReplacedAllInfo: %T", obj)
+			}
+			if err := processReplacedAllInfo(logger, handler, info, clientState, isInInitialList, keyFunc); err != nil {
+				return err
+			}
+		case SyncAll:
+			_, ok := obj.(SyncAllInfo)
+			if !ok {
+				return fmt.Errorf("SyncAll did not contain SyncAllInfo: %T", obj)
+			}
+			objs := clientState.List()
+			for _, obj := range objs {
+				handler.OnUpdate(obj, obj)
+			}
+			return nil
 		case Sync, Replaced, Added, Updated:
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
 				if err := clientState.Update(obj); err != nil {
@@ -607,6 +653,12 @@ func processDeltas(
 				return err
 			}
 			handler.OnDelete(obj)
+		case Bookmark:
+			info, ok := obj.(BookmarkInfo)
+			if !ok {
+				return fmt.Errorf("bookmark delta did not contain BookmarkInfo: %T", obj)
+			}
+			clientState.Bookmark(info.ResourceVersion)
 		}
 	}
 	return nil
@@ -622,10 +674,12 @@ func processDeltas(
 // Returns an error if any Delta or transaction fails. For TransactionError,
 // only successful operations trigger callbacks.
 func processDeltasInBatch(
+	logger klog.Logger,
 	handler ResourceEventHandler,
 	clientState Store,
 	deltas []Delta,
 	isInInitialList bool,
+	keyFunc KeyFunc,
 ) error {
 	// from oldest to newest
 	txns := make([]Transaction, 0)
@@ -634,7 +688,7 @@ func processDeltasInBatch(
 	if !txnSupported {
 		var errs []error
 		for _, delta := range deltas {
-			if err := processDeltas(handler, clientState, Deltas{delta}, isInInitialList); err != nil {
+			if err := processDeltas(logger, handler, clientState, Deltas{delta}, isInInitialList, keyFunc); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -677,6 +731,8 @@ func processDeltasInBatch(
 			callbacks = append(callbacks, func() {
 				handler.OnDelete(obj)
 			})
+		default:
+			return fmt.Errorf("Delta type %s is not supported in batch processing", d.Type)
 		}
 	}
 
@@ -697,18 +753,68 @@ func processDeltasInBatch(
 	return nil
 }
 
+func processReplacedAllInfo(logger klog.Logger, handler ResourceEventHandler, info ReplacedAllInfo, clientState Store, isInInitialList bool, keyFunc KeyFunc) error {
+	var deletions []DeletedFinalStateUnknown
+	type replacement struct {
+		oldObj interface{}
+		newObj interface{}
+	}
+	replacements := make([]replacement, 0, len(info.Objects))
+
+	err := reconcileReplacement(logger, nil, clientState, info.Objects, keyFunc,
+		func(obj DeletedFinalStateUnknown) error {
+			deletions = append(deletions, obj)
+			return nil
+		},
+		func(obj interface{}) error {
+			// This behavior matches processDeltas handling of Replace deltas
+			if old, exists, err := clientState.Get(obj); err == nil && exists {
+				replacements = append(replacements, replacement{newObj: obj, oldObj: old})
+			} else {
+				replacements = append(replacements, replacement{newObj: obj})
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Replace the client state first so the store reflects the events handlers are given
+	if err := clientState.Replace(info.Objects, info.ResourceVersion); err != nil {
+		return err
+	}
+	// Processing all deletions first matches behavior of RealFIFO#Replace
+	for _, objToDelete := range deletions {
+		handler.OnDelete(objToDelete)
+	}
+	// Processing adds/updates in order observed by reconcileReplacement matches behavior of RealFIFO#Replace
+	for _, r := range replacements {
+		if r.oldObj != nil {
+			handler.OnUpdate(r.oldObj, r.newObj)
+		} else {
+			handler.OnAdd(r.newObj, isInInitialList)
+		}
+	}
+	return nil
+}
+
 // newInformer returns a controller for populating the store while also
 // providing event notifications.
 //
 // Parameters
 //   - clientState is the store you want to populate
 //   - options contain the options to configure the controller
-func newInformer(clientState Store, options InformerOptions) Controller {
+func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
 
-	fifo := newQueueFIFO(clientState, options.Transform)
+	logger := klog.Background()
+	if options.Logger != nil {
+		logger = *options.Logger
+	}
+	logger, fifo := newQueueFIFO(logger, options.ObjectType, clientState, options.Transform, options.Identifier, options.InformerMetricsProvider)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -719,29 +825,54 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
+				// This must be the logger *of the fifo*.
+				return processDeltas(logger, options.Handler, clientState, deltas, isInInitialList, keyFunc)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
 		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-			return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList)
+			// Same here.
+			return processDeltasInBatch(logger, options.Handler, clientState, deltaList, isInInitialList, keyFunc)
 		},
 	}
 	return New(cfg)
 }
 
-func newQueueFIFO(clientState Store, transform TransformFunc) Queue {
+// newQueueFIFO constructs a new FIFO, choosing between real and delta FIFO
+// depending on the InOrderInformers feature gate.
+//
+// It returns the FIFO and the logger used by the FIFO.
+// That logger includes the name used for the FIFO,
+// in contrast to the logger which was passed in.
+func newQueueFIFO(logger klog.Logger, objectType any, clientState Store, transform TransformFunc, identifier InformerNameAndResource, metricsProvider InformerMetricsProvider) (klog.Logger, Queue) {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
-		return NewRealFIFOWithOptions(RealFIFOOptions{
-			KeyFunction:  MetaNamespaceKeyFunc,
-			KnownObjects: clientState,
-			Transformer:  transform,
-		})
+		options := RealFIFOOptions{
+			Logger:          &logger,
+			Name:            fmt.Sprintf("RealFIFO %T", objectType),
+			KeyFunction:     MetaNamespaceKeyFunc,
+			Transformer:     transform,
+			Identifier:      identifier,
+			MetricsProvider: metricsProvider,
+		}
+		// If atomic events are enabled, unset clientState in the case of atomic events as we cannot pass a
+		// store to an atomic fifo.
+		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.AtomicFIFO) {
+			options.AtomicEvents = true
+			options.UnlockWhileProcessing = clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.UnlockWhileProcessingFIFO)
+			options.EmitDeltaTypeBookmark = true
+		} else {
+			options.KnownObjects = clientState
+		}
+		f := NewRealFIFOWithOptions(options)
+		return f.logger, f
 	} else {
-		return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			Logger:                &logger,
+			Name:                  fmt.Sprintf("DeltaFIFO %T", objectType),
 			KnownObjects:          clientState,
 			EmitDeltaTypeReplaced: true,
 			Transformer:           transform,
 		})
+		return f.logger, f
 	}
 }

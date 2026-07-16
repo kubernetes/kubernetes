@@ -870,6 +870,8 @@ spec:
   schedulerName: schedulerNameValue
   schedulingGates:
   - name: nameValue
+  schedulingGroup:
+    podGroupName: podGroupNameValue
   securityContext:
     appArmorProfile:
       localhostProfile: localhostProfileValue
@@ -1225,10 +1227,6 @@ spec:
       storagePolicyID: storagePolicyIDValue
       storagePolicyName: storagePolicyNameValue
       volumePath: volumePathValue
-  workloadRef:
-    name: nameValue
-    podGroup: podGroupValue
-    podGroupReplicaKey: podGroupReplicaKeyValue
 status:
   allocatedResources:
     allocatedResourcesKey: "0"
@@ -1247,6 +1245,7 @@ status:
     - name: nameValue
       resources:
       - health: healthValue
+        message: messageValue
         resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
@@ -1303,6 +1302,9 @@ status:
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
+      volumeStatus:
+        image:
+          imageRef: imageRefValue
   ephemeralContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
@@ -1310,6 +1312,7 @@ status:
     - name: nameValue
       resources:
       - health: healthValue
+        message: messageValue
         resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
@@ -1366,6 +1369,9 @@ status:
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
+      volumeStatus:
+        image:
+          imageRef: imageRefValue
   extendedResourceClaimStatus:
     requestMappings:
     - containerName: containerNameValue
@@ -1382,6 +1388,7 @@ status:
     - name: nameValue
       resources:
       - health: healthValue
+        message: messageValue
         resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
@@ -1438,7 +1445,16 @@ status:
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
+      volumeStatus:
+        image:
+          imageRef: imageRefValue
   message: messageValue
+  nodeAllocatableResourceClaimStatuses:
+  - containers:
+    - containersValue
+    resourceClaimName: resourceClaimNameValue
+    resources:
+      resourcesKey: "0"
   nominatedNodeName: nominatedNodeNameValue
   observedGeneration: 17
   phase: phaseValue

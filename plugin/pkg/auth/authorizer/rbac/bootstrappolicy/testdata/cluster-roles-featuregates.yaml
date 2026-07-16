@@ -260,6 +260,17 @@ items:
     - deletecollection
     - patch
     - update
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - podgroups
+    - workloads
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - patch
+    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -410,6 +421,16 @@ items:
     - resourceclaims
     - resourceclaims/status
     - resourceclaimtemplates
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - podgroups
+    - podgroups/status
+    - workloads
     verbs:
     - get
     - list
@@ -977,13 +998,27 @@ items:
     - list
     - watch
   - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceclaims/binding
+    verbs:
+    - patch
+    - update
+  - apiGroups:
     - scheduling.k8s.io
     resources:
-    - workloads
+    - podgroups
     verbs:
     - get
     - list
     - watch
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - podgroups/status
+    verbs:
+    - patch
+    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1034,6 +1069,7 @@ items:
     name: system:monitoring
   rules:
   - nonResourceURLs:
+    - /flagz
     - /healthz
     - /healthz/*
     - /livez
@@ -1042,20 +1078,13 @@ items:
     - /metrics/slis
     - /readyz
     - /readyz/*
+    - /statusz
     verbs:
     - get
   - apiGroups:
     - ""
     resources:
     - nodes/metrics
-    verbs:
-    - get
-  - nonResourceURLs:
-    - /flagz
-    verbs:
-    - get
-  - nonResourceURLs:
-    - /statusz
     verbs:
     - get
 - apiVersion: rbac.authorization.k8s.io/v1

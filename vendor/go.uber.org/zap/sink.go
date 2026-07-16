@@ -71,7 +71,7 @@ func newSinkRegistry() *sinkRegistry {
 	return sr
 }
 
-// RegisterScheme registers the given factory for the specific scheme.
+// RegisterSink registers the given factory for the specific scheme.
 func (sr *sinkRegistry) RegisterSink(scheme string, factory func(*url.URL) (Sink, error)) error {
 	sr.mu.Lock()
 	defer sr.mu.Unlock()

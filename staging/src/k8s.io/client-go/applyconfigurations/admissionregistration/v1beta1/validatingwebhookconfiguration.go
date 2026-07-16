@@ -34,9 +34,9 @@ import (
 // Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 ValidatingWebhookConfiguration instead.
 type ValidatingWebhookConfigurationApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Webhooks is a list of webhooks and the affected resources and operations.
+	// webhooks is a list of webhooks and the affected resources and operations.
 	Webhooks []ValidatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
 }
 

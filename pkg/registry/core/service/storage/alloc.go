@@ -419,7 +419,7 @@ func (al *Allocators) allocIPs(service *api.Service, toAlloc map[api.IPFamily]st
 					el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocate IP: %v", err))}
 					return allocated, apierrors.NewInvalid(api.Kind("Service"), service.Name, el)
 				}
-				return allocated, apierrors.NewInternalError(fmt.Errorf("failed to allocate a serviceIP: %w", err))
+				return allocated, apierrors.NewInternalError(fmt.Errorf("failed to allocate a serviceIP for Service %q: %w", service.Name, err))
 			}
 			allocated[family] = allocatedIP.String()
 		} else {

@@ -467,7 +467,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)
 			obj2 := roundTrip(t, runtime.Object(test.original))

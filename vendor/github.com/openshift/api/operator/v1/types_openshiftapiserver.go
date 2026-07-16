@@ -39,6 +39,11 @@ type OpenShiftAPIServerSpec struct {
 
 type OpenShiftAPIServerStatus struct {
 	OperatorStatus `json:",inline"`
+
+	// encryptionStatus contains status reports for the KMS plugin health and its key rotation.
+	// +optional
+	// +openshift:enable:FeatureGate=KMSEncryption
+	EncryptionStatus KMSEncryptionStatus `json:"encryptionStatus,omitempty,omitzero"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -1247,8 +1247,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		},
 	}
 	for name, tc := range testCases {
-		name := name
-		tc := tc
 
 		t.Run(name, func(t *testing.T) {
 			cj := cronJob()

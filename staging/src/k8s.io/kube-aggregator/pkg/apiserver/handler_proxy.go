@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
@@ -38,6 +37,8 @@ import (
 	"k8s.io/klog/v2"
 	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
+	"k8s.io/kube-aggregator/pkg/controllers/status/remote"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 const (
@@ -228,16 +229,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 
 	proxyClientCert, proxyClientKey := r.proxyCurrentCertKeyContent()
 
-	transportConfig := &transport.Config{
-		TLS: transport.TLSConfig{
-			Insecure:   apiService.Spec.InsecureSkipTLSVerify,
-			ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
-			CertData:   proxyClientCert,
-			KeyData:    proxyClientKey,
-			CAData:     apiService.Spec.CABundle,
-		},
-		DialHolder: r.proxyTransportDial,
-	}
+	transportConfig := remote.BuildTransportConfig(r.proxyTransportDial, proxyClientCert, proxyClientKey, apiService)
 	transportConfig.Wrap(x509metrics.NewDeprecatedCertificateRoundTripperWrapperConstructor(
 		x509MissingSANCounter,
 		x509InsecureSHA1Counter,

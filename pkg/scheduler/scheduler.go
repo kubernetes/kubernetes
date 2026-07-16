@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -45,7 +46,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/backend/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
-	internalworkloadmanager "k8s.io/kubernetes/pkg/scheduler/backend/workloadmanager"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
@@ -58,12 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/utils/clock"
-)
-
-const (
-	// Duration the scheduler will wait before expiring an assumed pod.
-	// See issue #106361 for more details about this parameter and its value.
-	durationToExpireAssumedPod time.Duration = 0
 )
 
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
@@ -90,7 +84,7 @@ type Scheduler struct {
 	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
 	// Return a struct of ScheduleResult with the name of suggested host on success,
 	// otherwise will return a FitError with reasons.
-	SchedulePod func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, error)
+	SchedulePod func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error)
 
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}
@@ -103,9 +97,6 @@ type Scheduler struct {
 	// Adding a call to APIDispatcher should not be done directly by in-tree usages.
 	// framework.APICache should be used instead.
 	APIDispatcher *apidispatcher.APIDispatcher
-
-	// WorkloadManager can be used to provide workload-aware scheduling.
-	WorkloadManager internalworkloadmanager.WorkloadManager
 
 	// Profiles are the scheduling profiles.
 	Profiles profile.Map
@@ -123,10 +114,14 @@ type Scheduler struct {
 	// panic.
 	logger klog.Logger
 
+	podGroupLister schedulinglisters.PodGroupLister
+
 	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
 	registeredHandlers []cache.ResourceEventHandlerRegistration
 
 	nominatedNodeNameForExpectationEnabled bool
+	genericWorkloadEnabled                 bool
+	workloadAwarePreemptionEnabled         bool
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
@@ -318,11 +313,18 @@ func New(ctx context.Context,
 
 	podLister := informerFactory.Core().V1().Pods().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	var podGroupLister schedulinglisters.PodGroupLister
+	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		podGroupLister = informerFactory.Scheduling().V1alpha2().PodGroups().Lister()
+	}
 
 	snapshot := internalcache.NewEmptySnapshot()
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
 	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
+
+	// podsInPreBind holds all the pods that are in the scheduler in the preBind phase
+	podsInPreBind := frameworkruntime.NewPodsInPreBindMap()
 
 	var resourceClaimCache *assumecache.AssumeCache
 	var resourceSliceTracker *resourceslicetracker.Tracker
@@ -339,7 +341,7 @@ func New(ctx context.Context,
 		// If device taint rules are disabled, the additional informers are not needed and
 		// the tracker turns into a simple wrapper around the slice informer.
 		if resourceSliceTrackerOpts.EnableDeviceTaintRules {
-			resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+			resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
 			resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 		}
 		resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, resourceSliceTrackerOpts)
@@ -354,10 +356,8 @@ func New(ctx context.Context,
 	if feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncAPICalls) {
 		apiDispatcher = apidispatcher.New(client, int(options.parallelism), apicalls.Relevances)
 	}
-	var workloadManager internalworkloadmanager.WorkloadManager
-	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		workloadManager = internalworkloadmanager.New()
-	}
+
+	schedulerCache := internalcache.New(ctx, apiDispatcher, feature.DefaultFeatureGate.Enabled(features.GenericWorkload))
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
@@ -371,9 +371,10 @@ func New(ctx context.Context,
 		frameworkruntime.WithExtenders(extenders),
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
 		frameworkruntime.WithWaitingPods(waitingPods),
+		frameworkruntime.WithPodsInPreBind(podsInPreBind),
 		frameworkruntime.WithAPIDispatcher(apiDispatcher),
 		frameworkruntime.WithSharedCSIManager(sharedCSIManager),
-		frameworkruntime.WithWorkloadManager(workloadManager),
+		frameworkruntime.WithPodGroupManager(schedulerCache),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
@@ -403,6 +404,12 @@ func New(ctx context.Context,
 		return nil, returnErr
 	}
 
+	// Extract pod signing functions from each profile
+	podSigners := make(map[string]internalqueue.PodSigner)
+	for profileName, profile := range profiles {
+		podSigners[profileName] = profile.SignPod
+	}
+
 	podQueue := internalqueue.NewSchedulingQueue(
 		profiles[options.profiles[0].SchedulerName].QueueSortFunc(),
 		informerFactory,
@@ -416,9 +423,8 @@ func New(ctx context.Context,
 		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
 		internalqueue.WithMetricsRecorder(metricsRecorder),
 		internalqueue.WithAPIDispatcher(apiDispatcher),
+		internalqueue.WithPodSigners(podSigners),
 	)
-
-	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod, apiDispatcher)
 
 	var apiCache fwk.APICacher
 	if apiDispatcher != nil {
@@ -447,7 +453,9 @@ func New(ctx context.Context,
 		logger:                                 logger,
 		APIDispatcher:                          apiDispatcher,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
-		WorkloadManager:                        workloadManager,
+		podGroupLister:                         podGroupLister,
+		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
+		workloadAwarePreemptionEnabled:         feature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption),
 	}
 	sched.NextPod = podQueue.Pop
 	sched.applyDefaultHandlers()

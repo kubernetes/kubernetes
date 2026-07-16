@@ -229,9 +229,9 @@ func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1beta1.PodCertifi
 		return nil
 	}
 
-	subjectPublicKey, err := x509.ParsePKIXPublicKey(pcr.Spec.PKIXPublicKey)
+	req, err := x509.ParseCertificateRequest(pcr.Spec.StubPKCS10Request)
 	if err != nil {
-		return fmt.Errorf("while parsing subject public key: %w", err)
+		return fmt.Errorf("while parsing PKCS#10 request: %w", err)
 	}
 
 	// If our signer had an opinion on which key types were allowable, it would
@@ -276,7 +276,7 @@ func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1beta1.PodCertifi
 		return fmt.Errorf("while parsing signing certificate: %w", err)
 	}
 
-	subjectCertDER, err := x509.CreateCertificate(rand.Reader, template, signingCert, subjectPublicKey, c.caKeys[len(c.caKeys)-1])
+	subjectCertDER, err := x509.CreateCertificate(rand.Reader, template, signingCert, req.PublicKey, c.caKeys[len(c.caKeys)-1])
 	if err != nil {
 		return fmt.Errorf("while signing subject cert: %w", err)
 	}
@@ -353,7 +353,7 @@ func GenerateCAHierarchy(numIntermediates int) ([]crypto.PrivateKey, [][]byte, e
 	caKeys = append(caKeys, rootPrivKey)
 	caCerts = append(caCerts, rootDER)
 
-	for i := 0; i < numIntermediates; i++ {
+	for range numIntermediates {
 		pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
 			return nil, nil, fmt.Errorf("while generating intermediate key: %w", err)

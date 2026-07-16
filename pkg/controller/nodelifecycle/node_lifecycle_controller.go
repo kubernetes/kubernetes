@@ -368,23 +368,6 @@ func NewNodeLifecycleController(
 			newPod := obj.(*v1.Pod)
 			nc.podUpdated(prevPod, newPod)
 		},
-		DeleteFunc: func(obj interface{}) {
-			pod, isPod := obj.(*v1.Pod)
-			// We can get DeletedFinalStateUnknown instead of *v1.Pod here and we need to handle that correctly.
-			if !isPod {
-				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
-				if !ok {
-					logger.Error(nil, "Received unexpected object", "object", obj)
-					return
-				}
-				pod, ok = deletedState.Obj.(*v1.Pod)
-				if !ok {
-					logger.Error(nil, "DeletedFinalStateUnknown contained non-Pod object", "object", deletedState.Obj)
-					return
-				}
-			}
-			nc.podUpdated(pod, nil)
-		},
 	})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
 	controller.AddPodNodeNameIndexer(podInformer.Informer())

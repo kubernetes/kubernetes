@@ -1,5 +1,4 @@
 //go:build !go1.19
-// +build !go1.19
 
 /*
 Copyright 2022 The Kubernetes Authors.

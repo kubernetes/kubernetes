@@ -25,7 +25,7 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	command := exec.CommandContext(longerCtx, os.Args[0], "run-test", "--output=json", testName)
+	command := exec.CommandContext(longerCtx, os.Args[0], "run-test", "--output=json", fmt.Sprintf("--timeout=%s", timeout), testName)
 	command.Stdout = stdout
 	command.Stderr = stderr
 
@@ -37,30 +37,22 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 	}
 
 	go func() {
+		// interrupt after timeout, or exit early if the process finishes first
 		select {
-		// interrupt tests after timeout, and abort if they don't complete quick enough
 		case <-time.After(timeout):
-			if command.Process != nil {
-				// we're not going to do anything with the err
-				_ = command.Process.Signal(syscall.SIGINT)
-			}
-			// if the process appears to be hung a significant amount of time after the timeout
-			// send an ABRT so we get a stack dump
-			select {
-			case <-time.After(time.Minute):
-				if command.Process != nil {
-					// we're not going to do anything with the err
-					_ = command.Process.Signal(syscall.SIGABRT)
-				}
-			case <-timeoutCtx.Done():
-				if command.Process != nil {
-					_ = command.Process.Signal(syscall.SIGABRT)
-				}
-			}
 		case <-timeoutCtx.Done():
-			if command.Process != nil {
-				_ = command.Process.Signal(syscall.SIGINT)
-			}
+		}
+		if command.Process != nil {
+			_ = command.Process.Signal(syscall.SIGINT)
+		}
+		// Canceled means the process exited and the context was cancelled — no need to escalate
+		if timeoutCtx.Err() == context.Canceled {
+			return
+		}
+		// if the process is hung, send SIGABRT after a grace period for a stack dump
+		<-time.After(time.Minute)
+		if command.Process != nil {
+			_ = command.Process.Signal(syscall.SIGABRT)
 		}
 	}()
 
@@ -74,7 +66,7 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 	}
 
 	fmt.Fprintf(stderr, "Command Error: %v\n", cmdErr)
-	fmt.Fprintf(stderr, "Deserializaion Error: %v\n", parseErr)
+	fmt.Fprintf(stderr, "Deserialization Error: %v\n", parseErr)
 	return newTestResult(testName, result, start, time.Now(), stdout, stderr)
 }
 
@@ -83,28 +75,61 @@ func newTestResultFromOutput(stdout *bytes.Buffer) (*extensiontests.ExtensionTes
 		return nil, errors.New("no output from command")
 	}
 
+	jsonData, err := extractJSON(stdout.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
 	// when the command runs correctly, we get json or json slice output
 	retArray := []extensiontests.ExtensionTestResult{}
-	if arrayItemErr := json.Unmarshal(stdout.Bytes(), &retArray); arrayItemErr == nil {
+	if arrayItemErr := json.Unmarshal(jsonData, &retArray); arrayItemErr == nil {
 		if len(retArray) != 1 {
-			return nil, errors.New("expected 1 result, got %v results")
+			return nil, fmt.Errorf("expected 1 result, got %d results", len(retArray))
 		}
 		return &retArray[0], nil
 	}
 
 	// when the command runs correctly, we get json output
 	ret := &extensiontests.ExtensionTestResult{}
-	if singleItemErr := json.Unmarshal(stdout.Bytes(), ret); singleItemErr != nil {
+	if singleItemErr := json.Unmarshal(jsonData, ret); singleItemErr != nil {
 		return nil, singleItemErr
 	}
 
 	return ret, nil
 }
 
+// extractJSON finds the first JSON object or array in output, skipping any non-JSON
+// lines that precede it (e.g. klog lines, Ginkgo reporter output). It also ignores
+// trailing non-JSON content after the JSON payload. This is necessary because extension
+// binaries may emit log output to stdout before or after the JSON result, which would
+// otherwise cause deserialization failures.
+func extractJSON(output []byte) ([]byte, error) {
+	lines := bytes.Split(output, []byte("\n"))
+	for i, line := range lines {
+		trimmed := bytes.TrimSpace(line)
+		if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') {
+			// Calculate byte offset to the start of the JSON content
+			offset := 0
+			for j := 0; j < i; j++ {
+				offset += len(lines[j]) + 1 // +1 for the newline
+			}
+
+			var raw json.RawMessage
+			dec := json.NewDecoder(bytes.NewReader(output[offset:]))
+			if err := dec.Decode(&raw); err != nil {
+				continue // not valid JSON, try next candidate line
+			}
+			return raw, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no JSON object or array found in output (%d bytes)", len(output))
+}
+
 func newTestResult(name string, result extensiontests.Result, start, end time.Time, stdout, stderr *bytes.Buffer) *extensiontests.ExtensionTestResult {
 	duration := end.Sub(start)
 	dbStart := dbtime.DBTime(start)
-	dbEnd := dbtime.DBTime(start)
+	dbEnd := dbtime.DBTime(end)
 	ret := &extensiontests.ExtensionTestResult{
 		Name:      name,
 		Lifecycle: "", // lifecycle is completed one level above this.

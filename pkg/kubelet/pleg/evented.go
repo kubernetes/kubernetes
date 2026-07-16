@@ -118,6 +118,10 @@ func (e *EventedPLEG) Relist() {
 	e.genericPleg.Relist()
 }
 
+func (e *EventedPLEG) RequestRelist(podUID types.UID) {
+	e.genericPleg.RequestRelist(podUID)
+}
+
 // Start starts the Evented PLEG
 func (e *EventedPLEG) Start() {
 	e.runningMu.Lock()
@@ -416,6 +420,6 @@ func (e *EventedPLEG) updateLatencyMetric(event *runtimeapi.ContainerEventRespon
 	metrics.EventedPLEGConnLatency.Observe(duration.Seconds())
 }
 
-func (e *EventedPLEG) SetPodWatchCondition(podUID types.UID, conditionKey string, condition WatchCondition) {
-	e.genericPleg.SetPodWatchCondition(podUID, conditionKey, condition)
+func (e *EventedPLEG) RequestReinspect(podUID types.UID) {
+	e.genericPleg.RequestReinspect(podUID)
 }

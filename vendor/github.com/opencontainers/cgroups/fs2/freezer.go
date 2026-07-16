@@ -53,12 +53,9 @@ func setFreezer(dirPath string, state cgroups.FreezerState) error {
 func getFreezer(dirPath string) (cgroups.FreezerState, error) {
 	fd, err := cgroups.OpenFile(dirPath, "cgroup.freeze", unix.O_RDONLY)
 	if err != nil {
-		// If the kernel is too old, then we just treat the freezer as being in
-		// an "undefined" state.
-		if os.IsNotExist(err) || errors.Is(err, unix.ENODEV) {
-			err = nil
-		}
-		return cgroups.Undefined, err
+		// If the kernel is too old, then we just treat the freezer as
+		// being in an "undefined" state and ignore the error.
+		return cgroups.Undefined, ignoreNotExistOrNoDeviceError(err)
 	}
 	defer fd.Close()
 
@@ -67,11 +64,15 @@ func getFreezer(dirPath string) (cgroups.FreezerState, error) {
 
 func readFreezer(dirPath string, fd *os.File) (cgroups.FreezerState, error) {
 	if _, err := fd.Seek(0, 0); err != nil {
-		return cgroups.Undefined, err
+		// If the cgroup path is deleted at this point, then we just treat the freezer as
+		// being in an "undefined" state and ignore the error.
+		return cgroups.Undefined, ignoreNotExistOrNoDeviceError(err)
 	}
 	state := make([]byte, 2)
 	if _, err := fd.Read(state); err != nil {
-		return cgroups.Undefined, err
+		// If the cgroup path is deleted at this point, then we just treat the freezer as
+		// being in an "undefined" state and ignore the error.
+		return cgroups.Undefined, ignoreNotExistOrNoDeviceError(err)
 	}
 	switch string(state) {
 	case "0\n":
@@ -81,6 +82,21 @@ func readFreezer(dirPath string, fd *os.File) (cgroups.FreezerState, error) {
 	default:
 		return cgroups.Undefined, fmt.Errorf(`unknown "cgroup.freeze" state: %q`, state)
 	}
+}
+
+// ignoreNotExistOrNoDeviceError checks if the error is either a "not exist" error
+// or a "no device" error, and returns nil in those cases. Otherwise, it returns the error.
+func ignoreNotExistOrNoDeviceError(err error) error {
+	// We can safely ignore the error in the following two common situations:
+	// 1. The cgroup path does not exist at the time of opening(eg: the kernel is too old)
+	//    — indicated by os.IsNotExist.
+	// 2. The cgroup path is deleted during the seek/read operation — indicated by
+	//    errors.Is(err, unix.ENODEV).
+	// These conditions are expected and do not require special handling.
+	if os.IsNotExist(err) || errors.Is(err, unix.ENODEV) {
+		return nil
+	}
+	return err
 }
 
 // waitFrozen polls cgroup.events until it sees "frozen 1" in it.

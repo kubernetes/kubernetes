@@ -30,22 +30,20 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
 var (
-	cleanAssumedPeriod = 1 * time.Second
+	updateMetricsPeriod = 1 * time.Second
 )
 
 // New returns a Cache implementation.
-// It automatically starts a go routine that manages expiration of assumed pods.
-// "ttl" is how long the assumed pod will get expired.
+// It automatically starts a go routine that exports cache metrics.
 // "ctx" is the context that would close the background goroutine.
-func New(ctx context.Context, ttl time.Duration, apiDispatcher fwk.APIDispatcher) Cache {
-	logger := klog.FromContext(ctx)
-	cache := newCache(ctx, ttl, cleanAssumedPeriod, apiDispatcher)
-	cache.run(logger)
+func New(ctx context.Context, apiDispatcher fwk.APIDispatcher, genericWorkloadEnabled bool) Cache {
+	cache := newCache(ctx, updateMetricsPeriod, apiDispatcher, genericWorkloadEnabled)
+	cache.run()
 	return cache
 }
 
@@ -60,7 +58,6 @@ type nodeInfoListItem struct {
 
 type cacheImpl struct {
 	stop   <-chan struct{}
-	ttl    time.Duration
 	period time.Duration
 
 	// This mutex guards all fields within this cache struct.
@@ -77,7 +74,10 @@ type cacheImpl struct {
 	nodeTree *nodeTree
 	// A map from image name to its ImageStateSummary.
 	imageStates map[string]*fwk.ImageStateSummary
-
+	// podGroupStates stores the runtime state for each known pod group (only if GenericWorkload feature gate is enabled).
+	podGroupStates map[podGroupKey]*podGroupState
+	// genericWorkloadEnabled stores the GenericWorkload feature gate value.
+	genericWorkloadEnabled bool
 	// apiDispatcher is used for the methods that are expected to send API calls.
 	// It's non-nil only if the SchedulerAsyncAPICalls feature gate is enabled.
 	apiDispatcher fwk.APIDispatcher
@@ -85,26 +85,22 @@ type cacheImpl struct {
 
 type podState struct {
 	pod *v1.Pod
-	// Used by assumedPod to determinate expiration.
-	// If deadline is nil, assumedPod will never expire.
-	deadline *time.Time
-	// Used to block cache from expiring assumedPod if binding still runs
-	bindingFinished bool
 }
 
-func newCache(ctx context.Context, ttl, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
+func newCache(ctx context.Context, period time.Duration, apiDispatcher fwk.APIDispatcher, genericWorkloadEnabled bool) *cacheImpl {
 	logger := klog.FromContext(ctx)
 	return &cacheImpl{
-		ttl:    ttl,
 		period: period,
 		stop:   ctx.Done(),
 
-		nodes:         make(map[string]*nodeInfoListItem),
-		nodeTree:      newNodeTree(logger, nil),
-		assumedPods:   sets.New[string](),
-		podStates:     make(map[string]*podState),
-		imageStates:   make(map[string]*fwk.ImageStateSummary),
-		apiDispatcher: apiDispatcher,
+		nodes:                  make(map[string]*nodeInfoListItem),
+		nodeTree:               newNodeTree(logger, nil),
+		assumedPods:            sets.New[string](),
+		podStates:              make(map[string]*podState),
+		imageStates:            make(map[string]*fwk.ImageStateSummary),
+		podGroupStates:         make(map[podGroupKey]*podGroupState),
+		genericWorkloadEnabled: genericWorkloadEnabled,
+		apiDispatcher:          apiDispatcher,
 	}
 }
 
@@ -195,6 +191,11 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
+	if nodeSnapshot.placementNodes != nil {
+		logger.Error(nil, "UpdateSnapshot called with assumed placement. This is unexpected. Placement will be cleared.")
+		nodeSnapshot.ForgetPlacement()
+	}
+
 	// Get the last generation of the snapshot.
 	snapshotGeneration := nodeSnapshot.generation
 
@@ -212,6 +213,10 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 	// usedPVCSet must be re-created whenever the head node generation is greater than
 	// last snapshot generation.
 	updateUsedPVCSet := false
+
+	// Forget all assumed pods from a previous snapshot version.
+	// This is a safety check in case any pod wasn't forgotten in the previous scheduling cycle.
+	nodeSnapshot.forgetAllAssumedPods(logger)
 
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
 	// of NodeInfos updated after the last snapshot.
@@ -284,7 +289,30 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 		return errors.New(errMsg)
 	}
 
+	// Take a snapshot of pod group states for this scheduling cycle.
+	cache.updatePodGroupStateSnapshot(nodeSnapshot)
+
 	return nil
+}
+
+// updatePodGroupStateSnapshot updates the pod group state portion of the given snapshot.
+// It assumes that the cache lock is already held.
+// It removes entries that no longer exist in the live cache
+// and clones entries whose generation has advanced since the last snapshot.
+func (cache *cacheImpl) updatePodGroupStateSnapshot(snapshot *Snapshot) {
+	// Remove pod group states from snapshot that no longer exist in cache.
+	for key := range snapshot.podGroupStates {
+		if _, exists := cache.podGroupStates[key]; !exists {
+			delete(snapshot.podGroupStates, key)
+		}
+	}
+	// Clone only pod group states that changed since the last snapshot.
+	for key, podGroupState := range cache.podGroupStates {
+		if existing, ok := snapshot.podGroupStates[key]; ok && existing.generation == podGroupState.generation {
+			continue
+		}
+		snapshot.podGroupStates[key] = podGroupState.snapshot()
+	}
 }
 
 func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot *Snapshot, updateAll bool) {
@@ -381,34 +409,6 @@ func (cache *cacheImpl) AssumePod(logger klog.Logger, pod *v1.Pod) error {
 	return cache.addPod(logger, pod, true)
 }
 
-func (cache *cacheImpl) FinishBinding(logger klog.Logger, pod *v1.Pod) error {
-	return cache.finishBinding(logger, pod, time.Now())
-}
-
-// finishBinding exists to make tests deterministic by injecting now as an argument
-func (cache *cacheImpl) finishBinding(logger klog.Logger, pod *v1.Pod, now time.Time) error {
-	key, err := framework.GetPodKey(pod)
-	if err != nil {
-		return err
-	}
-
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-
-	logger.V(5).Info("Finished binding for pod, can be expired", "podKey", key, "pod", klog.KObj(pod))
-	currState, ok := cache.podStates[key]
-	if ok && cache.assumedPods.Has(key) {
-		if cache.ttl == time.Duration(0) {
-			currState.deadline = nil
-		} else {
-			dl := now.Add(cache.ttl)
-			currState.deadline = &dl
-		}
-		currState.bindingFinished = true
-	}
-	return nil
-}
-
 func (cache *cacheImpl) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
@@ -428,7 +428,7 @@ func (cache *cacheImpl) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	}
 	// Only assumed pod can be forgotten.
 	if cache.assumedPods.Has(key) {
-		return cache.removePod(logger, pod)
+		return cache.removePod(logger, pod, true)
 	}
 	return fmt.Errorf("pod %v(%v) wasn't assumed so cannot be forgotten", key, klog.KObj(pod))
 }
@@ -453,12 +453,21 @@ func (cache *cacheImpl) addPod(logger klog.Logger, pod *v1.Pod, assumePod bool) 
 	if assumePod {
 		cache.assumedPods.Insert(key)
 	}
+
+	if !cache.isPodGroupMember(pod) {
+		return nil
+	}
+	if assumePod {
+		cache.assumePodGroupMember(pod)
+	} else {
+		cache.addPodGroupMember(pod)
+	}
 	return nil
 }
 
 // Assumes that lock is already acquired.
 func (cache *cacheImpl) updatePod(logger klog.Logger, oldPod, newPod *v1.Pod) error {
-	if err := cache.removePod(logger, oldPod); err != nil {
+	if err := cache.removePod(logger, oldPod, false); err != nil {
 		return err
 	}
 	return cache.addPod(logger, newPod, false)
@@ -468,7 +477,7 @@ func (cache *cacheImpl) updatePod(logger klog.Logger, oldPod, newPod *v1.Pod) er
 // Removes a pod from the cached node info. If the node information was already
 // removed and there are no more pods left in the node, cleans up the node from
 // the cache.
-func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod) error {
+func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod, forgetPod bool) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
 		return err
@@ -490,6 +499,16 @@ func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod) error {
 
 	delete(cache.podStates, key)
 	delete(cache.assumedPods, key)
+
+	if !cache.isPodGroupMember(pod) {
+		return nil
+	}
+	if forgetPod {
+		cache.forgetPodGroupMember(logger, pod)
+	} else {
+		cache.removePodGroupMember(pod)
+	}
+
 	return nil
 }
 
@@ -516,7 +535,6 @@ func (cache *cacheImpl) AddPod(logger klog.Logger, pod *v1.Pod) error {
 			return nil
 		}
 	case !ok:
-		// Pod was expired. We should add it back.
 		if err = cache.addPod(logger, pod, false); err != nil {
 			utilruntime.HandleErrorWithLogger(logger, err, "Error occurred while adding pod")
 		}
@@ -575,7 +593,7 @@ func (cache *cacheImpl) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 	}
-	return cache.removePod(logger, currState.pod)
+	return cache.removePod(logger, currState.pod, false)
 }
 
 func (cache *cacheImpl) IsAssumedPod(pod *v1.Pod) (bool, error) {
@@ -678,6 +696,19 @@ func (cache *cacheImpl) RemoveNode(logger klog.Logger, node *v1.Node) error {
 	return nil
 }
 
+// GetNode returns the copy of node stored in the cache.
+// DO NOT use outside of tests.
+func (cache *cacheImpl) GetNode(name string) (*framework.NodeInfo, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	n, ok := cache.nodes[name]
+	if !ok {
+		return nil, fmt.Errorf("node %v does not exist in scheduler cache", name)
+	}
+	return n.info.SnapshotConcrete(), nil
+}
+
 // addNodeImageStates adds states of the images on given node to the given nodeInfo and update the imageStates in
 // scheduler cache. This function assumes the lock to scheduler cache has been acquired.
 func (cache *cacheImpl) addNodeImageStates(node *v1.Node, nodeInfo *framework.NodeInfo) {
@@ -729,44 +760,142 @@ func (cache *cacheImpl) removeNodeImageStates(node *v1.Node) {
 	}
 }
 
-func (cache *cacheImpl) run(logger klog.Logger) {
-	go wait.Until(func() {
-		cache.cleanupAssumedPods(logger, time.Now())
-	}, cache.period, cache.stop)
-}
-
-// cleanupAssumedPods exists for making test deterministic by taking time as input argument.
-// It also reports metrics on the cache size for nodes, pods, and assumed pods.
-func (cache *cacheImpl) cleanupAssumedPods(logger klog.Logger, now time.Time) {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-	defer cache.updateMetrics()
-
-	// The size of assumedPods should be small
-	for key := range cache.assumedPods {
-		ps, ok := cache.podStates[key]
-		if !ok {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Key found in assumed set but not in podStates, potentially a logical error")
-			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-		}
-		if !ps.bindingFinished {
-			logger.V(5).Info("Could not expire cache for pod as binding is still in progress", "podKey", key, "pod", klog.KObj(ps.pod))
-			continue
-		}
-		if cache.ttl != 0 && now.After(*ps.deadline) {
-			logger.Info("Pod expired", "podKey", key, "pod", klog.KObj(ps.pod))
-			if err := cache.removePod(logger, ps.pod); err != nil {
-				utilruntime.HandleErrorWithLogger(logger, err, "ExpirePod failed", "podKey", key, "pod", klog.KObj(ps.pod))
-			}
-		}
-	}
+func (cache *cacheImpl) run() {
+	go wait.Until(cache.updateMetrics, cache.period, cache.stop)
 }
 
 // updateMetrics updates cache size metric values for pods, assumed pods, and nodes
 func (cache *cacheImpl) updateMetrics() {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
 	metrics.CacheSize.WithLabelValues("assumed_pods").Set(float64(len(cache.assumedPods)))
 	metrics.CacheSize.WithLabelValues("pods").Set(float64(len(cache.podStates)))
 	metrics.CacheSize.WithLabelValues("nodes").Set(float64(len(cache.nodes)))
+}
+
+// isPodGroupMember returns true if the pod belongs to a pod group,
+// provided that GenericWorkload feature gate is enabled.
+func (cache *cacheImpl) isPodGroupMember(pod *v1.Pod) bool {
+	return cache.genericWorkloadEnabled && pod.Spec.SchedulingGroup != nil
+}
+
+// AddPodGroupMember adds not assigned and not assumed pod to its pod group state in the cache.
+func (cache *cacheImpl) AddPodGroupMember(pod *v1.Pod) {
+	if !cache.isPodGroupMember(pod) {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	cache.addPodGroupMember(pod)
+}
+
+// UpdatePodGroupMember updates a pod's entry inside its pod group state in the cache.
+func (cache *cacheImpl) UpdatePodGroupMember(logger klog.Logger, oldPod, newPod *v1.Pod) {
+	if !cache.isPodGroupMember(newPod) {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	cache.updatePodGroupMember(logger, oldPod, newPod)
+}
+
+// RemovePodGroupMember removes the pod from its pod group state in the cache.
+func (cache *cacheImpl) RemovePodGroupMember(pod *v1.Pod) {
+	if !cache.isPodGroupMember(pod) {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	cache.removePodGroupMember(pod)
+}
+
+// addPodGroupMember adds the pod to its pod group state, creating the group entry if it doesn't exist yet.
+// Assumes that the cache lock is already held.
+func (cache *cacheImpl) addPodGroupMember(pod *v1.Pod) {
+	key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	podGroupState, exists := cache.podGroupStates[key]
+	if !exists {
+		podGroupState = newPodGroupState()
+		cache.podGroupStates[key] = podGroupState
+	}
+
+	podGroupState.addPod(pod)
+}
+
+// updatePodGroupMember updates the pod entry inside its pod group state.
+// Assumes that the cache lock is already held.
+func (cache *cacheImpl) updatePodGroupMember(logger klog.Logger, oldPod, newPod *v1.Pod) {
+	key := newPodGroupKey(newPod.Namespace, *newPod.Spec.SchedulingGroup.PodGroupName)
+	podGroupState, exists := cache.podGroupStates[key]
+	if !exists {
+		// This should not happen: the pod group state should have been already created by a prior pod add action.
+		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "pod", klog.KObj(newPod), "podGroupKey", key)
+		return
+	}
+
+	podGroupState.updatePod(oldPod, newPod)
+}
+
+// removePodGroupMember removes the pod from its pod group state, deleting the group entry when empty.
+// Assumes that the cache lock is already held.
+func (cache *cacheImpl) removePodGroupMember(pod *v1.Pod) {
+	key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	podGroupState, exists := cache.podGroupStates[key]
+	if !exists {
+		return
+	}
+	podGroupState.deletePod(pod.UID)
+	if podGroupState.empty() {
+		delete(cache.podGroupStates, key)
+	}
+}
+
+// assumePodGroupMember marks the pod as assumed in its pod group state.
+// Assumes that the cache lock is already held.
+func (cache *cacheImpl) assumePodGroupMember(pod *v1.Pod) {
+	key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	podGroupState, exists := cache.podGroupStates[key]
+	if !exists {
+		podGroupState = newPodGroupState()
+		podGroupState.allPods[pod.UID] = pod
+		cache.podGroupStates[key] = podGroupState
+	}
+	podGroupState.assumePod(pod)
+}
+
+// forgetPodGroupMember moves the pod back from assumed to unscheduled in its pod group state.
+// Assumes that the cache lock is already held.
+func (cache *cacheImpl) forgetPodGroupMember(logger klog.Logger, pod *v1.Pod) {
+	key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	pgs, exists := cache.podGroupStates[key]
+	if !exists {
+		// This should not happen: the pod group state should have been already created by a prior pod add or assume action.
+		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for forget, this indicates a missed add or assume event", "pod", klog.KObj(pod), "podGroupKey", key)
+		return
+	}
+	pgs.forgetPod(pod.UID)
+}
+
+// PodGroupStates returns the PodGroupStateLister for this cache.
+func (cache *cacheImpl) PodGroupStates() fwk.PodGroupStateLister {
+	return cache
+}
+
+// Get returns the pod group state for the given pod group.
+func (cache *cacheImpl) Get(namespace string, podGroupName string) (fwk.PodGroupState, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	key := newPodGroupKey(namespace, podGroupName)
+	podGroupState, exists := cache.podGroupStates[key]
+	if !exists {
+		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
+	}
+	return podGroupState, nil
 }
 
 // BindPod handles the pod binding by adding a bind API call to the dispatcher.

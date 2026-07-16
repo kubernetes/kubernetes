@@ -32,12 +32,14 @@ import (
 	"k8s.io/client-go/util/watchlist"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
+
+	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
 
 func TestDoesClientSupportWatchListSemanticsForKubeClient(t *testing.T) {
-	target1 := &dummyStorage{}
+	target1 := &cachertesting.MockStorage{}
 	if !watchlist.DoesClientNotSupportWatchListSemantics(target1) {
-		t.Fatalf("dummyStorage should NOT support WatchList semantics")
+		t.Fatalf("cachertesting.MockStorage should NOT support WatchList semantics")
 	}
 
 	server, target2 := newEtcdTestStorage(t, "/pods/")
@@ -274,9 +276,9 @@ func TestListerWatcherListResourceVersionPropagation(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, scenario.watchListEnabled)
 
-			backingStorage := &dummyStorage{}
+			backingStorage := &cachertesting.MockStorage{}
 			var capturedOpts storage.ListOptions
-			backingStorage.getListFn = func(ctx context.Context, resPrefix string, opts storage.ListOptions, listObj runtime.Object) error {
+			backingStorage.GetListFn = func(ctx context.Context, resPrefix string, opts storage.ListOptions, listObj runtime.Object) error {
 				capturedOpts = opts
 				return nil
 			}

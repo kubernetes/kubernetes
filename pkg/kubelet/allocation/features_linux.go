@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2025 The Kubernetes Authors.
@@ -23,15 +22,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg, reason string) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return false, "InPlacePodVerticalScaling is disabled", "feature_gate_off"
-	}
-	if kubetypes.IsStaticPod(pod) {
-		return false, "In-place resize of static-pods is not supported", "static_pod"
 	}
 	return true, "", ""
 }

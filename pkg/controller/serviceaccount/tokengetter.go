@@ -18,7 +18,8 @@ package serviceaccount
 
 import (
 	"context"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -43,28 +44,28 @@ func NewGetterFromClient(c clientset.Interface, secretLister v1listers.SecretLis
 	return clientGetter{c, secretLister, serviceAccountLister, podLister, nodeLister}
 }
 
-func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
+func (c clientGetter) GetServiceAccount(ctx context.Context, namespace, name string) (*v1.ServiceAccount, error) {
 	if serviceAccount, err := c.serviceAccountLister.ServiceAccounts(namespace).Get(name); err == nil {
 		return serviceAccount, nil
 	}
-	return c.client.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	return c.client.CoreV1().ServiceAccounts(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
-func (c clientGetter) GetPod(namespace, name string) (*v1.Pod, error) {
+func (c clientGetter) GetPod(ctx context.Context, namespace, name string) (*v1.Pod, error) {
 	if pod, err := c.podLister.Pods(namespace).Get(name); err == nil {
 		return pod, nil
 	}
-	return c.client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	return c.client.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
-func (c clientGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
+func (c clientGetter) GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	if secret, err := c.secretLister.Secrets(namespace).Get(name); err == nil {
 		return secret, nil
 	}
-	return c.client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	return c.client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
-func (c clientGetter) GetNode(name string) (*v1.Node, error) {
+func (c clientGetter) GetNode(ctx context.Context, name string) (*v1.Node, error) {
 	// handle the case where the node lister isn't set due to feature being disabled
 	if c.nodeLister == nil {
 		return nil, apierrors.NewNotFound(v1.Resource("nodes"), name)
@@ -72,5 +73,5 @@ func (c clientGetter) GetNode(name string) (*v1.Node, error) {
 	if node, err := c.nodeLister.Get(name); err == nil {
 		return node, nil
 	}
-	return c.client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+	return c.client.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 }

@@ -29,23 +29,23 @@ import (
 //
 // ValidatingWebhook describes an admission webhook and the resources and operations it applies to.
 type ValidatingWebhookApplyConfiguration struct {
-	// The name of the admission webhook.
+	// name is the name of the admission webhook.
 	// Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where
 	// "imagepolicy" is the name of the webhook, and kubernetes.io is the name
 	// of the organization.
 	// Required.
 	Name *string `json:"name,omitempty"`
-	// ClientConfig defines how to communicate with the hook.
+	// clientConfig defines how to communicate with the hook.
 	// Required
 	ClientConfig *WebhookClientConfigApplyConfiguration `json:"clientConfig,omitempty"`
-	// Rules describes what operations on what resources/subresources the webhook cares about.
+	// rules describes what operations on what resources/subresources the webhook cares about.
 	// The webhook cares about an operation if it matches _any_ Rule.
 	// However, in order to prevent ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks
 	// from putting the cluster in a state which cannot be recovered from without completely
 	// disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
 	// on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
 	Rules []v1.RuleWithOperationsApplyConfiguration `json:"rules,omitempty"`
-	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
+	// failurePolicy defines how unrecognized errors from the admission endpoint are handled -
 	// allowed values are Ignore or Fail. Defaults to Ignore.
 	FailurePolicy *admissionregistrationv1beta1.FailurePolicyType `json:"failurePolicy,omitempty"`
 	// matchPolicy defines how the "rules" list is used to match incoming requests.
@@ -63,7 +63,7 @@ type ValidatingWebhookApplyConfiguration struct {
 	//
 	// Defaults to "Exact"
 	MatchPolicy *admissionregistrationv1beta1.MatchPolicyType `json:"matchPolicy,omitempty"`
-	// NamespaceSelector decides whether to run the webhook on an object based
+	// namespaceSelector decides whether to run the webhook on an object based
 	// on whether the namespace for that object matches the selector. If the
 	// object itself is a namespace, the matching is performed on
 	// object.metadata.labels. If the object is another cluster scoped resource,
@@ -107,7 +107,7 @@ type ValidatingWebhookApplyConfiguration struct {
 	//
 	// Default to the empty LabelSelector, which matches everything.
 	NamespaceSelector *metav1.LabelSelectorApplyConfiguration `json:"namespaceSelector,omitempty"`
-	// ObjectSelector decides whether to run the webhook based on if the
+	// objectSelector decides whether to run the webhook based on if the
 	// object has matching labels. objectSelector is evaluated against both
 	// the oldObject and newObject that would be sent to the webhook, and
 	// is considered to match if either object matches the selector. A null
@@ -119,20 +119,20 @@ type ValidatingWebhookApplyConfiguration struct {
 	// users may skip the admission webhook by setting the labels.
 	// Default to the empty LabelSelector, which matches everything.
 	ObjectSelector *metav1.LabelSelectorApplyConfiguration `json:"objectSelector,omitempty"`
-	// SideEffects states whether this webhook has side effects.
+	// sideEffects states whether this webhook has side effects.
 	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
 	// rejected by a future step in the admission chain and the side effects therefore need to be undone.
 	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
 	// sideEffects == Unknown or Some. Defaults to Unknown.
 	SideEffects *admissionregistrationv1beta1.SideEffectClass `json:"sideEffects,omitempty"`
-	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+	// timeoutSeconds specifies the timeout for this webhook. After the timeout passes,
 	// the webhook call will be ignored or the API call will fail based on the
 	// failure policy.
 	// The timeout value must be between 1 and 30 seconds.
 	// Default to 30 seconds.
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
-	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// admissionReviewVersions is an ordered list of preferred `AdmissionReview`
 	// versions the Webhook expects. API server will try to use first version in
 	// the list which it supports. If none of the versions specified in this list
 	// supported by API server, validation will fail for this object.
@@ -141,7 +141,7 @@ type ValidatingWebhookApplyConfiguration struct {
 	// and be subject to the failure policy.
 	// Default to `['v1beta1']`.
 	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty"`
-	// MatchConditions is a list of conditions that must be met for a request to be sent to this
+	// matchConditions is a list of conditions that must be met for a request to be sent to this
 	// webhook. Match conditions filter requests that have already been matched by the rules,
 	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
 	// There are a maximum of 64 match conditions allowed.

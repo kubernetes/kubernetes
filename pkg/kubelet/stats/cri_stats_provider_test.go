@@ -688,6 +688,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	c0 := containerStatsMap[cName0]
 	assert.Equal(container0.CreatedAt, c0.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c0, infos[container0.ContainerStatus.Id].Stats[0])
+	checkSwapStats(t, cName0, seedContainer0, infos[container0.ContainerStatus.Id], c0.Swap)
 	assert.Nil(c0.Rootfs)
 	assert.Nil(c0.Logs)
 	assert.Nil(c0.Accelerators)
@@ -696,6 +697,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	c1 := containerStatsMap[cName1]
 	assert.Equal(container1.CreatedAt, c1.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c1, infos[container1.ContainerStatus.Id].Stats[0])
+	checkSwapStats(t, cName1, seedContainer1, infos[container1.ContainerStatus.Id], c1.Swap)
 	assert.Nil(c1.Rootfs)
 	assert.Nil(c1.Logs)
 	assert.Nil(c1.Accelerators)
@@ -715,6 +717,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Equal(cName2, c2.Name)
 	assert.Equal(container2.CreatedAt, c2.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c2, infos[container2.ContainerStatus.Id].Stats[0])
+	checkSwapStats(t, cName2, seedContainer2, infos[container2.ContainerStatus.Id], c2.Swap)
 	assert.Nil(c2.Rootfs)
 	assert.Nil(c2.Logs)
 	assert.Nil(c2.Accelerators)
@@ -734,6 +737,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Equal(cName3, c3.Name)
 	assert.Equal(container4.CreatedAt, c3.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c3, infos[container4.ContainerStatus.Id].Stats[0])
+	checkSwapStats(t, cName3, seedContainer3, infos[container4.ContainerStatus.Id], c3.Swap)
 	assert.Nil(c2.Rootfs)
 	assert.Nil(c2.Logs)
 	assert.Nil(c2.Accelerators)

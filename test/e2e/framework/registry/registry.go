@@ -127,6 +127,10 @@ func podManifest(podTestLabel string) (*v1.Pod, error) {
 		},
 	}
 	pod.Spec.Containers[0].SecurityContext.RunAsUser = ptr.To[int64](5123)
+	pod.Spec.Containers[0].SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{
+		RunAsUserName: ptr.To("NT AUTHORITY\\SYSTEM"),
+		HostProcess:   ptr.To(true),
+	}
 	// setting HostNetwork to true so that the registry is accessible on localhost:<hostport>
 	// and we don't have to deal with any CNI quirks.
 	pod.Spec.HostNetwork = true

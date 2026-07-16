@@ -213,6 +213,13 @@ fi
 # is not used.
 suite_args+=(--report-complete-ginkgo --report-complete-junit)
 
+# Additional e2e.test arguments. Split into individual arguments at spaces.
+# For more complex arguments pass additional arguments to the script.
+if [[ -n "${KUBE_E2E_TEST_ARGS:-}" ]]; then
+  # shellcheck disable=SC2206 # Splitting at word boundaries is intentional here.
+  suite_args+=(${KUBE_E2E_TEST_ARGS})
+fi
+
 # When SIGTERM doesn't reach the E2E test suite binaries, ginkgo will exit
 # without collecting information from about the currently running and
 # potentially stuck tests. This seems to happen when Prow shuts down a test

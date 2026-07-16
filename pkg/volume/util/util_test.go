@@ -20,6 +20,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +31,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/utils/ptr"
 )
@@ -386,7 +386,9 @@ func TestMountOptionFromSpec(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		mountOptions := MountOptionFromSpec(scenario.volume, scenario.systemOptions...)
-		if !reflect.DeepEqual(slice.SortStrings(mountOptions), slice.SortStrings(scenario.expectedMountList)) {
+		slices.Sort(mountOptions)
+		slices.Sort(scenario.expectedMountList)
+		if !reflect.DeepEqual(mountOptions, scenario.expectedMountList) {
 			t.Errorf("for %s expected mount options : %v got %v", name, scenario.expectedMountList, mountOptions)
 		}
 	}

@@ -54,6 +54,8 @@ func (p *KYAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj.Object.Object)).Type().PkgPath()) {
 			return errors.New(InternalObjectPrinterErr)
 		}
+		return p.encoder.FromObject(obj, w)
+
 	case *runtime.Unknown:
 		return p.encoder.FromYAML(bytes.NewReader(obj.Raw), w)
 	}

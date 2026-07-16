@@ -20,18 +20,24 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	v1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func addPriorityClasses(ctrl *Plugin, priorityClasses []*scheduling.PriorityClass) error {
@@ -758,5 +764,162 @@ func TestPodAdmission(t *testing.T) {
 		if err == nil && test.expectError {
 			t.Errorf("Test %q: expected error and no error recevied", test.name)
 		}
+	}
+}
+
+func TestAdmitPodGroup(t *testing.T) {
+	podGroup := func(priorityClassName string) *scheduling.PodGroup {
+		return &scheduling.PodGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-podgroup",
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: scheduling.PodGroupSpec{
+				SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+					Basic: &scheduling.BasicSchedulingPolicy{},
+				},
+				PriorityClassName: priorityClassName,
+			},
+		}
+	}
+
+	podGroupWithPriority := func(priorityClassName string, priority int32) *scheduling.PodGroup {
+		pg := podGroup(priorityClassName)
+		pg.Spec.Priority = new(priority)
+		return pg
+	}
+
+	attributes := func(podGroup *scheduling.PodGroup, operation admission.Operation) admission.Attributes {
+		var oldPodGroup runtime.Object
+		var options runtime.Object = &metav1.CreateOptions{}
+		if operation == admission.Update {
+			oldPodGroup = podGroup.DeepCopy()
+			options = &metav1.UpdateOptions{}
+		}
+		return admission.NewAttributesRecord(
+			podGroup,
+			oldPodGroup,
+			scheduling.Kind("PodGroup").WithVersion("v1alpha2"),
+			podGroup.ObjectMeta.Namespace,
+			"",
+			scheduling.Resource("podgroups").WithVersion("v1alpha2"),
+			"",
+			operation,
+			options,
+			false,
+			nil,
+		)
+	}
+
+	testCases := []struct {
+		name                          string
+		priorityClasses               []*scheduling.PriorityClass
+		preparePodGroup               *scheduling.PodGroup
+		operation                     admission.Operation
+		expectedPriorityClass         string
+		expectedPriority              int32
+		enableWorkloadAwarePreemption bool
+		expectError                   bool
+	}{
+		{
+			name:                          "pod group with empty priorityClassName, accepted and set to global default",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			preparePodGroup:               podGroup("" /* empty priorityClassName */),
+			operation:                     admission.Create,
+			expectedPriorityClass:         "default1",
+			expectedPriority:              defaultClass1.Value,
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:                          "pod group with explicit priorityClassName, accepted",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			preparePodGroup:               podGroup("nondefault1"),
+			operation:                     admission.Create,
+			expectedPriorityClass:         "nondefault1",
+			expectedPriority:              nondefaultClass1.Value,
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:                          "pod group with non-existent priorityClassName, rejected",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			preparePodGroup:               podGroup("non-existent"),
+			operation:                     admission.Create,
+			enableWorkloadAwarePreemption: true,
+			expectError:                   true,
+		},
+		{
+			name:            "pod group with any priorityClassName but feature gate disabled, skips validation",
+			priorityClasses: []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			preparePodGroup: podGroup("non-existent"),
+			operation:       admission.Create,
+		},
+		{
+			name:                          "pod group with no priorityClassName and no global default, accepted and priority should be zero",
+			priorityClasses:               []*scheduling.PriorityClass{nondefaultClass1},
+			preparePodGroup:               podGroup("" /* empty priorityClassName */),
+			operation:                     admission.Create,
+			expectedPriorityClass:         "",
+			expectedPriority:              0,
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:                          "pod group create with pre-set Priority matching computed value, accepted",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			preparePodGroup:               podGroupWithPriority("nondefault1", nondefaultClass1.Value),
+			operation:                     admission.Create,
+			expectedPriorityClass:         "nondefault1",
+			expectedPriority:              nondefaultClass1.Value,
+			enableWorkloadAwarePreemption: true,
+		},
+		{
+			name:                          "pod group create with pre-set Priority not matching computed value, rejected",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			preparePodGroup:               podGroupWithPriority("nondefault1", int32(9999)),
+			operation:                     admission.Create,
+			enableWorkloadAwarePreemption: true,
+			expectError:                   true,
+		},
+		{
+			name:                          "update operation is a no-op, admission does not mutate pod group on update",
+			priorityClasses:               []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			preparePodGroup:               podGroup("non-existent"),
+			operation:                     admission.Update,
+			enableWorkloadAwarePreemption: true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:         true,
+				features.GangScheduling:          true,
+				features.WorkloadAwarePreemption: tt.enableWorkloadAwarePreemption,
+			})
+
+			admissionPlugin := NewPlugin()
+			if err := addPriorityClasses(admissionPlugin, tt.priorityClasses); err != nil {
+				t.Fatalf("unable to configure priority classes: %v", err)
+			}
+
+			_, ctx := ktesting.NewTestContext(t)
+			podGroupCopy := tt.preparePodGroup.DeepCopy()
+			err := admissionPlugin.Admit(ctx, attributes(tt.preparePodGroup, tt.operation), nil)
+			if (err != nil) != tt.expectError {
+				t.Errorf("PodGroup Admit(), error = %v, want = %v", err, tt.expectError)
+			}
+			if !tt.expectError && tt.operation == admission.Create && tt.enableWorkloadAwarePreemption && tt.preparePodGroup.Spec.PodGroupTemplateRef == nil {
+				if tt.preparePodGroup.Spec.PriorityClassName != tt.expectedPriorityClass {
+					t.Errorf("PodGroup Admit(), priorityClassName = %v, want = %v", tt.preparePodGroup.Spec.PriorityClassName, tt.expectedPriorityClass)
+				}
+				if *tt.preparePodGroup.Spec.Priority != tt.expectedPriority {
+					t.Errorf("PodGroup Admit(), Priority = %v, want = %v", *tt.preparePodGroup.Spec.Priority, tt.expectedPriority)
+				}
+			}
+			if tt.operation != admission.Create {
+				if diff := cmp.Diff(tt.preparePodGroup, podGroupCopy); len(diff) > 0 {
+					t.Errorf("PodGroup Admit() should not modify the PodGroup (-want +got):\n%s", diff)
+				}
+			}
+		})
 	}
 }

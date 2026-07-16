@@ -68,7 +68,7 @@ function kube::validate::stablemetrics() {
             "test/instrumentation/decode_metric.go" \
             "test/instrumentation/find_stable_metric.go" \
             "test/instrumentation/error.go" \
-            "test/instrumentation/metric.go" \
+            "test/instrumentation/endpoint_mapping.go" \
             -- \
             1>"${temp_file}")
 
@@ -100,7 +100,7 @@ function kube::validate::test::stablemetrics() {
             "test/instrumentation/decode_metric.go" \
             "test/instrumentation/find_stable_metric.go" \
             "test/instrumentation/error.go" \
-            "test/instrumentation/metric.go" \
+            "test/instrumentation/endpoint_mapping.go" \
             -- \
             1>"${temp_file}")
 
@@ -129,7 +129,7 @@ function kube::update::stablemetrics() {
             "test/instrumentation/decode_metric.go" \
             "test/instrumentation/find_stable_metric.go" \
             "test/instrumentation/error.go" \
-            "test/instrumentation/metric.go" \
+            "test/instrumentation/endpoint_mapping.go" \
             -- \
             1>"${temp_file}")
 
@@ -158,8 +158,9 @@ function kube::update::documentation::list() {
             "test/instrumentation/decode_metric.go" \
             "test/instrumentation/find_stable_metric.go" \
             "test/instrumentation/error.go" \
-            "test/instrumentation/metric.go" \
+            "test/instrumentation/endpoint_mapping.go" \
             --allstabilityclasses \
+            --endpoint-mappings="test/instrumentation/endpoint-mappings.yaml" \
             -- \
             1>"${temp_file}")
 
@@ -196,7 +197,7 @@ function kube::update::test::stablemetrics() {
             "test/instrumentation/decode_metric.go" \
             "test/instrumentation/find_stable_metric.go" \
             "test/instrumentation/error.go" \
-            "test/instrumentation/metric.go" \
+            "test/instrumentation/endpoint_mapping.go" \
             -- \
             1>"${temp_file}")
 

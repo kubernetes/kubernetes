@@ -1327,6 +1327,52 @@
               "categories": [
                 "api-extensions"
               ],
+              "resource": "mutatingadmissionpolicies",
+              "responseKind": {
+                "group": "",
+                "kind": "MutatingAdmissionPolicy",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "mutatingadmissionpolicy",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "categories": [
+                "api-extensions"
+              ],
+              "resource": "mutatingadmissionpolicybindings",
+              "responseKind": {
+                "group": "",
+                "kind": "MutatingAdmissionPolicyBinding",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "mutatingadmissionpolicybinding",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "categories": [
+                "api-extensions"
+              ],
               "resource": "mutatingwebhookconfigurations",
               "responseKind": {
                 "group": "",
@@ -1632,6 +1678,41 @@
           "freshness": "Current",
           "resources": [
             {
+              "resource": "podgroups",
+              "responseKind": {
+                "group": "",
+                "kind": "PodGroup",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "podgroup",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "PodGroup",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "workloads",
               "responseKind": {
                 "group": "",
@@ -1652,7 +1733,7 @@
               ]
             }
           ],
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       ]
     },
@@ -1937,6 +2018,41 @@
               ]
             },
             {
+              "resource": "devicetaintrules",
+              "responseKind": {
+                "group": "",
+                "kind": "DeviceTaintRule",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "devicetaintrule",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "DeviceTaintRule",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "resourceclaims",
               "responseKind": {
                 "group": "",
@@ -2132,6 +2248,41 @@
                   "responseKind": {
                     "group": "",
                     "kind": "DeviceTaintRule",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourcepoolstatusrequests",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourcePoolStatusRequest",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "resourcepoolstatusrequest",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "ResourcePoolStatusRequest",
                     "version": ""
                   },
                   "subresource": "status",

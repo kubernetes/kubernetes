@@ -24,6 +24,7 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
@@ -35,14 +36,16 @@ func NewMaxResourceSlices() map[string]*resourceapi.ResourceSlice {
 		"basic":                             newBasicResourceSlice(resourceapi.ResourceSliceMaxDevices),
 		"with-taints-and-consumes-counters": newResourceSliceWithTaintsAndConsumesCounters(),
 		"with-shared-counters":              newSharedCountersResourceSlice(),
+		"with-list-values":                  newResourceSliceWithListValues(),
+		"with-taints-and-consumes-counters-and-list-values": newResourceSliceWithTaintsAndConsumesCountersAndListValues(),
 	}
 	return slices
 }
 
 func newResourceSliceWithTaintsAndConsumesCounters() *resourceapi.ResourceSlice {
-	slice := newBasicResourceSlice(resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters)
+	slice := newBasicResourceSlice(resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
 	for i := range slice.Spec.Devices {
-		for j := 0; j < resourceapi.DeviceTaintsMaxLength; j++ {
+		for range resourceapi.DeviceTaintsMaxLength {
 			slice.Spec.Devices[i].Taints = append(slice.Spec.Devices[i].Taints,
 				resourceapi.DeviceTaint{
 					Key:       maxLabelName(i),
@@ -54,12 +57,12 @@ func newResourceSliceWithTaintsAndConsumesCounters() *resourceapi.ResourceSlice 
 		}
 		slice.Spec.Devices[i].ConsumesCounters = func() []resourceapi.DeviceCounterConsumption {
 			var consumesCounters []resourceapi.DeviceCounterConsumption
-			for i := 0; i < resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice; i++ {
+			for i := range resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice {
 				consumesCounters = append(consumesCounters, resourceapi.DeviceCounterConsumption{
 					CounterSet: maxDNSLabel(i),
 					Counters: func() map[string]resourceapi.Counter {
 						counters := make(map[string]resourceapi.Counter)
-						for i := 0; i < resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption; i++ {
+						for i := range resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption {
 							counters[maxDNSLabel(i)] = resourceapi.Counter{
 								Value: resource.MustParse("80Gi"),
 							}
@@ -78,13 +81,13 @@ func newBasicResourceSlice(numDevices int) *resourceapi.ResourceSlice {
 	slice := commonResourceSlice()
 	slice.Spec.PerDeviceNodeSelection = ptr.To(true)
 	var devices []resourceapi.Device
-	for i := 0; i < numDevices; i++ {
+	for i := range numDevices {
 		devices = append(devices, resourceapi.Device{
 			Name: maxDNSLabel(i),
 			// Use attributes rather than capacity since it is more expensive.
 			Attributes: func() map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
 				attributes := make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
-				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
+				for i := range resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
 					attributes[maxResourceQualifiedName(i)] = resourceapi.DeviceAttribute{
 						StringValue: ptr.To(maxDNSLabel(i)),
 					}
@@ -102,12 +105,12 @@ func newSharedCountersResourceSlice() *resourceapi.ResourceSlice {
 	slice := commonResourceSlice()
 	slice.Spec.NodeName = ptr.To(maxSubDomain(0))
 	var counterSets []resourceapi.CounterSet
-	for i := 0; i < resourceapi.ResourceSliceMaxCounterSets; i++ {
+	for i := range resourceapi.ResourceSliceMaxCounterSets {
 		counterSets = append(counterSets, resourceapi.CounterSet{
 			Name: maxDNSLabel(i),
 			Counters: func() map[string]resourceapi.Counter {
 				counters := make(map[string]resourceapi.Counter)
-				for i := 0; i < resourceapi.ResourceSliceMaxCountersPerCounterSet; i++ {
+				for i := range resourceapi.ResourceSliceMaxCountersPerCounterSet {
 					counters[maxDNSLabel(i)] = resourceapi.Counter{
 						Value: resource.MustParse("80Gi"),
 					}
@@ -118,6 +121,36 @@ func newSharedCountersResourceSlice() *resourceapi.ResourceSlice {
 	}
 	slice.Spec.SharedCounters = counterSets
 	return slice
+}
+
+func newResourceSliceWithListValues() *resourceapi.ResourceSlice {
+	slice := newBasicResourceSlice(resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
+	addListValues(slice)
+	return slice
+}
+
+func newResourceSliceWithTaintsAndConsumesCountersAndListValues() *resourceapi.ResourceSlice {
+	slice := newResourceSliceWithTaintsAndConsumesCounters()
+	addListValues(slice)
+	return slice
+}
+
+func addListValues(slice *resourceapi.ResourceSlice) {
+	for i, device := range slice.Spec.Devices {
+		// Make each attribute a list of strings (adds some encoding overhead).
+		// The first list gets as many additional strings as allowed by the overall value limit.
+		numAdditionalValues := resourceapi.ResourceSliceMaxAttributeValuesPerDevice - resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice
+		for k, v := range device.Attributes {
+			v.StringValues = []string{*v.StringValue}
+			v.StringValue = nil
+			for range numAdditionalValues {
+				v.StringValues = append(v.StringValues, v.StringValues[0])
+			}
+			numAdditionalValues = 0
+			device.Attributes[k] = v
+		}
+		slice.Spec.Devices[i] = device
+	}
 }
 
 func commonResourceSlice() *resourceapi.ResourceSlice {
@@ -145,7 +178,7 @@ func commonResourceSlice() *resourceapi.ResourceSlice {
 // maxKeyValueMap produces a map for labels or annotations.
 func maxKeyValueMap(n int) map[string]string {
 	m := make(map[string]string)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		m[maxQualifiedName(i)] = maxLabelValue(0)
 	}
 	return m
@@ -165,7 +198,7 @@ func maxQualifiedName(i int) string {
 }
 
 func maxLabelValue(i int) string {
-	return maxString(0, validation.LabelValueMaxLength)
+	return maxString(i, content.LabelValueMaxLength)
 }
 
 func maxSubDomain(i int) string {

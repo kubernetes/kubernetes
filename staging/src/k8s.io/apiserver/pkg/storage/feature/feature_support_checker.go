@@ -109,7 +109,7 @@ func (f *defaultFeatureSupportChecker) checkClient(ctx context.Context, c client
 		}
 		f.checkingEndpoint[ep] = struct{}{}
 		go func(ep string) {
-			defer runtime.HandleCrash()
+			defer runtime.HandleCrashWithContext(ctx)
 			err := delayFunc.Until(ctx, true, true, func(ctx context.Context) (done bool, err error) {
 				internalErr := f.clientSupportsRequestWatchProgress(ctx, c, ep)
 				return internalErr == nil, nil

@@ -304,18 +304,18 @@ func (requirednessTagValidator) doForbidden(context Context) (Validations, error
 func (rtv requirednessTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:    rtv.TagName(),
-		Scopes: rtv.ValidScopes().UnsortedList(),
+		Scopes: sets.List(rtv.ValidScopes()),
 	}
 
 	switch rtv.mode {
 	case requirednessRequired:
-		doc.StabilityLevel = Beta
+		doc.StabilityLevel = TagStabilityLevelStable
 		doc.Description = "Indicates that a field must be specified by clients."
 	case requirednessOptional:
-		doc.StabilityLevel = Beta
+		doc.StabilityLevel = TagStabilityLevelStable
 		doc.Description = "Indicates that a field is optional to clients."
 	case requirednessForbidden:
-		doc.StabilityLevel = Alpha
+		doc.StabilityLevel = TagStabilityLevelBeta
 		doc.Description = "Indicates that a field may not be specified."
 	default:
 		panic(fmt.Sprintf("unknown requiredness mode: %q", rtv.mode))

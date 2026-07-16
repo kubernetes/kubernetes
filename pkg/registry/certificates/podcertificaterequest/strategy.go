@@ -119,7 +119,7 @@ func NewStatusStrategy(strategy *Strategy, authorizer authorizer.Authorizer, clo
 // and should not be modified by the user.
 func (s *StatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"certificates.k8s.io/v1alpha1": fieldpath.NewSet(
+		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}

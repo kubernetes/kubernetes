@@ -45,6 +45,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Config().V1().Authentications().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("builds"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Config().V1().Builds().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("criocredentialproviderconfigs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Config().V1().CRIOCredentialProviderConfigs().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clusterimagepolicies"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Config().V1().ClusterImagePolicies().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clusteroperators"):

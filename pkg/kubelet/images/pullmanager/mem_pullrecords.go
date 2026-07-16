@@ -98,7 +98,7 @@ type cachedPullRecordsAccessor struct {
 	pulledRecords      *lruCache[string, kubeletconfiginternal.ImagePulledRecord]
 }
 
-func NewCachedPullRecordsAccessor(delegate PullRecordsAccessor, intentsCacheSize, pulledRecordsCacheSize, stripedLocksSize int32) PullRecordsAccessor {
+func NewCachedPullRecordsAccessor(logger klog.Logger, delegate PullRecordsAccessor, intentsCacheSize, pulledRecordsCacheSize, stripedLocksSize int32) PullRecordsAccessor {
 	intentsCacheSize = min(intentsCacheSize, 1024)
 	pulledRecordsCacheSize = min(pulledRecordsCacheSize, 2000)
 
@@ -113,11 +113,11 @@ func NewCachedPullRecordsAccessor(delegate PullRecordsAccessor, intentsCacheSize
 	// warm our caches and set authoritative
 	_, err := c.ListImagePullIntents()
 	if err != nil {
-		klog.InfoS("there was an error initializing the image pull intents cache, the cache will work in a non-authoritative mode until the intents are listed successfully", "error", err)
+		logger.Info("there was an error initializing the image pull intents cache, the cache will work in a non-authoritative mode until the intents are listed successfully", "error", err)
 	}
 	_, err = c.ListImagePulledRecords()
 	if err != nil {
-		klog.InfoS("there was an error initializing the image pulled records cache, the cache will work in a non-authoritative mode until the pulled records are listed successfully", "error", err)
+		logger.Info("there was an error initializing the image pulled records cache, the cache will work in a non-authoritative mode until the pulled records are listed successfully", "error", err)
 	}
 	return NewMeteringRecordsAccessor(c, inMemIntentsPercent, inMemPulledRecordsPercent)
 }
@@ -160,11 +160,11 @@ func (c *cachedPullRecordsAccessor) ImagePullIntentExists(image string) (bool, e
 	return exists, err
 }
 
-func (c *cachedPullRecordsAccessor) WriteImagePullIntent(image string) error {
+func (c *cachedPullRecordsAccessor) WriteImagePullIntent(logger klog.Logger, image string) error {
 	c.intentsLocks.Lock(image)
 	defer c.intentsLocks.Unlock(image)
 
-	if err := c.delegate.WriteImagePullIntent(image); err != nil {
+	if err := c.delegate.WriteImagePullIntent(logger, image); err != nil {
 		return err
 	}
 	c.intents.Set(image, &kubeletconfiginternal.ImagePullIntent{
@@ -174,11 +174,11 @@ func (c *cachedPullRecordsAccessor) WriteImagePullIntent(image string) error {
 	return nil
 }
 
-func (c *cachedPullRecordsAccessor) DeleteImagePullIntent(image string) error {
+func (c *cachedPullRecordsAccessor) DeleteImagePullIntent(logger klog.Logger, image string) error {
 	c.intentsLocks.Lock(image)
 	defer c.intentsLocks.Unlock(image)
 
-	if err := c.delegate.DeleteImagePullIntent(image); err != nil {
+	if err := c.delegate.DeleteImagePullIntent(logger, image); err != nil {
 		return err
 	}
 	c.intents.Delete(image)
@@ -223,35 +223,35 @@ func (c *cachedPullRecordsAccessor) GetImagePulledRecord(imageRef string) (*kube
 	return pulledRecord, exists, err
 }
 
-func (c *cachedPullRecordsAccessor) WriteImagePulledRecord(record *kubeletconfiginternal.ImagePulledRecord) error {
+func (c *cachedPullRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, record *kubeletconfiginternal.ImagePulledRecord) error {
 	c.pulledRecordsLocks.Lock(record.ImageRef)
 	defer c.pulledRecordsLocks.Unlock(record.ImageRef)
 
-	if err := c.delegate.WriteImagePulledRecord(record); err != nil {
+	if err := c.delegate.WriteImagePulledRecord(logger, record); err != nil {
 		return err
 	}
 	c.pulledRecords.Set(record.ImageRef, record)
 	return nil
 }
 
-func (c *cachedPullRecordsAccessor) DeleteImagePulledRecord(imageRef string) error {
+func (c *cachedPullRecordsAccessor) DeleteImagePulledRecord(logger klog.Logger, imageRef string) error {
 	c.pulledRecordsLocks.Lock(imageRef)
 	defer c.pulledRecordsLocks.Unlock(imageRef)
 
-	if err := c.delegate.DeleteImagePulledRecord(imageRef); err != nil {
+	if err := c.delegate.DeleteImagePulledRecord(logger, imageRef); err != nil {
 		return err
 	}
 	c.pulledRecords.Delete(imageRef)
 	return nil
 }
 
-func (f *cachedPullRecordsAccessor) intentsSize() (uint, error) {
-	intentsUsage := f.intents.Len() * 100 / f.intents.maxSize
+func (c *cachedPullRecordsAccessor) intentsSize() (uint, error) {
+	intentsUsage := c.intents.Len() * 100 / c.intents.maxSize
 	return uint(intentsUsage), nil
 }
 
-func (f *cachedPullRecordsAccessor) pulledRecordsSize() (uint, error) {
-	pulledRecordsUsage := f.pulledRecords.Len() * 100 / f.pulledRecords.maxSize
+func (c *cachedPullRecordsAccessor) pulledRecordsSize() (uint, error) {
+	pulledRecordsUsage := c.pulledRecords.Len() * 100 / c.pulledRecords.maxSize
 	return uint(pulledRecordsUsage), nil
 }
 

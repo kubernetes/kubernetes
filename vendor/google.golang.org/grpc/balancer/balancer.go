@@ -75,8 +75,6 @@ func unregisterForTesting(name string) {
 
 func init() {
 	internal.BalancerUnregister = unregisterForTesting
-	internal.ConnectedAddress = connectedAddress
-	internal.SetConnectedAddress = setConnectedAddress
 }
 
 // Get returns the resolver builder registered with the given name.
@@ -360,6 +358,10 @@ type Balancer interface {
 	// call SubConn.Shutdown for its existing SubConns; however, this will be
 	// required in a future release, so it is recommended.
 	Close()
+	// ExitIdle instructs the LB policy to reconnect to backends / exit the
+	// IDLE state, if appropriate and possible.  Note that SubConns that enter
+	// the IDLE state will not reconnect until SubConn.Connect is called.
+	ExitIdle()
 }
 
 // ExitIdler is an optional interface for balancers to implement.  If
@@ -367,8 +369,8 @@ type Balancer interface {
 // the ClientConn is idle.  If unimplemented, ClientConn.Connect will cause
 // all SubConns to connect.
 //
-// Notice: it will be required for all balancers to implement this in a future
-// release.
+// Deprecated: All balancers must implement this interface. This interface will
+// be removed in a future release.
 type ExitIdler interface {
 	// ExitIdle instructs the LB policy to reconnect to backends / exit the
 	// IDLE state, if appropriate and possible.  Note that SubConns that enter

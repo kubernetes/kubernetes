@@ -26,15 +26,22 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	"k8s.io/component-base/compatibility"
 
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	"k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
 	"k8s.io/apiserver/pkg/server/statusz/negotiate"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 var (
@@ -46,21 +53,27 @@ var (
 		"/openapi":     true,
 		"/.well-known": true,
 	}
+	v1alpha1StatuszKind       = v1alpha1.SchemeGroupVersion.WithKind("Statusz")
+	v1beta1StatuszKind        = v1beta1.SchemeGroupVersion.WithKind("Statusz")
+	recognizedStructuredKinds = map[schema.GroupVersionKind]bool{
+		v1alpha1StatuszKind: true,
+		v1beta1StatuszKind:  true,
+	}
 )
 
-const (
-	DefaultStatuszPath = "/statusz"
-	Kind               = "Statusz"
-	GroupName          = "config.k8s.io"
-	Version            = "v1alpha1"
-)
+const DefaultStatuszPath = "/statusz"
 
 const headerFmt = `
 %s statusz
 Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.
 `
 
-var schemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: Version}
+// statuszCodecFactory wraps a CodecFactory to filter out unsupported media types (like protobuf)
+// from the supported media types list, so error messages only show actually supported types.
+type statuszCodecFactory struct {
+	serializer.CodecFactory
+	supportedMediaTypes []runtime.SerializerInfo
+}
 
 type mux interface {
 	Handle(path string, handler http.Handler)
@@ -70,7 +83,8 @@ type ListedPathsOption []string
 
 func NewRegistry(effectiveVersion compatibility.EffectiveVersion, opts ...Option) statuszRegistry {
 	r := &registry{
-		effectiveVersion: effectiveVersion,
+		effectiveVersion:      effectiveVersion,
+		deprecatedVersionsMap: map[string]bool{"v1alpha1": true},
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -82,8 +96,21 @@ func NewRegistry(effectiveVersion compatibility.EffectiveVersion, opts ...Option
 func Install(m mux, componentName string, reg statuszRegistry) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	codecFactory := serializer.NewCodecFactory(
-		scheme,
+	utilruntime.Must(v1beta1.AddToScheme(scheme))
+	filteredCodecFactory, err := newStatuszCodecFactory(scheme, componentName, reg)
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+	restrictions := negotiate.StatuszEndpointRestrictions{
+		RecognizedStructuredKinds: recognizedStructuredKinds,
+	}
+	m.Handle(DefaultStatuszPath, handleStatusz(componentName, reg, filteredCodecFactory, restrictions))
+}
+
+// newStatuszCodecFactory creates a codec factory with the standard serializers for statusz,
+// filtering out unsupported media types (e.g., protobuf).
+func newStatuszCodecFactory(scheme *runtime.Scheme, componentName string, reg statuszRegistry) (*statuszCodecFactory, error) {
+	codecFactoryOpts := []serializer.CodecFactoryOptionsMutator{
 		serializer.WithSerializer(func(_ runtime.ObjectCreater, _ runtime.ObjectTyper) runtime.SerializerInfo {
 			textSerializer := statuszTextSerializer{componentName, reg}
 			return runtime.SerializerInfo{
@@ -95,16 +122,75 @@ func Install(m mux, componentName string, reg statuszRegistry) {
 				PrettySerializer: textSerializer,
 			}
 		}),
-	)
-	m.Handle(DefaultStatuszPath, handleStatusz(componentName, reg, codecFactory, negotiate.StatuszEndpointRestrictions{}))
+	}
+	// TODO: remove this explicit check when https://github.com/kubernetes/enhancements/pull/5740 is implemented.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
+		codecFactoryOpts = append(codecFactoryOpts, serializer.WithSerializer(cbor.NewSerializerInfo))
+	}
+
+	codecFactory := serializer.NewCodecFactory(scheme, codecFactoryOpts...)
+	allTypes := codecFactory.SupportedMediaTypes()
+	filtered := make([]runtime.SerializerInfo, 0, len(allTypes))
+
+	var unknownTypes []string
+	for _, info := range allTypes {
+		switch info.MediaType {
+		// Supported media types
+		case "text/plain", runtime.ContentTypeJSON, runtime.ContentTypeYAML, runtime.ContentTypeCBOR:
+			filtered = append(filtered, info)
+		// Unsupported media types
+		case runtime.ContentTypeProtobuf:
+			continue
+		default:
+			unknownTypes = append(unknownTypes, info.MediaType)
+		}
+	}
+
+	var err error
+	if len(unknownTypes) > 0 {
+		err = fmt.Errorf("statusz: unknown media type(s) %v, excluding from supported types", unknownTypes)
+	}
+
+	return &statuszCodecFactory{
+		CodecFactory:        codecFactory,
+		supportedMediaTypes: filtered,
+	}, err
+}
+
+func (f *statuszCodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
+	return f.supportedMediaTypes
 }
 
 func handleStatusz(componentName string, reg statuszRegistry, serializer runtime.NegotiatedSerializer, restrictions negotiate.StatuszEndpointRestrictions) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		obj := statusz(componentName, reg)
+		requestReceivedTimestamp, ok := request.ReceivedTimestampFrom(r.Context())
+		if !ok {
+			requestReceivedTimestamp = time.Now()
+		}
+		delegate := &metrics.ResponseWriterDelegator{ResponseWriter: w}
+		w = responsewriter.WrapForHTTP1Or2(delegate)
+
+		// Use MonitorRequest instead of InstrumentHandlerFunc because the group,
+		// version, and deprecated status depend on per-request content negotiation.
+		// For text/plain requests, group and version remain empty. For structured
+		// responses (JSON/YAML/CBOR), they are set to the negotiated API group and
+		// version (e.g., config.k8s.io/v1alpha1).
+		var group, version string
+		var deprecated bool
+		defer func() {
+			metrics.MonitorRequest(r, "GET", group, version,
+				"statusz",     // resource
+				"",            // subresource
+				"",            // scope
+				componentName, // component
+				deprecated,
+				"", // removedRelease
+				delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
+		}()
+
 		acceptHeader := r.Header.Get("Accept")
 		if strings.TrimSpace(acceptHeader) == "" {
-			writePlainTextResponse(obj, serializer, w)
+			writePlainTextResponse(v1beta1Statusz(componentName, reg), serializer, w)
 			return
 		}
 
@@ -121,11 +207,10 @@ func handleStatusz(componentName string, reg statuszRegistry, serializer runtime
 			return
 		}
 
-		var targetGV schema.GroupVersion
 		switch serializerInfo.MediaType {
-		case "application/json":
+		case "application/json", "application/yaml", "application/cbor":
 			if mediaType.Convert == nil {
-				err := fmt.Errorf("content negotiation failed: mediaType.Convert is nil for application/json")
+				err := fmt.Errorf("content negotiation failed: mediaType.Convert is nil for %s", serializerInfo.MediaType)
 				utilruntime.HandleError(err)
 				responsewriters.ErrorNegotiated(
 					err,
@@ -136,18 +221,19 @@ func handleStatusz(componentName string, reg statuszRegistry, serializer runtime
 				)
 				return
 			}
-			targetGV = mediaType.Convert.GroupVersion()
-			deprecated := reg.deprecatedVersions()[targetGV.Version]
+			// Set group, version, and deprecated from the negotiated target so
+			// the deferred MonitorRequest records the actual requested API version.
+			group = mediaType.Convert.Group
+			version = mediaType.Convert.Version
+			deprecated = reg.deprecatedVersions()[version]
 			if deprecated {
 				w.Header().Set("Warning", `299 - "This version of the statusz endpoint is deprecated. Please use a newer version."`)
 			}
+			handleStructuredResponse(w, r, componentName, reg, serializer, restrictions, mediaType)
 		case "text/plain":
-			// Even though text/plain serialization does not use the group/version,
-			// the serialization machinery expects a non-zero schema.GroupVersion to be passed.
-			// Passing the zero value can cause errors or unexpected behavior in the negotiation logic.
-			targetGV = schemeGroupVersion
+			writePlainTextResponse(v1beta1Statusz(componentName, reg), serializer, w)
 		default:
-			err = fmt.Errorf("content negotiation failed: unsupported media type '%s'", serializerInfo.MediaType)
+			err := fmt.Errorf("unsupported media type: %s/%s", serializerInfo.MediaType, serializerInfo.MediaTypeSubType)
 			utilruntime.HandleError(err)
 			responsewriters.ErrorNegotiated(
 				err,
@@ -156,14 +242,29 @@ func handleStatusz(componentName string, reg statuszRegistry, serializer runtime
 				w,
 				r,
 			)
-			return
 		}
-
-		writeResponse(obj, serializer, targetGV, restrictions, w, r)
 	}
 }
 
-// writePlainTextResponse writes the statusz response as text/plain using the registered serializer.
+func handleStructuredResponse(w http.ResponseWriter, r *http.Request, componentName string, reg statuszRegistry, serializer runtime.NegotiatedSerializer, restrictions negotiate.StatuszEndpointRestrictions, mediaType negotiation.MediaTypeOptions) {
+	switch *mediaType.Convert {
+	case v1alpha1StatuszKind:
+		writeStructuredResponse(v1alpha1Statusz(componentName, reg), serializer, mediaType.Convert.GroupVersion(), restrictions, w, r)
+	case v1beta1StatuszKind:
+		writeStructuredResponse(v1beta1Statusz(componentName, reg), serializer, mediaType.Convert.GroupVersion(), restrictions, w, r)
+	default:
+		err := fmt.Errorf("unsupported media type: %s", mediaType.Convert.String())
+		utilruntime.HandleError(err)
+		responsewriters.ErrorNegotiated(
+			err,
+			serializer,
+			schema.GroupVersion{},
+			w,
+			r,
+		)
+	}
+}
+
 func writePlainTextResponse(obj runtime.Object, serializer runtime.NegotiatedSerializer, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	// Find the text/plain serializer
@@ -185,7 +286,7 @@ func writePlainTextResponse(obj runtime.Object, serializer runtime.NegotiatedSer
 	}
 }
 
-func writeResponse(obj runtime.Object, serializer runtime.NegotiatedSerializer, targetGV schema.GroupVersion, restrictions negotiate.StatuszEndpointRestrictions, w http.ResponseWriter, r *http.Request) {
+func writeStructuredResponse(obj runtime.Object, serializer runtime.NegotiatedSerializer, targetGV schema.GroupVersion, restrictions negotiate.StatuszEndpointRestrictions, w http.ResponseWriter, r *http.Request) {
 	responsewriters.WriteObjectNegotiated(
 		serializer,
 		restrictions,
@@ -198,7 +299,7 @@ func writeResponse(obj runtime.Object, serializer runtime.NegotiatedSerializer, 
 	)
 }
 
-func statusz(componentName string, reg statuszRegistry) *v1alpha1.Statusz {
+func v1alpha1Statusz(componentName string, reg statuszRegistry) *v1alpha1.Statusz {
 	startTime := reg.processStartTime()
 	upTimeSeconds := max(0, int64(time.Since(startTime).Seconds()))
 	goVersion := reg.goVersion()
@@ -211,8 +312,38 @@ func statusz(componentName string, reg statuszRegistry) *v1alpha1.Statusz {
 	paths := aggregatePaths(reg.paths())
 	data := &v1alpha1.Statusz{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       Kind,
-			APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
+			Kind:       v1alpha1StatuszKind.Kind,
+			APIVersion: v1alpha1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: componentName,
+		},
+		StartTime:        metav1.Time{Time: startTime},
+		UptimeSeconds:    upTimeSeconds,
+		GoVersion:        goVersion,
+		BinaryVersion:    binaryVersion,
+		EmulationVersion: emulationVersion,
+		Paths:            paths,
+	}
+
+	return data
+}
+
+func v1beta1Statusz(componentName string, reg statuszRegistry) *v1beta1.Statusz {
+	startTime := reg.processStartTime()
+	upTimeSeconds := max(0, int64(time.Since(startTime).Seconds()))
+	goVersion := reg.goVersion()
+	binaryVersion := reg.binaryVersion().String()
+	var emulationVersion string
+	if reg.emulationVersion() != nil {
+		emulationVersion = reg.emulationVersion().String()
+	}
+
+	paths := aggregatePaths(reg.paths())
+	data := &v1beta1.Statusz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       v1beta1StatuszKind.Kind,
+			APIVersion: v1beta1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: componentName,

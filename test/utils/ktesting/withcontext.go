@@ -20,116 +20,54 @@ import (
 	"context"
 	"time"
 
-	"github.com/onsi/gomega"
 	"k8s.io/klog/v2"
 )
 
 // WithCancel sets up cancellation in a [TContext.Cleanup] callback and
 // constructs a new TContext where [TContext.Cancel] cancels only the new
 // context.
-func WithCancel(tCtx TContext) TContext {
+func (tCtx TContext) WithCancel() TContext {
 	ctx, cancel := context.WithCancelCause(tCtx)
 
-	return withContext{
-		TContext: tCtx,
-		Context:  ctx,
-		cancel: func(cause string) {
-			var cancelCause error
-			if cause != "" {
-				cancelCause = canceledError(cause)
-			}
-			cancel(cancelCause)
-		},
+	tCtx.Context = ctx
+	tCtx.cancel = func(cause string) {
+		var cancelCause error
+		if cause != "" {
+			cancelCause = canceledError(cause)
+		}
+		cancel(cancelCause)
 	}
+	return tCtx
 }
 
 // WithoutCancel causes the returned context to ignore cancellation of its parent.
-func WithoutCancel(tCtx TContext) TContext {
-	tCtx.Helper()
+// Calling Cancel will only cancel the new context.
+// This matches [context.WithoutCancel].
+func (tCtx TContext) WithoutCancel() TContext {
 	ctx := context.WithoutCancel(tCtx)
-	return WithContext(tCtx, ctx)
+
+	tCtx.Context = ctx
+	tCtx = tCtx.WithCancel() // Re-create a cancelable TContext.
+	return tCtx
 }
 
 // WithTimeout sets up new context with a timeout. Canceling the timeout gets
-// registered in a [TContext.Cleanup] callback. [TContext.Cancel] cancels only
+// registered in a cleanup callback. [TContext.Cancel] cancels only
 // the new context. The cause is used as reason why the context is canceled
 // once the timeout is reached. It may be empty, in which case the usual
 // "context canceled" error is used.
-func WithTimeout(tCtx TContext, timeout time.Duration, timeoutCause string) TContext {
-	tCtx.Helper()
+func (tCtx TContext) WithTimeout(timeout time.Duration, timeoutCause string) TContext {
 	ctx, cancel := withTimeout(tCtx, tCtx.TB(), timeout, timeoutCause)
 
-	return withContext{
-		TContext: tCtx,
-		Context:  ctx,
-		cancel:   cancel,
-	}
+	tCtx.Context = ctx
+	tCtx.cancel = cancel
+	return tCtx
 }
 
 // WithLogger constructs a new context with a different logger.
-func WithLogger(tCtx TContext, logger klog.Logger) TContext {
+func (tCtx TContext) WithLogger(logger klog.Logger) TContext {
 	ctx := klog.NewContext(tCtx, logger)
 
-	return withContext{
-		TContext: tCtx,
-		Context:  ctx,
-		cancel:   tCtx.Cancel,
-	}
-}
-
-// withContext combines some TContext with a new [context.Context] derived
-// from it. Because both provide the [context.Context] interface, methods must
-// be defined which pick the newer one.
-type withContext struct {
-	TContext
-	context.Context
-
-	cancel func(cause string)
-}
-
-func (wCtx withContext) Cancel(cause string) {
-	wCtx.cancel(cause)
-}
-
-func (wCtx withContext) CleanupCtx(cb func(TContext)) {
-	wCtx.Helper()
-	cleanupCtx(wCtx, cb)
-}
-
-func (wCtx withContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
-	wCtx.Helper()
-	return expect(wCtx, actual, extra...)
-}
-
-func (wCtx withContext) ExpectNoError(err error, explain ...interface{}) {
-	wCtx.Helper()
-	expectNoError(wCtx, err, explain...)
-}
-
-func (cCtx withContext) Run(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, false, cb)
-}
-
-func (cCtx withContext) SyncTest(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, true, cb)
-}
-
-func (wCtx withContext) Logger() klog.Logger {
-	return klog.FromContext(wCtx)
-}
-
-func (wCtx withContext) Deadline() (time.Time, bool) {
-	return wCtx.Context.Deadline()
-}
-
-func (wCtx withContext) Done() <-chan struct{} {
-	return wCtx.Context.Done()
-}
-
-func (wCtx withContext) Err() error {
-	return wCtx.Context.Err()
-}
-
-func (wCtx withContext) Value(key any) any {
-	return wCtx.Context.Value(key)
+	tCtx.Context = ctx
+	return tCtx
 }

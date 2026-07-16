@@ -66,6 +66,12 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 		return nil
 	})
 
+	// Handle the new quota configuration API
+	quotaConfig, err := install.NewQuotaConfigurationForAdmission(kubeInformers, genericConfig.MergedResourceConfig)
+	if err != nil {
+		return err
+	}
+
 	*pluginInitializers = append(*pluginInitializers,
 		imagepolicy.NewInitializer(imagereferencemutators.KubeImageMutators{}, enablement.OpenshiftConfig().ImagePolicyConfig.InternalRegistryHostname),
 		restrictusers.NewInitializer(openshiftInformers.getOpenshiftUserInformers()),
@@ -73,7 +79,7 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 		clusterresourcequota.NewInitializer(
 			openshiftInformers.getOpenshiftQuotaInformers().Quota().V1().ClusterResourceQuotas(),
 			clusterQuotaMappingController.GetClusterQuotaMapper(),
-			generic.NewRegistry(install.NewQuotaConfigurationForAdmission(kubeInformers).Evaluators()),
+			generic.NewRegistry(quotaConfig.Evaluators()),
 		),
 		nodeenv.NewInitializer(enablement.OpenshiftConfig().ProjectConfig.DefaultNodeSelector),
 		admissionrestconfig.NewInitializer(*rest.CopyConfig(genericConfig.LoopbackClientConfig)),

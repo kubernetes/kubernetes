@@ -36,6 +36,8 @@ func (o *NodeControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.Int32Var(&o.ConcurrentNodeSyncs, "concurrent-node-syncs", o.ConcurrentNodeSyncs, "Number of workers concurrently synchronizing nodes.")
+	// If concurrent-node-status-updates is not specified it will be derived from concurrent-node-syncs for backwards compatibility
+	fs.Int32Var(&o.ConcurrentNodeStatusUpdates, "concurrent-node-status-updates", 0, "Number of workers concurrently updating node statuses. If unspecified or 0, --concurrent-node-syncs is used instead")
 }
 
 // ApplyTo fills up ServiceController config with options.
@@ -45,6 +47,13 @@ func (o *NodeControllerOptions) ApplyTo(cfg *nodeconfig.NodeControllerConfigurat
 	}
 
 	cfg.ConcurrentNodeSyncs = o.ConcurrentNodeSyncs
+	// Concurrent node status updates used to be derived from the concurrent-node-syncs flag,
+	// so for backwards compatibility it will default to concurrent-node-syncs if concurrent-node-status-updates is not specified
+	if o.ConcurrentNodeStatusUpdates > 0 {
+		cfg.ConcurrentNodeStatusUpdates = o.ConcurrentNodeStatusUpdates
+	} else {
+		cfg.ConcurrentNodeStatusUpdates = o.ConcurrentNodeSyncs
+	}
 
 	return nil
 }
@@ -57,6 +66,9 @@ func (o *NodeControllerOptions) Validate() []error {
 	var errors []error
 	if o.ConcurrentNodeSyncs <= 0 {
 		errors = append(errors, fmt.Errorf("concurrent-node-syncs must be a positive number"))
+	}
+	if o.ConcurrentNodeStatusUpdates < 0 {
+		errors = append(errors, fmt.Errorf("concurrent-node-status-updates cannot be a negative number"))
 	}
 	return errors
 }

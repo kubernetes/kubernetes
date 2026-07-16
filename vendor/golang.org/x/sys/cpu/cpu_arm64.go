@@ -44,14 +44,11 @@ func initOptions() {
 }
 
 func archInit() {
-	switch runtime.GOOS {
-	case "freebsd":
+	if runtime.GOOS == "freebsd" {
 		readARM64Registers()
-	case "linux", "netbsd", "openbsd":
+	} else {
+		// Most platforms don't seem to allow directly reading these registers.
 		doinit()
-	default:
-		// Many platforms don't seem to allow reading these registers.
-		setMinimalFeatures()
 	}
 }
 
@@ -65,10 +62,10 @@ func setMinimalFeatures() {
 func readARM64Registers() {
 	Initialized = true
 
-	parseARM64SystemRegisters(getisar0(), getisar1(), getmmfr1(), getpfr0())
+	parseARM64SystemRegisters(getisar0(), getisar1(), getpfr0())
 }
 
-func parseARM64SystemRegisters(isar0, isar1, mmfr1, pfr0 uint64) {
+func parseARM64SystemRegisters(isar0, isar1, pfr0 uint64) {
 	// ID_AA64ISAR0_EL1
 	switch extractBits(isar0, 4, 7) {
 	case 1:
@@ -150,22 +147,6 @@ func parseARM64SystemRegisters(isar0, isar1, mmfr1, pfr0 uint64) {
 	switch extractBits(isar1, 52, 55) {
 	case 1:
 		ARM64.HasI8MM = true
-	}
-
-	// ID_AA64MMFR1_EL1
-	switch extractBits(mmfr1, 12, 15) {
-	case 1, 2:
-		ARM64.HasHPDS = true
-	}
-
-	switch extractBits(mmfr1, 16, 19) {
-	case 1:
-		ARM64.HasLOR = true
-	}
-
-	switch extractBits(mmfr1, 20, 23) {
-	case 1, 2, 3:
-		ARM64.HasPAN = true
 	}
 
 	// ID_AA64PFR0_EL1

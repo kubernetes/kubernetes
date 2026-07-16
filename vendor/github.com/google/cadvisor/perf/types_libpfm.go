@@ -1,5 +1,4 @@
 //go:build libpfm && cgo
-// +build libpfm,cgo
 
 // Copyright 2020 Google Inc. All Rights Reserved.
 //

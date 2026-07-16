@@ -39,6 +39,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/endpointslice/metrics"
 	"k8s.io/endpointslice/topologycache"
@@ -50,6 +51,10 @@ import (
 const (
 	controllerName = "endpointslice-controller.k8s.io"
 )
+
+func init() {
+	metrics.RegisterMetrics()
+}
 
 func expectAction(t *testing.T, actions []k8stesting.Action, index int, verb, resource string) {
 	t.Helper()
@@ -114,7 +119,7 @@ var defaultMaxEndpointsPerSlice = int32(100)
 // Even when there are no pods, we want to have a placeholder slice for each service
 func TestReconcileEmpty(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	resetMetrics()
 	namespace := "test"
 	svc, _ := newServiceAndEndpointMeta("foo", namespace)
 
@@ -468,7 +473,7 @@ func TestReconcile1Pod(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
+			resetMetrics()
 			triggerTime := time.Now().UTC()
 			r := newReconciler(client, []*corev1.Node{node1}, defaultMaxEndpointsPerSlice)
 			reconcileHelper(t, r, &testCase.service, []*corev1.Pod{pod1}, []*discovery.EndpointSlice{}, triggerTime)
@@ -574,7 +579,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
+			resetMetrics()
 
 			existingSlices := []*discovery.EndpointSlice{}
 			if tc.existing != nil {
@@ -727,7 +732,7 @@ func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 // reconcile should create 3 slices, completely filling 2 of them
 func TestReconcileManyPods(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	resetMetrics()
 	namespace := "test"
 	svc, _ := newServiceAndEndpointMeta("foo", namespace)
 
@@ -760,7 +765,7 @@ func TestReconcileManyPods(t *testing.T) {
 // this approach requires 1 update + 1 create instead of 2 updates + 1 create
 func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	resetMetrics()
 	namespace := "test"
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 
@@ -816,7 +821,7 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 // this approach requires 2 creates instead of 2 updates + 1 create
 func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	resetMetrics()
 	namespace := "test"
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 
@@ -973,7 +978,7 @@ func TestReconcileEndpointSlicesServicesReservedLabels(t *testing.T) {
 // reconcile repacks the endpoints into 3 slices, and deletes the extras
 func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	resetMetrics()
 	namespace := "test"
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 
@@ -1023,7 +1028,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 // for update.
 func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	resetMetrics()
 	namespace := "test"
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 
@@ -1082,7 +1087,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 // address type will be replaced with a newer IPv4 type.
 func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	resetMetrics()
 	namespace := "test"
 
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
@@ -1155,7 +1160,7 @@ func TestReconcileEndpointSlicesRecreation(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
+			resetMetrics()
 			namespace := "test"
 
 			svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
@@ -1204,7 +1209,7 @@ func TestReconcileEndpointSlicesRecreation(t *testing.T) {
 // This test ensures that EndpointSlices are grouped correctly in that case.
 func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	resetMetrics()
 	namespace := "test"
 
 	portNameIntStr := intstr.IntOrString{
@@ -1312,7 +1317,7 @@ func TestReconcileMaxEndpointsPerSlice(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(fmt.Sprintf("maxEndpointsPerSlice: %d", testCase.maxEndpointsPerSlice), func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
+			resetMetrics()
 			r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, testCase.maxEndpointsPerSlice)
 			reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 			expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), testCase.expectedSliceLengths)
@@ -1323,7 +1328,7 @@ func TestReconcileMaxEndpointsPerSlice(t *testing.T) {
 
 func TestReconcileEndpointSlicesMetrics(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	resetMetrics()
 	namespace := "test"
 	svc, _ := newServiceAndEndpointMeta("foo", namespace)
 
@@ -1345,6 +1350,154 @@ func TestReconcileEndpointSlicesMetrics(t *testing.T) {
 	fetchedSlices := fetchEndpointSlices(t, client, namespace)
 	reconcileHelper(t, r, &svc, pods[0:10], []*discovery.EndpointSlice{&fetchedSlices[0]}, time.Now())
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 10, addedPerSync: 20, removedPerSync: 10, numCreated: 1, numUpdated: 1, numDeleted: 0, slicesChangedPerSync: 2})
+}
+
+func TestReconcileEndpointSlicesMetrics_EndpointsAddedPerSync_CollectAndCompare(t *testing.T) {
+	resetMetrics()
+	client := newClientset()
+	namespace := "test"
+	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
+
+	keepPod := newPod(1, namespace, true, 1, false)
+	newDesiredPod := newPod(2, namespace, true, 1, false)
+
+	// Existing slice has one endpoint that should remain. Reconcile should add exactly 1 endpoint.
+	existingSlice := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
+	existingSlice.Endpoints = []discovery.Endpoint{
+		podToEndpoint(keepPod, &corev1.Node{}, &svc, discovery.AddressTypeIPv4),
+	}
+	createdSlice, err := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), existingSlice, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Expected no error creating EndpointSlice, got: %v", err)
+	}
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	reconcileHelper(t, r, &svc, []*corev1.Pod{keepPod, newDesiredPod}, []*discovery.EndpointSlice{createdSlice}, time.Now())
+
+	want := `
+# HELP endpoint_slice_controller_endpoints_added_per_sync [BETA] Number of endpoints added on each Service sync
+# TYPE endpoint_slice_controller_endpoints_added_per_sync histogram
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="2"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="4"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="8"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="16"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="32"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="64"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="128"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="256"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="512"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="1024"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="2048"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="4096"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="8192"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="16384"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="32768"} 1
+endpoint_slice_controller_endpoints_added_per_sync_bucket{le="+Inf"} 1
+endpoint_slice_controller_endpoints_added_per_sync_sum 1
+endpoint_slice_controller_endpoints_added_per_sync_count 1
+`
+
+	if err := testutil.CollectAndCompare(metrics.EndpointsAddedPerSync, strings.NewReader(want), "endpoint_slice_controller_endpoints_added_per_sync"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReconcileEndpointSlicesMetrics_EndpointsRemovedPerSync_CollectAndCompare(t *testing.T) {
+	resetMetrics()
+
+	client := newClientset()
+	namespace := "test"
+	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
+
+	stalePod := newPod(0, namespace, true, 1, false)
+	keepPod := newPod(1, namespace, true, 1, false)
+
+	// Existing slice has one stale endpoint and one endpoint that should remain.
+	// Reconcile should remove exactly 1 endpoint.
+	existingSlice := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
+	existingSlice.Endpoints = []discovery.Endpoint{
+		podToEndpoint(stalePod, &corev1.Node{}, &svc, discovery.AddressTypeIPv4),
+		podToEndpoint(keepPod, &corev1.Node{}, &svc, discovery.AddressTypeIPv4),
+	}
+	createdSlice, err := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), existingSlice, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Expected no error creating EndpointSlice, got: %v", err)
+	}
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	reconcileHelper(t, r, &svc, []*corev1.Pod{keepPod}, []*discovery.EndpointSlice{createdSlice}, time.Now())
+
+	want := `
+# HELP endpoint_slice_controller_endpoints_removed_per_sync [BETA] Number of endpoints removed on each Service sync
+# TYPE endpoint_slice_controller_endpoints_removed_per_sync histogram
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="2"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="4"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="8"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="16"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="32"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="64"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="128"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="256"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="512"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="1024"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="2048"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="4096"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="8192"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="16384"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="32768"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_bucket{le="+Inf"} 1
+endpoint_slice_controller_endpoints_removed_per_sync_sum 1
+endpoint_slice_controller_endpoints_removed_per_sync_count 1
+`
+
+	if err := testutil.CollectAndCompare(metrics.EndpointsRemovedPerSync, strings.NewReader(want), "endpoint_slice_controller_endpoints_removed_per_sync"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReconcileEndpointSlicesMetrics_GaugeUpdates(t *testing.T) {
+	resetMetrics()
+	client := newClientset()
+	namespace := "test"
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+
+	svc.Spec.TrafficDistribution = ptr.To(corev1.ServiceTrafficDistributionPreferClose)
+	if _, err := client.CoreV1().Services(namespace).Create(context.TODO(), &svc, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Expected no error creating Service, got: %v", err)
+	}
+
+	// Reconcile with exactly 2 pods to deterministically set gauge metric values.
+	pod1 := newPod(1, namespace, true, 1, false)
+	pod2 := newPod(2, namespace, true, 1, false)
+	reconcileHelper(t, r, &svc, []*corev1.Pod{pod1, pod2}, []*discovery.EndpointSlice{}, time.Unix(0, 0))
+
+	want := `
+# HELP endpoint_slice_controller_desired_endpoint_slices [BETA] Number of EndpointSlices that would exist with perfect endpoint allocation
+# TYPE endpoint_slice_controller_desired_endpoint_slices gauge
+endpoint_slice_controller_desired_endpoint_slices 1
+# HELP endpoint_slice_controller_endpoints_desired [BETA] Number of endpoints desired
+# TYPE endpoint_slice_controller_endpoints_desired gauge
+endpoint_slice_controller_endpoints_desired 2
+# HELP endpoint_slice_controller_num_endpoint_slices [BETA] Number of EndpointSlices
+# TYPE endpoint_slice_controller_num_endpoint_slices gauge
+endpoint_slice_controller_num_endpoint_slices 1
+# HELP endpoint_slice_controller_services_count_by_traffic_distribution [BETA] Number of Services using some specific trafficDistribution
+# TYPE endpoint_slice_controller_services_count_by_traffic_distribution gauge
+endpoint_slice_controller_services_count_by_traffic_distribution{traffic_distribution="PreferClose"} 1
+`
+
+	if err := testutil.GatherAndCompare(
+		legacyregistry.DefaultGatherer,
+		strings.NewReader(want),
+		"endpoint_slice_controller_endpoints_desired",
+		"endpoint_slice_controller_num_endpoint_slices",
+		"endpoint_slice_controller_desired_endpoint_slices",
+		"endpoint_slice_controller_services_count_by_traffic_distribution",
+	); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // When a Service has a non-nil deletionTimestamp we want to avoid creating any
@@ -1417,7 +1570,7 @@ func TestReconcilerFinalizeSvcDeletionTimestamp(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
+			resetMetrics()
 			r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
 
 			namespace := "test"
@@ -1670,7 +1823,7 @@ func TestReconcilerPodMissingNode(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
+			resetMetrics()
 			r := newReconciler(client, tc.existingNodes, defaultMaxEndpointsPerSlice)
 			logger, _ := ktesting.NewTestContext(t)
 
@@ -1900,7 +2053,7 @@ func TestReconcileTopology(t *testing.T) {
 			createEndpointSlices(t, client, ns, tc.existingSlices)
 			logger, _ := ktesting.NewTestContext(t)
 
-			setupMetrics()
+			resetMetrics()
 			r := newReconciler(client, tc.nodes, defaultMaxEndpointsPerSlice)
 			if tc.topologyCacheEnabled {
 				r.topologyCache = topologycache.NewTopologyCache()
@@ -2016,10 +2169,9 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 		name string
 		desc string
 
-		trafficDistributionFeatureGateEnabled bool
-		preferSameFeatureGateEnabled          bool
-		trafficDistribution                   *string
-		topologyAnnotation                    string
+		preferSameFeatureGateEnabled bool
+		trafficDistribution          *string
+		topologyAnnotation           string
 
 		// Defines how many hints belong to a particular zone/node
 		wantHintsDistributionByZone map[string]int
@@ -2030,11 +2182,10 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 		wantMetrics                     expectedMetrics
 	}{
 		{
-			name:                                  "trafficDistribution=PreferClose, topologyAnnotation=Disabled",
-			desc:                                  "When trafficDistribution is enabled and topologyAnnotation is disabled, hints should be distributed as per the trafficDistribution field",
-			trafficDistributionFeatureGateEnabled: true,
-			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferClose),
-			topologyAnnotation:                    "Disabled",
+			name:                "trafficDistribution=PreferClose, topologyAnnotation=Disabled",
+			desc:                "When trafficDistribution is enabled and topologyAnnotation is disabled, hints should be distributed as per the trafficDistribution field",
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
+			topologyAnnotation:  "Disabled",
 			wantHintsDistributionByZone: map[string]int{
 				"zone-a": 1, // {pod-0}
 				"zone-b": 3, // {pod-1, pod-2, pod-3}
@@ -2058,32 +2209,10 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                                  "feature gate disabled; trafficDistribution=PreferClose, topologyAnnotation=Disabled",
-			desc:                                  "When feature gate is disabled, trafficDistribution should be ignored",
-			trafficDistributionFeatureGateEnabled: false,
-			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferClose),
-			topologyAnnotation:                    "Disabled",
-			wantHintsDistributionByZone:           map[string]int{"": 6}, // Equivalent to no hints.
-			wantMetrics: expectedMetrics{
-				desiredSlices:                   1,
-				actualSlices:                    1,
-				desiredEndpoints:                6,
-				addedPerSync:                    6,
-				removedPerSync:                  0,
-				numCreated:                      1,
-				numUpdated:                      0,
-				numDeleted:                      0,
-				slicesChangedPerSync:            1, // 1 means both topologyAnnotation and trafficDistribution were not used.
-				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
-				slicesChangedPerSyncTrafficDist: 0, // 0 means trafficDistribution was not used.
-			},
-		},
-		{
-			name:                                  "trafficDistribution=PreferClose, topologyAnnotation=Auto",
-			desc:                                  "When trafficDistribution and topologyAnnotation are both enabled, precedence should be given to topologyAnnotation",
-			trafficDistributionFeatureGateEnabled: true,
-			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferClose),
-			topologyAnnotation:                    "Auto",
+			name:                "trafficDistribution=PreferClose, topologyAnnotation=Auto",
+			desc:                "When trafficDistribution and topologyAnnotation are both enabled, precedence should be given to topologyAnnotation",
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
+			topologyAnnotation:  "Auto",
 			wantHintsDistributionByZone: map[string]int{
 				"zone-a": 2, // {pod-0, pod-3} (pod-3 is just an example, it could have also been either of the other two)
 				"zone-b": 2, // {pod-1, pod-2}
@@ -2105,12 +2234,11 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                                  "trafficDistribution=nil, topologyAnnotation=<empty>",
-			desc:                                  "When trafficDistribution and topologyAnnotation are both disabled, no hints should be added",
-			trafficDistributionFeatureGateEnabled: true,
-			trafficDistribution:                   nil,
-			topologyAnnotation:                    "",
-			wantHintsDistributionByZone:           map[string]int{"": 6}, // Equivalent to no hints.
+			name:                        "trafficDistribution=nil, topologyAnnotation=<empty>",
+			desc:                        "When trafficDistribution and topologyAnnotation are both disabled, no hints should be added",
+			trafficDistribution:         nil,
+			topologyAnnotation:          "",
+			wantHintsDistributionByZone: map[string]int{"": 6}, // Equivalent to no hints.
 			wantMetrics: expectedMetrics{
 				desiredSlices:                   1,
 				actualSlices:                    1,
@@ -2126,12 +2254,11 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                                  "trafficDistribution=PreferSameNode, PSTD enabled",
-			desc:                                  "When trafficDistribution is PreferSameNode and PreferSameTrafficDistribution is enabled, both zone and node hints should be filled out",
-			trafficDistributionFeatureGateEnabled: true,
-			preferSameFeatureGateEnabled:          true,
-			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferSameNode),
-			topologyAnnotation:                    "Disabled",
+			name:                         "trafficDistribution=PreferSameNode, PSTD enabled",
+			desc:                         "When trafficDistribution is PreferSameNode and PreferSameTrafficDistribution is enabled, both zone and node hints should be filled out",
+			preferSameFeatureGateEnabled: true,
+			trafficDistribution:          ptr.To(corev1.ServiceTrafficDistributionPreferSameNode),
+			topologyAnnotation:           "Disabled",
 			wantHintsDistributionByZone: map[string]int{
 				"zone-a": 1, // {pod-0}
 				"zone-b": 3, // {pod-1, pod-2, pod-3}
@@ -2160,13 +2287,12 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                                  "trafficDistribution=PreferSameZone, PSTD disabled",
-			desc:                                  "When trafficDistribution is PreferSameZone and PreferSameTrafficDistribution is disabled, no hints should be set",
-			trafficDistributionFeatureGateEnabled: true,
-			preferSameFeatureGateEnabled:          false,
-			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferSameZone),
-			topologyAnnotation:                    "Disabled",
-			wantHintsDistributionByZone:           map[string]int{"": 6}, // Equivalent to no hints.
+			name:                         "trafficDistribution=PreferSameZone, PSTD disabled",
+			desc:                         "When trafficDistribution is PreferSameZone and PreferSameTrafficDistribution is disabled, no hints should be set",
+			preferSameFeatureGateEnabled: false,
+			trafficDistribution:          ptr.To(corev1.ServiceTrafficDistributionPreferSameZone),
+			topologyAnnotation:           "Disabled",
+			wantHintsDistributionByZone:  map[string]int{"": 6}, // Equivalent to no hints.
 			wantMetrics: expectedMetrics{
 				desiredSlices:                   1,
 				actualSlices:                    1,
@@ -2189,10 +2315,9 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := newClientset()
 			logger, _ := ktesting.NewTestContext(t)
-			setupMetrics()
+			resetMetrics()
 
 			r := newReconciler(client, nodes, defaultMaxEndpointsPerSlice)
-			r.trafficDistributionEnabled = tc.trafficDistributionFeatureGateEnabled
 			r.preferSameTrafficDistribution = tc.preferSameFeatureGateEnabled
 			r.topologyCache = topologycache.NewTopologyCache()
 			r.topologyCache.SetNodes(logger, nodes)
@@ -2235,6 +2360,48 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			expectMetrics(t, tc.wantMetrics)
 		})
 	}
+}
+
+// TestReconcileHeadlessServiceNoPorts verifies that headless services with no ports
+// don't cause EndpointSlice churn. Validates fix for https://github.com/kubernetes/kubernetes/issues/133474
+func TestReconcileHeadlessServiceNoPorts(t *testing.T) {
+	namespace := "test"
+	client := newClientset()
+	resetMetrics()
+	svc := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "headless-no-ports",
+			Namespace: namespace,
+			UID:       "test-uid",
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP:  corev1.ClusterIPNone,
+			Selector:   map[string]string{"foo": "bar"},
+			IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
+		},
+	}
+
+	pod := newPod(1, namespace, true, 1, false)
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: pod.Spec.NodeName}}}, defaultMaxEndpointsPerSlice)
+
+	reconcileHelper(t, r, &svc, []*corev1.Pod{pod}, []*discovery.EndpointSlice{}, time.Now())
+	assert.Len(t, client.Actions(), 1, "Expected 1 additional clientset action")
+	expectActions(t, client.Actions(), 1, "create", "endpointslices")
+
+	var existingSlices []*discovery.EndpointSlice
+	for _, slice := range fetchEndpointSlices(t, client, namespace) {
+		copy := slice.DeepCopy()
+		// replicate API server behavior which serializes this empty slice as nil
+		copy.Ports = nil
+		existingSlices = append(existingSlices, copy)
+	}
+	assert.Len(t, existingSlices, 1, "Expected 1 endpoint slices")
+
+	reconcileHelper(t, r, &svc, []*corev1.Pod{pod}, existingSlices, time.Now())
+
+	assert.Len(t, client.Actions(), 2, "Expected second reconcile to only list")
+	expectActions(t, client.Actions(), 1, "list", "endpointslices")
 }
 
 // Test Helpers
@@ -2464,7 +2631,7 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 	handleErr(t, err, "slicesChangedPreferSameNode")
 	actualSlicesChangedPerSyncTrafficDist := actualSlicesChangedPreferClose + actualSlicesChangedPreferSameZone + actualSlicesChangedPreferSameNode
 	if actualSlicesChangedPerSyncTrafficDist != float64(em.slicesChangedPerSyncTrafficDist) {
-		t.Errorf("Expected slicesChangedPerSyncTrafficDist to be %d, got %v", em.slicesChangedPerSyncTrafficDist, actualSlicesChangedPerSyncTopology)
+		t.Errorf("Expected slicesChangedPerSyncTrafficDist to be %d, got %v", em.slicesChangedPerSyncTrafficDist, actualSlicesChangedPerSyncTrafficDist)
 	}
 
 	actualSyncSuccesses, err := testutil.GetCounterMetricValue(metrics.EndpointSliceSyncs.WithLabelValues("success"))
@@ -2479,7 +2646,12 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 		t.Errorf("Expected endpointSliceSyncErrors to be %d, got %v", em.syncErrors, actualSyncErrors)
 	}
 
-	for _, trafficDistribution := range []string{"PreferClose", "ImplementationSpecific"} {
+	for _, trafficDistribution := range []string{
+		"PreferClose",
+		"PreferSameZone",
+		"PreferSameNode",
+		"ImplementationSpecific",
+	} {
 		gotServicesCount, err := testutil.GetGaugeMetricValue(metrics.ServicesCountByTrafficDistribution.WithLabelValues(trafficDistribution))
 		var wantServicesCount int
 		if em.servicesCountByTrafficDistribution != nil {
@@ -2498,8 +2670,7 @@ func handleErr(t *testing.T, err error, metricName string) {
 	}
 }
 
-func setupMetrics() {
-	metrics.RegisterMetrics()
+func resetMetrics() {
 	metrics.NumEndpointSlices.Reset()
 	metrics.DesiredEndpointSlices.Reset()
 	metrics.EndpointsDesired.Reset()

@@ -59,6 +59,7 @@ const (
 	csiPodUnschedulableTimeout = 5 * time.Minute
 	csiResizeWaitPeriod        = 5 * time.Minute
 	csiVolumeAttachmentTimeout = 7 * time.Minute
+	csiDriverTimeout           = 2 * time.Minute
 	// how long to wait for GetVolumeStats
 	csiNodeVolumeStatWaitPeriod = 2 * time.Minute
 	// how long to wait for Resizing Condition on PVC to appear
@@ -1085,13 +1086,13 @@ func createFSGroupRequestPreHook(nodeStageFsGroup, nodePublishFsGroup *string) *
 
 // createPreHook counts invocations of a certain method (identified by a substring in the full gRPC method name).
 func createPreHook(method string, callback func(counter int64) error) *drivers.Hooks {
-	var counter int64
+	var counter atomic.Int64
 
 	return &drivers.Hooks{
 		Pre: func() func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
 			return func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
 				if strings.Contains(fullMethod, method) {
-					counter := atomic.AddInt64(&counter, 1)
+					counter := counter.Add(1)
 					return nil, callback(counter)
 				}
 				return nil, nil
@@ -1266,6 +1267,23 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 	})
 	if waitErr != nil {
 		return fmt.Errorf("error waiting for pod %s/%s to have max volume condition: %v", pod.Namespace, pod.Name, waitErr)
+	}
+	return nil
+}
+
+func waitForCSIDriverDeleted(ctx context.Context, cs clientset.Interface, driverName string, interval, timeout time.Duration) error {
+	waitErr := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		_, err := cs.StorageV1().CSIDrivers().Get(ctx, driverName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting for CSIDriver %s to be deleted: %w", driverName, waitErr)
 	}
 	return nil
 }

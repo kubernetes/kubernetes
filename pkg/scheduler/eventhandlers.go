@@ -52,8 +52,7 @@ import (
 
 func (sched *Scheduler) addNodeToCache(obj interface{}) {
 	evt := fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add}
-	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
 	logger := sched.logger
 	node, ok := obj.(*v1.Node)
 	if !ok {
@@ -99,8 +98,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 
 func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 	evt := fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Delete}
-	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
 
 	logger := sched.logger
 	var node *v1.Node
@@ -135,10 +133,6 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		return
 	}
 
-	if sched.WorkloadManager != nil {
-		// Register pod into workload manager before adding to the cache or scheduling queue.
-		sched.WorkloadManager.AddPod(pod)
-	}
 	if assignedPod(pod) {
 		sched.addAssignedPodToCache(pod)
 	} else if responsibleForPod(pod, sched.Profiles) {
@@ -159,10 +153,6 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 		return
 	}
 
-	if sched.WorkloadManager != nil {
-		// Update pod in workload manager before updating it in the cache or scheduling queue.
-		sched.WorkloadManager.UpdatePod(oldPod, newPod)
-	}
 	if assignedPod(oldPod) {
 		sched.updateAssignedPodInCache(oldPod, newPod)
 	} else if assignedPod(newPod) {
@@ -187,10 +177,6 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 	switch t := obj.(type) {
 	case *v1.Pod:
 		pod = t
-		if sched.WorkloadManager != nil {
-			// Delete pod from workload manager before deleting the pod from cache or scheduling queue.
-			sched.WorkloadManager.DeletePod(pod)
-		}
 		if assignedPod(pod) {
 			sched.deleteAssignedPodFromCache(pod)
 		} else if responsibleForPod(pod, sched.Profiles) {
@@ -205,10 +191,6 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 		if !ok {
 			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
 			return
-		}
-		if sched.WorkloadManager != nil {
-			// Delete pod from workload manager before deleting the pod from cache or scheduling queue.
-			sched.WorkloadManager.DeletePod(pod)
 		}
 		// The carried object may be stale, so we don't use it to check if
 		// it's assigned or not. Attempting to cleanup anyways.
@@ -226,12 +208,12 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 }
 
 func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
-	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodAdd.Label()).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), framework.EventUnscheduledPodAdd.Label())()
 
 	logger := sched.logger
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
-	sched.SchedulingQueue.Add(logger, pod)
+	sched.Cache.AddPodGroupMember(pod)
+	sched.SchedulingQueue.Add(klog.NewContext(context.Background(), logger), pod)
 	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, pod, nil)
 	}
@@ -303,10 +285,10 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 		return
 	}
 
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodUpdate.Label()).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.ObserveSince(start, framework.EventUnscheduledPodUpdate.Label())()
 	for _, evt := range framework.PodSchedulingPropertiesChange(newPod, oldPod) {
 		if evt.Label() != framework.EventUnscheduledPodUpdate.Label() {
-			defer metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+			defer metrics.EventHandlingLatency.ObserveSince(start, evt.Label())()
 		}
 	}
 
@@ -315,6 +297,8 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 		// However, at the moment the updated newPod is discarded and this logic will be handled in the future releases.
 		_ = sched.syncPodWithDispatcher(newPod)
 	}
+
+	sched.Cache.UpdatePodGroupMember(logger, oldPod, newPod)
 
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
 	if err != nil {
@@ -330,7 +314,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 	}
 
 	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
-	sched.SchedulingQueue.Update(logger, oldPod, newPod)
+	sched.SchedulingQueue.Update(klog.NewContext(context.Background(), logger), oldPod, newPod)
 	if hasNominatedNodeNameChanged(oldPod, newPod) {
 		// Nominated node changed in pod, so we need to treat it as if the pod was deleted from the old nominated node,
 		// because the scheduler treats such a pod as if it was already assigned when scheduling lower or equal priority pods.
@@ -344,8 +328,7 @@ func hasNominatedNodeNameChanged(oldPod, newPod *v1.Pod) bool {
 }
 
 func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool) {
-	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodDelete.Label()).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), framework.EventUnscheduledPodDelete.Label())()
 
 	logger := sched.logger
 
@@ -358,6 +341,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
 		return
 	}
+	sched.Cache.RemovePodGroupMember(pod)
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))
@@ -383,8 +367,7 @@ func getLEPriorityPreCheck(priority int32) queue.PreEnqueueCheck {
 }
 
 func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {
-	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodAdd.Label()).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), framework.EventAssignedPodAdd.Label())()
 
 	logger := sched.logger
 
@@ -411,7 +394,7 @@ func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {
 
 func (sched *Scheduler) updateAssignedPodInCache(oldPod, newPod *v1.Pod) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodUpdate.Label()).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.ObserveSince(start, framework.EventAssignedPodUpdate.Label())()
 
 	logger := sched.logger
 
@@ -453,8 +436,7 @@ func (sched *Scheduler) updateAssignedPodInCache(oldPod, newPod *v1.Pod) {
 }
 
 func (sched *Scheduler) deleteAssignedPodFromCache(pod *v1.Pod) {
-	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodDelete.Label()).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), framework.EventAssignedPodDelete.Label())()
 
 	logger := sched.logger
 
@@ -538,8 +520,7 @@ func addAllEventHandlers(
 		if at&fwk.Add != 0 {
 			evt := fwk.ClusterEvent{Resource: resource, ActionType: fwk.Add}
 			funcs.AddFunc = func(obj interface{}) {
-				start := time.Now()
-				defer metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+				defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
 				if resource == fwk.StorageClass && !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 					sc, ok := obj.(*storagev1.StorageClass)
 					if !ok {
@@ -683,10 +664,10 @@ func addAllEventHandlers(
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
-		case fwk.Workload:
+		case fwk.PodGroup:
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-				if handlerRegistration, err = informerFactory.Scheduling().V1alpha1().Workloads().Informer().AddEventHandler(
-					buildEvtResHandler(at, fwk.Workload),
+				if handlerRegistration, err = informerFactory.Scheduling().V1alpha2().PodGroups().Informer().AddEventHandler(
+					buildEvtResHandler(at, fwk.PodGroup),
 				); err != nil {
 					return err
 				}
@@ -754,8 +735,9 @@ func preCheckForNode(logger klog.Logger, nodeInfo *framework.NodeInfo) queue.Pre
 func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures bool) []AdmissionResult {
 	var admissionResults []AdmissionResult
 	insufficientResources := noderesources.Fits(pod, nodeInfo, nil, noderesources.ResourceRequestsOptions{
-		EnablePodLevelResources:   utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		EnableDRAExtendedResource: utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
+		EnablePodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		EnableDRAExtendedResource:         utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
+		EnableDRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	})
 	if len(insufficientResources) != 0 {
 		for i := range insufficientResources {

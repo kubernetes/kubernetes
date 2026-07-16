@@ -46,6 +46,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 )
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
@@ -53,6 +54,11 @@ func TestRemoveContainer(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
+	// Swap in real ContainerLogManager for the stub.
+	logManager, err := logs.NewContainerLogManager(m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	require.NoError(t, err)
+	m.logManager = logManager
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -71,7 +77,7 @@ func TestRemoveContainer(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 	assert.Len(t, fakeContainers, 1)
 
 	containerID := fakeContainers[0].Id
@@ -89,7 +95,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeOS.Create(expectedContainerLogPath)
 	fakeOS.Create(expectedContainerLogPathRotated)
 
-	err = m.removeContainer(tCtx, containerID)
+	err = m.removeContainer(tCtx, containerID, false)
 	assert.NoError(t, err)
 
 	// Verify container log is removed.
@@ -102,6 +108,65 @@ func TestRemoveContainer(t *testing.T) {
 	containers, err := fakeRuntime.ListContainers(tCtx, &runtimeapi.ContainerFilter{Id: containerID})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
+}
+
+func TestRemoveContainer_keepLogs(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	// Swap in real ContainerLogManager for the stub.
+	logManager, err := logs.NewContainerLogManager(m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	require.NoError(t, err)
+	m.logManager = logManager
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// Create fake sandbox and container
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+	assert.Len(t, fakeContainers, 1)
+
+	containerID := fakeContainers[0].Id
+	fakeOS := m.osInterface.(*containertest.FakeOS)
+	fakeOS.GlobFn = func(pattern, path string) bool {
+		pattern = strings.ReplaceAll(pattern, "*", ".*")
+		pattern = strings.ReplaceAll(pattern, "\\", "\\\\")
+		return regexp.MustCompile(pattern).MatchString(path)
+	}
+	podLogsDirectory := "/var/log/pods"
+	expectedContainerLogPath := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log")
+	expectedContainerLogPathRotated := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
+
+	_, err = fakeOS.Create(expectedContainerLogPath)
+	require.NoError(t, err)
+	_, err = fakeOS.Create(expectedContainerLogPathRotated)
+	require.NoError(t, err)
+
+	err = m.removeContainer(tCtx, containerID, true)
+	require.NoError(t, err)
+
+	// Verify container logs are kept.
+	// We could not predict the order of `fakeOS.Removes`, so we use `assert.ElementsMatch` here.
+	require.Empty(t, fakeOS.Removes)
+	// Verify container is removed
+	require.Contains(t, fakeRuntime.Called, "RemoveContainer")
+	containers, err := fakeRuntime.ListContainers(tCtx, &runtimeapi.ContainerFilter{Id: containerID})
+	require.NoError(t, err)
+	require.Empty(t, containers)
 }
 
 // TestKillContainer tests killing the container in a Pod.
@@ -563,16 +628,21 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 
 	fakeRunner := &containertest.FakeContainerCommandRunner{}
 	fakeHTTP := &fakeHTTP{}
-	fakePodStatusProvider := podStatusProviderFunc(func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
-		return &kubecontainer.PodStatus{
-			ID:        uid,
-			Name:      name,
-			Namespace: namespace,
+	fakePodStatusProvider := fakePodStatusProvider{
+		pod: &kubecontainer.Pod{
+			ID:        testPod.UID,
+			Name:      testPod.Name,
+			Namespace: testPod.Namespace,
+		},
+		status: &kubecontainer.PodStatus{
+			ID:        testPod.UID,
+			Name:      testPod.Name,
+			Namespace: testPod.Namespace,
 			IPs: []string{
 				"127.0.0.1",
 			},
-		}, nil
-	})
+		},
+	}
 
 	lcHanlder := lifecycle.NewHandlerRunner(
 		fakeHTTP,
@@ -624,7 +694,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 	t.Run("PostStart-CmdExe", func(t *testing.T) {
 		tCtx := ktesting.Init(t)
 		// Fake all the things you need before trying to create a container
-		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
+		fakeSandBox, _ := makeAndSetFakePod(tCtx, m, fakeRuntime, testPod)
 		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(tCtx, testPod, 0)
 		testContainer.Lifecycle = cmdPostStart
 		fakePodStatus := &kubecontainer.PodStatus{
@@ -1029,11 +1099,13 @@ func TestUpdateContainerResources(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 	assert.Len(t, fakeContainers, 1)
 
-	cStatus, _, err := m.getPodContainerStatuses(tCtx, pod.UID, pod.Name, pod.Namespace, "")
-	assert.NoError(t, err)
+	runtimePod, err := m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	cStatus, _, err := m.getPodContainerStatuses(tCtx, runtimePod, "")
+	require.NoError(t, err)
 	containerID := cStatus[0].ID
 
 	err = m.updateContainerResources(tCtx, pod, &pod.Spec.Containers[0], containerID)

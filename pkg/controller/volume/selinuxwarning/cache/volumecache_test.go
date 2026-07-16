@@ -492,7 +492,7 @@ func TestVolumeCache_AddVolumeGetConflicts(t *testing.T) {
 			receivedConflicts := c.GetConflicts(logger)
 			sortConflicts(receivedConflicts)
 			if !reflect.DeepEqual(receivedConflicts, expectedConflicts) {
-				t.Errorf("GetConflicts returned unexpected conflicts: %+v", receivedConflicts)
+				t.Errorf("SendConflicts returned unexpected conflicts: %+v", receivedConflicts)
 				c.dump(dumpLogger)
 			}
 		})

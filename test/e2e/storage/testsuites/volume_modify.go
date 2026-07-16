@@ -232,8 +232,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		framework.ExpectNoError(err, "While waiting for PVC to have expected VAC")
 	})
 
-	// Marked as flaky until https://github.com/kubernetes-csi/external-resizer/issues/483 is solved.
-	framework.It("should recover from invalid target VAC by updating PVC to new valid VAC", framework.WithFlaky(), func(ctx context.Context) {
+	ginkgo.It("should recover from invalid target VAC by updating PVC to new valid VAC", func(ctx context.Context) {
 		init(ctx, false /* volume created without VAC */)
 		ginkgo.DeferCleanup(cleanup)
 

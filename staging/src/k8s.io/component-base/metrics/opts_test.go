@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/sets"
+	internalmetrics "k8s.io/component-base/metrics/internal"
 )
 
 func TestDefaultStabilityLevel(t *testing.T) {
@@ -53,7 +54,6 @@ func TestDefaultStabilityLevel(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			var stability = tc.inputValue
 
@@ -225,4 +225,54 @@ func TestResetLabelValueAllowLists(t *testing.T) {
 
 	ResetLabelValueAllowLists()
 	assert.Empty(t, labelValueAllowLists)
+}
+
+func TestToPromHistogramOptsWithNativeHistograms(t *testing.T) {
+	originalEnabled := internalmetrics.NativeHistogramsEnabled()
+	defer func() {
+		internalmetrics.SetNativeHistogramsEnabled(originalEnabled)
+	}()
+
+	tests := []struct {
+		name                                string
+		enableNativeHistograms              bool
+		expectedNativeHistogramBucketFactor float64
+		expectedNativeHistogramMaxBuckets   uint32
+	}{
+		{
+			name:                                "native histograms disabled",
+			enableNativeHistograms:              false,
+			expectedNativeHistogramBucketFactor: 0,
+			expectedNativeHistogramMaxBuckets:   0,
+		},
+		{
+			name:                                "native histograms enabled",
+			enableNativeHistograms:              true,
+			expectedNativeHistogramBucketFactor: 1.1,
+			expectedNativeHistogramMaxBuckets:   160,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			internalmetrics.SetNativeHistogramsEnabled(tc.enableNativeHistograms)
+
+			opts := &HistogramOpts{
+				Namespace: "test",
+				Name:      "histogram",
+				Help:      "test histogram",
+				Buckets:   []float64{0.1, 0.5, 1, 2, 5},
+			}
+
+			promOpts := opts.toPromHistogramOpts()
+
+			assert.InDelta(t, tc.expectedNativeHistogramBucketFactor, promOpts.NativeHistogramBucketFactor, 0.0,
+				"NativeHistogramBucketFactor mismatch")
+			assert.Equal(t, tc.expectedNativeHistogramMaxBuckets, promOpts.NativeHistogramMaxBucketNumber,
+				"NativeHistogramMaxBucketNumber mismatch")
+
+			// Verify classic buckets are always present
+			assert.Equal(t, opts.Buckets, promOpts.Buckets, "Classic buckets should always be present")
+		})
+	}
 }

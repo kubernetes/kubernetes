@@ -134,7 +134,7 @@ type Config struct {
 	// to look up all sorts of other information.
 	GengoContext *generator.Context
 
-	// Validator provides a way to compose validations.
+	// TagValidator provides a way to compose validations.
 	//
 	// For example, it is possible to define a validation such as
 	// "+myValidator=+format=IP" by using the registry to extract the
@@ -143,7 +143,7 @@ type Config struct {
 	//
 	// This field MUST NOT be used during init, since other validators may not
 	// be initialized yet.
-	Validator Validator
+	TagValidator TagValidationExtractor
 }
 
 // Scope describes where a validation (or potential validation) is located.
@@ -230,6 +230,9 @@ type Context struct {
 	// Constants provides access to all constants of the type being
 	// validated.  Only set when Scope is ScopeType.
 	Constants []*Constant
+
+	// StabilityLevel indicates the stability on the corresponding validation.
+	StabilityLevel ValidationStabilityLevel
 }
 
 // Constant represents a constant value.
@@ -247,46 +250,78 @@ type ListSelectorTerm struct {
 	Value any
 }
 
-// StabilityLevel indicates the stability of a validation tag.
-type StabilityLevel string
+// TagStabilityLevel indicates the stability of a validation tag.
+type TagStabilityLevel string
 
 const (
-	// Alpha indicates that a tag's semantics may change in the future.
-	Alpha StabilityLevel = "Alpha"
-	// Beta indicates that a tag's semantics will remain unchanged for the
+	// TagStabilityLevelAlpha indicates that a tag's semantics may change in the future.
+	TagStabilityLevelAlpha TagStabilityLevel = "Alpha"
+	// TagStabilityLevelBeta indicates that a tag's semantics will remain unchanged for the
 	// foreseeable future. This is used for soaking tags before qualifying to stable.
-	Beta StabilityLevel = "Beta"
-	// Stable indicates that a tag's semantics will remain unchanged for the
+	TagStabilityLevelBeta TagStabilityLevel = "Beta"
+	// TagStabilityLevelStable indicates that a tag's semantics will remain unchanged for the
 	// foreseeable future.
-	Stable StabilityLevel = "Stable"
+	TagStabilityLevelStable TagStabilityLevel = "Stable"
 )
+
+var stabilityOrder = map[TagStabilityLevel]int{
+	TagStabilityLevelAlpha:  0,
+	TagStabilityLevelBeta:   1,
+	TagStabilityLevelStable: 2,
+}
+
+// Validation stability level denotes the stability of a validation.
+type ValidationStabilityLevel string
+
+const (
+	// Alpha denotes the declarative validations should be run with the handwritten validation. But the handwritten validations are the authoritative.
+	ValidationStabilityLevelAlpha ValidationStabilityLevel = "Alpha"
+	// Beta denotes the declarative validations should be run with the handwritten validation. Declarative validations are authoritative.
+	ValidationStabilityLevelBeta ValidationStabilityLevel = "Beta"
+)
+
+// Compare returns an integer comparing two stability levels, or an error if either
+// stability level is unknown.
+func (s TagStabilityLevel) Compare(other TagStabilityLevel) (int, error) {
+	sOrder, okS := stabilityOrder[s]
+	if !okS {
+		return 0, fmt.Errorf("unknown stability level %q", s)
+	}
+	otherOrder, okOther := stabilityOrder[other]
+	if !okOther {
+		return 0, fmt.Errorf("unknown stability level %q", other)
+	}
+	return sOrder - otherOrder, nil
+}
 
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {
 	// Tag is the tag name, without the leading '+'.
 	Tag string
 	// StabilityLevel is the stability level of the tag.
-	StabilityLevel StabilityLevel
+	StabilityLevel TagStabilityLevel
 	// Args lists any arguments this tag might take.
-	Args []TagArgDoc
+	Args []TagArgDoc `json:",omitempty"`
 	// Usage is how the tag is used, including arguments.
 	Usage string
 	// Description is a short description of this tag's purpose.
 	Description string
 	// Docs is a human-oriented string explaining this tag.
 	Docs string
+	// Warning is an optional warning about this tag.
+	Warning string `json:",omitempty"`
 	// Scopes lists the place or places this tag may be used.
 	Scopes []Scope
 	// Payloads lists zero or more varieties of value for this tag. If this tag
 	// never has a payload, this list should be empty, but if the payload is
 	// optional, this list should include an entry for "<none>".
-	Payloads []TagPayloadDoc
+	Payloads []TagPayloadDoc `json:",omitempty"`
 	// PayloadsType is the type of the payloads.
-	PayloadsType codetags.ValueType
+	PayloadsType codetags.ValueType `json:",omitempty"`
 	// PayloadsRequired is true if a payload is required.
-	PayloadsRequired bool
+	PayloadsRequired bool `json:",omitempty"`
 	// AcceptsUnknownArgs is true if unknown args are accepted
-	AcceptsUnknownArgs bool
+	AcceptsUnknownArgs bool `json:",omitempty"`
 }
 
 func (td TagDoc) Arg(name string) (TagArgDoc, bool) {
@@ -497,6 +532,9 @@ type FunctionGen struct {
 	// Comments holds optional comments that should be added to the generated
 	// code (without the leading "//").
 	Comments []string
+
+	// StabilityLevel indicates the stability level of the corresponding validation.
+	StabilityLevel ValidationStabilityLevel
 }
 
 // WithTypeArgs returns a derived FunctionGen with type arguments.
@@ -522,6 +560,12 @@ func (fg FunctionGen) WithComment(comment string) FunctionGen {
 	return fg.WithComments(comment)
 }
 
+// WithStabilityLevel returns a new FunctionGen with the given stability level.
+func (fg FunctionGen) WithStabilityLevel(level ValidationStabilityLevel) FunctionGen {
+	fg.StabilityLevel = level
+	return fg
+}
+
 // Variable creates a VariableGen for a given variable name and init value.
 func Variable(variable PrivateVar, initializer any) VariableGen {
 	return VariableGen{
@@ -545,6 +589,14 @@ type VariableGen struct {
 type WrapperFunction struct {
 	Function FunctionGen
 	ObjType  *types.Type
+}
+
+// MultiWrapperFunction describes a function literal which has the fingerprint
+// of a regular validation function (op, fldPath, obj, oldObj) and calls
+// multiple other validation functions with the same signature.
+type MultiWrapperFunction struct {
+	Functions []FunctionGen
+	ObjType   *types.Type
 }
 
 // Literal is a literal value that, when used as an argument to a validator,

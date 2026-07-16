@@ -96,6 +96,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ImageMaximumGCAge.Duration != 0 && !localFeatureGate.Enabled(features.ImageMaximumGCAge) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option imageMaximumGCAge"))
 	}
+	if kc.ImageMinimumGCAge.Duration < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMinimumGCAge %v must not be negative", kc.ImageMinimumGCAge.Duration))
+	}
 	if kc.ImageMaximumGCAge.Duration < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMaximumGCAge %v must not be negative", kc.ImageMaximumGCAge.Duration))
 	}
@@ -346,6 +349,17 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if kc.MemoryThrottlingFactor != nil && (*kc.MemoryThrottlingFactor <= 0 || *kc.MemoryThrottlingFactor > 1.0) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor %v must be greater than 0 and less than or equal to 1.0", *kc.MemoryThrottlingFactor))
+	}
+
+	if !localFeatureGate.Enabled(features.MemoryQoS) &&
+		kc.MemoryReservationPolicy == kubeletconfig.TieredReservationMemoryReservationPolicy {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryReservationPolicy %q requires MemoryQoS feature gate to be enabled",
+			kc.MemoryReservationPolicy))
+	}
+	switch kc.MemoryReservationPolicy {
+	case kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy:
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for memoryReservationPolicy. Valid options are %q or %q", kc.MemoryReservationPolicy, kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy))
 	}
 
 	if kc.ContainerRuntimeEndpoint == "" {

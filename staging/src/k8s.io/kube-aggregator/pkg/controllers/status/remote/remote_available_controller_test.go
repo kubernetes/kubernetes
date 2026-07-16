@@ -18,6 +18,7 @@ package remote
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -29,7 +30,6 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apiserver/pkg/util/proxy"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	discoveryv1listers "k8s.io/client-go/listers/discovery/v1"
@@ -41,6 +41,7 @@ import (
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	availabilitymetrics "k8s.io/kube-aggregator/pkg/controllers/status/metrics"
+	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
 
@@ -177,12 +178,12 @@ func BenchmarkBuildCache(b *testing.B) {
 	apiServiceName := "remote.group"
 	// model 1 APIService pointing at a given service, and 30 pointing at local group/versions
 	apiServices := []runtime.Object{newRemoteAPIService(apiServiceName)}
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		apiServices = append(apiServices, newLocalAPIService(fmt.Sprintf("local.group%d", i)))
 	}
 	// model one service backing an API service, and 100 unrelated services
 	services := []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)}
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		services = append(services, newService("foo", fmt.Sprintf("bar%d", i), testServicePort, testServicePortName))
 	}
 	c, _ := setupAPIServices(b, apiServices)
@@ -543,4 +544,76 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 
 func emptyCert() []byte {
 	return []byte{}
+}
+
+func TestCloseIdleConnections(t *testing.T) {
+	apiServiceName := "remote.group"
+	apiServices := []runtime.Object{newRemoteAPIService(apiServiceName)}
+	services := []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)}
+	endpointSlices := []*discoveryv1.EndpointSlice{newEndpointSliceWithAddress("foo", "bar", testServicePort, testServicePortName)}
+
+	fakeClient := fake.NewSimpleClientset(apiServices...)
+	apiServiceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	endpointSliceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	for _, obj := range apiServices {
+		if err := apiServiceIndexer.Add(obj); err != nil {
+			t.Fatalf("failed to add APIService: %v", err)
+		}
+	}
+	for _, obj := range services {
+		if err := serviceIndexer.Add(obj); err != nil {
+			t.Fatalf("failed to add service: %v", err)
+		}
+	}
+	for _, obj := range endpointSlices {
+		if err := endpointSliceIndexer.Add(obj); err != nil {
+			t.Fatalf("failed to add endpointSlice: %v", err)
+		}
+	}
+
+	endpointSliceGetter, err := proxy.NewEndpointSliceListerGetter(discoveryv1listers.NewEndpointSliceLister(endpointSliceIndexer))
+	if err != nil {
+		t.Fatalf("error creating endpointSliceGetter: %v", err)
+	}
+
+	closed := make(chan struct{}, 1)
+	testServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	// We want to verify that the client closes the connection.
+	// httptest.Server doesn't expose ConnState, but the underlying http.Server does.
+	testServer.Config.ConnState = func(c net.Conn, state http.ConnState) {
+		if state == http.StateClosed {
+			select {
+			case closed <- struct{}{}:
+			default:
+			}
+		}
+	}
+	testServer.Start()
+	defer testServer.Close()
+
+	c := AvailableConditionController{
+		apiServiceClient:           fakeClient.ApiregistrationV1(),
+		apiServiceLister:           listers.NewAPIServiceLister(apiServiceIndexer),
+		serviceLister:              v1listers.NewServiceLister(serviceIndexer),
+		endpointSliceGetter:        endpointSliceGetter,
+		serviceResolver:            &fakeServiceResolver{url: testServer.URL},
+		proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
+		metrics:                    availabilitymetrics.New(),
+	}
+
+	// This should trigger the bad gateway response and (with the fix) close the connection.
+	err = c.sync(apiServiceName)
+	if err == nil {
+		t.Fatal("expected error from sync")
+	}
+
+	select {
+	case <-closed:
+		// success, connection was closed
+	case <-time.After(30 * time.Second):
+		t.Fatal("timeout waiting for connection to be closed")
+	}
 }

@@ -103,7 +103,8 @@ func calculatePriority(sumScores int64, numContainers int) int64 {
 	return fwk.MaxNodeScore * (sumScores - minThreshold) / (maxThreshold - minThreshold)
 }
 
-// sumImageScores returns the sum of image scores of all the containers that are already on the node.
+// sumImageScores returns the total image score for all container images in the Pod spec,
+// including regular containers, init containers, and image volumes, that already exist on the node.
 // Each image receives a raw score of its size, scaled by scaledImageScore. The raw scores are later used to calculate
 // the final score.
 func sumImageScores(nodeInfo fwk.NodeInfo, pod *v1.Pod, totalNumNodes int) int64 {
@@ -115,6 +116,14 @@ func sumImageScores(nodeInfo fwk.NodeInfo, pod *v1.Pod, totalNumNodes int) int64
 	}
 	for _, container := range pod.Spec.Containers {
 		if state, ok := nodeInfo.GetImageStates()[normalizedImageName(container.Image)]; ok {
+			sum += scaledImageScore(state, totalNumNodes)
+		}
+	}
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Image == nil {
+			continue
+		}
+		if state, ok := nodeInfo.GetImageStates()[normalizedImageName(volume.Image.Reference)]; ok {
 			sum += scaledImageScore(state, totalNumNodes)
 		}
 	}

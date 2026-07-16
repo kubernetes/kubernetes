@@ -21,6 +21,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -30,10 +31,12 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
+
 	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -52,6 +55,7 @@ import (
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
@@ -72,14 +76,17 @@ import (
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/clientbuilder"
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	controllerhealthz "k8s.io/controller-manager/pkg/healthz"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
+	configv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	configv1alpha1conversion "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 	garbagecollector "k8s.io/kubernetes/pkg/controller/garbagecollector"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 
@@ -141,6 +148,9 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 
+			// We use context.Background() here still because using server.SetupSignalContext() would cause
+			// components like the event broadcaster to terminate on signal immediately, which is not what we want.
+			// Termination for that case is being handled explicitly in Run() later on.
 			ctx := context.Background()
 			c, err := s.Config(ctx, KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
 			if err != nil {
@@ -157,8 +167,12 @@ controller, and serviceaccounts controller.`,
 			fg.(featuregate.MutableFeatureGate).AddMetrics()
 			// add component version metrics
 			s.ComponentGlobalsRegistry.AddMetrics()
+
+			if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
+				ctx = server.SetupSignalContext()
+			}
 			stopCh := server.SetupSignalHandler()
-			return Run(context.Background(), c.Complete(), stopCh)
+			return Run(ctx, c.Complete(), stopCh)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -209,10 +223,16 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 	c.EventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.Client.CoreV1().Events("")})
 	defer c.EventBroadcaster.Shutdown()
 
-	if cfgz, err := configz.New(ConfigzName); err == nil {
-		cfgz.Set(c.ComponentConfig)
-	} else {
-		logger.Error(err, "Unable to register configz")
+	externalConfig := &configv1alpha1.KubeControllerManagerConfiguration{}
+	if err := configv1alpha1conversion.Convert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeControllerManagerConfiguration(&c.ComponentConfig, externalConfig, nil); err != nil {
+		return fmt.Errorf("unable to convert configz: %w", err)
+	}
+	externalConfig.SetGroupVersionKind(configv1alpha1.SchemeGroupVersion.WithKind("KubeControllerManagerConfiguration"))
+
+	if cfgz, err := configz.New(ConfigzName); err != nil {
+		return fmt.Errorf("unable to register configz: %w", err)
+	} else if err := cfgz.Set(externalConfig); err != nil {
+		return fmt.Errorf("unable to set configz: %w", err)
 	}
 
 	// start the localhost health monitor early so that it can be used by the LE client
@@ -269,42 +289,43 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 
 	saTokenControllerDescriptor := newServiceAccountTokenControllerDescriptor(rootClientBuilder)
 
-	run := func(ctx context.Context, controllerDescriptors map[string]*ControllerDescriptor) {
+	run := func(ctx context.Context, controllerDescriptors map[string]*ControllerDescriptor) error {
 		controllerContext, err := CreateControllerContext(ctx, c, rootClientBuilder, clientBuilder)
 		if err != nil {
 			logger.Error(err, "Error building controller context")
-			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+			return err
 		}
 
 		// Prepare all controllers in advance.
 		controllers, err := BuildControllers(ctx, controllerContext, controllerDescriptors, unsecuredMux, healthzHandler)
 		if err != nil {
 			logger.Error(err, "Error building controllers")
-			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+			return err
 		}
 
 		// Start the informers.
 		stopCh := ctx.Done()
 		controllerContext.InformerFactory.Start(stopCh)
+		defer controllerContext.InformerFactory.Shutdown()
 		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
 		close(controllerContext.InformersStarted)
 
 		// Actually start the controllers.
 		if len(controllers) > 0 {
 			if !RunControllers(ctx, controllerContext, controllers, ControllerStartJitter, c.ControllerShutdownTimeout) {
-				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+				return errors.New("controller shutdown timeout reached")
 			}
 		} else {
 			<-ctx.Done()
 		}
+		return nil
 	}
 
 	// No leader election, run directly
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		controllerDescriptors := NewControllerDescriptors()
 		controllerDescriptors[names.ServiceAccountTokenController] = saTokenControllerDescriptor
-		run(ctx, controllerDescriptors)
-		return nil
+		return run(ctx, controllerDescriptors)
 	}
 
 	id, err := os.Hostname()
@@ -373,35 +394,63 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 		go leaseCandidate.Run(ctx)
 	}
 
-	// Start the main lock
-	go leaderElectAndRun(ctx, c, id, electionChecker,
-		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		c.ComponentConfig.Generic.LeaderElection.ResourceName,
-		leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(ctx context.Context) {
-				controllerDescriptors := NewControllerDescriptors()
-				if leaderMigrator != nil {
-					// If leader migration is enabled, we should start only non-migrated controllers
-					//  for the main lock.
-					controllerDescriptors = filteredControllerDescriptors(controllerDescriptors, leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
-					logger.Info("leader migration: starting main controllers.")
-				}
-				controllerDescriptors[names.ServiceAccountTokenController] = saTokenControllerDescriptor
-				run(ctx, controllerDescriptors)
-			},
-			OnStoppedLeading: func() {
-				select {
-				case <-stopCh:
-					// We were asked to terminate. Exit 0.
-					klog.Info("Requested to terminate. Exiting.")
-					os.Exit(0)
-				default:
-					// We lost the lock.
-					logger.Error(nil, "leaderelection lost")
-					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-				}
-			},
-		}, stopCh)
+	// Start the main lock.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// startedLeading must be used to wrap any OnStartedLeading leader election callback.
+	var (
+		errs     []error
+		errsLock sync.Mutex
+	)
+	startedLeading := func(next func(context.Context) error) func(context.Context) {
+		return func(ctx context.Context) {
+			// It's more efficient to cancel the context at the end of OnStartedLeading to signal termination,
+			// because OnStoppedLeading is only called once the LE lock is released.
+			defer cancel()
+			if err := next(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				errsLock.Lock()
+				errs = append(errs, err)
+				errsLock.Unlock()
+			}
+		}
+	}
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		leaderElectAndRun(ctx, c, id, electionChecker,
+			c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+			c.ComponentConfig.Generic.LeaderElection.ResourceName,
+			leaderelection.LeaderCallbacks{
+				OnStartedLeading: startedLeading(func(ctx context.Context) error {
+					controllerDescriptors := NewControllerDescriptors()
+					if leaderMigrator != nil {
+						// If leader migration is enabled, we should start only non-migrated controllers
+						//  for the main lock.
+						controllerDescriptors = filteredControllerDescriptors(controllerDescriptors, leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
+						logger.Info("leader migration: starting main controllers.")
+					}
+					controllerDescriptors[names.ServiceAccountTokenController] = saTokenControllerDescriptor
+					return run(ctx, controllerDescriptors)
+				}),
+				OnStoppedLeading: func() {
+					select {
+					case <-stopCh:
+						// We were asked to terminate. Exit 0.
+						klog.Info("Requested to terminate. Exiting.")
+						if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
+							os.Exit(0)
+						}
+					default:
+						// We lost the lock.
+						logger.Error(nil, "leaderelection lost/stopped")
+						if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
+							klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+						}
+					}
+				},
+			}, stopCh)
+	})
 
 	// If Leader Migration is enabled, proceed to attempt the migration lock.
 	if leaderMigrator != nil {
@@ -409,38 +458,49 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 		// At this point, the main lock must have already been acquired, or the KCM process already exited.
 		// We wait for the main lock before acquiring the migration lock to prevent the situation
 		//  where KCM instance A holds the main lock while KCM instance B holds the migration lock.
-		<-leaderMigrator.MigrationReady
+		select {
+		case <-leaderMigrator.MigrationReady:
+			// Start the migration lock.
+			wg.Go(func() {
+				leaderElectAndRun(ctx, c, id, electionChecker,
+					c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
+					c.ComponentConfig.Generic.LeaderMigration.LeaderName,
+					leaderelection.LeaderCallbacks{
+						OnStartedLeading: startedLeading(func(ctx context.Context) error {
+							logger.Info("leader migration: starting migrated controllers.")
+							controllerDescriptors := NewControllerDescriptors()
+							controllerDescriptors = filteredControllerDescriptors(controllerDescriptors, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated)
+							// DO NOT start saTokenController under migration lock
+							delete(controllerDescriptors, names.ServiceAccountTokenController)
+							return run(ctx, controllerDescriptors)
+						}),
+						OnStoppedLeading: func() {
+							select {
+							case <-stopCh:
+								// We were asked to terminate. Exit 0.
+								klog.Info("Requested to terminate. Exiting.")
+								if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
+									os.Exit(0)
+								}
+							default:
+								// We lost the lock.
+								logger.Error(nil, "migration leaderelection lost/stopped")
+								if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
+									klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+								}
+							}
+						},
+					}, stopCh)
+			})
 
-		// Start the migration lock.
-		go leaderElectAndRun(ctx, c, id, electionChecker,
-			c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
-			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
-			leaderelection.LeaderCallbacks{
-				OnStartedLeading: func(ctx context.Context) {
-					logger.Info("leader migration: starting migrated controllers.")
-					controllerDescriptors := NewControllerDescriptors()
-					controllerDescriptors = filteredControllerDescriptors(controllerDescriptors, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated)
-					// DO NOT start saTokenController under migration lock
-					delete(controllerDescriptors, names.ServiceAccountTokenController)
-					run(ctx, controllerDescriptors)
-				},
-				OnStoppedLeading: func() {
-					select {
-					case <-stopCh:
-						// We were asked to terminate. Exit 0.
-						klog.Info("Requested to terminate. Exiting.")
-						os.Exit(0)
-					default:
-						// We lost the lock.
-						logger.Error(nil, "migration leaderelection lost")
-						klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-					}
-				},
-			}, stopCh)
+		case <-ctx.Done():
+		}
 	}
 
-	<-stopCh
-	return nil
+	// Block until all leader elections are stopped.
+	wg.Wait()
+	// There is no need to hold errsLock since by this time all goroutines have terminated.
+	return utilerrors.NewAggregate(errs)
 }
 
 // ControllerContext defines the context object for controller
@@ -529,9 +589,14 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		return ControllerContext{}, fmt.Errorf("failed to create Kubernetes client for %q: %w", "shared-informers", err)
 	}
 
+	informerName, err := cache.NewInformerName("kube-controller-manager")
+	if err != nil {
+		return ControllerContext{}, fmt.Errorf("failed to create informer name: %w", err)
+	}
+
 	var sharedInformers informers.SharedInformerFactory
 	if InformerFactoryOverride == nil {
-		sharedInformers = informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
+		sharedInformers = informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim), informers.WithInformerName(informerName))
 	} else {
 		sharedInformers = InformerFactoryOverride
 	}
@@ -847,17 +912,16 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 		cancel()
 	}()
 	leaderelection.RunOrDie(leCtx, leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
-		Callbacks:     callbacks,
-		WatchDog:      electionChecker,
-		Name:          leaseName,
-		Coordinated:   utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection),
+		Lock:            rl,
+		LeaseDuration:   c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline:   c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:     c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+		Callbacks:       callbacks,
+		WatchDog:        electionChecker,
+		ReleaseOnCancel: utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit),
+		Name:            leaseName,
+		Coordinated:     utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection),
 	})
-
-	panic("unreachable")
 }
 
 // filteredControllerDescriptors returns all controllerDescriptors after filtering through filterFunc.

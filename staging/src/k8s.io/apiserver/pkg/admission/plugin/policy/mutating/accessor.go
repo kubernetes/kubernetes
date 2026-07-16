@@ -18,7 +18,6 @@ package mutating
 
 import (
 	v1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 )
@@ -59,19 +58,11 @@ func (v *mutatingAdmissionPolicyAccessor) GetParamKind() *v1.ParamKind {
 }
 
 func (v *mutatingAdmissionPolicyAccessor) GetMatchConstraints() *v1.MatchResources {
-	return convertV1alpha1ResourceRulesToV1(v.Spec.MatchConstraints)
+	return v.Spec.MatchConstraints
 }
 
 func (v *mutatingAdmissionPolicyAccessor) GetFailurePolicy() *v1.FailurePolicyType {
-	return toV1FailurePolicy(v.Spec.FailurePolicy)
-}
-
-func toV1FailurePolicy(failurePolicy *v1beta1.FailurePolicyType) *v1.FailurePolicyType {
-	if failurePolicy == nil {
-		return nil
-	}
-	fp := v1.FailurePolicyType(*failurePolicy)
-	return &fp
+	return v.Spec.FailurePolicy
 }
 
 type mutatingAdmissionPolicyBindingAccessor struct {
@@ -94,7 +85,7 @@ func (v *mutatingAdmissionPolicyBindingAccessor) GetPolicyName() types.Namespace
 }
 
 func (v *mutatingAdmissionPolicyBindingAccessor) GetMatchResources() *v1.MatchResources {
-	return convertV1alpha1ResourceRulesToV1(v.Spec.MatchResources)
+	return v.Spec.MatchResources
 }
 
 func (v *mutatingAdmissionPolicyBindingAccessor) GetParamRef() *v1.ParamRef {
@@ -114,31 +105,4 @@ func (v *mutatingAdmissionPolicyBindingAccessor) GetParamRef() *v1.ParamRef {
 		Selector:                v.Spec.ParamRef.Selector,
 		ParameterNotFoundAction: nfa,
 	}
-}
-
-func convertV1alpha1ResourceRulesToV1(mc *v1beta1.MatchResources) *v1.MatchResources {
-	if mc == nil {
-		return nil
-	}
-
-	var res v1.MatchResources
-	res.NamespaceSelector = mc.NamespaceSelector
-	res.ObjectSelector = mc.ObjectSelector
-	for _, ex := range mc.ExcludeResourceRules {
-		res.ExcludeResourceRules = append(res.ExcludeResourceRules, v1.NamedRuleWithOperations{
-			ResourceNames:      ex.ResourceNames,
-			RuleWithOperations: ex.RuleWithOperations,
-		})
-	}
-	for _, ex := range mc.ResourceRules {
-		res.ResourceRules = append(res.ResourceRules, v1.NamedRuleWithOperations{
-			ResourceNames:      ex.ResourceNames,
-			RuleWithOperations: ex.RuleWithOperations,
-		})
-	}
-	if mc.MatchPolicy != nil {
-		mp := v1.MatchPolicyType(*mc.MatchPolicy)
-		res.MatchPolicy = &mp
-	}
-	return &res
 }

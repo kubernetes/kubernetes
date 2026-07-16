@@ -196,6 +196,32 @@ func NewFakeReservePlugin(status *fwk.Status) frameworkruntime.PluginFactory {
 	}
 }
 
+// FakePostFilterPlugin is a test post filter plugin.
+type FakePostFilterPlugin struct {
+	Result *fwk.PostFilterResult
+	Status *fwk.Status
+}
+
+// Name returns name of the plugin.
+func (pl *FakePostFilterPlugin) Name() string {
+	return "FakePostFilter"
+}
+
+// PostFilter invoked at the PostFilter extension point.
+func (pl *FakePostFilterPlugin) PostFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
+	return pl.Result, pl.Status
+}
+
+// NewFakePostFilterPlugin initializes a fakePostFilterPlugin and returns it.
+func NewFakePostFilterPlugin(result *fwk.PostFilterResult, status *fwk.Status) frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return &FakePostFilterPlugin{
+			Result: result,
+			Status: status,
+		}, nil
+	}
+}
+
 // FakePreBindPlugin is a test prebind plugin.
 type FakePreBindPlugin struct {
 	PreBindPreFlightStatus *fwk.Status
@@ -208,8 +234,8 @@ func (pl *FakePreBindPlugin) Name() string {
 }
 
 // PreBindPreFlight invoked at the PreBind extension point.
-func (pl *FakePreBindPlugin) PreBindPreFlight(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) *fwk.Status {
-	return pl.PreBindPreFlightStatus
+func (pl *FakePreBindPlugin) PreBindPreFlight(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	return &fwk.PreBindPreFlightResult{AllowParallel: false}, pl.PreBindPreFlightStatus
 }
 
 // PreBind invoked at the PreBind extension point.

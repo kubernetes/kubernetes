@@ -1,19 +1,3 @@
-/*
-   Copyright 2014-2021 Docker Inc.
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-*/
-
 // Copyright 2011 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -24,6 +8,7 @@ import (
 	"compress/zlib"
 	"encoding/binary"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 )
@@ -58,6 +43,11 @@ func (frame *SettingsFrame) read(h ControlFrameHeader, f *Framer) error {
 	var numSettings uint32
 	if err := binary.Read(f.r, binary.BigEndian, &numSettings); err != nil {
 		return err
+	}
+	// Each setting is 8 bytes (4-byte id + 4-byte value).
+	// Payload is 4 bytes for numSettings + numSettings*8.
+	if h.length < 4 || numSettings > (h.length-4)/8 {
+		return &Error{InvalidControlFrame, 0}
 	}
 	frame.FlagIdValues = make([]SettingsFlagIdValue, numSettings)
 	for i := uint32(0); i < numSettings; i++ {
@@ -177,8 +167,19 @@ func (f *Framer) parseControlFrame(version uint16, frameType ControlFrameType) (
 	if err := binary.Read(f.r, binary.BigEndian, &length); err != nil {
 		return nil, err
 	}
+	maxControlFramePayload := uint32(MaxDataLength)
+	if f.maxFrameLength > 0 {
+		maxControlFramePayload = f.maxFrameLength
+	}
+
 	flags := ControlFlags((length & 0xff000000) >> 24)
 	length &= 0xffffff
+	if length > maxControlFramePayload {
+		if _, err := io.CopyN(ioutil.Discard, f.r, int64(length)); err != nil {
+			return nil, err
+		}
+		return nil, &Error{InvalidControlFrame, 0}
+	}
 	header := ControlFrameHeader{version, frameType, flags, length}
 	cframe, err := newControlFrame(frameType)
 	if err != nil {
@@ -190,10 +191,21 @@ func (f *Framer) parseControlFrame(version uint16, frameType ControlFrameType) (
 	return cframe, nil
 }
 
-func parseHeaderValueBlock(r io.Reader, streamId StreamId) (http.Header, error) {
+func (f *Framer) parseHeaderValueBlock(r io.Reader, streamId StreamId) (http.Header, error) {
 	var numHeaders uint32
 	if err := binary.Read(r, binary.BigEndian, &numHeaders); err != nil {
 		return nil, err
+	}
+	maxHeaders := defaultMaxHeaderCount
+	if f.maxHeaderCount > 0 {
+		maxHeaders = f.maxHeaderCount
+	}
+	if numHeaders > maxHeaders {
+		return nil, &Error{InvalidControlFrame, streamId}
+	}
+	maxFieldSize := defaultMaxHeaderFieldSize
+	if f.maxHeaderFieldSize > 0 {
+		maxFieldSize = f.maxHeaderFieldSize
 	}
 	var e error
 	h := make(http.Header, int(numHeaders))
@@ -201,6 +213,9 @@ func parseHeaderValueBlock(r io.Reader, streamId StreamId) (http.Header, error) 
 		var length uint32
 		if err := binary.Read(r, binary.BigEndian, &length); err != nil {
 			return nil, err
+		}
+		if length > maxFieldSize {
+			return nil, &Error{InvalidControlFrame, streamId}
 		}
 		nameBytes := make([]byte, length)
 		if _, err := io.ReadFull(r, nameBytes); err != nil {
@@ -216,6 +231,9 @@ func parseHeaderValueBlock(r io.Reader, streamId StreamId) (http.Header, error) 
 		}
 		if err := binary.Read(r, binary.BigEndian, &length); err != nil {
 			return nil, err
+		}
+		if length > maxFieldSize {
+			return nil, &Error{InvalidControlFrame, streamId}
 		}
 		value := make([]byte, length)
 		if _, err := io.ReadFull(r, value); err != nil {
@@ -256,7 +274,7 @@ func (f *Framer) readSynStreamFrame(h ControlFrameHeader, frame *SynStreamFrame)
 		}
 		reader = f.headerDecompressor
 	}
-	frame.Headers, err = parseHeaderValueBlock(reader, frame.StreamId)
+	frame.Headers, err = f.parseHeaderValueBlock(reader, frame.StreamId)
 	if !f.headerCompressionDisabled && (err == io.EOF && f.headerReader.N == 0 || f.headerReader.N != 0) {
 		err = &Error{WrongCompressedPayloadSize, 0}
 	}
@@ -288,7 +306,7 @@ func (f *Framer) readSynReplyFrame(h ControlFrameHeader, frame *SynReplyFrame) e
 		}
 		reader = f.headerDecompressor
 	}
-	frame.Headers, err = parseHeaderValueBlock(reader, frame.StreamId)
+	frame.Headers, err = f.parseHeaderValueBlock(reader, frame.StreamId)
 	if !f.headerCompressionDisabled && (err == io.EOF && f.headerReader.N == 0 || f.headerReader.N != 0) {
 		err = &Error{WrongCompressedPayloadSize, 0}
 	}
@@ -320,7 +338,7 @@ func (f *Framer) readHeadersFrame(h ControlFrameHeader, frame *HeadersFrame) err
 		}
 		reader = f.headerDecompressor
 	}
-	frame.Headers, err = parseHeaderValueBlock(reader, frame.StreamId)
+	frame.Headers, err = f.parseHeaderValueBlock(reader, frame.StreamId)
 	if !f.headerCompressionDisabled && (err == io.EOF && f.headerReader.N == 0 || f.headerReader.N != 0) {
 		err = &Error{WrongCompressedPayloadSize, 0}
 	}

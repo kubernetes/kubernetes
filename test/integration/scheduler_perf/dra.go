@@ -17,24 +17,26 @@ limitations under the License.
 package benchmark
 
 import (
+	"context"
 	"fmt"
 	"math/rand/v2"
 	"path/filepath"
 	"reflect"
 	"sync"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
+	resourcebeta "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -80,7 +82,7 @@ func (op *createResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *createResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	if op.CountParam != "" {
 		var err error
 		op.Count, err = w.Params.get(op.CountParam[1:])
@@ -118,10 +120,7 @@ func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
 		}
 	}
 
-	workers := op.Count
-	if workers > 30 {
-		workers = 30
-	}
+	workers := min(op.Count, 30)
 	workqueue.ParallelizeUntil(tCtx, workers, op.Count, create)
 	if createErr != nil {
 		tCtx.Fatal(createErr.Error())
@@ -160,7 +159,7 @@ func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
 func (op *createResourceDriverOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceDriverOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceDriverOp) patchParams(w *Workload) (realOp, error) {
 	if op.MaxClaimsPerNodeParam != "" {
 		var err error
 		op.MaxClaimsPerNode, err = w.Params.get(op.MaxClaimsPerNodeParam[1:])
@@ -198,7 +197,7 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext, draManager framewo
 		numSlices++
 	}
 
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int {
+	tCtx.Eventually(func(tCtx ktesting.TContext) int {
 		slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
 		tCtx.ExpectNoError(err, "list ResourceSlices")
 		return len(slices)
@@ -229,7 +228,7 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 		},
 	}
 
-	for i := 0; i < capacity; i++ {
+	for i := range capacity {
 		slice.Spec.Devices = append(slice.Spec.Devices,
 			resourceapi.Device{
 				Name: fmt.Sprintf("instance-%d", i),
@@ -268,7 +267,7 @@ func (op *allocResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *allocResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *allocResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *allocResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	return op, op.isValid(false)
 }
 
@@ -278,7 +277,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	claims, err := tCtx.Client().ResourceV1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "list claims")
 	tCtx.Logf("allocating %d ResourceClaims", len(claims.Items))
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 	defer tCtx.Cancel("allocResourceClaimsOp.run is done")
 
 	// Track cluster state.
@@ -292,30 +291,52 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		KubeClient:               tCtx.Client(),
 	}
 	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
-		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
 		resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	tCtx.ExpectNoError(err, "start resource slice tracker")
-	draManager := dynamicresources.NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil), resourceSliceTracker, informerFactory)
+	assumeCache := assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil)
+	draManager := dynamicresources.NewDRAManager(tCtx, assumeCache, resourceSliceTracker, informerFactory)
 	informerFactory.Start(tCtx.Done())
 	defer func() {
 		tCtx.Cancel("allocResourceClaimsOp.run is shutting down")
 		informerFactory.Shutdown()
 	}()
-	syncedInformers := informerFactory.WaitForCacheSync(tCtx.Done())
-	expectSyncedInformers := map[reflect.Type]bool{
-		reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
-		reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-		reflect.TypeOf(&v1.Node{}):                   true,
+	syncResult := informerFactory.WaitForCacheSyncWithContext(tCtx)
+	expectSyncResult := cache.SyncResult{
+		Synced: map[reflect.Type]bool{
+			reflect.TypeFor[*resourceapi.DeviceClass]():   true,
+			reflect.TypeFor[*resourceapi.ResourceClaim](): true,
+			reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+			reflect.TypeFor[*v1.Node]():                   true,
+		},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
-		expectSyncedInformers[reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{})] = true
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		expectSyncResult.Synced[reflect.TypeFor[*resourcebeta.DeviceTaintRule]()] = true
+	}
+	if diff := cmp.Diff(expectSyncResult, syncResult,
+		cmp.Transformer("TypeOf", func(t reflect.Type) string {
+			return t.String()
+		}),
+	); diff != "" {
+		tCtx.Fatalf("unexpected informer sync result (- expected, + actual):\n%s", diff)
 	}
 
-	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
-	celCache := cel.NewCache(10, cel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)})
+	celCache := cel.NewCache(10, cel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+	})
+
+	// Also wait for the assume cache to catch up.
+	// Without this we cannot reliably store the result of
+	// the UpdateStatus call below.
+	// Has to be done indirectly, the assume cache itself has
+	// no HasSynced method (maybe it should).
+	handle := assumeCache.AddEventHandler(cache.ResourceEventHandlerFuncs{})
+	if !cache.WaitForCacheSync(tCtx.Done(), handle.HasSynced) {
+		tCtx.Fatalf("assume cache failed to sync: %v", context.Cause(tCtx))
+	}
 
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())

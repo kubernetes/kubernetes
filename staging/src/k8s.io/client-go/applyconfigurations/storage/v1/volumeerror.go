@@ -35,7 +35,7 @@ type VolumeErrorApplyConfiguration struct {
 	Message *string `json:"message,omitempty"`
 	// errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.
 	//
-	// This is an optional, beta field that requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
+	// This field requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
 	ErrorCode *int32 `json:"errorCode,omitempty"`
 }
 

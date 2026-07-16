@@ -193,8 +193,13 @@ func lookupInRoot(root fd.Fd, unsafePath string, partial bool) (Handle *os.File,
 	// managed open, along with the remaining path components not opened.
 
 	// Try to use openat2 if possible.
-	if linux.HasOpenat2() {
-		return lookupOpenat2(root, unsafePath, partial)
+	//
+	// NOTE: If openat2(2) works normally but fails for this lookup, it is
+	// probably not a good idea to fall-back to the O_PATH resolver. An
+	// attacker could find a bug in the O_PATH resolver and uncontionally
+	// falling back to the O_PATH resolver would form a downgrade attack.
+	if handle, remainingPath, err := lookupOpenat2(root, unsafePath, partial); err == nil || linux.HasOpenat2() {
+		return handle, remainingPath, err
 	}
 
 	// Get the "actual" root path from /proc/self/fd. This is necessary if the

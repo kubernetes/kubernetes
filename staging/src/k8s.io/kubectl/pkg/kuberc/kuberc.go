@@ -70,7 +70,7 @@ type Preferences struct {
 	policy  clientcmdapi.PluginPolicy
 }
 
-// NewPreferences returns initialized Prefrences object.
+// NewPreferences returns initialized Preferences object.
 func NewPreferences() PreferencesHandler {
 	return &Preferences{
 		getPreferencesFunc: DefaultGetPreferences,

@@ -98,7 +98,16 @@ if [[ -z "${base}" && -n "${PULL_BASE_SHA:-}" && -n "${PULL_PULL_SHA:-}" ]]; the
         exit 1
     fi
 elif [[ -z "${base}" ]]; then
-    if ! base="$(git merge-base origin/master "${target:-HEAD}")"; then
+    # origin is the default remote, but we encourage our contributors
+    # to have both origin (their fork) and upstream, if upstream is present
+    # then prefer upstream
+    # if they have called it something else, there's no good way to be sure ...
+    remote='origin'
+    if git remote | grep -q 'upstream'; then
+        remote='upstream'
+    fi
+    default_branch="$(git rev-parse --abbrev-ref "${remote}"/HEAD | cut -d/ -f2)"
+    if ! base="$(git merge-base "${remote}/${default_branch}" "${target:-HEAD}")"; then
         echo >&2 "Could not determine default base revision. -r must be used explicitly."
         exit 1
     fi

@@ -80,7 +80,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 				ginkgo.By("Verifying the memory backed volume was removed from node", func() {
 					volumePath := fmt.Sprintf("/tmp/%s/volumes/kubernetes.io~empty-dir/%s", string(memoryBackedPod.UID), volumeName)
 					var err error
-					for i := 0; i < 10; i++ {
+					for range 10 {
 						// need to create a new verification pod on each pass since updates
 						//to the HostPath volume aren't propogated to the pod
 						pod := e2epod.NewPodClient(f).Create(ctx, &v1.Pod{

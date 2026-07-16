@@ -50,6 +50,7 @@ import (
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/server/statusz"
@@ -113,6 +114,9 @@ type GenericAPIServer struct {
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
+
+	// Flagz is used to set up flagz endpoint.
+	Flagz flagz.Reader
 
 	// minRequestTimeout is how short the request timeout can be.  This is used to build the RESTHandler
 	minRequestTimeout time.Duration
@@ -467,8 +471,15 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 	s.installReadyz()
 
+	componentName := "apiserver"
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if s.Flagz != nil {
+			flagz.Install(s.Handler.NonGoRestfulMux, componentName, s.Flagz)
+		}
+	}
+	// statusz is installed last so that it can list all the paths that have been registered
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(s.Handler.NonGoRestfulMux, "apiserver", statusz.NewRegistry(s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
+		statusz.Install(s.Handler.NonGoRestfulMux, componentName, statusz.NewRegistry(s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
 	}
 
 	return preparedGenericAPIServer{s}
@@ -537,7 +548,7 @@ func (s preparedGenericAPIServer) RunWithContext(ctx context.Context) error {
 	// If UDS profiling is enabled, start a local http server listening on that socket
 	if s.UnprotectedDebugSocket != nil {
 		go func() {
-			defer utilruntime.HandleCrash()
+			defer utilruntime.HandleCrashWithContext(ctx)
 			klog.Error(s.UnprotectedDebugSocket.RunWithContext(ctx))
 		}()
 	}
@@ -593,7 +604,7 @@ func (s preparedGenericAPIServer) RunWithContext(ctx context.Context) error {
 		Listener:   s.SecureServingInfo.Listener,
 		lateStopCh: lateStopCh,
 	}
-	unexpectedRequestsEventf.Store(s.Eventf)
+	unexpectedRequestsEventf.Store(eventfFunc(s.Eventf))
 
 	// close socket after delayed stopCh
 	shutdownTimeout := s.ShutdownTimeout
@@ -762,6 +773,11 @@ func (s preparedGenericAPIServer) RunWithContext(ctx context.Context) error {
 
 	klog.V(1).Info("[graceful-termination] apiserver is exiting")
 	s.Eventf(corev1.EventTypeNormal, "TerminationGracefulTerminationFinished", "All pending requests processed")
+
+	// Release the global reference to s.Eventf so the server object graph can
+	// be garbage collected. The TLS transport cache relies on GC to cancel cert
+	// rotation goroutines via runtime.AddCleanup (ClientsAllowTLSCacheGC).
+	unexpectedRequestsEventf.Store(eventfFunc(nil))
 
 	return nil
 }

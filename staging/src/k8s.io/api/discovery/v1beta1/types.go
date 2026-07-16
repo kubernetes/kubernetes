@@ -45,11 +45,15 @@ type EndpointSlice struct {
 	// * IPv4: Represents an IPv4 Address.
 	// * IPv6: Represents an IPv6 Address.
 	// * FQDN: Represents a Fully Qualified Domain Name.
+	// +required
+	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:immutable
 	AddressType AddressType `json:"addressType" protobuf:"bytes,4,rep,name=addressType"`
 
 	// endpoints is a list of unique endpoints in this slice. Each slice may
 	// include a maximum of 1000 endpoints.
 	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	Endpoints []Endpoint `json:"endpoints" protobuf:"bytes,2,rep,name=endpoints"`
 
 	// ports specifies the list of network ports exposed by each endpoint in
@@ -63,6 +67,8 @@ type EndpointSlice struct {
 }
 
 // AddressType represents the type of address referred to by an endpoint.
+// +enum
+// +k8s:alpha(since: "1.36")=+k8s:enum
 type AddressType string
 
 const (
@@ -85,6 +91,9 @@ type Endpoint struct {
 	// 100. These are all assumed to be fungible and clients may choose to only
 	// use the first element. Refer to: https://issue.k8s.io/106267
 	// +listType=set
+	// +required
+	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:maxItems=100
 	Addresses []string `json:"addresses" protobuf:"bytes,1,rep,name=addresses"`
 
 	// conditions contains information about the current status of the endpoint.

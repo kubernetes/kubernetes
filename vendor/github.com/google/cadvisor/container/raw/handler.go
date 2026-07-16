@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 // Handler for "raw" containers.
 package raw
 
@@ -279,6 +281,10 @@ func (h *rawContainerHandler) Exists() bool {
 
 func (h *rawContainerHandler) Type() container.ContainerType {
 	return container.ContainerTypeRaw
+}
+
+func (h *rawContainerHandler) GetExitCode() (int, error) {
+	return -1, fmt.Errorf("exit codes not applicable for raw cgroup containers")
 }
 
 type fsNamer struct {

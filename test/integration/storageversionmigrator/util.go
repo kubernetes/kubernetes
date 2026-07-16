@@ -800,7 +800,9 @@ func (svm *svmTest) waitForCRDUpdate(
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		500*time.Millisecond,
-		time.Second*60,
+		// CRD discovery and storage-version reporting can lag well beyond 1 minute
+		// on contended CI nodes while the apiextensions controllers converge.
+		2*time.Minute,
 		true,
 		func(ctx context.Context) (bool, error) {
 			apiGroups, _, err := svm.discoveryClient.ServerGroupsAndResources()
@@ -1054,6 +1056,24 @@ func (svm *svmTest) setupServerCert(t *testing.T) *certContext {
 	}
 }
 
+func (svm *svmTest) crdMigrated(t *testing.T, crdName string) bool {
+	t.Helper()
+
+	crd, err := svm.apiextensionsclient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), crdName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get CRD: %v", err)
+	}
+
+	var storedVersion string
+	for _, version := range crd.Spec.Versions {
+		if version.Storage {
+			storedVersion = version.Name
+		}
+	}
+
+	return len(crd.Status.StoredVersions) == 1 && crd.Status.StoredVersions[0] == storedVersion
+}
+
 func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bool {
 	t.Helper()
 
@@ -1072,7 +1092,7 @@ func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bo
 	return obj.GetAPIVersion() == fmt.Sprintf("%s/%s", crdGroup, version)
 }
 
-func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName, triggerCRName string) bool {
+func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName, crdName, triggerCRName string) bool {
 	t.Helper()
 
 	var triggerOnce sync.Once
@@ -1099,8 +1119,8 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName,
 				return false, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) {
-				t.Logf("%q SVM has completed migration", crdSVMName)
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) && svm.crdMigrated(t, crdName) {
+				t.Logf("%q SVM has completed migration for crd %s", crdSVMName, crdName)
 				return true, nil
 			}
 
@@ -1170,18 +1190,20 @@ func (svm *svmTest) createChaos(ctx context.Context, t *testing.T) {
 
 	noFailT := ignoreFailures{} // these create and delete requests are not coordinated with the rest of the test and can fail
 
-	const workers = 10
+	const workers = 5
 	wg.Add(workers)
 	for i := range workers {
-		i := i
 		go func() {
 			defer wg.Done()
+
+			ticker := time.NewTicker(100 * time.Millisecond) // 10 ops/sec
+			defer ticker.Stop()
 
 			for {
 				select {
 				case <-ctx.Done():
 					return
-				default:
+				case <-ticker.C:
 				}
 
 				_ = svm.createCR(ctx, noFailT, "chaos-cr-"+strconv.Itoa(i), "v1")

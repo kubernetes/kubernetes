@@ -65,8 +65,8 @@ message AllocatedDeviceStatus {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
-  // +k8s:optional
-  // +k8s:format=k8s-uuid
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-uuid
   optional string shareID = 7;
 
   // Conditions contains the latest observation of the device's state.
@@ -90,7 +90,7 @@ message AllocatedDeviceStatus {
   // NetworkData contains network-related information specific to the device.
   //
   // +optional
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional NetworkDeviceData networkData = 6;
 }
 
@@ -110,7 +110,7 @@ message AllocationResult {
   // AllocationTimestamp stores the time when the resources were allocated.
   // This field is not guaranteed to be set, in which case that time is unknown.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
   // feature gate.
   //
   // +optional
@@ -168,6 +168,14 @@ message CELDeviceSelector {
   // same domain. For example:
   //
   //     cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
+  //
+  // When the DRAListTypeAttributes feature gate is enabled,
+  // the includes() helper is available and it can work for both scalar
+  // and list-type attributes. It was introduced to support smooth migration
+  // from scalar attributes to list-type attributes while keeping
+  // CEL expressions simple. For example:
+  //
+  //     device.attributes["dra.example.com"].models.includes("some-model")
   //
   // The length of the expression must be smaller or equal to 10 Ki. The
   // cost of evaluating it is also limited based on the estimated number
@@ -307,8 +315,8 @@ message CounterSet {
   // It must be a DNS label.
   //
   // +required
-  // +k8s:required
-  // +k8s:format=k8s-short-name
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-short-name
   optional string name = 1;
 
   // Counters defines the set of counters for this CounterSet
@@ -317,6 +325,8 @@ message CounterSet {
   // The maximum number of counters is 32.
   //
   // +required
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:eachKey=+k8s:format=k8s-short-name
   map<string, Counter> counters = 2;
 }
 
@@ -335,6 +345,7 @@ message Device {
   // The maximum number of attributes and capacities combined is 32.
   //
   // +optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   map<string, DeviceAttribute> attributes = 2;
 
   // Capacity defines the set of capacities for this device.
@@ -355,13 +366,13 @@ message Device {
   // device is 2.
   //
   // +optional
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +listType=atomic
   // +k8s:listType=atomic
-  // +k8s:unique=map
-  // +k8s:listMapKey=counterSet
+  // +k8s:alpha(since: "1.36")=+k8s:unique=map
+  // +k8s:alpha(since: "1.36")=+k8s:listMapKey=counterSet
   // +featureGate=DRAPartitionableDevices
-  // +k8s:maxItems=2
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=2
   repeated DeviceCounterConsumption consumesCounters = 4;
 
   // NodeName identifies the node where the device is available.
@@ -402,12 +413,13 @@ message Device {
   // any device in a ResourceSlice, then the maximum number of
   // allowed devices per ResourceSlice is 64 instead of 128.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   repeated DeviceTaint taints = 8;
 
   // BindsToNode indicates if the usage of an allocation involving this device
@@ -415,7 +427,7 @@ message Device {
   // If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
   // to match the node where the allocation was made.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
   // feature gates.
   //
   // +optional
@@ -431,14 +443,14 @@ message Device {
   //
   // The conditions must be a valid condition type string.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
   // feature gates.
   //
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
-  // +k8s:optional
-  // +k8s:maxItems=4
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=4
   repeated string bindingConditions = 10;
 
   // BindingFailureConditions defines the conditions for binding failure.
@@ -449,14 +461,14 @@ message Device {
   //
   // The conditions must be a valid condition type string.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
   // feature gates.
   //
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
-  // +k8s:optional
-  // +k8s:maxItems=4
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=4
   repeated string bindingFailureConditions = 11;
 
   // AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
@@ -467,6 +479,21 @@ message Device {
   // +optional
   // +featureGate=DRAConsumableCapacity
   optional bool allowMultipleAllocations = 12;
+
+  // NodeAllocatableResourceMappings defines the mapping of node resources
+  // that are managed by the DRA driver exposing this device. This includes resources currently
+  // reported in v1.Node `status.allocatable` that are not extended resources
+  // (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
+  // Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+  // In addition to standard requests made through the Pod `spec`, these resources
+  // can also be requested through claims and allocated by the DRA driver.
+  // For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory
+  // dependencies of an accelerator device.
+  // The keys of this map are the node-allocatable resource names (e.g., "cpu", "memory").
+  // Extended resource names are not permitted as keys.
+  // +optional
+  // +featureGate=DRANodeAllocatableResources
+  map<string, NodeAllocatableResourceMapping> nodeAllocatableResourceMappings = 13;
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -476,7 +503,7 @@ message DeviceAllocationConfiguration {
   // or from a claim.
   //
   // +required
-  // +k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:required
   optional string source = 1;
 
   // Requests lists the names of requests where the configuration applies.
@@ -488,10 +515,10 @@ message DeviceAllocationConfiguration {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:listType=atomic
-  // +k8s:unique=set
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:unique=set
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated string requests = 2;
 
   optional DeviceConfiguration deviceConfiguration = 3;
@@ -503,8 +530,8 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated DeviceRequestAllocationResult results = 1;
 
   // This field is a combination of all the claim and class configuration parameters.
@@ -517,8 +544,8 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
-  // +k8s:maxItems=64
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=64
   repeated DeviceAllocationConfiguration config = 2;
 }
 
@@ -527,31 +554,79 @@ message DeviceAttribute {
   // IntValue is a number.
   //
   // +optional
-  // +k8s:optional
-  // +k8s:unionMember
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
   optional int64 int = 2;
 
   // BoolValue is a true/false value.
   //
   // +optional
-  // +k8s:optional
-  // +k8s:unionMember
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
   optional bool bool = 3;
 
   // StringValue is a string. Must not be longer than 64 characters.
   //
   // +optional
-  // +k8s:optional
-  // +k8s:unionMember
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
   optional string string = 4;
 
   // VersionValue is a semantic version according to semver.org spec 2.0.0.
   // Must not be longer than 64 characters.
   //
   // +optional
-  // +k8s:optional
-  // +k8s:unionMember
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
   optional string version = 5;
+
+  // IntValues is a non-empty list of numbers.
+  //
+  // This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+  //
+  // +optional
+  // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
+  // +featureGate=DRAListTypeAttributes
+  repeated int64 ints = 6;
+
+  // BoolValues is a non-empty list of true/false values.
+  //
+  // +optional
+  // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
+  // +featureGate=DRAListTypeAttributes
+  repeated bool bools = 7;
+
+  // StringValues is a non-empty list of strings.
+  // Each string must not be longer than 64 characters.
+  //
+  // This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+  //
+  // +optional
+  // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
+  // +featureGate=DRAListTypeAttributes
+  repeated string strings = 8;
+
+  // VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0.
+  // Each version string must not be longer than 64 characters.
+  //
+  // This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+  //
+  // +optional
+  // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:unionMember
+  // +featureGate=DRAListTypeAttributes
+  repeated string versions = 9;
 }
 
 // DeviceCapacity describes a quantity associated with a device.
@@ -587,11 +662,11 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:listType=atomic
-  // +k8s:unique=map
-  // +k8s:listMapKey=name
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:unique=map
+  // +k8s:alpha(since: "1.36")=+k8s:listMapKey=name
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated DeviceRequest requests = 1;
 
   // These constraints must be satisfied by the set of devices that get
@@ -599,8 +674,8 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated DeviceConstraint constraints = 2;
 
   // This field holds configuration for multiple potential drivers which
@@ -609,8 +684,8 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated DeviceClaimConfiguration config = 3;
 }
 
@@ -625,10 +700,10 @@ message DeviceClaimConfiguration {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:listType=atomic
-  // +k8s:unique=set
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:unique=set
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated string requests = 1;
 
   optional DeviceConfiguration deviceConfiguration = 2;
@@ -644,8 +719,8 @@ message DeviceClaimConfiguration {
 message DeviceClass {
   // Standard object metadata
   // +optional
-  // +k8s:subfield(name)=+k8s:optional
-  // +k8s:subfield(name)=+k8s:format=k8s-long-name
+  // +k8s:alpha(since: "1.36")=+k8s:subfield(name)=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:subfield(name)=+k8s:format=k8s-long-name
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines what can be allocated and how to configure it.
@@ -681,8 +756,8 @@ message DeviceClassSpec {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated DeviceSelector selectors = 1;
 
   // Config defines configuration parameters that apply to each device that is claimed via this class.
@@ -693,8 +768,8 @@ message DeviceClassSpec {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated DeviceClassConfiguration config = 2;
 
   // ExtendedResourceName is the extended resource name for the devices of this class.
@@ -706,11 +781,11 @@ message DeviceClassSpec {
   // If two classes are created at the same time, then the name of the class
   // lexicographically sorted first is picked.
   //
-  // This is an alpha field.
+  // This is a beta field.
   // +optional
   // +featureGate=DRAExtendedResource
-  // +k8s:optional
-  // +k8s:format=k8s-extended-resource-name
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-extended-resource-name
   optional string extendedResourceName = 4;
 }
 
@@ -722,7 +797,7 @@ message DeviceConfiguration {
   //
   // +optional
   // +oneOf=ConfigurationType
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional OpaqueDeviceConfiguration opaque = 1;
 }
 
@@ -740,10 +815,10 @@ message DeviceConstraint {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:listType=atomic
-  // +k8s:unique=set
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:unique=set
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated string requests = 1;
 
   // MatchAttribute requires that all devices in question have this
@@ -757,16 +832,26 @@ message DeviceConstraint {
   // its specification, but if one device doesn't, then it also will not be
   // chosen.
   //
+  // When the DRAListTypeAttributes feature gate is enabled, comparison uses
+  // set semantics(i.e., element order and duplicates are ignored): list-valued attributes
+  // match when the intersection across all devices is non-empty.
+  // Scalar values are treated as singleton sets for backward compatibility.
+  //
   // Must include the domain qualifier.
   //
   // +optional
   // +oneOf=ConstraintType
-  // +k8s:optional
-  // +k8s:format=k8s-resource-fully-qualified-name
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-resource-fully-qualified-name
   optional string matchAttribute = 2;
 
   // DistinctAttribute requires that all devices in question have this
   // attribute and that its type and value are unique across those devices.
+  //
+  // When the DRAListTypeAttributes feature gate is enabled, comparison uses
+  // set semantics (i.e., element order and duplicates are ignored):
+  // list-valued attributes must be pairwise disjoint across devices.
+  // Scalar values are treated as singleton sets for backward compatibility.
   //
   // This acts as the inverse of MatchAttribute.
   //
@@ -789,8 +874,8 @@ message DeviceCounterConsumption {
   // counters defined will be consumed.
   //
   // +required
-  // +k8s:required
-  // +k8s:format=k8s-short-name
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-short-name
   optional string counterSet = 1;
 
   // Counters defines the counters that will be consumed by the device.
@@ -798,6 +883,8 @@ message DeviceCounterConsumption {
   // The maximum number of counters is 32.
   //
   // +required
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:eachKey=+k8s:format=k8s-short-name
   map<string, Counter> counters = 2;
 }
 
@@ -827,7 +914,7 @@ message DeviceRequest {
   //
   // +optional
   // +oneOf=deviceRequestType
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional ExactDeviceRequest exactly = 2;
 
   // FirstAvailable contains subrequests, of which exactly one will be
@@ -848,11 +935,11 @@ message DeviceRequest {
   // +oneOf=deviceRequestType
   // +listType=atomic
   // +featureGate=DRAPrioritizedList
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:listType=atomic
-  // +k8s:unique=map
-  // +k8s:listMapKey=name
-  // +k8s:maxItems=8
+  // +k8s:alpha(since: "1.36")=+k8s:unique=map
+  // +k8s:alpha(since: "1.36")=+k8s:listMapKey=name
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=8
   repeated DeviceSubRequest firstAvailable = 3;
 }
 
@@ -877,8 +964,9 @@ message DeviceRequestAllocationResult {
   // vendor of the driver. It should use only lower case characters.
   //
   // +required
-  // +k8s:format=k8s-long-name-caseless
-  // +k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-long-name-caseless
+  // +k8s:alpha(since: "1.36")=+k8s:maxLength=63
+  // +k8s:alpha(since: "1.36")=+k8s:required
   optional string driver = 2;
 
   // This name together with the driver name and the device name field
@@ -888,8 +976,8 @@ message DeviceRequestAllocationResult {
   // DNS sub-domains separated by slashes.
   //
   // +required
-  // +k8s:required
-  // +k8s:format=k8s-resource-pool-name
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-resource-pool-name
   optional string pool = 3;
 
   // Device references one device instance via its name in the driver's
@@ -915,38 +1003,39 @@ message DeviceRequestAllocationResult {
   //
   // The maximum number of tolerations is 16.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   repeated DeviceToleration tolerations = 6;
 
   // BindingConditions contains a copy of the BindingConditions
   // from the corresponding ResourceSlice at the time of allocation.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
   // feature gates.
   //
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
-  // +k8s:optional
-  // +k8s:maxItems=4
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=4
   repeated string bindingConditions = 7;
 
   // BindingFailureConditions contains a copy of the BindingFailureConditions
   // from the corresponding ResourceSlice at the time of allocation.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
   // feature gates.
   //
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
-  // +k8s:optional
-  // +k8s:maxItems=4
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=4
   repeated string bindingFailureConditions = 8;
 
   // ShareID uniquely identifies an individual allocation share of the device,
@@ -956,8 +1045,8 @@ message DeviceRequestAllocationResult {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
-  // +k8s:optional
-  // +k8s:format=k8s-uuid
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-uuid
   optional string shareID = 9;
 
   // ConsumedCapacity tracks the amount of capacity consumed per device as part of the claim request.
@@ -1014,8 +1103,8 @@ message DeviceSubRequest {
   // to reference.
   //
   // +required
-  // +k8s:required
-  // +k8s:format=k8s-long-name
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-long-name
   optional string deviceClassName = 2;
 
   // Selectors define criteria which must be satisfied by a specific
@@ -1025,8 +1114,8 @@ message DeviceSubRequest {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated DeviceSelector selectors = 3;
 
   // AllocationMode and its related fields define how devices are allocated
@@ -1048,6 +1137,7 @@ message DeviceSubRequest {
   // requests with unknown modes.
   //
   // +optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional string allocationMode = 4;
 
   // Count is used only when the count mode is "ExactCount". Must be greater than zero.
@@ -1072,12 +1162,13 @@ message DeviceSubRequest {
   //
   // The maximum number of tolerations is 16.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   repeated DeviceToleration tolerations = 6;
 
   // Capacity define resource requirements against each capacity.
@@ -1124,14 +1215,132 @@ message DeviceTaint {
   // Consumers must treat unknown effects like None.
   //
   // +required
-  // +k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:required
   optional string effect = 3;
 
-  // TimeAdded represents the time at which the taint was added.
+  // TimeAdded represents the time at which the taint was added or
+  // (only in a DeviceTaintRule) the effect was modified.
   // Added automatically during create or update if not set.
+  //
+  // In addition, in a DeviceTaintRule a value provided during
+  // an update gets replaced with the current time if the provided
+  // value is the same as the old one and the new effect is different.
+  // Changing the key and/or value while keeping the effect unchanged
+  // is possible and does not update the time stamp because the eviction
+  // which uses it is either already started (NoExecute) or
+  // not started yet (NoEffect, NoSchedule).
   //
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
+}
+
+// DeviceTaintRule adds one taint to all devices which match the selector.
+// This has the same effect as if the taint was specified directly
+// in the ResourceSlice by the DRA driver.
+message DeviceTaintRule {
+  // Standard object metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec specifies the selector and one taint.
+  //
+  // Changing the spec automatically increments the metadata.generation number.
+  // +required
+  optional DeviceTaintRuleSpec spec = 2;
+
+  // Status provides information about what was requested in the spec.
+  //
+  // +optional
+  optional DeviceTaintRuleStatus status = 3;
+}
+
+// DeviceTaintRuleList is a collection of DeviceTaintRules.
+message DeviceTaintRuleList {
+  // Standard list metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of DeviceTaintRules.
+  repeated DeviceTaintRule items = 2;
+}
+
+// DeviceTaintRuleSpec specifies the selector and one taint.
+message DeviceTaintRuleSpec {
+  // DeviceSelector defines which device(s) the taint is applied to.
+  // All selector criteria must be satisfied for a device to
+  // match. The empty selector matches all devices. Without
+  // a selector, no devices are matches.
+  //
+  // +optional
+  optional DeviceTaintSelector deviceSelector = 1;
+
+  // The taint that gets applied to matching devices.
+  //
+  // +required
+  optional DeviceTaint taint = 2;
+}
+
+// DeviceTaintRuleStatus provides information about an on-going pod eviction.
+message DeviceTaintRuleStatus {
+  // Conditions provide information about the state of the DeviceTaintRule
+  // and the cluster at some point in time,
+  // in a machine-readable and human-readable format.
+  //
+  // The following condition is currently defined as part of this API, more may
+  // get added:
+  // - Type: EvictionInProgress
+  // - Status: True if there are currently pods which need to be evicted, False otherwise
+  //   (includes the effects which don't cause eviction).
+  // - Reason: not specified, may change
+  // - Message: includes information about number of pending pods and already evicted pods
+  //   in a human-readable format, updated periodically, may change
+  //
+  // For `effect: None`, the condition above gets set once for each change to
+  // the spec, with the message containing information about what would happen
+  // if the effect was `NoExecute`. This feedback can be used to decide whether
+  // changing the effect to `NoExecute` will work as intended. It only gets
+  // set once to avoid having to constantly update the status.
+  //
+  // Must have 8 or fewer entries.
+  //
+  // +optional
+  // +listType=map
+  // +listMapKey=type
+  // +patchStrategy=merge
+  // +patchMergeKey=type
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
+}
+
+// DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to.
+// The empty selector matches all devices. Without a selector, no devices
+// are matched.
+message DeviceTaintSelector {
+  // If driver is set, only devices from that driver are selected.
+  // This fields corresponds to slice.spec.driver.
+  //
+  // +optional
+  optional string driver = 2;
+
+  // If pool is set, only devices in that pool are selected.
+  //
+  // Also setting the driver name may be useful to avoid
+  // ambiguity when different drivers use the same pool name,
+  // but this is not required because selecting pools from
+  // different drivers may also be useful, for example when
+  // drivers with node-local devices use the node name as
+  // their pool name.
+  //
+  // +optional
+  optional string pool = 3;
+
+  // If device is set, only devices with that name are selected.
+  // This field corresponds to slice.spec.devices[].name.
+  //
+  // Setting also driver and pool may be required to avoid ambiguity,
+  // but is not required.
+  //
+  // +optional
+  optional string device = 4;
 }
 
 // The ResourceClaim this DeviceToleration is attached to tolerates any taint that matches
@@ -1142,8 +1351,8 @@ message DeviceToleration {
   // Must be a label name.
   //
   // +optional
-  // +k8s:optional
-  // +k8s:format=k8s-label-key
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-label-key
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.
@@ -1153,6 +1362,7 @@ message DeviceToleration {
   //
   // +optional
   // +default="Equal"
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional string operator = 2;
 
   // Value is the taint value the toleration matches to.
@@ -1166,6 +1376,7 @@ message DeviceToleration {
   // When specified, allowed values are NoSchedule and NoExecute.
   //
   // +optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional string effect = 4;
 
   // TolerationSeconds represents the period of time the toleration (which must be
@@ -1203,8 +1414,8 @@ message ExactDeviceRequest {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
-  // +k8s:maxItems=32
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=32
   repeated DeviceSelector selectors = 2;
 
   // AllocationMode and its related fields define how devices are allocated
@@ -1227,7 +1438,7 @@ message ExactDeviceRequest {
   // requests with unknown modes.
   //
   // +optional
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional string allocationMode = 3;
 
   // Count is used only when the count mode is "ExactCount". Must be greater than zero.
@@ -1266,12 +1477,13 @@ message ExactDeviceRequest {
   //
   // The maximum number of tolerations is 16.
   //
-  // This is an alpha field and requires enabling the DRADeviceTaints
+  // This is a beta field and requires enabling the DRADeviceTaints
   // feature gate.
   //
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   repeated DeviceToleration tolerations = 6;
 
   // Capacity define resource requirements against each capacity.
@@ -1300,11 +1512,11 @@ message NetworkDeviceData {
   // the allocated device. This might be the name of a physical or virtual
   // network interface being configured in the pod.
   //
-  // Must not be longer than 256 characters.
+  // Must not be longer than 256 bytes.
   //
   // +optional
-  // +k8s:optional
-  // +k8s:maxLength=256
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxBytes=256
   optional string interfaceName = 1;
 
   // IPs lists the network addresses assigned to the device's network interface.
@@ -1315,20 +1527,58 @@ message NetworkDeviceData {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +k8s:listType=atomic
-  // +k8s:unique=set
-  // +k8s:maxItems=16
+  // +k8s:alpha(since: "1.36")=+k8s:unique=set
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=16
   repeated string ips = 2;
 
   // HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
   //
-  // Must not be longer than 128 characters.
+  // Must not be longer than 128 bytes.
   //
   // +optional
-  // +k8s:optional
-  // +k8s:maxLength=128
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:maxBytes=128
   optional string hardwareAddress = 3;
+}
+
+// NodeAllocatableResourceMapping defines the translation between the DRA device/capacity
+// units requested to the corresponding quantity of the node allocatable resource.
+message NodeAllocatableResourceMapping {
+  // CapacityKey references a capacity name defined as a key in the
+  // `spec.devices[*].capacity` map. When this field is set, the value associated with
+  // this key in the `status.allocation.devices.results[*].consumedCapacity` map
+  // (for a specific claim allocation) determines the base quantity for
+  // the node allocatable resource. If `allocationMultiplier` is also set, it is
+  // multiplied with the base quantity.
+  // For example, if `spec.devices[*].capacity` has an entry "dra.example.com/memory": "128Gi",
+  // and this field is set to "dra.example.com/memory", then for a claim allocation
+  // that consumes { "dra.example.com/memory": "4Gi" } the base quantity for the
+  // node allocatable resource mapping will be "4Gi", and `allocationMultiplier` should
+  // be omitted or set to "1".
+  // +optional
+  optional string capacityKey = 1;
+
+  // AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim.
+  // It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set.
+  // 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.
+  // 	   a. A DRA driver representing each CPU core as a device would have
+  //        {ResourceName: "cpu", allocationMultiplier: "2"} in its
+  //        `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,
+  // 		  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.
+  //     b. A GPU device that needs additional node memory per GPU allocation would
+  //        have {ResourceName: "memory", allocationMultiplier: "2Gi"}.  Each allocated
+  // 		  GPU device instance of this type will account for 2Gi of memory.
+  //
+  // 2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.
+  // 	   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.
+  //     For example, if a Device's capacity "dra.example.com/cores" is consumed,
+  //     and each "core" provides 2 "cpu"s, the mapping would be:
+  //     {ResourceName: "cpu", capacityKey: "dra.example.com/cores", allocationMultiplier: "2"}.
+  //     If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity allocationMultiplier = 2;
 }
 
 // OpaqueDeviceConfiguration contains configuration parameters for a driver
@@ -1344,8 +1594,9 @@ message OpaqueDeviceConfiguration {
   // vendor of the driver. It should use only lower case characters.
   //
   // +required
-  // +k8s:required
-  // +k8s:format=k8s-long-name-caseless
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:maxLength=63
+  // +k8s:alpha(since: "1.36")=+k8s:format=k8s-long-name-caseless
   optional string driver = 1;
 
   // Parameters can contain arbitrary data. It is the responsibility of
@@ -1374,7 +1625,7 @@ message ResourceClaim {
 
   // Spec describes what is being requested and how to configure it.
   // The spec is immutable.
-  // +k8s:immutable
+  // +k8s:alpha(since: "1.36")=+k8s:immutable
   optional ResourceClaimSpec spec = 2;
 
   // Status describes whether the claim is ready to use and what has been allocated.
@@ -1429,8 +1680,8 @@ message ResourceClaimStatus {
   // Allocation is set once the claim has been allocated successfully.
   //
   // +optional
-  // +k8s:optional
-  // +k8s:update=NoModify
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:update=NoModify
   optional AllocationResult allocation = 1;
 
   // ReservedFor indicates which entities are currently allowed to use
@@ -1458,10 +1709,10 @@ message ResourceClaimStatus {
   // +listMapKey=uid
   // +patchStrategy=merge
   // +patchMergeKey=uid
-  // +k8s:optional
-  // +k8s:listType=map
-  // +k8s:listMapKey=uid
-  // +k8s:maxItems=256
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:listType=map
+  // +k8s:alpha(since: "1.36")=+k8s:listMapKey=uid
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=256
   repeated ResourceClaimConsumerReference reservedFor = 2;
 
   // Devices contains the status of each device allocated for this
@@ -1469,18 +1720,18 @@ message ResourceClaimStatus {
   // information. Entries are owned by their respective drivers.
   //
   // +optional
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +listType=map
   // +listMapKey=driver
   // +listMapKey=device
   // +listMapKey=pool
   // +listMapKey=shareID
   // +featureGate=DRAResourceClaimDeviceStatus
-  // +k8s:listType=map
-  // +k8s:listMapKey=driver
-  // +k8s:listMapKey=device
-  // +k8s:listMapKey=pool
-  // +k8s:listMapKey=shareID
+  // +k8s:alpha(since: "1.36")=+k8s:listType=map
+  // +k8s:alpha(since: "1.36")=+k8s:listMapKey=driver
+  // +k8s:alpha(since: "1.36")=+k8s:listMapKey=device
+  // +k8s:alpha(since: "1.36")=+k8s:listMapKey=pool
+  // +k8s:alpha(since: "1.36")=+k8s:listMapKey=shareID
   repeated AllocatedDeviceStatus devices = 4;
 }
 
@@ -1594,6 +1845,7 @@ message ResourceSlice {
   // Contains the information published by the driver.
   //
   // Changing the spec automatically increments the metadata.generation number.
+  // +required
   optional ResourceSliceSpec spec = 2;
 }
 
@@ -1668,7 +1920,7 @@ message ResourceSliceSpec {
   //
   // +optional
   // +listType=atomic
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +zeroOrOneOf=ResourceSliceType
   repeated Device devices = 6;
 
@@ -1694,14 +1946,14 @@ message ResourceSliceSpec {
   // The maximum number of counter sets is 8.
   //
   // +optional
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +listType=atomic
   // +k8s:listType=atomic
-  // +k8s:unique=map
-  // +k8s:listMapKey=name
+  // +k8s:alpha(since: "1.36")=+k8s:unique=map
+  // +k8s:alpha(since: "1.36")=+k8s:listMapKey=name
   // +featureGate=DRAPartitionableDevices
   // +zeroOrOneOf=ResourceSliceType
-  // +k8s:maxItems=8
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=8
   repeated CounterSet sharedCounters = 8;
 }
 

@@ -84,6 +84,7 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 - Configurable (trace) logging
 - Customizable gzip/deflate readers and writers using CompressorProvider registration
 - Inject your own http.Handler using the `HttpMiddlewareHandlerToFilter` function
+- Added `SetPathTokenCacheEnabled` and `SetCustomVerbCacheEnabled` to disable regexp caching (default=true)
 
 ## How to customize
 There are several hooks to customize the behavior of the go-restful package.

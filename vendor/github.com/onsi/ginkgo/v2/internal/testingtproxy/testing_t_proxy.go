@@ -27,6 +27,11 @@ type ginkgoWriterInterface interface {
 type ginkgoRecoverFunc func()
 type attachProgressReporterFunc func(func() string) func()
 
+var formatters = map[bool]formatter.Formatter{
+	true:  formatter.NewWithNoColorBool(true),
+	false: formatter.NewWithNoColorBool(false),
+}
+
 func New(writer ginkgoWriterInterface, fail failFunc, skip skipFunc, cleanup cleanupFunc, report reportFunc, addReportEntry addReportEntryFunc, ginkgoRecover ginkgoRecoverFunc, attachProgressReporter attachProgressReporterFunc, randomSeed int64, parallelProcess int, parallelTotal int, noColor bool, offset int) *ginkgoTestingTProxy {
 	return &ginkgoTestingTProxy{
 		fail:                   fail,
@@ -41,7 +46,7 @@ func New(writer ginkgoWriterInterface, fail failFunc, skip skipFunc, cleanup cle
 		randomSeed:             randomSeed,
 		parallelProcess:        parallelProcess,
 		parallelTotal:          parallelTotal,
-		f:                      formatter.NewWithNoColorBool(noColor),
+		f:                      formatters[noColor], //minimize allocations by reusing formatters
 	}
 }
 

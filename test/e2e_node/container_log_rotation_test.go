@@ -84,7 +84,7 @@ var _ = SIGDescribe("ContainerLogRotation", framework.WithSlow(), framework.With
 			ginkgo.By("get container log path")
 			gomega.Expect(logRotationPod.Status.ContainerStatuses).To(gomega.HaveLen(1), "log rotation pod should have one container")
 			id := kubecontainer.ParseContainerID(logRotationPod.Status.ContainerStatuses[0].ContainerID).ID
-			r, _, err := getCRIClient()
+			r, _, err := getCRIClient(ctx)
 			framework.ExpectNoError(err, "should connect to CRI and obtain runtime service clients and image service client")
 			resp, err := r.ContainerStatus(context.Background(), id, false)
 			framework.ExpectNoError(err)
@@ -156,9 +156,9 @@ var _ = SIGDescribe("ContainerLogRotationWithMultipleWorkers", framework.WithSlo
 			for _, pod := range logRotationPods {
 				gomega.Expect(pod.Status.ContainerStatuses).To(gomega.HaveLen(1), "log rotation pod should have one container")
 				id := kubecontainer.ParseContainerID(pod.Status.ContainerStatuses[0].ContainerID).ID
-				r, _, err := getCRIClient()
+				r, _, err := getCRIClient(ctx)
 				framework.ExpectNoError(err, "should connect to CRI and obtain runtime service clients and image service client")
-				resp, err := r.ContainerStatus(context.Background(), id, false)
+				resp, err := r.ContainerStatus(ctx, id, false)
 				framework.ExpectNoError(err)
 				logPaths = append(logPaths, resp.GetStatus().GetLogPath())
 			}

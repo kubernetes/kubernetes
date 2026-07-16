@@ -20,7 +20,10 @@ import (
 	"context"
 
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -38,7 +41,7 @@ var _ Scope = &containerScope{}
 func NewContainerScope(policy Policy) Scope {
 	return &containerScope{
 		scope{
-			name:             containerTopologyScope,
+			name:             ContainerTopologyScope,
 			podTopologyHints: podTopologyHints{},
 			policy:           policy,
 			podMap:           containermap.NewContainerMap(),
@@ -58,6 +61,9 @@ func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAd
 				metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Inc()
 			}
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+				return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission with a container-level topology manager"))
+			}
 			return admission.GetPodAdmitResult(&TopologyAffinityError{})
 		}
 		logger.Info("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)

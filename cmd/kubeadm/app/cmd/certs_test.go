@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -691,7 +690,6 @@ kubernetesVersion: %s`,
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.brokenCertName != "" {
 				// remove the file to simulate a missing certificate

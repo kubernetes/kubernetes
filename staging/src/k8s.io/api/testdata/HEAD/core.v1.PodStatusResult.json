@@ -140,7 +140,12 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue"
+            "recursiveReadOnly": "recursiveReadOnlyValue",
+            "volumeStatus": {
+              "image": {
+                "imageRef": "imageRefValue"
+              }
+            }
           }
         ],
         "user": {
@@ -158,7 +163,8 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue"
+                "health": "healthValue",
+                "message": "messageValue"
               }
             ]
           }
@@ -233,7 +239,12 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue"
+            "recursiveReadOnly": "recursiveReadOnlyValue",
+            "volumeStatus": {
+              "image": {
+                "imageRef": "imageRefValue"
+              }
+            }
           }
         ],
         "user": {
@@ -251,7 +262,8 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue"
+                "health": "healthValue",
+                "message": "messageValue"
               }
             ]
           }
@@ -327,7 +339,12 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue"
+            "recursiveReadOnly": "recursiveReadOnlyValue",
+            "volumeStatus": {
+              "image": {
+                "imageRef": "imageRefValue"
+              }
+            }
           }
         ],
         "user": {
@@ -345,7 +362,8 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue"
+                "health": "healthValue",
+                "message": "messageValue"
               }
             ]
           }
@@ -386,6 +404,17 @@
           "request": "requestValue"
         }
       ]
-    }
+    },
+    "nodeAllocatableResourceClaimStatuses": [
+      {
+        "resourceClaimName": "resourceClaimNameValue",
+        "containers": [
+          "containersValue"
+        ],
+        "resources": {
+          "resourcesKey": "0"
+        }
+      }
+    ]
   }
 }

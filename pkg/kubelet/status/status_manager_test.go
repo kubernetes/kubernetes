@@ -33,6 +33,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,6 +53,7 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/utils/ptr"
 )
 
 type mutablePodManager interface {
@@ -180,8 +182,8 @@ func TestNewStatusPreservesPodStartTime(t *testing.T) {
 	syncer.SetPodStatus(logger, pod, getRandomPodStatus())
 
 	status := expectPodStatus(t, syncer, pod)
-	if !status.StartTime.Time.Equal(startTime.Time) {
-		t.Errorf("Unexpected start time, expected %v, actual %v", startTime, status.StartTime)
+	if !status.StartTime.Time.Equal(startTime.Rfc3339Copy().Time) {
+		t.Errorf("Unexpected start time, expected %v, actual %v", startTime.Rfc3339Copy(), status.StartTime)
 	}
 }
 
@@ -510,6 +512,32 @@ func TestStatusEquality(t *testing.T) {
 	normalizeStatus(&pod, &podStatus)
 	if !isPodStatusByKubeletEqual(&oldPodStatus, &podStatus) {
 		t.Fatalf("Differences in pod condition not owned by kubelet should not affect normalized equality.")
+	}
+
+	claimStatusA := v1.PodResourceClaimStatus{
+		Name:              "my-claim",
+		ResourceClaimName: ptr.To("claim"),
+	}
+	extendedClaimStatusA := &v1.PodExtendedResourceClaimStatus{
+		RequestMappings: []v1.ContainerExtendedResourceRequest{
+			{RequestName: "request", ContainerName: "c", ResourceName: "example.com/gpu"},
+		},
+		ResourceClaimName: "claim",
+	}
+	oldPodStatus.ResourceClaimStatuses = []v1.PodResourceClaimStatus{claimStatusA}
+	oldPodStatus.ExtendedResourceClaimStatus = extendedClaimStatusA
+	oldPodStatus.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+		{
+			ResourceClaimName: "my-claim",
+			Containers:        []string{"ctr0"},
+			Resources:         map[v1.ResourceName]resource.Quantity{v1.ResourceMemory: resource.MustParse("100Mi")},
+		},
+	}
+
+	normalizeStatus(&pod, &oldPodStatus)
+	normalizeStatus(&pod, &podStatus)
+	if !isPodStatusByKubeletEqual(&oldPodStatus, &podStatus) {
+		t.Fatalf("Differences in pod resource claim statuses not owned by kubelet should not affect normalized equality.")
 	}
 }
 
@@ -2073,6 +2101,99 @@ func TestMergePodStatus(t *testing.T) {
 	}
 }
 
+func TestContainerTerminationMetric(t *testing.T) {
+	metrics.Register()
+	manager := newTestManager(&fake.Clientset{})
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "metric-pod",
+			Namespace: "test",
+			UID:       "12345",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "test-container"},
+			},
+		},
+	}
+	manager.podManager.(mutablePodManager).AddPod(pod)
+
+	metrics.TerminatedContainersTotal.Reset()
+
+	initialStatus := v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name: "test-container",
+				State: v1.ContainerState{
+					Running: &v1.ContainerStateRunning{},
+				},
+			},
+		},
+	}
+	manager.SetPodStatus(klog.Background(), pod, initialStatus)
+
+	manager.testSyncBatch(context.Background())
+
+	// Test successful termination (exit code 0)
+	successStatus := v1.PodStatus{
+		Phase: v1.PodSucceeded,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name: "test-container",
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						ExitCode: 0,
+						Reason:   "Completed",
+					},
+				},
+			},
+		},
+	}
+	manager.SetPodStatus(klog.Background(), pod, successStatus)
+	manager.testSyncBatch(context.Background())
+
+	count, err := testutil.GetCounterMetricValue(metrics.TerminatedContainersTotal.WithLabelValues(metrics.Container, "0", "Completed"))
+	require.NoError(t, err)
+	assert.InDelta(t, 1.0, count, 0)
+
+	// Test error termination (exit code 1) for a second container to verify cumulative behavior
+	errorPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "error-pod",
+			Namespace: "test",
+			UID:       "67890",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "error-container"},
+			},
+		},
+	}
+	manager.podManager.(mutablePodManager).AddPod(errorPod)
+
+	errorStatus := v1.PodStatus{
+		Phase: v1.PodFailed,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name: "error-container",
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						ExitCode: 1,
+						Reason:   "Error",
+					},
+				},
+			},
+		},
+	}
+	manager.SetPodStatus(klog.Background(), errorPod, errorStatus)
+	manager.testSyncBatch(context.Background())
+
+	count, err = testutil.GetCounterMetricValue(metrics.TerminatedContainersTotal.WithLabelValues(metrics.Container, "1", "Error"))
+	require.NoError(t, err)
+	assert.InDelta(t, 1.0, count, 0)
+}
+
 func TestPodResizeConditions(t *testing.T) {
 	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
 	podUID := types.UID("12345")
@@ -2161,7 +2282,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize pending condition to deferred with message",
 			updateFunc: func(podUID types.UID) bool {
-				return m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "some-message", 1)
+				return m.SetPodResizePendingCondition(podUID, "some-reason", "some-message", 1)
 			},
 			expectedUpdateFuncReturnVal: true,
 			expected: []*v1.PodCondition{

@@ -78,7 +78,7 @@ var _ = utils.SIGDescribe(framework.WithDisruptive(), "[LinuxOnly] NonGracefulNo
 	})
 
 	ginkgo.Describe("[NonGracefulNodeShutdown] pod that uses a persistent volume via gce pd driver", func() {
-		ginkgo.It("should get immediately rescheduled to a different node after non graceful node shutdown ", func(ctx context.Context) {
+		ginkgo.It("should get immediately rescheduled to a different node after non graceful node shutdown", func(ctx context.Context) {
 			// Install gce pd csi driver
 			ginkgo.By("deploying csi gce-pd driver")
 			driver := drivers.InitGcePDCSIDriver()

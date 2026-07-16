@@ -274,7 +274,7 @@ func getCPUTopology(sysFs sysfs.SysFs) ([]info.Node, int, error) {
 	cpusCount := len(cpusPaths)
 
 	if cpusCount == 0 {
-		err = fmt.Errorf("Any CPU is not available, cpusPath: %s", cpusPath)
+		err = fmt.Errorf("no CPU is available, cpusPath: %s", cpusPath)
 		return nil, 0, err
 	}
 

@@ -63,6 +63,11 @@ type KubeAPIServerStatus struct {
 	// +optional
 	// +listType=atomic
 	ServiceAccountIssuers []ServiceAccountIssuerStatus `json:"serviceAccountIssuers,omitempty"`
+
+	// encryptionStatus contains status reports for the KMS plugin health and its key rotation.
+	// +optional
+	// +openshift:enable:FeatureGate=KMSEncryption
+	EncryptionStatus KMSEncryptionStatus `json:"encryptionStatus,omitempty,omitzero"`
 }
 
 type ServiceAccountIssuerStatus struct {

@@ -59,7 +59,7 @@ func (enc *encoder) padding(offset, algn int) int {
 }
 
 // Calls binary.Write(enc.out, enc.order, v) and panics on write errors.
-func (enc *encoder) binwrite(v interface{}) {
+func (enc *encoder) binwrite(v any) {
 	if err := binary.Write(enc.out, enc.order, v); err != nil {
 		panic(err)
 	}
@@ -67,7 +67,7 @@ func (enc *encoder) binwrite(v interface{}) {
 
 // Encode encodes the given values to the underlying reader. All written values
 // are aligned properly as required by the D-Bus spec.
-func (enc *encoder) Encode(vs ...interface{}) (err error) {
+func (enc *encoder) Encode(vs ...any) (err error) {
 	defer func() {
 		err, _ = recover().(error)
 	}()

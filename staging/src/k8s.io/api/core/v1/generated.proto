@@ -1132,7 +1132,6 @@ message ContainerStatus {
   // AllocatedResources represents the compute resources allocated for this container by the
   // node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
   // and after successfully admitting desired pod resize.
-  // +featureGate=InPlacePodVerticalScalingAllocatedStatus
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 10;
 
@@ -2275,6 +2274,16 @@ message ImageVolumeSource {
   optional string pullPolicy = 2;
 }
 
+// ImageVolumeStatus represents the image-based volume status.
+message ImageVolumeStatus {
+  // ImageRef is the digest of the image used for this volume.
+  // It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+  // The ImageRef length should not exceed 256 characters.
+  // +kubebuilder:validation:MaxLength=256
+  // +required
+  optional string imageRef = 1;
+}
+
 // Maps a string key to a path within a volume.
 message KeyToPath {
   // key is the key to project.
@@ -2677,6 +2686,22 @@ message NodeAffinity {
   repeated PreferredSchedulingTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
+// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
+message NodeAllocatableResourceClaimStatus {
+  // ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
+  // +required
+  optional string resourceClaimName = 1;
+
+  // Containers lists the names of all containers in this pod that reference the claim.
+  // +optional
+  // +listType=set
+  repeated string containers = 2;
+
+  // Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
+  // +required
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> resources = 3;
+}
+
 // NodeCondition contains condition information for a node.
 message NodeCondition {
   // Type of node condition.
@@ -2812,7 +2837,6 @@ message NodeRuntimeHandlerFeatures {
   optional bool recursiveReadOnlyMounts = 1;
 
   // UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
-  // +featureGate=UserNamespacesSupport
   // +optional
   optional bool userNamespaces = 2;
 }
@@ -2974,7 +2998,6 @@ message NodeStatus {
   optional NodeConfigStatus config = 11;
 
   // The available runtime handlers.
-  // +featureGate=UserNamespacesSupport
   // +optional
   // +listType=atomic
   repeated NodeRuntimeHandler runtimeHandlers = 12;
@@ -3528,8 +3551,7 @@ message PersistentVolumeSource {
 
   // portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
   // Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-  // are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-  // is on.
+  // are redirected to the pxd.portworx.com CSI driver.
   // +optional
   optional PortworxVolumeSource portworxVolume = 18;
 
@@ -3918,8 +3940,6 @@ message PodCondition {
   optional string type = 1;
 
   // If set, this represents the .metadata.generation that the pod condition was set based upon.
-  // The PodObservedGenerationTracking feature gate must be enabled to use this field.
-  // +featureGate=PodObservedGenerationTracking
   // +optional
   optional int64 observedGeneration = 7;
 
@@ -4153,6 +4173,14 @@ message PodReadinessGate {
 //
 // It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
 // Containers that need access to the ResourceClaim reference it with this name.
+//
+// When the DRAWorkloadResourceClaims feature gate is enabled and this Pod
+// belongs to a PodGroup, a PodResourceClaim is matched to a
+// PodGroupResourceClaim if all of their fields are equal (Name,
+// ResourceClaimName, and ResourceClaimTemplateName). A matched claim references
+// a single ResourceClaim shared across all Pods in the PodGroup, reserved for
+// the PodGroup in ResourceClaimStatus.ReservedFor rather than for individual
+// Pods.
 message PodResourceClaim {
   // Name uniquely identifies this resource claim inside the pod.
   // This must be a DNS_LABEL.
@@ -4174,6 +4202,16 @@ message PodResourceClaim {
   // generated component, will be used to form a unique name for the
   // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
   //
+  // When the DRAWorkloadResourceClaims feature gate is enabled and the pod
+  // belongs to a PodGroup that defines a PodGroupResourceClaim with the same
+  // Name and ResourceClaimTemplateName, this PodResourceClaim resolves to the
+  // ResourceClaim generated for the PodGroup. All pods in the group that
+  // define an equivalent PodResourceClaim matching the
+  // PodGroupResourceClaim's Name and ResourceClaimTemplateName share the same
+  // generated ResourceClaim. ResourceClaims generated for a PodGroup are
+  // owned by the PodGroup and their lifecycles are tied to the PodGroup
+  // instead of any individual pod.
+  //
   // This field is immutable and no changes will be made to the
   // corresponding ResourceClaim by the control plane after creating the
   // ResourceClaim.
@@ -4193,9 +4231,16 @@ message PodResourceClaimStatus {
   optional string name = 1;
 
   // ResourceClaimName is the name of the ResourceClaim that was
-  // generated for the Pod in the namespace of the Pod. If this is
-  // unset, then generating a ResourceClaim was not necessary. The
-  // pod.spec.resourceClaims entry can be ignored in this case.
+  // generated for the Pod in the namespace of the Pod.
+  //
+  // When the DRAWorkloadResourceClaims feature is enabled and the
+  // corresponding PodResourceClaim matches a PodGroupResourceClaim
+  // made by the Pod's PodGroup, then this is the name of the
+  // ResourceClaim generated and reserved for the PodGroup.
+  //
+  // If this is unset, then generating a ResourceClaim was not
+  // necessary. The pod.spec.resourceClaims entry can be ignored in
+  // this case.
   //
   // +optional
   optional string resourceClaimName = 2;
@@ -4206,6 +4251,20 @@ message PodSchedulingGate {
   // Name of the scheduling gate.
   // Each scheduling gate must have a unique name field.
   optional string name = 1;
+}
+
+// PodSchedulingGroup identifies the runtime scheduling group instance that a Pod belongs to.
+// The scheduler uses this information to apply workload-aware scheduling semantics.
+// Exactly one field must be specified.
+// +union
+message PodSchedulingGroup {
+  // PodGroupName specifies the name of the standalone PodGroup object
+  // that represents the runtime instance of this group.
+  // Must be a DNS subdomain.
+  //
+  // +optional
+  // +oneOf=GroupSelection
+  optional string podGroupName = 1;
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -4669,7 +4728,6 @@ message PodSpec {
   // When set to false, a new userns is created for the pod. Setting false is useful for
   // mitigating container breakout vulnerabilities even allowing users to run their
   // containers as root without actually having root privileges on the host.
-  // This field is alpha-level and is only honored by servers that enable the UserNamespacesSupport feature.
   // +k8s:conversion-gen=false
   // +optional
   optional bool hostUsers = 37;
@@ -4735,17 +4793,22 @@ message PodSpec {
   // +optional
   optional string hostnameOverride = 41;
 
-  // WorkloadRef provides a reference to the Workload object that this Pod belongs to.
-  // This field is used by the scheduler to identify the PodGroup and apply the
-  // correct group scheduling policies. The Workload object referenced
-  // by this field may not exist at the time the Pod is created.
-  // This field is immutable, but a Workload object with the same name
-  // may be recreated with different policies. Doing this during pod scheduling
+  // SchedulingGroup provides a reference to the immediate scheduling runtime
+  // grouping object that this Pod belongs to.
+  // This field is used by the scheduler to identify the group and apply the
+  // correct group scheduling policies. The association with a group also
+  // impacts other lifecycle aspects of a Pod that are relevant in a wider context
+  // of scheduling like preemption, resource attachment, etc. If not specified,
+  // the Pod is treated as a single unit in all of these aspects.
+  // The group object referenced by this field may not exist at the time the
+  // Pod is created.
+  // This field is immutable, but a group object with the same name may be
+  // recreated with different policies. Doing this during pod scheduling
   // may result in the placement not conforming to the expected policies.
   //
   // +featureGate=GenericWorkload
   // +optional
-  optional WorkloadReference workloadRef = 42;
+  optional PodSchedulingGroup schedulingGroup = 43;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -4754,7 +4817,6 @@ message PodSpec {
 message PodStatus {
   // If set, this represents the .metadata.generation that the pod status was set based upon.
   // The PodObservedGenerationTracking feature gate must be enabled to use this field.
-  // +featureGate=PodObservedGenerationTracking
   // +optional
   optional int64 observedGeneration = 17;
 
@@ -4923,6 +4985,16 @@ message PodStatus {
   // +featureGate=InPlacePodLevelResourcesVerticalScaling
   // +optional
   optional ResourceRequirements resources = 20;
+
+  // NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
+  // that were allocated for this pod through DRA claims. This includes resources currently
+  // reported in v1.Node `status.allocatable` that are not extended resources
+  // (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
+  // Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+  // +featureGate=DRANodeAllocatableResources
+  // +optional
+  // +listType=atomic
+  repeated NodeAllocatableResourceClaimStatus nodeAllocatableResourceClaimStatuses = 21;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
@@ -5300,8 +5372,8 @@ message ReplicationController {
   // be the same as the Pod(s) that the replication controller manages.
   // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  // +k8s:subfield(name)=+k8s:optional
-  // +k8s:subfield(name)=+k8s:format=k8s-long-name
+  // +k8s:alpha(since: "1.36")=+k8s:subfield(name)=+k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:subfield(name)=+k8s:format=k8s-long-name
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the replication controller.
@@ -5358,18 +5430,18 @@ message ReplicationControllerSpec {
   // Defaults to 1.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
   // +optional
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +default=1
-  // +k8s:minimum=0
+  // +k8s:alpha(since: "1.36")=+k8s:minimum=0
   optional int32 replicas = 1;
 
   // Minimum number of seconds for which a newly created pod should be ready
   // without any of its container crashing, for it to be considered available.
   // Defaults to 0 (pod will be considered available as soon as it is ready)
   // +optional
-  // +k8s:optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   // +default=0
-  // +k8s:minimum=0
+  // +k8s:alpha(since: "1.36")=+k8s:minimum=0
   optional int32 minReadySeconds = 4;
 
   // Selector is a label query over pods that should match the Replicas count.
@@ -5468,6 +5540,12 @@ message ResourceHealth {
   //
   // In future we may want to introduce the PermanentlyUnhealthy Status.
   optional string health = 2;
+
+  // Message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
+  // This field is populated by the kubelet when ResourceHealthStatusMessage is enabled if the DRA plugin returns a message, and is null otherwise.
+  // +featureGate=ResourceHealthStatusMessage
+  // +optional
+  optional string message = 6;
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -5970,7 +6048,6 @@ message SecurityContext {
   // procMount denotes the type of proc mount to use for the containers.
   // The default value is Default which uses the container runtime defaults for
   // readonly paths and masked paths.
-  // This requires the ProcMountType feature flag to be enabled.
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional string procMount = 9;
@@ -6885,6 +6962,11 @@ message VolumeMountStatus {
   // depending on the mount result.
   // +optional
   optional string recursiveReadOnly = 4;
+
+  // volumeStatus represents volume-type-specific status about the mounted
+  // volume.
+  // +optional
+  optional VolumeStatus volumeStatus = 5;
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -7126,8 +7208,7 @@ message VolumeSource {
 
   // portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
   // Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-  // are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-  // is on.
+  // are redirected to the pxd.portworx.com CSI driver.
   // +optional
   optional PortworxVolumeSource portworxVolume = 24;
 
@@ -7184,12 +7265,20 @@ message VolumeSource {
   // A failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.
   // The types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.
   // The OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.
-  // The volume will be mounted read-only (ro) and non-executable files (noexec).
+  // The volume will be mounted read-only (ro).
   // Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.
   // The field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.
-  // +featureGate=ImageVolume
   // +optional
   optional ImageVolumeSource image = 30;
+}
+
+// VolumeStatus represents the status of a mounted volume.
+// At most one of its members must be specified.
+message VolumeStatus {
+  // image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
+  // +featureGate=ImageVolumeWithDigest
+  // +optional
+  optional ImageVolumeStatus image = 1;
 }
 
 // Represents a vSphere volume resource.
@@ -7247,35 +7336,5 @@ message WindowsSecurityContextOptions {
   // In addition, if HostProcess is true then HostNetwork must also be set to true.
   // +optional
   optional bool hostProcess = 4;
-}
-
-// WorkloadReference identifies the Workload object and PodGroup membership
-// that a Pod belongs to. The scheduler uses this information to apply
-// workload-aware scheduling semantics.
-message WorkloadReference {
-  // Name defines the name of the Workload object this Pod belongs to.
-  // Workload must be in the same namespace as the Pod.
-  // If it doesn't match any existing Workload, the Pod will remain unschedulable
-  // until a Workload object is created and observed by the kube-scheduler.
-  // It must be a DNS subdomain.
-  //
-  // +required
-  optional string name = 1;
-
-  // PodGroup is the name of the PodGroup within the Workload that this Pod
-  // belongs to. If it doesn't match any existing PodGroup within the Workload,
-  // the Pod will remain unschedulable until the Workload object is recreated
-  // and observed by the kube-scheduler. It must be a DNS label.
-  //
-  // +required
-  optional string podGroup = 2;
-
-  // PodGroupReplicaKey specifies the replica key of the PodGroup to which this
-  // Pod belongs. It is used to distinguish pods belonging to different replicas
-  // of the same pod group. The pod group policy is applied separately to each replica.
-  // When set, it must be a DNS label.
-  //
-  // +optional
-  optional string podGroupReplicaKey = 3;
 }
 

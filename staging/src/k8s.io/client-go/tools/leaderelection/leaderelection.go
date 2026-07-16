@@ -199,8 +199,8 @@ type LeaderElector struct {
 	// clock is wrapper around time to allow for less flaky testing
 	clock clock.Clock
 
-	// used to lock the observedRecord
-	observedRecordLock sync.Mutex
+	// used to lock the observedRecord and the observedTime
+	observedRecordLock sync.RWMutex
 
 	metrics leaderMetricsAdapter
 }
@@ -256,7 +256,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	desc := le.config.Lock.Describe()
 	logger := klog.FromContext(ctx)
 	logger.Info("Attempting to acquire leader lease...", "lock", desc)
-	wait.JitterUntil(func() {
+	wait.JitterUntilWithContext(ctx, func(ctx context.Context) {
 		if !le.config.Coordinated {
 			succeeded = le.tryAcquireOrRenew(ctx)
 		} else {
@@ -271,7 +271,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 		le.metrics.leaderOn(le.config.Name)
 		logger.Info("Successfully acquired lease", "lock", desc)
 		cancel()
-	}, le.config.RetryPeriod, JitterFactor, true, ctx.Done())
+	}, le.config.RetryPeriod, JitterFactor, true)
 	return succeeded
 }
 
@@ -281,8 +281,13 @@ func (le *LeaderElector) renew(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	logger := klog.FromContext(ctx)
-	wait.Until(func() {
+	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		err := wait.PollUntilContextTimeout(ctx, le.config.RetryPeriod, le.config.RenewDeadline, true, func(ctx context.Context) (done bool, err error) {
+			// PollUntilContextTimeout invokes condition even when the context is canceled when immediate=true.
+			// Short-circuit this to prevent unnecessary processing and error log messages.
+			if err := ctx.Err(); err != nil {
+				return false, err
+			}
 			if !le.config.Coordinated {
 				return le.tryAcquireOrRenew(ctx), nil
 			} else {
@@ -298,7 +303,7 @@ func (le *LeaderElector) renew(ctx context.Context) {
 		le.metrics.leaderOff(le.config.Name)
 		logger.Info("Failed to renew lease", "lock", desc, "err", err)
 		cancel()
-	}, le.config.RetryPeriod, ctx.Done())
+	}, le.config.RetryPeriod)
 
 	// if we hold the lease, give it up
 	if le.config.ReleaseOnCancel {
@@ -372,7 +377,11 @@ func (le *LeaderElector) tryCoordinatedRenew(ctx context.Context) bool {
 		le.observedRawRecord = oldLeaderElectionRawRecord
 	}
 
-	hasExpired := le.observedTime.Add(time.Second * time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).Before(now.Time)
+	le.observedRecordLock.RLock()
+	obsTime := le.observedTime
+	le.observedRecordLock.RUnlock()
+
+	hasExpired := obsTime.Add(time.Second * time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).Before(now.Time)
 	if hasExpired {
 		logger.Info("Lease has expired", "lock", le.config.Lock.Describe())
 		return false
@@ -442,7 +451,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 			le.setObservedRecord(&leaderElectionRecord)
 			return true
 		}
-		logger.Error(err, "Failed to update lease optimistically, falling back to slow path", "lock", le.config.Lock.Describe())
+		logger.V(2).Info("Failed to update lease optimistically, falling back to slow path", "lock", le.config.Lock.Describe(), "err", err)
 	}
 
 	// 2. obtain or create the ElectionRecord
@@ -512,7 +521,12 @@ func (le *LeaderElector) Check(maxTolerableExpiredLease time.Duration) error {
 	// If we are more than timeout seconds after the lease duration that is past the timeout
 	// on the lease renew. Time to start reporting ourselves as unhealthy. We should have
 	// died but conditions like deadlock can prevent this. (See #70819)
-	if le.clock.Since(le.observedTime) > le.config.LeaseDuration+maxTolerableExpiredLease {
+	le.observedRecordLock.RLock()
+	lastObservation := le.observedTime
+	leaseDuration := le.config.LeaseDuration
+	le.observedRecordLock.RUnlock()
+
+	if le.clock.Since(lastObservation) > leaseDuration+maxTolerableExpiredLease {
 		return fmt.Errorf("failed election to renew leadership on lease %s", le.config.Name)
 	}
 
@@ -520,7 +534,11 @@ func (le *LeaderElector) Check(maxTolerableExpiredLease time.Duration) error {
 }
 
 func (le *LeaderElector) isLeaseValid(now time.Time) bool {
-	return le.observedTime.Add(time.Second * time.Duration(le.getObservedRecord().LeaseDurationSeconds)).After(now)
+	// Lock to safely read both the time and the record
+	le.observedRecordLock.RLock()
+	defer le.observedRecordLock.RUnlock()
+
+	return le.observedTime.Add(time.Second * time.Duration(le.observedRecord.LeaseDurationSeconds)).After(now)
 }
 
 // setObservedRecord will set a new observedRecord and update observedTime to the current time.
@@ -536,8 +554,8 @@ func (le *LeaderElector) setObservedRecord(observedRecord *rl.LeaderElectionReco
 // getObservedRecord returns observersRecord.
 // Protect critical sections with lock.
 func (le *LeaderElector) getObservedRecord() rl.LeaderElectionRecord {
-	le.observedRecordLock.Lock()
-	defer le.observedRecordLock.Unlock()
+	le.observedRecordLock.RLock()
+	defer le.observedRecordLock.RUnlock()
 
 	return le.observedRecord
 }

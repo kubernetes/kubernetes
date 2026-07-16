@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
@@ -87,6 +88,8 @@ func New(
 	clusterName string,
 	clusterCIDRs []*net.IPNet,
 ) (*RouteController, error) {
+	registerMetrics()
+
 	if len(clusterCIDRs) == 0 {
 		klog.Fatal("RouteController: Must specify clusterCIDR.")
 	}
@@ -247,6 +250,8 @@ func (rc *RouteController) processNextWorkItem(ctx context.Context) bool {
 }
 
 func (rc *RouteController) reconcileNodeRoutes(ctx context.Context) error {
+	routeSyncCount.Inc()
+
 	routeList, err := rc.routes.ListRoutes(ctx, rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
@@ -436,7 +441,7 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 									Name:       string(nodeName),
 									UID:        node.UID,
 									Namespace:  "",
-								}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
+								}, v1.EventTypeWarning, "FailedToCreateRoute", "%s", msg)
 							klog.V(4).Info(msg)
 							return err
 						}
@@ -497,12 +502,12 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 
 func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreated bool) error {
 	_, condition := nodeutil.GetNodeCondition(&(node.Status), v1.NodeNetworkUnavailable)
-	if routesCreated && condition != nil && condition.Status == v1.ConditionFalse {
+	if routesCreated && condition != nil && condition.Status == v1.ConditionFalse && condition.Reason == "RouteCreated" {
 		klog.V(2).Infof("set node %v with NodeNetworkUnavailable=false was canceled because it is already set", node.Name)
 		return nil
 	}
 
-	if !routesCreated && condition != nil && condition.Status == v1.ConditionTrue {
+	if !routesCreated && condition != nil && condition.Status == v1.ConditionTrue && condition.Reason == "NoRouteCreated" {
 		klog.V(2).Infof("set node %v with NodeNetworkUnavailable=true was canceled because it is already set", node.Name)
 		return nil
 	}

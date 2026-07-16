@@ -54,6 +54,34 @@ For example:
 }
 ```
 
+### `x-kubernetes-list-map-keys`
+
+Operations and Definitions may have `x-kubernetes-list-maps-keys` if they
+are associated with a [kubernetes resource](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources). `x-kubernetes-list-type` = `map` specifies field names inside each list element to serve as unique keys for the list-as-map.
+
+**For example:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "servers": {
+      "type": "array",
+      "x-kubernetes-list-type": "map",
+      "x-kubernetes-list-map-keys": ["name"],
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" }
+        },
+        "required": ["name"]
+      }
+    }
+  }
+}
+```
+
 ### `x-kubernetes-patch-strategy` and `x-kubernetes-patch-merge-key`
 
 Some of the definitions may have these extensions. For more information about PatchStrategy and PatchMergeKey see

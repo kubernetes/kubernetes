@@ -9,7 +9,7 @@ package v1
 type VaultAppRoleAuthenticationApplyConfiguration struct {
 	// secret references a secret in the openshift-config namespace containing
 	// the AppRole credentials used to authenticate with Vault.
-	// The secret must contain two keys: "role-id" for the AppRole Role ID and "secret-id" for the AppRole Secret ID.
+	// The referenced Secret must contain two keys: "role-id" for the AppRole Role ID and "secret-id" for the AppRole Secret ID.
 	Secret *VaultSecretReferenceApplyConfiguration `json:"secret,omitempty"`
 }
 

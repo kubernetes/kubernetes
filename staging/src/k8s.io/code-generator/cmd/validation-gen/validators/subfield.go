@@ -34,11 +34,11 @@ func init() {
 }
 
 type subfieldTagValidator struct {
-	validator Validator
+	validator TagValidationExtractor
 }
 
 func (stv *subfieldTagValidator) Init(cfg Config) {
-	stv.validator = cfg.Validator
+	stv.validator = cfg.TagValidator
 }
 
 func (subfieldTagValidator) TagName() string {
@@ -71,13 +71,14 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 	result := Validations{}
 	subContext := Context{
-		Scope:      ScopeField,
-		Type:       submemb.Type,
-		Path:       context.Path.Child(subname),
-		Member:     submemb,
-		ParentPath: context.Path,
+		Scope:          ScopeField,
+		Type:           submemb.Type,
+		Path:           context.Path.Child(subname),
+		Member:         submemb,
+		ParentPath:     context.Path,
+		StabilityLevel: context.StabilityLevel,
 	}
-	if validations, err := stv.validator.ExtractValidations(subContext, *tag.ValueTag); err != nil {
+	if validations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		if len(validations.Variables) > 0 {
@@ -132,10 +133,10 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 }
 
 func (stv subfieldTagValidator) Docs() TagDoc {
-	doc := TagDoc{
+	return TagDoc{
 		Tag:            stv.TagName(),
-		StabilityLevel: Beta,
-		Scopes:         stv.ValidScopes().UnsortedList(),
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         sets.List(stv.ValidScopes()),
 		Description:    "Declares a validation for a subfield of a struct.",
 		Args: []TagArgDoc{{
 			Description: "<field-json-name>",
@@ -150,5 +151,4 @@ func (stv subfieldTagValidator) Docs() TagDoc {
 		PayloadsType:     codetags.ValueTypeTag,
 		PayloadsRequired: true,
 	}
-	return doc
 }

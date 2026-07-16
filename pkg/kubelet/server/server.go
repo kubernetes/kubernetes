@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -50,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -59,11 +61,14 @@ import (
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
+
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
+	translator "k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	compbasemetrics "k8s.io/component-base/metrics"
@@ -73,11 +78,12 @@ import (
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-client/pkg/util"
+	"k8s.io/cri-streaming/pkg/streaming"
+	"k8s.io/cri-streaming/pkg/streaming/portforward"
+	remotecommandserver "k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	podresourcesapiv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
-	"k8s.io/kubelet/pkg/cri/streaming"
-	"k8s.io/kubelet/pkg/cri/streaming/portforward"
-	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
+	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -86,6 +92,8 @@ import (
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	"k8s.io/kubernetes/pkg/kubelet/apis/pods"
+	kubeletcadvisor "k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
@@ -130,9 +138,12 @@ type Server struct {
 
 // TLSOptions holds the TLS options.
 type TLSOptions struct {
-	Config   *tls.Config
-	CertFile string
-	KeyFile  string
+	MinVersion       uint16
+	CipherSuites     []uint16
+	CurvePreferences []tls.CurveID
+	CertFile         string
+	KeyFile          string
+	ClientCAFile     string
 }
 
 // containerInterface defines the restful.Container functions used on the root container
@@ -172,7 +183,7 @@ func ListenAndServeKubeletServer(
 	checkers []healthz.HealthChecker,
 	flagz flagz.Reader,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
-	tlsOptions *TLSOptions,
+	tlsConfig *tls.Config,
 	auth AuthInterface,
 	tp oteltrace.TracerProvider) {
 
@@ -192,15 +203,14 @@ func ListenAndServeKubeletServer(
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	if tlsOptions != nil {
-		s.TLSConfig = tlsOptions.Config
-		// Passing empty strings as the cert and key files means no
-		// cert/keys are specified and GetCertificate in the TLSConfig
-		// should be called instead.
-		if err := s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile); err != nil {
+	if tlsConfig != nil {
+		s.TLSConfig = tlsConfig
+		if err := s.ListenAndServeTLS("", ""); err != nil {
 			logger.Error(err, "Failed to listen and serve")
 			os.Exit(1)
 		}
+
+		// support a hollow node with plain HTTP
 	} else if err := s.ListenAndServe(); err != nil {
 		logger.Error(err, "Failed to listen and serve")
 		os.Exit(1)
@@ -258,6 +268,32 @@ func ListenAndServePodResources(ctx context.Context, endpoint string, providers 
 	}
 }
 
+// ListenAndServePodsServer initializes an HTTP server to serve the Pod API.
+func ListenAndServePodsServer(ctx context.Context, endpoint string, srv podsv1alpha1.PodsServer) {
+	logger := klog.FromContext(ctx)
+	server := grpc.NewServer(apisgrpc.WithRateLimiter(ctx, "pods", pods.DefaultQPS, pods.DefaultBurstTokens))
+
+	podsv1alpha1.RegisterPodsServer(server, srv)
+
+	l, err := util.CreateListener(endpoint)
+	if err != nil {
+		logger.Error(err, "Failed to create listener for pods API endpoint")
+		os.Exit(1)
+	}
+
+	logger.Info("Starting to serve the pods API", "endpoint", endpoint)
+	go func() {
+		if err := server.Serve(l); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			logger.Error(err, "Failed to serve")
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	logger.Info("Shutting down pods API server")
+	server.GracefulStop()
+}
+
 type NodeRequestAttributesGetter interface {
 	GetRequestAttributes(ctx context.Context, u user.Info, r *http.Request) []authorizer.Attributes
 }
@@ -267,6 +303,7 @@ type AuthInterface interface {
 	authenticator.Request
 	NodeRequestAttributesGetter
 	authorizer.Authorizer
+	dynamiccertificates.CAContentProvider
 }
 
 // HostInterface contains all the kubelet methods required by the server.
@@ -315,17 +352,16 @@ func NewServer(
 	server.InstallAuthNotRequiredHandlers(ctx)
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
 		logger.Info("Adding debug handlers to kubelet server")
-		server.InstallAuthRequiredHandlers(ctx)
 		// To maintain backward compatibility serve logs and pprof only when enableDebuggingHandlers is also enabled
 		// see https://github.com/kubernetes/kubernetes/pull/87273
 		server.InstallSystemLogHandler(kubeCfg.EnableSystemLogHandler, kubeCfg.EnableSystemLogQuery)
 		server.InstallProfilingHandler(kubeCfg.EnableProfilingHandler, kubeCfg.EnableContentionProfiling)
 		server.InstallDebugFlagsHandler(kubeCfg.EnableDebugFlagsHandler)
+		// must be done last so all paths are included in /statusz
+		server.InstallAuthRequiredHandlers(ctx)
 	} else {
 		server.InstallDebuggingDisabledHandlers()
 	}
-
-	server.installStatusZ()
 
 	return server
 }
@@ -390,7 +426,14 @@ func (s *Server) InstallTracingFilter(tp oteltrace.TracerProvider, opts ...otelr
 	s.restfulCont.Filter(otelrestful.OTelFilter("kubelet", append(opts, otelrestful.WithTracerProvider(tp))...))
 }
 
-func (s *Server) installStatusZ() {
+func (s *Server) InstallZPages() {
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if s.flagz != nil {
+			s.addMetricsBucketMatcher("flagz")
+			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
+		}
+	}
+	// must be done last so all paths are included in /statusz
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 		s.addMetricsBucketMatcher("statusz")
 		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(s.restfulCont.RegisteredHandlePaths())))
@@ -471,7 +514,9 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+		if kubeletcadvisor.IsPsiEnabled(logger) {
+			includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+		}
 	}
 
 	// cAdvisor metrics are exposed under the secured handler as well
@@ -479,6 +524,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) {
 		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
+		servermetrics.SetMetricsProvider(servermetrics.CRIMetricsProvider)
 	} else {
 		cadvisorOpts := cadvisorv2.RequestOptions{
 			IdType:    cadvisorv2.TypeName,
@@ -486,6 +532,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 			Recursive: true,
 		}
 		r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
+		servermetrics.SetMetricsProvider(servermetrics.CAdvisorMetricsProvider)
 	}
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
@@ -599,13 +646,6 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 	s.addMetricsBucketMatcher("configz")
 	configz.InstallHandler(s.restfulCont)
 
-	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-		if s.flagz != nil {
-			s.addMetricsBucketMatcher("flagz")
-			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
-		}
-	}
-
 	// The /runningpods endpoint is used for testing only.
 	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
@@ -627,6 +667,9 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 			Operation("checkpoint"))
 		s.restfulCont.Add(ws)
 	}
+
+	// must be done last so all paths are included in /statusz
+	s.InstallZPages()
 }
 
 // InstallDebuggingDisabledHandlers registers the HTTP request patterns that provide better error message
@@ -932,13 +975,6 @@ func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
-// proxyStream proxies stream to url.
-func proxyStream(w http.ResponseWriter, r *http.Request, url *url.URL) {
-	// TODO(random-liu): Set MaxBytesPerSec to throttle the stream.
-	handler := proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
-	handler.ServeHTTP(w, r)
-}
-
 // getAttach handles requests to attach to a container.
 func (s *Server) getAttach(request *restful.Request, response *restful.Response) {
 	params := getExecRequestParams(request)
@@ -960,8 +996,20 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-
-	proxyStream(response.ResponseWriter, request.Request, url)
+	var handler http.Handler = proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+	// If upgrade request is for V5 websockets, wrap with websocket/spdy stream translation.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) &&
+		wsstream.IsWebSocketRequestWithStreamCloseProtocol(request.Request) {
+		servermetrics.IncWebSocketStreamingRequest("attach")
+		streamOptions := translator.Options{
+			Stdin:  streamOpts.Stdin,
+			Stdout: streamOpts.Stdout,
+			Stderr: streamOpts.Stderr,
+			Tty:    streamOpts.TTY,
+		}
+		handler = translator.NewStreamTranslatorHandler(url, nil, 0, streamOptions)
+	}
+	handler.ServeHTTP(response.ResponseWriter, request.Request)
 }
 
 // getExec handles requests to run a command inside a container.
@@ -985,7 +1033,20 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	var handler http.Handler = proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+	// If upgrade request is for V5 websockets, wrap with websocket/spdy stream translation.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) &&
+		wsstream.IsWebSocketRequestWithStreamCloseProtocol(request.Request) {
+		servermetrics.IncWebSocketStreamingRequest("exec")
+		streamOptions := translator.Options{
+			Stdin:  streamOpts.Stdin,
+			Stdout: streamOpts.Stdout,
+			Stderr: streamOpts.Stderr,
+			Tty:    streamOpts.TTY,
+		}
+		handler = translator.NewStreamTranslatorHandler(url, nil, 0, streamOptions)
+	}
+	handler.ServeHTTP(response.ResponseWriter, request.Request)
 }
 
 // getRun handles requests to run a command inside a container.
@@ -1026,12 +1087,21 @@ func writeJSONResponse(logger klog.Logger, response *restful.Response, data []by
 func (s *Server) getPortForward(request *restful.Request, response *restful.Response) {
 	params := getPortForwardRequestParams(request)
 
-	portForwardOptions, err := portforward.NewV4Options(request.Request)
-	if err != nil {
-		utilruntime.HandleError(err)
-		response.WriteError(http.StatusBadRequest, err)
-		return
+	websocketSPDYTunnel := utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) &&
+		wsstream.IsWebSocketRequestWithTunnelingProtocol(request.Request)
+	var portForwardOptions *portforward.V4Options
+	var err error
+	if websocketSPDYTunnel {
+		portForwardOptions = &portforward.V4Options{}
+	} else {
+		portForwardOptions, err = portforward.NewV4Options(request.Request)
+		if err != nil {
+			utilruntime.HandleError(err)
+			response.WriteError(http.StatusBadRequest, err) //nolint:errcheck
+			return
+		}
 	}
+
 	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
 	if !ok {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
@@ -1047,7 +1117,13 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	var handler http.Handler = proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+	// If upgrade request is for tunneling websockets, wrap with tunneling handling.
+	if websocketSPDYTunnel {
+		servermetrics.IncWebSocketStreamingRequest("portforward")
+		handler = translator.NewTunnelingHandler(handler)
+	}
+	handler.ServeHTTP(response.ResponseWriter, request.Request)
 }
 
 // checkpoint handles the checkpoint API request. It checks if the requested
@@ -1193,8 +1269,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
 	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Dec()
 
-	startTime := time.Now()
-	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+	// Use ObserveSince to ensure the duration is calculated when the defer executes,
+	// not when it's declared. In Go, arguments to deferred functions are evaluated
+	// immediately at the defer statement, which would cause the metric to record
+	// near-zero values (~2 microseconds) instead of actual request handling time.
+	defer servermetrics.HTTPRequestsDuration.ObserveSince(time.Now(), method, path, serverType, longRunning)()
 
 	handler.ServeHTTP(w, req)
 }

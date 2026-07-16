@@ -24,7 +24,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -35,7 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
-	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
@@ -3190,13 +3188,16 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 	nodeWithMultipleFeatures := st.MakeNode().Name("node-with-multiple-features").DeclaredFeatures([]string{"FeatureA", "FeatureB"}).Obj()
 
 	mockFeature := ndftesting.NewMockFeature(t)
-	mockFeature.EXPECT().Name().Return("FeatureA").Maybe()
-	mockFeature.EXPECT().InferForScheduling(mock.Anything).RunAndReturn(func(podInfo *ndf.PodInfo) bool {
+	mockFeature.SetName("FeatureA")
+	mockFeature.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool {
 		return podInfo.Spec.Containers[0].Name == "container-req-feature-a"
 	})
-	mockFeature.EXPECT().MaxVersion().Return(nil).Maybe()
-	mockFeature.EXPECT().InferForUpdate(mock.Anything, mock.Anything).Return(false).Maybe()
-	mockFeature.EXPECT().Discover(mock.Anything).Return(false).Maybe()
+	mockFeature.SetMaxVersion(nil)
+	mockFeature.SetInferForUpdate(func(_, _ *ndf.PodInfo) bool { return false })
+	mockFeature.SetDiscover(func(*ndf.NodeConfiguration) bool { return false })
+
+	ndfFramework := ndf.New([]ndf.Feature{mockFeature})
+	ndftesting.SetFrameworkDuringTest(t, *ndfFramework)
 
 	tests := []struct {
 		name           string
@@ -3252,13 +3253,6 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.featureEnabled)
-			if tt.featureEnabled {
-				originalAllFeatures := ndffeatures.AllFeatures
-				ndffeatures.AllFeatures = []ndf.Feature{mockFeature}
-				defer func() {
-					ndffeatures.AllFeatures = originalAllFeatures
-				}()
-			}
 			testCtx := testutils.InitTestSchedulerWithNS(t, "node-features-filter")
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name

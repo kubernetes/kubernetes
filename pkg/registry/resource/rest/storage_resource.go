@@ -21,6 +21,7 @@ import (
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -32,6 +33,7 @@ import (
 	devicetaintrulestore "k8s.io/kubernetes/pkg/registry/resource/devicetaintrule/storage"
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
 	resourceclaimtemplatestore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate/storage"
+	resourcepoolstatusrequeststore "k8s.io/kubernetes/pkg/registry/resource/resourcepoolstatusrequest/storage"
 	resourceslicestore "k8s.io/kubernetes/pkg/registry/resource/resourceslice/storage"
 )
 
@@ -41,6 +43,7 @@ import (
 
 type RESTStorageProvider struct {
 	NamespaceClient v1.NamespaceInterface
+	Authorizer      authorizer.Authorizer
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -87,7 +90,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	}
 
 	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient)
+		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient, p.Authorizer)
 		if err != nil {
 			return nil, err
 		}
@@ -126,6 +129,15 @@ func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstora
 		storage[resource+"/status"] = deviceTaintStatusStorage
 	}
 
+	if resource := "resourcepoolstatusrequests"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
+		resourcePoolStatusRequestStorage, resourcePoolStatusRequestStatusStorage, err := resourcepoolstatusrequeststore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourcePoolStatusRequestStorage
+		storage[resource+"/status"] = resourcePoolStatusRequestStatusStorage
+	}
+
 	return storage, nil
 }
 
@@ -141,7 +153,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	}
 
 	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1beta1.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient)
+		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient, p.Authorizer)
 		if err != nil {
 			return nil, err
 		}
@@ -179,8 +191,17 @@ func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorag
 		storage[resource] = deviceclassStorage
 	}
 
+	if resource := "devicetaintrules"; apiResourceConfigSource.ResourceEnabled(resourcev1beta2.SchemeGroupVersion.WithResource(resource)) {
+		deviceTaintRuleStorage, deviceTaintRuleStatusStorage, err := devicetaintrulestore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = deviceTaintRuleStorage
+		storage[resource+"/status"] = deviceTaintRuleStatusStorage
+	}
+
 	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1beta2.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient)
+		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient, p.Authorizer)
 		if err != nil {
 			return nil, err
 		}

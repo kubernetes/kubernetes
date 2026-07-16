@@ -37,16 +37,16 @@ type VersionValidationRunner func(t *testing.T, gv string, versionValidationErro
 //	      errs = append(errs, versionValidationErrors...) // generated declarative validation
 //		  // Validate that the errors are what was expected for this test case.
 //		})
-func RunValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options []string, unversioned runtime.Object, fn VersionValidationRunner, subresources ...string) {
-	runValidation(t, scheme, options, unversioned, fn, subresources...)
+func RunValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options []string, unversioned runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
+	runValidation(t, scheme, options, unversioned, fn, ignoreConversionErrors, subresources...)
 }
 
 // RunUpdateValidationForEachVersion is like RunValidationForEachVersion but for update validation.
-func RunUpdateValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options []string, unversioned, unversionedOld runtime.Object, fn VersionValidationRunner, subresources ...string) {
-	runUpdateValidation(t, scheme, options, unversioned, unversionedOld, fn, subresources...)
+func RunUpdateValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options []string, unversioned, unversionedOld runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
+	runUpdateValidation(t, scheme, options, unversioned, unversionedOld, fn, ignoreConversionErrors, subresources...)
 }
 
-func runValidation(t *testing.T, scheme *runtime.Scheme, options []string, unversioned runtime.Object, fn VersionValidationRunner, subresources ...string) {
+func runValidation(t *testing.T, scheme *runtime.Scheme, options []string, unversioned runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
 	unversionedGVKs, _, err := scheme.ObjectKinds(unversioned)
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +66,9 @@ func runValidation(t *testing.T, scheme *runtime.Scheme, options []string, unver
 						t.Fatal(err)
 					}
 					err = scheme.Convert(unversioned, versioned, nil)
-					if err != nil {
+					if ignoreConversionErrors && err != nil {
+						t.Skipf("Failed to convert object from internal type to %s: %v", gvk.Version, err)
+					} else if err != nil {
 						t.Fatal(err)
 					}
 					fn(t, gv.String(), scheme.Validate(context.Background(), options, versioned, subresources...))
@@ -76,7 +78,7 @@ func runValidation(t *testing.T, scheme *runtime.Scheme, options []string, unver
 	}
 }
 
-func runUpdateValidation(t *testing.T, scheme *runtime.Scheme, options []string, unversionedNew, unversionedOld runtime.Object, fn VersionValidationRunner, subresources ...string) {
+func runUpdateValidation(t *testing.T, scheme *runtime.Scheme, options []string, unversionedNew, unversionedOld runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
 	unversionedGVKs, _, err := scheme.ObjectKinds(unversionedNew)
 	if err != nil {
 		t.Fatal(err)
@@ -96,10 +98,11 @@ func runUpdateValidation(t *testing.T, scheme *runtime.Scheme, options []string,
 						t.Fatal(err)
 					}
 					err = scheme.Convert(unversionedNew, versionedNew, nil)
-					if err != nil {
+					if ignoreConversionErrors && err != nil {
+						t.Skipf("Failed to convert object from internal type to %s: %v", gvk.Version, err)
+					} else if err != nil {
 						t.Fatal(err)
 					}
-
 					var versionedOld runtime.Object
 					if unversionedOld != nil {
 						versionedOld, err = scheme.New(gvk)
@@ -108,7 +111,9 @@ func runUpdateValidation(t *testing.T, scheme *runtime.Scheme, options []string,
 						}
 
 						err = scheme.Convert(unversionedOld, versionedOld, nil)
-						if err != nil {
+						if ignoreConversionErrors && err != nil {
+							t.Skipf("Failed to convert object from internal type to %s: %v", gvk.Version, err)
+						} else if err != nil {
 							t.Fatal(err)
 						}
 					}

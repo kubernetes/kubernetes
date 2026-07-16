@@ -194,6 +194,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newGarbageCollectorControllerDescriptor())
 	register(newDaemonSetControllerDescriptor())
 	register(newJobControllerDescriptor())
+	register(newPodGroupProtectionControllerDescriptor())
 	register(newDeploymentControllerDescriptor())
 	register(newReplicaSetControllerDescriptor())
 	register(newHorizontalPodAutoscalerControllerDescriptor())
@@ -230,6 +231,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	// feature gated
 	register(newStorageVersionGarbageCollectorControllerDescriptor())
 	register(newResourceClaimControllerDescriptor())
+	register(newResourcePoolStatusRequestControllerDescriptor())
 	register(newDeviceTaintEvictionControllerDescriptor())
 	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())

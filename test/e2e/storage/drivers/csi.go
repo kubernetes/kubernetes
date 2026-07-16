@@ -122,6 +122,10 @@ func initHostPathCSIDriver(name string, capabilities map[storageframework.Capabi
 			VolumeModifyStressTestOptions: &storageframework.VolumeModifyStressTestOptions{
 				NumPods: 10,
 			},
+			VolumeGroupSnapshotStressTestOptions: &storageframework.VolumeGroupSnapshotStressTestOptions{
+				NumPods:      5,
+				NumSnapshots: 5,
+			},
 			PerformanceTestOptions: &storageframework.PerformanceTestOptions{
 				ProvisioningOptions: &storageframework.PerformanceTestProvisioningOptions{
 					VolumeSize: "1Mi",
@@ -174,6 +178,9 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 	if os.Getenv("CSI_PROW_ENABLE_GROUP_SNAPSHOT") == "true" {
 		capabilities[storageframework.CapVolumeGroupSnapshot] = true
 	}
+	if os.Getenv("CSI_PROW_ENABLE_SNAPSHOT_METADATA") == "true" {
+		capabilities[storageframework.CapSnapshotMetadata] = true
+	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
 		// Volume attributes don't matter, but we have to provide at least one map.
@@ -182,6 +189,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		},
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshot-metadata/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-health-monitor/external-health-monitor-controller/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
@@ -306,6 +314,15 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		})
 	}
 
+	// SnapshotMetadata feature E2E patches
+	// TODO: These can be removed after the SnapshotMetadata feature is default enabled
+	if os.Getenv("CSI_PROW_ENABLE_SNAPSHOT_METADATA") == "true" {
+		patches = append(patches, utils.PatchCSIOptions{
+			DriverContainerName:      "hostpath",
+			DriverContainerArguments: []string{"--enable-snapshot-metadata"},
+		})
+	}
+
 	err = utils.CreateFromManifests(ctx, config.Framework, driverNamespace, func(item interface{}) error {
 		for _, o := range patches {
 			if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
@@ -323,16 +340,34 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		switch item := item.(type) {
 		case *appsv1.StatefulSet:
 			var containers []v1.Container
+			var volumes []v1.Volume
 			for _, container := range item.Spec.Template.Spec.Containers {
 				switch container.Name {
 				case "csi-external-health-monitor-agent", "csi-external-health-monitor-controller":
 					// Remove these containers.
+				case "csi-snapshot-metadata":
+					// Only keep the snapshot metadata sidecar when the feature is enabled.
+					if h.driverInfo.Capabilities[storageframework.CapSnapshotMetadata] {
+						containers = append(containers, container)
+					}
 				default:
 					// Keep the others.
 					containers = append(containers, container)
 				}
 			}
+			for _, volume := range item.Spec.Template.Spec.Volumes {
+				switch volume.Name {
+				case "csi-snapshot-metadata-server-certs":
+					// Only keep the snapshot metadata sidecar when the feature is enabled.
+					if h.driverInfo.Capabilities[storageframework.CapSnapshotMetadata] {
+						volumes = append(volumes, volume)
+					}
+				default:
+					volumes = append(volumes, volume)
+				}
+			}
 			item.Spec.Template.Spec.Containers = containers
+			item.Spec.Template.Spec.Volumes = volumes
 		}
 		return nil
 	}, h.manifests...)
@@ -657,7 +692,7 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 			VolumeMountGroupRequired:    m.enableVolumeMountGroup,
 			EnableTopology:              m.enableTopology,
 			IO: proxy.PodDirIO{
-				F:             f,
+				TCtx:          f.TContext(context.Background() /* no cancellation, the traditional behavior! */),
 				Namespace:     m.driverNamespace.Name,
 				PodName:       podname,
 				ContainerName: "busybox",

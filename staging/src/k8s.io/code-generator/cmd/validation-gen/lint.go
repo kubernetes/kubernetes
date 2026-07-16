@@ -19,8 +19,8 @@ package main
 import (
 	"fmt"
 	"sort"
-	"strings"
 
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
@@ -37,9 +37,12 @@ type linter struct {
 }
 
 // lintRule is a function that validates a slice of comments.
+// container is the type containing the element being linted (e.g. the Struct when linting a Field).
+// It may be nil if the element is top-level (e.g. a Type definition).
+// t is the type of the element being linted (e.g. the Field's type, or the Type itself).
 // It returns a string as an error message if the comments are invalid,
 // and an error there is an error happened during the linting process.
-type lintRule func(comments []string) (string, error)
+type lintRule func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error)
 
 func (l *linter) AddError(t *types.Type, field, msg string) {
 	var err error
@@ -53,7 +56,7 @@ func (l *linter) AddError(t *types.Type, field, msg string) {
 
 func newLinter(rules ...lintRule) *linter {
 	if len(rules) == 0 {
-		rules = defaultLintRules
+		klog.Errorf("rules are not passed to the linter")
 	}
 	return &linter{
 		linted:     make(map[*types.Type]bool),
@@ -69,8 +72,12 @@ func (l *linter) lintType(t *types.Type) error {
 	l.linted[t] = true
 
 	if t.CommentLines != nil {
+		extracted := codetags.Extract("+", t.CommentLines)
+		if _, ok := extracted["k8s:validation-gen-nolint"]; ok {
+			return nil
+		}
 		klog.V(5).Infof("linting type %s", t.Name.String())
-		lintErrs, err := l.lintComments(t.CommentLines)
+		lintErrs, err := l.lintComments(t, t, t.CommentLines)
 		if err != nil {
 			return err
 		}
@@ -88,7 +95,7 @@ func (l *linter) lintType(t *types.Type) error {
 		// Recursively lint each member of the struct.
 		for _, member := range t.Members {
 			klog.V(5).Infof("linting comments for field %s of type %s", member.String(), t.Name.String())
-			lintErrs, err := l.lintComments(member.CommentLines)
+			lintErrs, err := l.lintComments(t, member.Type, member.CommentLines)
 			if err != nil {
 				return err
 			}
@@ -117,10 +124,29 @@ func (l *linter) lintType(t *types.Type) error {
 }
 
 // lintComments runs all registered rules on a slice of comments.
-func (l *linter) lintComments(comments []string) ([]string, error) {
+func (l *linter) lintComments(container *types.Type, t *types.Type, comments []string) ([]string, error) {
 	var lintErrs []string
+	var tags []codetags.Tag
+
+	extracted := codetags.Extract("+", comments)
+	keys := make([]string, 0, len(extracted))
+	for k := range extracted {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, tagName := range keys {
+		lines := extracted[tagName]
+		t, err := codetags.ParseAll(lines)
+		if err != nil {
+			// If parsing fails, it means it is not a valid tag.
+			continue
+		}
+		tags = append(tags, t...)
+	}
+
 	for _, rule := range l.rules {
-		if msg, err := rule(comments); err != nil {
+		if msg, err := rule(container, t, tags); err != nil {
 			return nil, err
 		} else if msg != "" {
 			lintErrs = append(lintErrs, msg)
@@ -128,31 +154,4 @@ func (l *linter) lintComments(comments []string) ([]string, error) {
 	}
 
 	return lintErrs, nil
-}
-
-// conflictingTagsRule creates a lintRule which checks for conflicting tags.
-func conflictingTagsRule(msg string, tags ...string) lintRule {
-	if len(tags) < 2 {
-		panic("conflictingTagsRule: at least 2 tags must be specified")
-	}
-
-	return func(comments []string) (string, error) {
-		found := make(map[string]bool)
-		for _, comment := range comments {
-			for _, tag := range tags {
-				if strings.HasPrefix(comment, tag) {
-					found[tag] = true
-				}
-			}
-		}
-		if len(found) > 1 {
-			keys := make([]string, 0, len(found))
-			for k := range found {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
-			return fmt.Sprintf("conflicting tags: {%s}: %s", strings.Join(keys, ", "), msg), nil
-		}
-		return "", nil
-	}
 }

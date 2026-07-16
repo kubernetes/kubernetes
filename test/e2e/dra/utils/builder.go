@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -35,6 +34,7 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,99 +42,102 @@ import (
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
 
-// ExtendedResourceName returns hard coded extended resource name with a variable
-// suffix from the input integer when it's greater than or equal to 0.
-// "example.com/resource" is not special, any valid extended resource name can be used
-// instead, except when using example device plugin in the test, which hard coded it,
-// see test/e2e/dra/deploy_device_plugin.go.
-// i == -1 == SingletonIndex is special, the extended resource name has no extra suffix
-// and matches the one used by the example device plugin.
-func (b *Builder) ExtendedResourceName(i int) string {
-	switch i {
-	case SingletonIndex:
-		return "example.com/resource"
-	default:
-		return b.driver.Name + "/resource" + fmt.Sprintf("-%d", i)
-	}
+// ExtendedResourceName returns extended resource name with a variable suffix.
+// Example: b.ExtendedResourceName("gpu") returns "driver-name/resource-gpu"
+func (b *Builder) ExtendedResourceName(suffix string) string {
+	return b.Driver.Name + "/resource-" + suffix
 }
 
-// Builder contains a running counter to make objects unique within thir
+// Builder contains a running counter to make objects unique within their
 // namespace.
 type Builder struct {
-	f                       *framework.Framework
-	driver                  *Driver
+	namespace               string
+	Driver                  *Driver
 	UseExtendedResourceName bool
 
 	podCounter      int
+	workloadCounter int
+	podGroupCounter int
 	claimCounter    int
 	ClassParameters string // JSON
+	SkipCleanup     bool
+}
+
+// DeviceClassWrapper is a wrapper around DeviceClass that allows
+// adding builder-style functions that modify the class before creation.
+type DeviceClassWrapper struct {
+	*resourceapi.DeviceClass
 }
 
 // ClassName returns the default device class name.
 func (b *Builder) ClassName() string {
-	return b.f.UniqueName + b.driver.NameSuffix + "-class"
+	return b.namespace + b.Driver.NameSuffix + "-class"
 }
 
-// SingletonIndex causes Builder.Class and ExtendedResourceName to create a
-// DeviceClass where the the extended resource name has no %d
-// suffix and matches the name as used by the example device plugin.
-const SingletonIndex = -1
+// DriverName returns the default device driver name.
+func (b *Builder) DriverName() string {
+	return b.Driver.Name
+}
 
 // Class returns the device Class that the builder's other objects
 // reference.
-// The input i is used to pick the extended resource name whose suffix has the
-// same i for the device class.
-// i == -1 == SingletonIndex is special, the extended resource name has no extra suffix.
-func (b *Builder) Class(i int) *resourceapi.DeviceClass {
-	ern := b.ExtendedResourceName(i)
+func (b *Builder) Class() *DeviceClassWrapper {
 	name := b.ClassName()
-	switch i {
-	case SingletonIndex:
-		name += "-singleton"
-	case 0:
-		// No numeric suffix. This is what most tests use.
-	default:
-		name += "-" + strconv.Itoa(i)
-	}
 	class := &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	if b.UseExtendedResourceName {
-		class.Spec = resourceapi.DeviceClassSpec{
-			ExtendedResourceName: &ern,
-		}
-	}
 	class.Spec.Selectors = []resourceapi.DeviceSelector{{
 		CEL: &resourceapi.CELDeviceSelector{
-			Expression: fmt.Sprintf(`device.driver == "%s"`, b.driver.Name),
+			Expression: fmt.Sprintf(`device.driver == "%s"`, b.Driver.Name),
 		},
 	}}
 	if b.ClassParameters != "" {
 		class.Spec.Config = []resourceapi.DeviceClassConfiguration{{
 			DeviceConfiguration: resourceapi.DeviceConfiguration{
 				Opaque: &resourceapi.OpaqueDeviceConfiguration{
-					Driver:     b.driver.Name,
+					Driver:     b.Driver.Name,
 					Parameters: runtime.RawExtension{Raw: []byte(b.ClassParameters)},
 				},
 			},
 		}}
 	}
-	return class
+	return &DeviceClassWrapper{DeviceClass: class}
+}
+
+// ClassWithExtendedResource returns a device class with the extended resource name set to the provided value.
+// The class name is suffixed with the last part of the extended resource name to make it unique.
+func (b *Builder) ClassWithExtendedResource(extendedResource string) *resourceapi.DeviceClass {
+	suffix := extendedResource[strings.LastIndex(extendedResource, "/")+1:]
+	return b.Class().WithName(b.ClassName() + "-" + suffix).WithExtendedResource(extendedResource).DeviceClass
+}
+
+// WithName sets the name of the device class.
+func (dcw *DeviceClassWrapper) WithName(name string) *DeviceClassWrapper {
+	dcw.ObjectMeta.Name = name
+	return dcw
+}
+
+// WithExtendedResource sets the extended resource name of the device class.
+func (dcw *DeviceClassWrapper) WithExtendedResource(extendedResourceName string) *DeviceClassWrapper {
+	dcw.Spec.ExtendedResourceName = &extendedResourceName
+	return dcw
 }
 
 // ExternalClaim returns external resource claim
 // that test pods can reference
 func (b *Builder) ExternalClaim() *resourceapi.ResourceClaim {
 	b.claimCounter++
-	name := "external-claim" + b.driver.NameSuffix // This is what podExternal expects.
+	name := "external-claim" + b.Driver.NameSuffix // This is what podExternal expects.
 	if b.claimCounter > 1 {
 		name += fmt.Sprintf("-%d", b.claimCounter)
 	}
@@ -159,7 +162,7 @@ func (b *Builder) claimSpecWithV1beta1() resourcev1beta1.ResourceClaimSpec {
 			Config: []resourcev1beta1.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourcev1beta1.DeviceConfiguration{
 					Opaque: &resourcev1beta1.OpaqueDeviceConfiguration{
-						Driver: b.driver.Name,
+						Driver: b.Driver.Name,
 						Parameters: runtime.RawExtension{
 							Raw: []byte(parameters),
 						},
@@ -187,7 +190,7 @@ func (b *Builder) claimSpecWithV1beta2() resourcev1beta2.ResourceClaimSpec {
 			Config: []resourcev1beta2.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
 					Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
-						Driver: b.driver.Name,
+						Driver: b.Driver.Name,
 						Parameters: runtime.RawExtension{
 							Raw: []byte(parameters),
 						},
@@ -215,7 +218,7 @@ func (b *Builder) ClaimSpec() resourceapi.ResourceClaimSpec {
 			Config: []resourceapi.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourceapi.DeviceConfiguration{
 					Opaque: &resourceapi.OpaqueDeviceConfiguration{
-						Driver: b.driver.Name,
+						Driver: b.Driver.Name,
 						Parameters: runtime.RawExtension{
 							Raw: []byte(parameters),
 						},
@@ -243,12 +246,12 @@ func (b *Builder) Pod() *v1.Pod {
 	//
 	// It is tempting to use `terminationGraceperiodSeconds: 0`, but that is a very bad
 	// idea because it removes the pod before the kubelet had a chance to react (https://github.com/kubernetes/kubernetes/issues/120671).
-	pod := e2epod.MakePod(b.f.Namespace.Name, nil, nil, admissionapi.LevelRestricted, "" /* no command = pause */)
+	pod := e2epod.MakePod(b.namespace, nil, nil, admissionapi.LevelRestricted, "" /* no command = pause */)
 	pod.Labels = make(map[string]string)
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 	pod.GenerateName = ""
 	b.podCounter++
-	pod.Name = fmt.Sprintf("tester%s-%d", b.driver.NameSuffix, b.podCounter)
+	pod.Name = fmt.Sprintf("tester%s-%d", b.Driver.NameSuffix, b.podCounter)
 	return pod
 }
 
@@ -312,12 +315,11 @@ func (b *Builder) PodInlineMultiple() (*v1.Pod, *resourceapi.ResourceClaimTempla
 	return pod, template
 }
 
-// PodExternal adds a pod that references external resource claim with default class name and parameters.
-func (b *Builder) PodExternal() *v1.Pod {
+// PodExternal adds a pod that references the named resource claim.
+func (b *Builder) PodExternal(externalClaimName string) *v1.Pod {
 	pod := b.Pod()
 	pod.Spec.Containers[0].Name = "with-resource"
 	podClaimName := "resource-claim"
-	externalClaimName := "external-claim" + b.driver.NameSuffix
 	pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 		{
 			Name:              podClaimName,
@@ -328,110 +330,226 @@ func (b *Builder) PodExternal() *v1.Pod {
 	return pod
 }
 
-// podShared returns a pod with 3 containers that reference external resource claim with default class name and parameters.
-func (b *Builder) PodExternalMultiple() *v1.Pod {
-	pod := b.PodExternal()
+// podShared returns a pod with 3 containers that reference the named external resource claim.
+func (b *Builder) PodExternalMultiple(externalClaimName string) *v1.Pod {
+	pod := b.PodExternal(externalClaimName)
 	pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy(), *pod.Spec.Containers[0].DeepCopy())
 	pod.Spec.Containers[1].Name += "-1"
 	pod.Spec.Containers[2].Name += "-2"
 	return pod
 }
 
+// GroupedPodWithClaims returns a pod that is a member of the given PodGroup.
+func (b *Builder) GroupedPodWithClaims(podGroup *schedulingv1alpha2.PodGroup) *v1.Pod {
+	pod := b.Pod()
+	pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+		PodGroupName: &podGroup.Name,
+	}
+	for _, claim := range podGroup.Spec.ResourceClaims {
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, v1.PodResourceClaim{
+			Name:                      claim.Name,
+			ResourceClaimName:         claim.ResourceClaimName,
+			ResourceClaimTemplateName: claim.ResourceClaimTemplateName,
+		})
+		pod.Spec.Containers[0].Resources.Claims = append(pod.Spec.Containers[0].Resources.Claims, v1.ResourceClaim{Name: claim.Name})
+	}
+	return pod
+}
+
+// Workload creates a Workload with one PodGroupTemplate and no ResourceClaims.
+func (b *Builder) Workload() *schedulingv1alpha2.Workload {
+	workload := &schedulingv1alpha2.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.namespace,
+			Name:      fmt.Sprintf("tester%s-%d", b.Driver.NameSuffix, b.workloadCounter),
+		},
+		Spec: schedulingv1alpha2.WorkloadSpec{
+			PodGroupTemplates: []schedulingv1alpha2.PodGroupTemplate{
+				{
+					Name: "group",
+					SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha2.BasicSchedulingPolicy{},
+					},
+				},
+			},
+		},
+	}
+	b.workloadCounter++
+	return workload
+}
+
+// WorkloadExternal creates a Workload with one PodGroupTemplate that refers to
+// one ResourceClaim with the given name.
+func (b *Builder) WorkloadExternal(externalClaimName string) *schedulingv1alpha2.Workload {
+	workload := b.Workload()
+	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1alpha2.PodGroupResourceClaim{
+		{
+			Name:              "resource-claim",
+			ResourceClaimName: &externalClaimName,
+		},
+	}
+	return workload
+}
+
+// WorkloadInline creates a ResourceClaimTemplate and a Workload with one
+// PodGroupTemplate that refers to that ResourceClaimTemplate.
+func (b *Builder) WorkloadInline() (*schedulingv1alpha2.Workload, *resourceapi.ResourceClaimTemplate) {
+	workload := b.Workload()
+	podGroupClaimName := "my-inline-claim"
+	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1alpha2.PodGroupResourceClaim{
+		{
+			Name:                      podGroupClaimName,
+			ResourceClaimTemplateName: new(workload.Name),
+		},
+	}
+	template := &resourceapi.ResourceClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      workload.Name,
+			Namespace: workload.Namespace,
+		},
+		Spec: resourceapi.ResourceClaimTemplateSpec{
+			Spec: b.ClaimSpec(),
+		},
+	}
+	return workload, template
+}
+
+// PodGroup returns a simple PodGroup owned by the given Workload with no
+// resource claims.
+func (b *Builder) PodGroup(workload *schedulingv1alpha2.Workload, template schedulingv1alpha2.PodGroupTemplate) *schedulingv1alpha2.PodGroup {
+	podGroup := &schedulingv1alpha2.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.namespace,
+			Name:      fmt.Sprintf("%s-%s-%d", workload.Name, template.Name, b.podGroupCounter),
+		},
+		Spec: schedulingv1alpha2.PodGroupSpec{
+			PodGroupTemplateRef: &schedulingv1alpha2.PodGroupTemplateReference{
+				Workload: &schedulingv1alpha2.WorkloadPodGroupTemplateReference{
+					WorkloadName:         workload.Name,
+					PodGroupTemplateName: template.Name,
+				},
+			},
+			SchedulingPolicy: template.SchedulingPolicy,
+			ResourceClaims:   template.ResourceClaims,
+		},
+	}
+	b.podGroupCounter++
+	return podGroup
+}
+
 // Create takes a bunch of objects and calls their Create function.
-func (b *Builder) Create(ctx context.Context, objs ...klog.KMetadata) []klog.KMetadata {
+func (b *Builder) Create(tCtx ktesting.TContext, objs ...klog.KMetadata) []klog.KMetadata {
+	tCtx.Helper()
+	cleanupCtx := tCtx.CleanupCtx
+	if b.SkipCleanup {
+		cleanupCtx = func(func(tCtx ktesting.TContext)) {}
+	}
+
 	var createdObjs []klog.KMetadata
 	for _, obj := range objs {
-		ginkgo.By(fmt.Sprintf("creating %T %s", obj, obj.GetName()))
+		tCtx.Logf("Creating %T %s", obj, obj.GetName())
 		var err error
 		var createdObj klog.KMetadata
 		switch obj := obj.(type) {
 		case *resourceapi.DeviceClass:
-			createdObj, err = b.ClientV1().DeviceClasses().Create(ctx, obj, metav1.CreateOptions{})
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := b.ClientV1().DeviceClasses().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "delete device class")
+			createdObj, err = b.ClientV1(tCtx).DeviceClasses().Create(tCtx, obj, metav1.CreateOptions{})
+			cleanupCtx(func(tCtx ktesting.TContext) {
+				err := b.ClientV1(tCtx).DeviceClasses().Delete(tCtx, createdObj.GetName(), metav1.DeleteOptions{})
+				tCtx.ExpectNoError(err, "delete device class")
 			})
 		case *v1.Pod:
-			createdObj, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = tCtx.Client().CoreV1().Pods(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		case *v1.ResourceQuota:
-			createdObj, err = b.f.ClientSet.CoreV1().ResourceQuotas(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = tCtx.Client().CoreV1().ResourceQuotas(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		case *v1.ConfigMap:
-			createdObj, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = tCtx.Client().CoreV1().ConfigMaps(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceClaim:
-			createdObj, err = b.ClientV1().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.ClientV1(tCtx).ResourceClaims(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		case *resourcev1beta1.ResourceClaim:
-			createdObj, err = b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = tCtx.Client().ResourceV1beta1().ResourceClaims(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		case *resourcev1beta2.ResourceClaim:
-			createdObj, err = b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = tCtx.Client().ResourceV1beta2().ResourceClaims(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceClaimTemplate:
-			createdObj, err = b.ClientV1().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.ClientV1(tCtx).ResourceClaimTemplates(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		case *resourcev1beta1.ResourceClaimTemplate:
-			createdObj, err = b.f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = tCtx.Client().ResourceV1beta1().ResourceClaimTemplates(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		case *resourcev1beta2.ResourceClaimTemplate:
-			createdObj, err = b.f.ClientSet.ResourceV1beta2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = tCtx.Client().ResourceV1beta2().ResourceClaimTemplates(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceSlice:
-			createdObj, err = b.ClientV1().ResourceSlices().Create(ctx, obj, metav1.CreateOptions{})
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := b.ClientV1().ResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "delete node resource slice")
+			createdObj, err = b.ClientV1(tCtx).ResourceSlices().Create(tCtx, obj, metav1.CreateOptions{})
+			cleanupCtx(func(tCtx ktesting.TContext) {
+				err := b.ClientV1(tCtx).ResourceSlices().Delete(tCtx, createdObj.GetName(), metav1.DeleteOptions{})
+				tCtx.ExpectNoError(err, "delete node resource slice")
 			})
 		case *resourcealphaapi.DeviceTaintRule:
-			createdObj, err = b.f.ClientSet.ResourceV1alpha3().DeviceTaintRules().Create(ctx, obj, metav1.CreateOptions{})
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := b.f.ClientSet.ResourceV1alpha3().DeviceTaintRules().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "delete DeviceTaintRule")
+			createdObj, err = tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Create(tCtx, obj, metav1.CreateOptions{})
+			cleanupCtx(func(tCtx ktesting.TContext) {
+				err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Delete(tCtx, createdObj.GetName(), metav1.DeleteOptions{})
+				tCtx.ExpectNoError(err, "delete DeviceTaintRule")
+			})
+		case *resourcev1beta2.DeviceTaintRule:
+			createdObj, err = tCtx.Client().ResourceV1beta2().DeviceTaintRules().Create(tCtx, obj, metav1.CreateOptions{})
+			cleanupCtx(func(tCtx ktesting.TContext) {
+				err := tCtx.Client().ResourceV1beta2().DeviceTaintRules().Delete(tCtx, createdObj.GetName(), metav1.DeleteOptions{})
+				tCtx.ExpectNoError(err, "delete DeviceTaintRule")
 			})
 		case *appsv1.DaemonSet:
-			createdObj, err = b.f.ClientSet.AppsV1().DaemonSets(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = tCtx.Client().AppsV1().DaemonSets(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 			// Cleanup not really needed, but speeds up namespace shutdown.
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := b.f.ClientSet.AppsV1().DaemonSets(b.f.Namespace.Name).Delete(ctx, obj.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "delete daemonset")
+			cleanupCtx(func(tCtx ktesting.TContext) {
+				err := tCtx.Client().AppsV1().DaemonSets(b.namespace).Delete(tCtx, obj.Name, metav1.DeleteOptions{})
+				tCtx.ExpectNoError(err, "delete daemonset")
 			})
+		case *schedulingv1alpha2.Workload:
+			createdObj, err = tCtx.Client().SchedulingV1alpha2().Workloads(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
+		case *schedulingv1alpha2.PodGroup:
+			createdObj, err = tCtx.Client().SchedulingV1alpha2().PodGroups(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		default:
-			framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
+			tCtx.Fatalf("internal error, unsupported type %T", obj)
 		}
-		framework.ExpectNoErrorWithOffset(1, err, "create %T", obj)
+		tCtx.ExpectNoError(err, "create %T", obj)
 		createdObjs = append(createdObjs, createdObj)
 	}
 	return createdObjs
 }
 
-func (b *Builder) DeletePodAndWaitForNotFound(ctx context.Context, pod *v1.Pod) {
-	err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-	framework.ExpectNoErrorWithOffset(1, err, "delete %T", pod)
-	err = e2epod.WaitForPodNotFoundInNamespace(ctx, b.f.ClientSet, pod.Name, pod.Namespace, b.f.Timeouts.PodDelete)
-	framework.ExpectNoErrorWithOffset(1, err, "terminate %T", pod)
+func (b *Builder) DeletePodAndWaitForNotFound(tCtx ktesting.TContext, pod *v1.Pod) {
+	tCtx.Helper()
+	err := tCtx.Client().CoreV1().Pods(b.namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
+	tCtx.ExpectNoError(err, "delete %T", pod)
+	/* TODO: add timeouts to TContext? */
+	err = e2epod.WaitForPodNotFoundInNamespace(tCtx, tCtx.Client(), pod.Name, pod.Namespace, 5*time.Minute /* former b.f.Timeouts.PodDelete */)
+	tCtx.ExpectNoError(err, "terminate %T", pod)
 }
 
 // TestPod runs pod and checks if container logs contain expected environment variables
-func (b *Builder) TestPod(ctx context.Context, f *framework.Framework, pod *v1.Pod, env ...string) {
-	ginkgo.GinkgoHelper()
+func (b *Builder) TestPod(tCtx ktesting.TContext, pod *v1.Pod, env ...string) {
+	tCtx.Helper()
 
-	if !b.driver.WithKubelet {
+	if !b.Driver.WithKubelet {
 		// Less testing when we cannot rely on the kubelet to actually run the pod.
-		err := e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name)
-		framework.ExpectNoError(err, "schedule pod")
+		err := e2epod.WaitForPodScheduled(tCtx, tCtx.Client(), pod.Namespace, pod.Name)
+		tCtx.ExpectNoError(err, "schedule pod")
 		return
 	}
 
-	err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-	framework.ExpectNoError(err, "start pod")
+	err := e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), pod)
+	tCtx.ExpectNoError(err, "start pod")
 
 	if len(env) == 0 {
 		_, env = b.ParametersEnv()
 	}
 	for _, container := range pod.Spec.Containers {
-		TestContainerEnv(ctx, f, pod, container.Name, false, env...)
+		TestContainerEnv(tCtx, pod, container.Name, false, env...)
 	}
 }
 
 // envLineRE matches env output with variables set by test/e2e/dra/test-driver.
 var envLineRE = regexp.MustCompile(`^(?:admin|user|claim)_[a-zA-Z0-9_]*=.*$`)
 
-func TestContainerEnv(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, fullMatch bool, env ...string) {
-	ginkgo.GinkgoHelper()
-	stdout, stderr, err := e2epod.ExecWithOptionsContext(ctx, f, e2epod.ExecOptions{
+func TestContainerEnv(tCtx ktesting.TContext, pod *v1.Pod, containerName string, fullMatch bool, env ...string) {
+	tCtx.Helper()
+	stdout, stderr, err := e2epod.ExecWithOptionsTCtx(tCtx, e2epod.ExecOptions{
 		Command:       []string{"env"},
 		Namespace:     pod.Namespace,
 		PodName:       pod.Name,
@@ -440,8 +558,8 @@ func TestContainerEnv(ctx context.Context, f *framework.Framework, pod *v1.Pod, 
 		CaptureStderr: true,
 		Quiet:         true,
 	})
-	framework.ExpectNoError(err, fmt.Sprintf("get env output for container %s", containerName))
-	gomega.Expect(stderr).To(gomega.BeEmpty(), fmt.Sprintf("env stderr for container %s", containerName))
+	tCtx.ExpectNoError(err, fmt.Sprintf("get env output for container %s", containerName))
+	tCtx.Expect(stderr).To(gomega.BeEmpty(), fmt.Sprintf("env stderr for container %s", containerName))
 	if fullMatch {
 		// Find all env variables set by the test driver.
 		var actualEnv, expectEnv []string
@@ -455,91 +573,116 @@ func TestContainerEnv(ctx context.Context, f *framework.Framework, pod *v1.Pod, 
 		}
 		sort.Strings(actualEnv)
 		sort.Strings(expectEnv)
-		gomega.Expect(actualEnv).To(gomega.Equal(expectEnv), fmt.Sprintf("container %s env output:\n%s", containerName, stdout))
+		tCtx.Expect(actualEnv).To(gomega.Equal(expectEnv), fmt.Sprintf("container %s env output:\n%s", containerName, stdout))
 	} else {
 		for i := 0; i < len(env); i += 2 {
 			envStr := fmt.Sprintf("%s=%s\n", env[i], env[i+1])
-			gomega.Expect(stdout).To(gomega.ContainSubstring(envStr), fmt.Sprintf("container %s env variables", containerName))
+			tCtx.Expect(stdout).To(gomega.ContainSubstring(envStr), fmt.Sprintf("container %s env variables", containerName))
 		}
 	}
 }
 
 func NewBuilder(f *framework.Framework, driver *Driver) *Builder {
-	b := &Builder{f: f, driver: driver}
-	ginkgo.BeforeEach(b.setUp)
+	b := &Builder{Driver: driver}
+	ginkgo.BeforeEach(func() {
+		b.setUp(f.TContext(context.Background()))
+	})
 	return b
 }
 
-func NewBuilderNow(ctx context.Context, f *framework.Framework, driver *Driver) *Builder {
-	b := &Builder{f: f, driver: driver}
-	b.setUp(ctx)
+func NewBuilderNow(tCtx ktesting.TContext, driver *Driver) *Builder {
+	b := &Builder{Driver: driver}
+	b.setUp(tCtx)
 	return b
 }
 
-func (b *Builder) setUp(ctx context.Context) {
+func (b *Builder) setUp(tCtx ktesting.TContext) {
+	b.namespace = tCtx.Namespace()
 	b.podCounter = 0
+	b.workloadCounter = 0
+	b.podGroupCounter = 0
 	b.claimCounter = 0
-	b.Create(ctx, b.Class(0))
-	ginkgo.DeferCleanup(b.tearDown)
+	b.Create(tCtx, b.Class().DeviceClass)
+	tCtx.CleanupCtx(b.tearDown)
 }
 
 // ClientV1 returns a wrapper for client-go which provides the V1 API on top of whatever is enabled in the cluster.
-func (b *Builder) ClientV1() cgoresource.ResourceV1Interface {
-	return draclient.New(b.f.ClientSet)
+func (b *Builder) ClientV1(tCtx ktesting.TContext) cgoresource.ResourceV1Interface {
+	return draclient.New(tCtx.Client())
 }
 
-func (b *Builder) tearDown(ctx context.Context) {
+func (b *Builder) tearDown(tCtx ktesting.TContext) {
+	client := b.ClientV1(tCtx)
+
 	// Before we allow the namespace and all objects in it do be deleted by
 	// the framework, we must ensure that test pods and the claims that
 	// they use are deleted. Otherwise the driver might get deleted first,
 	// in which case deleting the claims won't work anymore.
-	ginkgo.By("delete pods and claims")
-	pods, err := b.listTestPods(ctx)
-	framework.ExpectNoError(err, "list pods")
+	tCtx.Log("delete pods, podgroups, and claims")
+	pods, err := b.listTestPods(tCtx)
+	tCtx.ExpectNoError(err, "list pods")
 	for _, pod := range pods {
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		ginkgo.By(fmt.Sprintf("deleting %T %s", &pod, klog.KObj(&pod)))
-		err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+		tCtx.Logf("Deleting %T %s", &pod, klog.KObj(&pod))
+		options := metav1.DeleteOptions{}
+		if !b.Driver.WithRealNodes {
+			// Force-delete, no kubelet.
+			options.GracePeriodSeconds = ptr.To(int64(0))
+		}
+		err := tCtx.Client().CoreV1().Pods(b.namespace).Delete(tCtx, pod.Name, options)
 		if !apierrors.IsNotFound(err) {
-			framework.ExpectNoError(err, "delete pod")
+			tCtx.ExpectNoError(err, "delete pod")
 		}
 	}
-	gomega.Eventually(func() ([]v1.Pod, error) {
-		return b.listTestPods(ctx)
+	tCtx.Eventually(func(tCtx ktesting.TContext) ([]v1.Pod, error) {
+		return b.listTestPods(tCtx)
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining pods despite deletion")
 
-	claims, err := b.ClientV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err, "get resource claims")
+	// Clean up PodGroups to release claims allocated for them.
+	podGroups, err := b.listTestPodGroups(tCtx)
+	tCtx.ExpectNoError(err, "list podgroups")
+	for _, podGroup := range podGroups {
+		if podGroup.DeletionTimestamp != nil {
+			continue
+		}
+		tCtx.Logf("Deleting %T %s", &podGroup, klog.KObj(&podGroup))
+		err := tCtx.Client().SchedulingV1alpha2().PodGroups(b.namespace).Delete(tCtx, podGroup.Name, metav1.DeleteOptions{})
+		if !apierrors.IsNotFound(err) {
+			tCtx.ExpectNoError(err, "delete podgroup")
+		}
+	}
+	tCtx.Eventually(func(tCtx ktesting.TContext) ([]schedulingv1alpha2.PodGroup, error) {
+		return b.listTestPodGroups(tCtx)
+	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining podgroups despite deletion")
+
+	claims, err := b.ClientV1(tCtx).ResourceClaims(b.namespace).List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err, "get resource claims")
 	for _, claim := range claims.Items {
 		if claim.DeletionTimestamp != nil {
 			continue
 		}
-		ginkgo.By(fmt.Sprintf("deleting %T %s", &claim, klog.KObj(&claim)))
-		err := b.ClientV1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+		tCtx.Logf("Deleting %T %s", &claim, klog.KObj(&claim))
+		err := client.ResourceClaims(b.namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
 		if !apierrors.IsNotFound(err) {
-			framework.ExpectNoError(err, "delete claim")
+			tCtx.ExpectNoError(err, "delete claim")
 		}
 	}
 
-	for host, plugin := range b.driver.Nodes {
-		ginkgo.By(fmt.Sprintf("waiting for resources on %s to be unprepared", host))
-		gomega.Eventually(plugin.GetPreparedResources).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
+	for host, plugin := range b.Driver.Nodes {
+		tCtx.Logf("Waiting for resources on %s to be unprepared", host)
+		tCtx.Eventually(func(ktesting.TContext) []app.ClaimID { return plugin.GetPreparedResources() }).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
 	}
 
-	ginkgo.By("waiting for claims to be deallocated and deleted")
-	gomega.Eventually(func() ([]resourceapi.ResourceClaim, error) {
-		claims, err := b.ClientV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			return nil, err
-		}
-		return claims.Items, nil
-	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "claims in the namespaces")
+	tCtx.Log("waiting for claims to be deallocated and deleted")
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourceapi.ResourceClaimList, error) {
+		return client.ResourceClaims(tCtx.Namespace()).List(tCtx, metav1.ListOptions{})
+	}).WithTimeout(time.Minute).Should(gomega.HaveField("Items", gomega.BeEmpty()), "claims in the namespaces")
 }
 
-func (b *Builder) listTestPods(ctx context.Context) ([]v1.Pod, error) {
-	pods, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+func (b *Builder) listTestPods(tCtx ktesting.TContext) ([]v1.Pod, error) {
+	pods, err := tCtx.Client().CoreV1().Pods(b.namespace).List(tCtx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -552,6 +695,18 @@ func (b *Builder) listTestPods(ctx context.Context) ([]v1.Pod, error) {
 		testPods = append(testPods, pod)
 	}
 	return testPods, nil
+}
+
+func (b *Builder) listTestPodGroups(tCtx ktesting.TContext) ([]schedulingv1alpha2.PodGroup, error) {
+	podGroups, err := tCtx.Client().SchedulingV1alpha2().PodGroups(b.namespace).List(tCtx, metav1.ListOptions{})
+	if apierrors.IsNotFound(err) {
+		// API is disabled
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return podGroups.Items, nil
 }
 
 func TaintAllDevices(taints ...resourceapi.DeviceTaint) driverResourcesMutatorFunc {
@@ -572,7 +727,7 @@ func NetworkResources(maxAllocations int, tainted bool) driverResourcesGenFunc {
 	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
 		driverResources := make(map[string]resourceslice.DriverResources)
 		devices := make([]resourceapi.Device, 0)
-		for i := 0; i < maxAllocations; i++ {
+		for i := range maxAllocations {
 			device := resourceapi.Device{
 				Name: fmt.Sprintf("device-%d", i),
 			}
@@ -638,7 +793,7 @@ func DriverResourcesNow(nodes *Nodes, maxAllocations int, devicesPerNode ...map[
 			}
 		} else if maxAllocations >= 0 {
 			devices := make([]resourceapi.Device, maxAllocations)
-			for i := 0; i < maxAllocations; i++ {
+			for i := range maxAllocations {
 				devices[i] = resourceapi.Device{
 					Name: fmt.Sprintf("device-%02d", i),
 				}

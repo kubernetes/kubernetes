@@ -18,12 +18,10 @@ package label
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
-	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/klog/v2"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -50,6 +50,7 @@ const (
 	MsgNotLabeled = "not labeled"
 	MsgLabeled    = "labeled"
 	MsgUnLabeled  = "unlabeled"
+	MsgModified   = "modified"
 )
 
 // LabelOptions have the data required to perform the label operation
@@ -296,15 +297,11 @@ func (o *LabelOptions) RunLabel() error {
 			return err
 		}
 		if o.dryRunStrategy == cmdutil.DryRunClient || o.local || o.list {
-			err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
+			added, removed, err := labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
 			}
-			newObj, err := json.Marshal(obj)
-			if err != nil {
-				return err
-			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj, o.overwrite)
+			dataChangeMsg = updateDataChangeMsg(added, removed)
 			outputObj = info.Object
 		} else {
 			name, namespace := info.Name, info.Namespace
@@ -321,39 +318,45 @@ func (o *LabelOptions) RunLabel() error {
 				}
 			}
 
-			if err := labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels); err != nil {
+			added, removed, err := labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
+			if err != nil {
 				return err
 			}
+
+			dataChangeMsg = updateDataChangeMsg(added, removed)
+
 			if err := o.Recorder.Record(obj); err != nil {
 				klog.V(4).Infof("error recording current command: %v", err)
 			}
-			newObj, err := json.Marshal(obj)
-			if err != nil {
-				return err
-			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj, o.overwrite)
-			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
-			createdPatch := err == nil
-			if err != nil {
-				klog.V(2).Infof("couldn't compute patch: %v", err)
-			}
 
-			mapping := info.ResourceMapping()
-			client, err := o.unstructuredClientForMapping(mapping)
-			if err != nil {
-				return err
-			}
-			helper := resource.NewHelper(client, mapping).
-				DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
-				WithFieldManager(o.fieldManager)
+			if added.Len() > 0 || removed.Len() > 0 {
+				newObj, err := json.Marshal(obj)
+				if err != nil {
+					return err
+				}
+				patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
+				createdPatch := err == nil
+				if err != nil {
+					klog.V(2).Infof("couldn't compute patch: %v", err)
+				}
 
-			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
-			} else {
-				outputObj, err = helper.Replace(namespace, name, false, obj)
-			}
-			if err != nil {
-				return err
+				mapping := info.ResourceMapping()
+				client, err := o.unstructuredClientForMapping(mapping)
+				if err != nil {
+					return err
+				}
+				helper := resource.NewHelper(client, mapping).
+					DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
+					WithFieldManager(o.fieldManager)
+
+				if createdPatch {
+					outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
+				} else {
+					outputObj, err = helper.Replace(namespace, name, false, obj)
+				}
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -387,13 +390,15 @@ func (o *LabelOptions) RunLabel() error {
 	})
 }
 
-func updateDataChangeMsg(oldObj []byte, newObj []byte, overwrite bool) string {
+func updateDataChangeMsg(actuallyAdded, actuallyRemoved sets.Set[string]) string {
 	msg := MsgNotLabeled
-	if !reflect.DeepEqual(oldObj, newObj) {
+	switch {
+	case actuallyAdded.Len() > 0 && actuallyRemoved.Len() > 0:
+		msg = MsgModified
+	case actuallyAdded.Len() > 0:
 		msg = MsgLabeled
-		if !overwrite && len(newObj) < len(oldObj) {
-			msg = MsgUnLabeled
-		}
+	case actuallyRemoved.Len() > 0:
+		msg = MsgUnLabeled
 	}
 	return msg
 }
@@ -435,14 +440,14 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	return labels, remove, nil
 }
 
-func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, remove []string) error {
+func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, remove []string) (sets.Set[string], sets.Set[string], error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	if !overwrite {
 		if err := validateNoOverwrites(accessor, labels); err != nil {
-			return err
+			return nil, nil, err
 		}
 	}
 
@@ -451,16 +456,25 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 		objLabels = make(map[string]string)
 	}
 
+	added := sets.New[string]()
+	removed := sets.New[string]()
+
 	for key, value := range labels {
-		objLabels[key] = value
+		if currentValue, ok := objLabels[key]; !ok || currentValue != value {
+			objLabels[key] = value
+			added.Insert(key)
+		}
 	}
 	for _, label := range remove {
-		delete(objLabels, label)
+		if _, ok := objLabels[label]; ok {
+			delete(objLabels, label)
+			removed.Insert(label)
+		}
 	}
 	accessor.SetLabels(objLabels)
 
 	if len(resourceVersion) != 0 {
 		accessor.SetResourceVersion(resourceVersion)
 	}
-	return nil
+	return added, removed, nil
 }

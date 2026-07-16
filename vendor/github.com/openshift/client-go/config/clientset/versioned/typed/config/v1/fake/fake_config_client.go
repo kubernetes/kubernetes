@@ -24,6 +24,10 @@ func (c *FakeConfigV1) Builds() v1.BuildInterface {
 	return newFakeBuilds(c)
 }
 
+func (c *FakeConfigV1) CRIOCredentialProviderConfigs() v1.CRIOCredentialProviderConfigInterface {
+	return newFakeCRIOCredentialProviderConfigs(c)
+}
+
 func (c *FakeConfigV1) ClusterImagePolicies() v1.ClusterImagePolicyInterface {
 	return newFakeClusterImagePolicies(c)
 }

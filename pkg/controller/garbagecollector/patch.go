@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -114,14 +115,7 @@ func (gc *GarbageCollector) deleteOwnerRefJSONMergePatch(item *node, ownerUIDs .
 	expectedObjectMeta.ResourceVersion = accessor.GetResourceVersion()
 	refs := accessor.GetOwnerReferences()
 	for _, ref := range refs {
-		var skip bool
-		for _, ownerUID := range ownerUIDs {
-			if ref.UID == ownerUID {
-				skip = true
-				break
-			}
-		}
-		if !skip {
+		if !slices.Contains(ownerUIDs, ref.UID) {
 			expectedObjectMeta.OwnerReferences = append(expectedObjectMeta.OwnerReferences, ref)
 		}
 	}
@@ -134,7 +128,7 @@ func (n *node) unblockOwnerReferencesStrategicMergePatch() ([]byte, error) {
 	var dummy metaonly.MetadataOnlyObject
 	var blockingRefs []metav1.OwnerReference
 	falseVar := false
-	for _, owner := range n.owners {
+	for _, owner := range n.getOwners() {
 		if owner.BlockOwnerDeletion != nil && *owner.BlockOwnerDeletion {
 			ref := owner
 			ref.BlockOwnerDeletion = &falseVar
@@ -157,7 +151,7 @@ func (gc *GarbageCollector) unblockOwnerReferencesJSONMergePatch(n *node) ([]byt
 	expectedObjectMeta.ResourceVersion = accessor.GetResourceVersion()
 	var expectedOwners []metav1.OwnerReference
 	falseVar := false
-	for _, owner := range n.owners {
+	for _, owner := range n.getOwners() {
 		owner.BlockOwnerDeletion = &falseVar
 		expectedOwners = append(expectedOwners, owner)
 	}

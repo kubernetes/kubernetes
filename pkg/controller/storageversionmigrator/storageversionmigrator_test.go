@@ -178,19 +178,7 @@ func TestSync(t *testing.T) {
 				k8stesting.NewUpdateAction(
 					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
-					newSVMWithConditions("test-svm", "100", []metav1.Condition{{
-						Type:   string(svmv1beta1.MigrationRunning),
-						Status: metav1.ConditionTrue,
-					}}),
-				),
-				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
-					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
-						{
-							Type:   string(svmv1beta1.MigrationRunning),
-							Status: metav1.ConditionFalse,
-						},
 						{
 							Type:   string(svmv1beta1.MigrationSucceeded),
 							Status: metav1.ConditionTrue,
@@ -271,19 +259,7 @@ func TestSync(t *testing.T) {
 				k8stesting.NewUpdateAction(
 					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
-					newSVMWithConditions("test-svm", "100", []metav1.Condition{{
-						Type:   string(svmv1beta1.MigrationRunning),
-						Status: metav1.ConditionTrue,
-					}}),
-				),
-				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
-					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
-						{
-							Type:   string(svmv1beta1.MigrationRunning),
-							Status: metav1.ConditionFalse,
-						},
 						{
 							Type:   string(svmv1beta1.MigrationFailed),
 							Status: metav1.ConditionTrue,
@@ -311,20 +287,6 @@ func TestSync(t *testing.T) {
 					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
-						{
-							Type:   string(svmv1beta1.MigrationRunning),
-							Status: metav1.ConditionTrue,
-						},
-					}),
-				),
-				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
-					"",
-					newSVMWithConditions("test-svm", "100", []metav1.Condition{
-						{
-							Type:   string(svmv1beta1.MigrationRunning),
-							Status: metav1.ConditionFalse,
-						},
 						{
 							Type:   string(svmv1beta1.MigrationSucceeded),
 							Status: metav1.ConditionTrue,
@@ -359,18 +321,6 @@ func TestSync(t *testing.T) {
 				"ns1/res1": apierrors.NewTooManyRequests("simulating throttling", 1),
 			},
 			expectErr: true,
-			expectKubeActions: []k8stesting.Action{
-				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
-					"",
-					newSVMWithConditions("test-svm", "100", []metav1.Condition{
-						{
-							Type:   string(svmv1beta1.MigrationRunning),
-							Status: metav1.ConditionTrue,
-						},
-					}),
-				),
-			},
 			expectDynamicActions: []k8stesting.Action{
 				k8stesting.NewPatchAction(testGVR, "ns1", "res1", types.ApplyPatchType, mustMarshal(t, typeMetaUIDRV{
 					TypeMeta:           metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
@@ -423,20 +373,6 @@ func TestSync(t *testing.T) {
 					"",
 					newSVMWithConditions("test-svm", "100", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationRunning),
-							Status: metav1.ConditionTrue,
-						},
-					}),
-				),
-				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
-					"",
-					newSVMWithConditions("test-svm", "100", []metav1.Condition{
-						{
-							Type:   string(svmv1beta1.MigrationRunning),
-							Status: metav1.ConditionFalse,
-						},
-						{
 							Type:   string(svmv1beta1.MigrationFailed),
 							Status: metav1.ConditionTrue,
 						},
@@ -484,7 +420,7 @@ func TestSync(t *testing.T) {
 
 			if tc.expectKubeActions != nil {
 				kubeActions := filterActions(kubeClient.Actions())
-				require.Len(t, kubeActions, len(tc.expectKubeActions), "mismatched number of kube client actions")
+				require.Len(t, kubeActions, len(tc.expectKubeActions), "mismatched number of kube client actions, expected %d, got %d", len(tc.expectKubeActions), len(kubeActions))
 
 				for i, expected := range tc.expectKubeActions {
 					actual := kubeActions[i]

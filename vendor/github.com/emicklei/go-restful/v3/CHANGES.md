@@ -1,5 +1,9 @@
 # Change history of go-restful
 
+## [v3.13.0] - 2025-08-14
+
+- optimize performance of path matching in CurlyRouter ( thanks @wenhuang, Wen Huang)
+
 ## [v3.12.2] - 2025-02-21
 
 - allow empty payloads in post,put,patch, issue #580 ( thanks @liggitt, Jordan Liggitt)

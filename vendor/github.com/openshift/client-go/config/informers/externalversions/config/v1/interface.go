@@ -14,6 +14,8 @@ type Interface interface {
 	Authentications() AuthenticationInformer
 	// Builds returns a BuildInformer.
 	Builds() BuildInformer
+	// CRIOCredentialProviderConfigs returns a CRIOCredentialProviderConfigInformer.
+	CRIOCredentialProviderConfigs() CRIOCredentialProviderConfigInformer
 	// ClusterImagePolicies returns a ClusterImagePolicyInformer.
 	ClusterImagePolicies() ClusterImagePolicyInformer
 	// ClusterOperators returns a ClusterOperatorInformer.
@@ -82,6 +84,11 @@ func (v *version) Authentications() AuthenticationInformer {
 // Builds returns a BuildInformer.
 func (v *version) Builds() BuildInformer {
 	return &buildInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// CRIOCredentialProviderConfigs returns a CRIOCredentialProviderConfigInformer.
+func (v *version) CRIOCredentialProviderConfigs() CRIOCredentialProviderConfigInformer {
+	return &cRIOCredentialProviderConfigInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ClusterImagePolicies returns a ClusterImagePolicyInformer.

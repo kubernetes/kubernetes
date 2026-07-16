@@ -370,7 +370,6 @@ func TestOwnerReferences(t *testing.T) {
 		},
 	}
 	for i, ref := range refs {
-		ref := ref
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
 			u1 := unstructured.Unstructured{

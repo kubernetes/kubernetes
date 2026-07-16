@@ -1190,3 +1190,79 @@ func TestFastPathLeaderElection(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckMethodRace(t *testing.T) {
+	objectType := "leases"
+	objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+	recorder := record.NewFakeRecorder(100)
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+		EventRecorder: recorder,
+	}
+
+	var lockMu sync.Mutex
+	var lockObj runtime.Object
+
+	c := &fake.Clientset{}
+
+	c.AddReactor("get", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockMu.Lock()
+		defer lockMu.Unlock()
+		if lockObj != nil {
+			return true, lockObj, nil
+		}
+		return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+	})
+
+	c.AddReactor("create", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockMu.Lock()
+		defer lockMu.Unlock()
+		lockObj = action.(fakeclient.CreateAction).GetObject()
+		return true, lockObj, nil
+	})
+
+	c.AddReactor("update", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockMu.Lock()
+		defer lockMu.Unlock()
+		lockObj = action.(fakeclient.UpdateAction).GetObject()
+		return true, lockObj, nil
+	})
+
+	lock := &rl.LeaseLock{
+		LeaseMeta:  objectMeta,
+		LockConfig: resourceLockConfig,
+		Client:     c.CoordinationV1(),
+	}
+
+	// aggressive timing to provoke the race
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 2 * time.Second,
+		RenewDeadline: 1 * time.Second,
+		RetryPeriod:   5 * time.Millisecond,
+		Callbacks: LeaderCallbacks{
+			OnNewLeader:      func(identity string) {},
+			OnStartedLeading: func(context.Context) {},
+			OnStoppedLeading: func() {},
+		},
+	}
+
+	le, err := NewLeaderElector(lec)
+	if err != nil {
+		t.Fatalf("Failed to create leader elector: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go le.Run(ctx)
+
+	start := time.Now()
+	for time.Since(start) < 2*time.Second {
+		// If Check() does not lock observedRecordLock, this read will race with the
+		// write in le.Run()'s setObservedRecord.
+		_ = le.Check(time.Second)
+
+		time.Sleep(10 * time.Millisecond)
+	}
+}

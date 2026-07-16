@@ -40,7 +40,7 @@ var _ = SIGDescribe("Events", func() {
 	f := framework.NewDefaultFramework("events")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	ginkgo.It("should be sent by kubelets and the scheduler about pods scheduling and running ", func(ctx context.Context) {
+	ginkgo.It("should be sent by kubelets and the scheduler about pods scheduling and running", func(ctx context.Context) {
 
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 

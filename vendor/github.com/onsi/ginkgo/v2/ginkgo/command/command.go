@@ -22,11 +22,11 @@ type Command struct {
 func (c Command) Run(args []string, additionalArgs []string) {
 	args, err := c.Flags.Parse(args)
 	if err != nil {
-		AbortWithUsage(err.Error())
+		AbortWithUsage("%s", err.Error())
 	}
 	for _, arg := range args {
 		if len(arg) > 1 && strings.HasPrefix(arg, "-") {
-			AbortWith(types.GinkgoErrors.FlagAfterPositionalParameter().Error())
+			AbortWith("%s", types.GinkgoErrors.FlagAfterPositionalParameter().Error())
 		}
 	}
 	c.Command(args, additionalArgs)
@@ -49,6 +49,6 @@ func (c Command) EmitUsage(writer io.Writer) {
 	}
 	flagUsage := c.Flags.Usage()
 	if flagUsage != "" {
-		fmt.Fprintf(writer, formatter.F(flagUsage))
+		fmt.Fprint(writer, formatter.F(flagUsage))
 	}
 }

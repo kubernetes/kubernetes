@@ -28,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -1176,6 +1178,10 @@ type fakeRecorder struct {
 	events  []string
 	fEvents []string
 	aEvents []string
+}
+
+func (f *fakeRecorder) WithLogger(logger klog.Logger) record.EventRecorderLogger {
+	return f
 }
 
 func (f *fakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {

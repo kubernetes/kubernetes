@@ -252,11 +252,17 @@ func (statusStrategy) NamespaceScoped() bool {
 func (statusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"apiextensions.k8s.io/v1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("metadata"),
+			// Disabled to match PrepareForUpdate, which do not wipe metadata
+			// https://github.com/kubernetes/kubernetes/issues/137681
+			// fieldpath.MakePathOrDie("metadata"),
+
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"apiextensions.k8s.io/v1beta1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("metadata"),
+			// Disabled to match PrepareForUpdate, which do not wipe metadata
+			// https://github.com/kubernetes/kubernetes/issues/137681
+			// fieldpath.MakePathOrDie("metadata"),
+
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}

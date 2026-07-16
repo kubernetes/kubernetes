@@ -41,21 +41,21 @@ var (
 	depth = k8smetrics.NewGaugeVec(&k8smetrics.GaugeOpts{
 		Subsystem:      WorkQueueSubsystem,
 		Name:           DepthKey,
-		StabilityLevel: k8smetrics.ALPHA,
+		StabilityLevel: k8smetrics.BETA,
 		Help:           "Current depth of workqueue",
 	}, []string{"name"})
 
 	adds = k8smetrics.NewCounterVec(&k8smetrics.CounterOpts{
 		Subsystem:      WorkQueueSubsystem,
 		Name:           AddsKey,
-		StabilityLevel: k8smetrics.ALPHA,
+		StabilityLevel: k8smetrics.BETA,
 		Help:           "Total number of adds handled by workqueue",
 	}, []string{"name"})
 
 	latency = k8smetrics.NewHistogramVec(&k8smetrics.HistogramOpts{
 		Subsystem:      WorkQueueSubsystem,
 		Name:           QueueLatencyKey,
-		StabilityLevel: k8smetrics.ALPHA,
+		StabilityLevel: k8smetrics.BETA,
 		Help:           "How long in seconds an item stays in workqueue before being requested.",
 		Buckets:        k8smetrics.ExponentialBuckets(10e-9, 10, 10),
 	}, []string{"name"})
@@ -63,7 +63,7 @@ var (
 	workDuration = k8smetrics.NewHistogramVec(&k8smetrics.HistogramOpts{
 		Subsystem:      WorkQueueSubsystem,
 		Name:           WorkDurationKey,
-		StabilityLevel: k8smetrics.ALPHA,
+		StabilityLevel: k8smetrics.BETA,
 		Help:           "How long in seconds processing an item from workqueue takes.",
 		Buckets:        k8smetrics.ExponentialBuckets(10e-9, 10, 10),
 	}, []string{"name"})
@@ -71,7 +71,7 @@ var (
 	unfinished = k8smetrics.NewGaugeVec(&k8smetrics.GaugeOpts{
 		Subsystem:      WorkQueueSubsystem,
 		Name:           UnfinishedWorkKey,
-		StabilityLevel: k8smetrics.ALPHA,
+		StabilityLevel: k8smetrics.BETA,
 		Help: "How many seconds of work has done that " +
 			"is in progress and hasn't been observed by work_duration. Large " +
 			"values indicate stuck threads. One can deduce the number of stuck " +
@@ -81,7 +81,7 @@ var (
 	longestRunningProcessor = k8smetrics.NewGaugeVec(&k8smetrics.GaugeOpts{
 		Subsystem:      WorkQueueSubsystem,
 		Name:           LongestRunningProcessorKey,
-		StabilityLevel: k8smetrics.ALPHA,
+		StabilityLevel: k8smetrics.BETA,
 		Help: "How many seconds has the longest running " +
 			"processor for workqueue been running.",
 	}, []string{"name"})
@@ -89,7 +89,7 @@ var (
 	retries = k8smetrics.NewCounterVec(&k8smetrics.CounterOpts{
 		Subsystem:      WorkQueueSubsystem,
 		Name:           RetriesKey,
-		StabilityLevel: k8smetrics.ALPHA,
+		StabilityLevel: k8smetrics.BETA,
 		Help:           "Total number of retries handled by workqueue",
 	}, []string{"name"})
 

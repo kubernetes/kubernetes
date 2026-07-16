@@ -40,6 +40,12 @@ type featureGatesSetter interface {
 	Set(clientfeatures.Feature, bool) error
 }
 
+type featureGatesSetterForTesting interface {
+	featureGatesSetter
+
+	SetForTesting(clientfeatures.Feature, bool) error
+}
+
 // SetFeatureDuringTest sets the specified feature to the specified value for the duration of the test.
 //
 // Example use:
@@ -68,9 +74,17 @@ func setFeatureDuringTestInternal(tb testing.TB, feature clientfeatures.Feature,
 		}
 	}
 
-	if err := featureGates.Set(feature, featureValue); err != nil {
+	setFeature := func(feature clientfeatures.Feature, featureValue bool) error {
+		if testSetter, ok := featureGates.(featureGatesSetterForTesting); ok {
+			return testSetter.SetForTesting(feature, featureValue)
+		}
+		return featureGates.Set(feature, featureValue)
+	}
+
+	if err := setFeature(feature, featureValue); err != nil {
 		return err
 	}
+
 	overriddenFeatures[feature] = tb.Name()
 
 	tb.Cleanup(func() {
@@ -78,7 +92,7 @@ func setFeatureDuringTestInternal(tb testing.TB, feature clientfeatures.Feature,
 		defer overriddenFeaturesLock.Unlock()
 		delete(overriddenFeatures, feature)
 		// if default is not set
-		if err := featureGates.Set(feature, originalFeatureValue); err != nil {
+		if err := setFeature(feature, originalFeatureValue); err != nil {
 			tb.Errorf("failed restoring client-go feature: %v to its original value: %v, err: %v", feature, originalFeatureValue, err)
 		}
 	})

@@ -149,7 +149,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		var pvcs []*v1.PersistentVolumeClaim
 		numVols := 2
 
-		for i := 0; i < numVols; i++ {
+		for range numVols {
 			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 			resource := storageframework.CreateVolumeResource(ctx, driver, l.config, pattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
@@ -189,7 +189,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		var pvcs []*v1.PersistentVolumeClaim
 		numVols := 2
 
-		for i := 0; i < numVols; i++ {
+		for range numVols {
 			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 			resource := storageframework.CreateVolumeResource(ctx, driver, l.config, pattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
@@ -223,7 +223,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		var pvcs []*v1.PersistentVolumeClaim
 		numVols := 2
 
-		for i := 0; i < numVols; i++ {
+		for i := range numVols {
 			curPattern := pattern
 			if i != 0 {
 				// 1st volume should be block and set filesystem for 2nd and later volumes
@@ -273,7 +273,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		var pvcs []*v1.PersistentVolumeClaim
 		numVols := 2
 
-		for i := 0; i < numVols; i++ {
+		for i := range numVols {
 			curPattern := pattern
 			if i != 0 {
 				// 1st volume should be block and set filesystem for 2nd and later volumes
@@ -564,7 +564,7 @@ func TestConcurrentAccessToSingleVolume(ctx context.Context, f *framework.Framew
 	var pods []*v1.Pod
 
 	// Create each pod with pvc
-	for i := 0; i < numPods; i++ {
+	for i := range numPods {
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Creating pod%d with a volume on %+v", index, node))
 		podConfig := e2epod.Config{
@@ -573,7 +573,7 @@ func TestConcurrentAccessToSingleVolume(ctx context.Context, f *framework.Framew
 			SeLinuxLabel:  e2epod.GetLinuxLabel(),
 			NodeSelection: node,
 			PVCsReadOnly:  readOnly,
-			ImageID:       e2epod.GetTestImageID(imageutils.JessieDnsutils),
+			ImageID:       e2epod.GetTestImageID(imageutils.GlibcDnsTesting),
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, cs, &podConfig, f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
@@ -697,7 +697,7 @@ func TestConcurrentAccessToRelatedVolumes(ctx context.Context, f *framework.Fram
 			SeLinuxLabel:  e2epod.GetLinuxLabel(),
 			NodeSelection: node,
 			PVCsReadOnly:  false,
-			ImageID:       e2epod.GetTestImageID(imageutils.JessieDnsutils),
+			ImageID:       e2epod.GetTestImageID(imageutils.GlibcDnsTesting),
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, cs, &podConfig, f.Timeouts.PodStart)
 		defer func() {

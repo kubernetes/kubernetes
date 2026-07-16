@@ -53,12 +53,7 @@
           "items": {
             "description": "items is a collection of ClusterTrustBundle objects",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.certificates.v1beta1.ClusterTrustBundle"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.certificates.v1beta1.ClusterTrustBundle"
             },
             "type": "array"
           },
@@ -167,12 +162,7 @@
           "items": {
             "description": "items is a collection of PodCertificateRequest objects",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.certificates.v1beta1.PodCertificateRequest"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.certificates.v1beta1.PodCertificateRequest"
             },
             "type": "array"
           },
@@ -222,7 +212,7 @@
             "type": "string"
           },
           "pkixPublicKey": {
-            "description": "pkixPublicKey is the PKIX-serialized public key the signer will issue the certificate to.\n\nThe key must be one of RSA3072, RSA4096, ECDSAP256, ECDSAP384, ECDSAP521, or ED25519. Note that this list may be expanded in the future.\n\nSigner implementations do not need to support all key types supported by kube-apiserver and kubelet.  If a signer does not support the key type used for a given PodCertificateRequest, it must deny the request by setting a status.conditions entry with a type of \"Denied\" and a reason of \"UnsupportedKeyType\". It may also suggest a key type that it does support in the message field.",
+            "description": "The PKIX-serialized public key the signer will issue the certificate to.\n\nThe key must be one of RSA3072, RSA4096, ECDSAP256, ECDSAP384, ECDSAP521, or ED25519. Note that this list may be expanded in the future.\n\nSigner implementations do not need to support all key types supported by kube-apiserver and kubelet.  If a signer does not support the key type used for a given PodCertificateRequest, it must deny the request by setting a status.conditions entry with a type of \"Denied\" and a reason of \"UnsupportedKeyType\". It may also suggest a key type that it does support in the message field.\n\nDeprecated: This field is replaced by StubPKCS10Request. If StubPKCS10Request is set, this field must be empty.  Signer implementations should extract the public key from the StubPKCS10Request field.",
             "format": "byte",
             "type": "string"
           },
@@ -237,7 +227,7 @@
             "type": "string"
           },
           "proofOfPossession": {
-            "description": "proofOfPossession proves that the requesting kubelet holds the private key corresponding to pkixPublicKey.\n\nIt is contructed by signing the ASCII bytes of the pod's UID using `pkixPublicKey`.\n\nkube-apiserver validates the proof of possession during creation of the PodCertificateRequest.\n\nIf the key is an RSA key, then the signature is over the ASCII bytes of the pod UID, using RSASSA-PSS from RFC 8017 (as implemented by the golang function crypto/rsa.SignPSS with nil options).\n\nIf the key is an ECDSA key, then the signature is as described by [SEC 1, Version 2.0](https://www.secg.org/sec1-v2.pdf) (as implemented by the golang library function crypto/ecdsa.SignASN1)\n\nIf the key is an ED25519 key, the the signature is as described by the [ED25519 Specification](https://ed25519.cr.yp.to/) (as implemented by the golang library crypto/ed25519.Sign).",
+            "description": "A proof that the requesting kubelet holds the private key corresponding to pkixPublicKey.\n\nIt is contructed by signing the ASCII bytes of the pod's UID using `pkixPublicKey`.\n\nkube-apiserver validates the proof of possession during creation of the PodCertificateRequest.\n\nIf the key is an RSA key, then the signature is over the ASCII bytes of the pod UID, using RSASSA-PSS from RFC 8017 (as implemented by the golang function crypto/rsa.SignPSS with nil options).\n\nIf the key is an ECDSA key, then the signature is as described by [SEC 1, Version 2.0](https://www.secg.org/sec1-v2.pdf) (as implemented by the golang library function crypto/ecdsa.SignASN1)\n\nIf the key is an ED25519 key, the the signature is as described by the [ED25519 Specification](https://ed25519.cr.yp.to/) (as implemented by the golang library crypto/ed25519.Sign).\n\nDeprecated: This field is replaced by StubPKCS10Request. If StubPKCS10Request is set, this field must be empty.",
             "format": "byte",
             "type": "string"
           },
@@ -256,9 +246,13 @@
             "description": "signerName indicates the requested signer.\n\nAll signer names beginning with `kubernetes.io` are reserved for use by the Kubernetes project.  There is currently one well-known signer documented by the Kubernetes project, `kubernetes.io/kube-apiserver-client-pod`, which will issue client certificates understood by kube-apiserver.  It is currently unimplemented.",
             "type": "string"
           },
+          "stubPKCS10Request": {
+            "description": "A PKCS#10 certificate signing request (DER-serialized) generated by Kubelet using the subject private key.\n\nMost signer implementations will ignore the contents of the CSR except to extract the subject public key. The API server automatically verifies the CSR signature during admission, so the signer does not need to repeat the verification.  CSRs generated by kubelet are completely empty.\n\nThe subject public key must be one of RSA3072, RSA4096, ECDSAP256, ECDSAP384, ECDSAP521, or ED25519. Note that this list may be expanded in the future.\n\nSigner implementations do not need to support all key types supported by kube-apiserver and kubelet.  If a signer does not support the key type used for a given PodCertificateRequest, it must deny the request by setting a status.conditions entry with a type of \"Denied\" and a reason of \"UnsupportedKeyType\". It may also suggest a key type that it does support in the message field.",
+            "format": "byte",
+            "type": "string"
+          },
           "unverifiedUserAnnotations": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "unverifiedUserAnnotations allow pod authors to pass additional information to the signer implementation.  Kubernetes does not restrict or validate this metadata in any way.\n\nEntries are subject to the same validation as object metadata annotations, with the addition that all keys must be domain-prefixed. No restrictions are placed on values, except an overall size limitation on the entire field.\n\nSigners should document the keys and values they support.  Signers should deny requests that contain keys they do not recognize.",
@@ -273,8 +267,7 @@
           "serviceAccountUID",
           "nodeName",
           "nodeUID",
-          "pkixPublicKey",
-          "proofOfPossession"
+          "stubPKCS10Request"
         ],
         "type": "object"
       },
@@ -296,12 +289,7 @@
           "conditions": {
             "description": "conditions applied to the request.\n\nThe types \"Issued\", \"Denied\", and \"Failed\" have special handling.  At most one of these conditions may be present, and they must have status \"True\".\n\nIf the request is denied with `Reason=UnsupportedKeyType`, the signer may suggest a key type that will work in the message field.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -336,7 +324,6 @@
           "categories": {
             "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -364,7 +351,6 @@
           "shortNames": {
             "description": "shortNames is a list of suggested short names of the resource.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -382,7 +368,6 @@
           "verbs": {
             "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array"
@@ -420,12 +405,7 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -500,7 +480,6 @@
           "dryRun": {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -544,307 +523,7 @@
             "version": "v1"
           },
           {
-            "group": "admission.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "admission.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apiextensions.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "apiextensions.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apiregistration.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "apiregistration.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apps",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "apps",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apps",
-            "kind": "DeleteOptions",
-            "version": "v1beta2"
-          },
-          {
-            "group": "authentication.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "authentication.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "authentication.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "authorization.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "authorization.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta2"
-          },
-          {
-            "group": "batch",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "batch",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
             "group": "certificates.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "certificates.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "certificates.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "coordination.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "coordination.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha2"
-          },
-          {
-            "group": "coordination.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "discovery.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "discovery.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "events.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "events.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "extensions",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta2"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta3"
-          },
-          {
-            "group": "imagepolicy.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "internal.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "policy",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "policy",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "resource.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "resource.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha3"
-          },
-          {
-            "group": "resource.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "resource.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta2"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "storagemigration.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1beta1"
           }
@@ -873,6 +552,14 @@
           "selfLink": {
             "description": "Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.",
             "type": "string"
+          },
+          "shardInfo": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ShardInfo"
+              }
+            ],
+            "description": "shardInfo is set when the list is a filtered subset of the full collection, as selected by a shard selector on the request. It echoes back the selector so clients can verify which shard they received and merge sharded responses. Clients should not cache sharded list responses as a full representation of the collection.\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate."
           }
         },
         "type": "object"
@@ -924,7 +611,6 @@
         "properties": {
           "annotations": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
@@ -954,7 +640,6 @@
           "finalizers": {
             "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed. Finalizers may be processed and removed in any order.  Order is NOT enforced because it introduces significant risk of stuck finalizers. finalizers is a shared field, any actor with permission can reorder it. If the finalizer list is processed in order, then this can lead to a situation in which the component responsible for the first finalizer in the list is waiting for a signal (field value, external system, or other) produced by a component responsible for a finalizer later in the list, resulting in a deadlock. Without enforced ordering finalizers are free to order amongst themselves and are not vulnerable to ordering changes in the list.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -972,7 +657,6 @@
           },
           "labels": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
@@ -981,12 +665,7 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1002,12 +681,7 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -1091,6 +765,20 @@
         },
         "type": "object"
       },
+      "io.k8s.apimachinery.pkg.apis.meta.v1.ShardInfo": {
+        "description": "ShardInfo describes the shard selector that was applied to produce a list response. Its presence on a list response indicates the list is a filtered subset.",
+        "properties": {
+          "selector": {
+            "default": "",
+            "description": "selector is the shard selector string from the request, echoed back so clients can verify which shard they received and merge responses from multiple shards.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector"
+        ],
+        "type": "object"
+      },
       "io.k8s.apimachinery.pkg.apis.meta.v1.Status": {
         "description": "Status is a return value for calls that don't return other objects.",
         "properties": {
@@ -1170,12 +858,7 @@
           "causes": {
             "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1237,307 +920,7 @@
             "version": "v1"
           },
           {
-            "group": "admission.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "admission.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apiextensions.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "apiextensions.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apiregistration.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "apiregistration.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apps",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "apps",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apps",
-            "kind": "WatchEvent",
-            "version": "v1beta2"
-          },
-          {
-            "group": "authentication.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "authentication.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "authentication.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "authorization.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "authorization.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta2"
-          },
-          {
-            "group": "batch",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "batch",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
             "group": "certificates.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "certificates.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "certificates.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "coordination.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "coordination.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha2"
-          },
-          {
-            "group": "coordination.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "discovery.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "discovery.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "events.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "events.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "extensions",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta2"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta3"
-          },
-          {
-            "group": "imagepolicy.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "internal.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "policy",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "policy",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "resource.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "resource.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha3"
-          },
-          {
-            "group": "resource.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "resource.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta2"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "storagemigration.k8s.io",
             "kind": "WatchEvent",
             "version": "v1beta1"
           }
@@ -1716,6 +1099,15 @@
             }
           },
           {
+            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+            "in": "query",
+            "name": "shardSelector",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
             "in": "query",
             "name": "timeoutSeconds",
@@ -1847,6 +1239,15 @@
             "name": "sendInitialEvents",
             "schema": {
               "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+            "in": "query",
+            "name": "shardSelector",
+            "schema": {
+              "type": "string",
               "uniqueItems": true
             }
           },
@@ -2615,6 +2016,15 @@
             }
           },
           {
+            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+            "in": "query",
+            "name": "shardSelector",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
             "in": "query",
             "name": "timeoutSeconds",
@@ -2746,6 +2156,15 @@
             "name": "sendInitialEvents",
             "schema": {
               "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+            "in": "query",
+            "name": "shardSelector",
+            "schema": {
+              "type": "string",
               "uniqueItems": true
             }
           },
@@ -3881,6 +3300,15 @@
           }
         },
         {
+          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+          "in": "query",
+          "name": "shardSelector",
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -4038,6 +3466,15 @@
           "name": "sendInitialEvents",
           "schema": {
             "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+          "in": "query",
+          "name": "shardSelector",
+          "schema": {
+            "type": "string",
             "uniqueItems": true
           }
         },
@@ -4213,6 +3650,15 @@
           }
         },
         {
+          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+          "in": "query",
+          "name": "shardSelector",
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -4380,6 +3826,15 @@
           "name": "sendInitialEvents",
           "schema": {
             "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+          "in": "query",
+          "name": "shardSelector",
+          "schema": {
+            "type": "string",
             "uniqueItems": true
           }
         },
@@ -4565,6 +4020,15 @@
           }
         },
         {
+          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+          "in": "query",
+          "name": "shardSelector",
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -4722,6 +4186,15 @@
           "name": "sendInitialEvents",
           "schema": {
             "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+          "in": "query",
+          "name": "shardSelector",
+          "schema": {
+            "type": "string",
             "uniqueItems": true
           }
         },

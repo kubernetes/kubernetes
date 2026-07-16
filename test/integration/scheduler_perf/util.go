@@ -36,6 +36,7 @@ import (
 	resourcealpha "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,11 +51,11 @@ import (
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
@@ -92,13 +93,16 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
+func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
 	var runtimeConfig []string
 	if enabledFeatures[features.DynamicResourceAllocation] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapi.SchemeGroupVersion))
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcev1beta2.SchemeGroupVersion))
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcev1beta1.SchemeGroupVersion))
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcealpha.SchemeGroupVersion))
+	}
+	if enabledFeatures[features.GenericWorkload] {
+		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", schedulingapi.SchemeGroupVersion))
 	}
 	customFlags := []string{
 		// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
@@ -113,9 +117,12 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		tCtx.Fatalf("start apiserver: %v", err)
 	}
 	// Cleanup will be in reverse order: first the clients by canceling the
-	// child context (happens automatically), then the server.
+	// child context, then the server.
 	tCtx.Cleanup(server.TearDownFn)
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
+	tCtx.Cleanup(func() {
+		tCtx.Cancel("test is done")
+	})
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
@@ -132,11 +139,11 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		}
 	}
 
-	tCtx = ktesting.WithRESTConfig(tCtx, cfg)
+	tCtx = tCtx.WithRESTConfig(cfg)
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	scheduler, informerFactory := util.StartScheduler(tCtx, config, outOfTreePluginRegistry)
+	scheduler, informerFactory := util.StartScheduler(tCtx, config, opts.outOfTreePluginRegistry)
 	util.StartFakePVController(tCtx, tCtx.Client(), informerFactory)
 	runGC := util.CreateGCController(tCtx, tCtx, *cfg, informerFactory)
 	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, informerFactory)
@@ -145,7 +152,12 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	if enabledFeatures[features.DynamicResourceAllocation] {
 		// Testing of DRA with inline resource claims depends on this
 		// controller for creating and removing ResourceClaims.
-		runResourceClaimController = util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory)
+		features := resourceclaim.Features{
+			AdminAccess:            true,
+			PrioritizedList:        true,
+			WorkloadResourceClaims: enabledFeatures[features.DRAWorkloadResourceClaims],
+		}
+		runResourceClaimController = util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory, features)
 	}
 
 	informerFactory.Start(tCtx.Done())
@@ -778,4 +790,39 @@ func (mc *memoryCollector) collect() []DataItem {
 		mc.createMetricDataItem(heapValues, "MB", "heap_memory_usage"),
 		growthItem,
 	}
+}
+
+// schedulingDurationCollector calculates the total duration of the scheduling phase, including pod creation.
+type schedulingDurationCollector struct {
+	resultLabels map[string]string
+	duration     time.Duration
+}
+
+func newSchedulingDurationCollector(resultLabels map[string]string) *schedulingDurationCollector {
+	return &schedulingDurationCollector{
+		resultLabels: resultLabels,
+	}
+}
+
+func (sdc *schedulingDurationCollector) init() error {
+	return nil
+}
+
+func (sdc *schedulingDurationCollector) run(tCtx ktesting.TContext) {
+	start := time.Now()
+	// Wait for the scheduling to finish
+	<-tCtx.Done()
+	sdc.duration = time.Since(start)
+}
+
+func (sdc *schedulingDurationCollector) collect() []DataItem {
+	labels := maps.Clone(sdc.resultLabels)
+	labels["Metric"] = "SchedulingDuration"
+	return []DataItem{{
+		Labels: labels,
+		Data: map[string]float64{
+			"Duration": sdc.duration.Seconds(),
+		},
+		Unit: "s",
+	}}
 }

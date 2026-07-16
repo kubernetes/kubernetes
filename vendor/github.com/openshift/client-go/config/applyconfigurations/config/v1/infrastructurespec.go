@@ -2,6 +2,10 @@
 
 package v1
 
+import (
+	configv1 "github.com/openshift/api/config/v1"
+)
+
 // InfrastructureSpecApplyConfiguration represents a declarative configuration of the InfrastructureSpec type for use
 // with apply.
 //
@@ -23,6 +27,16 @@ type InfrastructureSpecApplyConfiguration struct {
 	// platformSpec holds desired information specific to the underlying
 	// infrastructure provider.
 	PlatformSpec *PlatformSpecApplyConfiguration `json:"platformSpec,omitempty"`
+	// controlPlaneTopology expresses the desired topology configuration for control nodes.
+	//
+	// When status.controlPlaneTopology is 'SingleReplica' and spec.controlPlaneTopology is set to 'HighlyAvailable',
+	// a transition will be triggered to reconfigure the cluster from SingleReplica to HighlyAvailable.
+	//
+	// When left blank or status.controlPlaneTopology and spec.controlPlaneTopology are the same value,
+	// no changes are required and no transitions will be triggered.
+	//
+	// This value may be set to match status.controlPlaneTopology regardless of the current value.
+	ControlPlaneTopology *configv1.TopologyMode `json:"controlPlaneTopology,omitempty"`
 }
 
 // InfrastructureSpecApplyConfiguration constructs a declarative configuration of the InfrastructureSpec type for use with
@@ -44,5 +58,13 @@ func (b *InfrastructureSpecApplyConfiguration) WithCloudConfig(value *ConfigMapF
 // If called multiple times, the PlatformSpec field is set to the value of the last call.
 func (b *InfrastructureSpecApplyConfiguration) WithPlatformSpec(value *PlatformSpecApplyConfiguration) *InfrastructureSpecApplyConfiguration {
 	b.PlatformSpec = value
+	return b
+}
+
+// WithControlPlaneTopology sets the ControlPlaneTopology field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ControlPlaneTopology field is set to the value of the last call.
+func (b *InfrastructureSpecApplyConfiguration) WithControlPlaneTopology(value configv1.TopologyMode) *InfrastructureSpecApplyConfiguration {
+	b.ControlPlaneTopology = &value
 	return b
 }

@@ -93,6 +93,24 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
+	testImageVolume := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image: "gcr.io/30",
+			},
+		},
+		Volumes: []v1.Volume{
+			{
+				Name: "imageVolume",
+				VolumeSource: v1.VolumeSource{
+					Image: &v1.ImageVolumeSource{
+						Reference: "gcr.io/300",
+					},
+				},
+			},
+		},
+	}
+
 	test30Init300 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -340,6 +358,21 @@ func TestImageLocalityPriority(t *testing.T) {
 			nodes:        []*v1.Node{makeImageNode("node1", node203040), makeImageNode("node2", node400030)},
 			expectedList: []fwk.NodeScore{{Name: "node1", Score: 1}, {Name: "node2", Score: 0}},
 			name:         "pod with multiple small images",
+		},
+		{
+			// Pod: gcr.io/300 gcr.io/30
+
+			// Node1
+			// Image: gcr.io/300:latest 300MB
+			// Score: 100 * (300M * 1/2 - 23M) / (1000M - 23M) = 12
+
+			// Node2
+			// Image: gcr.io/30:latest 30MB
+			// Score:  100 * (30M - 23M) / (1000M - 23M) = 0
+			pod:          &v1.Pod{Spec: testImageVolume},
+			nodes:        []*v1.Node{makeImageNode("node1", node300600900), makeImageNode("node2", node400030)},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 12}, {Name: "node2", Score: 0}},
+			name:         "pod with ImageVolume",
 		},
 		{
 			// Pod: gcr.io/30  InitContainers: gcr.io/300

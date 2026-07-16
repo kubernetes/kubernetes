@@ -144,7 +144,7 @@ func applyFieldsEntry(fieldManager string, fieldsJSON string, subresource string
 		Operation:   metav1.ManagedFieldsOperationApply,
 		APIVersion:  "v1",
 		FieldsType:  "FieldsV1",
-		FieldsV1:    &metav1.FieldsV1{Raw: []byte(fieldsJSON)},
+		FieldsV1:    metav1.NewFieldsV1(fieldsJSON),
 		Subresource: subresource,
 	}
 }

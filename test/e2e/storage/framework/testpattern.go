@@ -60,8 +60,10 @@ var (
 	DynamicCreatedSnapshot TestSnapshotType = "DynamicSnapshot"
 	// PreprovisionedCreatedSnapshot represents a snapshot type for pre-provisioned snapshot
 	PreprovisionedCreatedSnapshot TestSnapshotType = "PreprovisionedSnapshot"
-
+	// VolumeGroupSnapshot represents a group snapshot type for dynamic created volumegroupsnapshot
 	VolumeGroupSnapshot TestSnapshotType = "VolumeGroupSnapshot"
+	// PreprovisionedCreatedVolumeGroupSnapshot represents a group snapshot type for pre-provisioned volumegroupsnapshot
+	PreprovisionedCreatedVolumeGroupSnapshot TestSnapshotType = "PreprovisionedVolumeGroupSnapshot"
 )
 
 // TestSnapshotDeletionPolicy represents the deletion policy of the snapshot class
@@ -229,6 +231,7 @@ var (
 		TestTags:               []interface{}{framework.WithSlow()},
 		SnapshotType:           DynamicCreatedSnapshot,
 		SnapshotDeletionPolicy: DeleteSnapshot,
+		AllowExpansion:         true,
 	}
 
 	// Definitions for ntfs
@@ -311,6 +314,15 @@ var (
 		AllowExpansion: true,
 	}
 
+	// Definition for snapshot metadata
+	SnapshotMetadata = TestPattern{
+		Name:                   "SnapshotMetadata",
+		VolType:                DynamicPV,
+		VolMode:                v1.PersistentVolumeBlock,
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
+	}
+
 	// Definitions for snapshot case
 
 	// DynamicSnapshotDelete is TestPattern for "Dynamic snapshot"
@@ -328,6 +340,31 @@ var (
 		SnapshotDeletionPolicy: DeleteSnapshot,
 		VolType:                DynamicPV,
 	}
+
+	// VolumeGroupSnapshotRetain is TestPattern for "VolumeGroupSnapshot"
+	VolumeGroupSnapshotRetain = TestPattern{
+		Name:                   " (retain policy)",
+		SnapshotType:           VolumeGroupSnapshot,
+		SnapshotDeletionPolicy: RetainSnapshot,
+		VolType:                DynamicPV,
+	}
+
+	// PreprovisionedVolumeGroupSnapshotDelete is TestPattern for "Pre-provisioned VolumeGroupSnapshot"
+	PreprovisionedVolumeGroupSnapshotDelete = TestPattern{
+		Name:                   "Pre-provisioned VolumeGroupSnapshot (delete policy)",
+		SnapshotType:           PreprovisionedCreatedVolumeGroupSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
+		VolType:                DynamicPV,
+	}
+
+	// PreprovisionedVolumeGroupSnapshotRetain is TestPattern for "Pre-provisioned VolumeGroupSnapshot"
+	PreprovisionedVolumeGroupSnapshotRetain = TestPattern{
+		Name:                   "Pre-provisioned VolumeGroupSnapshot (retain policy)",
+		SnapshotType:           PreprovisionedCreatedVolumeGroupSnapshot,
+		SnapshotDeletionPolicy: RetainSnapshot,
+		VolType:                DynamicPV,
+	}
+
 	// PreprovisionedSnapshotDelete is TestPattern for "Pre-provisioned snapshot"
 	PreprovisionedSnapshotDelete = TestPattern{
 		Name:                   "Pre-provisioned Snapshot (delete policy)",
@@ -357,7 +394,7 @@ var (
 		SnapshotDeletionPolicy: RetainSnapshot,
 		VolType:                DynamicPV,
 	}
-	// EphemeralSnapshotDelete is TestPattern for snapshotting of a generic ephemeral volume
+	// EphemeralSnapshotRetain is TestPattern for snapshotting of a generic ephemeral volume
 	// where snapshots are preserved.
 	EphemeralSnapshotRetain = TestPattern{
 		Name:                   "Ephemeral Snapshot (retain policy)",

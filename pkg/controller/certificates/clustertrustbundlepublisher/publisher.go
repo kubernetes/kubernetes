@@ -285,7 +285,7 @@ func (p *ClusterTrustBundlePublisher[T]) Run(ctx context.Context) {
 	}()
 
 	wg.Go(func() {
-		p.ctbInformer.Run(ctx.Done())
+		p.ctbInformer.RunWithContext(ctx)
 	})
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, p.ctbListerSynced) {

@@ -108,10 +108,6 @@ const (
 	StartContainer SyncAction = "StartContainer"
 	// KillContainer action
 	KillContainer SyncAction = "KillContainer"
-	// SetupNetwork action
-	SetupNetwork SyncAction = "SetupNetwork"
-	// TeardownNetwork action
-	TeardownNetwork SyncAction = "TeardownNetwork"
 	// InitContainer action
 	InitContainer SyncAction = "InitContainer"
 	// CreatePodSandbox action

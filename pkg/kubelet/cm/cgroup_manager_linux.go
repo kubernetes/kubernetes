@@ -42,6 +42,8 @@ const (
 	systemdSuffix string = ".slice"
 	// Cgroup2MemoryMin is memory.min for cgroup v2
 	Cgroup2MemoryMin string = "memory.min"
+	// Cgroup2MemoryLow is memory.low for cgroup v2
+	Cgroup2MemoryLow string = "memory.low"
 	// Cgroup2MemoryHigh is memory.high for cgroup v2
 	Cgroup2MemoryHigh      string = "memory.high"
 	Cgroup2MaxCpuLimit     string = "max"
@@ -308,7 +310,7 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 		resources.CpuPeriod = *resourceConfig.CPUPeriod
 	}
 	if resourceConfig.PidsLimit != nil {
-		resources.PidsLimit = *resourceConfig.PidsLimit
+		resources.PidsLimit = resourceConfig.PidsLimit
 	}
 	if !resourceConfig.CPUSet.IsEmpty() {
 		resources.CpusetCpus = resourceConfig.CPUSet.String()

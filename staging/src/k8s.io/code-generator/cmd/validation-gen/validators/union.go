@@ -117,8 +117,8 @@ func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag c
 func (udtv unionDiscriminatorTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            udtv.TagName(),
-		StabilityLevel: Beta,
-		Scopes:         udtv.ValidScopes().UnsortedList(),
+		StabilityLevel: TagStabilityLevelBeta,
+		Scopes:         sets.List(udtv.ValidScopes()),
 		Description:    "Indicates that this field is the discriminator for a union.",
 		Args: []TagArgDoc{{
 			Name:        "union",
@@ -156,8 +156,8 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags
 func (umtv unionMemberTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            umtv.TagName(),
-		StabilityLevel: Beta,
-		Scopes:         umtv.ValidScopes().UnsortedList(),
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         sets.List(umtv.ValidScopes()),
 		Description:    "Indicates that this field is a member of a union.",
 		Args: []TagArgDoc{{
 			Name:        "union",
@@ -199,6 +199,9 @@ type union struct {
 	// "field name" (eg: `field[{"name": "succeeded"}]`), and the value is a
 	// list of selection criteria.
 	itemMembers map[string][]ListSelectorTerm
+
+	// stabilityLevel denotes the stability level of the corresponding union validation.
+	stabilityLevel ValidationStabilityLevel
 }
 
 type unionMember struct {
@@ -302,14 +305,14 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 				}
 
 				extraArgs := append([]any{supportVarName, discriminatorExtractor}, extractorArgs...)
-				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...)
+				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...).WithStabilityLevel(u.stabilityLevel)
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getMemberArgs(u, context, false)...))
 				result.Variables = append(result.Variables, supportVar)
 
 				extraArgs := append([]any{supportVarName}, extractorArgs...)
-				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...)
+				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...).WithStabilityLevel(u.stabilityLevel)
 				result.Functions = append(result.Functions, fn)
 			}
 		}
@@ -325,8 +328,10 @@ func createMemberExtractor(ptrType *types.Type, member *types.Member) FunctionLi
 	}
 	nt := util.NativeType(member.Type)
 	switch nt.Kind {
-	case types.Pointer, types.Map, types.Slice:
+	case types.Pointer:
 		extractor.Body = fmt.Sprintf("if obj == nil {return false}; return obj.%s != nil", member.Name)
+	case types.Map, types.Slice:
+		extractor.Body = fmt.Sprintf("if obj == nil {return false}; return len(obj.%s) != 0", member.Name)
 	case types.Builtin:
 		extractor.Body = fmt.Sprintf("if obj == nil {return false}; var z %s; return obj.%s != z", member.Type, member.Name)
 	default:
@@ -387,6 +392,10 @@ func processDiscriminatorValidations(shared map[string]unions, context Context, 
 	}
 	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
+
+	if context.StabilityLevel != "" {
+		u.stabilityLevel = context.StabilityLevel
+	}
 
 	var discriminatorFieldName string
 	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
@@ -450,6 +459,9 @@ func processFieldMemberValidations(shared map[string]unions, context Context, ta
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 	u.members = append(u.members, unionMember{fieldName, memberName})
 
+	if context.StabilityLevel != "" {
+		u.stabilityLevel = context.StabilityLevel
+	}
 	u.fieldMembers = append(u.fieldMembers, context.Member)
 
 	return nil
@@ -481,6 +493,10 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 	u.members = append(u.members, unionMember{fieldName, memberName})
+
+	if context.StabilityLevel != "" {
+		u.stabilityLevel = context.StabilityLevel
+	}
 
 	if _, found := u.itemMembers[fieldName]; found {
 		return fmt.Errorf("list-item union member %q already exists", fieldName)

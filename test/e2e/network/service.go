@@ -31,6 +31,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -53,7 +54,6 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	cloudprovider "k8s.io/cloud-provider"
-	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -150,7 +150,7 @@ func affinityCheckFromTest(ctx context.Context, cs clientset.Interface, serviceI
 	params := &e2enetwork.HTTPPokeParams{Timeout: 2 * time.Second}
 	getHosts := func() []string {
 		var hosts []string
-		for i := 0; i < AffinityConfirmCount; i++ {
+		for range AffinityConfirmCount {
 			result := e2enetwork.PokeHTTP(serviceIP, servicePort, "", params)
 			if result.Status == e2enetwork.HTTPSuccess {
 				hosts = append(hosts, string(result.Body))
@@ -204,7 +204,7 @@ func checkAffinity(ctx context.Context, cs clientset.Interface, execPod *v1.Pod,
 			return false
 		}
 		if !trackerFulfilled {
-			checkAffinityFailed(tracker, fmt.Sprintf("Connection timed out or not enough responses."))
+			checkAffinityFailed(tracker, "Connection timed out or not enough responses.")
 		}
 		if shouldHold {
 			checkAffinityFailed(tracker, "Affinity should hold but didn't.")
@@ -698,16 +698,17 @@ func waitForAPIServerUp(ctx context.Context, c clientset.Interface) error {
 // getEndpointNodesWithInternalIP returns a map of nodenames:internal-ip on which the
 // endpoints of the Service are running.
 func getEndpointNodesWithInternalIP(ctx context.Context, jig *e2eservice.TestJig) (map[string]string, error) {
-	nodesWithIPs, err := jig.GetEndpointNodesWithIP(ctx, v1.NodeInternalIP)
+	nodes, err := jig.ListNodesWithEndpoint(ctx)
 	if err != nil {
 		return nil, err
 	}
-	endpointsNodeMap := make(map[string]string, len(nodesWithIPs))
-	for nodeName, internalIPs := range nodesWithIPs {
+	endpointsNodeMap := make(map[string]string, len(nodes))
+	for _, node := range nodes {
+		internalIPs := e2enode.GetAddresses(&node, v1.NodeInternalIP)
 		if len(internalIPs) < 1 {
-			return nil, fmt.Errorf("no internal ip found for node %s", nodeName)
+			return nil, fmt.Errorf("no internal ip found for node %s", node.Name)
 		}
-		endpointsNodeMap[nodeName] = internalIPs[0]
+		endpointsNodeMap[node.Name] = internalIPs[0]
 	}
 	return endpointsNodeMap, nil
 }
@@ -902,7 +903,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should be updated after adding or deleting ports ", func(ctx context.Context) {
+	ginkgo.It("should be updated after adding or deleting ports", func(ctx context.Context) {
 		serviceName := "edit-port-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -1712,7 +1713,7 @@ var _ = common.SIGDescribe("Services", func() {
 		numberOfRetries := 5
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
 		var err error
-		for i := 0; i < numberOfRetries; i++ {
+		for range numberOfRetries {
 			port, err := e2eservice.GetUnusedStaticNodePort()
 			framework.ExpectNoError(err, "Static node port allocator was not able to find a free nodeport.")
 			baseService.Spec.Ports[0].NodePort = port
@@ -2056,7 +2057,7 @@ var _ = common.SIGDescribe("Services", func() {
 		nodePortAddress0 := net.JoinHostPort(nodeIPs0[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
 		nodePortAddress1 := net.JoinHostPort(nodeIPs1[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
 		// connect 3 times every 5 seconds to the Service with the unready and terminating endpoint
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			execHostnameTest(*pausePod1, clusterIPAddress, webserverPod0.Name)
 			execHostnameTest(*pausePod1, nodePortAddress0, webserverPod0.Name)
 			execHostnameTest(*pausePod1, nodePortAddress1, webserverPod0.Name)
@@ -2199,7 +2200,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		clusterIPAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
 		// connect 3 times every 5 seconds to the Service and expect a failure
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to cluster IP")
@@ -2342,55 +2343,77 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should implement service.kubernetes.io/headless", func(ctx context.Context) {
+		var err error
+
+		ginkgo.By("Creating a Service with no selector and no endpoints")
 		ns := f.Namespace.Name
-		numPods, servicePort := 3, defaultServeHostnameServicePort
-		serviceHeadlessLabels := map[string]string{v1.IsHeadlessService: ""}
+		servicePort := 80
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "example-custom-endpoints",
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{
+					Name:     "port80",
+					Port:     int32(servicePort),
+					Protocol: v1.ProtocolTCP,
+				}},
+			},
+		}
+		svc, err = cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
+		svcIP := svc.Spec.ClusterIP
 
-		// We will create 2 services to test creating services in both states and also dynamic updates
-		// svcHeadless: Created with the label, will always be disabled. We create this early and
-		//              test again late to make sure it never becomes available.
-		// svcHeadlessToggled: Created without the label then the label is toggled verifying reachability at each step.
+		ginkgo.By("Creating a Pod to handle HTTP requests")
+		podName := "pod-handle-http-request"
+		serverPod := e2epod.NewAgnhostPodFromContainers(
+			"", podName, nil,
+			e2epod.NewAgnhostContainer("container-handle-8090-request", nil, []v1.ContainerPort{{ContainerPort: 8090, Protocol: v1.ProtocolTCP}}, "serve-hostname", "--port", "8090"),
+		)
+		pod := e2epod.NewPodClient(f).CreateSync(ctx, serverPod)
 
-		ginkgo.By("creating service-headless in namespace " + ns)
-		svcHeadless := getServeHostnameService("service-headless")
-		svcHeadless.ObjectMeta.Labels = serviceHeadlessLabels
-		// This should be improved, as we do not want a Headlesss Service to contain an IP...
-		_, svcHeadlessIP, err := StartServeHostnameService(ctx, cs, svcHeadless, ns, numPods)
-		framework.ExpectNoError(err, "failed to create deployment with headless service: %s in the namespace: %s", svcHeadlessIP, ns)
+		addressType := discoveryv1.AddressTypeIPv4
+		if framework.TestContext.ClusterIsIPv6() {
+			addressType = discoveryv1.AddressTypeIPv6
+		}
 
-		ginkgo.By("creating service in namespace " + ns)
-		svcHeadlessToggled := getServeHostnameService("service-headless-toggled")
-		podHeadlessToggledNames, svcHeadlessToggledIP, err := StartServeHostnameService(ctx, cs, svcHeadlessToggled, ns, numPods)
-		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svcHeadlessToggledIP, ns)
+		ginkgo.By("Creating an EndpointSlice without headless label")
+		eps := &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-custom-slice",
+				Labels: map[string]string{
+					discoveryv1.LabelServiceName: svc.Name,
+					discoveryv1.LabelManagedBy:   "e2e-test" + ns,
+				}},
+			AddressType: addressType,
+			Endpoints: []discoveryv1.Endpoint{{
+				Addresses:  []string{pod.Status.PodIP},
+				Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+			}},
+			Ports: []discoveryv1.EndpointPort{{
+				Name:     ptr.To("port80"),
+				Port:     ptr.To[int32](8090),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}},
+		}
 
-		jig := e2eservice.NewTestJig(cs, ns, svcHeadlessToggled.ObjectMeta.Name)
-
-		ginkgo.By("verifying service is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
-
-		ginkgo.By("verifying service-headless is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcHeadlessIP, servicePort))
-
-		ginkgo.By("adding service.kubernetes.io/headless label")
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.ObjectMeta.Labels = serviceHeadlessLabels
-		})
+		eps, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("verifying service is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcHeadlessToggledIP, servicePort))
+		// connect to the service must work
+		ginkgo.By("Creating a client pod that will try to connect to the webserver")
+		clientPod := e2epod.NewAgnhostPod(ns, "client-pod", nil, nil, nil)
+		e2epod.NewPodClient(f).CreateSync(ctx, clientPod)
 
-		ginkgo.By("removing service.kubernetes.io/headless annotation")
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.ObjectMeta.Labels = nil
-		})
+		ginkgo.By("Test connection to the webserver")
+		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, []string{podName}, svcIP, servicePort))
+
+		ginkgo.By("Updating the EndpointSlice to include headless label")
+		eps.ObjectMeta.Labels[v1.IsHeadlessService] = ""
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Update(ctx, eps, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("verifying service is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
-
-		ginkgo.By("verifying service-headless is still not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcHeadlessIP, servicePort))
+		ginkgo.By("Verify that service is no longer reachable")
+		framework.ExpectNoError(verifyServeHostnameServiceDown(ctx, cs, ns, svcIP, servicePort))
 	})
 
 	ginkgo.It("should be rejected when no endpoints exist", func(ctx context.Context) {
@@ -2560,7 +2583,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
 		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
 			execHostnameTest(*pausePod0, serviceAddress, webserverPod0.Name)
 
@@ -2631,7 +2654,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
 		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
 			execHostnameTest(*pausePod0, serviceAddress, webserverPod0.Name)
 
@@ -2704,7 +2727,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
 		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
 			// note that the expected hostname is the node name because the backend pod is on host network
 			execHostnameTest(*pausePod0, serviceAddress, node0.Name)
@@ -2733,7 +2756,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pausePod3.Name, f.Namespace.Name, framework.PodStartTimeout))
 
 		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
 			// note that the expected hostname is the node name because the backend pod is on host network
 			execHostnameTest(*pausePod2, serviceAddress, node0.Name)
@@ -2955,7 +2978,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		// assert 5 times that both the local and remote pod can connect to the Service while all endpoints are terminating
 		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			// There's a Service with internalTrafficPolicy=Cluster,
 			// with a single endpoint (which is terminating) called webserver0 running on node0.
 			// pausePod0 and pausePod1 are on node0 and node1 respectively.
@@ -3031,7 +3054,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
 		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			// There's a Service with internalTrafficPolicy=Local,
 			// with a single endpoint (which is terminating) called webserver0 running on node0.
 			// pausePod0 and pausePod1 are on node0 and node1 respectively.
@@ -3110,7 +3133,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// assert 5 times that both the local and remote pod can connect to the Service NodePort while all endpoints are terminating
 		nodeIPs := e2enode.GetAddresses(&node0, v1.NodeInternalIP)
 		nodePortAddress := net.JoinHostPort(nodeIPs[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			// There's a Service Type=NodePort with externalTrafficPolicy=Cluster,
 			// with a single endpoint (which is terminating) called webserver0 running on node0.
 			// pausePod0 and pausePod1 are on node0 and node1 respectively.
@@ -3189,7 +3212,7 @@ var _ = common.SIGDescribe("Services", func() {
 		nodeIPs1 := e2enode.GetAddresses(&node1, v1.NodeInternalIP)
 		nodePortAddress0 := net.JoinHostPort(nodeIPs0[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
 		nodePortAddress1 := net.JoinHostPort(nodeIPs1[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			// There's a Service Type=NodePort with externalTrafficPolicy=Local,
 			// with a single endpoint (which is terminating) called webserver0 running on node0.
 			// pausePod0 and pausePod1 are on node0 and node1 respectively.
@@ -3675,7 +3698,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Service, same ports with different protocols on a Load Balancer Service
 		Description: Create a LoadBalancer service with two ports that have the same value but use different protocols. Add a Pod that listens on both ports. The Pod must be reachable via the ClusterIP and both ports
 	*/
-	ginkgo.It("should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer ", func(ctx context.Context) {
+	ginkgo.It("should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer", func(ctx context.Context) {
 		serviceName := "multiprotocol-lb-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -3825,7 +3848,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("creating the service")
 		var svc *v1.Service
 		numberOfRetries := 5
-		for i := 0; i < numberOfRetries; i++ {
+		for range numberOfRetries {
 			port, err := e2eservice.GetUnusedStaticNodePort()
 			framework.ExpectNoError(err, "Static node port allocator was not able to find a free nodeport.")
 			svc, err = jig.CreateLoadBalancerServiceWaitForClusterIPOnly(func(svc *v1.Service) {
@@ -4187,12 +4210,12 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
 		// The node addresses must have the same IP family as the ClusterIP
-		family := v1.IPv4Protocol
-		if netutils.IsIPv6String(svc.Spec.ClusterIP) {
-			family = v1.IPv6Protocol
-		}
+		family := svc.Spec.IPFamilies[0]
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
-		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node internal IP for family: %s", family)
+		if svcIP == "" {
+			svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeExternalIP, family)
+		}
+		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
 		svcIP = svc.Spec.ClusterIP
@@ -4215,7 +4238,7 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 	// try several times to avoid the probability that we hit the same pod twice
 	hosts := sets.NewString()
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, net.JoinHostPort(svcIP, strconv.Itoa(servicePort)))
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		hostname, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err == nil {
 			hosts.Insert(hostname)
@@ -4270,12 +4293,12 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(ctx context.Context, 
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
 		// The node addresses must have the same IP family as the ClusterIP
-		family := v1.IPv4Protocol
-		if netutils.IsIPv6String(svc.Spec.ClusterIP) {
-			family = v1.IPv6Protocol
-		}
+		family := svc.Spec.IPFamilies[0]
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
-		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node internal IP for family: %s", family)
+		if svcIP == "" {
+			svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeExternalIP, family)
+		}
+		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
 		svcIP = svc.Spec.ClusterIP

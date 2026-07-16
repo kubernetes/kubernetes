@@ -168,8 +168,9 @@ func TestServiceAccountCreation(t *testing.T) {
 			var wg sync.WaitGroup
 			defer wg.Wait()
 
-			logger, ctx := ktesting.NewTestContext(t)
-			defer ctx.Cancel("test case terminating")
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
+			defer tCtx.Cancel("test case terminating")
 
 			controller, err := NewServiceAccountsController(
 				logger,
@@ -200,7 +201,7 @@ func TestServiceAccountCreation(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 			wg.Go(func() {
-				controller.Run(ctx, 1)
+				controller.Run(tCtx, 1)
 			})
 
 			if tc.ExistingNamespace != nil {

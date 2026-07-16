@@ -245,8 +245,8 @@ func TestSyncEndpoints(t *testing.T) {
 				}
 			}
 
-			logger, _ := ktesting.NewTestContext(t)
-			err := esController.syncEndpoints(logger, fmt.Sprintf("%s/%s", namespace, endpointsName))
+			_, syncCtx := ktesting.NewTestContext(t)
+			err := esController.syncEndpoints(syncCtx, fmt.Sprintf("%s/%s", namespace, endpointsName))
 			if err != nil {
 				t.Fatalf("Unexpected error from syncEndpoints: %v", err)
 			}

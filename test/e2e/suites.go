@@ -41,9 +41,6 @@ func AfterSuiteActions(ctx context.Context) {
 			framework.Logf("Error gathering metrics: %v", err)
 		}
 	}
-	if framework.TestContext.NodeKiller.NodeKillerStop != nil {
-		framework.TestContext.NodeKiller.NodeKillerStop()
-	}
 }
 
 func gatherTestSuiteMetrics(ctx context.Context) error {

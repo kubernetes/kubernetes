@@ -81,6 +81,9 @@ type Suite struct {
 	ClusterStability ClusterStability `json:"clusterStability,omitempty"`
 	// TestTimeout is the default timeout for tests in this suite.
 	TestTimeout *time.Duration `json:"testTimeout,omitempty"`
+	// ResourcePools defines the total capacity of named resource pools for this suite.
+	// The scheduler enforces that parallel test demand does not exceed pool capacity.
+	ResourcePools map[string]int `json:"resourcePools,omitempty"`
 }
 
 type Image struct {

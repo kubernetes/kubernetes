@@ -19,6 +19,7 @@ package test
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -177,9 +178,9 @@ var tests = map[string]testcase{
 	},
 	"override single value": {
 		withValues: []interface{}{"akey", "avalue"},
-		text:       "test",
+		text:       "test-with-values",
 		values:     []interface{}{"akey", "avalue2"},
-		expectedOutput: `I output.go:<LINE>] "test" akey="avalue2"
+		expectedOutput: `I output.go:<LINE>] "test-with-values" akey="avalue2"
 `,
 	},
 	"override WithValues": {
@@ -216,9 +217,9 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 `,
 	},
 	"print duplicate keys in arguments": {
-		text:   "test",
+		text:   "test-arguments",
 		values: []interface{}{"akey", "avalue", "akey", "avalue2"},
-		expectedOutput: `I output.go:<LINE>] "test" akey="avalue" akey="avalue2"
+		expectedOutput: `I output.go:<LINE>] "test-arguments" akey="avalue2"
 `,
 	},
 	"preserve order of key/value pairs": {
@@ -426,6 +427,30 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 		expectedOutput: `I output.go:<LINE>] "cycle" list="<internal error: json: unsupported value: encountered a cycle via *test.myList>"
 `,
 	},
+	"duplicates": {
+		withValues:     []interface{}{"trace", traceIDFromHex("101112131415161718191A1B1C1D1E1F"), "span", spanIDFromHex("0102030405060708")},
+		moreValues:     []interface{}{"trace", traceIDFromHex("101112131415161718191A1B1C1D1E1F"), "span", spanIDFromHex("1112131415161718")},
+		evenMoreValues: []interface{}{"trace", traceIDFromHex("101112131415161718191A1B1C1D1E1F"), "span", spanIDFromHex("2122232425262728")},
+		text:           "duplicates",
+
+		expectedOutput: `I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="1112131415161718"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="2122232425262728"
+`,
+	},
+	"mixed duplicates": {
+		withValues:     []interface{}{"trace", traceIDFromHex("101112131415161718191A1B1C1D1E1F"), "span", spanIDFromHex("0102030405060708"), "a", 1},
+		moreValues:     []interface{}{"b", 2, "trace", traceIDFromHex("101112131415161718191A1B1C1D1E1F"), "span", spanIDFromHex("1112131415161718")},
+		evenMoreValues: []interface{}{"c", 3, "trace", traceIDFromHex("101112131415161718191A1B1C1D1E1F"), "span", spanIDFromHex("2122232425262728"), "d", 4},
+		text:           "duplicates",
+
+		expectedOutput: `I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708" a=1
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" a=1 b=2 span="1112131415161718"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708" a=1
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" a=1 c=3 span="2122232425262728" d=4
+`,
+	},
 }
 
 func printWithLogger(logger logr.Logger, test testcase) {
@@ -440,6 +465,7 @@ func printWithLogger(logger logr.Logger, test testcase) {
 	logger = logger.WithValues(test.withValues...) // <WITH-VALUES>
 	loggers := []logr.Logger{logger}
 	if test.moreValues != nil {
+		// Intentionally append the logger again: WithValues must not change what it prints.
 		loggers = append(loggers, logger.WithValues(test.moreValues...), logger) // <WITH-VALUES-2>
 	}
 	if test.evenMoreValues != nil {
@@ -478,22 +504,12 @@ func initPrintWithKlog(tb testing.TB, test testcase) {
 
 func printWithKlog(test testcase) {
 	kv := []interface{}{}
-	haveKeyInValues := func(key interface{}) bool {
-		for i := 0; i < len(test.values); i += 2 {
-			if key == test.values[i] {
-				return true
-			}
-		}
-		return false
-	}
 	appendKV := func(withValues ...interface{}) {
 		if len(withValues)%2 != 0 {
 			withValues = append(withValues, "(MISSING)")
 		}
 		for i := 0; i < len(withValues); i += 2 {
-			if !haveKeyInValues(withValues[i]) {
-				kv = append(kv, withValues[i], withValues[i+1])
-			}
+			kv = append(kv, withValues[i], withValues[i+1])
 		}
 	}
 	// Here we need to emulate the handling of WithValues above.
@@ -543,10 +559,10 @@ func Output(t *testing.T, config OutputConfig) {
 		t.Run(n, func(t *testing.T) {
 			initPrintWithKlog(t, test)
 
-			testOutput := func(t *testing.T, expectedLine int, print func(buffer *bytes.Buffer)) {
+			testOutput := func(t *testing.T, expectedLine int, logToBuffer func(buffer *bytes.Buffer)) {
 				var tmpWriteBuffer bytes.Buffer
 				klog.SetOutput(&tmpWriteBuffer)
-				print(&tmpWriteBuffer)
+				logToBuffer(&tmpWriteBuffer)
 				klog.Flush()
 
 				actual := tmpWriteBuffer.String()
@@ -570,14 +586,14 @@ func Output(t *testing.T, config OutputConfig) {
 				}
 				expectedWithPlaceholder := expected
 				expected = strings.ReplaceAll(expected, "<LINE>", fmt.Sprintf("%d", callLine))
-				expected = strings.ReplaceAll(expected, "<WITH-VALUES>", fmt.Sprintf("%d", expectedLine-18))
+				expected = strings.ReplaceAll(expected, "<WITH-VALUES>", fmt.Sprintf("%d", expectedLine-19))
 				expected = strings.ReplaceAll(expected, "<WITH-VALUES-2>", fmt.Sprintf("%d", expectedLine-15))
 				expected = strings.ReplaceAll(expected, "<WITH-VALUES-3>", fmt.Sprintf("%d", expectedLine-12))
 				if actual != expected {
 					if expectedWithPlaceholder == test.expectedOutput {
-						t.Errorf("Output mismatch. Expected:\n%s\nActual:\n%s\n", expectedWithPlaceholder, actual)
+						t.Errorf("Output mismatch.\n\nExpected with placeholders:\n%s\nExpected without placeholders:\n%s\nActual:\n%s\n", expectedWithPlaceholder, expected, actual)
 					} else {
-						t.Errorf("Output mismatch. klog:\n%s\nExpected:\n%s\nActual:\n%s\n", test.expectedOutput, expectedWithPlaceholder, actual)
+						t.Errorf("Output mismatch. klog:\n%s\n\nExpected with placeholders:\n%s\nExpected without placeholders:\n%s\nActual:\n%s\n", test.expectedOutput, expectedWithPlaceholder, expected, actual)
 					}
 				}
 			}
@@ -843,9 +859,9 @@ func Output(t *testing.T, config OutputConfig) {
 				expected = strings.ReplaceAll(expected, "<LINE>", fmt.Sprintf("%d", callLine))
 				if actual != expected {
 					if expectedWithPlaceholder == test.output {
-						t.Errorf("Output mismatch. Expected:\n%s\nActual:\n%s\n", expectedWithPlaceholder, actual)
+						t.Errorf("Output mismatch. Expected with placeholders:\n%s\nExpected without placeholders:\n%s\nActual:\n%s\n", expectedWithPlaceholder, expected, actual)
 					} else {
-						t.Errorf("Output mismatch. klog:\n%s\nExpected:\n%s\nActual:\n%s\n", test.output, expectedWithPlaceholder, actual)
+						t.Errorf("Output mismatch. klog:\n%s\nExpected with placeholders:\n%s\nExpected without placeholders:\n%s\nActual:\n%s\n", test.output, expectedWithPlaceholder, expected, actual)
 					}
 				}
 			})
@@ -1021,4 +1037,66 @@ func newCyclicList() *myList {
 	b := &myList{Value: 2, Next: a}
 	a.Next = b
 	return a
+}
+
+// SpanID mimicks https://pkg.go.dev/go.opentelemetry.io/otel/trace#SpanID.
+type SpanID [8]byte
+
+var (
+	_ json.Marshaler = SpanID{}
+	_ fmt.Stringer   = SpanID{}
+)
+
+func (s SpanID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func (s SpanID) String() string {
+	return hex.EncodeToString(s[:])
+}
+
+func spanIDFromHex(str string) SpanID {
+	decoded, err := hex.DecodeString(str)
+	if err != nil {
+		panic(fmt.Sprintf("invalid hex string %q: %v", str, err))
+	}
+	if len(decoded) != len(SpanID{}) {
+		panic(fmt.Sprintf("invalid length of hex string %q: need %d bytes", str, len(SpanID{})))
+	}
+	var result SpanID
+	for i := range result {
+		result[i] = decoded[i]
+	}
+	return result
+}
+
+// TraceID mimicks https://pkg.go.dev/go.opentelemetry.io/otel/trace#TraceID.
+type TraceID [16]byte
+
+var (
+	_ json.Marshaler = TraceID{}
+	_ fmt.Stringer   = TraceID{}
+)
+
+func (s TraceID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func (s TraceID) String() string {
+	return hex.EncodeToString(s[:])
+}
+
+func traceIDFromHex(str string) TraceID {
+	decoded, err := hex.DecodeString(str)
+	if err != nil {
+		panic(fmt.Sprintf("invalid hex string %q: %v", str, err))
+	}
+	if len(decoded) != len(TraceID{}) {
+		panic(fmt.Sprintf("invalid length of hex string %q: need %d bytes", str, len(TraceID{})))
+	}
+	var result TraceID
+	for i := range result {
+		result[i] = decoded[i]
+	}
+	return result
 }

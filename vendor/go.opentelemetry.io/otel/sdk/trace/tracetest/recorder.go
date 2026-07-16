@@ -47,14 +47,14 @@ func (sr *SpanRecorder) OnEnd(s sdktrace.ReadOnlySpan) {
 // Shutdown does nothing.
 //
 // This method is safe to be called concurrently.
-func (sr *SpanRecorder) Shutdown(context.Context) error {
+func (*SpanRecorder) Shutdown(context.Context) error {
 	return nil
 }
 
 // ForceFlush does nothing.
 //
 // This method is safe to be called concurrently.
-func (sr *SpanRecorder) ForceFlush(context.Context) error {
+func (*SpanRecorder) ForceFlush(context.Context) error {
 	return nil
 }
 

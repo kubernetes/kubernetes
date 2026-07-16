@@ -60,6 +60,7 @@
     "requiresRepublish": true,
     "seLinuxMount": true,
     "nodeAllocatableUpdatePeriodSeconds": 9,
-    "serviceAccountTokenInSecrets": true
+    "serviceAccountTokenInSecrets": true,
+    "preventPodSchedulingIfMissing": true
   }
 }

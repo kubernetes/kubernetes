@@ -101,7 +101,7 @@ type PrometheusConfigApplyConfiguration struct {
 	// Each resource name must be unique within this list.
 	Resources []ContainerResourceApplyConfiguration `json:"resources,omitempty"`
 	// retention configures how long Prometheus retains metrics data and how much storage it can use.
-	// When omitted, the platform chooses reasonable defaults (currently 15 days retention, no size limit).
+	// When omitted, the platform chooses reasonable defaults (currently 15d retention, no size limit).
 	Retention *RetentionApplyConfiguration `json:"retention,omitempty"`
 	// tolerations defines tolerations for the pods.
 	// tolerations is optional.

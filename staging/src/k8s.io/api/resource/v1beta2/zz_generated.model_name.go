@@ -157,6 +157,31 @@ func (in DeviceTaint) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in DeviceTaintRule) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.DeviceTaintRule"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in DeviceTaintRuleList) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.DeviceTaintRuleList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in DeviceTaintRuleSpec) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.DeviceTaintRuleSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in DeviceTaintRuleStatus) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.DeviceTaintRuleStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in DeviceTaintSelector) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.DeviceTaintSelector"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceToleration) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta2.DeviceToleration"
 }
@@ -169,6 +194,11 @@ func (in ExactDeviceRequest) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NetworkDeviceData) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta2.NetworkDeviceData"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodeAllocatableResourceMapping) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.NodeAllocatableResourceMapping"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

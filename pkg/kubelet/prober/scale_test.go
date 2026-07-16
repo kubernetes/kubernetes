@@ -80,7 +80,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 			m := NewManager(
@@ -134,12 +134,12 @@ func TestTCPPortExhaustion(t *testing.T) {
 					})
 				}
 				podManager.AddPod(&pod)
-				m.statusManager.SetPodStatus(logger, &pod, pod.Status)
+				m.statusManager.SetPodStatus(tCtx.Logger(), &pod, pod.Status)
 				m.AddPod(tCtx, &pod)
 			}
 			t.Logf("Adding %d pods with %d containers each in %v", numTestPods, numContainers, time.Since(now))
 
-			ctx := ktesting.WithTimeout(tCtx, 59*time.Second, "timeout 59 Second")
+			ctx := tCtx.WithTimeout(59*time.Second, "timeout 59 Second")
 			defer ctx.Cancel("TestTCPPortExhaustion completed")
 			var wg sync.WaitGroup
 

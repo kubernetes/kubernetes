@@ -10,7 +10,7 @@ Yet, still with a high level of abstraction.
 
 `k8s.io/component-base` staging repository was considered as a candidate for hosting the helpers. Although, since the helpers are not required by the core components, the repository was deemed unsuitable.
 
-The only allowed kubernetes dependencies are `k8s.io/apimachinery`, `k8s.io/api` and `k8s.io/client-go`.
+To maintain a minimal footprint and prevent dependency bloat, no external direct dependencies are allowed.
 
 ## Purpose
 

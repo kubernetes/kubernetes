@@ -45,8 +45,7 @@ func (ld *LineDelimiter) Write(buf []byte) (n int, err error) {
 
 // Flush all lines up until now.  This will assume insert a linebreak at the current point of the stream.
 func (ld *LineDelimiter) Flush() (err error) {
-	lines := strings.Split(ld.buf.String(), "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(ld.buf.String(), "\n") {
 		if _, err = ld.output.Write(ld.delimiter); err != nil {
 			return
 		}

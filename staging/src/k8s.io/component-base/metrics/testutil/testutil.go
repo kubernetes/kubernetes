@@ -17,12 +17,15 @@ limitations under the License.
 package testutil
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/metrics"
@@ -166,4 +169,74 @@ func AssertHistogramTotalCount(t TB, name string, labelFilter map[string]string,
 			}
 		}
 	}
+}
+
+// AssertHasNativeHistogram verifies that a native histogram metric with the given labels exists and has valid data.
+func AssertHasNativeHistogram(t TB, mf *dto.MetricFamily, labelFilter map[string]string) {
+	if mf.GetType() != dto.MetricType_HISTOGRAM {
+		t.Errorf("metric %q is not a histogram", mf.GetName())
+		return
+	}
+
+	for _, m := range mf.GetMetric() {
+		if !LabelsMatch(m, labelFilter) {
+			continue
+		}
+		h := m.GetHistogram()
+		if h == nil {
+			continue
+		}
+
+		if h.Schema == nil {
+			t.Errorf("expected native histogram data to be present for metric %q with labels %v", mf.GetName(), labelFilter)
+		}
+
+		// If there are observations, PositiveSpan should have data for positive durations
+		if h.GetSampleCount() > 0 && len(h.GetPositiveSpan()) == 0 {
+			t.Errorf("expected PositiveSpan data for histogram with observations")
+		}
+
+		return
+	}
+	t.Errorf("metric %q with labels %v not found", mf.GetName(), labelFilter)
+}
+
+// ScrapeMetricsProto scrapes metrics from a URL using protobuf format.
+// This is necessary for native histograms as they are only fully exposed in protobuf format.
+// Returns a map of metric families keyed by metric name.
+func ScrapeMetricsProto(url string, client *http.Client) (map[string]*dto.MetricFamily, error) {
+	if client == nil {
+		return nil, fmt.Errorf("http client is required")
+	}
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	// Request protobuf format to get native histogram data
+	req.Header.Set("Accept", string(expfmt.NewFormat(expfmt.TypeProtoDelim)))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	// Parse protobuf format
+	decoder := expfmt.NewDecoder(resp.Body, expfmt.ResponseFormat(resp.Header))
+	result := make(map[string]*dto.MetricFamily)
+	for {
+		var mf dto.MetricFamily
+		if err := decoder.Decode(&mf); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, fmt.Errorf("failed to decode metric: %w", err)
+		}
+		result[mf.GetName()] = &mf
+	}
+	return result, nil
 }

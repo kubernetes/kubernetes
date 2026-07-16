@@ -3,6 +3,7 @@ package cmdrun
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -10,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/extension"
@@ -36,7 +36,7 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run-suite NAME",
 		Short: "Run a group of tests by suite. This is more limited than origin, and intended for light local " +
-			"development use. Orchestration parameters, scheduling, isolation, etc are not obeyed, and Ginkgo tests are executed serially.",
+			"development use. Ginkgo tests are executed in parallel, controlled by --max-concurrency (default 10).",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancelCause := context.WithCancelCause(context.Background())
@@ -74,7 +74,7 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 			}
 			suite, err := ext.GetSuite(args[0])
 			if err != nil {
-				return errors.Wrapf(err, "couldn't find suite: %s", args[0])
+				return fmt.Errorf("couldn't find suite %q: %w", args[0], err)
 			}
 
 			compositeWriter := extensiontests.NewCompositeResultWriter()
@@ -88,7 +88,7 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 			if opts.junitPath != "" {
 				junitWriter, err := extensiontests.NewJUnitResultWriter(opts.junitPath, suite.Name)
 				if err != nil {
-					return errors.Wrap(err, "couldn't create junit writer")
+					return fmt.Errorf("couldn't create junit writer: %w", err)
 				}
 				compositeWriter.AddWriter(junitWriter)
 			}
@@ -96,7 +96,7 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 			if opts.htmlPath != "" {
 				htmlWriter, err := extensiontests.NewHTMLResultWriter(opts.htmlPath, suite.Name)
 				if err != nil {
-					return errors.Wrap(err, "couldn't create html writer")
+					return fmt.Errorf("couldn't create html writer: %w", err)
 				}
 				compositeWriter.AddWriter(htmlWriter)
 			}
@@ -111,14 +111,26 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 
 			specs, err := ext.GetSpecs().Filter(suite.Qualifiers)
 			if err != nil {
-				return errors.Wrap(err, "couldn't filter specs")
+				return fmt.Errorf("couldn't filter specs: %w", err)
+			}
+
+			if suite.TestTimeout != nil {
+				for _, spec := range specs {
+					if spec.Timeout == 0 {
+						spec.Timeout = *suite.TestTimeout
+					}
+				}
 			}
 
 			concurrency := opts.concurrencyFlags.MaxConcurency
 			if suite.Parallelism > 0 {
 				concurrency = min(concurrency, suite.Parallelism)
 			}
-			results, runErr := specs.Run(ctx, compositeWriter, concurrency)
+			var runOpts []extensiontests.SchedulerOption
+			if len(suite.ResourcePools) > 0 {
+				runOpts = append(runOpts, extensiontests.WithResourcePoolCapacity(suite.ResourcePools))
+			}
+			results, runErr := specs.Run(ctx, compositeWriter, concurrency, runOpts...)
 			if opts.junitPath != "" {
 				// we want to commit the results to disk regardless of the success or failure of the specs
 				if err := writeResults(opts.junitPath, results); err != nil {

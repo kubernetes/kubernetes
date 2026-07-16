@@ -59,7 +59,7 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 				},
 			},
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("roleRef", "name"), "name is required"),
+				field.Required(field.NewPath("roleRef", "name"), "name is required").MarkAlpha(),
 			},
 		},
 
@@ -76,7 +76,7 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 				},
 			},
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("subjects").Index(0).Child("name"), "name is required"),
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), "name is required").MarkAlpha(),
 			},
 		},
 

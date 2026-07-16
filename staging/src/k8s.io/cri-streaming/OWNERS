@@ -1,0 +1,18 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - dims
+  - mikebrow
+  - saschagrunert
+  - aojea
+  - seans3
+  - liggitt
+reviewers:
+  - dims
+  - mikebrow
+  - saschagrunert
+  - aojea
+  - seans3
+  - liggitt
+labels:
+  - sig/node

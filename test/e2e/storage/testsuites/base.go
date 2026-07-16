@@ -69,6 +69,7 @@ var BaseSuites = []func() storageframework.TestSuite{
 	InitVolumeStressTestSuite,
 	InitFsGroupChangePolicyTestSuite,
 	InitVolumeGroupSnapshottableTestSuite,
+	InitVolumeGroupSnapshotClassTestSuite,
 	func() storageframework.TestSuite {
 		return InitCustomEphemeralTestSuite(GenericEphemeralTestPatterns())
 	},
@@ -82,6 +83,7 @@ var CSISuites = append(BaseSuites,
 		return InitCustomEphemeralTestSuite(CSIEphemeralTestPatterns())
 	},
 	InitSnapshottableTestSuite,
+	InitSnapshotMetadataTestSuite,
 	InitSnapshottableStressTestSuite,
 	InitVolumePerformanceTestSuite,
 	InitPvcDeletionPerformanceTestSuite,
@@ -89,6 +91,7 @@ var CSISuites = append(BaseSuites,
 	InitVolumeModifyTestSuite,
 	InitVolumeModifyStressTestSuite,
 	InitSELinuxMountTestSuite,
+	InitVolumeGroupSnapshottableStressTestSuite,
 )
 
 func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) opCounts {

@@ -100,7 +100,14 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 50000
-
+  - name: 5000Nodes_50000Pods_NodeDeclaredFeaturesDisabled
+    labels: [performance]
+    featureGates:
+      NodeDeclaredFeatures: false
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 50000
 # This test case simulates the scheduling of daemonset.
 # https://github.com/kubernetes/kubernetes/issues/124709
 - name: SchedulingDaemonset

@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -477,10 +478,58 @@ func TestRepairIPAddress_syncIPAddress(t *testing.T) {
 	tests := []struct {
 		name     string
 		ip       *networkingv1.IPAddress
+		svc      *v1.Service
 		testTime time.Time
 		actions  [][]string // verb and resource
 		wantErr  bool
 	}{
+		{
+			name: "ExternalName Service with late IPAddress",
+			ip: &networkingv1.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "10.0.1.1",
+					Labels: map[string]string{
+						networkingv1.LabelIPAddressFamily: string(v1.IPv4Protocol),
+						networkingv1.LabelManagedBy:       ipallocator.ControllerName,
+					},
+					CreationTimestamp: metav1.Time{Time: testTimeNow.Add(10 * time.Second)},
+				},
+				Spec: networkingv1.IPAddressSpec{
+					ParentRef: &networkingv1.ParentReference{
+						Group:     "",
+						Resource:  "services",
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
+			},
+			svc:      newExternalNameService("foo", testTimeNow),
+			testTime: testTimeNow.Add(2 * time.Second),
+		},
+		{
+			name: "ExternalName Service with late IPAddress after threshold",
+			ip: &networkingv1.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "10.0.1.1",
+					Labels: map[string]string{
+						networkingv1.LabelIPAddressFamily: string(v1.IPv4Protocol),
+						networkingv1.LabelManagedBy:       ipallocator.ControllerName,
+					},
+					CreationTimestamp: metav1.Time{Time: testTimeNow.Add(10 * time.Second)},
+				},
+				Spec: networkingv1.IPAddressSpec{
+					ParentRef: &networkingv1.ParentReference{
+						Group:     "",
+						Resource:  "services",
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
+			},
+			svc:      newExternalNameService("foo", testTimeNow),
+			testTime: testTimeNow.Add(71 * time.Second),
+			actions:  [][]string{{"delete", "ipaddresses"}},
+		},
 		{
 			name: "correct ipv4 address",
 			ip: &networkingv1.IPAddress{
@@ -602,7 +651,11 @@ func TestRepairIPAddress_syncIPAddress(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = r.serviceStore.Add(newService("foo", []string{tt.ip.Name}))
+			svc := tt.svc
+			if svc == nil {
+				svc = newService("foo", []string{tt.ip.Name})
+			}
+			err = r.serviceStore.Add(svc)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -618,6 +671,20 @@ func TestRepairIPAddress_syncIPAddress(t *testing.T) {
 			expectAction(t, c.Actions(), tt.actions)
 
 		})
+	}
+}
+
+func newExternalNameService(name string, timestamp time.Time) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "bar",
+			Name:              name,
+			CreationTimestamp: metav1.Time{Time: timestamp},
+		},
+		Spec: v1.ServiceSpec{
+			Type:         v1.ServiceTypeExternalName,
+			ExternalName: "foo.bar.com",
+		},
 	}
 }
 
@@ -705,5 +772,85 @@ func expectEvents(t *testing.T, actual <-chan string, expected []string) {
 		default:
 			return // No more events, as expected.
 		}
+	}
+}
+
+func TestRepairIPAddress_runOnce(t *testing.T) {
+	tests := []struct {
+		name          string
+		conflictCount int
+		errorType     func(string) error
+		expectedRuns  int
+		expectedErr   bool
+	}{
+		{
+			name:          "Retry on Conflict",
+			conflictCount: 2,
+			errorType: func(name string) error {
+				return apierrors.NewConflict(networkingv1.Resource("ipaddresses"), name, fmt.Errorf("conflict"))
+			},
+			expectedRuns: 3,
+			expectedErr:  false,
+		},
+		{
+			name:          "Retry on Forbidden",
+			conflictCount: 2,
+			errorType: func(name string) error {
+				return apierrors.NewForbidden(networkingv1.Resource("ipaddresses"), name, fmt.Errorf("forbidden"))
+			},
+			expectedRuns: 3,
+			expectedErr:  false,
+		},
+		{
+			name:          "No Retry on InternalError",
+			conflictCount: 1, // It will fail once and stop
+			errorType: func(name string) error {
+				return apierrors.NewInternalError(fmt.Errorf("internal error"))
+			},
+			expectedRuns: 1,
+			expectedErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, r := newFakeRepair(testTimeNow)
+			// Add a service that needs repair (missing IPAddress)
+			svc := newService("test-svc", []string{"10.0.1.1"})
+			err := r.serviceStore.Add(svc)
+			if err != nil {
+				t.Fatalf("Unexpected error adding service: %v", err)
+			}
+			r.servicesSynced = func() bool { return true }
+			r.ipAddressSynced = func() bool { return true }
+			r.serviceCIDRSynced = func() bool { return true }
+
+			// Add a default ServiceCIDR
+			cidr := newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6)
+			err = r.serviceCIDRStore.Add(cidr)
+			if err != nil {
+				t.Fatalf("Unexpected error adding ServiceCIDR: %v", err)
+			}
+
+			// Track how many times create is called
+			createCalls := 0
+			client.PrependReactor("create", "ipaddresses", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				createCalls++
+				if createCalls <= tt.conflictCount {
+					return true, nil, tt.errorType("10.0.1.1")
+				}
+				// Pass through to the default reactor (which creates the object)
+				return false, nil, nil
+			})
+
+			err = r.runOnce()
+			if (err != nil) != tt.expectedErr {
+				t.Errorf("runOnce() error = %v, expectedErr %v", err, tt.expectedErr)
+			}
+
+			if createCalls != tt.expectedRuns {
+				t.Errorf("Expected %d create calls, got %d", tt.expectedRuns, createCalls)
+			}
+		})
 	}
 }

@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
@@ -309,9 +310,9 @@ func TestFailureHandler(t *testing.T) {
 
 				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
 				queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(recorder), internalqueue.WithAPIDispatcher(apiDispatcher))
-				schedulerCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
+				schedulerCache := internalcache.New(ctx, apiDispatcher, false)
 
-				queue.Add(logger, testPod)
+				queue.Add(ctx, testPod)
 
 				if _, err := queue.Pop(logger); err != nil {
 					t.Fatalf("Pop failed: %v", err)
@@ -321,7 +322,7 @@ func TestFailureHandler(t *testing.T) {
 					if err := podInformer.Informer().GetStore().Update(testPodUpdated); err != nil {
 						t.Fatal(err)
 					}
-					queue.Update(logger, testPod, testPodUpdated)
+					queue.Update(ctx, testPod, testPodUpdated)
 				}
 				if tt.podDeletedDuringScheduling {
 					if err := podInformer.Informer().GetStore().Delete(testPod); err != nil {
@@ -383,7 +384,7 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 			}
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithAPIDispatcher(apiDispatcher))
-			schedulerCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
+			schedulerCache := internalcache.New(ctx, apiDispatcher, false)
 
 			// Add node to schedulerCache no matter it's deleted in API server or not.
 			schedulerCache.AddNode(logger, &nodeFoo)
@@ -691,7 +692,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				{Resource: fwk.DeviceClass, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: fwk.Workload, ActionType: fwk.All}: {
+				{Resource: fwk.PodGroup, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
 			},
@@ -884,7 +885,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.StorageClass:          fwk.All,
 				fwk.ResourceClaim:         fwk.All,
 				fwk.DeviceClass:           fwk.All,
-				fwk.Workload:              fwk.All,
+				fwk.PodGroup:              fwk.All,
 			},
 			enableGangScheduling:            true,
 			enableInPlacePodVerticalScaling: true,
@@ -1035,8 +1036,8 @@ func Test_UnionedGVKs(t *testing.T) {
 			enableSchedulerQueueingHints:    true,
 		},
 		{
-			name:    "plugins with default profile and NodeDeclaredFeatures",
-			plugins: schedulerapi.PluginSet{Enabled: append(defaults.PluginsV1.MultiPoint.Enabled, schedulerapi.Plugin{Name: names.NodeDeclaredFeatures})},
+			name:    "plugins with default profile (NodeDeclaredFeatures: enabled)",
+			plugins: defaults.PluginsV1.MultiPoint,
 			want: map[fwk.EventResource]fwk.ActionType{
 				// NodeDeclaredFeatures adds fwk.Update
 				fwk.Pod: fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Delete | fwk.Update,
@@ -1074,7 +1075,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.DeviceClass:           fwk.All - fwk.Delete,
 				fwk.ResourceClaim:         fwk.All - fwk.Delete,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
-				fwk.Workload:              fwk.Add,
+				fwk.PodGroup:              fwk.Add,
 			},
 			enableGangScheduling:            true,
 			enableInPlacePodVerticalScaling: true,
@@ -1092,6 +1093,15 @@ func Test_UnionedGVKs(t *testing.T) {
 			} else if !tt.enableInPlacePodVerticalScaling {
 				// In place pod resize GA'd in 1.35. Set emulation version to 1.34 for tests that do not have the flag set
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
+				// DRADeviceBindingConditions is alpha in 1.34 (disabled by default).
+				// Strip BindingTimeout from DynamicResources args to avoid validation failure.
+				pluginConfig = slices.Clone(pluginConfig)
+				for i := range pluginConfig {
+					if pluginConfig[i].Name == "DynamicResources" {
+						pluginConfig[i].Args = &schedulerapi.DynamicResourcesArgs{}
+						break
+					}
+				}
 			} else {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.enableNodeDeclaredFeatures)
 				featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -1301,7 +1311,7 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			// Wait all pods in waitSchedulingPods to be scheduled.
 			wg.Wait()
 
-			utiltesting.Eventually(tCtx, func(utiltesting.TContext) sets.Set[string] {
+			tCtx.Eventually(func(utiltesting.TContext) sets.Set[string] {
 				// Ensure that all waitingPods in scheduler can be obtained from any profiles.
 				actualPodNamesInWaitingPods := sets.New[string]()
 				for _, schedFramework := range scheduler.Profiles {
@@ -1432,10 +1442,10 @@ func (*emptyEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]fwk.C
 
 // fakePermitPlugin only implements PermitPlugin interface.
 type fakePermitPlugin struct {
-	eventRecorder events.EventRecorder
+	eventRecorder events.EventRecorderLogger
 }
 
-func newFakePermitPlugin(eventRecorder events.EventRecorder) frameworkruntime.PluginFactory {
+func newFakePermitPlugin(eventRecorder events.EventRecorderLogger) frameworkruntime.PluginFactory {
 	return func(ctx context.Context, configuration runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
 		pl := &fakePermitPlugin{
 			eventRecorder: eventRecorder,
@@ -1456,10 +1466,39 @@ const (
 func (f fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
 	defer func() {
 		// Send event with podWaiting reason to broadcast this pod is already waiting in the permit stage.
-		f.eventRecorder.Eventf(p, nil, v1.EventTypeWarning, podWaitingReason, "", "")
+		f.eventRecorder.WithLogger(klog.FromContext(ctx)).Eventf(p, nil, v1.EventTypeWarning, podWaitingReason, "", "")
 	}()
 
 	return fwk.NewStatus(fwk.Wait), permitTimeout
 }
 
 var _ fwk.PermitPlugin = &fakePermitPlugin{}
+
+func TestNewInformerFactoryTrim(t *testing.T) {
+	cs := fake.NewClientset()
+
+	pd := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Name:      "test",
+		Namespace: "default",
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			{
+				Manager:    "update",
+				Operation:  metav1.ManagedFieldsOperationApply,
+				APIVersion: "apps/v1",
+			},
+		},
+	}}
+	require.NoError(t, cs.Tracker().Add(pd))
+
+	informerFactory := NewInformerFactory(cs, 0)
+	lister := informerFactory.Core().V1().Pods().Lister()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	p, err := lister.Pods("default").Get("test")
+	require.NoError(t, err)
+	require.Empty(t, p.GetManagedFields(), "expected managedFields to be trimmed by the transform")
+}

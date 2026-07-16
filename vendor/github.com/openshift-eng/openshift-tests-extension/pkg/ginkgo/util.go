@@ -11,7 +11,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
-	"github.com/pkg/errors"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 
@@ -21,7 +20,7 @@ import (
 func configureGinkgo() (*types.SuiteConfig, *types.ReporterConfig, error) {
 	if !ginkgo.GetSuite().InPhaseBuildTree() {
 		if err := ginkgo.GetSuite().BuildTree(); err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't build ginkgo tree")
+			return nil, nil, fmt.Errorf("couldn't build ginkgo tree: %w", err)
 		}
 	}
 
@@ -57,7 +56,7 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get current working directory")
+		return nil, fmt.Errorf("couldn't get current working directory: %w", err)
 	}
 
 	ginkgo.GetSuite().WalkTests(func(name string, spec types.TestSpec) {
@@ -81,22 +80,17 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 					Name: spec.Text(),
 				}
 
-				var summary types.SpecReport
 				ginkgo.GetSuite().RunSpec(spec, ginkgo.Labels{}, "", cwd, ginkgo.GetFailer(), ginkgo.GetWriter(), *suiteConfig,
 					*reporterConfig)
-				for _, report := range ginkgo.GetSuite().GetReport().SpecReports {
-					if report.NumAttempts > 0 {
-						summary = report
-					}
-				}
+				summary := findSpecReport(ginkgo.GetSuite().GetReport().SpecReports)
 
 				result.Output = summary.CapturedGinkgoWriterOutput
 				result.Error = summary.CapturedStdOutErr
 
-				switch {
-				case summary.State == types.SpecStatePassed:
+				switch summary.State {
+				case types.SpecStatePassed:
 					result.Result = ext.ResultPassed
-				case summary.State == types.SpecStateSkipped, summary.State == types.SpecStatePending:
+				case types.SpecStateSkipped, types.SpecStatePending:
 					result.Result = ext.ResultSkipped
 					if len(summary.Failure.Message) > 0 {
 						result.Output = fmt.Sprintf(
@@ -115,7 +109,7 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 							summary.Failure.ForwardedPanic,
 						)
 					}
-				case summary.State == types.SpecStateFailed, summary.State == types.SpecStatePanicked, summary.State == types.SpecStateInterrupted, summary.State == types.SpecStateAborted:
+				case types.SpecStateFailed, types.SpecStatePanicked, types.SpecStateInterrupted, types.SpecStateAborted:
 					result.Result = ext.ResultFailed
 					var errors []string
 					if len(summary.Failure.ForwardedPanic) > 0 {
@@ -126,7 +120,7 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 					}
 					errors = append(errors, fmt.Sprintf("fail [%s:%d]: %s", lastFilenameSegment(summary.Failure.Location.FileName), summary.Failure.Location.LineNumber, summary.Failure.Message))
 					result.Error = strings.Join(errors, "\n")
-				case summary.State == types.SpecStateTimedout:
+				case types.SpecStateTimedout:
 					result.Result = ext.ResultFailed
 					var errors []string
 					for _, additionalFailure := range summary.AdditionalFailures {
@@ -137,16 +131,23 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 					}
 					errors = append(errors, fmt.Sprintf("fail [%s:%d]: %s", lastFilenameSegment(summary.Failure.Location.FileName), summary.Failure.Location.LineNumber, summary.Failure.Message))
 					result.Error = strings.Join(errors, "\n")
+				case types.SpecStateInvalid:
+					result.Result = ext.ResultFailed
+					result.Error = fmt.Sprintf("test produced no spec report; this is a bug in the test framework: %#v", summary)
 				default:
-					panic(fmt.Sprintf("test produced unknown outcome: %#v", summary))
+					result.Result = ext.ResultFailed
+					result.Error = fmt.Sprintf("test produced unknown outcome: %#v", summary)
 				}
 
 				return result
 			},
-			RunParallel: func(ctx context.Context) *ext.ExtensionTestResult {
-				// TODO pass through timeout and determine Lifecycle
-				return SpawnProcessToRunTest(ctx, name, 90*time.Minute)
-			},
+		}
+		testCase.RunParallel = func(ctx context.Context) *ext.ExtensionTestResult {
+			timeout := 90 * time.Minute
+			if testCase.Timeout > 0 {
+				timeout = testCase.Timeout
+			}
+			return SpawnProcessToRunTest(ctx, name, timeout)
 		}
 		specs = append(specs, testCase)
 	})
@@ -208,6 +209,25 @@ func lastFilenameSegment(filename string) string {
 		return parts[len(parts)-1]
 	}
 	return filename
+}
+
+// findSpecReport selects the best matching spec report from the list of reports
+// produced by RunSpec. It first looks for a report that was actually attempted
+// (NumAttempts > 0), which covers passed/failed/panicked specs. If none is found
+// (as happens with Pending or Skipped specs where Ginkgo never enters the
+// execution loop), it falls back to the last report in the list.
+func findSpecReport(reports types.SpecReports) types.SpecReport {
+	var summary types.SpecReport
+	for _, report := range reports {
+		if report.NumAttempts > 0 {
+			summary = report
+		}
+	}
+	// Pending/Skipped specs have NumAttempts==0; fall back to the last report
+	if summary.State == types.SpecStateInvalid && len(reports) > 0 {
+		summary = reports[len(reports)-1]
+	}
+	return summary
 }
 
 func collectAdditionalFailures(errors *[]string, suffix string, failure types.Failure) {

@@ -1,3 +1,41 @@
+## 2.28.1
+
+Update all dependencies.  This auto-updated the required version of Go to 1.24, consistent with the fact that Go 1.23 has been out of support for almost six months.
+
+## 2.28.0
+
+Ginkgo's SemVer filter now supports filtering multiple components by SemVer version:
+
+```go
+It("should work in a specific version range (1.0.0, 2.0.0) and third-party dependency redis in [8.0.0, ~)", SemVerConstraint(">= 3.2.0"), ComponentSemVerConstraint("redis", ">= 8.0.0") func() {
+    // This test will only run when version is between 1.0.0 (exclusive) and 2.0.0 (exclusive) and redis version is >= 8.0.0
+})
+```
+
+can be filtered in or out with an invocation like:
+
+```bash
+ginkgo --sem-ver-filter="2.1.1, redis=8.2.0"
+```
+
+Huge thanks to @Icarus9913 for working on this!
+
+## 2.27.5
+
+### Fixes
+Don't make a new formatter for each GinkgoT(); that's just silly and uses precious memory
+
+## 2.27.4
+
+### Fixes
+- CurrentTreeConstructionNodeReport: fix for nested container nodes [59bc751]
+
+## 2.27.3
+
+### Fixes
+report exit result in case of failure [1c9f356]
+fix data race [ece19c8]
+
 ## 2.27.2
 
 ### Fixes

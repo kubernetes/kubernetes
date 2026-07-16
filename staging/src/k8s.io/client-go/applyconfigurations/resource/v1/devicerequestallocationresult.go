@@ -57,8 +57,7 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	// administrative access. See the corresponding request field
 	// for a definition of mode.
 	//
-	// This is an alpha field and requires enabling the DRAAdminAccess
-	// feature gate. Admin access is disabled if this field is unset or
+	// Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	AdminAccess *bool `json:"adminAccess,omitempty"`
 	// A copy of all tolerations specified in the request at the time
@@ -66,19 +65,19 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
 	// BindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	BindingConditions []string `json:"bindingConditions,omitempty"`
 	// BindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty"`
 	// ShareID uniquely identifies an individual allocation share of the device,

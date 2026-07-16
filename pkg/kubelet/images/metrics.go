@@ -30,8 +30,8 @@ import (
 var (
 	ensureImageRequestsCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Subsystem:      kubeletmetrics.KubeletSubsystem + "_" + "image_manager",
-			Name:           "ensure_image_requests_total",
+			Subsystem:      kubeletmetrics.KubeletSubsystem,
+			Name:           "image_manager_ensure_image_requests_total",
 			Help:           "Number of ensure-image requests processed by the kubelet.",
 			StabilityLevel: metrics.ALPHA,
 		},

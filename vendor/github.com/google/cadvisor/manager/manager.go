@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 // Manager of cAdvisor-monitored containers.
 package manager
 
@@ -191,7 +193,6 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, HousekeepingConfi
 	eventsChannel := make(chan watcher.ContainerEvent, 16)
 
 	newManager := &manager{
-		containers:                            make(map[namespacedContainerName]*containerData),
 		quitChannels:                          make([]chan error, 0, 2),
 		memoryCache:                           memoryCache,
 		fsInfo:                                fsInfo,
@@ -245,9 +246,40 @@ type namespacedContainerName struct {
 	Name string
 }
 
+// containerMap is a type-safe wrapper around sync.Map for storing containerData
+// keyed by namespacedContainerName.
+type containerMap struct {
+	m sync.Map
+}
+
+// Load returns the containerData for the given name, or nil if not found.
+func (c *containerMap) Load(name namespacedContainerName) (*containerData, bool) {
+	v, ok := c.m.Load(name)
+	if !ok {
+		return nil, false
+	}
+	return v.(*containerData), true
+}
+
+// Store stores the containerData for the given name.
+func (c *containerMap) Store(name namespacedContainerName, data *containerData) {
+	c.m.Store(name, data)
+}
+
+// Delete removes the containerData for the given name.
+func (c *containerMap) Delete(name namespacedContainerName) {
+	c.m.Delete(name)
+}
+
+// Range calls f for each container in the map. If f returns false, iteration stops.
+func (c *containerMap) Range(f func(name namespacedContainerName, data *containerData) bool) {
+	c.m.Range(func(key, value any) bool {
+		return f(key.(namespacedContainerName), value.(*containerData))
+	})
+}
+
 type manager struct {
-	containers               map[namespacedContainerName]*containerData
-	containersLock           sync.RWMutex
+	containers               containerMap
 	memoryCache              *memory.InMemoryCache
 	fsInfo                   fs.FsInfo
 	sysFs                    sysfs.SysFs
@@ -363,10 +395,14 @@ func (m *manager) Stop() error {
 }
 
 func (m *manager) destroyCollectors() {
-	for _, container := range m.containers {
+	m.containers.Range(func(_ namespacedContainerName, container *containerData) bool {
+		if container == nil {
+			return true
+		}
 		container.perfCollector.Destroy()
 		container.resctrlCollector.Destroy()
-	}
+		return true
+	})
 }
 
 func (m *manager) updateMachineInfo(quit chan error) {
@@ -425,17 +461,8 @@ func (m *manager) globalHousekeeping(quit chan error) {
 }
 
 func (m *manager) getContainerData(containerName string) (*containerData, error) {
-	var cont *containerData
-	var ok bool
-	func() {
-		m.containersLock.RLock()
-		defer m.containersLock.RUnlock()
-
-		// Ensure we have the container.
-		cont, ok = m.containers[namespacedContainerName{
-			Name: containerName,
-		}]
-	}()
+	// Ensure we have the container.
+	cont, ok := m.containers.Load(namespacedContainerName{Name: containerName})
 	if !ok {
 		return nil, fmt.Errorf("unknown container %q", containerName)
 	}
@@ -563,9 +590,7 @@ func (m *manager) containerDataToContainerInfo(cont *containerData, query *info.
 }
 
 func (m *manager) getContainer(containerName string) (*containerData, error) {
-	m.containersLock.RLock()
-	defer m.containersLock.RUnlock()
-	cont, ok := m.containers[namespacedContainerName{Name: containerName}]
+	cont, ok := m.containers.Load(namespacedContainerName{Name: containerName})
 	if !ok {
 		return nil, fmt.Errorf("unknown container %q", containerName)
 	}
@@ -573,21 +598,20 @@ func (m *manager) getContainer(containerName string) (*containerData, error) {
 }
 
 func (m *manager) getSubcontainers(containerName string) map[string]*containerData {
-	m.containersLock.RLock()
-	defer m.containersLock.RUnlock()
-	containersMap := make(map[string]*containerData, len(m.containers))
+	matchedName := path.Join(containerName, "/")
+	containersMap := make(map[string]*containerData)
 
 	// Get all the unique subcontainers of the specified container
-	matchedName := path.Join(containerName, "/")
-	for i := range m.containers {
-		if m.containers[i] == nil {
-			continue
+	m.containers.Range(func(_ namespacedContainerName, cont *containerData) bool {
+		if cont == nil {
+			return true
 		}
-		name := m.containers[i].info.Name
+		name := cont.info.Name
 		if name == containerName || strings.HasPrefix(name, matchedName) {
-			containersMap[m.containers[i].info.Name] = m.containers[i]
+			containersMap[name] = cont
 		}
-	}
+		return true
+	})
 	return containersMap
 }
 
@@ -602,16 +626,18 @@ func (m *manager) SubcontainersInfo(containerName string, query *info.ContainerI
 }
 
 func (m *manager) getAllNamespacedContainers(ns string) map[string]*containerData {
-	m.containersLock.RLock()
-	defer m.containersLock.RUnlock()
-	containers := make(map[string]*containerData, len(m.containers))
+	containers := make(map[string]*containerData)
 
 	// Get containers in a namespace.
-	for name, cont := range m.containers {
+	m.containers.Range(func(name namespacedContainerName, cont *containerData) bool {
+		if cont == nil {
+			return true
+		}
 		if name.Namespace == ns {
 			containers[cont.info.Name] = cont
 		}
-	}
+		return true
+	})
 	return containers
 }
 
@@ -621,30 +647,32 @@ func (m *manager) AllDockerContainers(query *info.ContainerInfoRequest) (map[str
 }
 
 func (m *manager) namespacedContainer(containerName string, ns string) (*containerData, error) {
-	m.containersLock.RLock()
-	defer m.containersLock.RUnlock()
-
 	// Check for the container in the namespace.
-	cont, ok := m.containers[namespacedContainerName{
-		Namespace: ns,
-		Name:      containerName,
-	}]
+	if cont, ok := m.containers.Load(namespacedContainerName{Namespace: ns, Name: containerName}); ok {
+		return cont, nil
+	}
 
 	// Look for container by short prefix name if no exact match found.
-	if !ok {
-		for contName, c := range m.containers {
-			if contName.Namespace == ns && strings.HasPrefix(contName.Name, containerName) {
-				if cont == nil {
-					cont = c
-				} else {
-					return nil, fmt.Errorf("unable to find container in %q namespace. Container %q is not unique", ns, containerName)
-				}
+	var cont *containerData
+	var err error
+	m.containers.Range(func(name namespacedContainerName, c *containerData) bool {
+		if name.Namespace == ns && strings.HasPrefix(name.Name, containerName) {
+			if cont == nil {
+				cont = c
+			} else {
+				err = fmt.Errorf("unable to find container in %q namespace. Container %q is not unique", ns, containerName)
+				return false // stop iteration
 			}
 		}
+		return true
+	})
 
-		if cont == nil {
-			return nil, fmt.Errorf("unable to find container %q in %q namespace", containerName, ns)
-		}
+	if err != nil {
+		return nil, err
+	}
+
+	if cont == nil {
+		return nil, fmt.Errorf("unable to find container %q in %q namespace", containerName, ns)
 	}
 
 	return cont, nil
@@ -837,14 +865,7 @@ func (m *manager) GetVersionInfo() (*info.VersionInfo, error) {
 }
 
 func (m *manager) Exists(containerName string) bool {
-	m.containersLock.RLock()
-	defer m.containersLock.RUnlock()
-
-	namespacedName := namespacedContainerName{
-		Name: containerName,
-	}
-
-	_, ok := m.containers[namespacedName]
+	_, ok := m.containers.Load(namespacedContainerName{Name: containerName})
 	return ok
 }
 
@@ -858,7 +879,7 @@ func (m *manager) GetProcessList(containerName string, options v2.RequestOptions
 		return nil, err
 	}
 	if len(conts) != 1 {
-		return nil, fmt.Errorf("Expected the request to match only one container")
+		return nil, fmt.Errorf("expected the request to match only one container")
 	}
 	// TODO(rjnagal): handle count? Only if we can do count by type (eg. top 5 cpu users)
 	ps := []v2.ProcessInfo{}
@@ -904,19 +925,12 @@ func (m *manager) registerCollectors(collectorConfigs map[string]string, cont *c
 
 // Create a container.
 func (m *manager) createContainer(containerName string, watchSource watcher.ContainerWatchSource) error {
-	m.containersLock.Lock()
-	defer m.containersLock.Unlock()
-
-	return m.createContainerLocked(containerName, watchSource)
-}
-
-func (m *manager) createContainerLocked(containerName string, watchSource watcher.ContainerWatchSource) error {
 	namespacedName := namespacedContainerName{
 		Name: containerName,
 	}
 
 	// Check that the container didn't already exist.
-	if _, ok := m.containers[namespacedName]; ok {
+	if _, ok := m.containers.Load(namespacedName); ok {
 		return nil
 	}
 
@@ -973,12 +987,12 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	}
 
 	// Add the container name and all its aliases. The aliases must be within the namespace of the factory.
-	m.containers[namespacedName] = cont
+	m.containers.Store(namespacedName, cont)
 	for _, alias := range cont.info.Aliases {
-		m.containers[namespacedContainerName{
+		m.containers.Store(namespacedContainerName{
 			Namespace: cont.info.Namespace,
 			Name:      alias,
-		}] = cont
+		}, cont)
 	}
 
 	klog.V(3).Infof("Added container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
@@ -1007,37 +1021,35 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 }
 
 func (m *manager) destroyContainer(containerName string) error {
-	m.containersLock.Lock()
-	defer m.containersLock.Unlock()
-
-	return m.destroyContainerLocked(containerName)
-}
-
-func (m *manager) destroyContainerLocked(containerName string) error {
 	namespacedName := namespacedContainerName{
 		Name: containerName,
 	}
-	cont, ok := m.containers[namespacedName]
+	cont, ok := m.containers.Load(namespacedName)
 	if !ok {
 		// Already destroyed, done.
 		return nil
 	}
 
-	// Tell the container to stop.
-	err := cont.Stop()
+	exitCode, err := cont.handler.GetExitCode()
+	if err != nil {
+		klog.V(4).Infof("Could not retrieve exit code for container %q: %v (using -1)", containerName, err)
+		exitCode = -1
+	}
+
+	err = cont.Stop()
 	if err != nil {
 		return err
 	}
 
 	// Remove the container from our records (and all its aliases).
-	delete(m.containers, namespacedName)
+	m.containers.Delete(namespacedName)
 	for _, alias := range cont.info.Aliases {
-		delete(m.containers, namespacedContainerName{
+		m.containers.Delete(namespacedContainerName{
 			Namespace: cont.info.Namespace,
 			Name:      alias,
 		})
 	}
-	klog.V(3).Infof("Destroyed container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
+	klog.V(3).Infof("Destroyed container: %q (aliases: %v, namespace: %q, exit_code: %d)", containerName, cont.info.Aliases, cont.info.Namespace, exitCode)
 
 	contRef, err := cont.handler.ContainerReference()
 	if err != nil {
@@ -1048,6 +1060,11 @@ func (m *manager) destroyContainerLocked(containerName string) error {
 		ContainerName: contRef.Name,
 		Timestamp:     time.Now(),
 		EventType:     info.EventContainerDeletion,
+		EventData: info.EventData{
+			ContainerDeletion: &info.ContainerDeletionEventData{
+				ExitCode: exitCode,
+			},
+		},
 	}
 	err = m.eventHandler.AddEvent(newEvent)
 	if err != nil {
@@ -1059,11 +1076,7 @@ func (m *manager) destroyContainerLocked(containerName string) error {
 // Detect all containers that have been added or deleted from the specified container.
 func (m *manager) getContainersDiff(containerName string) (added []info.ContainerReference, removed []info.ContainerReference, err error) {
 	// Get all subcontainers recursively.
-	m.containersLock.RLock()
-	cont, ok := m.containers[namespacedContainerName{
-		Name: containerName,
-	}]
-	m.containersLock.RUnlock()
+	cont, ok := m.containers.Load(namespacedContainerName{Name: containerName})
 	if !ok {
 		return nil, nil, fmt.Errorf("failed to find container %q while checking for new containers", containerName)
 	}
@@ -1074,24 +1087,23 @@ func (m *manager) getContainersDiff(containerName string) (added []info.Containe
 	}
 	allContainers = append(allContainers, info.ContainerReference{Name: containerName})
 
-	m.containersLock.RLock()
-	defer m.containersLock.RUnlock()
-
 	// Determine which were added and which were removed.
 	allContainersSet := make(map[string]*containerData)
-	for name, d := range m.containers {
-		// Only add the canonical name.
-		if d.info.Name == name.Name {
-			allContainersSet[name.Name] = d
+	m.containers.Range(func(name namespacedContainerName, cont *containerData) bool {
+		if cont == nil {
+			return true
 		}
-	}
+		// Only add the canonical name.
+		if cont.info.Name == name.Name {
+			allContainersSet[name.Name] = cont
+		}
+		return true
+	})
 
 	// Added containers
 	for _, c := range allContainers {
 		delete(allContainersSet, c.Name)
-		_, ok := m.containers[namespacedContainerName{
-			Name: c.Name,
-		}]
+		_, ok := m.containers.Load(namespacedContainerName{Name: c.Name})
 		if !ok {
 			added = append(added, c)
 		}
@@ -1322,16 +1334,13 @@ func (m *manager) DebugInfo() map[string][]string {
 	debugInfo := container.DebugInfo()
 
 	// Get unique containers.
-	var conts map[*containerData]struct{}
-	func() {
-		m.containersLock.RLock()
-		defer m.containersLock.RUnlock()
-
-		conts = make(map[*containerData]struct{}, len(m.containers))
-		for _, c := range m.containers {
-			conts[c] = struct{}{}
+	conts := make(map[*containerData]struct{})
+	m.containers.Range(func(_ namespacedContainerName, cont *containerData) bool {
+		if cont != nil {
+			conts[cont] = struct{}{}
 		}
-	}()
+		return true
+	})
 
 	// List containers.
 	lines := make([]string, 0, len(conts))

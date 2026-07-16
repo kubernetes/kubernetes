@@ -86,8 +86,10 @@ type KubeletFlags struct {
 	// Omit this flag to use the combination of built-in default configuration values and flags.
 	KubeletConfigFile string
 
-	// kubeletDropinConfigDirectory is a path to a directory to specify dropins allows the user to optionally specify
-	// additional configs to overwrite what is provided by default and in the KubeletConfigFile flag
+	// KubeletDropinConfigDirectory is the path to a directory containing drop-in configuration files that override settings from defaults and the --config file.
+	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
+	// Drop-in files must have a '.conf' suffix and are processed in lexical order. Only '.conf' files are loaded; all other files are ignored.
+	// All .conf files in the directory and its subdirectories are processed in lexical order.
 	KubeletDropinConfigDirectory string
 
 	// WindowsService should be set to true if kubelet is running as a service on Windows.
@@ -280,7 +282,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	f.addOSFlags(fs)
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
-	fs.StringVar(&f.KubeletDropinConfigDirectory, "config-dir", "", "Path to a directory to specify drop-ins, allows the user to optionally specify additional configs to overwrite what is provided by default and in the KubeletConfigFile flag. [default='']")
+	fs.StringVar(&f.KubeletDropinConfigDirectory, "config-dir", "", "Path to a directory containing drop-in configuration files that override settings from defaults and the --config file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Drop-in files must have a '.conf' suffix (e.g., '99-kubelet-address.conf') and are processed in lexical order. Only '.conf' files are loaded; all other files are ignored. All .conf files in the directory and its subdirectories are processed in lexical order. [default='']")
 	fs.StringVar(&f.KubeConfig, "kubeconfig", f.KubeConfig, "Path to a kubeconfig file, specifying how to connect to the API server. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode.")
 
 	fs.StringVar(&f.BootstrapKubeconfig, "bootstrap-kubeconfig", f.BootstrapKubeconfig, "Path to a kubeconfig file that will be used to get client certificate for kubelet. "+
@@ -469,7 +471,8 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfigapi.KubeletCon
 	fs.BoolVar(&c.RunOnce, "runonce", c.RunOnce, "If true, exit after spawning pods from static pod files or remote urls. Exclusive with --enable-server")
 
 	fs.BoolVar(&c.CPUCFSQuota, "cpu-cfs-quota", c.CPUCFSQuota, "Enable CPU CFS quota enforcement for containers that specify CPU limits")
-	fs.DurationVar(&c.CPUCFSQuotaPeriod.Duration, "cpu-cfs-quota-period", c.CPUCFSQuotaPeriod.Duration, "Sets CPU CFS quota period value, cpu.cfs_period_us, defaults to Linux Kernel default")
+	fs.DurationVar(&c.CPUCFSQuotaPeriod.Duration, "cpu-cfs-quota-period", c.CPUCFSQuotaPeriod.Duration, "Sets CPU CFS quota period value (cpu.cfs_period_us). Defaults to Linux Kernel default. "+"Requires the CustomCPUCFSQuotaPeriod feature gate to set non-default values.")
+
 	fs.BoolVar(&c.EnableControllerAttachDetach, "enable-controller-attach-detach", c.EnableControllerAttachDetach, "Enables the Attach/Detach controller to manage attachment/detachment of volumes scheduled to this node, and disables kubelet from executing any attach/detach operations")
 	fs.BoolVar(&c.MakeIPTablesUtilChains, "make-iptables-util-chains", c.MakeIPTablesUtilChains, "If true, kubelet will ensure iptables utility rules are present on host.")
 	fs.StringVar(&c.ContainerLogMaxSize, "container-log-max-size", c.ContainerLogMaxSize, "<Warning: Beta feature> Set the maximum size (e.g. 10Mi) of container log file before it is rotated.")

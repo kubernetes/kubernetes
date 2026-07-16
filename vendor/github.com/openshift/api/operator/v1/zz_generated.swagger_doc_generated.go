@@ -118,6 +118,15 @@ func (Authentication) SwaggerDoc() map[string]string {
 	return map_Authentication
 }
 
+var map_AuthenticationConfigMapReference = map[string]string{
+	"":     "AuthenticationConfigMapReference references a ConfigMap in the openshift-config namespace.",
+	"name": "name is the metadata.name of the referenced ConfigMap. Must be a valid DNS subdomain name (RFC 1123): at most 253 characters, only lowercase alphanumeric characters, '-' or '.', starting and ending with an alphanumeric character.",
+}
+
+func (AuthenticationConfigMapReference) SwaggerDoc() map[string]string {
+	return map_AuthenticationConfigMapReference
+}
+
 var map_AuthenticationList = map[string]string{
 	"":         "AuthenticationList is a collection of items\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -125,6 +134,26 @@ var map_AuthenticationList = map[string]string{
 
 func (AuthenticationList) SwaggerDoc() map[string]string {
 	return map_AuthenticationList
+}
+
+var map_AuthenticationProxyConfig = map[string]string{
+	"":           "AuthenticationProxyConfig holds proxy configuration scoped to authentication components (the OAuth server and the cluster authentication operator).",
+	"httpProxy":  "httpProxy is the URL of the proxy for HTTP requests. Must be a valid URL with http or https scheme, a non-empty hostname, and no path, query parameters, or fragment. Userinfo (e.g. user:password@host) is allowed for proxy authentication. Maximum length is 2048 characters.",
+	"httpsProxy": "httpsProxy is the URL of the proxy for HTTPS requests. Must be a valid URL with http or https scheme, a non-empty hostname, and no path, query parameters, or fragment. Userinfo (e.g. user:password@host) is allowed for proxy authentication. Maximum length is 2048 characters.",
+	"noProxy":    "noProxy is a list of hostnames and/or CIDRs and/or IPs for which the proxy should not be used. Must contain at least one entry when set. Each entry must be between 1 and 253 characters long and at most 64 entries are allowed. Duplicate entries are not permitted. Entries that are not valid hostnames, CIDRs, or IPs are silently ignored. Cluster-internal defaults (.cluster.local, .svc, 127.0.0.1, localhost) are always appended automatically and do not need to be included.",
+	"trustedCA":  "trustedCA is a reference to a ConfigMap in the openshift-config namespace containing a CA certificate bundle under the key \"ca-bundle.crt\". This bundle is appended to the system trust store used by authentication components for proxy TLS connections. When omitted, only the system trust store is used.",
+}
+
+func (AuthenticationProxyConfig) SwaggerDoc() map[string]string {
+	return map_AuthenticationProxyConfig
+}
+
+var map_AuthenticationSpec = map[string]string{
+	"proxy": "proxy configures proxy settings for outbound connections made by the authentication stack. When set, it replaces the cluster-wide proxy (proxy.config.openshift.io/cluster) entirely for authentication — individual fields are not inherited from the cluster-wide configuration. When omitted, the cluster-wide proxy is used if configured; otherwise no proxy is used.",
+}
+
+func (AuthenticationSpec) SwaggerDoc() map[string]string {
+	return map_AuthenticationSpec
 }
 
 var map_AuthenticationStatus = map[string]string{
@@ -137,6 +166,7 @@ func (AuthenticationStatus) SwaggerDoc() map[string]string {
 
 var map_OAuthAPIServerStatus = map[string]string{
 	"latestAvailableRevision": "latestAvailableRevision is the latest revision used as suffix of revisioned secrets like encryption-config. A new revision causes a new deployment of pods.",
+	"encryptionStatus":        "encryptionStatus contains status reports for the KMS plugin health and its key rotation.",
 }
 
 func (OAuthAPIServerStatus) SwaggerDoc() map[string]string {
@@ -515,13 +545,14 @@ func (AzureDiskEncryptionSet) SwaggerDoc() map[string]string {
 }
 
 var map_CSIDriverConfigSpec = map[string]string{
-	"":           "CSIDriverConfigSpec defines configuration spec that can be used to optionally configure a specific CSI Driver.",
-	"driverType": "driverType indicates type of CSI driver for which the driverConfig is being applied to. Valid values are: AWS, Azure, GCP, IBMCloud, vSphere and omitted. Consumers should treat unknown values as a NO-OP.",
-	"aws":        "aws is used to configure the AWS CSI driver.",
-	"azure":      "azure is used to configure the Azure CSI driver.",
-	"gcp":        "gcp is used to configure the GCP CSI driver.",
-	"ibmcloud":   "ibmcloud is used to configure the IBM Cloud CSI driver.",
-	"vSphere":    "vSphere is used to configure the vsphere CSI driver.",
+	"":             "CSIDriverConfigSpec defines configuration spec that can be used to optionally configure a specific CSI Driver.",
+	"driverType":   "driverType indicates type of CSI driver for which the driverConfig is being applied to. Valid values are: AWS, Azure, GCP, IBMCloud, vSphere, SecretsStore and omitted. Consumers should treat unknown values as a NO-OP.",
+	"aws":          "aws is used to configure the AWS CSI driver.",
+	"azure":        "azure is used to configure the Azure CSI driver.",
+	"gcp":          "gcp is used to configure the GCP CSI driver.",
+	"ibmcloud":     "ibmcloud is used to configure the IBM Cloud CSI driver.",
+	"vSphere":      "vSphere is used to configure the vsphere CSI driver.",
+	"secretsStore": "secretsStore is used to configure the Secrets Store CSI driver.",
 }
 
 func (CSIDriverConfigSpec) SwaggerDoc() map[string]string {
@@ -566,6 +597,15 @@ func (ClusterCSIDriverStatus) SwaggerDoc() map[string]string {
 	return map_ClusterCSIDriverStatus
 }
 
+var map_CustomSecretRotation = map[string]string{
+	"":                  "CustomSecretRotation holds configuration for custom secret rotation behavior.",
+	"minimumRefreshAge": "minimumRefreshAge is the minimum time in seconds between secret rotation attempts. Each time kubelet calls NodePublishVolume, the driver checks whether this interval has elapsed since the last successful provider call. If it has, the driver contacts the secret provider to fetch the latest secret values and updates the mounted volume. Setting this value below the kubelet syncFrequency (default: 1 minute) has no additional effect on the actual rotation cadence. Must be at least 1 second and no more than 31560000 seconds (~1 year). When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.",
+}
+
+func (CustomSecretRotation) SwaggerDoc() map[string]string {
+	return map_CustomSecretRotation
+}
+
 var map_GCPCSIDriverConfigSpec = map[string]string{
 	"":       "GCPCSIDriverConfigSpec defines properties that can be configured for the GCP CSI driver.",
 	"kmsKey": "kmsKey sets the cluster default storage class to encrypt volumes with customer-supplied encryption keys, rather than the default keys managed by GCP.",
@@ -594,6 +634,55 @@ var map_IBMCloudCSIDriverConfigSpec = map[string]string{
 
 func (IBMCloudCSIDriverConfigSpec) SwaggerDoc() map[string]string {
 	return map_IBMCloudCSIDriverConfigSpec
+}
+
+var map_ManagedTokenRequests = map[string]string{
+	"":          "ManagedTokenRequests holds the configuration for operator-managed service account token requests.",
+	"audiences": "audiences specifies service account token audiences that kubelet will provide to the CSI driver during NodePublishVolume calls. These tokens enable workload identity federation (WIF) with cloud providers such as AWS, Azure, and GCP. When empty, the operator clears all tokenRequests from the CSIDriver object.",
+}
+
+func (ManagedTokenRequests) SwaggerDoc() map[string]string {
+	return map_ManagedTokenRequests
+}
+
+var map_SecretsStoreCSIDriverConfigSpec = map[string]string{
+	"":               "SecretsStoreCSIDriverConfigSpec defines properties that can be configured for the Secrets Store CSI driver.",
+	"secretRotation": "secretRotation controls automatic secret rotation behavior. When omitted, secret rotation is enabled with a default poll interval of 2 minutes.",
+	"tokenRequests":  "tokenRequests controls service account token configuration for workload identity federation (WIF) with cloud providers. When omitted, the operator preserves any existing tokenRequests already configured on the CSIDriver object without modification.",
+}
+
+func (SecretsStoreCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_SecretsStoreCSIDriverConfigSpec
+}
+
+var map_SecretsStoreSecretRotation = map[string]string{
+	"":       "SecretsStoreSecretRotation configures the automatic secret rotation behavior for the Secrets Store CSI driver.",
+	"type":   "type determines the secret rotation behavior. When \"None\", secret rotation is disabled and secrets are only fetched at initial pod mount time. When \"Custom\", secret rotation is enabled with the configuration specified in the custom field.",
+	"custom": "custom holds the custom rotation configuration. Only valid when type is \"Custom\".",
+}
+
+func (SecretsStoreSecretRotation) SwaggerDoc() map[string]string {
+	return map_SecretsStoreSecretRotation
+}
+
+var map_SecretsStoreTokenRequest = map[string]string{
+	"":                  "SecretsStoreTokenRequest specifies a service account token audience configuration for workload identity federation (WIF) with the Secrets Store CSI driver.",
+	"audience":          "audience is the intended audience of the service account token. An empty string means the issued token will use the kube-apiserver's default APIAudiences.",
+	"expirationSeconds": "expirationSeconds is the requested duration of validity of the service account token. The token issuer may return a token with a different validity duration. When omitted, the token expiration is determined by the kube-apiserver. Must be at least 600 seconds (10 minutes) and no more than 315360000 seconds (~10 years).",
+}
+
+func (SecretsStoreTokenRequest) SwaggerDoc() map[string]string {
+	return map_SecretsStoreTokenRequest
+}
+
+var map_SecretsStoreTokenRequests = map[string]string{
+	"":        "SecretsStoreTokenRequests configures how service account tokens are provided to the Secrets Store CSI driver for workload identity federation.",
+	"type":    "type determines how the operator manages tokenRequests on the CSIDriver object. When \"Unmanaged\", existing tokenRequests on the CSIDriver are preserved and the managed field is not used. When \"Managed\", the operator sets tokenRequests from the audiences specified in the managed field, replacing any previously configured values. Once set to \"Managed\", type cannot be reverted back to \"Unmanaged\".",
+	"managed": "managed holds configuration for operator-managed tokenRequests. Only valid when type is \"Managed\".",
+}
+
+func (SecretsStoreTokenRequests) SwaggerDoc() map[string]string {
+	return map_SecretsStoreTokenRequests
 }
 
 var map_VSphereCSIDriverConfigSpec = map[string]string{
@@ -798,7 +887,7 @@ func (EtcdList) SwaggerDoc() map[string]string {
 
 var map_EtcdSpec = map[string]string{
 	"controlPlaneHardwareSpeed": "HardwareSpeed allows user to change the etcd tuning profile which configures the latency parameters for heartbeat interval and leader election timeouts allowing the cluster to tolerate longer round-trip-times between etcd members. Valid values are \"\", \"Standard\" and \"Slower\".\n\t\"\" means no opinion and the platform is left to choose a reasonable default\n\twhich is subject to change without notice.",
-	"backendQuotaGiB":           "backendQuotaGiB sets the etcd backend storage size limit in gibibytes. The value should be an integer not less than 8 and not more than 32. When not specified, the default value is 8.",
+	"backendQuotaGiB":           "backendQuotaGiB sets the etcd backend storage size limit in gibibytes. The value should be an integer not less than 8 and not more than 16. When not specified, the default value is 8.",
 }
 
 func (EtcdSpec) SwaggerDoc() map[string]string {
@@ -830,6 +919,7 @@ var map_AWSNetworkLoadBalancerParameters = map[string]string{
 	"":               "AWSNetworkLoadBalancerParameters holds configuration parameters for an AWS Network load balancer. For Example: Setting AWS EIPs https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html",
 	"subnets":        "subnets specifies the subnets to which the load balancer will attach. The subnets may be specified by either their ID or name. The total number of subnets is limited to 10.\n\nIn order for the load balancer to be provisioned with subnets, each subnet must exist, each subnet must be from a different availability zone, and the load balancer service must be recreated to pick up new values.\n\nWhen omitted from the spec, the subnets will be auto-discovered for each availability zone. Auto-discovered subnets are not reported in the status of the IngressController object.",
 	"eipAllocations": "eipAllocations is a list of IDs for Elastic IP (EIP) addresses that are assigned to the Network Load Balancer. The following restrictions apply:\n\neipAllocations can only be used with external scope, not internal. An EIP can be allocated to only a single IngressController. The number of EIP allocations must match the number of subnets that are used for the load balancer. Each EIP allocation must be unique. A maximum of 10 EIP allocations are permitted.\n\nSee https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html for general information about configuration, characteristics, and limitations of Elastic IP addresses.",
+	"protocol":       "protocol specifies whether the Network Load Balancer uses PROXY protocol to forward connections to the IngressController.\n\nWhen set to \"TCP\", the NLB uses AWS's native client IP preservation. This may cause hairpin connection failures for internal load balancers when connections are made from pods to router pods on the same node.\n\nWhen set to \"PROXY\", the NLB disables native client IP preservation and uses PROXY protocol v2. The IngressController enables PROXY protocol on HAProxy so that it can parse PROXY protocol headers to obtain the original client IP. This avoids hairpin connection failures.\n\nThe following values are valid for this field:\n\n* \"TCP\". * \"PROXY\".\n\nWhen omitted, this means the user has no opinion and the value is left to the platform to choose a reasonable default, which is subject to change over time. The current default is \"PROXY\".\n\nNote that changing this field may cause brief connection failures during the transition as the NLB attribute change and router rollout occur independently.",
 }
 
 func (AWSNetworkLoadBalancerParameters) SwaggerDoc() map[string]string {
@@ -1082,6 +1172,7 @@ var map_IngressControllerSpec = map[string]string{
 	"httpCompression":                 "httpCompression defines a policy for HTTP traffic compression. By default, there is no HTTP compression.",
 	"idleConnectionTerminationPolicy": "idleConnectionTerminationPolicy maps directly to HAProxy's idle-close-on-response option and controls whether HAProxy keeps idle frontend connections open during a soft stop (router reload).\n\nAllowed values for this field are \"Immediate\" and \"Deferred\". The default value is \"Immediate\".\n\nWhen set to \"Immediate\", idle connections are closed immediately during router reloads. This ensures immediate propagation of route changes but may impact clients sensitive to connection resets.\n\nWhen set to \"Deferred\", HAProxy will maintain idle connections during a soft reload instead of closing them immediately. These connections remain open until any of the following occurs:\n\n  - A new request is received on the connection, in which\n    case HAProxy handles it in the old process and closes\n    the connection after sending the response.\n\n  - HAProxy's `timeout http-keep-alive` duration expires.\n    By default this is 300 seconds, but it can be changed\n    using httpKeepAliveTimeout tuning option.\n\n  - The client's keep-alive timeout expires, causing the\n    client to close the connection.\n\nSetting Deferred can help prevent errors in clients or load balancers that do not properly handle connection resets. Additionally, this option allows you to retain the pre-2.4 HAProxy behaviour: in HAProxy version 2.2 (OpenShift versions < 4.14), maintaining idle connections during a soft reload was the default behaviour, but starting with HAProxy 2.4, the default changed to closing idle connections immediately.\n\nImportant Consideration:\n\n  - Using Deferred will result in temporary inconsistencies\n    for the first request on each persistent connection\n    after a route update and router reload. This request\n    will be processed by the old HAProxy process using its\n    old configuration. Subsequent requests will use the\n    updated configuration.\n\nOperational Considerations:\n\n  - Keeping idle connections open during reloads may lead\n    to an accumulation of old HAProxy processes if\n    connections remain idle for extended periods,\n    especially in environments where frequent reloads\n    occur.\n\n  - Consider monitoring the number of HAProxy processes in\n    the router pods when Deferred is set.\n\n  - You may need to enable or adjust the\n    `ingress.operator.openshift.io/hard-stop-after`\n    duration (configured via an annotation on the\n    IngressController resource) in environments with\n    frequent reloads to prevent resource exhaustion.",
 	"closedClientConnectionPolicy":    "closedClientConnectionPolicy controls how the IngressController behaves when the client closes the TCP connection while the TLS handshake or HTTP request is in progress. This option maps directly to HAProxy’s \"abortonclose\" option.\n\nValid values are: \"Abort\" and \"Continue\". The default value is \"Continue\".\n\nWhen set to \"Abort\", the router will stop processing the TLS handshake if it is in progress, and it will not send an HTTP request to the backend server if the request has not yet been sent when the client closes the connection.\n\nWhen set to \"Continue\", the router will complete the TLS handshake if it is in progress, or send an HTTP request to the backend server and wait for the backend server's response, regardless of whether the client has closed the connection.\n\nSetting \"Abort\" can help free CPU resources otherwise spent on TLS computation for connections the client has already closed, and can reduce request queue size, thereby reducing the load on saturated backend servers.\n\nImportant Considerations:\n\n  - The default policy (\"Continue\") is HTTP-compliant, and requests\n    for aborted client connections will still be served.\n    Use the \"Continue\" policy to allow a client to send a request\n    and then immediately close its side of the connection while\n    still receiving a response on the half-closed connection.\n\n  - When clients use keep-alive connections, the most common case for premature\n    closure is when the user wants to cancel the transfer or when a timeout\n    occurs. In that case, the \"Abort\" policy may be used to reduce resource consumption.\n\n  - Using RSA keys larger than 2048 bits can significantly slow down\n    TLS computations. Consider using the \"Abort\" policy to reduce CPU usage.",
+	"haproxyVersion":                  "haproxyVersion specifies the HAProxy version to use for this IngressController.\n\nOpenShift 5.0 introduces HAProxy 3.2 as its default version and supports HAProxy 2.8 from OpenShift 4.22 for migration purposes. When an OpenShift release introduces a new default HAProxy version, that HAProxy version becomes available as a pinnable value in subsequent OpenShift releases, providing a smooth migration path for administrators who want to defer HAProxy upgrades.\n\nValid values for OpenShift 5.0: - Unset (default): Uses HAProxy 3.2 (the default for OpenShift 5.0) - \"3.2\": Explicitly pins HAProxy 3.2 for preservation during cluster\n  upgrades to future OpenShift releases\n- \"2.8\": Uses HAProxy 2.8 from OpenShift 4.22 (migration support, will\n  be dropped in the next OpenShift release)\n\nIf a specific HAProxy version is set and would become unsupported in a target cluster upgrade, a preflight check will block the cluster upgrade until this field is updated to unset or a supported version.",
 }
 
 func (IngressControllerSpec) SwaggerDoc() map[string]string {
@@ -1099,6 +1190,7 @@ var map_IngressControllerStatus = map[string]string{
 	"observedGeneration":         "observedGeneration is the most recent generation observed.",
 	"namespaceSelector":          "namespaceSelector is the actual namespaceSelector in use.",
 	"routeSelector":              "routeSelector is the actual routeSelector in use.",
+	"effectiveHAProxyVersion":    "effectiveHAProxyVersion reports the HAProxy version currently in use by this IngressController. This reflects the resolved value of the spec.haproxyVersion field. When omitted, the effective value has not yet been resolved by the operator or the feature is not enabled for this cluster.\n\nExamples for OpenShift 5.0: - \"3.2\": Using HAProxy 3.2 - \"2.8\": Using HAProxy 2.8",
 }
 
 func (IngressControllerStatus) SwaggerDoc() map[string]string {
@@ -1296,6 +1388,27 @@ func (InsightsReport) SwaggerDoc() map[string]string {
 	return map_InsightsReport
 }
 
+var map_KMSEncryptionStatus = map[string]string{
+	"healthReports": "healthReports contains all KMS plugin health reports. When omitted, no health reports are available. Each entry must have a unique combination of nodeName and keyId.",
+}
+
+func (KMSEncryptionStatus) SwaggerDoc() map[string]string {
+	return map_KMSEncryptionStatus
+}
+
+var map_KMSPluginHealthReport = map[string]string{
+	"nodeName":        "nodeName is the name of the node this instance of the plugin runs on. The combination of nodeName and keyId makes this health report unique. The value must be a valid Kubernetes node name: a lowercase RFC 1123 subdomain consisting of lowercase alphanumeric characters, '-' or '.', starting and ending with an alphanumeric character, and be at most 253 characters in length.",
+	"keyId":           "keyId is the encryption-key-secret id (kms-{keyId}.sock), a unique identifier of the plugin on that node. This is not a cryptographic key used to encrypt/decrypt any resources. The value must be between 1 and 512 characters.",
+	"status":          "status contains a health indicator for the respective KMS plugin The field can have three states: healthy, unhealthy, error. With error and unhealthy containing additional information in Detail.",
+	"lastCheckedTime": "lastCheckedTime is a timestamp of when the probe was last checked.",
+	"kekId":           "kekId refers to the remote KEK id from KMS v2 StatusResponse.key_id. This is not a cryptographic key, but a unique representation of the KEK. The value must be between 1 and 1024 characters.",
+	"detail":          "detail contains additional error/health information for the respective KMS plugin. When omitted, no additional error or health information is provided. When set, the value must be between 1 and 1024 characters.",
+}
+
+func (KMSPluginHealthReport) SwaggerDoc() map[string]string {
+	return map_KMSPluginHealthReport
+}
+
 var map_KubeAPIServer = map[string]string{
 	"":         "KubeAPIServer provides information to configure an operator to manage kube-apiserver.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -1327,6 +1440,7 @@ func (KubeAPIServerSpec) SwaggerDoc() map[string]string {
 
 var map_KubeAPIServerStatus = map[string]string{
 	"serviceAccountIssuers": "serviceAccountIssuers tracks history of used service account issuers. The item without expiration time represents the currently used service account issuer. The other items represents service account issuers that were used previously and are still being trusted. The default expiration for the items is set by the platform and it defaults to 24h. see: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection",
+	"encryptionStatus":      "encryptionStatus contains status reports for the KMS plugin health and its key rotation.",
 }
 
 func (KubeAPIServerStatus) SwaggerDoc() map[string]string {
@@ -2078,6 +2192,14 @@ var map_OpenShiftAPIServerList = map[string]string{
 
 func (OpenShiftAPIServerList) SwaggerDoc() map[string]string {
 	return map_OpenShiftAPIServerList
+}
+
+var map_OpenShiftAPIServerStatus = map[string]string{
+	"encryptionStatus": "encryptionStatus contains status reports for the KMS plugin health and its key rotation.",
+}
+
+func (OpenShiftAPIServerStatus) SwaggerDoc() map[string]string {
+	return map_OpenShiftAPIServerStatus
 }
 
 var map_OpenShiftControllerManager = map[string]string{

@@ -388,6 +388,28 @@ func (AuthenticationStatus) SwaggerDoc() map[string]string {
 	return map_AuthenticationStatus
 }
 
+var map_ClientCredentialConfig = map[string]string{
+	"":              "ClientCredentialConfig configures the client credentials and token endpoint to use to get an access token via the OAuth2 client credentials grant flow.",
+	"clientID":      "clientID is a required client identifier to use during the OAuth2 client credentials flow. clientID must be at least 1 character in length, must not exceed 256 characters in length, and must only contain printable ASCII characters.",
+	"clientSecret":  "clientSecret is a required reference to a Secret in the openshift-config namespace to be used as the client secret during the OAuth2 client credentials flow.\n\nThe key 'client-secret' is used to locate the client secret data in the Secret.",
+	"tokenEndpoint": "tokenEndpoint is a required URL to query for an access token using the client credential OAuth2 flow. tokenEndpoint must be at least 1 character in length and must not exceed 2048 characters in length. tokenEndpoint must be a valid HTTPS URL. tokenEndpoint must have a host and a path. tokenEndpoint must not contain query parameters, fragments, or user information (e.g., \"user:password@host\").",
+	"scopes":        "scopes is an optional list of OAuth2 scopes to request when obtaining an access token.\n\nIf not specified, the token endpoint's default scopes will be used.\n\nWhen specified, there must be at least 1 entry and must not exceed 16 entries. Each entry must be at least 1 character in length and must not exceed 256 characters in length. Each entry must only contain printable ASCII characters, excluding spaces, double quotes and backslashes. Entries must be unique.",
+	"tls":           "tls is an optional field that allows configuring the TLS settings used to interact with the identity provider as an OAuth2 client.\n\nWhen omitted, system default TLS settings will be used for the OAuth2 client.",
+}
+
+func (ClientCredentialConfig) SwaggerDoc() map[string]string {
+	return map_ClientCredentialConfig
+}
+
+var map_ClientSecretSecretReference = map[string]string{
+	"":     "ClientSecretSecretReference is a reference to a Secret in the openshift-config namespace that should be used for configuring the client secret to be used when sourcing claims from external sources with the client credential authentication flow.",
+	"name": "name is the required name of the Secret that exists in the openshift-config namespace.\n\nIt must be at least 1 character in length, must not exceed 253 characters in length, must start and end with a lowercase alphanumeric character, and must only contain lowercase alphanumeric characters, '-' or '.'.",
+}
+
+func (ClientSecretSecretReference) SwaggerDoc() map[string]string {
+	return map_ClientSecretSecretReference
+}
+
 var map_DeprecatedWebhookTokenAuthenticator = map[string]string{
 	"":           "deprecatedWebhookTokenAuthenticator holds the necessary configuration options for a remote token authenticator. It's the same as WebhookTokenAuthenticator but it's missing the 'required' validation on KubeConfig field.",
 	"kubeConfig": "kubeConfig contains kube config file data which describes how to access the remote webhook service. For further details, see: https://kubernetes.io/docs/reference/access-authn-authz/authentication/#webhook-token-authentication The key \"kubeConfig\" is used to locate the data. If the secret or expected key is not found, the webhook is not honored. If the specified kube config data is not valid, the webhook is not honored. The namespace for this secret is determined by the point of use.",
@@ -395,6 +417,56 @@ var map_DeprecatedWebhookTokenAuthenticator = map[string]string{
 
 func (DeprecatedWebhookTokenAuthenticator) SwaggerDoc() map[string]string {
 	return map_DeprecatedWebhookTokenAuthenticator
+}
+
+var map_ExternalClaimsSource = map[string]string{
+	"":               "ExternalClaimsSource provides the configuration for a single external claim source.",
+	"authentication": "authentication is an optional field that configures how the apiserver authenticates with an external claims source. When not specified, anonymous authentication is used which means no 'Authorization' header is sent in the HTTP request to fetch the external claims.",
+	"tls":            "tls is an optional field that configures the http client TLS settings when fetching external claims from this source.\n\nWhen omitted, system default TLS settings will be used for fetching claims from the external source.",
+	"url":            "url is a required configuration of the URL for which the external claims are located.",
+	"mappings":       "mappings is a required list of the claim and response handling expression pairs that produces the claims from the external source. mappings must have at least 1 entry and must not exceed 16 entries. Entries must have a unique name across all external claim sources.",
+	"predicates":     "predicates is an optional list of constraints in which claims should attempt to be fetched from this external source.\n\nWhen omitted, claims are always fetched from this external source.\n\nWhen specified, all predicates must evaluate to 'true' before claims are attempted to be fetched from this external source. predicates must have at least 1 entry and must not exceed 16 entries. Entries must have unique expressions.",
+}
+
+func (ExternalClaimsSource) SwaggerDoc() map[string]string {
+	return map_ExternalClaimsSource
+}
+
+var map_ExternalSourceAuthentication = map[string]string{
+	"":                 "ExternalSourceAuthentication configures how the apiserver should attempt to authenticate with an external claims source.",
+	"type":             "type is a required field that sets the type of authentication method used by the authenticator when fetching external claims.\n\nAllowed values are 'RequestProvidedToken' and 'ClientCredential'.\n\nWhen set to 'RequestProvidedToken', the authenticator will use the token provided to the kube-apiserver as part of the request to authenticate with the external claims source.\n\nWhen set to 'ClientCredential', the authenticator will use the configured client-id, client-secret, and token endpoint to fetch an access token using the OAuth2 client credentials grant flow. The fetched access token will then be used to authenticate with the external claims source.",
+	"clientCredential": "clientCredential configures the client credentials and token endpoint to use to get an access token. clientCredential is required when type is 'ClientCredential', and forbidden otherwise.",
+}
+
+func (ExternalSourceAuthentication) SwaggerDoc() map[string]string {
+	return map_ExternalSourceAuthentication
+}
+
+var map_ExternalSourceCertificateAuthorityConfigMapReference = map[string]string{
+	"":     "ExternalSourceCertificateAuthorityConfigMapReference is a reference to a ConfigMap in the openshift-config namespace that should be used for configuring the certificate authority to be used when sourcing claims from external sources.",
+	"name": "name is the required name of the ConfigMap that exists in the openshift-config namespace. The key \"ca-bundle.crt\" must be present and must contain the CA certificate to be used to verify the external source's TLS certificate.\n\nIt must be at least 1 character in length, must not exceed 253 characters in length, must start and end with a lowercase alphanumeric character, and must only contain lowercase alphanumeric characters, '-' or '.'.",
+}
+
+func (ExternalSourceCertificateAuthorityConfigMapReference) SwaggerDoc() map[string]string {
+	return map_ExternalSourceCertificateAuthorityConfigMapReference
+}
+
+var map_ExternalSourcePredicate = map[string]string{
+	"":           "ExternalSourcePredicate configures a singular condition that must return true before the external source is queried to retrieve external claims.",
+	"expression": "expression is a required CEL expression that is used to determine whether or not an external source should be used to fetch external claims.\n\nThe expression must return a boolean value, where true means that the source should be consulted and false means that it should not.\n\nClaims from the token used for the request to the kube-apiserver are made available via the `claims` variable.\n\nThe contents of the `claims` variable varies based on the claims that are present in the token being validated. It is the responsibility of those configuring this field to understand what claims the identity provider includes when issuing tokens.\n\nexpression must be at least 1 character and must not exceed 1024 characters in length.",
+}
+
+func (ExternalSourcePredicate) SwaggerDoc() map[string]string {
+	return map_ExternalSourcePredicate
+}
+
+var map_ExternalSourceTLS = map[string]string{
+	"":                     "ExternalSourceTLS configures the TLS options that the apiserver uses as a client when making a request to the external claim source.",
+	"certificateAuthority": "certificateAuthority is a required reference to a ConfigMap in the openshift-config namespace that contains the CA certificate to use to validate TLS connections with the external claims source. The key \"ca-bundle.crt\" must be present in the referenced ConfigMap and must contain the CA certificate to be used to verify the external source's TLS certificate.",
+}
+
+func (ExternalSourceTLS) SwaggerDoc() map[string]string {
+	return map_ExternalSourceTLS
 }
 
 var map_ExtraMapping = map[string]string{
@@ -445,12 +517,13 @@ func (OIDCClientStatus) SwaggerDoc() map[string]string {
 }
 
 var map_OIDCProvider = map[string]string{
-	"name":                 "name is a required field that configures the unique human-readable identifier associated with the identity provider. It is used to distinguish between multiple identity providers and has no impact on token validation or authentication mechanics.\n\nname must not be an empty string (\"\").",
-	"issuer":               "issuer is a required field that configures how the platform interacts with the identity provider and how tokens issued from the identity provider are evaluated by the Kubernetes API server.",
-	"oidcClients":          "oidcClients is an optional field that configures how on-cluster, platform clients should request tokens from the identity provider. oidcClients must not exceed 20 entries and entries must have unique namespace/name pairs.",
-	"claimMappings":        "claimMappings is a required field that configures the rules to be used by the Kubernetes API server for translating claims in a JWT token, issued by the identity provider, to a cluster identity.",
-	"claimValidationRules": "claimValidationRules is an optional field that configures the rules to be used by the Kubernetes API server for validating the claims in a JWT token issued by the identity provider.\n\nValidation rules are joined via an AND operation.",
-	"userValidationRules":  "userValidationRules is an optional field that configures the set of rules used to validate the cluster user identity that was constructed via mapping token claims to user identity attributes. Rules are CEL expressions that must evaluate to 'true' for authentication to succeed. If any rule in the chain of rules evaluates to 'false', authentication will fail. When specified, at least one rule must be specified and no more than 64 rules may be specified.",
+	"name":                  "name is a required field that configures the unique human-readable identifier associated with the identity provider. It is used to distinguish between multiple identity providers and has no impact on token validation or authentication mechanics.\n\nname must not be an empty string (\"\").",
+	"issuer":                "issuer is a required field that configures how the platform interacts with the identity provider and how tokens issued from the identity provider are evaluated by the Kubernetes API server.",
+	"oidcClients":           "oidcClients is an optional field that configures how on-cluster, platform clients should request tokens from the identity provider. oidcClients must not exceed 20 entries and entries must have unique namespace/name pairs.",
+	"claimMappings":         "claimMappings is a required field that configures the rules to be used by the Kubernetes API server for translating claims in a JWT token, issued by the identity provider, to a cluster identity.",
+	"claimValidationRules":  "claimValidationRules is an optional field that configures the rules to be used by the Kubernetes API server for validating the claims in a JWT token issued by the identity provider.\n\nValidation rules are joined via an AND operation.",
+	"userValidationRules":   "userValidationRules is an optional field that configures the set of rules used to validate the cluster user identity that was constructed via mapping token claims to user identity attributes. Rules are CEL expressions that must evaluate to 'true' for authentication to succeed. If any rule in the chain of rules evaluates to 'false', authentication will fail. When specified, at least one rule must be specified and no more than 64 rules may be specified.",
+	"externalClaimsSources": "externalClaimsSources is an optional field that can be used to configure sources, external to the token provided in a request, in which claims should be fetched from and made available to the claim mapping process that is used to build the identity of a token holder.\n\nFor example, fetching additional user metadata from an OIDC provider's UserInfo endpoint.\n\nWhen not specified, only claims present in the token itself will be available in the claim mapping process.\n\nWhen specified, at least one external claim source must be specified and no more than 5 sources may be specified. All external claim sources must have unique claim mappings. When an external source responds and resolves additional claims successfully, they will be made available as claims during the claim mapping process. Externally sourced claims with the same name as a claim existing within the token will overwrite the claim data from the token with the externally sourced information. If an external source does not respond, responds with an error, or the additional claim data cannot be resolved from the response successfully it will not be included in the claim data passed to the claim mapping process.",
 }
 
 func (OIDCProvider) SwaggerDoc() map[string]string {
@@ -464,6 +537,26 @@ var map_PrefixedClaimMapping = map[string]string{
 
 func (PrefixedClaimMapping) SwaggerDoc() map[string]string {
 	return map_PrefixedClaimMapping
+}
+
+var map_SourceURL = map[string]string{
+	"":               "SourceURL configures the options used to build the URL that is queried for external claims.",
+	"hostname":       "hostname is a required hostname for which the external claims are located.\n\nIt must be a valid DNS subdomain name as per RFC1123.\n\nThis means that it must start and end with a lowercase alphanumeric character, must only consist of lowercase alphanumeric characters, '-', and '.'. hostname may optionally specify a port in the format ':{port}'. If a port is specified it must not exceed 65535.\n\nhostname must be at least 1 character in length. When specifying a port, hostname must not exceed 259 characters in length. When not specifying a port, hostname must not exceed 253 characters in length.",
+	"pathExpression": "pathExpression is a required CEL expression that returns a list of string values used to construct the URL path. Claims from the token used for the request to the kube-apiserver are made available via the `claims` variable. expression must be at least 1 character in length and must not exceed 1024 characters in length.\n\nValues in the returned list will be joined with the hostname using a forward slash (`/`) as a separator. Values in the returned list do not need to include the forward slash. If a forward slash is included in a returned value, it will be encoded as `%2F`.\n\nExample of a static path configuration:\n\n    pathExpression: ['realms', 'k8s', 'protocol', 'openid-connect', 'userinfo']\n\nThe above example would resolve to the path: '/realms/k8s/protocol/openid-connect/userinfo'\n\nExample of a dynamic path configuration:\n\n    pathExpression: \"['admin', 'realms', 'k8s', 'users'] + [claims.sub] + ['groups']\"\n\nAssuming 'claims.sub' is set to '12345', the above example would resolve to the path: '/admin/realms/k8s/users/12345/groups'",
+}
+
+func (SourceURL) SwaggerDoc() map[string]string {
+	return map_SourceURL
+}
+
+var map_SourcedClaimMapping = map[string]string{
+	"":           "SourcedClaimMapping configures the mapping behavior for a single external claim from the response the apiserver received from the external claim source.",
+	"name":       "name is a required name of the claim that will be produced and made available during the claim-to-identity mapping process. name must consist of only lowercase alpha characters and underscores ('_'). name must be at least 1 character and must not exceed 256 characters in length.",
+	"expression": "expression is a required CEL expression that will produce a value to be assigned to the claim. The full response body from the request to the external claim source is provided via the `response.body` variable.\n\nThe contents of the `response.body` variable varies based on the response received from the external source. It is the responsibility of those configuring this expression to understand what is returned from the external source.\n\nexpression must be at least 1 character and must not exceed 1024 characters in length.",
+}
+
+func (SourcedClaimMapping) SwaggerDoc() map[string]string {
+	return map_SourcedClaimMapping
 }
 
 var map_TokenClaimMapping = map[string]string{
@@ -984,6 +1077,44 @@ var map_ConsoleStatus = map[string]string{
 
 func (ConsoleStatus) SwaggerDoc() map[string]string {
 	return map_ConsoleStatus
+}
+
+var map_CRIOCredentialProviderConfig = map[string]string{
+	"":         "CRIOCredentialProviderConfig holds cluster-wide singleton resource configurations for CRI-O credential provider, the name of this instance is \"cluster\". CRI-O credential provider is a binary shipped with CRI-O that provides a way to obtain container image pull credentials from external sources. For example, it can be used to fetch mirror registry credentials from secrets resources in the cluster within the same namespace the pod will be running in. CRIOCredentialProviderConfig configuration specifies the pod image sources registries that should trigger the CRI-O credential provider execution, which will resolve the CRI-O mirror configurations and obtain the necessary credentials for pod creation. Note: Configuration changes will only take effect after the kubelet restarts, which is automatically managed by the cluster during rollout.\n\nThe resource is a singleton named \"cluster\".\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec defines the desired configuration of the CRI-O Credential Provider. This field is required and must be provided when creating the resource.",
+	"status":   "status represents the current state of the CRIOCredentialProviderConfig. When omitted or nil, it indicates that the status has not yet been set by the controller. The controller will populate this field with validation conditions and operational state.",
+}
+
+func (CRIOCredentialProviderConfig) SwaggerDoc() map[string]string {
+	return map_CRIOCredentialProviderConfig
+}
+
+var map_CRIOCredentialProviderConfigList = map[string]string{
+	"":         "CRIOCredentialProviderConfigList contains a list of CRIOCredentialProviderConfig resources\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+}
+
+func (CRIOCredentialProviderConfigList) SwaggerDoc() map[string]string {
+	return map_CRIOCredentialProviderConfigList
+}
+
+var map_CRIOCredentialProviderConfigSpec = map[string]string{
+	"":            "CRIOCredentialProviderConfigSpec defines the desired configuration of the CRI-O Credential Provider.",
+	"matchImages": "matchImages is a list of string patterns used to determine whether the CRI-O credential provider should be invoked for a given image. This list is passed to the kubelet CredentialProviderConfig, and if any pattern matches the requested image, CRI-O credential provider will be invoked to obtain credentials for pulling that image or its mirrors. Depending on the platform, the CRI-O credential provider may be installed alongside an existing platform specific provider. Conflicts between the existing platform specific provider image match configuration and this list will be handled by the following precedence rule: credentials from built-in kubelet providers (e.g., ECR, GCR, ACR) take precedence over those from the CRIOCredentialProviderConfig when both match the same image. To avoid uncertainty, it is recommended to avoid configuring your private image patterns to overlap with existing platform specific provider config(e.g., the entries from https://github.com/openshift/machine-config-operator/blob/main/templates/common/aws/files/etc-kubernetes-credential-providers-ecr-credential-provider.yaml). You can check the resource's Status conditions to see if any entries were ignored due to exact matches with known built-in provider patterns.\n\nThis field is optional, the items of the list must contain between 1 and 50 entries. The list is treated as a set, so duplicate entries are not allowed.\n\nFor more details, see: https://kubernetes.io/docs/tasks/administer-cluster/kubelet-credential-provider/ https://github.com/cri-o/crio-credential-provider#architecture\n\nEach entry in matchImages is a pattern which can optionally contain a port and a path. Each entry must be no longer than 512 characters. Wildcards ('*') are supported for full subdomain labels, such as '*.k8s.io' or 'k8s.*.io', and for top-level domains, such as 'k8s.*' (which matches 'k8s.io' or 'k8s.net'). A global wildcard '*' (matching any domain) is not allowed. Wildcards may replace an entire hostname label (e.g., *.example.com), but they cannot appear within a label (e.g., f*oo.example.com) and are not allowed in the port or path. For example, 'example.*.com' is valid, but 'exa*mple.*.com' is not. Each wildcard matches only a single domain label, so '*.io' does **not** match '*.k8s.io'.\n\nA match exists between an image and a matchImage when all of the below are true: Both contain the same number of domain parts and each part matches. The URL path of an matchImages must be a prefix of the target image URL path. If the matchImages contains a port, then the port must match in the image as well.\n\nExample values of matchImages: - 123456789.dkr.ecr.us-east-1.amazonaws.com - *.azurecr.io - gcr.io - *.*.registry.io - registry.io:8080/path",
+}
+
+func (CRIOCredentialProviderConfigSpec) SwaggerDoc() map[string]string {
+	return map_CRIOCredentialProviderConfigSpec
+}
+
+var map_CRIOCredentialProviderConfigStatus = map[string]string{
+	"":           "CRIOCredentialProviderConfigStatus defines the observed state of CRIOCredentialProviderConfig",
+	"conditions": "conditions represent the latest available observations of the configuration state. When omitted, it indicates that no conditions have been reported yet. The maximum number of conditions is 16. Conditions are stored as a map keyed by condition type, ensuring uniqueness.\n\nExpected condition types include: \"Validated\": indicates whether the matchImages configuration is valid",
+}
+
+func (CRIOCredentialProviderConfigStatus) SwaggerDoc() map[string]string {
+	return map_CRIOCredentialProviderConfigStatus
 }
 
 var map_AWSDNSSpec = map[string]string{
@@ -1737,9 +1868,10 @@ func (InfrastructureList) SwaggerDoc() map[string]string {
 }
 
 var map_InfrastructureSpec = map[string]string{
-	"":             "InfrastructureSpec contains settings that apply to the cluster infrastructure.",
-	"cloudConfig":  "cloudConfig is a reference to a ConfigMap containing the cloud provider configuration file. This configuration file is used to configure the Kubernetes cloud provider integration when using the built-in cloud provider integration or the external cloud controller manager. The namespace for this config map is openshift-config.\n\ncloudConfig should only be consumed by the kube_cloud_config controller. The controller is responsible for using the user configuration in the spec for various platforms and combining that with the user provided ConfigMap in this field to create a stitched kube cloud config. The controller generates a ConfigMap `kube-cloud-config` in `openshift-config-managed` namespace with the kube cloud config is stored in `cloud.conf` key. All the clients are expected to use the generated ConfigMap only.",
-	"platformSpec": "platformSpec holds desired information specific to the underlying infrastructure provider.",
+	"":                     "InfrastructureSpec contains settings that apply to the cluster infrastructure.",
+	"cloudConfig":          "cloudConfig is a reference to a ConfigMap containing the cloud provider configuration file. This configuration file is used to configure the Kubernetes cloud provider integration when using the built-in cloud provider integration or the external cloud controller manager. The namespace for this config map is openshift-config.\n\ncloudConfig should only be consumed by the kube_cloud_config controller. The controller is responsible for using the user configuration in the spec for various platforms and combining that with the user provided ConfigMap in this field to create a stitched kube cloud config. The controller generates a ConfigMap `kube-cloud-config` in `openshift-config-managed` namespace with the kube cloud config is stored in `cloud.conf` key. All the clients are expected to use the generated ConfigMap only.",
+	"platformSpec":         "platformSpec holds desired information specific to the underlying infrastructure provider.",
+	"controlPlaneTopology": "controlPlaneTopology expresses the desired topology configuration for control nodes.\n\nWhen status.controlPlaneTopology is 'SingleReplica' and spec.controlPlaneTopology is set to 'HighlyAvailable', a transition will be triggered to reconfigure the cluster from SingleReplica to HighlyAvailable.\n\nWhen left blank or status.controlPlaneTopology and spec.controlPlaneTopology are the same value, no changes are required and no transitions will be triggered.\n\nThis value may be set to match status.controlPlaneTopology regardless of the current value.",
 }
 
 func (InfrastructureSpec) SwaggerDoc() map[string]string {
@@ -2151,6 +2283,7 @@ var map_ComponentRouteSpec = map[string]string{
 	"name":                     "name is the logical name of the route to customize.\n\nThe namespace and name of this componentRoute must match a corresponding entry in the list of status.componentRoutes if the route is to be customized.",
 	"hostname":                 "hostname is the hostname that should be used by the route.",
 	"servingCertKeyPairSecret": "servingCertKeyPairSecret is a reference to a secret of type `kubernetes.io/tls` in the openshift-config namespace. The serving cert/key pair must match and will be used by the operator to fulfill the intent of serving with this name. If the custom hostname uses the default routing suffix of the cluster, the Secret specification for a serving certificate will not be needed.",
+	"labels":                   "labels defines additional labels to be applied to the route created for the component. These labels are used by the IngressController to determine which routes it should manage. Changing labels may cause the route to be reassigned to a different IngressController. When omitted, no additional labels are applied to the component route. When specified, labels must contain at least one entry, up to a maximum of 8. Label keys must be valid qualified names, consisting of a name segment and an optional prefix separated by a slash (/). The name segment must be at most 63 characters in length and must consist only of alphanumeric characters, dashes (-), underscores (_), and dots (.), and must start and end with alphanumeric characters. The prefix, if specified, must be a DNS subdomain: at most 253 characters in length, consisting of dot-separated segments where each segment starts and ends with an alphanumeric character. Label values must be either empty or 1-63 characters, consisting of alphanumeric characters, dashes (-), underscores (_), or dots (.), starting and ending with an alphanumeric character. Keys with the \"kubernetes.io/\", \"k8s.io/\", and \"openshift.io/\" prefixes are reserved and may not be used.",
 }
 
 func (ComponentRouteSpec) SwaggerDoc() map[string]string {
@@ -2205,7 +2338,7 @@ func (IngressPlatformSpec) SwaggerDoc() map[string]string {
 var map_IngressSpec = map[string]string{
 	"domain":               "domain is used to generate a default host name for a route when the route's host name is empty. The generated host name will follow this pattern: \"<route-name>.<route-namespace>.<domain>\".\n\nIt is also used as the default wildcard domain suffix for ingress. The default ingresscontroller domain will follow this pattern: \"*.<domain>\".\n\nOnce set, changing domain is not currently supported.",
 	"appsDomain":           "appsDomain is an optional domain to use instead of the one specified in the domain field when a Route is created without specifying an explicit host. If appsDomain is nonempty, this value is used to generate default host values for Route. Unlike domain, appsDomain may be modified after installation. This assumes a new ingresscontroller has been setup with a wildcard certificate.",
-	"componentRoutes":      "componentRoutes is an optional list of routes that are managed by OpenShift components that a cluster-admin is able to configure the hostname and serving certificate for. The namespace and name of each route in this list should match an existing entry in the status.componentRoutes list.\n\nTo determine the set of configurable Routes, look at namespace and name of entries in the .status.componentRoutes list, where participating operators write the status of configurable routes.",
+	"componentRoutes":      "componentRoutes is an optional list of routes that are managed by OpenShift components that a cluster-admin is able to configure the hostname and serving certificate for. The namespace and name of each route in this list should match an existing entry in the status.componentRoutes list.\n\nTo determine the set of configurable Routes, look at namespace and name of entries in the .status.componentRoutes list, where participating operators write the status of configurable routes. A maximum of 250 component routes may be configured.",
 	"requiredHSTSPolicies": "requiredHSTSPolicies specifies HSTS policies that are required to be set on newly created  or updated routes matching the domainPattern/s and namespaceSelector/s that are specified in the policy. Each requiredHSTSPolicy must have at least a domainPattern and a maxAge to validate a route HSTS Policy route annotation, and affect route admission.\n\nA candidate route is checked for HSTS Policies if it has the HSTS Policy route annotation: \"haproxy.router.openshift.io/hsts_header\" E.g. haproxy.router.openshift.io/hsts_header: max-age=31536000;preload;includeSubDomains\n\n- For each candidate route, if it matches a requiredHSTSPolicy domainPattern and optional namespaceSelector, then the maxAge, preloadPolicy, and includeSubdomainsPolicy must be valid to be admitted.  Otherwise, the route is rejected. - The first match, by domainPattern and optional namespaceSelector, in the ordering of the RequiredHSTSPolicies determines the route's admission status. - If the candidate route doesn't match any requiredHSTSPolicy domainPattern and optional namespaceSelector, then it may use any HSTS Policy annotation.\n\nThe HSTS policy configuration may be changed after routes have already been created. An update to a previously admitted route may then fail if the updated route does not conform to the updated HSTS policy configuration. However, changing the HSTS policy configuration will not cause a route that is already admitted to stop working.\n\nNote that if there are no RequiredHSTSPolicies, any HSTS Policy annotation on the route is valid.",
 	"loadBalancer":         "loadBalancer contains the load balancer details in general which are not only specific to the underlying infrastructure provider of the current cluster and are required for Ingress Controller to work on OpenShift.",
 }
@@ -2341,7 +2474,7 @@ func (KMSPluginConfig) SwaggerDoc() map[string]string {
 
 var map_VaultAppRoleAuthentication = map[string]string{
 	"":       "VaultAppRoleAuthentication defines the configuration for AppRole authentication with Vault.",
-	"secret": "secret references a secret in the openshift-config namespace containing the AppRole credentials used to authenticate with Vault. The secret must contain two keys: \"role-id\" for the AppRole Role ID and \"secret-id\" for the AppRole Secret ID.",
+	"secret": "secret references a secret in the openshift-config namespace containing the AppRole credentials used to authenticate with Vault. The referenced Secret must contain two keys: \"role-id\" for the AppRole Role ID and \"secret-id\" for the AppRole Secret ID.",
 }
 
 func (VaultAppRoleAuthentication) SwaggerDoc() map[string]string {
@@ -2374,7 +2507,7 @@ var map_VaultKMSPluginConfig = map[string]string{
 	"vaultNamespace": "vaultNamespace specifies the Vault namespace where the Transit secrets engine is mounted. This is only applicable for Vault Enterprise installations. When this field is not set, no namespace is used.\n\nThe value must be between 1 and 4096 characters. The namespace cannot end with a forward slash, cannot contain spaces, and cannot be one of the reserved strings: root, sys, audit, auth, cubbyhole, or identity.",
 	"tls":            "tls contains the TLS configuration for connecting to the Vault server. When this field is not set, system default TLS settings are used.",
 	"authentication": "authentication defines the authentication method used to authenticate with Vault.",
-	"transitMount":   "transitMount specifies the mount path of the Vault Transit engine.\n\nWhen omitted, this means the user has no opinion and the platform is left to choose a reasonable default. These defaults are subject to change over time. The current default is \"transit\".\n\nThe transit mount must be between 1 and 1024 characters when specified, cannot start or end with a forward slash, cannot contain consecutive forward slashes, and must only contain RFC 3986 unreserved characters (alphanumeric, hyphen, period, underscore, tilde) and forward slashes as path separators.",
+	"transitMount":   "transitMount specifies the mount path of the Vault Transit engine.\n\nThe transit mount must be between 1 and 1024 characters, cannot start or end with a forward slash, cannot contain consecutive forward slashes, and must only contain RFC 3986 unreserved characters (alphanumeric, hyphen, period, underscore, tilde) and forward slashes as path separators.",
 	"transitKey":     "transitKey specifies the name of the encryption key in Vault's Transit engine. This key is used to encrypt and decrypt data.\n\nThe transit key must be between 1 and 512 characters, cannot contain forward slashes, and must only contain alphanumeric characters, hyphens, periods, and underscores.",
 }
 
@@ -2393,7 +2526,7 @@ func (VaultSecretReference) SwaggerDoc() map[string]string {
 
 var map_VaultTLSConfig = map[string]string{
 	"":           "VaultTLSConfig contains TLS configuration for connecting to Vault.",
-	"caBundle":   "caBundle references a ConfigMap in the openshift-config namespace containing the CA certificate bundle used to verify the TLS connection to the Vault server. The ConfigMap must contain the CA bundle in the key \"ca-bundle.crt\". When this field is not set, the system's trusted CA certificates are used.\n\nThe namespace for the ConfigMap is openshift-config.\n\nExample ConfigMap:\n  apiVersion: v1\n  kind: ConfigMap\n  metadata:\n    name: vault-ca-bundle\n    namespace: openshift-config\n  data:\n    ca-bundle.crt: |",
+	"caBundle":   "caBundle references a ConfigMap in the openshift-config namespace containing the CA certificate bundle used to verify the TLS connection to the Vault server. The referenced ConfigMap must contain the CA bundle in the key \"ca-bundle.crt\". When this field is not set, the system's trusted CA certificates are used.\n\nThe namespace for the ConfigMap is openshift-config.\n\nExample ConfigMap:\n  apiVersion: v1\n  kind: ConfigMap\n  metadata:\n    name: vault-ca-bundle\n    namespace: openshift-config\n  data:\n    ca-bundle.crt: |",
 	"serverName": "serverName specifies the Server Name Indication (SNI) to use when connecting to Vault via TLS. This is useful when the Vault server's hostname doesn't match its TLS certificate. When this field is not set, the hostname from vaultAddress is used for SNI.\n\nThe value must be a valid DNS hostname: it must contain no more than 253 characters, contain only lowercase alphanumeric characters, '-' or '.', and start and end with an alphanumeric character.",
 }
 
@@ -2511,6 +2644,15 @@ func (NetworkMigration) SwaggerDoc() map[string]string {
 	return map_NetworkMigration
 }
 
+var map_NetworkObservabilitySpec = map[string]string{
+	"":                   "NetworkObservabilitySpec defines the configuration for network observability installation",
+	"installationPolicy": "installationPolicy controls whether network observability is installed during cluster deployment. Valid values are \"InstallAndEnable\" and \"NoAction\". When set to \"InstallAndEnable\", ensure that network observability will be installed and enabled on the cluster. If already installed, no action taken, but if it gets uninstalled, it will install it again. When set to \"NoAction\", nothing will be done regarding Network observability. During the installation of NetworkObservability, the platform checks for any existing manual installations. If a successful installation using the OLMv0 or OLMv1 API is detected, it will be used. If the platform cannot determine how the current version was installed, or if the existing installation is incomplete, the installation process will stop.",
+}
+
+func (NetworkObservabilitySpec) SwaggerDoc() map[string]string {
+	return map_NetworkObservabilitySpec
+}
+
 var map_NetworkSpec = map[string]string{
 	"":                     "NetworkSpec is the desired network configuration. As a general rule, this SHOULD NOT be read directly. Instead, you should consume the NetworkStatus, as it indicates the currently deployed configuration. Currently, most spec fields are immutable after installation. Please view the individual ones for further details on each.",
 	"clusterNetwork":       "IP address pool to use for pod IPs. This field is immutable after installation.",
@@ -2519,6 +2661,7 @@ var map_NetworkSpec = map[string]string{
 	"externalIP":           "externalIP defines configuration for controllers that affect Service.ExternalIP. If nil, then ExternalIP is not allowed to be set.",
 	"serviceNodePortRange": "The port range allowed for Services of type NodePort. If not specified, the default of 30000-32767 will be used. Such Services without a NodePort specified will have one automatically allocated from this range. This parameter can be updated after the cluster is installed.",
 	"networkDiagnostics":   "networkDiagnostics defines network diagnostics configuration.\n\nTakes precedence over spec.disableNetworkDiagnostics in network.operator.openshift.io. If networkDiagnostics is not specified or is empty, and the spec.disableNetworkDiagnostics flag in network.operator.openshift.io is set to true, the network diagnostics feature will be disabled.",
+	"networkObservability": "networkObservability is an optional field that configures network observability installation during cluster deployment (day-0). When omitted, unless this is a SNO cluster, network observability will be installed if not already present, after that, no action taken.",
 }
 
 func (NetworkSpec) SwaggerDoc() map[string]string {
@@ -3061,6 +3204,7 @@ func (OldTLSProfile) SwaggerDoc() map[string]string {
 var map_TLSProfileSpec = map[string]string{
 	"":              "TLSProfileSpec is the desired behavior of a TLSSecurityProfile.",
 	"ciphers":       "ciphers is used to specify the cipher algorithms that are negotiated during the TLS handshake. Operators may remove entries that their operands do not support. For example, to use only ECDHE-RSA-AES128-GCM-SHA256 (yaml):\n\n  ciphers:\n    - ECDHE-RSA-AES128-GCM-SHA256\n\nTLS 1.3 cipher suites (e.g. TLS_AES_128_GCM_SHA256) are not configurable and are always enabled when TLS 1.3 is negotiated.",
+	"groups":        "groups is an optional, ordered field used to specify the supported groups (formerly known as elliptic curves) that are used during the TLS handshake.  The order of the groups represents a suggested preference, with the most preferred group first. Note that not all platform components honor the ordering: Go-based components use Go's internal preference order and treat this list as a filter of allowed groups rather than an ordered preference. Operators may remove entries their operands do not support.\n\nWhen omitted, this means no opinion and the platform is left to choose reasonable defaults which are subject to change over time and may be different per platform component depending on the underlying TLS libraries they use. If specified, the list must contain at least one and at most 7 groups, and each group must be unique.\n\nFor example, to use X25519 and secp256r1 (yaml):\n\n  groups:\n    - X25519\n    - secp256r1",
 	"minTLSVersion": "minTLSVersion is used to specify the minimal version of the TLS protocol that is negotiated during the TLS handshake. For example, to use TLS versions 1.1, 1.2 and 1.3 (yaml):\n\n  minTLSVersion: VersionTLS11",
 }
 
@@ -3070,11 +3214,11 @@ func (TLSProfileSpec) SwaggerDoc() map[string]string {
 
 var map_TLSSecurityProfile = map[string]string{
 	"":             "TLSSecurityProfile defines the schema for a TLS security profile. This object is used by operators to apply TLS security settings to operands.",
-	"type":         "type is one of Old, Intermediate, Modern or Custom. Custom provides the ability to specify individual TLS security profile parameters.\n\nThe profiles are based on version 5.7 of the Mozilla Server Side TLS configuration guidelines. The cipher lists consist of the configuration's \"ciphersuites\" followed by the Go-specific \"ciphers\" from the guidelines. See: https://ssl-config.mozilla.org/guidelines/5.7.json\n\nThe profiles are intent based, so they may change over time as new ciphers are developed and existing ciphers are found to be insecure. Depending on precisely which ciphers are available to a process, the list may be reduced.",
-	"old":          "old is a TLS profile for use when services need to be accessed by very old clients or libraries and should be used only as a last resort.\n\nThis profile is equivalent to a Custom profile specified as:\n  minTLSVersion: VersionTLS10\n  ciphers:\n    - TLS_AES_128_GCM_SHA256\n    - TLS_AES_256_GCM_SHA384\n    - TLS_CHACHA20_POLY1305_SHA256\n    - ECDHE-ECDSA-AES128-GCM-SHA256\n    - ECDHE-RSA-AES128-GCM-SHA256\n    - ECDHE-ECDSA-AES256-GCM-SHA384\n    - ECDHE-RSA-AES256-GCM-SHA384\n    - ECDHE-ECDSA-CHACHA20-POLY1305\n    - ECDHE-RSA-CHACHA20-POLY1305\n    - ECDHE-ECDSA-AES128-SHA256\n    - ECDHE-RSA-AES128-SHA256\n    - ECDHE-ECDSA-AES128-SHA\n    - ECDHE-RSA-AES128-SHA\n    - ECDHE-ECDSA-AES256-SHA\n    - ECDHE-RSA-AES256-SHA\n    - AES128-GCM-SHA256\n    - AES256-GCM-SHA384\n    - AES128-SHA256\n    - AES128-SHA\n    - AES256-SHA\n    - DES-CBC3-SHA",
-	"intermediate": "intermediate is a TLS profile for use when you do not need compatibility with legacy clients and want to remain highly secure while being compatible with most clients currently in use.\n\nThis profile is equivalent to a Custom profile specified as:\n  minTLSVersion: VersionTLS12\n  ciphers:\n    - TLS_AES_128_GCM_SHA256\n    - TLS_AES_256_GCM_SHA384\n    - TLS_CHACHA20_POLY1305_SHA256\n    - ECDHE-ECDSA-AES128-GCM-SHA256\n    - ECDHE-RSA-AES128-GCM-SHA256\n    - ECDHE-ECDSA-AES256-GCM-SHA384\n    - ECDHE-RSA-AES256-GCM-SHA384\n    - ECDHE-ECDSA-CHACHA20-POLY1305\n    - ECDHE-RSA-CHACHA20-POLY1305",
-	"modern":       "modern is a TLS security profile for use with clients that support TLS 1.3 and do not need backward compatibility for older clients.\n\nThis profile is equivalent to a Custom profile specified as:\n  minTLSVersion: VersionTLS13\n  ciphers:\n    - TLS_AES_128_GCM_SHA256\n    - TLS_AES_256_GCM_SHA384\n    - TLS_CHACHA20_POLY1305_SHA256",
-	"custom":       "custom is a user-defined TLS security profile. Be extremely careful using a custom profile as invalid configurations can be catastrophic. An example custom profile looks like this:\n\n  minTLSVersion: VersionTLS11\n  ciphers:\n    - ECDHE-ECDSA-CHACHA20-POLY1305\n    - ECDHE-RSA-CHACHA20-POLY1305\n    - ECDHE-RSA-AES128-GCM-SHA256\n    - ECDHE-ECDSA-AES128-GCM-SHA256",
+	"type":         "type is one of Old, Intermediate, Modern or Custom. Custom provides the ability to specify individual TLS security profile parameters.\n\nThe cipher and groups lists in these profiles are based on version 5.8 of the Mozilla Server Side TLS configuration guidelines. See: https://ssl-config.mozilla.org/guidelines/5.8.json\n\nThe groups are listed in suggested preference order, with the most preferred group first. Note that not all platform components honor the ordering: Go-based components use Go's internal preference order and treat this list as a filter of allowed groups rather than an ordered preference. Note that X25519MLKEM768 is a post-quantum hybrid group that is not FIPS-approved and should be ignored by components running in FIPS mode.\n\nThe profiles are intent based, so they may change over time as new ciphers are developed and existing ciphers are found to be insecure. Depending on precisely which ciphers are available to a process, the list may be reduced.",
+	"old":          "old is a TLS profile for use when services need to be accessed by very old clients or libraries and should be used only as a last resort.\n\nThe supported groups list includes by default the following groups in suggested preference order (ordering may not be honored by all implementations): X25519MLKEM768, X25519, secp256r1, secp384r1.\n\nThis profile is equivalent to a Custom profile specified as:\n  minTLSVersion: VersionTLS10\n  ciphers:\n    - TLS_AES_128_GCM_SHA256\n    - TLS_AES_256_GCM_SHA384\n    - TLS_CHACHA20_POLY1305_SHA256\n    - ECDHE-ECDSA-AES128-GCM-SHA256\n    - ECDHE-RSA-AES128-GCM-SHA256\n    - ECDHE-ECDSA-AES256-GCM-SHA384\n    - ECDHE-RSA-AES256-GCM-SHA384\n    - ECDHE-ECDSA-CHACHA20-POLY1305\n    - ECDHE-RSA-CHACHA20-POLY1305\n    - ECDHE-ECDSA-AES128-SHA256\n    - ECDHE-RSA-AES128-SHA256\n    - ECDHE-ECDSA-AES128-SHA\n    - ECDHE-RSA-AES128-SHA\n    - ECDHE-ECDSA-AES256-SHA384\n    - ECDHE-RSA-AES256-SHA384\n    - ECDHE-ECDSA-AES256-SHA\n    - ECDHE-RSA-AES256-SHA\n    - AES128-GCM-SHA256\n    - AES256-GCM-SHA384\n    - AES128-SHA256\n    - AES256-SHA256\n    - AES128-SHA\n    - AES256-SHA\n    - DES-CBC3-SHA",
+	"intermediate": "intermediate is a TLS profile for use when you do not need compatibility with legacy clients and want to remain highly secure while being compatible with most clients currently in use.\n\nThe supported groups list includes by default the following groups in suggested preference order (ordering may not be honored by all implementations): X25519MLKEM768, X25519, secp256r1, secp384r1.\n\nThis profile is equivalent to a Custom profile specified as:\n  minTLSVersion: VersionTLS12\n  ciphers:\n    - TLS_AES_128_GCM_SHA256\n    - TLS_AES_256_GCM_SHA384\n    - TLS_CHACHA20_POLY1305_SHA256\n    - ECDHE-ECDSA-AES128-GCM-SHA256\n    - ECDHE-RSA-AES128-GCM-SHA256\n    - ECDHE-ECDSA-AES256-GCM-SHA384\n    - ECDHE-RSA-AES256-GCM-SHA384\n    - ECDHE-ECDSA-CHACHA20-POLY1305\n    - ECDHE-RSA-CHACHA20-POLY1305",
+	"modern":       "modern is a TLS security profile for use with clients that support TLS 1.3 and do not need backward compatibility for older clients. The supported groups list includes by default the following groups in suggested preference order (ordering may not be honored by all implementations): X25519MLKEM768, X25519, secp256r1, secp384r1. This profile is equivalent to a Custom profile specified as:\n  minTLSVersion: VersionTLS13\n  ciphers:\n    - TLS_AES_128_GCM_SHA256\n    - TLS_AES_256_GCM_SHA384\n    - TLS_CHACHA20_POLY1305_SHA256",
+	"custom":       "custom is a user-defined TLS security profile. Be extremely careful using a custom profile as invalid configurations can be catastrophic.\n\nThe supported groups list for this profile is empty by default.\n\nAn example custom profile looks like this:\n\n  minTLSVersion: VersionTLS11\n  ciphers:\n    - ECDHE-ECDSA-CHACHA20-POLY1305\n    - ECDHE-RSA-CHACHA20-POLY1305\n    - ECDHE-RSA-AES128-GCM-SHA256\n    - ECDHE-ECDSA-AES128-GCM-SHA256",
 }
 
 func (TLSSecurityProfile) SwaggerDoc() map[string]string {

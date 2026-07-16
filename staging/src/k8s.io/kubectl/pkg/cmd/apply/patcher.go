@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -114,7 +115,7 @@ func (p *Patcher) delete(namespace, name string) error {
 	return err
 }
 
-func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
+func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, name string, errOut io.Writer, localApply bool) ([]byte, runtime.Object, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
@@ -193,6 +194,24 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 
 	if string(patch) == "{}" {
 		return patch, obj, nil
+	}
+
+	if localApply {
+		var patchedBytes []byte
+		if patchType == types.StrategicMergePatchType {
+			versionedObj, _ := scheme.Scheme.New(p.Mapping.GroupVersionKind)
+			patchedBytes, err = strategicpatch.StrategicMergePatch(current, patch, versionedObj)
+		} else {
+			patchedBytes, err = jsonpatch.MergePatch(current, patch)
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("applying patch locally: %w", err)
+		}
+		patchedObj, _, err := unstructured.UnstructuredJSONScheme.Decode(patchedBytes, nil, nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("decoding locally patched object: %w", err)
+		}
+		return patch, patchedObj, nil
 	}
 
 	if p.ResourceVersion != nil {
@@ -357,7 +376,7 @@ func (p *Patcher) buildStrategicMergeFromBuiltins(versionedObj runtime.Object, o
 // the final patched object. On failure, returns an error.
 func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	var getErr error
-	patchBytes, patchObject, err := p.patchSimple(current, modified, namespace, name, errOut)
+	patchBytes, patchObject, err := p.patchSimple(current, modified, namespace, name, errOut, false)
 	if p.Retries == 0 {
 		p.Retries = maxPatchRetry
 	}
@@ -369,7 +388,7 @@ func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespa
 		if getErr != nil {
 			return nil, nil, getErr
 		}
-		patchBytes, patchObject, err = p.patchSimple(current, modified, namespace, name, errOut)
+		patchBytes, patchObject, err = p.patchSimple(current, modified, namespace, name, errOut, false)
 	}
 	if err != nil {
 		if (apierrors.IsConflict(err) || apierrors.IsInvalid(err)) && p.Force {
@@ -379,6 +398,12 @@ func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespa
 		}
 	}
 	return patchBytes, patchObject, err
+}
+
+// PatchLocal computes and applies the patch locally without sending to the server.
+// Used for --dry-run=client.
+func (p *Patcher) PatchLocal(current runtime.Object, modified []byte, errOut io.Writer) ([]byte, runtime.Object, error) {
+	return p.patchSimple(current, modified, "", "", errOut, true)
 }
 
 func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, namespace, name string) ([]byte, runtime.Object, error) {

@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -33,12 +32,23 @@ import (
 	_ "github.com/google/cadvisor/container/crio/install"
 	_ "github.com/google/cadvisor/container/systemd/install"
 
+	// Register filesystem plugins needed for container stats.
+	_ "github.com/google/cadvisor/fs/btrfs/install"
+	_ "github.com/google/cadvisor/fs/devicemapper/install"
+	_ "github.com/google/cadvisor/fs/nfs/install"
+	_ "github.com/google/cadvisor/fs/overlay/install"
+	_ "github.com/google/cadvisor/fs/tmpfs/install"
+	_ "github.com/google/cadvisor/fs/vfs/install"
+	_ "github.com/google/cadvisor/fs/zfs/install"
+
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
+	"github.com/opencontainers/cgroups"
+	cgroupfs2 "github.com/opencontainers/cgroups/fs2"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -88,13 +98,12 @@ func init() {
 }
 
 // New creates a new cAdvisor Interface for linux systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
+func New(logger klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:     struct{}{},
 		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
-		cadvisormetrics.CpuLoadMetrics:      struct{}{},
 		cadvisormetrics.DiskIOMetrics:       struct{}{},
 		cadvisormetrics.NetworkUsageMetrics: struct{}{},
 		cadvisormetrics.AppMetrics:          struct{}{},
@@ -103,7 +112,11 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+		if IsPsiEnabled(logger) {
+			includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+		} else {
+			logger.Info("PSI support not available")
+		}
 	}
 
 	if usingLegacyStats || localStorageCapacityIsolation {
@@ -161,6 +174,26 @@ func (cc *cadvisorClient) ImagesFsInfo(ctx context.Context) (cadvisorapiv2.FsInf
 		return cadvisorapiv2.FsInfo{}, err
 	}
 	return cc.getFsInfo(ctx, label)
+}
+
+// IsPsiEnabled checks whether PSI (Pressure Stall Information) is available on
+// the host by opening the root cgroup's cpu.pressure file using the same
+// opencontainers/cgroups library that cAdvisor uses to read actual PSI values.
+// PSI is a single kernel feature (CONFIG_PSI / boot param "psi=") so checking
+// cpu.pressure alone is sufficient to determine support for all three resources
+// (cpu, memory, io).
+func IsPsiEnabled(logger klog.Logger) bool {
+	return isPsiEnabled(logger, cgroupfs2.UnifiedMountpoint, "cpu.pressure")
+}
+
+func isPsiEnabled(logger klog.Logger, cgroupDir, psiFile string) bool {
+	f, err := cgroups.OpenFile(cgroupDir, psiFile, os.O_RDONLY)
+	if err != nil {
+		logger.V(4).Info("PSI not available", "dir", cgroupDir, "file", psiFile, "err", err)
+		return false
+	}
+	_ = f.Close()
+	return true
 }
 
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {

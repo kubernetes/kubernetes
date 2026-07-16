@@ -908,6 +908,8 @@ spec:
       schedulerName: schedulerNameValue
       schedulingGates:
       - name: nameValue
+      schedulingGroup:
+        podGroupName: podGroupNameValue
       securityContext:
         appArmorProfile:
           localhostProfile: localhostProfileValue
@@ -1263,10 +1265,6 @@ spec:
           storagePolicyID: storagePolicyIDValue
           storagePolicyName: storagePolicyNameValue
           volumePath: volumePathValue
-      workloadRef:
-        name: nameValue
-        podGroup: podGroupValue
-        podGroupReplicaKey: podGroupReplicaKeyValue
 status:
   availableReplicas: 5
   conditions:

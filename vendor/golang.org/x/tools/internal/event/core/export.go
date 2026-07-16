@@ -8,7 +8,6 @@ import (
 	"context"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"golang.org/x/tools/internal/event/label"
 )
@@ -17,23 +16,21 @@ import (
 // It may return a modified context and event.
 type Exporter func(context.Context, Event, label.Map) context.Context
 
-var (
-	exporter unsafe.Pointer
-)
+var exporter atomic.Pointer[Exporter]
 
 // SetExporter sets the global exporter function that handles all events.
 // The exporter is called synchronously from the event call site, so it should
 // return quickly so as not to hold up user code.
 func SetExporter(e Exporter) {
-	p := unsafe.Pointer(&e)
 	if e == nil {
 		// &e is always valid, and so p is always valid, but for the early abort
 		// of ProcessEvent to be efficient it needs to make the nil check on the
 		// pointer without having to dereference it, so we make the nil function
 		// also a nil pointer
-		p = nil
+		exporter.Store(nil)
+	} else {
+		exporter.Store(&e)
 	}
-	atomic.StorePointer(&exporter, p)
 }
 
 // deliver is called to deliver an event to the supplied exporter.
@@ -48,7 +45,7 @@ func deliver(ctx context.Context, exporter Exporter, ev Event) context.Context {
 // Export is called to deliver an event to the global exporter if set.
 func Export(ctx context.Context, ev Event) context.Context {
 	// get the global exporter and abort early if there is not one
-	exporterPtr := (*Exporter)(atomic.LoadPointer(&exporter))
+	exporterPtr := exporter.Load()
 	if exporterPtr == nil {
 		return ctx
 	}
@@ -61,7 +58,7 @@ func Export(ctx context.Context, ev Event) context.Context {
 // It will fill in the time.
 func ExportPair(ctx context.Context, begin, end Event) (context.Context, func()) {
 	// get the global exporter and abort early if there is not one
-	exporterPtr := (*Exporter)(atomic.LoadPointer(&exporter))
+	exporterPtr := exporter.Load()
 	if exporterPtr == nil {
 		return ctx, func() {}
 	}

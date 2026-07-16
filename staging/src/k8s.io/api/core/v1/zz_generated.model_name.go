@@ -422,6 +422,11 @@ func (in ImageVolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImageVolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.ImageVolumeStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in KeyToPath) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.KeyToPath"
 }
@@ -534,6 +539,11 @@ func (in NodeAddress) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NodeAffinity) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.NodeAffinity"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodeAllocatableResourceClaimStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -794,6 +804,11 @@ func (in PodResourceClaimStatus) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodSchedulingGate) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PodSchedulingGate"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodSchedulingGroup) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.PodSchedulingGroup"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -1192,6 +1207,11 @@ func (in VolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in VolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.VolumeStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in VsphereVirtualDiskVolumeSource) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource"
 }
@@ -1204,9 +1224,4 @@ func (in WeightedPodAffinityTerm) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in WindowsSecurityContextOptions) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.WindowsSecurityContextOptions"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in WorkloadReference) OpenAPIModelName() string {
-	return "io.k8s.api.core.v1.WorkloadReference"
 }

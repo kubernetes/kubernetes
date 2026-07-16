@@ -18,6 +18,7 @@ package schema
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 // Schema is a list of named types.
@@ -28,7 +29,7 @@ type Schema struct {
 	Types []TypeDef `yaml:"types,omitempty"`
 
 	once sync.Once
-	m    map[string]TypeDef
+	m    atomic.Pointer[map[string]TypeDef]
 
 	lock sync.Mutex
 	// Cached results of resolving type references to atoms. Only stores
@@ -144,26 +145,28 @@ type Map struct {
 	ElementRelationship ElementRelationship `yaml:"elementRelationship,omitempty"`
 
 	once sync.Once
-	m    map[string]StructField
+	m    atomic.Pointer[map[string]StructField]
 }
 
 // FindField is a convenience function that returns the referenced StructField,
 // if it exists, or (nil, false) if it doesn't.
 func (m *Map) FindField(name string) (StructField, bool) {
 	m.once.Do(func() {
-		m.m = make(map[string]StructField, len(m.Fields))
+		mm := make(map[string]StructField, len(m.Fields))
 		for _, field := range m.Fields {
-			m.m[field.Name] = field
+			mm[field.Name] = field
 		}
+		m.m.Store(&mm)
 	})
-	sf, ok := m.m[name]
+	sf, ok := (*m.m.Load())[name]
 	return sf, ok
 }
 
-// CopyInto this instance of Map into the other
-// If other is nil this method does nothing.
-// If other is already initialized, overwrites it with this instance
-// Warning: Not thread safe
+// CopyInto clones this instance of Map into dst
+//
+// If dst is nil this method does nothing.
+// If dst is already initialized, overwrites it with this instance.
+// Warning: Not thread safe. Only use dst after this function returns.
 func (m *Map) CopyInto(dst *Map) {
 	if dst == nil {
 		return
@@ -175,12 +178,13 @@ func (m *Map) CopyInto(dst *Map) {
 	dst.Unions = m.Unions
 	dst.ElementRelationship = m.ElementRelationship
 
-	if m.m != nil {
+	mm := m.m.Load()
+	if mm != nil {
 		// If cache is non-nil then the once token had been consumed.
 		// Must reset token and use it again to ensure same semantics.
 		dst.once = sync.Once{}
 		dst.once.Do(func() {
-			dst.m = m.m
+			dst.m.Store(mm)
 		})
 	}
 }
@@ -274,12 +278,13 @@ type List struct {
 // if it exists, or (nil, false) if it doesn't.
 func (s *Schema) FindNamedType(name string) (TypeDef, bool) {
 	s.once.Do(func() {
-		s.m = make(map[string]TypeDef, len(s.Types))
+		sm := make(map[string]TypeDef, len(s.Types))
 		for _, t := range s.Types {
-			s.m[t.Name] = t
+			sm[t.Name] = t
 		}
+		s.m.Store(&sm)
 	})
-	t, ok := s.m[name]
+	t, ok := (*s.m.Load())[name]
 	return t, ok
 }
 
@@ -352,10 +357,11 @@ func (s *Schema) Resolve(tr TypeRef) (Atom, bool) {
 	return result, true
 }
 
-// Clones this instance of Schema into the other
-// If other is nil this method does nothing.
-// If other is already initialized, overwrites it with this instance
-// Warning: Not thread safe
+// CopyInto clones this instance of Schema into dst
+//
+// If dst is nil this method does nothing.
+// If dst is already initialized, overwrites it with this instance.
+// Warning: Not thread safe. Only use dst after this function returns.
 func (s *Schema) CopyInto(dst *Schema) {
 	if dst == nil {
 		return
@@ -364,12 +370,13 @@ func (s *Schema) CopyInto(dst *Schema) {
 	// Schema type is considered immutable so sharing references
 	dst.Types = s.Types
 
-	if s.m != nil {
+	sm := s.m.Load()
+	if sm != nil {
 		// If cache is non-nil then the once token had been consumed.
 		// Must reset token and use it again to ensure same semantics.
 		dst.once = sync.Once{}
 		dst.once.Do(func() {
-			dst.m = s.m
+			dst.m.Store(sm)
 		})
 	}
 }

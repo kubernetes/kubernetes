@@ -402,6 +402,9 @@ func TestValidateNestedValueValidationComplete(t *testing.T) {
 	// check that we didn't forget to check any forbidden generic field
 	tt := reflect.TypeOf(Generic{})
 	for i := 0; i < tt.NumField(); i++ {
+		if name := tt.Field(i).Name; name == "ExternalDocs" || name == "Example" {
+			continue // allowed in nested value validations
+		}
 		vv := &NestedValueValidation{}
 		x := reflect.ValueOf(&vv.ForbiddenGenerics).Elem()
 		fuzzer.Fill(x.Field(i).Addr().Interface())

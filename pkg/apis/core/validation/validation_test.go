@@ -561,6 +561,9 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			if !scenario.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
@@ -1040,6 +1043,9 @@ func TestValidationOptionsForPersistentVolume(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolume(nil, tc.oldPv)
@@ -1626,6 +1632,9 @@ func TestValidatePeristentVolumeAttributesClassUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
+		if !scenario.enableVolumeAttributesClass {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		}
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 		originalNewPV := scenario.newPV.DeepCopy()
@@ -2227,6 +2236,9 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			if !scenario.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			var errs field.ErrorList
@@ -3183,6 +3195,9 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
@@ -3214,6 +3229,9 @@ func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableVolumeAttributesClass {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaimTemplate(nil, tc.oldPvcTemplate)
@@ -8017,7 +8035,7 @@ func TestValidateResizePolicy(t *testing.T) {
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 			},
 			ExpectError:      true,
-			Errors:           field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when `restartPolicy` is 'Never'")},
+			Errors:           field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when pod `restartPolicy` is 'Never'")},
 			PodRestartPolicy: "Never",
 		},
 		"InvalidMemoryPolicyWithPodRestartPolicy": {
@@ -8026,7 +8044,7 @@ func TestValidateResizePolicy(t *testing.T) {
 				{ResourceName: "memory", RestartPolicy: "NotRequired"},
 			},
 			ExpectError:      true,
-			Errors:           field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when `restartPolicy` is 'Never'")},
+			Errors:           field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when pod `restartPolicy` is 'Never'")},
 			PodRestartPolicy: "Never",
 		},
 		"InvalidMemoryCPUPolicyWithPodRestartPolicy": {
@@ -8035,7 +8053,7 @@ func TestValidateResizePolicy(t *testing.T) {
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 			},
 			ExpectError:      true,
-			Errors:           field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when `restartPolicy` is 'Never'"), field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when `restartPolicy` is 'Never'")},
+			Errors:           field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when pod `restartPolicy` is 'Never'"), field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when pod `restartPolicy` is 'Never'")},
 			PodRestartPolicy: "Never",
 		},
 		"ValidMemoryCPUPolicyWithPodRestartPolicy": {
@@ -8049,19 +8067,21 @@ func TestValidateResizePolicy(t *testing.T) {
 		},
 	}
 	for k, v := range testCases {
-		errs := validateResizePolicy(v.PolicyList, field.NewPath("field"), &v.PodRestartPolicy)
-		if !v.ExpectError && len(errs) > 0 {
-			t.Errorf("Testcase %s - expected success, got error: %+v", k, errs)
-		}
-		if v.ExpectError {
-			if len(errs) == 0 {
-				t.Errorf("Testcase %s - expected error, got success", k)
+		t.Run(k, func(t *testing.T) {
+			errs := validateResizePolicy(v.PolicyList, field.NewPath("field"), &v.PodRestartPolicy)
+			if !v.ExpectError && len(errs) > 0 {
+				t.Errorf("Testcase %s - expected success, got error: %+v", k, errs)
 			}
-			delta := cmp.Diff(errs, v.Errors)
-			if delta != "" {
-				t.Errorf("Testcase %s - expected errors '%v', got '%v', diff: '%v'", k, v.Errors, errs, delta)
+			if v.ExpectError {
+				if len(errs) == 0 {
+					t.Errorf("Testcase %s - expected error, got success", k)
+				}
+				delta := cmp.Diff(errs, v.Errors)
+				if delta != "" {
+					t.Errorf("Testcase %s - expected errors '%v', got '%v', diff: '%v'", k, v.Errors, errs, delta)
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -9449,8 +9469,7 @@ func TestValidateInitContainers(t *testing.T) {
 		Image:                    "nginx",
 		ImagePullPolicy:          "IfNotPresent",
 		TerminationMessagePolicy: "File",
-	},
-	}
+	}}
 
 	successCase := []core.Container{{
 		Name:  "container-1-same-host-port-different-protocol",
@@ -9519,10 +9538,27 @@ func TestValidateInitContainers(t *testing.T) {
 		ResizePolicy: []core.ContainerResizePolicy{
 			{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 		},
-	},
-	}
-	var PodRestartPolicy core.RestartPolicy = "Never"
-	if errs := validateInitContainers(successCase, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowSidecarResizePolicy: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	}, {
+		Name:                     "restartcontainer-policy-allowed-if-already-exists",
+		Image:                    "nginx",
+		ImagePullPolicy:          "IfNotPresent",
+		TerminationMessagePolicy: "File",
+		ResizePolicy: []core.ContainerResizePolicy{
+			{ResourceName: core.ResourceCPU, RestartPolicy: core.RestartContainer},
+		},
+	}, {
+		Name:                     "restartcontainer-policy-allowed-if-sidecar",
+		Image:                    "nginx",
+		ImagePullPolicy:          "IfNotPresent",
+		TerminationMessagePolicy: "File",
+		ResizePolicy: []core.ContainerResizePolicy{
+			{ResourceName: core.ResourceCPU, RestartPolicy: core.RestartContainer},
+		},
+		RestartPolicy: ptr.To(core.ContainerRestartPolicyAlways),
+	}}
+
+	var PodRestartPolicy core.RestartPolicy = "Always"
+	if errs := validateInitContainers(successCase, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9897,22 +9933,41 @@ func TestValidateInitContainers(t *testing.T) {
 			},
 		}},
 		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop", BadValue: ""}},
-	},
-		{
-			"Not supported ResizePolicy: invalid",
-			line(),
-			[]core.Container{{
-				Name:                     "init",
-				Image:                    "image",
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-				ResizePolicy: []core.ContainerResizePolicy{
-					{ResourceName: "cpu", RestartPolicy: "NotRequired"},
-				},
-			}},
-			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].resizePolicy", BadValue: []core.ContainerResizePolicy{{ResourceName: "cpu", RestartPolicy: "NotRequired"}}}},
-		},
-	}
+	}, {
+		"Not supported ResizePolicy: invalid",
+		line(),
+		[]core.Container{{
+			Name:                     "init",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			ResizePolicy: []core.ContainerResizePolicy{
+				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].resizePolicy", BadValue: []core.ContainerResizePolicy{{ResourceName: "cpu", RestartPolicy: "NotRequired"}}}},
+	}, {
+		"RestartContainer policy forbidden for non-sidecar init container",
+		line(),
+		[]core.Container{{
+			Name:                     "standard-init-no-restart",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			ResizePolicy: []core.ContainerResizePolicy{
+				{ResourceName: core.ResourceCPU, RestartPolicy: core.RestartContainer},
+			},
+		}},
+		field.ErrorList{{
+			Type:     field.ErrorTypeInvalid,
+			Field:    "initContainers[0].resizePolicy",
+			BadValue: []core.ContainerResizePolicy{{ResourceName: core.ResourceCPU, RestartPolicy: core.RestartContainer}},
+		}, {
+			Type:     field.ErrorTypeInvalid,
+			Field:    "initContainers[0].resizePolicy[0].restartPolicy",
+			BadValue: core.RestartContainer,
+		}},
+	}}
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
@@ -13702,6 +13757,37 @@ func TestValidatePodUpdate(t *testing.T) {
 			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set",
 		}, {
 			new: *podtest.MakePod("foo",
+				podtest.SetInitContainers(core.Container{
+					Name: "ictr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+					ResizePolicy: []core.ContainerResizePolicy{{ResourceName: core.ResourceCPU, RestartPolicy: core.RestartContainer}},
+				}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetInitContainers(core.Container{
+					Name: "ictr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				}),
+			),
+			err:  "spec.initContainers[0].resizePolicy[0].restartPolicy: Invalid value: \"RestartContainer\": must not be set to 'RestartContainer' for non-sidecar initContainers",
+			test: "adding RestartContainer resize policy to non-sidecar init container should fail",
+			opts: PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: false},
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetInitContainers(core.Container{
+					Name: "ictr", Image: "image:v2", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+					ResizePolicy: []core.ContainerResizePolicy{{ResourceName: core.ResourceCPU, RestartPolicy: core.RestartContainer}},
+				}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetInitContainers(core.Container{
+					Name: "ictr", Image: "image:v1", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+					ResizePolicy: []core.ContainerResizePolicy{{ResourceName: core.ResourceCPU, RestartPolicy: core.RestartContainer}},
+				}),
+			),
+			err:  "",
+			test: "existing RestartContainer resize policy on non-sidecar init container should be allowed on update",
+			opts: PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: true},
+		}, {
+			new: *podtest.MakePod("foo",
 				podtest.SetOS(core.Windows),
 				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
 			),
@@ -14557,19 +14643,44 @@ func TestValidatePodUpdate(t *testing.T) {
 			test: "memory limit change with pod-level resources",
 		}, {
 			new: *podtest.MakePod("pod",
-				podtest.SetWorkloadRef(&core.WorkloadReference{
-					Name:     "w",
-					PodGroup: "pg",
+				podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+					PodGroupName: new("pg1"),
 				}),
 			),
 			old: *podtest.MakePod("pod",
-				podtest.SetWorkloadRef(&core.WorkloadReference{
-					Name:     "w2",
-					PodGroup: "pg",
+				podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+					PodGroupName: new("pg2"),
 				}),
 			),
 			err:  "pod updates may not change fields other than",
-			test: "updated workloadRef",
+			test: "updated schedulingGroup",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyNever),
+					podtest.SetContainerRestartPolicyRules(core.ContainerRestartRule{
+						Action: core.ContainerRestartRuleActionRestartAllContainers,
+						ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+							Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{42},
+						},
+					}),
+				)),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyNever),
+					podtest.SetContainerRestartPolicyRules(core.ContainerRestartRule{
+						Action: core.ContainerRestartRuleActionRestartAllContainers,
+						ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+							Operator: core.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{43},
+						},
+					}),
+				)),
+			),
+			err:  "pod updates may not change fields other than",
+			test: "updated restartPolicyRules",
 		},
 	}
 
@@ -14621,6 +14732,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		old                                         core.Pod
 		err                                         string
 		enableClearingNominatedNodeNameAfterBinding bool
+		validationOptions                           PodValidationOptions
 	}{{
 		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
@@ -15180,7 +15292,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		old: *podtest.MakePod("foo",
 			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
 		),
-		err:  `status.resourceClaimStatuses[0].name: Invalid value: "%$!#": a lowercase RFC 1123 subdomain must consist of`,
+		err:  `status.resourceClaimStatuses[0].resourceClaimName: Invalid value: "%$!#": a lowercase RFC 1123 subdomain must consist of`,
 		test: "Invalid ResourceClaim name",
 	}, {
 		new: *podtest.MakePod("foo",
@@ -16013,6 +16125,117 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			}),
 		),
 		old: *podtest.MakePod("foo"),
+	}, {
+		old: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: &core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: "imageref",
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: &core.VolumeStatus{
+									Image: nil,
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		test:              "should wipe VolumeStatus if ImageVolumeWithDigest feature gate is disabled didn't exist on previous pod",
+		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: false},
+	}, {
+		old: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: &core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: "",
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: &core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: "",
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		test:              "should not be allowed to set an empty imageRef",
+		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: true},
+		err:               `status.containerStatuses[0].volumeMounts[0].volumeStatus.imageVolumeStatus.imageRef: Required value: imageRef must not be empty`,
+	}, {
+		old: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: &core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: strings.Repeat("x", 257),
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						VolumeMounts: []core.VolumeMountStatus{
+							{
+								VolumeStatus: &core.VolumeStatus{
+									Image: &core.ImageVolumeStatus{
+										ImageRef: strings.Repeat("x", 257),
+									},
+								},
+							},
+						},
+					}),
+				),
+			),
+		),
+		test:              "should not be allowed to set an imageRef of len larger than 256",
+		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: true},
+		err:               `status.containerStatuses[0].volumeMounts[0].volumeStatus.imageVolumeStatus.imageRef: Too long: may not be more than 256`,
 	},
 	}
 
@@ -16021,7 +16244,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 
 		test.new.ResourceVersion = "1"
 		test.old.ResourceVersion = "1"
-		errs := ValidatePodStatusUpdate(&test.new, &test.old, PodValidationOptions{})
+		errs := ValidatePodStatusUpdate(&test.new, &test.old, test.validationOptions)
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
@@ -16033,6 +16256,304 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
 			}
 		}
+	}
+}
+
+func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
+	validPodSpec1 := core.PodSpec{
+		Containers: []core.Container{
+			{
+				Name:  "c1",
+				Image: "image",
+				Resources: core.ResourceRequirements{
+					Claims: []core.ResourceClaim{
+						{Name: "claim1"},
+					},
+				},
+			},
+		},
+		ResourceClaims: []core.PodResourceClaim{
+			{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")},
+		},
+	}
+	validPodSpec2 := core.PodSpec{
+		Containers: []core.Container{
+			{
+				Name:  "c1",
+				Image: "image",
+				Resources: core.ResourceRequirements{
+					Claims: []core.ResourceClaim{
+						{Name: "claim1"},
+						{Name: "claim2"},
+					},
+				},
+			},
+		},
+		ResourceClaims: []core.PodResourceClaim{
+			{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")},
+			{Name: "claim2", ResourceClaimName: ptr.To("my-claim2")},
+		},
+	}
+
+	testCases := []struct {
+		name        string
+		podStatus   core.PodStatus
+		spec        core.PodSpec
+		expectError bool
+		errorType   field.ErrorType
+		errorField  string
+		errorMsg    string
+	}{
+		{
+			name: "Valid NodeAllocatableResourceClaimStatus",
+			spec: validPodSpec1,
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceCPU:    resource.MustParse("1"),
+							core.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Valid Multiple NodeAllocatableResourceClaimStatus",
+			spec: validPodSpec2,
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+					{
+						ResourceClaimName: "my-claim2",
+						Containers:        []string{"c1"},
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid Resource Name",
+			spec: validPodSpec1,
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Resources: map[core.ResourceName]resource.Quantity{
+							"example.com/foo": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources[example.com/foo]",
+			errorMsg:    "must be a node allocatable resource name",
+		},
+		{
+			name: "Negative Quantity",
+			spec: validPodSpec1,
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceCPU: resource.MustParse("-1"),
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources[cpu]",
+			errorMsg:    "must be non-negative",
+		},
+		{
+			name: "Empty containers list",
+			spec: validPodSpec1,
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeRequired,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].containers",
+			errorMsg:    "must not be empty",
+		},
+		{
+			name: "Missing ResourceClaimName",
+			spec: validPodSpec1,
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						Containers: []string{"c1"},
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeRequired,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resourceClaimName",
+			errorMsg:    "must not be empty",
+		},
+		{
+			name: "Empty Resources",
+			spec: validPodSpec1,
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Resources:         map[core.ResourceName]resource.Quantity{},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeRequired,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources",
+			errorMsg:    "must not be empty",
+		},
+		{
+			name: "Valid ResourceClaimName from PodSpec",
+			spec: core.PodSpec{
+				Containers: []core.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+					},
+				},
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")},
+				},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Valid ResourceClaimName from PodStatus",
+			spec: core.PodSpec{
+				Containers: []core.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+					},
+				},
+			},
+			podStatus: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "claim1", ResourceClaimName: ptr.To("generated-claim1")},
+				},
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "generated-claim1",
+						Containers:        []string{"c1"},
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid ResourceClaimName not found",
+			spec: core.PodSpec{
+				Containers: []core.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+					},
+				},
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")},
+				},
+			},
+			podStatus: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "claim2", ResourceClaimName: ptr.To("generated-claim2")},
+				},
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "non-existent-claim",
+						Containers:        []string{"c1"},
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resourceClaimName",
+			errorMsg:    "not found in PodSpec.ResourceClaims or PodStatus.ResourceClaimStatuses",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateNodeAllocatableResourceClaimStatus(tc.podStatus, &tc.spec, field.NewPath("status", "nodeAllocatableResourceClaimStatuses"))
+
+			if !tc.expectError {
+				if len(errs) != 0 {
+					t.Errorf("Unexpected errors: %v", errs)
+				}
+				return
+			}
+
+			if len(errs) == 0 {
+				t.Errorf("Expected errors, but got none")
+				return
+			}
+
+			found := false
+			for _, err := range errs {
+				if err.Type == tc.errorType && err.Field == tc.errorField {
+					found = true
+					break
+				}
+			}
+			if !found {
+				if tc.errorMsg != "" {
+					t.Errorf("Expected error [Type: %v, Field: %s, Message containing: %q], but got %v",
+						tc.errorType, tc.errorField, tc.errorMsg, errs)
+				} else {
+					t.Errorf("Expected error [Type: %v, Field: %s], but got %v",
+						tc.errorType, tc.errorField, errs)
+				}
+			}
+		})
 	}
 }
 
@@ -22989,7 +23510,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Overhead",
 		"Tolerations",
 		"TopologySpreadConstraints",
-		"WorkloadRef",
+		"SchedulingGroup",
 	)
 
 	expect := sets.NewString().Union(osSpecificFields).Union(osNeutralFields)
@@ -27846,6 +28367,103 @@ func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
 				field.NotSupported(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(0).Child("health"), core.ResourceHealthStatus("invalid-health-value"), []string{"Healthy", "Unhealthy", "Unknown"}),
 			},
 		},
+
+		"don't allow message longer than max length": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+									Message:    ptr.To(string(make([]byte, v1.ResourceHealthMessageMaxLength+1))),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.TooLong(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(0).Child("message"), string(make([]byte, v1.ResourceHealthMessageMaxLength+1)), v1.ResourceHealthMessageMaxLength),
+			},
+		},
+
+		"allow message at exactly max length": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+									Message:    ptr.To(string(make([]byte, v1.ResourceHealthMessageMaxLength))),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+
+		"don't allow empty message": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+									Message:    ptr.To(""),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Required(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(0).Child("message"), "must be non-empty if specified"),
+			},
+		},
 	}
 	for name, tt := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -27981,10 +28599,11 @@ func TestValidatePodResize(t *testing.T) {
 	}
 
 	tests := []struct {
-		test string
-		old  *core.Pod
-		new  *core.Pod
-		err  string
+		test                 string
+		old                  *core.Pod
+		new                  *core.Pod
+		disableInitCtrResize bool
+		err                  string
 	}{
 		{
 			test: "pod-level resources resize with nil resources in old pod",
@@ -28357,16 +28976,96 @@ func TestValidatePodResize(t *testing.T) {
 			new:  mkPodWithInitContainers(getResources("100m", "", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
 			err:  "spec.initContainers[0].resources.limits: Forbidden: resource limits cannot be removed",
 		}, {
-			test: "Pod QoS unchanged, burstable -> burstable, remove cpu and memory requests",
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu and memory requests from sidecar container",
 			old:  mkPodWithInitContainers(getResources("100m", "100Mi", "", ""), getResources("100m", "", "", ""), core.ContainerRestartPolicyAlways),
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "", "", ""), core.ContainerRestartPolicyAlways),
 			err:  "spec.initContainers[0].resources.requests: Forbidden: resource requests cannot be removed",
 		}, {
-			test: "Pod QoS unchanged, burstable -> burstable, remove cpu and memory requests",
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu and memory requests from non-sidecar initContainer",
 			old:  mkPodWithInitContainers(getResources("100m", "100Mi", "", ""), getResources("100m", "", "", ""), ""),
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "", "", ""), ""),
-			err:  "spec: Forbidden: resources for non-sidecar init containers are immutable",
-		}, {
+			err:  "spec.initContainers[0].resources.requests: Forbidden: resource requests cannot be removed",
+		},
+		{
+			test: "Pod QoS unchanged, burstable -> burstable, attempt to resize non-sidecar initContainer without resize policy",
+			old: mkPodWithInitContainers(nil, nil, "", podtest.SetInitContainers(
+				podtest.MakeContainer("ctr-1",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+						Limits:   getResources("100m", "", "", ""),
+					}),
+				))),
+			new: mkPodWithInitContainers(nil, nil, "", podtest.SetInitContainers(
+				podtest.MakeContainer("ctr-1",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("200m", "200Mi", "", ""),
+						Limits:   getResources("200m", "", "", ""),
+					}),
+				))),
+		},
+		{
+			test: "Pod QoS unchanged, burstable -> burstable, attempt to resize non-sidecar initContainer with NotRequired resize policy",
+			old: mkPodWithInitContainers(nil, nil, "", podtest.SetInitContainers(
+				podtest.MakeContainer("ctr-1",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+						Limits:   getResources("100m", "", "", ""),
+					}),
+					podtest.SetContainerResizePolicy(
+						core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"}),
+				))),
+			new: mkPodWithInitContainers(nil, nil, "", podtest.SetInitContainers(
+				podtest.MakeContainer("ctr-1",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("200m", "200Mi", "", ""),
+						Limits:   getResources("200m", "", "", ""),
+					}),
+					podtest.SetContainerResizePolicy(
+						core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"}),
+				))),
+		},
+		{
+			test: "Pod QoS unchanged, burstable -> burstable, attempt to resize non-sidecar initContainer with RestartContainer resize policy",
+			old: mkPodWithInitContainers(nil, nil, "", podtest.SetInitContainers(
+				podtest.MakeContainer("ctr-1",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+						Limits:   getResources("100m", "", "", ""),
+					}),
+					podtest.SetContainerResizePolicy(
+						core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "RestartContainer"}),
+				))),
+			new: mkPodWithInitContainers(nil, nil, "", podtest.SetInitContainers(
+				podtest.MakeContainer("ctr-1",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("200m", "200Mi", "", ""),
+						Limits:   getResources("200m", "", "", ""),
+					}),
+					podtest.SetContainerResizePolicy(
+						core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "RestartContainer"}),
+				))),
+			err: "spec.initContainers[0]: Forbidden: non-sidecar init containers with a resize policy of RestartContainer cannot be resized",
+		},
+		{
+			test: "Pod QoS unchanged, burstable -> burstable, attempt to resize non-sidecar initContainer with FG disabled",
+			old: mkPodWithInitContainers(nil, nil, "", podtest.SetInitContainers(
+				podtest.MakeContainer("ctr-1",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+						Limits:   getResources("100m", "", "", ""),
+					}),
+				))),
+			new: mkPodWithInitContainers(nil, nil, "", podtest.SetInitContainers(
+				podtest.MakeContainer("ctr-1",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("200m", "200Mi", "", ""),
+						Limits:   getResources("200m", "", "", ""),
+					}),
+				))),
+			disableInitCtrResize: true,
+			err:                  "Forbidden: resources for non-sidecar init containers are immutable",
+		},
+		{
 			test: "Pod with nil Resource field in Status",
 			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
@@ -28457,7 +29156,7 @@ func TestValidatePodResize(t *testing.T) {
 			test: "storage limit change for sidecar containers",
 			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "2Gi", ""), core.ContainerRestartPolicyAlways),
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "1Gi", ""), core.ContainerRestartPolicyAlways),
-			err:  "spec: Forbidden: only cpu and memory resources for sidecar containers are mutable",
+			err:  "spec.initContainers[0]: Forbidden: only cpu and memory resources for init or sidecar containers are mutable",
 		}, {
 			test: "cpu request change for sidecar containers",
 			old:  mkPodWithInitContainers(getResources("200m", "0", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
@@ -28472,7 +29171,7 @@ func TestValidatePodResize(t *testing.T) {
 			test: "storage request change for sidecar containers",
 			old:  mkPodWithInitContainers(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
 			new:  mkPodWithInitContainers(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
-			err:  "spec: Forbidden: only cpu and memory resources for sidecar containers are mutable",
+			err:  "spec.initContainers[0]: Forbidden: only cpu and memory resources for init or sidecar containers are mutable",
 		}, {
 			test: "pod container addition",
 			old: podtest.MakePod("pod", podtest.SetContainers(
@@ -28576,10 +29275,78 @@ func TestValidatePodResize(t *testing.T) {
 			)),
 			err: "spec: Forbidden: only cpu and memory resources are mutable",
 		},
+		{
+			test: "Resize pod with NodeAllocatableResourceClaimStatuses",
+			old: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Requests: getResources("100m", "200Mi", "", ""),
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{{ResourceClaimName: "node-allocatable-claim"}}
+				return p
+			}(),
+			new: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Requests: getResources("200m", "200Mi", "", ""),
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{{ResourceClaimName: "node-allocatable-claim"}}
+				return p
+			}(),
+			err: "spec: Forbidden: pods with node allocatable resource claims cannot be resized",
+		},
+		{
+			test: "Resize pod with NodeAllocatableResourceClaimStatuses",
+			old: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Requests: getResources("100m", "200Mi", "", ""),
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				}
+				return p
+			}(),
+			new: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Requests: getResources("200m", "200Mi", "", ""),
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Resources: map[core.ResourceName]resource.Quantity{
+							core.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				}
+				return p
+			}(),
+			err: "spec: Forbidden: pods with node allocatable resource claims cannot be resized",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingInitContainers, !test.disableInitCtrResize)
+
 			test.new.ObjectMeta.ResourceVersion = "1"
 			test.old.ObjectMeta.ResourceVersion = "1"
 
@@ -29476,6 +30243,44 @@ func TestValidateContainerRestartPolicy(t *testing.T) {
 				BadValue: core.ContainerRestartRuleOnExitCodesOperator(""),
 			}},
 		},
+		{
+			Name:          "restart-policy-rules with too many exit codes",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "Restart",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   make([]int32, 256),
+				},
+			}},
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeTooMany,
+				Field:    "containers[0].restartPolicyRules[0].exitCodes.values",
+				BadValue: 256,
+			}},
+		},
+		{
+			Name:          "restart-policy-rules with too many rules",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: func() []core.ContainerRestartRule {
+				rules := make([]core.ContainerRestartRule, 21)
+				for i := range rules {
+					rules[i] = core.ContainerRestartRule{
+						Action: "Restart",
+						ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+							Operator: "In",
+							Values:   []int32{42},
+						},
+					}
+				}
+				return rules
+			}(),
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeTooMany,
+				Field:    "containers[0].restartPolicyRules",
+				BadValue: 21,
+			}},
+		},
 	}
 
 	for _, tc := range errorCases {
@@ -30277,17 +31082,10 @@ func TestValidateNodeDeclaredFeatures(t *testing.T) {
 	}
 }
 
-func TestValidateWorkloadReference(t *testing.T) {
+func TestValidatePodSchedulingGroup(t *testing.T) {
 	successCases := map[string]*core.Pod{
-		"correct": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           "group",
-			PodGroupReplicaKey: "replica",
-		})),
-		"no replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           "group",
-			PodGroupReplicaKey: "",
+		"correct": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+			PodGroupName: new("group"),
 		})),
 	}
 	for name, pod := range successCases {
@@ -30298,45 +31096,15 @@ func TestValidateWorkloadReference(t *testing.T) {
 	}
 
 	failureCases := map[string]*core.Pod{
-		"empty workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "",
-			PodGroup:           "group",
-			PodGroupReplicaKey: "replica",
+		"nil pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{})),
+		"empty pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+			PodGroupName: new(""),
 		})),
-		"incorrect workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               ".workload",
-			PodGroup:           "group",
-			PodGroupReplicaKey: "replica",
+		"incorrect pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+			PodGroupName: new(".podGroup"),
 		})),
-		"too long workload name": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               strings.Repeat("w", 254),
-			PodGroup:           "group",
-			PodGroupReplicaKey: "replica",
-		})),
-		"empty pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           "",
-			PodGroupReplicaKey: "replica",
-		})),
-		"incorrect pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           ".group",
-			PodGroupReplicaKey: "replica",
-		})),
-		"too long pod group": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           strings.Repeat("g", 64),
-			PodGroupReplicaKey: "replica",
-		})),
-		"incorrect replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           "group",
-			PodGroupReplicaKey: ".replica",
-		})),
-		"too long replica key": podtest.MakePod("", podtest.SetWorkloadRef(&core.WorkloadReference{
-			Name:               "workload",
-			PodGroup:           "group",
-			PodGroupReplicaKey: strings.Repeat("r", 64),
+		"too long pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
+			PodGroupName: new(strings.Repeat("w", 254)),
 		})),
 	}
 	for name, pod := range failureCases {

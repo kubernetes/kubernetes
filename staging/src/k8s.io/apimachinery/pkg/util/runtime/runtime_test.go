@@ -311,3 +311,39 @@ func TestHandleError(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorToString(t *testing.T) {
+	for name, tt := range map[string]struct {
+		err          error
+		msg          string
+		kvs          []any
+		expectString string
+	}{
+		"simple": {
+			errors.New("some error"),
+			"Unhandled error",
+			nil,
+			`"Unhandled error" err="some error"`,
+		},
+		"nil-error": {
+			nil,
+			"Some problem occurred",
+			nil,
+			`"Some problem occurred"`,
+		},
+		"keys-and-values": {
+			errors.New("some error"),
+			"Some error occurred",
+			[]any{"str", "foobar", "int", 1, "multiLine", "line 1\nline 2"},
+			`"Some error occurred" err="some error" str="foobar" int=1 multiLine=<
+	line 1
+	line 2
+ >`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			actualString := ErrorToString(tt.err, tt.msg, tt.kvs...)
+			assert.Equal(t, tt.expectString, actualString)
+		})
+	}
+}

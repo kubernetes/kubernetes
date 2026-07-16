@@ -17,10 +17,13 @@ limitations under the License.
 package discovery
 
 import (
+	"crypto/x509"
+	"fmt"
 	"net/url"
 
 	clientset "k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	clientcertutil "k8s.io/client-go/util/cert"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/klog/v2"
 
@@ -31,6 +34,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/token"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 )
 
 // TokenUser defines token user
@@ -38,9 +42,8 @@ const TokenUser = "tls-bootstrap-token-user"
 
 // For returns a kubeconfig object that can be used for doing the TLS Bootstrap with the right credentials
 // Also, before returning anything, it makes sure it can trust the API Server
+// It also prints the CA certificate information for user verification at verbosity level 1
 func For(client clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
-	// TODO: Print summary info about the CA certificate, along with the checksum signature
-	// we also need an ability for the user to configure the client to validate received CA cert against a checksum
 	config, err := DiscoverValidatedKubeConfig(client, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't validate the identity of the API Server")
@@ -49,6 +52,7 @@ func For(client clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*client
 	// If the users has provided a TLSBootstrapToken use it for the join process.
 	// This is usually the case of Token discovery, but it can also be used with a discovery file
 	// without embedded authentication credentials.
+	var skipAuthCheck bool
 	if len(cfg.Discovery.TLSBootstrapToken) != 0 {
 		klog.V(1).Info("[discovery] Using provided TLSBootstrapToken as authentication credentials for the join process")
 
@@ -56,22 +60,31 @@ func For(client clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*client
 		if err != nil {
 			return nil, errors.Wrapf(err, "malformed kubeconfig in the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
 		}
-		return kubeconfigutil.CreateWithToken(
+		config = kubeconfigutil.CreateWithToken(
 			clusterinfo.Server,
 			kubeadmapiv1.DefaultClusterName,
 			TokenUser,
 			clusterinfo.CertificateAuthorityData,
 			cfg.Discovery.TLSBootstrapToken,
-		), nil
+		)
+		skipAuthCheck = true
 	}
 
 	// if the config returned from discovery has authentication credentials, proceed with the TLS bootstrap process
-	if kubeconfigutil.HasAuthenticationCredentials(config) {
-		return config, nil
+	if !skipAuthCheck && !kubeconfigutil.HasAuthenticationCredentials(config) {
+		return nil, errors.New("could not find authentication credentials for the TLS bootstrap process. " +
+			"Please use Token discovery, a discovery file with embedded authentication credentials or a discovery " +
+			"file without authentication credentials but with the TLSBootstrapToken flag")
 	}
 
-	// if there are no authentication credentials (nor in the config returned from discovery, nor in the TLSBootstrapToken), fail
-	return nil, errors.New("couldn't find authentication credentials for the TLS bootstrap process. Please use Token discovery, a discovery file with embedded authentication credentials or a discovery file without authentication credentials but with the TLSBootstrapToken flag")
+	// If the CA cert is available in the kubeconfig, print it for information purposes
+	var cert *x509.Certificate
+	if cert, err = getCACertFromKubeconfig(config); err != nil {
+		return nil, errors.Wrap(err, "could not get CA certificate from discovery kubeconfig")
+	}
+	klog.V(1).Infof("[discovery] Using CA certificate from discovery kubeconfig:\n%s", formatCACertInfo(cert))
+
+	return config, nil
 }
 
 // DiscoverValidatedKubeConfig returns a validated Config object that specifies where the cluster is and the CA cert to trust
@@ -95,4 +108,37 @@ func DiscoverValidatedKubeConfig(dryRunClient clientset.Interface, cfg *kubeadma
 func isHTTPSURL(s string) bool {
 	u, err := url.Parse(s)
 	return err == nil && u.Scheme == "https"
+}
+
+// getCACertFromKubeconfig returns a single CA certificate from a kubeconfig, if available.
+func getCACertFromKubeconfig(config *clientcmdapi.Config) (*x509.Certificate, error) {
+	_, clusterInfo, err := kubeconfigutil.GetClusterFromKubeConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	certs, err := clientcertutil.ParseCertsPEM(clusterInfo.CertificateAuthorityData)
+	if err != nil {
+		return nil, err
+	}
+	if len(certs) == 0 {
+		return nil, errors.New("no CA certificate found in CertificateAuthorityData")
+	}
+	return certs[0], nil
+}
+
+// formatCACertInfo formats summary information about the CA certificate.
+func formatCACertInfo(cert *x509.Certificate) string {
+	return fmt.Sprintf("CA Certificate:\n"+
+		"\tSubject: %v\n"+
+		"\tIssuer: %v\n"+
+		"\tSerialNumber: %v\n"+
+		"\tNotBefore: %v\n"+
+		"\tNotAfter: %v\n"+
+		"\tSignatureAlgorithm: %v\n"+
+		"\tPublicKeyAlgorithm: %v\n"+
+		"\tHash: %v",
+		cert.Subject, cert.Issuer, cert.SerialNumber, cert.NotBefore,
+		cert.NotAfter, cert.SignatureAlgorithm, cert.PublicKeyAlgorithm,
+		pubkeypin.Hash(cert),
+	)
 }

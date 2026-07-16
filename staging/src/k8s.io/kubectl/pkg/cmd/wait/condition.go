@@ -59,7 +59,10 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 		return false, nil
 	}
 	for _, conditionUncast := range conditions {
-		condition := conditionUncast.(map[string]interface{})
+		condition, ok := conditionUncast.(map[string]interface{})
+		if !ok {
+			continue
+		}
 		name, found, err := unstructured.NestedString(condition, "type")
 		if !found || err != nil || !strings.EqualFold(name, w.conditionName) {
 			continue
@@ -112,7 +115,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrorInterrupted(nil), info) // nolint:staticcheck // SA1019
 	if o.Timeout == 0 {
 		// If timeout is zero we will fetch the object(s) once only and check
-		gottenObj, initObjGetErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(context.Background(), info.Name, metav1.GetOptions{})
+		gottenObj, initObjGetErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(ctx, info.Name, metav1.GetOptions{})
 		if initObjGetErr != nil {
 			return nil, false, initObjGetErr
 		}
@@ -136,13 +139,13 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 	mapping := info.ResourceMapping() // used to pass back meaningful errors if object disappears
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
 	lw := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+		ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(ctx, options)
 		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+		WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(ctx, options)
 		},
 	}, o.DynamicClient)
 

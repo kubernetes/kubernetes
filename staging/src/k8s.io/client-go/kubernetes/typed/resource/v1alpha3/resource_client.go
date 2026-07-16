@@ -29,6 +29,7 @@ import (
 type ResourceV1alpha3Interface interface {
 	RESTClient() rest.Interface
 	DeviceTaintRulesGetter
+	ResourcePoolStatusRequestsGetter
 }
 
 // ResourceV1alpha3Client is used to interact with features provided by the resource.k8s.io group.
@@ -38,6 +39,10 @@ type ResourceV1alpha3Client struct {
 
 func (c *ResourceV1alpha3Client) DeviceTaintRules() DeviceTaintRuleInterface {
 	return newDeviceTaintRules(c)
+}
+
+func (c *ResourceV1alpha3Client) ResourcePoolStatusRequests() ResourcePoolStatusRequestInterface {
+	return newResourcePoolStatusRequests(c)
 }
 
 // NewForConfig creates a new ResourceV1alpha3Client for the given config.
