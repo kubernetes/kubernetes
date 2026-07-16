@@ -104,6 +104,8 @@ type fakeKubelet struct {
 	getExecCheck        func(string, types.UID, string, []string, remotecommandserver.Options)
 	getAttachCheck      func(string, types.UID, string, remotecommandserver.Options)
 	getPortForwardCheck func(string, string, types.UID, portforward.V4Options)
+	allocatedPodsFunc   func() []*v1.Pod
+	allocatedPodFunc    func(uid types.UID) (*v1.Pod, bool)
 
 	containerLogsFunc func(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	resyncInterval    time.Duration
@@ -138,6 +140,21 @@ func (fk *fakeKubelet) GetPods() []*v1.Pod {
 
 func (fk *fakeKubelet) GetRunningPods(ctx context.Context) ([]*v1.Pod, error) {
 	return fk.runningPodsFunc(ctx)
+}
+
+func (fk *fakeKubelet) GetAllocatedPods() ([]*v1.Pod, error) {
+	if fk.allocatedPodsFunc != nil {
+		return fk.allocatedPodsFunc(), nil
+	}
+	return nil, nil
+}
+
+func (fk *fakeKubelet) GetAllocatedPod(uid types.UID) (*v1.Pod, bool, error) {
+	if fk.allocatedPodFunc != nil {
+		pod, found := fk.allocatedPodFunc(uid)
+		return pod, found, nil
+	}
+	return nil, false, nil
 }
 
 func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
@@ -2536,4 +2553,164 @@ func TestKubeletNativeHistogramMetrics(t *testing.T) {
 	}
 
 	testutil.AssertHasNativeHistogram(t, mf, nil)
+}
+
+func TestGetAllocatedPods(t *testing.T) {
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod1",
+			Namespace: "ns1",
+			UID:       "uid1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "c1", Image: "img1"},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod2",
+			Namespace: "ns1",
+			UID:       "uid2",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "c2", Image: "img2"},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		path           string
+		allocatedPods  []*v1.Pod
+		allocatedPod   *v1.Pod
+		allocatedFound bool
+		expectedStatus int
+		expectedPods   []v1.Pod
+		expectedPod    *v1.Pod
+	}{
+		{
+			name:           "feature disabled - list",
+			featureEnabled: false,
+			path:           "/allocatedPods",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "feature disabled - get",
+			featureEnabled: false,
+			path:           "/allocatedPods/uid1",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "feature enabled - list empty",
+			featureEnabled: true,
+			path:           "/allocatedPods",
+			allocatedPods:  []*v1.Pod{},
+			expectedStatus: http.StatusOK,
+			expectedPods:   []v1.Pod{},
+		},
+		{
+			name:           "feature enabled - list pods",
+			featureEnabled: true,
+			path:           "/allocatedPods",
+			allocatedPods:  []*v1.Pod{pod1, pod2},
+			expectedStatus: http.StatusOK,
+			expectedPods: []v1.Pod{
+				{
+					ObjectMeta: pod1.ObjectMeta,
+					Spec:       pod1.Spec,
+				},
+				{
+					ObjectMeta: pod2.ObjectMeta,
+					Spec:       pod2.Spec,
+				},
+			},
+		},
+		{
+			name:           "feature enabled - get pod found",
+			featureEnabled: true,
+			path:           "/allocatedPods/uid1",
+			allocatedPod:   pod1,
+			allocatedFound: true,
+			expectedStatus: http.StatusOK,
+			expectedPod: &v1.Pod{
+				ObjectMeta: pod1.ObjectMeta,
+				Spec:       pod1.Spec,
+			},
+		},
+		{
+			name:           "feature enabled - get pod not found",
+			featureEnabled: true,
+			path:           "/allocatedPods/uid3",
+			allocatedFound: false,
+			expectedStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Feature gate must be set BEFORE creating the server
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodAllocatedSubresource, tt.featureEnabled)
+
+			tCtx := ktesting.Init(t)
+			fw := newServerTest(tCtx)
+			defer fw.testHTTPServer.Close()
+
+			fw.fakeKubelet.allocatedPodsFunc = func() []*v1.Pod {
+				return tt.allocatedPods
+			}
+			fw.fakeKubelet.allocatedPodFunc = func(uid types.UID) (*v1.Pod, bool) {
+				if tt.allocatedPod != nil && uid == tt.allocatedPod.UID {
+					return tt.allocatedPod, tt.allocatedFound
+				}
+				return nil, tt.allocatedFound
+			}
+
+			req, err := http.NewRequest(http.MethodGet, fw.testHTTPServer.URL+tt.path, nil)
+			require.NoError(t, err)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			if tt.expectedStatus != http.StatusOK {
+				return
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			if tt.expectedPods != nil {
+				var podList v1.PodList
+				err = json.Unmarshal(body, &podList)
+				require.NoError(t, err)
+				assert.Len(t, podList.Items, len(tt.expectedPods))
+				for i, expectedPod := range tt.expectedPods {
+					assert.Equal(t, expectedPod.Name, podList.Items[i].Name)
+					assert.Equal(t, expectedPod.Spec, podList.Items[i].Spec)
+					assert.Empty(t, podList.Items[i].Status)
+				}
+			}
+
+			if tt.expectedPod != nil {
+				var pod v1.Pod
+				err = json.Unmarshal(body, &pod)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedPod.Name, pod.Name)
+				assert.Equal(t, tt.expectedPod.Spec, pod.Spec)
+				assert.Empty(t, pod.Status)
+			}
+		})
+	}
 }

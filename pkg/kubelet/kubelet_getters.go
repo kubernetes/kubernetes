@@ -31,6 +31,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
@@ -479,4 +481,38 @@ func (kl *Kubelet) getLastObservedNodeAddresses(ctx context.Context) []v1.NodeAd
 		return nil
 	}
 	return node.Status.Addresses
+}
+
+// GetAllocatedPods returns all active pods with their allocated resources.
+func (kl *Kubelet) GetAllocatedPods() ([]*v1.Pod, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodAllocatedSubresource) {
+		return nil, fmt.Errorf("PodAllocatedSubresource feature is disabled")
+	}
+	if kl.allocationManager == nil {
+		return nil, nil
+	}
+	return kl.allocationManager.GetAllocatedPods(), nil
+}
+
+// GetAllocatedPod returns the allocated pod with the given UID.
+// It returns (nil, false, nil) if the pod is not found or is inactive.
+func (kl *Kubelet) GetAllocatedPod(uid types.UID) (*v1.Pod, bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodAllocatedSubresource) {
+		return nil, false, fmt.Errorf("PodAllocatedSubresource feature is disabled")
+	}
+	if kl.allocationManager == nil {
+		return nil, false, nil
+	}
+	resolvedUID := kl.podManager.TranslatePodUID(uid)
+	pod, found := kl.podManager.GetPodByUID(types.UID(resolvedUID))
+	if !found {
+		return nil, false, nil
+	}
+	activePods := kl.filterOutInactivePods([]*v1.Pod{pod})
+	if len(activePods) == 0 {
+		// Pod is assigned to this node but not active (terminated or rejected by admission)
+		return nil, false, nil
+	}
+	allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+	return allocatedPod, true, nil
 }

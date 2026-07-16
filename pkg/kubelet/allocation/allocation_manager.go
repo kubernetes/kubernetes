@@ -105,6 +105,9 @@ type Manager interface {
 
 	// RetryPendingResizes retries all pending resizes.
 	RetryPendingResizes(ctx context.Context, trigger string)
+
+	// GetAllocatedPods returns all active pods with their allocated resources.
+	GetAllocatedPods() []*v1.Pod
 }
 
 type manager struct {
@@ -623,4 +626,8 @@ func IsResizableContainer(container *v1.Container, containerType podutil.Contain
 	default:
 		return false
 	}
+}
+
+func (m *manager) GetAllocatedPods() []*v1.Pod {
+	return m.getAllocatedPods(m.getActivePods())
 }

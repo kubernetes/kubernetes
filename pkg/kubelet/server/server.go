@@ -99,6 +99,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 func init() {
@@ -115,6 +116,7 @@ const (
 	checkpointPath      = "/checkpoint/"
 	pprofBasePath       = "/debug/pprof/"
 	debugFlagPath       = "/debug/flags/v"
+	allocatedPodsPath   = "/allocatedPods"
 	podsPath            = "/pods"
 	runningPodsPath     = "/runningpods/"
 )
@@ -323,6 +325,8 @@ type HostInterface interface {
 	GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
 	ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error)
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
+	GetAllocatedPods() ([]*v1.Pod, error)
+	GetAllocatedPod(uid types.UID) (*v1.Pod, bool, error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -647,6 +651,22 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 	s.addMetricsBucketMatcher("configz")
 	configz.InstallHandler(s.restfulCont)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodAllocatedSubresource) {
+		s.addMetricsBucketMatcher("allocatedPods")
+		ws = new(restful.WebService)
+		ws.Filter(GETOnlyRestfulFilter())
+		ws.
+			Path(allocatedPodsPath).
+			Produces(restful.MIME_JSON)
+		ws.Route(ws.GET("").
+			To(s.getAllocatedPods).
+			Operation("getAllocatedPods"))
+		ws.Route(ws.GET("/{podUID}").
+			To(s.getAllocatedPod).
+			Operation("getAllocatedPod"))
+		s.restfulCont.Add(ws)
+	}
+
 	// The /runningpods endpoint is used for testing only.
 	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
@@ -902,6 +922,11 @@ func encodePods(pods []*v1.Pod) (data []byte, err error) {
 	return runtime.Encode(codec, podList)
 }
 
+func encodePod(pod *v1.Pod) (data []byte, err error) {
+	codec := legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: v1.GroupName, Version: "v1"})
+	return runtime.Encode(codec, pod)
+}
+
 // getPods returns a list of pods bound to the Kubelet and their spec.
 func (s *Server) getPods(logger klog.Logger, request *restful.Request, response *restful.Response) {
 	pods := s.host.GetPods()
@@ -927,6 +952,77 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 	data, err := encodePods(pods)
 	if err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+	writeJSONResponse(logger, response, data)
+}
+
+func (s *Server) getAllocatedPods(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	logger := klog.FromContext(ctx)
+	pods, err := s.host.GetAllocatedPods()
+	if err != nil {
+		logger.Error(err, "Failed to GetAllocatedPods")
+		if err := response.WriteError(http.StatusInternalServerError, err); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+
+	// Filter out status from allocated pods.
+	copiedPods := make([]*v1.Pod, len(pods))
+	for i, pod := range pods {
+		copied := *pod // Shallow copy
+		copied.Status = v1.PodStatus{}
+		copiedPods[i] = &copied
+	}
+	data, err := encodePods(copiedPods)
+	if err != nil {
+		logger.Error(err, "Failed to encode allocated pods")
+		if err := response.WriteError(http.StatusInternalServerError, err); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+	writeJSONResponse(logger, response, data)
+}
+
+func (s *Server) getAllocatedPod(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	logger := klog.FromContext(ctx)
+	podUID := request.PathParameter("podUID")
+	if len(podUID) == 0 {
+		logger.Error(nil, "Invalid request path: missing podUID", "path", request.Request.URL.Path)
+		if err := response.WriteErrorString(http.StatusBadRequest, "podUID is required"); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+	pod, found, err := s.host.GetAllocatedPod(types.UID(podUID))
+	if err != nil {
+		logger.Error(err, "Failed to get allocated pod", "podUID", podUID)
+		if err := response.WriteError(http.StatusInternalServerError, err); err != nil {
+			logger.Error(err, "Failed to write error response", "podUID", podUID)
+		}
+		return
+	}
+	if !found {
+		logger.V(3).Info("Allocated pod not found", "podUID", podUID)
+		if err := response.WriteErrorString(http.StatusNotFound, "pod not found"); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+
+	// Filter out status from allocated pod.
+	copied := *pod // Shallow copy
+	copied.Status = v1.PodStatus{}
+	data, err := encodePod(&copied)
+	if err != nil {
+		logger.Error(err, "Failed to encode allocated pod", "pod", format.Pod(pod))
+		if err := response.WriteError(http.StatusInternalServerError, err); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
 		return
 	}
 	writeJSONResponse(logger, response, data)
