@@ -402,6 +402,13 @@ message CapacityRequestPolicy {
 
 // CapacityRequestPolicyRange defines a valid range for consumable capacity values.
 //
+// If the DRAFractionalCapacityRange feature gate is
+// enabled and at least one of Min, Max, or Step is a fractional quantity (i.e.
+// its value is not an integer), milli-unit arithmetic is used instead,
+// supporting values with up to 3 decimal places (e.g. 100m = 0.1).
+// The largest supported value then is 1000 times smaller compared to using 64-bit integers.
+// Otherwise, all comparisons use 64-bit integer arithmetic via resource.Quantity.Value().
+//
 //   - If the requested amount is less than Min, it is rounded up to the Min value.
 //   - If Step is set and the requested amount is between Min and Max but not aligned with Step,
 //     it will be rounded up to the next value equal to Min + (n * Step).
