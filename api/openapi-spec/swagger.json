@@ -13282,6 +13282,9 @@
           "description": "`status` is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -13307,7 +13310,7 @@
           "type": "string"
         },
         "status": {
-          "description": "`status` is the status of the condition. Can be True, False, Unknown. Required.",
+          "description": "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
           "type": "string"
         },
         "type": {
@@ -13315,6 +13318,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "type": "object"
     },
     "io.k8s.api.flowcontrol.v1.FlowSchemaList": {
@@ -13462,6 +13468,9 @@
           "type": "integer"
         }
       },
+      "required": [
+        "limitResponse"
+      ],
       "type": "object"
     },
     "io.k8s.api.flowcontrol.v1.NonResourcePolicyRule": {
@@ -13547,6 +13556,9 @@
           "description": "`status` is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -13572,7 +13584,7 @@
           "type": "string"
         },
         "status": {
-          "description": "`status` is the status of the condition. Can be True, False, Unknown. Required.",
+          "description": "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
           "type": "string"
         },
         "type": {
@@ -13580,6 +13592,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "type": "object"
     },
     "io.k8s.api.flowcontrol.v1.PriorityLevelConfigurationList": {
