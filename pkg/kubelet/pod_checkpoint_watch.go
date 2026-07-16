@@ -48,6 +48,7 @@ const podCheckpointSourceIndex = "sourcePod"
 
 var errPodCheckpointInFlight = errors.New("pod checkpoint is waiting for another pod operation")
 var errPodCheckpointNotPending = errors.New("pod checkpoint was replaced or already completed")
+var errPodCheckpointPolicyUnavailable = errors.New("pod checkpoint is waiting for RuntimeClass option policy")
 
 func podCheckpointTerminal(pc *nodev1alpha1.PodCheckpoint) bool {
 	cond := apimeta.FindStatusCondition(pc.Status.Conditions, nodev1alpha1.PodCheckpointConditionReady)
@@ -267,8 +268,8 @@ func (kl *Kubelet) syncPodCheckpoint(ctx context.Context, key string) error {
 	if pc.Spec.TimeoutSeconds != nil {
 		timeout = time.Duration(*pc.Spec.TimeoutSeconds) * time.Second
 	}
-	if err := kl.CheckpointPod(ctx, pod.UID, kubecontainer.GetPodFullName(pod), namespace, name, pc.UID, timeout); err != nil {
-		if errors.Is(err, errPodCheckpointInFlight) || errors.Is(err, errPodCheckpointNotPending) {
+	if err := kl.CheckpointPod(ctx, pod.UID, kubecontainer.GetPodFullName(pod), namespace, name, pc.UID, timeout, pc.Spec.CheckpointOptions); err != nil {
+		if errors.Is(err, errPodCheckpointInFlight) || errors.Is(err, errPodCheckpointNotPending) || errors.Is(err, errPodCheckpointPolicyUnavailable) {
 			return err
 		}
 		// A non-nil error is a synchronous setup/precondition failure (the

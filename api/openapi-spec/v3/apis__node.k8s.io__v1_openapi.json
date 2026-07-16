@@ -74,6 +74,14 @@
             ],
             "description": "overhead represents the resource overhead associated with running a pod for a given RuntimeClass. For more details, see\n https://kubernetes.io/docs/concepts/scheduling-eviction/pod-overhead/"
           },
+          "podCheckpoint": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.node.v1.RuntimeClassPodCheckpoint"
+              }
+            ],
+            "description": "podCheckpoint lists the runtime-specific option keys that users may supply when checkpointing or restoring Pods of this RuntimeClass. If unset, users cannot supply options; checkpoint and restore use the runtime's defaults. Administrator settings belong in the runtime's configuration, not in user-supplied options. Values are validated by the runtime. This field is alpha-level and requires PodLevelCheckpointRestore."
+          },
           "scheduling": {
             "allOf": [
               {
@@ -134,6 +142,28 @@
             "version": "v1"
           }
         ]
+      },
+      "io.k8s.api.node.v1.RuntimeClassPodCheckpoint": {
+        "description": "RuntimeClassPodCheckpoint configures user-supplied checkpoint and restore options for a runtime handler. It permits option keys, not administrator configuration or secrets. Administrators should only allow documented keys that are safe for untrusted users. The runtime must reject unsupported or unsafe values, including values that grant privileges, select unallocated devices, or override administrator configuration.",
+        "properties": {
+          "allowedCheckpointOptions": {
+            "description": "allowedCheckpointOptions lists the keys users may set in PodCheckpoint.spec.checkpointOptions for Pods of this RuntimeClass. An empty list permits no keys. Each key must be nonempty and at most 256 bytes; at most 64 distinct keys may be listed. Keys are matched exactly and are case-sensitive; wildcards have no special meaning. The runtime must validate values for every allowed key.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "set"
+          },
+          "allowedRestoreOptions": {
+            "description": "allowedRestoreOptions lists the keys users may set in Pod.spec.restoreFrom.options for Pods of this RuntimeClass. An empty list permits no keys. Each key must be nonempty and at most 256 bytes; at most 64 distinct keys may be listed. Keys are matched exactly and are case-sensitive; wildcards have no special meaning. The runtime must validate values for every allowed key.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "set"
+          }
+        },
+        "type": "object"
       },
       "io.k8s.api.node.v1.Scheduling": {
         "description": "Scheduling specifies the scheduling constraints for nodes supporting a RuntimeClass.",

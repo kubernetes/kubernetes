@@ -17,16 +17,20 @@ limitations under the License.
 package runtimeclass
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	nodev1 "k8s.io/client-go/listers/node/v1"
+	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
 )
 
 // Manager caches RuntimeClass API objects, and provides accessors to the Kubelet.
 type Manager struct {
+	client          clientset.Interface
 	informerFactory informers.SharedInformerFactory
 	lister          nodev1.RuntimeClassLister
 }
@@ -39,6 +43,7 @@ func NewManager(client clientset.Interface) *Manager {
 	lister := factory.Node().V1().RuntimeClasses().Lister()
 
 	return &Manager{
+		client:          client,
 		informerFactory: factory,
 		lister:          lister,
 	}
@@ -74,5 +79,30 @@ func (m *Manager) LookupRuntimeHandler(runtimeClassName *string) (string, error)
 		return "", fmt.Errorf("failed to lookup RuntimeClass %s: %v", name, err)
 	}
 
+	return rc.Handler, nil
+}
+
+// LookupRuntimeHandlerForRestore resolves the handler and option policy from
+// one live RuntimeClass, so a recreated class cannot apply its allowlist to a
+// handler still cached from the old object. Empty options use the normal lookup.
+func (m *Manager) LookupRuntimeHandlerForRestore(ctx context.Context, runtimeClassName *string, options map[string]string) (string, error) {
+	if len(options) == 0 {
+		return m.LookupRuntimeHandler(runtimeClassName)
+	}
+	if runtimeClassName == nil || *runtimeClassName == "" {
+		return "", fmt.Errorf("spec.restoreFrom.options requires spec.runtimeClassName and a RuntimeClass restore option allowlist")
+	}
+	name := *runtimeClassName
+	rc, err := m.client.NodeV1().RuntimeClasses().Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to read RuntimeClass %q for restore options: %w", name, err)
+	}
+	var allowed []string
+	if rc.PodCheckpoint != nil {
+		allowed = rc.PodCheckpoint.AllowedRestoreOptions
+	}
+	if err := checkpointutil.ValidateRuntimeOptions(options, allowed); err != nil {
+		return "", fmt.Errorf("spec.restoreFrom.options for RuntimeClass %q: %w", name, err)
+	}
 	return rc.Handler, nil
 }

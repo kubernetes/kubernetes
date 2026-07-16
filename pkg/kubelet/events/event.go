@@ -89,6 +89,7 @@ const (
 	CheckpointWrongNode         = "CheckpointWrongNode"
 	PodSpecMismatch             = "PodSpecMismatch"
 	RestoreInProgress           = "RestoreInProgress"
+	RestorePolicyUnavailable    = "RestorePolicyUnavailable"
 	RestorePreparationFailed    = "RestorePreparationFailed"
 	RestorePostProcessingFailed = "RestorePostProcessingFailed"
 )

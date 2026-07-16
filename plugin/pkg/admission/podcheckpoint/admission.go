@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	node "k8s.io/kubernetes/pkg/apis/node"
+	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -103,6 +104,24 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, _ admissi
 	}
 	if pod.Spec.NodeName == "" || pod.Status.Phase != v1.PodRunning {
 		return admission.NewForbidden(a, fmt.Errorf("source Pod %q must be assigned to a node and Running before checkpointing", ref.Name))
+	}
+	if len(checkpoint.Spec.CheckpointOptions) == 0 {
+		return nil
+	}
+	if pod.Spec.RuntimeClassName == nil || *pod.Spec.RuntimeClassName == "" {
+		return admission.NewForbidden(a, fmt.Errorf("spec.checkpointOptions requires a source Pod with spec.runtimeClassName and a RuntimeClass checkpoint option allowlist"))
+	}
+	className := *pod.Spec.RuntimeClassName
+	class, err := p.client.NodeV1().RuntimeClasses().Get(ctx, className, metav1.GetOptions{})
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("cannot read RuntimeClass %q for spec.checkpointOptions: %w", className, err))
+	}
+	var allowed []string
+	if class.PodCheckpoint != nil {
+		allowed = class.PodCheckpoint.AllowedCheckpointOptions
+	}
+	if err := checkpointutil.ValidateRuntimeOptions(checkpoint.Spec.CheckpointOptions, allowed); err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("spec.checkpointOptions for RuntimeClass %q: %w", className, err))
 	}
 	return nil
 }

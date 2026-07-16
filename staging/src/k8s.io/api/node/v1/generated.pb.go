@@ -41,6 +41,8 @@ func (m *RuntimeClass) Reset() { *m = RuntimeClass{} }
 
 func (m *RuntimeClassList) Reset() { *m = RuntimeClassList{} }
 
+func (m *RuntimeClassPodCheckpoint) Reset() { *m = RuntimeClassPodCheckpoint{} }
+
 func (m *Scheduling) Reset() { *m = Scheduling{} }
 
 func (m *Overhead) Marshal() (dAtA []byte, err error) {
@@ -115,6 +117,18 @@ func (m *RuntimeClass) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.PodCheckpoint != nil {
+		{
+			size, err := m.PodCheckpoint.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x2a
+	}
 	if m.Scheduling != nil {
 		{
 			size, err := m.Scheduling.MarshalToSizedBuffer(dAtA[:i])
@@ -201,6 +215,47 @@ func (m *RuntimeClassList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	}
 	i--
 	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *RuntimeClassPodCheckpoint) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *RuntimeClassPodCheckpoint) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *RuntimeClassPodCheckpoint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.AllowedRestoreOptions) > 0 {
+		for iNdEx := len(m.AllowedRestoreOptions) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.AllowedRestoreOptions[iNdEx])
+			copy(dAtA[i:], m.AllowedRestoreOptions[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.AllowedRestoreOptions[iNdEx])))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if len(m.AllowedCheckpointOptions) > 0 {
+		for iNdEx := len(m.AllowedCheckpointOptions) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.AllowedCheckpointOptions[iNdEx])
+			copy(dAtA[i:], m.AllowedCheckpointOptions[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.AllowedCheckpointOptions[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -312,6 +367,10 @@ func (m *RuntimeClass) Size() (n int) {
 		l = m.Scheduling.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.PodCheckpoint != nil {
+		l = m.PodCheckpoint.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -326,6 +385,27 @@ func (m *RuntimeClassList) Size() (n int) {
 	if len(m.Items) > 0 {
 		for _, e := range m.Items {
 			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *RuntimeClassPodCheckpoint) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.AllowedCheckpointOptions) > 0 {
+		for _, s := range m.AllowedCheckpointOptions {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.AllowedRestoreOptions) > 0 {
+		for _, s := range m.AllowedRestoreOptions {
+			l = len(s)
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
@@ -390,6 +470,7 @@ func (this *RuntimeClass) String() string {
 		`Handler:` + fmt.Sprintf("%v", this.Handler) + `,`,
 		`Overhead:` + strings.Replace(this.Overhead.String(), "Overhead", "Overhead", 1) + `,`,
 		`Scheduling:` + strings.Replace(this.Scheduling.String(), "Scheduling", "Scheduling", 1) + `,`,
+		`PodCheckpoint:` + strings.Replace(this.PodCheckpoint.String(), "RuntimeClassPodCheckpoint", "RuntimeClassPodCheckpoint", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -406,6 +487,17 @@ func (this *RuntimeClassList) String() string {
 	s := strings.Join([]string{`&RuntimeClassList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RuntimeClassPodCheckpoint) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RuntimeClassPodCheckpoint{`,
+		`AllowedCheckpointOptions:` + fmt.Sprintf("%v", this.AllowedCheckpointOptions) + `,`,
+		`AllowedRestoreOptions:` + fmt.Sprintf("%v", this.AllowedRestoreOptions) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -789,6 +881,42 @@ func (m *RuntimeClass) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodCheckpoint", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.PodCheckpoint == nil {
+				m.PodCheckpoint = &RuntimeClassPodCheckpoint{}
+			}
+			if err := m.PodCheckpoint.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -905,6 +1033,120 @@ func (m *RuntimeClassList) Unmarshal(dAtA []byte) error {
 			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *RuntimeClassPodCheckpoint) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RuntimeClassPodCheckpoint: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RuntimeClassPodCheckpoint: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllowedCheckpointOptions", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.AllowedCheckpointOptions = append(m.AllowedCheckpointOptions, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllowedRestoreOptions", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.AllowedRestoreOptions = append(m.AllowedRestoreOptions, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

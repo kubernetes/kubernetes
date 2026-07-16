@@ -23,10 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodeapi "k8s.io/kubernetes/pkg/api/node"
 	"k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/node/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements verification logic for RuntimeClass.
@@ -57,6 +59,7 @@ func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 // PrepareForCreate clears fields that are not allowed to be set by end users
 // on creation.
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	dropDisabledFields(obj.(*node.RuntimeClass), nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -64,7 +67,14 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newRuntimeClass := obj.(*node.RuntimeClass)
 	oldRuntimeClass := old.(*node.RuntimeClass)
 
-	_, _ = newRuntimeClass, oldRuntimeClass
+	dropDisabledFields(newRuntimeClass, oldRuntimeClass)
+}
+
+func dropDisabledFields(runtimeClass, oldRuntimeClass *node.RuntimeClass) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) &&
+		(oldRuntimeClass == nil || oldRuntimeClass.PodCheckpoint == nil) {
+		runtimeClass.PodCheckpoint = nil
+	}
 }
 
 // Validate validates a new RuntimeClass. Validation must check for a correct signature.

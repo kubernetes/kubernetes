@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"net/http"
@@ -2426,7 +2427,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
 		} else {
 			switch reason := kubecontainer.RestoreErrorReason(result.Error()); reason {
-			case events.RestoreInProgress, events.RestorePreparationFailed, events.RestorePostProcessingFailed:
+			case events.RestoreInProgress, events.RestorePolicyUnavailable, events.RestorePreparationFailed, events.RestorePostProcessingFailed:
 				// Preparation has no runtime side effects. Post-processing retries
 				// observe the existing sandbox without repeating the CRI restore.
 				kl.restoreOperationsInFlight.Store(pod.UID, struct{}{})
@@ -3717,6 +3718,7 @@ func (kl *Kubelet) CheckpointPod(
 	podCheckpointName string,
 	podCheckpointUID types.UID,
 	timeout time.Duration,
+	checkpointOptions map[string]string,
 ) error {
 	logger := klog.FromContext(ctx)
 
@@ -3764,6 +3766,9 @@ func (kl *Kubelet) CheckpointPod(
 	activeSandbox := podStatus.SandboxStatuses[0]
 	if activeSandbox == nil || activeSandbox.State != runtimeapi.PodSandboxState_SANDBOX_READY || activeSandbox.Id == "" {
 		return fmt.Errorf("pod %v has no ready sandbox", podFullName)
+	}
+	if err := kl.validatePodCheckpointOptions(ctx, pod, checkpointOptions, activeSandbox.RuntimeHandler); err != nil {
+		return err
 	}
 
 	// Enforce the execution-time preconditions (KEP-5823) before reaching the
@@ -3824,6 +3829,7 @@ func (kl *Kubelet) CheckpointPod(
 		PodSandboxId: activeSandbox.Id,
 		OutputPath:   outputPath,
 		ContainerIds: containerIDs,
+		Options:      maps.Clone(checkpointOptions),
 	}
 
 	// Pause the pod's probes for the duration of the checkpoint: its containers

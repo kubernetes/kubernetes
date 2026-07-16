@@ -62,5 +62,13 @@
         "tolerationSeconds": 5
       }
     ]
+  },
+  "podCheckpoint": {
+    "allowedCheckpointOptions": [
+      "allowedCheckpointOptionsValue"
+    ],
+    "allowedRestoreOptions": [
+      "allowedRestoreOptionsValue"
+    ]
   }
 }
