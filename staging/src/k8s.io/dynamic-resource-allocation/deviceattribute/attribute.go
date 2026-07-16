@@ -37,6 +37,12 @@ const (
 	// referring to a PCI (Peripheral Component Interconnect) device.
 	// This attribute can be used to identify PCI devices.
 	StandardDeviceAttributePCIBusID resourceapi.QualifiedName = StandardDeviceAttributePrefix + "pciBusID"
+
+	// StandardDeviceAttributeMdevUUID is a standard device attribute name
+	// which describes the UUID of the mediated device (mdev) for virtualization workloads.
+	// The value is a string value representing a 128-bit UUID (e.g., "123e4567-e89b-12d3-a456-426614174000").
+	// This attribute can be used to identify mediated devices.
+	StandardDeviceAttributeMdevUUID resourceapi.QualifiedName = StandardDeviceAttributePrefix + "mdevUUID"
 )
 
 // DeviceAttribute represents a device attribute name and its value
