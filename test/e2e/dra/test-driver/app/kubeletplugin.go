@@ -44,6 +44,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	cdi "tags.cncf.io/container-device-interface/specs-go"
 )
 
 type Options struct {
@@ -382,20 +383,22 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourc
 			continue
 		}
 
-		spec := &spec{
-			Version: "0.3.0", // This has to be a version accepted by the runtimes.
-			Kind:    vendor + "/" + class,
-			// At least one device is required and its entry must have more
-			// than just the name.
-			Devices: []device{
+		spec := &cdi.Spec{
+			Kind: vendor + "/" + class,
+			Devices: []cdi.Device{
 				{
 					Name: deviceName,
-					ContainerEdits: containerEdits{
+					ContainerEdits: cdi.ContainerEdits{
 						Env: envs,
 					},
 				},
 			},
 		}
+		minVersion, err := cdi.MinimumRequiredVersion(spec)
+		if err != nil {
+			return nil, fmt.Errorf("determine CDI spec version: %w", err)
+		}
+		spec.Version = minVersion
 		filePath := ex.getJSONFilePath(claim.UID, baseRequestName)
 		buffer, err := json.Marshal(spec)
 		if err != nil {
