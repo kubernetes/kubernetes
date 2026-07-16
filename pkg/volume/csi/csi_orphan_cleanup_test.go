@@ -211,6 +211,26 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "no vol_data empty dir removes dir",
+			prepare: func(t *testing.T, volumeDir string, _ *mount.FakeMounter) {
+				t.Helper()
+				// empty volume dir, no metadata
+			},
+			wantDataGone: true,
+			wantDirGone:  true,
+		},
+		{
+			name: "no vol_data with leftover file keeps dir",
+			prepare: func(t *testing.T, volumeDir string, _ *mount.FakeMounter) {
+				t.Helper()
+				if err := os.WriteFile(filepath.Join(volumeDir, "userdata.txt"), []byte("keep"), 0640); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantDataGone: true,
+			wantDirGone:  false,
+		},
+		{
 			name: "unreadable vol_data.json removal fails",
 			prepare: func(t *testing.T, volumeDir string, _ *mount.FakeMounter) {
 				t.Helper()
