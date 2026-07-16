@@ -60,6 +60,16 @@ func (s *Strategy) NamespaceScoped() bool {
 	return true
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (s *Strategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+}
+
 func (s *Strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	req := obj.(*certificates.PodCertificateRequest)
 	req.Status = certificates.PodCertificateRequestStatus{}

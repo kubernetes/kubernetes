@@ -46,9 +46,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		DefaultQualifiedResource:  scheduling.Resource("compositepodgroups"),
 		SingularQualifiedResource: scheduling.Resource("compositepodgroup"),
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
