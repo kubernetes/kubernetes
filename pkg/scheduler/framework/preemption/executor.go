@@ -23,7 +23,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -174,8 +175,13 @@ func (e *Executor) actuatePodPreemption(ctx context.Context, candidate Candidate
 }
 
 // actuatePodGroupPreemption actuates the preemption given preemptor pods, pod group and a list of victims to be evicted.
-func (e *Executor) actuatePodGroupPreemption(ctx context.Context, candidate Candidate, preemptorPods []*v1.Pod, preemptor *schedulingapi.PodGroup, pluginName string) *fwk.Status {
-	podGroupPreemptor := &podGroupExecutorPreemptor{pg: preemptor, pods: preemptorPods}
+func (e *Executor) actuatePodGroupPreemption(ctx context.Context, candidate Candidate, pgInfo fwk.PodGroupInfo, pluginName string) *fwk.Status {
+	var podGroupPreemptor ExecutorPreemptor
+	if pgInfo.GetCompositePodGroup() != nil {
+		podGroupPreemptor = &compositePodGroupExecutorPreemptor{cpg: pgInfo.GetCompositePodGroup(), pods: pgInfo.GetUnscheduledPods()}
+	} else {
+		podGroupPreemptor = &podGroupExecutorPreemptor{pg: pgInfo.GetPodGroup(), pods: pgInfo.GetUnscheduledPods()}
+	}
 	if e.fts.EnableAsyncPreemption {
 		e.prepareCandidateAsync(candidate, podGroupPreemptor, pluginName)
 		return nil
@@ -355,7 +361,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 
 func observeVictims(preemptor ExecutorPreemptor, candidate Candidate) {
 	numVictims := float64(len(candidate.Victims().Pods))
-	if preemptor.Type() == "podgroup" {
+	if preemptor.Type() == string(fwk.PodGroupKeyType) || preemptor.Type() == string(fwk.CompositePodGroupKeyType) {
 		metrics.WorkloadPreemptionVictims.Observe(numVictims)
 	} else {
 		metrics.PreemptionVictims.Observe(numVictims)
@@ -491,12 +497,12 @@ func (p *podExecutorPreemptor) Priority() int32 {
 }
 
 func (p *podExecutorPreemptor) Type() string {
-	return "pod"
+	return string(fwk.PodKeyType)
 }
 
 // podGroupExecutorPreemptor is a wrapper around pod group used by preemption execution.
 type podGroupExecutorPreemptor struct {
-	pg   *schedulingapi.PodGroup
+	pg   *schedulingv1beta1.PodGroup
 	pods []*v1.Pod
 }
 
@@ -534,5 +540,48 @@ func (p *podGroupExecutorPreemptor) Pods() map[string]*v1.Pod {
 }
 
 func (p *podGroupExecutorPreemptor) Type() string {
-	return "podgroup"
+	return string(fwk.PodGroupKeyType)
+}
+
+// compositePodGroupExecutorPreemptor is a wrapper around composite pod group used by preemption execution.
+type compositePodGroupExecutorPreemptor struct {
+	cpg  *schedulingv1alpha3.CompositePodGroup
+	pods []*v1.Pod
+}
+
+func (p *compositePodGroupExecutorPreemptor) UID() types.UID {
+	return p.cpg.UID
+}
+
+func (p *compositePodGroupExecutorPreemptor) SchedulerName() string {
+	// All pods in a composite pod group should use the same scheduler name.
+	return p.pods[0].Spec.SchedulerName
+}
+
+func (p *compositePodGroupExecutorPreemptor) GetName() string {
+	return p.cpg.Name
+}
+
+func (p *compositePodGroupExecutorPreemptor) GetNamespace() string {
+	return p.cpg.Namespace
+}
+
+func (p *compositePodGroupExecutorPreemptor) Obj() runtime.Object {
+	return p.cpg
+}
+
+func (p *compositePodGroupExecutorPreemptor) Priority() int32 {
+	return util.CompositePodGroupPriority(p.cpg)
+}
+
+func (p *compositePodGroupExecutorPreemptor) Pods() map[string]*v1.Pod {
+	m := make(map[string]*v1.Pod, len(p.pods))
+	for _, pod := range p.pods {
+		m[pod.Name] = pod
+	}
+	return m
+}
+
+func (p *compositePodGroupExecutorPreemptor) Type() string {
+	return string(fwk.CompositePodGroupKeyType)
 }

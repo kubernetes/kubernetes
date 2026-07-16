@@ -3546,10 +3546,10 @@ func TestPodGroupInfoGetChildrenSorting(t *testing.T) {
 	}
 
 	expectedOrder := []*PodGroupInfo{pgInfo3, pgInfo1, pgInfo4, pgInfo2}
-	gotOrder := pgi.GetChildren()
+	gotOrder := pgi.GetChildGroups()
 
 	if diff := cmp.Diff(expectedOrder, gotOrder); diff != "" {
-		t.Errorf("GetChildren() returned diff (-want +got):\n%s", diff)
+		t.Errorf("GetChildGroups() returned diff (-want +got):\n%s", diff)
 	}
 }
 
@@ -4316,5 +4316,96 @@ func TestQueuedPodGroupInfo_ForEachPodInfo(t *testing.T) {
 
 	if count != 1 {
 		t.Errorf("Expected 1 pod after early exit, got %d", count)
+	}
+}
+
+func TestPodGroupInfo_GetUnscheduledPods(t *testing.T) {
+	pod1 := st.MakePod().Name("pod1").Namespace("ns1").Obj()
+	pod2 := st.MakePod().Name("pod2").Namespace("ns1").Obj()
+	pod3 := st.MakePod().Name("pod3").Namespace("ns1").Obj()
+	pod4 := st.MakePod().Name("pod4").Namespace("ns1").Obj()
+
+	pgStandalone := st.MakePodGroup().Name("pg-standalone").Namespace("ns1").Obj()
+	pgChild1 := st.MakePodGroup().Name("pg-child1").Namespace("ns1").Obj()
+	pgChild2 := st.MakePodGroup().Name("pg-child2").Namespace("ns1").Obj()
+	pgChild3 := st.MakePodGroup().Name("pg-child3").Namespace("ns1").Obj()
+	cpgParent := st.MakeCompositePodGroup().Name("cpg-parent").Namespace("ns1").Obj()
+	cpgRoot := st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns1").Obj()
+	cpgSub := st.MakeCompositePodGroup().Name("cpg-sub").Namespace("ns1").Obj()
+
+	tests := []struct {
+		name     string
+		pgi      *PodGroupInfo
+		expected []*v1.Pod
+	}{
+		{
+			name: "Standalone PodGroupInfo with unscheduled pods",
+			pgi: &PodGroupInfo{
+				PodGroup:        pgStandalone,
+				UnscheduledPods: []*v1.Pod{pod1, pod2},
+				Type:            fwk.PodGroupKeyType,
+			},
+			expected: []*v1.Pod{pod1, pod2},
+		},
+		{
+			name: "PodGroupInfo with children",
+			pgi: &PodGroupInfo{
+				CompositePodGroup: cpgParent,
+				Type:              fwk.CompositePodGroupKeyType,
+				Children: []*PodGroupInfo{
+					{
+						PodGroup:        pgChild1,
+						UnscheduledPods: []*v1.Pod{pod1},
+						Type:            fwk.PodGroupKeyType,
+					},
+					{
+						PodGroup:        pgChild2,
+						UnscheduledPods: []*v1.Pod{pod2, pod3},
+						Type:            fwk.PodGroupKeyType,
+					},
+				},
+			},
+			expected: []*v1.Pod{pod1, pod2, pod3},
+		},
+		{
+			name: "Multi-level PodGroupInfo with children",
+			pgi: &PodGroupInfo{
+				CompositePodGroup: cpgRoot,
+				Type:              fwk.CompositePodGroupKeyType,
+				Children: []*PodGroupInfo{
+					{
+						CompositePodGroup: cpgSub,
+						Type:              fwk.CompositePodGroupKeyType,
+						Children: []*PodGroupInfo{
+							{
+								PodGroup:        pgChild1,
+								UnscheduledPods: []*v1.Pod{pod1},
+								Type:            fwk.PodGroupKeyType,
+							},
+							{
+								PodGroup:        pgChild2,
+								UnscheduledPods: []*v1.Pod{pod2, pod3},
+								Type:            fwk.PodGroupKeyType,
+							},
+						},
+					},
+					{
+						PodGroup:        pgChild3,
+						UnscheduledPods: []*v1.Pod{pod4},
+						Type:            fwk.PodGroupKeyType,
+					},
+				},
+			},
+			expected: []*v1.Pod{pod1, pod2, pod3, pod4},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.pgi.GetUnscheduledPods()
+			if diff := cmp.Diff(tt.expected, got); diff != "" {
+				t.Errorf("GetUnscheduledPods() mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

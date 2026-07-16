@@ -20,12 +20,13 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -63,7 +64,7 @@ type IsEligiblePodFunc func(nodeInfo fwk.NodeInfo, victim preemption.Victim, pre
 type MoreImportantVictimFunc func(victim1, victim2 preemption.Victim) bool
 
 type podGroupEvaluator interface {
-	Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
+	Preempt(ctx context.Context, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
 }
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
@@ -76,6 +77,7 @@ type DefaultPreemption struct {
 	Evaluator         *preemption.Evaluator
 	pgLister          fwk.PodGroupLister
 	pgSnapshotLister  fwk.PodGroupLister
+	cpgSnapshotLister fwk.CompositePodGroupLister
 	podGroupEvaluator podGroupEvaluator
 
 	// IsEligiblePod returns whether a victim (individual pod/pod group) is allowed to be preempted by a preemptor pod.
@@ -124,7 +126,11 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	if pl.fts.EnableGenericWorkload {
 		pl.pgLister = fh.PodGroupManager().PodGroups()
 		pl.pgSnapshotLister = fh.SnapshotSharedLister().PodGroups()
-		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor, pl.fts.EnablePodGroupPreemptionPolicy)
+		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor, pl.fts)
+	}
+
+	if pl.fts.EnableCompositePodGroup {
+		pl.cpgSnapshotLister = fh.SnapshotSharedLister().CompositePodGroups()
 	}
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim
@@ -135,12 +141,10 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 
 	// Default behavior, defines the order for victims sorting. The order is:
 	// 1. Higher Priority.
-	// 2. If GenericWorkload is enabled: PodGroup > Individual Pod.
+	// 2. Workload Type: CompositePodGroup > PodGroup > Individual Pod.
 	// 3. For individual Pods: Older StartTime (longer runtime).
-	// 4. For PodGroups: Larger Group Size, then Older StartTime.
-	pl.MoreImportantVictim = func(vi1, vi2 preemption.Victim) bool {
-		return preemption.MoreImportantVictim(vi1, vi2, pl.fts.EnableGenericWorkload)
-	}
+	// 4. For Group types: Larger Group Size, then Older StartTime.
+	pl.MoreImportantVictim = preemption.MoreImportantVictim
 
 	return &pl, nil
 }
@@ -164,13 +168,43 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 		return nil
 	}
 	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload {
-		pg, err := pl.pgLister.Get(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
-		// If the pg is not found do not block the pod. It's not a default preemption responsibility
-		// to block pods from pod group without pg from entering the queue.
-		if err != nil {
-			return nil
+		var rootUID types.UID
+		if !pl.fts.EnableCompositePodGroup {
+			pg, err := pl.pgLister.Get(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
+			// If the pg is not found do not block the pod. It's not a default preemption responsibility
+			// to block pods from pod group without pg from entering the queue.
+			if err != nil {
+				return nil
+			}
+			rootUID = pg.GetUID()
+		} else {
+			snapshot, err := pl.fh.PodGroupManager().BuildHierarchySnapshotFromPod(p)
+			// If the root group cannot be resolved, do not block the pod. It's not a default preemption responsibility
+			// to block pods from a pod group whose root group is missing from entering the queue.
+			if err != nil {
+				return nil
+			}
+			podGroupKey := fwk.PodGroupKey(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
+			rootKey, ok, err := pl.fh.PodGroupManager().GetRootKeyForGroup(podGroupKey)
+			if !ok || err != nil {
+				return nil
+			}
+			switch rootKey.Type {
+			case fwk.PodGroupKeyType:
+				pg, err := snapshot.PodGroups().Get(rootKey.Namespace, rootKey.Name)
+				if err != nil {
+					return nil
+				}
+				rootUID = pg.GetUID()
+			case fwk.CompositePodGroupKeyType:
+				cpg, err := snapshot.CompositePodGroups().Get(rootKey.Namespace, rootKey.Name)
+				if err != nil {
+					return nil
+				}
+				rootUID = cpg.GetUID()
+			}
 		}
-		if pl.Executor.IsPodGroupRunningPreemption(pg.GetUID()) {
+		if pl.Executor.IsPodGroupRunningPreemption(rootUID) {
 			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod group to be finished")
 		}
 		return nil
@@ -431,8 +465,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			for _, p := range nodeInfo.GetPods() {
-				victim := preemption.NewPodVictim(p, pl.pgSnapshotLister)
-
+				victim := preemption.NewPodVictim(p, pl.pgSnapshotLister, pl.cpgSnapshotLister)
 				if pl.isPreemptionAllowed(nodeInfo, victim, pod) && preemption.PodTerminatingByPreemption(p.GetPod()) {
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
@@ -475,12 +508,7 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		metrics.WorkloadPreemptionAttempts.WithLabelValues(status.Code().String()).Inc()
 	}()
 
-	if pl.fts.EnableCompositePodGroup && pgInfo.GetCompositePodGroup() != nil {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "pod group preemption: not supported for composite pod groups yet")
-	}
-	pg := pgInfo.GetPodGroup()
-
-	if pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0 {
+	if pl.fts.EnableTopologyAwareWorkloadScheduling && hasTopologyConstraints(pgInfo) {
 		return nil, fwk.NewStatus(fwk.Unschedulable, "pod group preemption: not supported with topology constraints")
 	}
 
@@ -495,10 +523,20 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		}
 	}()
 
-	res, status := pl.podGroupEvaluator.Preempt(ctx, pg, pgInfo.GetUnscheduledPods(), pgSchedulingFunc)
+	res, status := pl.podGroupEvaluator.Preempt(ctx, pgInfo, pgSchedulingFunc)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)
 	}
 	return res, status
+}
+
+func hasTopologyConstraints(pgInfo fwk.PodGroupInfo) bool {
+	if pg := pgInfo.GetPodGroup(); pg != nil {
+		return pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0
+	}
+	if cpg := pgInfo.GetCompositePodGroup(); cpg != nil && cpg.Spec.SchedulingConstraints != nil && len(cpg.Spec.SchedulingConstraints.Topology) > 0 {
+		return true
+	}
+	return slices.ContainsFunc(pgInfo.GetChildren(), hasTopologyConstraints)
 }

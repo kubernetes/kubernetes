@@ -1220,6 +1220,7 @@ type PodGroupInfo struct {
 	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
 	// PodGroupManager.PodGroupState can be used for that.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
+	// Only leaf pod groups have unscheduled pods.
 	UnscheduledPods []*v1.Pod
 	// PodGroup is a PodGroup API object.
 	PodGroup *schedulingv1beta1.PodGroup
@@ -1246,8 +1247,18 @@ func (pgi *PodGroupInfo) GetKey() string {
 	return fmt.Sprintf("%s/%s/%s", pgi.Type, pgi.Namespace, pgi.Name)
 }
 
+// GetUnscheduledPods returns the unscheduled pods for this pod group.
+// For composite pod groups, this method recursively aggregates the unscheduled pods
+// from all leaf pod groups in the hierarchy.
 func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
-	return pgi.UnscheduledPods
+	if pgi.PodGroup != nil {
+		return pgi.UnscheduledPods
+	}
+	var pods []*v1.Pod
+	for _, child := range pgi.Children {
+		pods = append(pods, child.GetUnscheduledPods()...)
+	}
+	return pods
 }
 
 func (pgi *PodGroupInfo) GetPodGroup() *schedulingv1beta1.PodGroup {
@@ -1258,6 +1269,17 @@ func (pgi *PodGroupInfo) GetCompositePodGroup() *schedulingv1alpha3.CompositePod
 	return pgi.CompositePodGroup
 }
 
+func (pgi *PodGroupInfo) GetChildren() []fwk.PodGroupInfo {
+	if len(pgi.Children) == 0 {
+		return nil
+	}
+	children := make([]fwk.PodGroupInfo, len(pgi.Children))
+	for i, child := range pgi.GetChildGroups() {
+		children[i] = child
+	}
+	return children
+}
+
 func (pgi *PodGroupInfo) GetCreationTimestamp() time.Time {
 	if pgi.PodGroup != nil {
 		return pgi.PodGroup.CreationTimestamp.Time
@@ -1265,14 +1287,15 @@ func (pgi *PodGroupInfo) GetCreationTimestamp() time.Time {
 	return pgi.CompositePodGroup.CreationTimestamp.Time
 }
 
-func (pgi *PodGroupInfo) GetChildren() []*PodGroupInfo {
+func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
 	if pgi.CompositePodGroup == nil {
 		// Only CompositePodGroups have children groups.
 		return nil
 	}
 	result := make([]*PodGroupInfo, len(pgi.Children))
 	copy(result, pgi.Children)
-	// Sort the children by creation timestamp.
+	// Sort the children by creation timestamp. If timestamps are equal, compare the child groups
+	// by their names to have a tie-breaker that enforces deterministic order.
 	slices.SortFunc(result, func(a, b *PodGroupInfo) int {
 		aTime := a.GetCreationTimestamp()
 		bTime := b.GetCreationTimestamp()
@@ -1280,6 +1303,11 @@ func (pgi *PodGroupInfo) GetChildren() []*PodGroupInfo {
 			return -1
 		}
 		if aTime.After(bTime) {
+			return 1
+		}
+		if a.Name < b.Name {
+			return -1
+		} else if a.Name > b.Name {
 			return 1
 		}
 		return 0
