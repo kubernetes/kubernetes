@@ -18,10 +18,38 @@ package deep
 
 import (
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
+
+	st.Value(&SetByServerStruct{
+		StructField: SetByServerOtherStruct{
+			StructField:    SetByServerSmallStruct{SetByServerField: "xyz"},
+			StructPtrField: &SetByServerSmallStruct{SetByServerField: "xyz"},
+		},
+		StructPtrField: &SetByServerOtherStruct{
+			StructField:    SetByServerSmallStruct{SetByServerField: "xyz"},
+			StructPtrField: &SetByServerSmallStruct{SetByServerField: "xyz"},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{})
+
+	st.Value(&SetByServerStruct{
+		StructField: SetByServerOtherStruct{
+			StructField:    SetByServerSmallStruct{SetByServerField: ""},
+			StructPtrField: &SetByServerSmallStruct{SetByServerField: ""},
+		},
+		StructPtrField: &SetByServerOtherStruct{
+			StructField:    SetByServerSmallStruct{SetByServerField: ""},
+			StructPtrField: &SetByServerSmallStruct{SetByServerField: ""},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{
+		field.Required(field.NewPath("structField", "structField", "setByServerField"), ""),
+		field.Required(field.NewPath("structPtrField", "structField", "setByServerField"), ""),
+		field.Required(field.NewPath("structPtrField", "structPtrField", "setByServerField"), ""),
+	})
 
 	st.Value(&Struct{
 		StructField: OtherStruct{

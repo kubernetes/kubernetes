@@ -18,6 +18,7 @@ package validators
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -102,13 +103,14 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	itemPath := context.Path.Key(itemKey)
 	itemSelector := generateSelector(criteria)
 	subContext := Context{
-		Scope:          ScopeListVal,
-		Type:           elemT,
-		Path:           itemPath,
-		ListSelector:   itemSelector,
-		ParentPath:     context.Path,
-		ParentType:     context.Type,
-		StabilityLevel: context.StabilityLevel,
+		Scope:            ScopeListVal,
+		Type:             elemT,
+		Path:             itemPath,
+		ListSelector:     itemSelector,
+		ParentPath:       context.Path,
+		ParentType:       context.Type,
+		StabilityLevel:   context.StabilityLevel,
+		GatingConditions: slices.Clone(context.GatingConditions),
 	}
 
 	validations, err := itv.validator.ExtractTagValidations(subContext, *tag.ValueTag)

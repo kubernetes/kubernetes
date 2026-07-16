@@ -51,3 +51,30 @@ type OtherStruct struct {
 type SmallStruct struct {
 	StringField string `json:"stringField"`
 }
+
+type SetByServerSmallStruct struct {
+	SetByServerField string `json:"setByServerField"`
+}
+
+type SetByServerOtherStruct struct {
+	StructField SetByServerSmallStruct `json:"structField"`
+
+	// +k8s:optional
+	StructPtrField *SetByServerSmallStruct `json:"structPtrField"`
+}
+
+type SetByServerStruct struct {
+	TypeMeta int `json:"typeMeta"`
+
+	// +k8s:subfield(structField)=+k8s:subfield(setByServerField)=+k8s:optional
+	// +k8s:subfield(structField)=+k8s:subfield(setByServerField)=+k8s:setByServer
+	StructField SetByServerOtherStruct `json:"structField"`
+
+	// TODO:- Passing nil to structPtrField.StructPtrField will result a NPE error in the generated code. Fix the framework accordingly.
+	// +k8s:optional
+	// +k8s:subfield(structField)=+k8s:subfield(setByServerField)=+k8s:optional
+	// +k8s:subfield(structField)=+k8s:subfield(setByServerField)=+k8s:setByServer
+	// +k8s:subfield(structPtrField)=+k8s:subfield(setByServerField)=+k8s:optional
+	// +k8s:subfield(structPtrField)=+k8s:subfield(setByServerField)=+k8s:setByServer
+	StructPtrField *SetByServerOtherStruct `json:"structPtrField"`
+}

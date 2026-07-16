@@ -29,6 +29,12 @@ const (
 	ifDisabledTag = "k8s:ifDisabled"
 )
 
+// OptionCondition represents an option/feature-gate condition (e.g. +k8s:ifEnabled, +k8s:ifDisabled).
+type OptionCondition struct {
+	Option  string
+	Enabled bool
+}
+
 func init() {
 	RegisterTagValidator(&ifTagValidator{true, nil})
 	RegisterTagValidator(&ifTagValidator{false, nil})
@@ -65,7 +71,7 @@ func (itv ifTagValidator) GetValidations(context Context, tag codetags.Tag) (Val
 	if !ok {
 		return Validations{}, fmt.Errorf("missing required option name positional argument")
 	}
-
+	context = context.WithCondition(OptionCondition{Option: optionArg.Value, Enabled: itv.enabled})
 	validations, err := itv.validator.ExtractTagValidations(context, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
