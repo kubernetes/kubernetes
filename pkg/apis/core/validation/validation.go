@@ -52,7 +52,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
@@ -6686,16 +6685,6 @@ func ValidatePodBinding(binding *core.Binding) field.ErrorList {
 // explicitly here rather than through a RESTCreateStrategy.
 func ValidatePodBindingCreate(ctx context.Context, scheme *runtime.Scheme, binding *core.Binding) field.ErrorList {
 	errs := ValidatePodBinding(binding)
-
-	// BindingREST.Create is reachable both via the pods/binding subresource and the
-	// deprecated top-level bindings endpoint. Declarative validation for Binding is
-	// registered as a top-level resource, so normalize the subresource before
-	// dispatching regardless of which route the request came in on.
-	if requestInfo, ok := genericapirequest.RequestInfoFrom(ctx); ok && requestInfo.Subresource != "" {
-		info := *requestInfo
-		info.Subresource = ""
-		ctx = genericapirequest.WithRequestInfo(ctx, &info)
-	}
 
 	dv := rest.DeclarativeValidation{Scheme: scheme}
 	return dv.ValidateDeclaratively(ctx, binding, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
