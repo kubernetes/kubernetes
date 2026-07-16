@@ -14,4 +14,5 @@
 
 FROM debian
 COPY ./app /app
+USER nobody
 ENTRYPOINT /app
