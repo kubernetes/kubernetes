@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	. "k8s.io/apimachinery/pkg/watch"
@@ -29,6 +30,21 @@ type testType string
 
 func (obj testType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 func (obj testType) DeepCopyObject() runtime.Object   { return obj }
+
+// testPtrType is a pointer-based runtime.Object whose DeepCopyObject returns a
+// distinct pointer, so tests can verify that objects are actually deep-copied.
+type testPtrType struct {
+	Value string
+}
+
+func (obj *testPtrType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *testPtrType) DeepCopyObject() runtime.Object {
+	if obj == nil {
+		return nil
+	}
+	clone := *obj
+	return &clone
+}
 
 func TestFake(t *testing.T) {
 	f := NewFake()
@@ -199,26 +215,17 @@ func TestRaceFreeFakeWatcherLifecycle(t *testing.T) {
 }
 
 func TestRaceFreeFakeWatcherPanicsWhenFull(t *testing.T) {
-	expectPanic := func(name string, fn func()) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Errorf("%s: expected panic on full channel", name)
-			}
-		}()
-		fn()
-	}
-
 	f := NewRaceFreeFake()
 	// Fill the buffered channel without a consumer.
 	for i := int32(0); i < DefaultChanSize; i++ {
 		f.Add(testType("foo"))
 	}
 
-	expectPanic("Add", func() { f.Add(testType("foo")) })
-	expectPanic("Modify", func() { f.Modify(testType("foo")) })
-	expectPanic("Delete", func() { f.Delete(testType("foo")) })
-	expectPanic("Error", func() { f.Error(testType("foo")) })
-	expectPanic("Action", func() { f.Action(Added, testType("foo")) })
+	assert.PanicsWithError(t, "channel full", func() { f.Add(testType("foo")) }, "Add")
+	assert.PanicsWithError(t, "channel full", func() { f.Modify(testType("foo")) }, "Modify")
+	assert.PanicsWithError(t, "channel full", func() { f.Delete(testType("foo")) }, "Delete")
+	assert.PanicsWithError(t, "channel full", func() { f.Error(testType("foo")) }, "Error")
+	assert.PanicsWithError(t, "channel full", func() { f.Action(Added, testType("foo")) }, "Action")
 }
 
 func TestEmpty(t *testing.T) {
@@ -298,10 +305,13 @@ func TestMockWatcher(t *testing.T) {
 }
 
 func TestEventDeepCopy(t *testing.T) {
-	e := Event{Type: Added, Object: testType("foo")}
+	e := Event{Type: Added, Object: &testPtrType{Value: "foo"}}
 	c := e.DeepCopy()
 	if !reflect.DeepEqual(e, *c) {
 		t.Errorf("expected %#v, got %#v", e, *c)
+	}
+	if c.Object == e.Object {
+		t.Errorf("expected Object to be deep-copied, got the same pointer")
 	}
 
 	empty := Event{}
