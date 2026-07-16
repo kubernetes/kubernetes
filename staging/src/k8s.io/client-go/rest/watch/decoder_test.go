@@ -138,7 +138,9 @@ func TestDecoder_Errors(t *testing.T) {
 				if _, err := in.Write([]byte(testCase.input + "\n")); err != nil {
 					t.Errorf("Unexpected error %v", err)
 				}
-				in.Close()
+				if err := in.Close(); err != nil {
+					t.Errorf("Unexpected error %v", err)
+				}
 			}()
 
 			done := make(chan struct{})
