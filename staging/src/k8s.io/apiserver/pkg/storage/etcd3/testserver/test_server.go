@@ -128,7 +128,8 @@ func RunEtcd(t testing.TB, cfg *embed.Config) *kubernetes.Client {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.KV = storagetesting.NewKVRecorder(client.KV)
-	client.Kubernetes = storagetesting.NewKubernetesRecorder(client.Kubernetes)
+	kubernetesRecorder := storagetesting.NewKubernetesRecorder(client.Kubernetes)
+	client.KV = storagetesting.NewKVRecorder(client.KV, kubernetesRecorder)
+	client.Kubernetes = kubernetesRecorder
 	return client
 }
