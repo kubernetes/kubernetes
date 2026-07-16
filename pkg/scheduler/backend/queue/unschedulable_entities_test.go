@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -62,7 +63,6 @@ func TestUnschedulableEntities(t *testing.T) {
 		add    action = "adding"
 		update action = "updating"
 		delete action = "deleting"
-		clear  action = "clearing"
 	)
 
 	type step struct {
@@ -73,16 +73,13 @@ func TestUnschedulableEntities(t *testing.T) {
 
 	var actionToOperation = map[action]func(ue *unschedulableEntities, pInfo *framework.QueuedPodInfo, gatedBefore bool){
 		add: func(ue *unschedulableEntities, pInfo *framework.QueuedPodInfo, _ bool) {
-			ue.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
+			ue.add(klog.Background(), pInfo, framework.EventUnscheduledPodAdd.Label())
 		},
 		update: func(ue *unschedulableEntities, pInfo *framework.QueuedPodInfo, gatedBefore bool) {
-			ue.addOrUpdate(pInfo, gatedBefore, framework.EventUnscheduledPodUpdate.Label())
+			ue.update(pInfo, gatedBefore)
 		},
 		delete: func(ue *unschedulableEntities, pInfo *framework.QueuedPodInfo, gatedBefore bool) {
 			ue.delete(pInfo, gatedBefore)
-		},
-		clear: func(ue *unschedulableEntities, _ *framework.QueuedPodInfo, _ bool) {
-			ue.clear()
 		},
 	}
 
@@ -96,8 +93,8 @@ func TestUnschedulableEntities(t *testing.T) {
 	}
 
 	gated := func(p *v1.Pod, ue *unschedulableEntities) bool {
-		pInfo := ue.get(newQueuedPodInfoForLookup(p))
-		return pInfo != nil && pInfo.Gated()
+		pInfo, ok := ue.get(newQueuedPodInfoForLookup(p))
+		return ok && pInfo.Gated()
 	}
 
 	makePodInfo := func(p *v1.Pod, gated bool) *framework.QueuedPodInfo {
@@ -135,7 +132,6 @@ func TestUnschedulableEntities(t *testing.T) {
 						makePodInfo(pods[0], false),
 						makePodInfo(pods[1], false),
 						makePodInfo(pods[2], false),
-						makePodInfo(pods[2], false),
 						makePodInfo(pods[3], false),
 					},
 					expectedPods: []*framework.QueuedPodInfo{
@@ -147,9 +143,9 @@ func TestUnschedulableEntities(t *testing.T) {
 				},
 				{
 					action: update,
-					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], false)},
+					pods:   []*framework.QueuedPodInfo{makePodInfo(pods[0], true)},
 					expectedPods: []*framework.QueuedPodInfo{
-						makePodInfo(pods[0], false),
+						makePodInfo(pods[0], true),
 						makePodInfo(pods[1], false),
 						makePodInfo(pods[2], false),
 						makePodInfo(pods[3], false),
@@ -228,12 +224,6 @@ func TestUnschedulableEntities(t *testing.T) {
 
 				assertMetrics(step.expectedPods, string(step.action))
 			}
-
-			ue.clear()
-			if len(ue.entityInfoMap) != 0 {
-				t.Errorf("Expected the map to be empty, but has %v elements.", len(ue.entityInfoMap))
-			}
-			assertMetrics([]*framework.QueuedPodInfo{}, string(clear))
 		})
 	}
 }
@@ -255,8 +245,8 @@ func TestUnschedulablePodGroups_Unified(t *testing.T) {
 		},
 	}
 
-	ue.addOrUpdate(pgInfo, false, "test")
-	if ue.get(pgInfo) == nil {
+	ue.add(klog.Background(), pgInfo, "test")
+	if !ue.has(pgInfo) {
 		t.Errorf("Expected pod group to be present")
 	}
 	if unschedulableRecorder.value() != 1 {
@@ -264,7 +254,7 @@ func TestUnschedulablePodGroups_Unified(t *testing.T) {
 	}
 
 	ue.delete(pgInfo, false)
-	if ue.get(pgInfo) != nil {
+	if ue.has(pgInfo) {
 		t.Errorf("Expected pod group to be deleted")
 	}
 	if unschedulableRecorder.value() != 0 {

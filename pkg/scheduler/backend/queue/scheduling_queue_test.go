@@ -118,8 +118,7 @@ func setQueuedPodInfoGated(queuedPodInfo *framework.QueuedPodInfo, gatingPlugin 
 }
 
 func getUnschedulablePod(p *PriorityQueue, pod *v1.Pod) *v1.Pod {
-	pInfo := p.unschedulableEntities.get(newQueuedPodInfoForLookup(pod))
-	if pInfo != nil {
+	if pInfo, ok := p.unschedulableEntities.get(newQueuedPodInfoForLookup(pod)); ok {
 		return pInfo.(*framework.QueuedPodInfo).Pod
 	}
 	return nil
@@ -249,8 +248,8 @@ func TestPriorityQueue_AddNominatedGatedPod(t *testing.T) {
 	q.Add(ctx, gatedPod)
 
 	// Verify the pod is gated
-	pInfo := q.unschedulableEntities.get(newQueuedPodInfoForLookup(gatedPod))
-	if pInfo == nil || !pInfo.Gated() {
+	pInfo, ok := q.unschedulableEntities.get(newQueuedPodInfoForLookup(gatedPod))
+	if !ok || !pInfo.Gated() {
 		t.Fatalf("Expected pod to be gated in unschedulableEntities")
 	}
 
@@ -1448,7 +1447,7 @@ func TestPriorityQueue_Pop(t *testing.T) {
 			// Add high priority entity to the errorBackoffQ
 			q.backoffQ.add(logger, errorBackoffEntity, framework.EventUnscheduledPodAdd.Label())
 			// Add entity to the unschedulableEntities
-			q.unschedulableEntities.addOrUpdate(unschedEntity, false, framework.EventUnscheduledPodAdd.Label())
+			q.unschedulableEntities.add(klog.Background(), unschedEntity, framework.EventUnscheduledPodAdd.Label())
 
 			var gotPods []string
 			for i := 0; i < len(tt.wantPods)+1; i++ {
@@ -1567,7 +1566,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 				pInfo := q.newQueuedPodInfo(tCtx, medPriorityPodInfo.Pod, queuePlugin)
 				// needs to increment to make the pod backing off
 				pInfo.UnschedulableCount++
-				q.unschedulableEntities.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
+				q.unschedulableEntities.add(klog.Background(), pInfo, framework.EventUnscheduledPodAdd.Label())
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
 				updatedPod.Annotations["foo"] = "test"
 				return medPriorityPodInfo.Pod, updatedPod
@@ -1580,7 +1579,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 				pInfo := q.newQueuedPodInfo(tCtx, medPriorityPodInfo.Pod, queuePlugin)
 				// needs to increment to make the pod backing off
 				pInfo.UnschedulableCount++
-				q.unschedulableEntities.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
+				q.unschedulableEntities.add(klog.Background(), pInfo, framework.EventUnscheduledPodAdd.Label())
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
 				updatedPod.Annotations["foo"] = "test1"
 				// Move clock by podMaxBackoffDuration, so that pods in the unschedulableEntities would pass the backing off,
@@ -1593,7 +1592,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 			name:  "when updating a pod in unschedulableEntities, if the scheduling hint returns QueueSkip, it remains in unschedulableEntities",
 			wantQ: unschedulableQ,
 			prepareFunc: func(tCtx ktesting.TContext, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
-				q.unschedulableEntities.addOrUpdate(q.newQueuedPodInfo(tCtx, medPriorityPodInfo.Pod, skipPlugin), false, framework.EventUnscheduledPodAdd.Label())
+				q.unschedulableEntities.add(klog.Background(), q.newQueuedPodInfo(tCtx, medPriorityPodInfo.Pod, skipPlugin), framework.EventUnscheduledPodAdd.Label())
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
 				updatedPod.Annotations["foo"] = "test1"
 				return medPriorityPodInfo.Pod, updatedPod
@@ -1650,7 +1649,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 				pInfo = pInfoFromActive.(*framework.QueuedPodInfo)
 			}
 
-			if pInfoFromUnsched := q.unschedulableEntities.get(newQueuedPodInfoForLookup(newPod)); pInfoFromUnsched != nil {
+			if pInfoFromUnsched, ok := q.unschedulableEntities.get(newQueuedPodInfoForLookup(newPod)); ok {
 				if tt.wantQ != unschedulableQ {
 					t.Errorf("expected pod %s to not be queued to unschedulableEntities, but it was", newPod.Name)
 				}
@@ -1861,14 +1860,14 @@ func TestPriorityQueue_Delete(t *testing.T) {
 			// Verification
 			for _, pod := range tt.expectedAbsentPods {
 				pInfoLookup := newQueuedPodInfoForLookup(pod)
-				if q.activeQ.has(pInfoLookup) || q.backoffQ.has(pInfoLookup) || q.unschedulableEntities.get(pInfoLookup) != nil {
+				if q.activeQ.has(pInfoLookup) || q.backoffQ.has(pInfoLookup) || q.unschedulableEntities.has(pInfoLookup) {
 					t.Errorf("Expected pod %v to be absent, but it is present", pod.Name)
 				}
 			}
 
 			for _, pod := range tt.expectedPresentPods {
 				pInfoLookup := newQueuedPodInfoForLookup(pod)
-				if !q.activeQ.has(pInfoLookup) && !q.backoffQ.has(pInfoLookup) && q.unschedulableEntities.get(pInfoLookup) == nil {
+				if !q.activeQ.has(pInfoLookup) && !q.backoffQ.has(pInfoLookup) && !q.unschedulableEntities.has(pInfoLookup) {
 					t.Errorf("Expected pod %v to be present, but it is absent", pod.Name)
 				}
 			}
@@ -1967,7 +1966,7 @@ func TestPriorityQueue_Activate(t *testing.T) {
 			}
 
 			for _, qPodInfo := range tt.qPodInfoInUnschedulableEntities {
-				q.unschedulableEntities.addOrUpdate(qPodInfo, false, framework.EventUnscheduledPodAdd.Label())
+				q.unschedulableEntities.add(klog.Background(), qPodInfo, framework.EventUnscheduledPodAdd.Label())
 			}
 
 			for _, qPodInfo := range tt.qPodInfoInBackoffQ {
@@ -2180,8 +2179,8 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 				if got != tt.wantSuccess {
 					t.Errorf("Unexpected result: want %v, but got %v", tt.wantSuccess, got)
 				}
-				if tt.wantUnschedulablePods != len(q.unschedulableEntities.entityInfoMap) {
-					t.Errorf("Unexpected unschedulableEntities: want %v, but got %v", tt.wantUnschedulablePods, len(q.unschedulableEntities.entityInfoMap))
+				if tt.wantUnschedulablePods != q.unschedulableEntities.len() {
+					t.Errorf("Unexpected unschedulableEntities: want %v, but got %v", tt.wantUnschedulablePods, q.unschedulableEntities.len())
 				}
 
 				// Simulate an update event.
@@ -2189,8 +2188,8 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 				metav1.SetMetaDataAnnotation(&clone.ObjectMeta, "foo", "")
 				q.Update(ctx, tt.pod, clone)
 				// Ensure the pod is still located in unschedulableEntities.
-				if tt.wantUnschedulablePods != len(q.unschedulableEntities.entityInfoMap) {
-					t.Errorf("Unexpected unschedulableEntities: want %v, but got %v", tt.wantUnschedulablePods, len(q.unschedulableEntities.entityInfoMap))
+				if tt.wantUnschedulablePods != q.unschedulableEntities.len() {
+					t.Errorf("Unexpected unschedulableEntities: want %v, but got %v", tt.wantUnschedulablePods, q.unschedulableEntities.len())
 				}
 			})
 		}
@@ -2281,14 +2280,14 @@ func TestPriorityQueue_moveToBackoffQ(t *testing.T) {
 					if !q.backoffQ.has(pInfo) {
 						t.Errorf("Expected pod to be in backoffQ, but it isn't")
 					}
-					if q.unschedulableEntities.get(pInfo) != nil {
+					if q.unschedulableEntities.has(pInfo) {
 						t.Errorf("Expected pod not to be in unschedulableEntities, but it is")
 					}
 				} else {
 					if q.backoffQ.has(pInfo) {
 						t.Errorf("Expected pod not to be in backoffQ, but it is")
 					}
-					if q.unschedulableEntities.get(pInfo) == nil {
+					if !q.unschedulableEntities.has(pInfo) {
 						t.Errorf("Expected pod to be in unschedulableEntities, but it isn't")
 					}
 				}
@@ -2575,7 +2574,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			} else {
 				// The pod was already moved to unschedulableEntities because it's gated.
 				// Update it with the test's configured podInfo to ensure custom test fields are set.
-				q.unschedulableEntities.addOrUpdate(test.podInfo, test.podInfo.Gated(), "test-setup")
+				q.unschedulableEntities.update(test.podInfo, test.podInfo.Gated())
 			}
 			cl.Step(test.duration)
 
@@ -2593,7 +2592,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 				t.Fatalf("expected pod to be queued to activeQ, but it was not")
 			}
 
-			if q.unschedulableEntities.get(test.podInfo) == nil && test.expectedQ == unschedulableQ {
+			if !q.unschedulableEntities.has(test.podInfo) && test.expectedQ == unschedulableQ {
 				t.Fatalf("expected pod to be queued to unschedulableEntities, but it was not")
 			}
 		})
@@ -2738,7 +2737,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	// hpp1 will go to backoffQ because no failure plugin is associated with it.
 	// All plugins other than hpp1 are enqueued to the unschedulable Pod pool.
 	for _, pod := range []*v1.Pod{unschedulablePodInfo.Pod, highPriorityPodInfo.Pod, hpp2} {
-		if q.unschedulableEntities.get(newQueuedPodInfoForLookup(pod)) == nil {
+		if !q.unschedulableEntities.has(newQueuedPodInfoForLookup(pod)) {
 			t.Errorf("Expected %v in the unschedulableEntities", pod.Name)
 		}
 	}
@@ -2762,9 +2761,9 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 		t.Errorf("Expected 0 item to be in backoffQ, but got: %v", q.backoffQ.len())
 	}
 	expectInFlightPods(t, q, medPriorityPodInfo.Pod.UID)
-	if len(q.unschedulableEntities.entityInfoMap) != 1 {
+	if q.unschedulableEntities.len() != 1 {
 		// hpp2 won't be moved regardless of its backoff timer.
-		t.Errorf("Expected 1 item to be in unschedulableEntities, but got: %v", len(q.unschedulableEntities.entityInfoMap))
+		t.Errorf("Expected 1 item to be in unschedulableEntities, but got: %v", q.unschedulableEntities.len())
 	}
 }
 
@@ -3477,8 +3476,8 @@ func TestFlushUnschedulableEntitiesLeftoverSetsFlag(t *testing.T) {
 	}
 
 	// Verify flag is cleared when pod returns to queue
-	internalPInfo := q.unschedulableEntities.get(newQueuedPodInfoForLookup(pod))
-	if internalPInfo == nil {
+	internalPInfo, ok := q.unschedulableEntities.get(newQueuedPodInfoForLookup(pod))
+	if !ok {
 		t.Fatalf("pod should be in unschedulableEntities")
 	}
 	if internalPInfo.(*framework.QueuedPodInfo).WasFlushedFromUnschedulable {
@@ -3673,7 +3672,7 @@ func TestGatedPodFlushFrequency(t *testing.T) {
 			}
 
 			// Add gated pod directly to unschedulableEntities
-			q.unschedulableEntities.addOrUpdate(tt.entityInfo, false, "test-setup")
+			q.unschedulableEntities.add(klog.Background(), tt.entityInfo, "test-setup")
 
 			// Step clock past the flush duration and trigger flush
 			// T=5:01
@@ -3919,7 +3918,7 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			if isInBackoffQ := q.backoffQ.has(pgInfo); isInBackoffQ != test.expectedInBackoffQ {
 				tCtx.Errorf("Expected pod group to be in backoffQ: %v, got %v", test.expectedInBackoffQ, isInBackoffQ)
 			}
-			if isInUnschedulable := q.unschedulableEntities.get(pgInfo) != nil; isInUnschedulable != test.expectedInUnschedulableEntities {
+			if isInUnschedulable := q.unschedulableEntities.has(pgInfo); isInUnschedulable != test.expectedInUnschedulableEntities {
 				tCtx.Errorf("Expected pod group to be in unschedulableEntities: %v, got %v", test.expectedInUnschedulableEntities, isInUnschedulable)
 			}
 			if q.pendingPodGroupPods.len() != 0 {
@@ -4100,7 +4099,7 @@ var (
 			// needs to increment it to make it backoff
 			pInfo.UnschedulableCount++
 		}
-		queue.unschedulableEntities.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
+		queue.unschedulableEntities.add(klog.Background(), pInfo, framework.EventUnscheduledPodAdd.Label())
 	}
 	deletePod = func(tCtx ktesting.TContext, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.Delete(tCtx.Logger(), pInfo.Pod)
@@ -5449,7 +5448,8 @@ func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
 	gatedPod := st.MakePod().SchedulingGates([]string{"hello world"}).Obj()
 	q.Add(ctx, gatedPod)
 
-	if !q.unschedulableEntities.get(newQueuedPodInfoForLookup(gatedPod)).Gated() {
+	entity, ok := q.unschedulableEntities.get(newQueuedPodInfoForLookup(gatedPod))
+	if !ok || !entity.Gated() {
 		t.Error("Expected pod to be gated")
 	}
 
@@ -5487,7 +5487,7 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 	q := NewTestQueue(ctx, newDefaultQueueSort())
 	q.activeQ.add(logger, newQueuedPodInfoForLookup(activeQPod), framework.EventUnscheduledPodAdd.Label())
 	q.backoffQ.add(logger, newQueuedPodInfoForLookup(backoffQPod), framework.EventUnscheduledPodAdd.Label())
-	q.unschedulableEntities.addOrUpdate(newQueuedPodInfoForLookup(unschedPod), false, framework.EventUnscheduledPodAdd.Label())
+	q.unschedulableEntities.add(klog.Background(), newQueuedPodInfoForLookup(unschedPod), framework.EventUnscheduledPodAdd.Label())
 
 	tests := []struct {
 		name        string
@@ -5870,7 +5870,7 @@ func TestPriorityQueue_UpdateRecomputesSignature(t *testing.T) {
 			name: "pod in unschedulableEntities",
 			prepareFunc: func(tCtx ktesting.TContext, q *PriorityQueue) {
 				pInfo := q.newQueuedPodInfo(tCtx, pod1)
-				q.unschedulableEntities.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
+				q.unschedulableEntities.add(klog.Background(), pInfo, framework.EventUnscheduledPodAdd.Label())
 			},
 		},
 		{
@@ -6052,13 +6052,13 @@ func setupInitialPodGroupState(t *testing.T, ctx context.Context, q *PriorityQue
 	case stateUnschedulable:
 		entity := q.activeQ.delete(pgLookup)
 		if entity != nil {
-			q.unschedulableEntities.addOrUpdate(entity, false, framework.EventUnscheduledPodAdd.Label())
+			q.unschedulableEntities.add(klog.Background(), entity, framework.EventUnscheduledPodAdd.Label())
 		}
 	case stateGated:
 		entity := q.activeQ.delete(pgLookup)
 		if entity != nil {
 			entity.SetGatingPlugin("preEnqueuePlugin", []fwk.ClusterEvent{pvAdd})
-			q.unschedulableEntities.addOrUpdate(entity, false, framework.EventUnscheduledPodAdd.Label())
+			q.unschedulableEntities.add(klog.Background(), entity, framework.EventUnscheduledPodAdd.Label())
 		}
 	}
 }
@@ -6233,8 +6233,7 @@ func TestAddPodGroupMember(t *testing.T) {
 				entity, _ = q.backoffQ.get(pgLookup)
 			}
 
-			unschedulableEntity := q.unschedulableEntities.get(pgLookup)
-			inUnschedulable := unschedulableEntity != nil
+			unschedulableEntity, inUnschedulable := q.unschedulableEntities.get(pgLookup)
 			if inUnschedulable != tt.expectedInUnschedulable {
 				t.Errorf("Expected incoming pod in unschedulableEntities: %v, got %v", tt.expectedInUnschedulable, inUnschedulable)
 			}
@@ -6451,8 +6450,7 @@ func TestDeletePodGroupMember(t *testing.T) {
 				entity, _ = q.backoffQ.get(pgLookup)
 			}
 
-			unschedulableEntity := q.unschedulableEntities.get(pgLookup)
-			inUnschedulable := unschedulableEntity != nil
+			unschedulableEntity, inUnschedulable := q.unschedulableEntities.get(pgLookup)
 			if inUnschedulable != tt.expectedInUnschedulable {
 				t.Errorf("Expected target pod group in unschedulableEntities: %v, got %v", tt.expectedInUnschedulable, inUnschedulable)
 			}
@@ -6708,8 +6706,7 @@ func TestUpdatePodGroupMember(t *testing.T) {
 				entity, _ = q.backoffQ.get(pgLookup)
 			}
 
-			unschedulableEntity := q.unschedulableEntities.get(pgLookup)
-			inUnschedulable := unschedulableEntity != nil
+			unschedulableEntity, inUnschedulable := q.unschedulableEntities.get(pgLookup)
 			if inUnschedulable != tt.expectedInUnschedulable {
 				t.Errorf("Expected target pod group in unschedulableEntities: %v, got %v", tt.expectedInUnschedulable, inUnschedulable)
 			}
@@ -6881,8 +6878,7 @@ func TestActivatePodGroupMember(t *testing.T) {
 				t.Errorf("Expected target pod group not to be present in backoffQ")
 			}
 
-			unschedulableEntity := q.unschedulableEntities.get(pgLookup)
-			inUnschedulable := unschedulableEntity != nil
+			unschedulableEntity, inUnschedulable := q.unschedulableEntities.get(pgLookup)
 			if inUnschedulable != tt.expectedInUnschedulable {
 				t.Errorf("Expected target pod group in unschedulableEntities: %v, got %v", tt.expectedInUnschedulable, inUnschedulable)
 			}
@@ -7061,8 +7057,7 @@ func TestMoveAllToActiveOrBackoffQueuePodGroupMember(t *testing.T) {
 				t.Errorf("Expected target pod group not to be present in backoffQ")
 			}
 
-			unschedulableEntity := q.unschedulableEntities.get(pgLookup)
-			inUnschedulable := unschedulableEntity != nil
+			unschedulableEntity, inUnschedulable := q.unschedulableEntities.get(pgLookup)
 			if inUnschedulable != tt.expectedInUnschedulable {
 				t.Errorf("Expected target pod group in unschedulableEntities: %v, got %v", tt.expectedInUnschedulable, inUnschedulable)
 			}
@@ -7192,7 +7187,7 @@ func TestFlushBackoffQCompletedPodGroupMember(t *testing.T) {
 				entity, _ = q.backoffQ.get(pgLookup)
 			}
 
-			if q.unschedulableEntities.get(pgLookup) != nil {
+			if q.unschedulableEntities.has(pgLookup) {
 				t.Errorf("Expected target pod group not to be present in unschedulableEntities")
 			}
 
@@ -7292,8 +7287,7 @@ func TestFlushUnschedulableEntitiesLeftoverPodGroupMember(t *testing.T) {
 				t.Errorf("Expected target pod group not to be present in backoffQ")
 			}
 
-			unschedulableEntity := q.unschedulableEntities.get(pgLookup)
-			inUnschedulable := unschedulableEntity != nil
+			unschedulableEntity, inUnschedulable := q.unschedulableEntities.get(pgLookup)
 			if inUnschedulable != tt.expectedInUnschedulable {
 				t.Errorf("Expected target pod group in unschedulableEntities: %v, got %v", tt.expectedInUnschedulable, inUnschedulable)
 			}
@@ -7496,8 +7490,7 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 				entity, _ = q.backoffQ.get(pgLookup)
 			}
 
-			unschedulableEntity := q.unschedulableEntities.get(pgLookup)
-			inUnschedulable := unschedulableEntity != nil
+			unschedulableEntity, inUnschedulable := q.unschedulableEntities.get(pgLookup)
 			if inUnschedulable != tt.expectedInUnschedulable {
 				t.Errorf("Expected pod group in unschedulableEntities: %v, got %v", tt.expectedInUnschedulable, inUnschedulable)
 			}
