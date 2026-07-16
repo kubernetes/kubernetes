@@ -3036,6 +3036,8 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			//  until it reaches the maximum limit, and then it immediately aborts
 			//  b) GetList successfully decodes the first 100 objects in the good set into list
 			verifier: func(t *testing.T, _ string, list *example.PodList, err error) {
+				// must match the aggregation limit that etcd3 configures via
+				// corruptObjErrAggregatorFactory when the feature is enabled
 				limit := 100
 				var statusGot apierrors.APIStatus
 				if !errors.As(err, &statusGot) {
@@ -3056,7 +3058,7 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 				}
 
 				// b) before the limit is hit and GetList aborts, it successfully decodes 100 objects
-				if want, got := 100, len(list.Items); want != got {
+				if want, got := limit, len(list.Items); want != got {
 					t.Errorf("expected GetList to successfully decode %d object(s), but got: %d", want, got)
 				}
 			},
@@ -3075,6 +3077,8 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 			//  until it reaches the maximum limit, and then it immediately aborts
 			//  b) GetList successfully decodes zero objects
 			verifier: func(t *testing.T, _ string, list *example.PodList, err error) {
+				// must match the aggregation limit that etcd3 configures via
+				// corruptObjErrAggregatorFactory when the feature is enabled
 				limit := 100
 				var statusGot apierrors.APIStatus
 				if !errors.As(err, &statusGot) {

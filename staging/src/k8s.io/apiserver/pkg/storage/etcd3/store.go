@@ -165,7 +165,7 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 
 	listErrAggrFactory := defaultListErrorAggregatorFactory
 	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
-		listErrAggrFactory = corruptObjErrAggregatorFactory(100)
+		listErrAggrFactory = corruptObjErrAggregatorFactory(maxCorruptObjErrsToAggregate)
 	}
 
 	w := &watcher{

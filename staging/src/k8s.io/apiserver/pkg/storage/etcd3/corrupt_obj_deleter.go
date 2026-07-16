@@ -59,6 +59,10 @@ func WithCorruptObjErrorHandlingTransformer(transformer value.Transformer) value
 	return &corruptObjErrorInterpretingTransformer{Transformer: transformer}
 }
 
+// maxCorruptObjErrsToAggregate caps the number of corrupt object errors
+// aggregated during a LIST operation.
+const maxCorruptObjErrsToAggregate = 100
+
 // corruptObjErrAggregatorFactory returns an error aggregator that aggregates
 // corrupt object error(s) that the list operation encounters while
 // retrieving objects from the storage.
