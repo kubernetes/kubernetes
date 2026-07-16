@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -483,16 +484,20 @@ func (c *csiAttacher) waitForVolumeDetachmentWithLister(volumeHandle, attachID s
 }
 
 func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spec, volumeHandle, attachID string, timeout time.Duration, verifyStatus func() (bool, error), operation string) error {
-	var (
-		initBackoff = 500 * time.Millisecond
+	clock := &clock.RealClock{}
+	backoff := wait.Backoff{
+		Duration: 500 * time.Millisecond,
+		Factor:   1.05,
+		Jitter:   0.1,
+		// Steps is set to MaxInt32 to mirror the behavior of the removed
+		// wait.NewExponentialBackoffManager, which never exhausted its steps so the
+		// backoff kept increasing up to Cap and then held there.
+		Steps: math.MaxInt32,
 		// This is approximately the duration between consecutive ticks after two minutes (CSI timeout).
-		maxBackoff    = 7 * time.Second
-		resetDuration = time.Minute
-		backoffFactor = 1.05
-		jitter        = 0.1
-		clock         = &clock.RealClock{}
-	)
-	backoffMgr := wait.NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration, backoffFactor, jitter, clock)
+		Cap: 7 * time.Second,
+	}
+	timer := backoff.DelayWithReset(clock, time.Minute).Timer(clock)
+	defer timer.Stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -505,9 +510,8 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 	}
 
 	for {
-		t := backoffMgr.Backoff()
 		select {
-		case <-t.C():
+		case <-timer.C():
 			successful, err := verifyStatus()
 			if err != nil {
 				return err
@@ -515,8 +519,8 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 			if successful {
 				return nil
 			}
+			timer.Next()
 		case <-ctx.Done():
-			t.Stop()
 			klog.Error(log("%s timeout after %v [volume=%v; attachment.ID=%v]", operation, timeout, volumeHandle, attachID))
 			return fmt.Errorf("timed out waiting for external-attacher of %v CSI driver to %v volume %v", csiDriverName, strings.ToLower(operation), volumeHandle)
 		}
