@@ -735,9 +735,12 @@ func (s *store) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
 // shouldStream determines whether a list request should use etcd RangeStream.
 func shouldStream(opts storage.ListOptions) bool {
 	// Only recursive lists stream, a non-recursive request reads a single object.
-	// Streaming's main goal is to bound unbounded reads, limited and continue requests are
-	// already bounded by pagination, so we are opting out of streaming for them for now.
-	if !opts.Recursive || opts.Predicate.Limit > 0 || opts.Predicate.Continue != "" {
+	if !opts.Recursive {
+		return false
+	}
+	// etcd is unaware of selector matches, so a filtered page can't carry a proper limit.
+	// Stream only unfiltered pages.
+	if opts.Predicate.Limit > 0 && !opts.Predicate.Empty() {
 		return false
 	}
 	return utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) &&
@@ -794,7 +797,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	chunks := s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey)
 	if shouldStream(opts) {
-		streamChunks, supported := s.streamChunks(ctx, keyPrefix, withRev)
+		streamChunks, supported := s.streamChunks(ctx, keyPrefix, withRev, limit, continueKey)
 		if supported {
 			chunks = streamChunks
 		} else {
@@ -913,14 +916,23 @@ func (s *store) listReadError(ctx context.Context, err error, withRev int64, pag
 }
 
 // streamChunks reads the list as a single etcd RangeStream, pinned to withRev when
-// nonzero. supported is false when the etcd server does not implement RangeStream.
-func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev int64) (chunks iter.Seq2[listChunk, error], supported bool) {
+// nonzero, capped at limit keys and resumed from continueKey when set.
+// supported is false when the etcd server does not implement RangeStream.
+func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev, limit int64, continueKey string) (chunks iter.Seq2[listChunk, error], supported bool) {
 	startTime := time.Now()
+	paging := continueKey != ""
+	startKey := keyPrefix
+	if paging {
+		startKey = continueKey
+	}
 	streamOpts := []clientv3.OpOption{clientv3.WithRange(clientv3.GetPrefixRangeEnd(keyPrefix))}
 	if withRev > 0 {
 		streamOpts = append(streamOpts, clientv3.WithRev(withRev))
 	}
-	stream, streamErr := s.client.KV.GetStream(ctx, keyPrefix, streamOpts...)
+	if limit > 0 {
+		streamOpts = append(streamOpts, clientv3.WithLimit(limit))
+	}
+	stream, streamErr := s.client.KV.GetStream(ctx, startKey, streamOpts...)
 	var first clientv3.RangeStreamResponse
 	var firstOk bool
 	if streamErr == nil {
@@ -937,7 +949,7 @@ func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev int6
 			metrics.RecordEtcdRequest("listStream", s.groupResource, err, startTime)
 		}()
 		if err = streamErr; err != nil {
-			yield(listChunk{}, s.listReadError(ctx, err, withRev, false, "", keyPrefix))
+			yield(listChunk{}, s.listReadError(ctx, err, withRev, paging, continueKey, keyPrefix))
 			return
 		}
 		estimator := s.getResourceSizeEstimator()
@@ -948,7 +960,7 @@ func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev int6
 		resp, ok := first, firstOk
 		for ok {
 			if err = resp.Err(); err != nil {
-				yield(listChunk{}, s.listReadError(ctx, err, withRev, false, "", keyPrefix))
+				yield(listChunk{}, s.listReadError(ctx, err, withRev, paging, continueKey, keyPrefix))
 				return
 			}
 			rangeResp := resp.RangeResponse
@@ -960,7 +972,9 @@ func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev int6
 				revision = &rangeResp.Header.Revision
 			}
 			next, nextOk := <-stream
-			if !yield(listChunk{kvs: rangeResp.Kvs, revision: revision, count: rangeResp.Count, hasMore: nextOk}, nil) {
+			// On the final chunk, More means the limit truncated the range, so there
+			// is a next page even though the stream ended.
+			if !yield(listChunk{kvs: rangeResp.Kvs, revision: revision, count: rangeResp.Count, hasMore: nextOk || rangeResp.More}, nil) {
 				return
 			}
 			resp, ok = next, nextOk
