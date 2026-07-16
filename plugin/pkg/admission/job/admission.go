@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"io"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
@@ -30,7 +28,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -94,68 +91,14 @@ func (p *Plugin) ValidateInitialization() error {
 }
 
 // Validate performs admission checks on Job updates that require
-// cross-referencing other API objects.
+// cross-referencing other API objects. It is only active when
+// the workload scheduling feature gates are enabled.
 func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if a.GetResource().GroupResource() != batch.Resource("jobs") {
 		return nil
 	}
 	if a.GetSubresource() != "" {
 		return nil
-	}
-
-	job, ok := a.GetObject().(*batch.Job)
-	if !ok {
-		return nil
-	}
-	oldJob, ok := a.GetOldObject().(*batch.Job)
-	if !ok {
-		return nil
-	}
-
-	if err := p.validateParallelismChange(a, job, oldJob); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// validateParallelismChange rejects parallelism changes on Jobs whose
-// PodGroup uses gang scheduling.
-func (p *Plugin) validateParallelismChange(a admission.Attributes, job, oldJob *batch.Job) error {
-	if !p.genericWorkloadEnabled && !p.workloadWithJobEnabled {
-		return nil
-	}
-	if ptr.Equal(job.Spec.Parallelism, oldJob.Spec.Parallelism) {
-		return nil
-	}
-
-	// When SchedulingGroup is set in the template, look up that PodGroup directly.
-	sg := oldJob.Spec.Template.Spec.SchedulingGroup
-	if sg != nil && sg.PodGroupName != nil {
-		pg, err := p.pgLister.PodGroups(oldJob.Namespace).Get(*sg.PodGroupName)
-		if err != nil {
-			return nil
-		}
-		if pg.Spec.SchedulingPolicy.Gang != nil {
-			return admission.NewForbidden(a, fmt.Errorf(
-				"cannot change parallelism for a Job referencing gang-scheduled PodGroup %q", pg.Name))
-		}
-		return nil
-	}
-
-	// When SchedulingGroup is not in the template, scan PodGroups in the namespace owned by this Job.
-	pgs, err := p.pgLister.PodGroups(oldJob.Namespace).List(labels.Everything())
-	if err != nil {
-		return nil
-	}
-	for _, pg := range pgs {
-		if !metav1.IsControlledBy(pg, oldJob) {
-			continue
-		}
-		if pg.Spec.SchedulingPolicy.Gang != nil {
-			return admission.NewForbidden(a, fmt.Errorf(
-				"cannot change parallelism for a Job referencing gang-scheduled PodGroup %q", pg.Name))
-		}
 	}
 
 	return nil

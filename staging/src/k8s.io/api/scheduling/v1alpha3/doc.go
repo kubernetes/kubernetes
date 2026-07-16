@@ -18,6 +18,8 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
 // +k8s:openapi-model-package=io.k8s.api.scheduling.v1alpha3
+// +k8s:validation-gen=*
+// +k8s:validation-gen-scheme-registry=nil
 
 // +groupName=scheduling.k8s.io
 
