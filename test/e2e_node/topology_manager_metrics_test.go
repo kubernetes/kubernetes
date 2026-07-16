@@ -81,11 +81,18 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 				"kubelet_topology_manager_admission_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(0),
 				}),
+				"kubelet_container_aligned_compute_resources_failure_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::numa_node": timelessSample(0),
+					"pod::numa_node":       timelessSample(0),
+				}),
 				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::numa_node": timelessSample(0),
 					"pod::numa_node":       timelessSample(0),
 				}),
-				"kubelet_topology_manager_admission_duration_ms_count": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+				"kubelet_topology_manager_admission_duration_seconds": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+					"": timelessSample(0),
+				}),
+				"kubelet_topology_manager_admission_duration_ms": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
 					"": timelessSample(0),
 				}),
 			})
@@ -112,11 +119,18 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 				"kubelet_topology_manager_admission_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(1),
 				}),
+				"kubelet_container_aligned_compute_resources_failure_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::numa_node": timelessSample(0),
+					"pod::numa_node":       timelessSample(1),
+				}),
 				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::numa_node": timelessSample(0),
 					"pod::numa_node":       timelessSample(1),
 				}),
-				"kubelet_topology_manager_admission_duration_ms_count": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+				"kubelet_topology_manager_admission_duration_seconds": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+					"": checkMetricValueGreaterThan(0),
+				}),
+				"kubelet_topology_manager_admission_duration_ms": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
 					"": checkMetricValueGreaterThan(0),
 				}),
 			})
@@ -143,11 +157,18 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 				"kubelet_topology_manager_admission_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(0),
 				}),
+				"kubelet_container_aligned_compute_resources_failure_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::numa_node": timelessSample(0),
+					"pod::numa_node":       timelessSample(0),
+				}),
 				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::numa_node": timelessSample(0),
 					"pod::numa_node":       timelessSample(0),
 				}),
-				"kubelet_topology_manager_admission_duration_ms_count": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+				"kubelet_topology_manager_admission_duration_seconds": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+					"": checkMetricValueGreaterThan(0),
+				}),
+				"kubelet_topology_manager_admission_duration_ms": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
 					"": checkMetricValueGreaterThan(0),
 				}),
 			})
@@ -171,6 +192,10 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 				"kubelet_container_aligned_compute_resources_count": gstruct.MatchAllElements(idFn, gstruct.Elements{
 					"container::numa_node": timelessSample(0),
 					"pod::numa_node":       timelessSample(1),
+				}),
+				"kubelet_container_aligned_compute_resources_failure_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::numa_node": timelessSample(0),
+					"pod::numa_node":       timelessSample(0),
 				}),
 				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::numa_node": timelessSample(0),

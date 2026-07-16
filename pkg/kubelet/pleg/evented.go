@@ -200,9 +200,11 @@ func (e *EventedPLEG) watchEventsChannel(ctx context.Context) {
 
 			err := e.runtimeService.GetContainerEvents(ctx, containerEventsResponseCh, func(runtimeapi.RuntimeService_GetContainerEventsClient) {
 				metrics.EventedPLEGConn.Inc()
+				metrics.EventedPLEGConnTotal.Inc()
 			})
 			if err != nil {
 				metrics.EventedPLEGConnErr.Inc()
+				metrics.EventedPLEGConnErrTotal.Inc()
 				numAttempts++
 				e.Relist(ctx) // Force a relist to get the latest container and pods running metric.
 				logger.V(4).Info("Evented PLEG: Failed to get container events, retrying: ", "err", err)
@@ -323,6 +325,7 @@ func (e *EventedPLEG) sendPodLifecycleEvent(logger klog.Logger, event *PodLifecy
 	default:
 		// record how many events were discarded due to channel out of capacity
 		metrics.PLEGDiscardEvents.Inc()
+		metrics.PLEGDiscardEventsTotal.Inc()
 		logger.Error(nil, "Evented PLEG: Event channel is full, discarded pod lifecycle event")
 	}
 }
