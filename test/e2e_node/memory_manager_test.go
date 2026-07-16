@@ -807,9 +807,10 @@ func configureMemoryManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration,
 	}
 
 	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
-	// InPlacePodLevelResourcesVerticalScaling is only supported when PodLevelResources is enabled
+	// InPlacePodLevelResourcesVerticalScaling and PodLevelResourcesFixKubeletQOSClass are only supported when PodLevelResources is enabled
 	if !kubeletArguments.enablePodLevelResources {
 		newCfg.FeatureGates["InPlacePodLevelResourcesVerticalScaling"] = kubeletArguments.enablePodLevelResources
+		newCfg.FeatureGates["PodLevelResourcesFixKubeletQOSClass"] = kubeletArguments.enablePodLevelResources
 	}
 	newCfg.FeatureGates["PodLevelResourceManagers"] = kubeletArguments.enablePodLevelResourceManagers
 
