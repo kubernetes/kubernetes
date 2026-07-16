@@ -2536,8 +2536,8 @@ func (kl *Kubelet) handlePodRestoreResult(logger klog.Logger, pod *v1.Pod, apiPo
 	}
 
 	switch reason := kubecontainer.RestoreErrorReason(result.Error()); reason {
-	case events.CheckpointNotReady, events.RestoreInProgress, events.RestorePreparationFailed,
-		events.RestorePostProcessingFailed:
+	case events.CheckpointNotReady, events.RestoreInProgress, events.RestorePolicyUnavailable,
+		events.RestorePreparationFailed, events.RestorePostProcessingFailed:
 		// Preparation has no runtime side effects. Post-processing retries
 		// observe the existing sandbox without repeating the CRI restore.
 		kl.restoreOperationsInFlight.Store(pod.UID, struct{}{})

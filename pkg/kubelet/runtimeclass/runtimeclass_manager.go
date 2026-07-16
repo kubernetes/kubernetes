@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	nodev1 "k8s.io/client-go/listers/node/v1"
 	"k8s.io/client-go/tools/cache"
+	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
 )
 
 // ErrNotSynced reports that the RuntimeClass cache has not completed its
@@ -95,4 +96,31 @@ func (m *Manager) GetRuntimeClass(name string) (*apinodev1.RuntimeClass, error) 
 		return nil, ErrNotSynced
 	}
 	return m.lister.Get(name)
+}
+
+// ValidateRestoreOptions checks restore options against the
+// allowedRestoreOptions of the named RuntimeClass and returns its handler. The
+// handler and the allowlist come from the same cached object, so a recreated
+// RuntimeClass cannot apply its allowlist to a handler from the old object.
+// Empty options need no allowlist and use the normal handler lookup.
+func (m *Manager) ValidateRestoreOptions(runtimeClassName *string, options map[string]string) (string, error) {
+	if len(options) == 0 {
+		return m.LookupRuntimeHandler(runtimeClassName)
+	}
+	if runtimeClassName == nil || *runtimeClassName == "" {
+		return "", fmt.Errorf("spec.restoreFrom.options requires spec.runtimeClassName and a RuntimeClass restore option allowlist")
+	}
+	name := *runtimeClassName
+	rc, err := m.GetRuntimeClass(name)
+	if err != nil {
+		return "", fmt.Errorf("failed to read RuntimeClass %q for restore options: %w", name, err)
+	}
+	var allowed []string
+	if rc.PodCheckpointOptions != nil {
+		allowed = rc.PodCheckpointOptions.AllowedRestoreOptions
+	}
+	if err := checkpointutil.ValidateRuntimeOptions(options, allowed); err != nil {
+		return "", fmt.Errorf("spec.restoreFrom.options for RuntimeClass %q: %w", name, err)
+	}
+	return rc.Handler, nil
 }

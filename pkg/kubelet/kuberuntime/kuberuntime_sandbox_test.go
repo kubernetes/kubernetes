@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,8 +30,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -221,7 +226,13 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 
 func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
+	client := rctest.NewPopulatedClient()
+	class, err := client.NodeV1().RuntimeClasses().Get(tCtx, rctest.SandboxRuntimeClass, metav1.GetOptions{})
+	require.NoError(t, err)
+	class.PodCheckpointOptions = &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"example.runtime/target"}}
+	_, err = client.NodeV1().RuntimeClasses().Update(tCtx, class, metav1.UpdateOptions{})
+	require.NoError(t, err)
+	rcm := runtimeclass.NewManager(client)
 	defer rctest.StartManagerSync(rcm)()
 
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
@@ -230,14 +241,17 @@ func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 
 	tests := map[string]struct {
 		runtimeClassName *string
+		options          map[string]string
 		expectedHandler  string
 		hostNetwork      bool
 		expectError      bool
 	}{
-		"unspecified RuntimeClass":        {expectedHandler: ""},
-		"valid RuntimeClass":              {runtimeClassName: ptr.To(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
-		"host network with runtime class": {runtimeClassName: ptr.To(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler, hostNetwork: true},
-		"missing RuntimeClass":            {runtimeClassName: new("phantom"), expectError: true},
+		"unspecified RuntimeClass":              {expectedHandler: ""},
+		"unspecified RuntimeClass with options": {options: map[string]string{"example.runtime/target": "node-local"}, expectError: true},
+		"valid RuntimeClass":                    {runtimeClassName: ptr.To(rctest.SandboxRuntimeClass), options: map[string]string{"example.runtime/target": "node-local"}, expectedHandler: rctest.SandboxRuntimeHandler},
+		"host network with runtime class":       {runtimeClassName: ptr.To(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler, hostNetwork: true},
+		"disallowed restore key":                {runtimeClassName: ptr.To(rctest.SandboxRuntimeClass), options: map[string]string{"device-map": "0"}, expectError: true},
+		"missing RuntimeClass":                  {runtimeClassName: new("phantom"), expectError: true},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -248,7 +262,8 @@ func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 			pod := newTestPod()
 			pod.Spec.HostNetwork = test.hostNetwork
 			pod.Spec.SecurityContext = &v1.PodSecurityContext{}
-			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			restoreOptions := maps.Clone(test.options)
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: restoreOptions}
 			pod.Spec.RuntimeClassName = test.runtimeClassName
 
 			restored, _, err := m.restorePodSandbox(tCtx, pod, 1, nil)
@@ -259,8 +274,11 @@ func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Len(t, fakeRuntime.RestoredPods, 1)
+			if restoreOptions != nil {
+				restoreOptions["example.runtime/target"] = "changed-after-call"
+			}
 			assert.Equal(t, test.expectedHandler, fakeRuntime.RestoredPods[0].RuntimeHandler)
-			assert.Empty(t, fakeRuntime.RestoredPods[0].Options)
+			assert.Equal(t, test.options, fakeRuntime.RestoredPods[0].Options)
 			response, err := fakeRuntime.PodSandboxStatus(tCtx, restored.id, false)
 			require.NoError(t, err)
 			assert.Equal(t, test.expectedHandler, response.Status.RuntimeHandler)
@@ -269,6 +287,106 @@ func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 			assert.False(t, changed, reason)
 			assert.Equal(t, uint32(1), attempt)
 			assert.Equal(t, restored.id, sandboxID)
+		})
+	}
+}
+
+func TestRestorePodSandboxUsesRuntimeClassPolicy(t *testing.T) {
+	for _, allow := range []bool{false, true} {
+		t.Run(fmt.Sprintf("policy-allows=%t", allow), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			class := &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler"}
+			if allow {
+				class.PodCheckpointOptions = &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}
+			}
+			manager := runtimeclass.NewManager(fake.NewClientset(class))
+			defer rctest.StartManagerSync(manager)()
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			m.runtimeClassManager = manager
+			mkdirCalls := 0
+			m.osInterface.(*containertest.FakeOS).MkdirAllFn = func(string, os.FileMode) error {
+				mkdirCalls++
+				return nil
+			}
+			pod := newTestPod()
+			pod.Spec.RuntimeClassName = new("runtime")
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: map[string]string{"tcp": "close"}}
+			_, _, err = m.restorePodSandbox(tCtx, pod, 1, nil)
+			if allow {
+				require.NoError(t, err)
+				require.Len(t, fakeRuntime.RestoredPods, 1)
+				require.Equal(t, "handler", fakeRuntime.RestoredPods[0].RuntimeHandler)
+			} else {
+				require.ErrorContains(t, err, `runtime option "tcp" is not allowed`)
+				require.Equal(t, events.PodSpecMismatch, kubecontainer.RestoreErrorReason(err))
+				require.Zero(t, mkdirCalls)
+				require.Empty(t, fakeRuntime.RestoredPods)
+				require.NotContains(t, fakeRuntime.Called, "StartContainer")
+				require.NotContains(t, fakeRuntime.Called, "RunPodSandbox")
+			}
+		})
+	}
+}
+
+func TestRestorePodSandboxOptionsRequireRuntimeClassManager(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.runtimeClassManager = nil
+	mkdirCalls := 0
+	m.osInterface.(*containertest.FakeOS).MkdirAllFn = func(string, os.FileMode) error {
+		mkdirCalls++
+		return nil
+	}
+	pod := newTestPod()
+	pod.Spec.RuntimeClassName = new("runtime")
+	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: map[string]string{"tcp": "close"}}
+	_, _, err = m.restorePodSandbox(tCtx, pod, 1, nil)
+	require.ErrorContains(t, err, "without a RuntimeClass manager")
+	require.Equal(t, events.PodSpecMismatch, kubecontainer.RestoreErrorReason(err))
+	require.Zero(t, mkdirCalls)
+	require.Empty(t, fakeRuntime.RestoredPods)
+	require.NotContains(t, fakeRuntime.Called, "StartContainer")
+}
+
+func TestRestorePodSandboxRuntimeClassLookupErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		synced   bool
+		objects  []apiruntime.Object
+		notFound bool
+		reason   string
+	}{
+		// The kubelet has started but its RuntimeClass cache has not synced.
+		{name: "cache not synced", objects: []apiruntime.Object{&nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler"}}, reason: events.RestorePolicyUnavailable},
+		// The cache may not have received a new RuntimeClass yet.
+		{name: "class not found", synced: true, notFound: true, reason: events.RestorePreparationFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			manager := runtimeclass.NewManager(fake.NewClientset(tc.objects...))
+			if tc.synced {
+				defer rctest.StartManagerSync(manager)()
+			}
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			m.runtimeClassManager = manager
+			mkdirCalls := 0
+			m.osInterface.(*containertest.FakeOS).MkdirAllFn = func(string, os.FileMode) error {
+				mkdirCalls++
+				return nil
+			}
+			pod := newTestPod()
+			pod.Spec.RuntimeClassName = new("runtime")
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: map[string]string{"tcp": "close"}}
+			_, _, err = m.restorePodSandbox(tCtx, pod, 1, nil)
+			require.Equal(t, tc.reason, kubecontainer.RestoreErrorReason(err))
+			require.Equal(t, tc.notFound, apierrors.IsNotFound(err), "unexpected error: %v", err)
+			require.Zero(t, mkdirCalls)
+			require.Empty(t, fakeRuntime.RestoredPods)
+			require.NotContains(t, fakeRuntime.Called, "StartContainer")
+			require.NotContains(t, fakeRuntime.Called, "RunPodSandbox")
 		})
 	}
 }
@@ -1284,6 +1402,7 @@ func TestRestorePodSandboxUsesOneRuntimeHandler(t *testing.T) {
 				class, err := client.NodeV1().RuntimeClasses().Get(ctx, rctest.SandboxRuntimeClass, metav1.GetOptions{})
 				require.NoError(t, err)
 				class.Handler = "new-handler"
+				class.PodCheckpointOptions = &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}
 				_, err = client.NodeV1().RuntimeClasses().Update(ctx, class, metav1.UpdateOptions{})
 				require.NoError(t, err)
 				manager := runtimeclass.NewManager(client)
@@ -1303,7 +1422,7 @@ func TestRestorePodSandboxUsesOneRuntimeHandler(t *testing.T) {
 				pod := newTestPod()
 				pod.Spec.SecurityContext = &v1.PodSecurityContext{}
 				pod.Spec.RuntimeClassName = new(rctest.SandboxRuntimeClass)
-				pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+				pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: map[string]string{"tcp": "close"}}
 				if userNamespace {
 					pod.Spec.HostUsers = new(false)
 				}

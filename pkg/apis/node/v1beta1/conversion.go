@@ -24,6 +24,8 @@ import (
 
 // Convert_v1beta1_RuntimeClass_To_node_RuntimeClass clears fields that this
 // unserved version cannot represent, including when the destination is reused.
+// This includes podCheckpointOptions, which holds both the checkpoint and the
+// restore option allowlists.
 func Convert_v1beta1_RuntimeClass_To_node_RuntimeClass(in *nodev1beta1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
 	if err := autoConvert_v1beta1_RuntimeClass_To_node_RuntimeClass(in, out, s); err != nil {
 		return err
@@ -32,8 +34,9 @@ func Convert_v1beta1_RuntimeClass_To_node_RuntimeClass(in *nodev1beta1.RuntimeCl
 	return nil
 }
 
-// Convert_node_RuntimeClass_To_v1beta1_RuntimeClass omits the v1-only checkpoint
-// policy because this unserved version predates it.
+// Convert_node_RuntimeClass_To_v1beta1_RuntimeClass omits the v1-only
+// podCheckpointOptions, which holds both the checkpoint and the restore option
+// allowlists, because this unserved version predates it.
 func Convert_node_RuntimeClass_To_v1beta1_RuntimeClass(in *node.RuntimeClass, out *nodev1beta1.RuntimeClass, s conversion.Scope) error {
 	return autoConvert_node_RuntimeClass_To_v1beta1_RuntimeClass(in, out, s)
 }

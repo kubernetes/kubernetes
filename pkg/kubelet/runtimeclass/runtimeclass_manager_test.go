@@ -23,7 +23,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	nodev1 "k8s.io/api/node/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
 
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
@@ -73,4 +77,49 @@ func TestGetRuntimeClass(t *testing.T) {
 	assert.Equal(t, rctest.SandboxRuntimeHandler, rc.Handler)
 	_, err = manager.GetRuntimeClass("phantom")
 	assert.True(t, apierrors.IsNotFound(err), "unexpected error: %v", err)
+}
+
+func TestValidateRestoreOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		className    *string
+		options      map[string]string
+		policy       *nodev1.RuntimeClassPodCheckpointOptions
+		missingClass bool
+		wantErr      string
+	}{
+		{name: "no options uses default handler"},
+		{name: "options without class", options: map[string]string{"tcp": "close"}, wantErr: "spec.runtimeClassName"},
+		{name: "options with empty class", className: new(""), options: map[string]string{"tcp": "close"}, wantErr: "spec.runtimeClassName"},
+		{name: "missing class", className: new("runtime"), options: map[string]string{"tcp": "close"}, missingClass: true, wantErr: "failed to read RuntimeClass"},
+		{name: "missing policy", className: new("runtime"), options: map[string]string{"tcp": "close"}, wantErr: `runtime option "tcp" is not allowed`},
+		{name: "checkpoint list cannot authorize restore", className: new("runtime"), options: map[string]string{"tcp": "close"}, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}, wantErr: `runtime option "tcp" is not allowed`},
+		{name: "restore list authorizes key", className: new("runtime"), options: map[string]string{"tcp": "close"}, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}},
+		{name: "other restore key denied", className: new("runtime"), options: map[string]string{"device-map": "sensitive-value"}, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}, wantErr: `runtime option "device-map" is not allowed`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var objects []runtime.Object
+			if tc.className != nil && *tc.className != "" && !tc.missingClass {
+				objects = append(objects, &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: *tc.className}, Handler: "handler", PodCheckpointOptions: tc.policy})
+			}
+			manager := runtimeclass.NewManager(fake.NewClientset(objects...))
+			defer rctest.StartManagerSync(manager)()
+			handler, err := manager.ValidateRestoreOptions(tc.className, tc.options)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				require.NotContains(t, err.Error(), "sensitive-value")
+				require.Empty(t, handler)
+				if tc.missingClass {
+					require.True(t, apierrors.IsNotFound(err), "unexpected error: %v", err)
+				}
+				return
+			}
+			require.NoError(t, err)
+			if tc.className == nil {
+				require.Empty(t, handler)
+			} else {
+				require.Equal(t, "handler", handler)
+			}
+		})
+	}
 }

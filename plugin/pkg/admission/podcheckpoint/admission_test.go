@@ -123,6 +123,7 @@ func TestValidateCheckpointRuntimeOptions(t *testing.T) {
 		{name: "empty checkpoint allowlist", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{}, wantErr: `runtime option "tcp" is not allowed`},
 		{name: "allowed checkpoint key", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}},
 		{name: "disallowed checkpoint key", options: map[string]string{"device-map": "sensitive-value"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}, wantErr: `runtime option "device-map" is not allowed`},
+		{name: "restore list cannot authorize checkpoint", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}, wantErr: `runtime option "tcp" is not allowed`},
 		{name: "feature disabled ignores options", options: map[string]string{"tcp": "close"}, disabled: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

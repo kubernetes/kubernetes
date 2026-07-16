@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"path/filepath"
 	"runtime"
@@ -28,6 +29,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
@@ -39,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	netutils "k8s.io/utils/net"
@@ -170,10 +173,28 @@ func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *
 		return nil, message, err
 	}
 
-	runtimeHandler, err := m.lookupRuntimeHandler(pod)
-	if err != nil {
-		message := fmt.Sprintf("Failed to restore sandbox for pod %q: %v", format.Pod(pod), err)
-		return nil, message, err
+	runtimeHandler := ""
+	if m.runtimeClassManager != nil {
+		runtimeHandler, err = m.runtimeClassManager.ValidateRestoreOptions(pod.Spec.RuntimeClassName, pod.Spec.RestoreFrom.Options)
+		if err != nil {
+			message := fmt.Sprintf("Failed to restore sandbox for pod %q: %v", format.Pod(pod), err)
+			// As on the normal sandbox path, a RuntimeClass missing from the
+			// cache is retried, because the cache may not have received it yet.
+			if len(pod.Spec.RestoreFrom.Options) != 0 && !apierrors.IsNotFound(err) {
+				reason := events.PodSpecMismatch
+				if errors.Is(err, runtimeclass.ErrNotSynced) {
+					reason = events.RestorePolicyUnavailable
+				}
+				err = &kubecontainer.RestoreError{Reason: reason, Err: err}
+			}
+			return nil, message, err
+		}
+		if runtimeHandler != "" {
+			logger.V(2).Info("Restoring pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
+		}
+	} else if len(pod.Spec.RestoreFrom.Options) != 0 {
+		err := fmt.Errorf("cannot validate spec.restoreFrom.options without a RuntimeClass manager")
+		return nil, err.Error(), &kubecontainer.RestoreError{Reason: events.PodSpecMismatch, Err: err}
 	}
 
 	podSandboxConfig, message, err := m.preparePodSandboxConfig(ctx, pod, attempt, runtimeHandler)
@@ -218,6 +239,7 @@ func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *
 		CheckpointPath:   checkpointPath,
 		Config:           podSandboxConfig,
 		RuntimeHandler:   runtimeHandler,
+		Options:          maps.Clone(pod.Spec.RestoreFrom.Options),
 		ContainerConfigs: containerConfigs,
 	}
 

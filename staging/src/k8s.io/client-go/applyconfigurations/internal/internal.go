@@ -4662,6 +4662,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: options
+      type:
+        map:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     elementRelationship: atomic
 - name: io.k8s.api.core.v1.CinderPersistentVolumeSource
   map:
@@ -12094,6 +12100,12 @@ var schemaYAML = typed.YAMLObject(`types:
   map:
     fields:
     - name: allowedCheckpointOptions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: allowedRestoreOptions
       type:
         list:
           elementType:

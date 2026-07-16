@@ -20605,7 +20605,7 @@ func schema_k8sio_api_core_v1_CheckpointReference(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CheckpointReference identifies a PodCheckpoint to restore a Pod from.",
+				Description: "CheckpointReference identifies a PodCheckpoint and specifies options for restoring a Pod from it.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -20614,6 +20614,26 @@ func schema_k8sio_api_core_v1_CheckpointReference(ref common.ReferenceCallback) 
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-map-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "options contains opaque runtime-specific options for this restore attempt. Empty options use runtime defaults. Each key must appear in this Pod's RuntimeClass podCheckpointOptions.allowedRestoreOptions; without a RuntimeClass or allowlist, only empty options are permitted. Admission and the kubelet check the keys, and the kubelet passes the map unchanged to RestorePodRequest.options as untrusted user input. The runtime must reject unsupported, invalid, or unsafe values. Options must not contain secrets or override administrator configuration, security constraints, or the Pod's allocated devices. Administrator settings belong in node or runtime configuration.\n\nRestore options are independent of the options used to create the checkpoint and are not stored in the PodCheckpoint. Requirements intrinsic to the checkpoint are recorded in runtime-owned checkpoint data instead. At most 64 entries are allowed, with keys of at most 256 bytes and values of at most 4096 bytes.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -45048,7 +45068,7 @@ func schema_k8sio_api_node_v1_RuntimeClass(ref common.ReferenceCallback) common.
 					},
 					"podCheckpointOptions": {
 						SchemaProps: spec.SchemaProps{
-							Description: "podCheckpointOptions lists the runtime-specific option keys that users may supply when checkpointing Pods of this RuntimeClass. If unset, users cannot supply options; checkpoints use the runtime's defaults. Administrator settings belong in the runtime's configuration, not in user-supplied options. Values are validated by the runtime. This field is alpha-level and requires PodLevelCheckpointRestore.",
+							Description: "podCheckpointOptions lists the runtime-specific option keys that users may supply when checkpointing or restoring Pods of this RuntimeClass. If unset, users cannot supply options; checkpoint and restore use the runtime's defaults. Administrator settings belong in the runtime's configuration, not in user-supplied options. Values are validated by the runtime. This field is alpha-level and requires PodLevelCheckpointRestore.",
 							Ref:         ref(nodev1.RuntimeClassPodCheckpointOptions{}.OpenAPIModelName()),
 						},
 					},
@@ -45115,7 +45135,7 @@ func schema_k8sio_api_node_v1_RuntimeClassPodCheckpointOptions(ref common.Refere
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "RuntimeClassPodCheckpointOptions configures user-supplied checkpoint options for a runtime handler. It permits option keys, not administrator configuration or secrets. Administrators should only allow documented keys that are safe for untrusted users. The runtime must reject unsupported or unsafe values, including values that grant privileges, select unallocated devices, or override administrator configuration.",
+				Description: "RuntimeClassPodCheckpointOptions configures user-supplied checkpoint and restore options for a runtime handler. It permits option keys, not administrator configuration or secrets. Administrators should only allow documented keys that are safe for untrusted users. The runtime must reject unsupported or unsafe values, including values that grant privileges, select unallocated devices, or override administrator configuration.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"allowedCheckpointOptions": {
@@ -45126,6 +45146,25 @@ func schema_k8sio_api_node_v1_RuntimeClassPodCheckpointOptions(ref common.Refere
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "allowedCheckpointOptions lists the keys users may set in PodCheckpoint.spec.checkpointOptions for Pods of this RuntimeClass. An empty list permits no keys. Each key must be nonempty and at most 256 bytes; at most 64 distinct keys may be listed. Keys are matched exactly and are case-sensitive; wildcards have no special meaning. The runtime must validate values for every allowed key.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"allowedRestoreOptions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "allowedRestoreOptions lists the keys users may set in Pod.spec.restoreFrom.options for Pods of this RuntimeClass. An empty list permits no keys. Each key must be nonempty and at most 256 bytes; at most 64 distinct keys may be listed. Keys are matched exactly and are case-sensitive; wildcards have no special meaning. The runtime must validate values for every allowed key.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
