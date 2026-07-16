@@ -679,7 +679,7 @@ const (
 	// slightly longer than actual in-use time or unused time because of processing delays or
 	// when this feature was enabled in the cluster.
 	//
-	// Requires PersistentVolumeClaimUnusedSinceTime alpha featuregate
+	// Requires PersistentVolumeClaimUnusedSinceTime beta featuregate
 	PersistentVolumeClaimUnused PersistentVolumeClaimConditionType = "Unused"
 )
 
