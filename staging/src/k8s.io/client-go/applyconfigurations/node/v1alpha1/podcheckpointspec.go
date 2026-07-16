@@ -35,6 +35,17 @@ type PodCheckpointSpecApplyConfiguration struct {
 	// are clamped to it. The kubelet enforces the effective timeout with the
 	// CRI call deadline, which bounds how long the Pod can stay frozen.
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
+	// checkpointOptions contains opaque runtime-specific options for this
+	// checkpoint operation. The kubelet passes these entries unchanged to
+	// CheckpointPodRequest.options. Keys and values must be documented by the
+	// runtime selected for the source Pod, and unsupported entries cause the
+	// checkpoint to fail. Options must not contain secrets.
+	//
+	// These options are not restore defaults. If an option changes what is
+	// required to restore the resulting checkpoint, the runtime records that
+	// requirement in its checkpoint data. Restore-time choices are supplied
+	// separately by the restoring Pod.
+	CheckpointOptions map[string]string `json:"checkpointOptions,omitempty"`
 }
 
 // PodCheckpointSpecApplyConfiguration constructs a declarative configuration of the PodCheckpointSpec type for use with
@@ -56,5 +67,19 @@ func (b *PodCheckpointSpecApplyConfiguration) WithSourcePod(value *PodReferenceA
 // If called multiple times, the TimeoutSeconds field is set to the value of the last call.
 func (b *PodCheckpointSpecApplyConfiguration) WithTimeoutSeconds(value int32) *PodCheckpointSpecApplyConfiguration {
 	b.TimeoutSeconds = &value
+	return b
+}
+
+// WithCheckpointOptions puts the entries into the CheckpointOptions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the CheckpointOptions field,
+// overwriting an existing map entries in CheckpointOptions field with the same key.
+func (b *PodCheckpointSpecApplyConfiguration) WithCheckpointOptions(entries map[string]string) *PodCheckpointSpecApplyConfiguration {
+	if b.CheckpointOptions == nil && len(entries) > 0 {
+		b.CheckpointOptions = make(map[string]string, len(entries))
+	}
+	for k, v := range entries {
+		b.CheckpointOptions[k] = v
+	}
 	return b
 }

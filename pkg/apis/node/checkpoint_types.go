@@ -71,6 +71,14 @@ type PodCheckpointSpec struct {
 	// CRI call deadline, which bounds how long the Pod can stay frozen.
 	// +optional
 	TimeoutSeconds *int32
+
+	// checkpointOptions contains opaque runtime-specific options for this
+	// checkpoint operation. They are not reused as restore options. If an option
+	// creates a restore requirement, the runtime records it in the checkpoint
+	// data it owns.
+	// +optional
+	// +mapType=atomic
+	CheckpointOptions map[string]string
 }
 
 // PodReference identifies a pod in the same namespace by name and, optionally,

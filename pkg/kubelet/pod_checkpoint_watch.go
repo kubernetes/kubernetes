@@ -243,7 +243,7 @@ func (kl *Kubelet) syncPodCheckpoint(ctx context.Context, key string) error {
 	if pc.Spec.TimeoutSeconds != nil {
 		timeout = time.Duration(*pc.Spec.TimeoutSeconds) * time.Second
 	}
-	if err := kl.CheckpointPod(ctx, pod.UID, kubecontainer.GetPodFullName(pod), namespace, name, pc.UID, timeout); err != nil {
+	if err := kl.CheckpointPod(ctx, pod.UID, kubecontainer.GetPodFullName(pod), namespace, name, pc.UID, timeout, pc.Spec.CheckpointOptions); err != nil {
 		if errors.Is(err, errPodCheckpointInFlight) {
 			return err
 		}

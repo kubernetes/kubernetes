@@ -227,7 +227,8 @@ func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fakeRuntime.RestoredPods = nil
 			pod := newTestPod()
-			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			restoreOptions := map[string]string{"example.runtime/target": "node-local"}
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: restoreOptions}
 			pod.Spec.RuntimeClassName = test.runtimeClassName
 
 			_, _, err := m.restorePodSandbox(tCtx, pod, 1, nil)
@@ -238,8 +239,9 @@ func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Len(t, fakeRuntime.RestoredPods, 1)
+			restoreOptions["example.runtime/target"] = "changed-after-call"
 			assert.Equal(t, test.expectedHandler, fakeRuntime.RestoredPods[0].RuntimeHandler)
-			assert.Empty(t, fakeRuntime.RestoredPods[0].Options)
+			assert.Equal(t, map[string]string{"example.runtime/target": "node-local"}, fakeRuntime.RestoredPods[0].Options)
 		})
 	}
 }

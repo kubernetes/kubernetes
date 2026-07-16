@@ -82,9 +82,9 @@ func Register(plugins *admission.Plugins) {
 //     "restore" verb on the referenced PodCheckpoint in the Pod's namespace, and
 //     requires the Pod's spec to equal the pod template captured in the
 //     checkpoint. The equality check normalizes the injected node constraint
-//     (along with spec.nodeName and spec.restoreFrom). The equality check here is
-//     authoritative; the kubelet re-checks it before the CRI restore as defense
-//     in depth.
+//     (along with spec.nodeName and the restoreFrom invocation).
+//     The equality check here is authoritative; the kubelet re-checks it before
+//     the CRI restore as defense in depth.
 type Plugin struct {
 	*admission.Handler
 	authz         authorizer.UnconditionalAuthorizer
@@ -259,10 +259,10 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 //
 // The comparison runs after API defaulting (both sides are defaulted) and uses
 // the same sanitization as checkpoint capture and the kubelet's defense-in-depth
-// check. That normalization removes spec.nodeName, spec.restoreFrom, and only
-// node-identity scheduling constraints, including the metadata.name requirement
-// Admit injects. Other required node affinity remains part of the authoritative
-// template and must match.
+// check. That normalization removes spec.nodeName, the restoreFrom invocation,
+// and only node-identity scheduling constraints, including the
+// metadata.name requirement Admit injects. Other required node affinity remains
+// part of the authoritative template and must match.
 //
 // The check is skipped when the template is not yet populated. Admit still
 // requires status.nodeName so the Pod can be pinned safely; the kubelet keeps a
@@ -294,7 +294,7 @@ func validatePodSpecMatchesCheckpoint(convertor runtime.ObjectConvertor, a admis
 	if !equality.Semantic.DeepEqual(*want, *got) {
 		errs := field.ErrorList{field.Forbidden(
 			field.NewPath("spec"),
-			fmt.Sprintf("must match the pod spec captured in PodCheckpoint %q; changing the spec between checkpoint and restore is not permitted (spec.nodeName, spec.restoreFrom, and node-local placement constraints excepted)", checkpointName),
+			fmt.Sprintf("must match the pod spec captured in PodCheckpoint %q; changing the spec between checkpoint and restore is not permitted (spec.nodeName, the restore invocation, and node-local placement constraints excepted)", checkpointName),
 		)}
 		return apierrors.NewInvalid(schema.GroupKind{Kind: "Pod"}, pod.Name, errs)
 	}
