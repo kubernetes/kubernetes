@@ -23,6 +23,7 @@ import (
 	fmt "fmt"
 
 	io "io"
+	"sort"
 
 	v11 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -273,6 +274,30 @@ func (m *PodCheckpointSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.CheckpointOptions) > 0 {
+		keysForCheckpointOptions := make([]string, 0, len(m.CheckpointOptions))
+		for k := range m.CheckpointOptions {
+			keysForCheckpointOptions = append(keysForCheckpointOptions, string(k))
+		}
+		sort.Strings(keysForCheckpointOptions)
+		for iNdEx := len(keysForCheckpointOptions) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.CheckpointOptions[string(keysForCheckpointOptions[iNdEx])]
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
+			i = encodeVarintGenerated(dAtA, i, uint64(len(v)))
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForCheckpointOptions[iNdEx])
+			copy(dAtA[i:], keysForCheckpointOptions[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForCheckpointOptions[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
 	if m.TimeoutSeconds != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.TimeoutSeconds))
 		i--
@@ -526,6 +551,14 @@ func (m *PodCheckpointSpec) Size() (n int) {
 	if m.TimeoutSeconds != nil {
 		n += 1 + sovGenerated(uint64(*m.TimeoutSeconds))
 	}
+	if len(m.CheckpointOptions) > 0 {
+		for k, v := range m.CheckpointOptions {
+			_ = k
+			_ = v
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + len(v) + sovGenerated(uint64(len(v)))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
 	return n
 }
 
@@ -655,9 +688,20 @@ func (this *PodCheckpointSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
+	keysForCheckpointOptions := make([]string, 0, len(this.CheckpointOptions))
+	for k := range this.CheckpointOptions {
+		keysForCheckpointOptions = append(keysForCheckpointOptions, k)
+	}
+	sort.Strings(keysForCheckpointOptions)
+	mapStringForCheckpointOptions := "map[string]string{"
+	for _, k := range keysForCheckpointOptions {
+		mapStringForCheckpointOptions += fmt.Sprintf("%v: %v,", k, this.CheckpointOptions[k])
+	}
+	mapStringForCheckpointOptions += "}"
 	s := strings.Join([]string{`&PodCheckpointSpec{`,
 		`SourcePod:` + strings.Replace(this.SourcePod.String(), "PodReference", "PodReference", 1) + `,`,
 		`TimeoutSeconds:` + valueToStringGenerated(this.TimeoutSeconds) + `,`,
+		`CheckpointOptions:` + mapStringForCheckpointOptions + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1373,6 +1417,133 @@ func (m *PodCheckpointSpec) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.TimeoutSeconds = &v
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CheckpointOptions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.CheckpointOptions == nil {
+				m.CheckpointOptions = make(map[string]string)
+			}
+			var mapkey string
+			var mapvalue string
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var stringLenmapvalue uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapvalue |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapvalue := int(stringLenmapvalue)
+					if intStringLenmapvalue < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapvalue := iNdEx + intStringLenmapvalue
+					if postStringIndexmapvalue < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapvalue > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = string(dAtA[iNdEx:postStringIndexmapvalue])
+					iNdEx = postStringIndexmapvalue
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.CheckpointOptions[mapkey] = mapvalue
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

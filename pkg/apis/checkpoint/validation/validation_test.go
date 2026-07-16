@@ -53,6 +53,9 @@ func TestValidatePodCheckpoint(t *testing.T) {
 		{name: "empty sourcePod.uid", wantErr: true, mutate: func(pc *checkpoint.PodCheckpoint) {
 			pc.Spec.SourcePod.UID = ptr.To(types.UID(""))
 		}},
+		{name: "valid checkpoint options", mutate: func(pc *checkpoint.PodCheckpoint) {
+			pc.Spec.CheckpointOptions = map[string]string{"example.runtime/mode": "incremental"}
+		}},
 		{name: "missing sourcePod", wantErr: true, mutate: func(pc *checkpoint.PodCheckpoint) {
 			pc.Spec.SourcePod = nil
 		}},
@@ -102,6 +105,9 @@ func TestValidatePodCheckpointUpdate(t *testing.T) {
 		}},
 		{name: "sourcePod.uid immutable", wantErr: true, mutate: func(pc *checkpoint.PodCheckpoint) {
 			pc.Spec.SourcePod.UID = ptr.To(types.UID("7b2c1e4a-0e3a-4f1b-9c2d-2a5f6e8d1234"))
+		}},
+		{name: "checkpointOptions immutable", wantErr: true, mutate: func(pc *checkpoint.PodCheckpoint) {
+			pc.Spec.CheckpointOptions = map[string]string{"example.runtime/mode": "incremental"}
 		}},
 	}
 	for _, tc := range tests {

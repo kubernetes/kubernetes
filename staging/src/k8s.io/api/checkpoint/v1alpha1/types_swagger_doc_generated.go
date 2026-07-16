@@ -78,9 +78,10 @@ func (PodCheckpointList) SwaggerDoc() map[string]string {
 }
 
 var map_PodCheckpointSpec = map[string]string{
-	"":               "PodCheckpointSpec defines the desired state of a PodCheckpoint.",
-	"sourcePod":      "sourcePod identifies the pod to checkpoint. The pod must exist in the same namespace as the PodCheckpoint resource. Required in alpha (validation rejects an unset reference); it is marked optional in the schema so a future selector-based or controller-populated mode can relax it without an incompatible API change. Immutable.",
-	"timeoutSeconds": "timeoutSeconds is the maximum number of seconds the checkpoint operation may take, between 1 and 3600. If unset, the kubelet's configured checkpoint timeout is used; values larger than that configured ceiling are clamped to it. The kubelet enforces the effective timeout with the CRI call deadline, which bounds how long the Pod can stay frozen.",
+	"":                  "PodCheckpointSpec defines the desired state of a PodCheckpoint.",
+	"sourcePod":         "sourcePod identifies the pod to checkpoint. The pod must exist in the same namespace as the PodCheckpoint resource. Required in alpha (validation rejects an unset reference); it is marked optional in the schema so a future selector-based or controller-populated mode can relax it without an incompatible API change. Immutable.",
+	"timeoutSeconds":    "timeoutSeconds is the maximum number of seconds the checkpoint operation may take, between 1 and 3600. If unset, the kubelet's configured checkpoint timeout is used; values larger than that configured ceiling are clamped to it. The kubelet enforces the effective timeout with the CRI call deadline, which bounds how long the Pod can stay frozen.",
+	"checkpointOptions": "checkpointOptions contains opaque runtime-specific options for this checkpoint operation. The kubelet passes these entries unchanged to CheckpointPodRequest.options. Keys and values must be documented by the runtime selected for the source Pod, and unsupported entries cause the checkpoint to fail. Options must not contain secrets.\n\nThese options are not restore defaults. If an option changes what is required to restore the resulting checkpoint, the runtime records that requirement in its checkpoint data. Restore-time choices are supplied separately by the restoring Pod.",
 }
 
 func (PodCheckpointSpec) SwaggerDoc() map[string]string {

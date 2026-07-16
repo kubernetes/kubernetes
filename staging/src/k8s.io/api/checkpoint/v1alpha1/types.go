@@ -88,6 +88,20 @@ type PodCheckpointSpec struct {
 	// CRI call deadline, which bounds how long the Pod can stay frozen.
 	// +optional
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,2,opt,name=timeoutSeconds"`
+
+	// checkpointOptions contains opaque runtime-specific options for this
+	// checkpoint operation. The kubelet passes these entries unchanged to
+	// CheckpointPodRequest.options. Keys and values must be documented by the
+	// runtime selected for the source Pod, and unsupported entries cause the
+	// checkpoint to fail. Options must not contain secrets.
+	//
+	// These options are not restore defaults. If an option changes what is
+	// required to restore the resulting checkpoint, the runtime records that
+	// requirement in its checkpoint data. Restore-time choices are supplied
+	// separately by the restoring Pod.
+	// +optional
+	// +mapType=atomic
+	CheckpointOptions map[string]string `json:"checkpointOptions,omitempty" protobuf:"bytes,3,rep,name=checkpointOptions"`
 }
 
 // PodReference identifies a pod in the same namespace by name and, optionally,
