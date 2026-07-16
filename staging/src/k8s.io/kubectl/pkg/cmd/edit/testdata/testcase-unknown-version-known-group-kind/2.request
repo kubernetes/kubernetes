@@ -1,0 +1,10 @@
+{
+	"extraField": {
+		"addedData": "foo"
+	},
+	"metadata": {
+		"labels": {
+			"label2": "value2"
+		}
+	}
+}

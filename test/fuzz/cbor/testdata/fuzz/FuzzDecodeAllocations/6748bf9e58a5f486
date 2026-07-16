@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("\xa2V00\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r00000A0V00\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r0000")

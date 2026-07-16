@@ -1,0 +1,43 @@
+{
+  "components": {
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "title": "Kubernetes",
+    "version": "unversioned"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/openid/v1/jwks/": {
+      "get": {
+        "description": "get service account issuer OpenID JSON Web Key Set (contains public token verification keys)",
+        "operationId": "getServiceAccountIssuerOpenIDKeyset",
+        "responses": {
+          "200": {
+            "content": {
+              "application/jwk-set+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "openid"
+        ]
+      }
+    }
+  }
+}

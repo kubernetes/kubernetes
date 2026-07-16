@@ -1,0 +1,10 @@
+language: go
+go:
+  - 1.x
+  - tip
+env:
+  - GO111MODULE=on
+install:
+  - go mod download
+script:
+  - go test -race -v

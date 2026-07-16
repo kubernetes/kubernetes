@@ -1,0 +1,12 @@
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task: test
+
+  test:
+    cmds:
+      - go test -v .

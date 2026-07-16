@@ -1,0 +1,133 @@
+/*
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cmd
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"runtime"
+	"runtime/pprof"
+	"runtime/trace"
+
+	"github.com/spf13/pflag"
+)
+
+var (
+	profileName   string
+	profileOutput string
+)
+
+func addProfilingFlags(flags *pflag.FlagSet) {
+	flags.StringVar(&profileName, "profile", "none", "Name of profile to capture. One of (none|cpu|heap|goroutine|threadcreate|block|mutex|trace)")
+	flags.StringVar(&profileOutput, "profile-output", "profile.pprof", "Name of the file to write the profile to")
+}
+
+// initProfiling inits profiling and returns a function to be called on exit to flush and close.
+func initProfiling() (func() error, error) {
+	var (
+		f   *os.File
+		err error
+	)
+	switch profileName {
+	case "none":
+		return nil, nil
+	case "cpu":
+		f, err = os.Create(profileOutput)
+		if err != nil {
+			return nil, err
+		}
+
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			f.Close() //nolint:errcheck
+			return nil, err
+		}
+	// Block and mutex profiles need a call to Set{Block,Mutex}ProfileRate to
+	// output anything. We choose to sample all events.
+	case "block":
+		runtime.SetBlockProfileRate(1)
+	case "mutex":
+		runtime.SetMutexProfileFraction(1)
+	case "trace":
+		f, err = os.Create(profileOutput)
+		if err != nil {
+			return nil, err
+		}
+
+		// Enable the CPU profiler. Samples will be captured in the execution trace.
+		// This is the same rate value as used in pprof.StartCPUProfile.
+		runtime.SetCPUProfileRate(100)
+		if err := trace.Start(f); err != nil {
+			f.Close() //nolint:errcheck
+			return nil, err
+		}
+	default:
+		// Check the profile name is valid.
+		if profile := pprof.Lookup(profileName); profile == nil {
+			return nil, fmt.Errorf("unknown profile '%s'", profileName)
+		}
+	}
+
+	// If the command is interrupted before the end (ctrl-c), flush the profiling files
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		flushProfiling(f) //nolint:errcheck
+		os.Exit(0)
+	}()
+
+	return func() error {
+		return flushProfiling(f)
+	}, nil
+}
+
+func flushProfiling(output io.Closer) error {
+	if output != nil {
+		defer output.Close() //nolint:errcheck
+	}
+
+	switch profileName {
+	case "none":
+		return nil
+	case "cpu":
+		pprof.StopCPUProfile()
+	case "trace":
+		trace.Stop()
+		runtime.SetCPUProfileRate(0)
+	case "heap":
+		runtime.GC()
+		fallthrough
+	default:
+		profile := pprof.Lookup(profileName)
+		if profile == nil {
+			return nil
+		}
+
+		f, err := os.Create(profileOutput)
+		if err != nil {
+			return err
+		}
+
+		defer f.Close()
+		profile.WriteTo(f, 0)
+	}
+
+	return nil
+}

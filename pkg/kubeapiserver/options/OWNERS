@@ -1,0 +1,17 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+filters:
+  ".*authentication.*":
+    approvers:
+      - sig-auth-authenticators-approvers
+    reviewers:
+      - sig-auth-authenticators-reviewers
+    labels:
+      - sig/auth
+  ".*authorization.*":
+    approvers:
+      - sig-auth-authorizers-approvers
+    reviewers:
+      - sig-auth-authorizers-reviewers
+    labels:
+      - sig/auth

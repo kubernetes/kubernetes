@@ -1,0 +1,9 @@
+PUT /apis/flops/v1alpha1/namespaces/mops/flips/mips/status?fieldValidation=warn HTTP/1.1
+Host: example.com
+Accept: application/json
+Accept-Encoding: gzip
+Content-Length: 29
+Content-Type: application/json
+User-Agent: TestGoldenRequest
+
+{"metadata":{"name":"mips"}}

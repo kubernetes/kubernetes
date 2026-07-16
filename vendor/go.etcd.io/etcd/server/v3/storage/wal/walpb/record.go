@@ -1,0 +1,57 @@
+// Copyright 2015 The etcd Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package walpb
+
+import (
+	"errors"
+	"fmt"
+
+	"google.golang.org/protobuf/proto"
+)
+
+var ErrCRCMismatch = errors.New("walpb: crc mismatch")
+
+func (rec *Record) Validate(crc uint32) error {
+	if rec.GetCrc() == crc {
+		return nil
+	}
+	return fmt.Errorf("%w: expected: %x computed: %x", ErrCRCMismatch, rec.GetCrc(), crc)
+}
+
+// Clone returns a deep copy of s, or an empty Snapshot if s is nil.
+func (s *Snapshot) Clone() *Snapshot {
+	if s == nil {
+		return &Snapshot{}
+	}
+	return proto.Clone(s).(*Snapshot)
+}
+
+// ValidateSnapshotForWrite ensures the Snapshot the newly written snapshot is valid.
+//
+// There might exist log-entries written by old etcd versions that does not conform
+// to the requirements.
+func ValidateSnapshotForWrite(e *Snapshot) error {
+	if e.Index == nil {
+		return errors.New("snapshot is missing index: " + e.String())
+	}
+	if e.Term == nil {
+		return errors.New("snapshot is missing term: " + e.String())
+	}
+	// Since etcd>=3.5.0
+	if e.ConfState == nil && e.GetIndex() > 0 {
+		return errors.New("Saved (not-initial) snapshot is missing ConfState: " + e.String())
+	}
+	return nil
+}

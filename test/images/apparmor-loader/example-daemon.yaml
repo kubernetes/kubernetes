@@ -1,0 +1,55 @@
+# The example DaemonSet demonstrating how the profile loader can be deployed onto a cluster to
+# automatically load AppArmor profiles from a ConfigMap.
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: apparmor-loader
+  # Namespace must match that of the ConfigMap.
+  namespace: apparmor
+  labels:
+    daemon: apparmor-loader
+spec:
+  selector:
+    matchLabels:
+      daemon: apparmor-loader
+  template:
+    metadata:
+      name: apparmor-loader
+      labels:
+        daemon: apparmor-loader
+    spec:
+      containers:
+      - name: apparmor-loader
+        image: google/apparmor-loader:latest
+        args:
+          # Tell the loader to pull the /profiles directory every 30 seconds.
+          - -poll
+          - 30s
+          - /profiles
+        securityContext:
+          # The loader requires root permissions to actually load the profiles.
+          privileged: true
+        volumeMounts:
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: apparmor-includes
+          mountPath: /etc/apparmor.d
+          readOnly: true
+        - name: profiles
+          mountPath: /profiles
+          readOnly: true
+      volumes:
+      # The /sys directory must be mounted to interact with the AppArmor module.
+      - name: sys
+        hostPath:
+          path: /sys
+      # The /etc/apparmor.d directory is required for most apparmor include templates.
+      - name: apparmor-includes
+        hostPath:
+          path: /etc/apparmor.d
+      # Map in the profile data.
+      - name: profiles
+        configMap:
+          name: apparmor-profiles

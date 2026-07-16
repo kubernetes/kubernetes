@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: b
+  namespace: nsb
+  labels:
+    prune-group: "true"
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.7

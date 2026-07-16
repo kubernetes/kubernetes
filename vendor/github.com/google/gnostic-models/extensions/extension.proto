@@ -1,0 +1,97 @@
+// Copyright 2017 Google LLC. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package gnostic.extension.v1;
+
+import "google/protobuf/any.proto";
+
+// This option lets the proto compiler generate Java code inside the package
+// name (see below) instead of inside an outer class. It creates a simpler
+// developer experience by reducing one-level of name nesting and be
+// consistent with most programming languages that don't support outer classes.
+option java_multiple_files = true;
+
+// The Java outer classname should be the filename in UpperCamelCase. This
+// class is only used to hold proto descriptor, so developers don't need to
+// work with it directly.
+option java_outer_classname = "GnosticExtension";
+
+// The Java package name must be proto package name with proper prefix.
+option java_package = "org.gnostic.v1";
+
+// A reasonable prefix for the Objective-C symbols generated from the package.
+// It should at a minimum be 3 characters long, all uppercase, and convention
+// is to use an abbreviation of the package name. Something short, but
+// hopefully unique enough to not conflict with things that may come along in
+// the future. 'GPB' is reserved for the protocol buffer implementation itself.
+//
+// "Gnostic Extension"
+option objc_class_prefix = "GNX";
+
+// The Go package name.
+option go_package = "./extensions;gnostic_extension_v1";
+
+// The version number of Gnostic.
+message Version {
+  int32 major = 1;
+  int32 minor = 2;
+  int32 patch = 3;
+  // A suffix for alpha, beta or rc release, e.g., "alpha-1", "rc2". It should
+  // be empty for mainline stable releases.
+  string suffix = 4;
+}
+
+// An encoded Request is written to the ExtensionHandler's stdin.
+message ExtensionHandlerRequest {
+
+  // The extension to process.
+  Wrapper wrapper = 1;
+
+  // The version number of Gnostic.
+  Version compiler_version = 2;
+}
+
+// The extensions writes an encoded ExtensionHandlerResponse to stdout.
+message ExtensionHandlerResponse {
+
+  // true if the extension is handled by the extension handler; false otherwise
+  bool handled = 1;
+
+  // Error message(s).  If non-empty, the extension handling failed.
+  // The extension handler process should exit with status code zero
+  // even if it reports an error in this way.
+  //
+  // This should be used to indicate errors which prevent the extension from
+  // operating as intended.  Errors which indicate a problem in gnostic
+  // itself -- such as the input Document being unparseable -- should be
+  // reported by writing a message to stderr and exiting with a non-zero
+  // status code.
+  repeated string errors = 2;
+
+  // text output
+  google.protobuf.Any value = 3;
+}
+
+message Wrapper {
+  // version of the OpenAPI specification in which this extension was written.
+  string version = 1;
+
+  // Name of the extension.
+  string extension_name = 2;
+
+  // YAML-formatted extension value.
+  string yaml = 3;
+}

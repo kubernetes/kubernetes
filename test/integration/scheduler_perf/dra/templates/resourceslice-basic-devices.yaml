@@ -1,0 +1,52 @@
+{{$numDevices := or .numDevices 10}}
+{{$numPCIRoots := or .numPCIRoots 2}}
+
+kind: ResourceSlice
+apiVersion: resource.k8s.io/v1
+metadata:
+  name: resourceslice-{{.Index}}
+spec:
+  pool:
+    name: resourceslice-{{.Index}}
+    generation: 1
+    resourceSliceCount: 1
+  driver: test-driver.cdi.k8s.io
+  nodeName: scheduler-perf-dra-{{.Index}}
+  devices:{{range ($numDevices | Int)}}
+  - name: basic-device-{{.}}
+    # This is based on an Intel GPU (https://github.com/intel/intel-resource-drivers-for-kubernetes/blob/main/doc/gpu/USAGE.md#deployment-validation, under details)
+    # because it has a decent, realistic number of attributes.
+    # driverVersion was added to enable testing of version support.
+    attributes:
+      driver:
+        string: xe
+      driverVersion:
+        version: "1.2.3"
+      resource.k8s.io/pciRoot:
+        string: "{{Mod . $numPCIRoots}}" # The PCI root cycles though all available root numbers.
+      family:
+        string: Arc Pro B-Series
+      health:
+        string: Healthy
+      model:
+        string: B60
+      pciAddress:
+        string: "0000:0{{.}}:00.0"
+      pciId:
+        string: "0xe211"
+      pciRoot:
+         # The PCI root cycles though all available root numbers.
+        string: "0{{Mod . $numPCIRoots}}"
+      resource.kubernetes.io/pciBusID:
+        string: "0000:0{{.}}:00.0"
+      resource.kubernetes.io/pciRoot:
+        string: pci0000:0{{Mod . $numPCIRoots}}
+      sriov:
+        bool: true
+      type:
+        string: gpu
+    capacity:
+      memory:
+        value: 24480Mi
+      millicores:
+        value: 1k{{end}}
