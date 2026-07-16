@@ -723,12 +723,16 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		return fmt.Errorf("node may only request 0 or 1 audiences")
 	}
 
-	foundAudiencesInPodSpec, err := p.podReferencesAudience(ctx, pod, requestedAudience)
-	if err != nil {
-		return fmt.Errorf("error validating audience %q: %w", requestedAudience, err)
-	}
-	if foundAudiencesInPodSpec {
+	foundAudiencesInPodSpec, validationErr := p.podReferencesAudience(ctx, pod, requestedAudience)
+	if validationErr == nil && foundAudiencesInPodSpec {
 		return nil
+	}
+
+	if p.authz == nil {
+		if validationErr != nil {
+			return fmt.Errorf("error validating audience %q: %w", requestedAudience, validationErr)
+		}
+		return fmt.Errorf("%s is not authorized to request tokens for audience %q", a.GetUserInfo().GetName(), requestedAudience)
 	}
 
 	attrs := buildAuthorizerAttributes(
@@ -743,6 +747,9 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 	// following the same pattern as withAuthorization (ref: https://github.com/kubernetes/kubernetes/blob/2b025e645975d6d51bf38c008f972c632cf49657/staging/src/k8s.io/apiserver/pkg/endpoints/filters/authorization.go#L71-L91)
 	if authorized == authorizer.DecisionAllow {
 		return nil
+	}
+	if validationErr != nil {
+		return fmt.Errorf("error validating audience %q: %w", requestedAudience, validationErr)
 	}
 	if err != nil {
 		return fmt.Errorf("error authorizing %s to request tokens for audience %q: %w", a.GetUserInfo().GetName(), requestedAudience, err)
