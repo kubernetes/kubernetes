@@ -19,7 +19,6 @@ package qos
 import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	resourcehelper "k8s.io/component-helpers/resource"
 )
 
 var supportedQoSComputeResources = sets.New(core.ResourceCPU, core.ResourceMemory)
@@ -40,7 +39,7 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 // A pod is Burstable if cpu & memory limits and requests do not match across all containers.
 func ComputePodQOS(pod *core.Pod) core.PodQOSClass {
 	// When pod-level resources are specified, we use them to determine QoS class.
-	if resourcehelper.IsPodLevelResourcesSet(pod) {
+	if pod.Spec.Resources != nil {
 		return requirementsQOS(pod.Spec.Resources)
 	}
 

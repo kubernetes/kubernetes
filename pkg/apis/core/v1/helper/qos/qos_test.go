@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -36,13 +35,6 @@ import (
 )
 
 func TestComputePodQOS(t *testing.T) {
-	type testCase struct {
-		pod                                        *v1.Pod
-		expected                                   v1.PodQOSClass
-		podLevelResourcesEnabled                   bool
-		podLevelResourcesFixKubeletQOSClassEnabled bool
-	}
-
 	guaranteedResources := v1.ResourceRequirements{
 		// Ephemeral storage request should not affect QOS.
 		Requests: v1.ResourceList{
@@ -84,6 +76,12 @@ func TestComputePodQOS(t *testing.T) {
 			Requests: getResourceList("100m", "100Mi"),
 			Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
 		},
+	}
+
+	type testCase struct {
+		pod                      *v1.Pod
+		expected                 v1.PodQOSClass
+		podLevelResourcesEnabled bool
 	}
 
 	// Container level test cases
@@ -180,7 +178,6 @@ func TestComputePodQOS(t *testing.T) {
 		plrTest := tc
 		plrTest.pod = pod
 		plrTest.podLevelResourcesEnabled = true
-		plrTest.podLevelResourcesFixKubeletQOSClassEnabled = true
 		tests = append(tests, plrTest)
 	}
 
@@ -191,16 +188,10 @@ func TestComputePodQOS(t *testing.T) {
 		pod.Name = "pod-" + pod.Name + "-plr"
 		pod.Spec.Resources = pod.Spec.Containers[0].Resources.DeepCopy()
 		pod.Spec.Containers[0].Resources = guaranteedResources
-		expectedQOS := tc.expected
-		if !resourcehelper.IsPodLevelResourcesSet(pod) {
-			expectedQOS = v1.PodQOSGuaranteed
-			pod.Name += "-fallback"
-		}
 		tests = append(tests, testCase{
 			pod:                      pod,
-			expected:                 expectedQOS,
+			expected:                 tc.expected,
 			podLevelResourcesEnabled: true,
-			podLevelResourcesFixKubeletQOSClassEnabled: true,
 		})
 
 		// variant 2: PLR disabled, guaranteed pod
@@ -211,175 +202,12 @@ func TestComputePodQOS(t *testing.T) {
 			pod:                      pod,
 			expected:                 tc.expected,
 			podLevelResourcesEnabled: false,
-			podLevelResourcesFixKubeletQOSClassEnabled: false,
 		})
 	}
-
-	// Explicit empty and zero pod-level resource test cases
-	explicitPLRTests := []testCase{
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "empty-pod-level-resources-should-fallback-to-containers"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{Name: "guaranteed", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("100m", "100Mi")}},
-					},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{},
-						Limits:   v1.ResourceList{},
-					},
-				},
-			},
-			expected:                 v1.PodQOSGuaranteed,
-			podLevelResourcesEnabled: true,
-			podLevelResourcesFixKubeletQOSClassEnabled: true,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "completely-empty-pod-level-resources-should-fallback-to-containers"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{Name: "guaranteed", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("100m", "100Mi")}},
-					},
-					Resources: &v1.ResourceRequirements{},
-				},
-			},
-			expected:                 v1.PodQOSGuaranteed,
-			podLevelResourcesEnabled: true,
-			podLevelResourcesFixKubeletQOSClassEnabled: true,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "completely-empty-pod-level-resources-old-behavior"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{Name: "guaranteed", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("100m", "100Mi")}},
-					},
-					Resources: &v1.ResourceRequirements{},
-				},
-			},
-			expected:                 v1.PodQOSBestEffort,
-			podLevelResourcesEnabled: true,
-			podLevelResourcesFixKubeletQOSClassEnabled: false,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "nil-pod-level-resources-should-fallback-to-containers"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{Name: "guaranteed", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("100m", "100Mi")}},
-					},
-				},
-			},
-			expected:                 v1.PodQOSGuaranteed,
-			podLevelResourcesEnabled: true,
-			podLevelResourcesFixKubeletQOSClassEnabled: true,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "zero-pod-level-resources-should-not-fallback-to-containers"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{Name: "guaranteed", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("100m", "100Mi")}},
-					},
-					Resources: &v1.ResourceRequirements{
-						Requests: getResourceList("0", "0"),
-						Limits:   getResourceList("0", "0"),
-					},
-				},
-			},
-			expected:                 v1.PodQOSBestEffort,
-			podLevelResourcesEnabled: true,
-			podLevelResourcesFixKubeletQOSClassEnabled: true,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "zero-pod-level-resources-should-not-fallback-to-containers-fix-disabled"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{Name: "guaranteed", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("100m", "100Mi")}},
-					},
-					Resources: &v1.ResourceRequirements{
-						Requests: getResourceList("0", "0"),
-						Limits:   getResourceList("0", "0"),
-					},
-				},
-			},
-			expected:                 v1.PodQOSBestEffort,
-			podLevelResourcesEnabled: true,
-			podLevelResourcesFixKubeletQOSClassEnabled: false,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "empty-pod-level-resources-old-behavior"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{Name: "guaranteed", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("100m", "100Mi")}},
-					},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{},
-						Limits:   v1.ResourceList{},
-					},
-				},
-			},
-			expected:                 v1.PodQOSBestEffort,
-			podLevelResourcesEnabled: true,
-			podLevelResourcesFixKubeletQOSClassEnabled: false,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "guaranteed-with-pod-level-resources-and-hugepages"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{Name: "best-effort"},
-					},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU:                   resource.MustParse("10m"),
-							v1.ResourceMemory:                resource.MustParse("100Mi"),
-							v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
-						},
-						Limits: v1.ResourceList{
-							v1.ResourceCPU:                   resource.MustParse("10m"),
-							v1.ResourceMemory:                resource.MustParse("100Mi"),
-							v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
-						},
-					},
-				},
-			},
-			expected:                 v1.PodQOSGuaranteed,
-			podLevelResourcesEnabled: true,
-			podLevelResourcesFixKubeletQOSClassEnabled: true,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "burstable-with-pod-level-resources-and-hugepages"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{Name: "best-effort"},
-					},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU:                   resource.MustParse("10m"),
-							v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
-						},
-						Limits: v1.ResourceList{
-							v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
-						},
-					},
-				},
-			},
-			expected:                 v1.PodQOSBurstable,
-			podLevelResourcesEnabled: true,
-			podLevelResourcesFixKubeletQOSClassEnabled: true,
-		},
-	}
-	tests = append(tests, explicitPLRTests...)
 
 	for _, testCase := range tests {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixKubeletQOSClass, testCase.podLevelResourcesFixKubeletQOSClassEnabled)
 			if actual := ComputePodQOS(testCase.pod); testCase.expected != actual {
 				t.Errorf("ComputePodQOS error: expected: %s, actual: %s;\npod = %s", testCase.expected, actual, prettyPrintPod(testCase.pod))
 			}

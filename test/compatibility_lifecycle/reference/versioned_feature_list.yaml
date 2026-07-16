@@ -1379,12 +1379,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
-- name: PodLevelResourcesFixKubeletQOSClass
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.37"
 - name: PodLogsQuerySplitStreams
   versionedSpecs:
   - default: false
