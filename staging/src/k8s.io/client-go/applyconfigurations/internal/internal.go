@@ -4662,6 +4662,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: options
+      type:
+        map:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     elementRelationship: atomic
 - name: io.k8s.api.core.v1.CinderPersistentVolumeSource
   map:
@@ -12163,6 +12169,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.node.v1alpha1.PodCheckpointSpec
   map:
     fields:
+    - name: checkpointOptions
+      type:
+        map:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: sourcePod
       type:
         namedType: io.k8s.api.node.v1alpha1.PodReference

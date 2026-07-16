@@ -20539,7 +20539,7 @@ func schema_k8sio_api_core_v1_CheckpointReference(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CheckpointReference identifies a PodCheckpoint to restore a Pod from.",
+				Description: "CheckpointReference identifies a PodCheckpoint and specifies options for restoring a Pod from it.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -20548,6 +20548,26 @@ func schema_k8sio_api_core_v1_CheckpointReference(ref common.ReferenceCallback) 
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-map-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Options contains opaque runtime-specific options for this restore attempt. The kubelet passes these entries unchanged to RestorePodRequest.options. Keys and values must be documented by the runtime selected for this Pod. Unsupported entries cause the restore to fail. Options must not contain secrets.\n\nRestore options are independent of the options used to create the checkpoint and are not stored in the PodCheckpoint. Requirements intrinsic to the checkpoint are recorded in runtime-owned checkpoint data instead.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -45314,6 +45334,26 @@ func schema_k8sio_api_node_v1alpha1_PodCheckpointSpec(ref common.ReferenceCallba
 							Description: "timeoutSeconds is the maximum number of seconds the checkpoint operation may take, between 1 and 3600. If unset, the kubelet's configured checkpoint timeout is used; values larger than that configured ceiling are clamped to it. The kubelet enforces the effective timeout with the CRI call deadline, which bounds how long the Pod can stay frozen.",
 							Type:        []string{"integer"},
 							Format:      "int32",
+						},
+					},
+					"checkpointOptions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-map-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "checkpointOptions contains opaque runtime-specific options for this checkpoint operation. The kubelet passes these entries unchanged to CheckpointPodRequest.options. Keys and values must be documented by the runtime selected for the source Pod, and unsupported entries cause the checkpoint to fail. Options must not contain secrets.\n\nThese options are not restore defaults. If an option changes what is required to restore the resulting checkpoint, the runtime records that requirement in its checkpoint data. Restore-time choices are supplied separately by the restoring Pod.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
 						},
 					},
 				},
