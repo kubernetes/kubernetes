@@ -254,10 +254,13 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 				tc.prepare(t, volumeDir, fake)
 			}
 
-			err := CleanupUnmountedVolumeArtifacts(mounter, volumeDir)
+			cleaned, err := CleanupUnmountedVolumeArtifacts(mounter, volumeDir)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
+				}
+				if cleaned {
+					t.Fatalf("expected cleaned=false on error")
 				}
 				if tc.errContains != "" && !contains(err.Error(), tc.errContains) {
 					t.Fatalf("error %q does not contain %q", err.Error(), tc.errContains)

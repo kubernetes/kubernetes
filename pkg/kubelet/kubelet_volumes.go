@@ -158,7 +158,15 @@ func (kl *Kubelet) removeOrphanedPodVolumeDirs(logger klog.Logger, uid types.UID
 	// After hard reboots, mounts are gone but CSI metadata files often remain and
 	// block rmdir-only cleanup of the volumes tree ("not a directory" errors).
 	// See https://github.com/kubernetes/kubernetes/issues/105536.
-	// Safety: only well-known CSI metadata is removed, and only when not mounted.
+	//
+	// Safety (must stay aligned with #102576):
+	//   - This runs only after cleanupOrphanedPodDirs has verified podVolumesExist
+	//     is false (volume manager has no possibly-mounted volumes; disk mount
+	//     check did not find mounts). Do not call cleanOrphanedCSIVolumeDirs from
+	//     other paths without that gate.
+	//   - Only well-known CSI metadata is removed, and only when IsMountPoint says
+	//     the CSI mount path is not mounted (bind mounts included on Linux).
+	//   - Arbitrary files under the volume dir are never deleted.
 	orphanVolumeErrors = append(orphanVolumeErrors, kl.cleanOrphanedCSIVolumeDirs(logger, uid)...)
 
 	// Remove any remaining subdirectories along with the volumes directory itself.
@@ -175,6 +183,8 @@ func (kl *Kubelet) removeOrphanedPodVolumeDirs(logger klog.Logger, uid types.UID
 
 // cleanOrphanedCSIVolumeDirs removes residual CSI volume metadata for orphaned pods
 // when the corresponding CSI volume is no longer mounted.
+//
+// Must only be called when podVolumesExist(uid) is false (see removeOrphanedPodVolumeDirs).
 func (kl *Kubelet) cleanOrphanedCSIVolumeDirs(logger klog.Logger, uid types.UID) []error {
 	pluginDir := filepath.Join(kl.getPodVolumesDir(uid), utilstrings.EscapeQualifiedName(csi.CSIPluginName))
 	entries, err := os.ReadDir(pluginDir)
@@ -191,11 +201,14 @@ func (kl *Kubelet) cleanOrphanedCSIVolumeDirs(logger klog.Logger, uid types.UID)
 			continue
 		}
 		volumeDir := filepath.Join(pluginDir, entry.Name())
-		if err := csi.CleanupUnmountedVolumeArtifacts(kl.mounter, volumeDir); err != nil {
+		cleaned, err := csi.CleanupUnmountedVolumeArtifacts(kl.mounter, volumeDir)
+		if err != nil {
 			errs = append(errs, fmt.Errorf("orphaned pod %q found, but failed to clean residual CSI volume artifacts at %s: %w", uid, volumeDir, err))
 			continue
 		}
-		logger.V(4).Info("Cleaned residual CSI volume artifacts for orphaned pod", "podUID", uid, "path", volumeDir)
+		if cleaned {
+			logger.V(4).Info("Cleaned residual CSI volume artifacts for orphaned pod", "podUID", uid, "path", volumeDir)
+		}
 	}
 	return errs
 }
