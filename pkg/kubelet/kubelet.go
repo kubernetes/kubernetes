@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"net/http"
@@ -3612,6 +3613,7 @@ type podCheckpointRequest struct {
 	name      string
 	uid       types.UID
 	timeout   time.Duration
+	options   map[string]string
 }
 
 // requestPodCheckpoint hands a PodCheckpoint to the pod worker of its source
@@ -3681,7 +3683,8 @@ func (kl *Kubelet) syncPodCheckpointRequest(ctx context.Context, pod *v1.Pod, po
 	logger := klog.FromContext(ctx)
 	run, err := kl.preparePodCheckpoint(ctx, pod, podStatus, request)
 	switch {
-	case errors.Is(err, errPodCheckpointInFlight) || errors.Is(err, errPodCheckpointAPIUnavailable) || errors.Is(err, errPodCheckpointRuntimeUnavailable):
+	case errors.Is(err, errPodCheckpointInFlight) || errors.Is(err, errPodCheckpointPolicyUnavailable) ||
+		errors.Is(err, errPodCheckpointAPIUnavailable) || errors.Is(err, errPodCheckpointRuntimeUnavailable):
 		if !kl.podCheckpointPending(request) {
 			kl.finishPodCheckpoint(pod.UID, request.uid)
 			return nil
@@ -3792,6 +3795,9 @@ func (kl *Kubelet) preparePodCheckpoint(ctx context.Context, pod *v1.Pod, podSta
 	if activeSandbox == nil || activeSandbox.State != runtimeapi.PodSandboxState_SANDBOX_READY || activeSandbox.Id == "" {
 		return nil, fmt.Errorf("pod %v has no ready sandbox", podFullName)
 	}
+	if err := kl.validatePodCheckpointOptions(pod, request.options, activeSandbox.RuntimeHandler); err != nil {
+		return nil, err
+	}
 
 	// Enforce the execution-time preconditions (KEP-5823) before reaching the
 	// container runtime: the pod must be bound to a node, non-restartable init
@@ -3838,6 +3844,7 @@ func (kl *Kubelet) preparePodCheckpoint(ctx context.Context, pod *v1.Pod, podSta
 			PodSandboxId: activeSandbox.Id,
 			OutputPath:   outputPath,
 			ContainerIds: containerIDs,
+			Options:      maps.Clone(request.options),
 		},
 	}, nil
 }

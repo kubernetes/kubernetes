@@ -61,6 +61,19 @@ type RuntimeClass struct {
 	// nodes.
 	// +optional
 	Scheduling *Scheduling
+
+	// podCheckpointOptions permits user-supplied checkpoint option keys for this
+	// runtime handler. An unset policy permits no user options.
+	// +optional
+	PodCheckpointOptions *RuntimeClassPodCheckpointOptions
+}
+
+// RuntimeClassPodCheckpointOptions configures the runtime-specific option keys users
+// may supply. Administrator configuration remains separate in the runtime.
+type RuntimeClassPodCheckpointOptions struct {
+	// allowedCheckpointOptions lists keys permitted in checkpoint requests.
+	// +optional
+	AllowedCheckpointOptions []string
 }
 
 // Overhead structure represents the resource overhead associated with running a pod.
@@ -150,6 +163,19 @@ type PodCheckpointSpec struct {
 	// Immutable because the operation's deadline is fixed when it starts.
 	// +optional
 	TimeoutSeconds *int32
+
+	// checkpointOptions contains opaque runtime-specific options for this
+	// checkpoint operation. Empty options use runtime defaults. Keys require the
+	// source Pod's RuntimeClass checkpoint allowlist, and runtimes validate safe
+	// values as untrusted user input. Administrator settings belong in node or
+	// runtime configuration. They are not reused as restore options. If an option
+	// creates a restore requirement, the runtime records it in the checkpoint
+	// data it owns.
+	// At most 64 entries are allowed, with keys of at most 256 bytes and values
+	// of at most 4096 bytes.
+	// +optional
+	// +mapType=atomic
+	CheckpointOptions map[string]string
 }
 
 // PodReference identifies a pod in the same namespace by name and, optionally,

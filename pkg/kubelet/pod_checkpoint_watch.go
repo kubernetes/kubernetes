@@ -57,6 +57,7 @@ var errPodCheckpointInFlight = errors.New("pod checkpoint is waiting for another
 var errPodCheckpointSourcePending = errors.New("pod checkpoint is waiting for its source Pod to be observed locally")
 var errPodCheckpointNotPending = errors.New("pod checkpoint was replaced or already completed")
 var errPodCheckpointAPIUnavailable = errors.New("pod checkpoint is waiting for the API server")
+var errPodCheckpointPolicyUnavailable = errors.New("pod checkpoint is waiting for RuntimeClass option policy")
 
 func (kl *Kubelet) recordPodCheckpointEvent(ctx context.Context, namespace, name string, uid types.UID, eventType, reason, message string) {
 	if kl.recorder == nil {
@@ -378,6 +379,7 @@ func (kl *Kubelet) syncPodCheckpoint(ctx context.Context, key string) error {
 		name:      name,
 		uid:       pc.UID,
 		timeout:   timeout,
+		options:   pc.Spec.CheckpointOptions,
 	})
 }
 
@@ -518,8 +520,7 @@ func (kl *Kubelet) publishPodCheckpointTemplate(ctx context.Context, namespace, 
 		// The PodCheckpoint was deleted after the request.
 		return fmt.Errorf("%w: %w", errPodCheckpointNotPending, err)
 	}
-	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) ||
-		apierrors.IsTimeout(err) || apierrors.IsServerTimeout(err) {
+	if checkpointutil.RuntimeOptionPolicyUnavailable(err) {
 		return fmt.Errorf("%w: capture checkpoint template: %w", errPodCheckpointAPIUnavailable, err)
 	}
 	return err
