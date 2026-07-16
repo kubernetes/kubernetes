@@ -480,3 +480,23 @@ func (kl *Kubelet) getLastObservedNodeAddresses(ctx context.Context) []v1.NodeAd
 	}
 	return node.Status.Addresses
 }
+
+// GetAllocatedPods returns all active pods with their allocated resources.
+func (kl *Kubelet) GetAllocatedPods() ([]*v1.Pod, error) {
+	return kl.allocationManager.GetAllocatedPods(), nil
+}
+
+// GetAllocatedPodByName returns the allocated pod with the given namespace and name.
+// It returns (nil, nil) if the pod is not found or is inactive.
+func (kl *Kubelet) GetAllocatedPodByName(namespace, name string) (*v1.Pod, error) {
+	pod, found := kl.GetPodByName(namespace, name)
+	if !found {
+		return nil, nil
+	}
+	activePods := kl.filterOutInactivePods([]*v1.Pod{pod})
+	if len(activePods) == 0 {
+		return nil, nil
+	}
+	allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+	return allocatedPod, nil
+}

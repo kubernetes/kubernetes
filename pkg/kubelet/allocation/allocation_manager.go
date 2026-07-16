@@ -109,6 +109,9 @@ type Manager interface {
 
 	// HasPodAllocatedResources returns whether a pod has been allocated resources.
 	HasPodAllocatedResources(podUID types.UID) bool
+
+	// GetAllocatedPods returns all active pods with their allocated resources.
+	GetAllocatedPods() []*v1.Pod
 }
 
 type manager struct {
@@ -677,6 +680,10 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 		}
 	}
 	return allocatedPods
+}
+
+func (m *manager) GetAllocatedPods() []*v1.Pod {
+	return m.getAllocatedPods(m.getActivePods())
 }
 
 func IsResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
