@@ -323,8 +323,12 @@ func TestBroadcasterActionOrDrop(t *testing.T) {
 	}
 
 	// Park the distribution loop so that events accumulate in m.incoming.
+	// blockQueue can't be used here because it would wait for the parked
+	// function to finish, so send the marker directly while holding
+	// incomingBlock, matching blockQueue's send-side locking.
 	started := make(chan struct{})
 	release := make(chan struct{})
+	m.incomingBlock.Lock()
 	m.incoming <- Event{
 		Type: internalRunFunctionMarker,
 		Object: functionFakeRuntimeObject(func() {
@@ -332,6 +336,7 @@ func TestBroadcasterActionOrDrop(t *testing.T) {
 			<-release
 		}),
 	}
+	m.incomingBlock.Unlock()
 	<-started
 
 	// The first event fills the incoming queue, the second is dropped.

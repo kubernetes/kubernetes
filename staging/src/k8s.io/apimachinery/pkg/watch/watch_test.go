@@ -163,6 +163,19 @@ func TestFakeWatcherLifecycle(t *testing.T) {
 		t.Errorf("unexpected stopped watcher after reset")
 	}
 
+	// The fresh channel is open and empty. Checking this first also keeps
+	// the Add goroutine below from panicking on a closed channel if Reset
+	// ever regresses, which would crash the test binary without a clean
+	// failure message.
+	select {
+	case _, ok := <-f.ResultChan():
+		if !ok {
+			t.Fatalf("channel still closed after reset")
+		}
+		t.Fatalf("unexpected event after reset")
+	default:
+	}
+
 	// Events flow again on the fresh channel.
 	go f.Add(testType("baz"))
 	got, ok := <-f.ResultChan()
@@ -294,7 +307,7 @@ func TestMockWatcher(t *testing.T) {
 		ResultChanFunc: func() <-chan Event { return ch },
 	}
 
-	if got := w.ResultChan(); got != (<-chan Event)(ch) {
+	if got := w.ResultChan(); got != ch {
 		t.Errorf("expected ResultChan to return the provided channel")
 	}
 
