@@ -49,9 +49,10 @@ type FakeRuntimeHelper struct {
 	PodRestoreStarted     map[kubetypes.UID]bool
 	PodRestoreStartedErr  error
 	ContainerImageVolumes map[kubetypes.UID]map[string]kubecontainer.ImageVolumes
+	ContainerHandlers     map[kubetypes.UID]map[string]string
 }
 
-func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
+func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes, runtimeHandler string) (*kubecontainer.RunContainerOptions, func(), error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -62,6 +63,14 @@ func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *
 		f.ContainerImageVolumes[pod.UID] = make(map[string]kubecontainer.ImageVolumes)
 	}
 	f.ContainerImageVolumes[pod.UID][container.Name] = imageVolumes
+
+	if f.ContainerHandlers == nil {
+		f.ContainerHandlers = make(map[kubetypes.UID]map[string]string)
+	}
+	if f.ContainerHandlers[pod.UID] == nil {
+		f.ContainerHandlers[pod.UID] = make(map[string]string)
+	}
+	f.ContainerHandlers[pod.UID][container.Name] = runtimeHandler
 
 	var opts kubecontainer.RunContainerOptions
 	if len(container.TerminationMessagePath) != 0 {

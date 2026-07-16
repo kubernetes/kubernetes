@@ -686,9 +686,9 @@ func (kl *Kubelet) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
+func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes, runtimeHandler string) (*kubecontainer.RunContainerOptions, func(), error) {
 	logger := klog.FromContext(ctx)
-	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
+	supportsRRO := runtimeHandlerSupportsRecursiveReadOnlyMounts(logger, runtimeHandler, kl.runtimeState.runtimeHandlers())
 
 	opts, err := kl.containerManager.GetResources(ctx, pod, container)
 	if err != nil {

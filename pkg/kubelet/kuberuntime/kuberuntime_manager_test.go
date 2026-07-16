@@ -6757,10 +6757,10 @@ type testRuntimeHelper struct {
 	runContainerPodIPs            []string
 }
 
-func (t *testRuntimeHelper) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
+func (t *testRuntimeHelper) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes, runtimeHandler string) (*kubecontainer.RunContainerOptions, func(), error) {
 	t.runContainerPodIP = podIP
 	t.runContainerPodIPs = append([]string(nil), podIPs...)
-	return t.FakeRuntimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, podIPs, imageVolumes)
+	return t.FakeRuntimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, podIPs, imageVolumes, runtimeHandler)
 }
 
 func (t *testRuntimeHelper) OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error {
@@ -7114,7 +7114,7 @@ func TestSysctlFiltering(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			pod := createTestPodFunc(test.hostNetwork, test.hostIPC, test.hostUsers)
-			config, err := m.generatePodSandboxLinuxConfig(tCtx, pod)
+			config, err := m.generatePodSandboxLinuxConfig(tCtx, pod, "")
 			require.NoError(t, err)
 			if !reflect.DeepEqual(test.expectedSysctls, config.Sysctls) {
 				t.Errorf("Expected sysctls %v, got %v", test.expectedSysctls, config.Sysctls)

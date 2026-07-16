@@ -47,9 +47,9 @@ import (
 // preparePodSandboxConfig generates the sandbox config and creates the Pod log
 // directory. Both new and restored sandboxes use it. On failure, it returns a
 // message for the Pod's sync result.
-func (m *kubeGenericRuntimeManager) preparePodSandboxConfig(ctx context.Context, pod *v1.Pod, attempt uint32) (*runtimeapi.PodSandboxConfig, string, error) {
+func (m *kubeGenericRuntimeManager) preparePodSandboxConfig(ctx context.Context, pod *v1.Pod, attempt uint32, runtimeHandler string) (*runtimeapi.PodSandboxConfig, string, error) {
 	logger := klog.FromContext(ctx)
-	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, attempt)
+	podSandboxConfig, err := m.generatePodSandboxConfigWithRuntimeHandler(ctx, pod, attempt, runtimeHandler)
 	if err != nil {
 		message := fmt.Sprintf("Failed to generate sandbox config for pod %q: %v", format.Pod(pod), err)
 		logger.Error(err, "Failed to generate sandbox config for pod", "pod", klog.KObj(pod))
@@ -69,21 +69,18 @@ func (m *kubeGenericRuntimeManager) preparePodSandboxConfig(ctx context.Context,
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
 func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32) (string, string, error) {
 	logger := klog.FromContext(ctx)
-	podSandboxConfig, message, err := m.preparePodSandboxConfig(ctx, pod, attempt)
+	runtimeHandler, err := m.lookupRuntimeHandler(pod)
 	if err != nil {
+		message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
 		return "", message, err
 	}
+	if runtimeHandler != "" {
+		logger.V(2).Info("Running pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
+	}
 
-	runtimeHandler := ""
-	if m.runtimeClassManager != nil {
-		runtimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
-		if err != nil {
-			message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
-			return "", message, err
-		}
-		if runtimeHandler != "" {
-			logger.V(2).Info("Running pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
-		}
+	podSandboxConfig, message, err := m.preparePodSandboxConfig(ctx, pod, attempt, runtimeHandler)
+	if err != nil {
+		return "", message, err
 	}
 
 	podSandBoxID, err := m.runtimeService.RunPodSandbox(ctx, podSandboxConfig, runtimeHandler)
@@ -173,21 +170,15 @@ func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *
 		return nil, message, err
 	}
 
-	podSandboxConfig, message, err := m.preparePodSandboxConfig(ctx, pod, attempt)
+	runtimeHandler, err := m.lookupRuntimeHandler(pod)
 	if err != nil {
+		message := fmt.Sprintf("Failed to restore sandbox for pod %q: %v", format.Pod(pod), err)
 		return nil, message, err
 	}
 
-	runtimeHandler := ""
-	if m.runtimeClassManager != nil {
-		runtimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
-		if err != nil {
-			message := fmt.Sprintf("Failed to restore sandbox for pod %q: %v", format.Pod(pod), err)
-			return nil, message, err
-		}
-		if runtimeHandler != "" {
-			logger.V(2).Info("Restoring pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
-		}
+	podSandboxConfig, message, err := m.preparePodSandboxConfig(ctx, pod, attempt, runtimeHandler)
+	if err != nil {
+		return nil, message, err
 	}
 
 	logger.V(2).Info("Restoring pod sandbox from checkpoint", "pod", klog.KObj(pod), "checkpointName", pod.Spec.RestoreFrom.Name, "checkpointPath", checkpointPath, "runtimeHandler", runtimeHandler)
@@ -204,13 +195,13 @@ func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *
 	if err := m.pullRestoreContainerImages(ctx, pod, podSandboxConfig, runtimeHandler, pullSecrets); err != nil {
 		return nil, err.Error(), err
 	}
-	imageVolumePullResults, err := m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
+	imageVolumePullResults, err := m.getImageVolumesWithRuntimeHandler(ctx, pod, podSandboxConfig, pullSecrets, runtimeHandler)
 	if err != nil {
 		message := fmt.Sprintf("Failed to prepare image volumes for restore for pod %q: %v", format.Pod(pod), err)
 		logger.Error(err, "Failed to prepare image volumes for pod restore", "pod", klog.KObj(pod))
 		return nil, message, err
 	}
-	containerConfigs, cleanupAction, err := m.generateContainerConfigsForRestore(ctx, pod, podSandboxConfig, imageVolumePullResults)
+	containerConfigs, cleanupAction, err := m.generateContainerConfigsForRestore(ctx, pod, podSandboxConfig, imageVolumePullResults, runtimeHandler)
 	if cleanupAction != nil {
 		defer cleanupAction()
 	}
@@ -443,7 +434,7 @@ func (m *kubeGenericRuntimeManager) pullRestoreContainerImages(ctx context.Conte
 // configurations used by the normal start path. The runtime uses the base image
 // and applies restore-time security, resource, logging, device, and mount settings.
 // The checkpoint supplies the process state, including its argv and environment.
-func (m *kubeGenericRuntimeManager) generateContainerConfigsForRestore(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, imageVolumePullResults imageVolumePulls) ([]*runtimeapi.ContainerConfig, func(), error) {
+func (m *kubeGenericRuntimeManager) generateContainerConfigsForRestore(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, imageVolumePullResults imageVolumePulls, runtimeHandler string) ([]*runtimeapi.ContainerConfig, func(), error) {
 	logger := klog.FromContext(ctx)
 
 	var containerConfigs []*runtimeapi.ContainerConfig
@@ -462,7 +453,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfigsForRestore(ctx conte
 			return nil, nil, fmt.Errorf("failed to prepare image volumes for container %s: %w", container.Name, err)
 		}
 
-		config, cleanupAction, msg, err := m.createContainerConfig(ctx, pod, container, containerType, 0, "", container.Image, nil, nil, imageVolumes)
+		config, cleanupAction, msg, err := m.createContainerConfig(ctx, pod, container, containerType, 0, "", container.Image, nil, nil, imageVolumes, runtimeHandler)
 		if cleanupAction != nil {
 			cleanupActions = append(cleanupActions, cleanupAction)
 		}
@@ -498,6 +489,14 @@ func (m *kubeGenericRuntimeManager) generateContainerConfigsForRestore(ctx conte
 
 // generatePodSandboxConfig generates pod sandbox config from v1.Pod.
 func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context, pod *v1.Pod, attempt uint32) (*runtimeapi.PodSandboxConfig, error) {
+	runtimeHandler, err := m.lookupRuntimeHandler(pod)
+	if err != nil {
+		return nil, err
+	}
+	return m.generatePodSandboxConfigWithRuntimeHandler(ctx, pod, attempt, runtimeHandler)
+}
+
+func (m *kubeGenericRuntimeManager) generatePodSandboxConfigWithRuntimeHandler(ctx context.Context, pod *v1.Pod, attempt uint32, runtimeHandler string) (*runtimeapi.PodSandboxConfig, error) {
 	// TODO: deprecating podsandbox resource requirements in favor of the pod level cgroup
 	// Refer https://github.com/kubernetes/kubernetes/issues/29871
 	logger := klog.FromContext(ctx)
@@ -557,7 +556,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 		podSandboxConfig.PortMappings = portMappings
 	}
 
-	lc, err := m.generatePodSandboxLinuxConfig(ctx, pod)
+	lc, err := m.generatePodSandboxLinuxConfig(ctx, pod, runtimeHandler)
 	if err != nil {
 		return nil, err
 	}
@@ -582,7 +581,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 // We've to call PodSandboxLinuxConfig always irrespective of the underlying OS as securityContext is not part of
 // podSandboxConfig. It is currently part of LinuxPodSandboxConfig. In future, if we have securityContext pulled out
 // in podSandboxConfig we should be able to use it.
-func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(ctx context.Context, pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
+func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(ctx context.Context, pod *v1.Pod, runtimeHandler string) (*runtimeapi.LinuxPodSandboxConfig, error) {
 	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
 	lc := &runtimeapi.LinuxPodSandboxConfig{
 		CgroupParent: cgroupParent,
@@ -617,7 +616,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(ctx context.Co
 		if sc.RunAsGroup != nil && runtime.GOOS != "windows" {
 			lc.SecurityContext.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*sc.RunAsGroup)}
 		}
-		namespaceOptions, err := runtimeutil.NamespacesForPod(ctx, pod, m.runtimeHelper, m.runtimeClassManager)
+		namespaceOptions, err := runtimeutil.NamespacesForPodWithRuntimeHandler(ctx, pod, m.runtimeHelper, runtimeHandler)
 		if err != nil {
 			return nil, err
 		}

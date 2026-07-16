@@ -82,7 +82,7 @@ func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
 		},
 	}
 
-	err = fakeRuntimeSvc.applyPlatformSpecificContainerConfig(tCtx, containerConfig, &pod.Spec.Containers[0], pod, new(int64), "foo", nil)
+	err = fakeRuntimeSvc.applyPlatformSpecificContainerConfig(tCtx, containerConfig, &pod.Spec.Containers[0], pod, new(int64), "foo", nil, "")
 	require.NoError(t, err)
 
 	limit := int64(3000)

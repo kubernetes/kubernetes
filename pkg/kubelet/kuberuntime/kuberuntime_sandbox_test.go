@@ -176,7 +176,7 @@ func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		config, _ := m.generatePodSandboxLinuxConfig(tCtx, test.pod)
+		config, _ := m.generatePodSandboxLinuxConfig(tCtx, test.pod, "")
 		actualProfile := config.SecurityContext.Seccomp.ProfileType.String()
 		assert.EqualValues(t, test.expectedProfile, actualProfile, "TestCase[%d]: %s", i, test.description)
 	}
@@ -1179,7 +1179,7 @@ func TestRestoreContainerImagesAndCredentials(t *testing.T) {
 			require.NoError(t, m.pullRestoreContainerImages(ctx, pod, config, "", nil))
 			assert.Contains(t, images.Called, "PullImage", "missing application images must be pulled before RestorePod")
 			images.Images[container.Image].Uid = &runtimeapi.Int64Value{Value: uid}
-			configs, cleanup, err := m.generateContainerConfigsForRestore(ctx, pod, config, nil)
+			configs, cleanup, err := m.generateContainerConfigsForRestore(ctx, pod, config, nil, "")
 			require.NoError(t, err)
 			defer cleanup()
 			require.Len(t, configs, 1)
@@ -1257,4 +1257,89 @@ func TestRestorePodSandboxIgnoresUnverifiedPodIPs(t *testing.T) {
 	require.Empty(t, helper.runContainerPodIPs)
 	require.Len(t, runtime.RestoredPods, 1)
 	require.Equal(t, pod.Labels["io.kubernetes.pod.ip"], runtime.RestoredPods[0].Config.Labels["io.kubernetes.pod.ip"])
+}
+
+type restoreImageStatusRecorder struct {
+	internalapi.ImageManagerService
+	imageStatusSpecs []*runtimeapi.ImageSpec
+}
+
+func (r *restoreImageStatusRecorder) ImageStatus(ctx context.Context, spec *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error) {
+	r.imageStatusSpecs = append(r.imageStatusSpecs, spec)
+	return r.ImageManagerService.ImageStatus(ctx, spec, verbose)
+}
+
+func TestRestorePodSandboxUsesOneRuntimeHandler(t *testing.T) {
+	for _, imageHandlerEnabled := range []bool{false, true} {
+		for _, userNamespace := range []bool{false, true} {
+			t.Run(fmt.Sprintf("image-handler=%t/user-namespace=%t", imageHandlerEnabled, userNamespace), func(t *testing.T) {
+				if userNamespace && runtime.GOOS != "linux" {
+					t.Skip("user namespaces require Linux")
+				}
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, imageHandlerEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, true)
+				ctx := ktesting.Init(t)
+				client := rctest.NewPopulatedClient()
+				class, err := client.NodeV1().RuntimeClasses().Get(ctx, rctest.SandboxRuntimeClass, metav1.GetOptions{})
+				require.NoError(t, err)
+				class.Handler = "new-handler"
+				_, err = client.NodeV1().RuntimeClasses().Update(ctx, class, metav1.UpdateOptions{})
+				require.NoError(t, err)
+				manager := runtimeclass.NewManager(client)
+				defer rctest.StartManagerSync(manager)()
+				runtimeService, images, m, err := createTestRuntimeManager(ctx)
+				require.NoError(t, err)
+				m.runtimeClassManager = manager
+				imageService := &restoreImageStatusRecorder{ImageManagerService: images}
+				m.imageService = imageService
+				helper := m.runtimeHelper.(*containertest.FakeRuntimeHelper)
+				// Only the selected handler supports user namespaces, so each
+				// configuration path must receive it.
+				helper.RuntimeHandlers = map[string]kubecontainer.RuntimeHandler{
+					"new-handler":                {SupportsUserNamespaces: true},
+					rctest.SandboxRuntimeHandler: {},
+				}
+				pod := newTestPod()
+				pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+				pod.Spec.RuntimeClassName = new(rctest.SandboxRuntimeClass)
+				pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+				if userNamespace {
+					pod.Spec.HostUsers = new(false)
+				}
+				pod.Spec.Volumes = []v1.Volume{{Name: "image-data", VolumeSource: v1.VolumeSource{
+					Image: &v1.ImageVolumeSource{Reference: "volume-image:latest", PullPolicy: v1.PullAlways},
+				}}}
+				pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "image-data", MountPath: "/data"}}
+
+				_, _, err = m.restorePodSandbox(ctx, pod, 0, nil)
+				require.NoError(t, err)
+				require.Len(t, runtimeService.RestoredPods, 1)
+				restored := runtimeService.RestoredPods[0]
+				assert.Equal(t, "new-handler", restored.RuntimeHandler)
+				for _, config := range restored.ContainerConfigs {
+					assert.Equal(t, "new-handler", helper.ContainerHandlers[pod.UID][config.Metadata.Name], "run options must use the selected handler")
+				}
+				if userNamespace {
+					require.NotNil(t, restored.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions())
+					for _, config := range restored.ContainerConfigs {
+						require.NotNil(t, config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions())
+					}
+				}
+				expectedImageHandler := ""
+				if imageHandlerEnabled {
+					expectedImageHandler = "new-handler"
+				}
+				imageVolume := helper.ContainerImageVolumes[pod.UID][pod.Spec.Containers[0].Name]["image-data"]
+				require.NotNil(t, imageVolume)
+				assert.Equal(t, expectedImageHandler, imageVolume.RuntimeHandler)
+				images.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: "busybox:latest", RuntimeHandler: expectedImageHandler}, nil, "restore base image must use the selected handler")
+				images.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: "volume-image:latest", RuntimeHandler: expectedImageHandler}, nil, "image volume must use the selected handler")
+				require.NotEmpty(t, imageService.imageStatusSpecs)
+				for _, spec := range imageService.imageStatusSpecs {
+					assert.Equal(t, expectedImageHandler, spec.RuntimeHandler, "image lookup must use the selected handler")
+				}
+			})
+		}
+	}
 }

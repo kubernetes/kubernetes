@@ -2217,15 +2217,27 @@ func (m *kubeGenericRuntimeManager) toKubeContainerImageVolumes(ctx context.Cont
 }
 
 func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, pullSecrets []v1.Secret) (imageVolumePulls, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
+		return nil, nil
+	}
+	runtimeHandler, err := m.getPodRuntimeHandler(pod)
+	if err != nil {
+		klog.FromContext(ctx).Error(err, "Failed to get pod runtime handler", "pod", klog.KObj(pod))
+		return nil, err
+	}
+	return m.getImageVolumesWithRuntimeHandler(ctx, pod, podSandboxConfig, pullSecrets, runtimeHandler)
+}
+
+func (m *kubeGenericRuntimeManager) getImageVolumesWithRuntimeHandler(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, pullSecrets []v1.Secret, runtimeHandler string) (imageVolumePulls, error) {
 	logger := klog.FromContext(ctx)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 		return nil, nil
 	}
-
-	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
-	if err != nil {
-		logger.Error(err, "Failed to get pod runtime handler", "pod", klog.KObj(pod))
-		return nil, err
+	// Image-volume specs go directly into the container config, so apply the
+	// same gate used by image-service request conversion.
+	podRuntimeHandler := ""
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI) {
+		podRuntimeHandler = runtimeHandler
 	}
 
 	res := make(imageVolumePulls)
