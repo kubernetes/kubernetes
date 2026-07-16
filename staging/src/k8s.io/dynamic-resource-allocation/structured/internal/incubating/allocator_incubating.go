@@ -1527,6 +1527,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for _, counterSet := range pool.CounterSets {
 			availableCountersForCounterSet := make(map[string]resourceapi.Counter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
+				c.Value = c.Value.DeepCopy()
 				availableCountersForCounterSet[name] = c
 			}
 			availableCountersForPool[counterSet.Name] = availableCountersForCounterSet
@@ -1594,6 +1595,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounters, found := consumedCountersForCounterSet[name]
 			if !found {
+				c.Value = c.Value.DeepCopy()
 				consumedCountersForCounterSet[name] = c
 				continue
 			}
