@@ -234,6 +234,9 @@ func (e *aggregatedStorageError) Error() string {
 		fmt.Fprintf(&b, "\t%s\n", err.Error())
 	}
 	b.WriteString("}")
+	if e.abortErr != nil {
+		fmt.Fprintf(&b, ", aborted: %v", e.abortErr)
+	}
 	return b.String()
 }
 
