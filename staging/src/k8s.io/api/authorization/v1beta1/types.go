@@ -42,7 +42,7 @@ type SubjectAccessReview struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated
-	// +optional
+	// +required
 	Spec SubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the request is allowed or not
@@ -71,7 +71,7 @@ type SelfSubjectAccessReview struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated.  user and groups must be empty
-	// +optional
+	// +required
 	Spec SelfSubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the request is allowed or not
@@ -100,7 +100,7 @@ type LocalSubjectAccessReview struct {
 
 	// spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace
 	// you made the request against.  If empty, it is defaulted.
-	// +optional
+	// +required
 	Spec SubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the request is allowed or not
