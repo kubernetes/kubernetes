@@ -98,6 +98,8 @@ func TestPrepareForCreateConfigurableToleranceEnabled(t *testing.T) {
 }
 
 func TestPrepareForCreateConfigurableToleranceDisabled(t *testing.T) {
+	// Set emulated version to 1.36 so that disabling the feature gate is allowed.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
 	hpa := prepareHPA(oneMinReplicas, withTolerance)
 
@@ -119,6 +121,8 @@ func TestPrepareForUpdateConfigurableToleranceEnabled(t *testing.T) {
 }
 
 func TestPrepareForUpdateConfigurableToleranceDisabled(t *testing.T) {
+	// Set emulated version to 1.36 so that disabling the feature gate is allowed.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
 	newHPA := prepareHPA(oneMinReplicas, withTolerance)
 	oldHPA := prepareHPA(oneMinReplicas, withoutTolerance)
