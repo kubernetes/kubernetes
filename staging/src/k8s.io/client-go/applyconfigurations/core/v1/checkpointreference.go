@@ -21,10 +21,20 @@ package v1
 // CheckpointReferenceApplyConfiguration represents a declarative configuration of the CheckpointReference type for use
 // with apply.
 //
-// CheckpointReference identifies a PodCheckpoint to restore a Pod from.
+// CheckpointReference identifies a PodCheckpoint and specifies options for
+// restoring a Pod from it.
 type CheckpointReferenceApplyConfiguration struct {
 	// Name is the name of a PodCheckpoint in the Pod's namespace.
 	Name *string `json:"name,omitempty"`
+	// Options contains opaque runtime-specific options for this restore attempt.
+	// The kubelet passes these entries unchanged to RestorePodRequest.options. Keys
+	// and values must be documented by the runtime selected for this Pod.
+	// Unsupported entries cause the restore to fail. Options must not contain secrets.
+	//
+	// Restore options are independent of the options used to create the
+	// checkpoint and are not stored in the PodCheckpoint. Requirements intrinsic
+	// to the checkpoint are recorded in runtime-owned checkpoint data instead.
+	Options map[string]string `json:"options,omitempty"`
 }
 
 // CheckpointReferenceApplyConfiguration constructs a declarative configuration of the CheckpointReference type for use with
@@ -38,5 +48,19 @@ func CheckpointReference() *CheckpointReferenceApplyConfiguration {
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *CheckpointReferenceApplyConfiguration) WithName(value string) *CheckpointReferenceApplyConfiguration {
 	b.Name = &value
+	return b
+}
+
+// WithOptions puts the entries into the Options field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the Options field,
+// overwriting an existing map entries in Options field with the same key.
+func (b *CheckpointReferenceApplyConfiguration) WithOptions(entries map[string]string) *CheckpointReferenceApplyConfiguration {
+	if b.Options == nil && len(entries) > 0 {
+		b.Options = make(map[string]string, len(entries))
+	}
+	for k, v := range entries {
+		b.Options[k] = v
+	}
 	return b
 }

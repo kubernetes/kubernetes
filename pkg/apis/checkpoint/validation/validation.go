@@ -78,6 +78,9 @@ func ValidatePodCheckpointUpdate(newPC, oldPC *checkpoint.PodCheckpoint) field.E
 	// sourcePod is immutable; the referenced instance (name and pinned UID)
 	// cannot be swapped after the PodCheckpoint is admitted.
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newPC.Spec.SourcePod, oldPC.Spec.SourcePod, field.NewPath("spec", "sourcePod"))...)
+	// Options are invocation input. Changing them after the asynchronous
+	// operation has started would make retries observe different requests.
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newPC.Spec.CheckpointOptions, oldPC.Spec.CheckpointOptions, field.NewPath("spec", "checkpointOptions"))...)
 
 	allErrs = append(allErrs, validatePodCheckpointSpec(&newPC.Spec, field.NewPath("spec"))...)
 

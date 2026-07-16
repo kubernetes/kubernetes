@@ -4602,8 +4602,8 @@ type PodValidationOptions struct {
 	AllowEmptyImageVolumeReference bool
 	// Allow containers to have CAP_SYS_ADMIN even if AllowPrivilegeEscalation is false
 	AllowSysAdminWhenPrivilegeEscalationFalse bool
-	// Allow spec.restoreFrom to be set (gated by the PodLevelCheckpointRestore
-	// feature gate, with ratcheting for objects that already set it).
+	// Allow the spec.restoreFrom invocation to be set (gated by
+	// PodLevelCheckpointRestore, with ratcheting for objects that already use it).
 	AllowRestoreFrom bool
 }
 

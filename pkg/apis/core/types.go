@@ -4199,11 +4199,24 @@ type PodSpec struct {
 	RestoreFrom *CheckpointReference
 }
 
-// CheckpointReference identifies a PodCheckpoint to restore a Pod from.
+// CheckpointReference identifies a PodCheckpoint and specifies options for
+// restoring a Pod from it.
 type CheckpointReference struct {
 	// Name is the name of a PodCheckpoint in the Pod's namespace.
 	// +required
 	Name string
+
+	// Options contains opaque runtime-specific options for this restore attempt.
+	// The kubelet passes these entries unchanged to RestorePodRequest.options. Keys
+	// and values must be documented by the runtime selected for this Pod.
+	// Unsupported entries cause the restore to fail. Options must not contain secrets.
+	//
+	// Restore options are independent of the options used to create the checkpoint
+	// and are not stored in the PodCheckpoint. Requirements intrinsic to the
+	// checkpoint are recorded in runtime-owned checkpoint data instead.
+	// +optional
+	// +mapType=atomic
+	Options map[string]string
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.

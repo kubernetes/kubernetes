@@ -160,6 +160,13 @@ func (in *PodCheckpointSpec) DeepCopyInto(out *PodCheckpointSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.CheckpointOptions != nil {
+		in, out := &in.CheckpointOptions, &out.CheckpointOptions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

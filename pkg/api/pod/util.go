@@ -449,9 +449,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
 	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
 
-	// spec.restoreFrom is gated by PodLevelCheckpointRestore; allow it if the
-	// gate is enabled or the existing object already set it (ratcheting).
-	opts.AllowRestoreFrom = utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) || restoreFromInUse(oldPodSpec)
+	// The restore invocation is gated by PodLevelCheckpointRestore; allow it if
+	// the gate is enabled or the existing object already uses it (ratcheting).
+	opts.AllowRestoreFrom = utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) || restoreInUse(oldPodSpec)
 
 	if oldPodSpec != nil {
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
@@ -785,8 +785,8 @@ func dropDisabledFields(
 		dropContainerRestartRules(podSpec)
 	}
 
-	// If the feature is disabled and not in use, drop spec.restoreFrom.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) && !restoreFromInUse(oldPodSpec) {
+	// If the feature is disabled and not in use, drop the restore invocation.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) && !restoreInUse(oldPodSpec) {
 		podSpec.RestoreFrom = nil
 	}
 
@@ -1492,10 +1492,10 @@ func inPlacePodVerticalScalingInUse(podSpec *api.PodSpec) bool {
 	return inUse
 }
 
-// restoreFromInUse returns true if the pod spec has a restore invocation. Preserve
+// restoreInUse returns true if the pod spec has a restore invocation. Preserve
 // even an incomplete reference during feature-gate rollback so validation can
 // report it instead of silently dropping it.
-func restoreFromInUse(podSpec *api.PodSpec) bool {
+func restoreInUse(podSpec *api.PodSpec) bool {
 	return podSpec != nil && podSpec.RestoreFrom != nil
 }
 

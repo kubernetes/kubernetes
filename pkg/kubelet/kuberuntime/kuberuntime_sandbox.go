@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"path/filepath"
 	"runtime"
@@ -207,6 +208,7 @@ func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *
 		CheckpointPath:   checkpointPath,
 		Config:           podSandboxConfig,
 		RuntimeHandler:   runtimeHandler,
+		Options:          maps.Clone(pod.Spec.RestoreFrom.Options),
 		ContainerConfigs: containerConfigs,
 	}
 

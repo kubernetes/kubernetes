@@ -40,8 +40,11 @@ func sourcePod() *v1.Pod {
 		Spec: v1.PodSpec{
 			NodeName:     "node-1",
 			NodeSelector: map[string]string{"disktype": "ssd"},
-			RestoreFrom:  &v1.CheckpointReference{Name: "ckpt"},
-			Containers:   []v1.Container{{Name: "main", Image: "my-app:latest"}},
+			RestoreFrom: &v1.CheckpointReference{
+				Name:    "ckpt",
+				Options: map[string]string{"example.runtime/target": "new-node"},
+			},
+			Containers: []v1.Container{{Name: "main", Image: "my-app:latest"}},
 		},
 		Status: v1.PodStatus{Phase: v1.PodRunning},
 	}
@@ -72,7 +75,7 @@ func TestSanitizePodTemplate_StripsNodeLocalAndIdentityFields(t *testing.T) {
 		t.Errorf("ManagedFields not cleared: %+v", tmpl.ManagedFields)
 	}
 
-	// Node-local scheduling state and restoreFrom must be cleared.
+	// Node-local scheduling state and the restore invocation must be cleared.
 	if tmpl.Spec.NodeName != "" {
 		t.Errorf("spec.NodeName not cleared: %q", tmpl.Spec.NodeName)
 	}
@@ -155,8 +158,13 @@ func TestSanitizePodTemplate_DoesNotMutateSource(t *testing.T) {
 	}
 	if pod.Spec.RestoreFrom == nil {
 		t.Errorf("source pod spec.RestoreFrom was mutated (cleared)")
-	} else if pod.Spec.RestoreFrom.Name != "ckpt" {
-		t.Errorf("source pod spec.RestoreFrom.Name was mutated: %q", pod.Spec.RestoreFrom.Name)
+	} else {
+		if pod.Spec.RestoreFrom.Name != "ckpt" {
+			t.Errorf("source pod spec.RestoreFrom.Name was mutated: %q", pod.Spec.RestoreFrom.Name)
+		}
+		if pod.Spec.RestoreFrom.Options["example.runtime/target"] != "new-node" {
+			t.Errorf("source pod spec.RestoreFrom.Options was mutated: %v", pod.Spec.RestoreFrom.Options)
+		}
 	}
 	if pod.UID != types.UID("abc-123") {
 		t.Errorf("source pod UID was mutated: %q", pod.UID)

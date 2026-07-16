@@ -48,7 +48,10 @@
       "name": "nameValue",
       "uid": "uidValue"
     },
-    "timeoutSeconds": 2
+    "timeoutSeconds": 2,
+    "checkpointOptions": {
+      "checkpointOptionsKey": "checkpointOptionsValue"
+    }
   },
   "status": {
     "nodeName": "nodeNameValue",
@@ -1881,7 +1884,10 @@
           "podGroupName": "podGroupNameValue"
         },
         "restoreFrom": {
-          "name": "nameValue"
+          "name": "nameValue",
+          "options": {
+            "optionsKey": "optionsValue"
+          }
         }
       }
     },

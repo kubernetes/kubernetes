@@ -1147,8 +1147,8 @@ func (kl *Kubelet) GetPodCheckpointPath(ctx context.Context, pod *v1.Pod) (strin
 	// Anti-tamper check: the restoring pod's spec must match the spec captured at
 	// checkpoint time, so a pod cannot be pointed at a foreign checkpoint to
 	// recreate its memory into a different container layout. Compare the
-	// sanitized specs (node-local and restoreFrom fields are normalized out on
-	// both sides). Fail closed if the checkpoint has no captured template: an
+	// sanitized specs (node-local fields and the restore invocation are
+	// normalized out on both sides). Fail closed if the checkpoint has no captured template: an
 	// absent template means the equality check cannot be performed, so the
 	// restore must be rejected rather than allowed unchecked.
 	if pc.Status.CheckpointedPodTemplate == nil {

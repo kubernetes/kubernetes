@@ -133,6 +133,15 @@ func SetRestoreFrom(checkpoint string) Tweak {
 	}
 }
 
+func SetRestoreOptions(options map[string]string) Tweak {
+	return func(pod *api.Pod) {
+		if pod.Spec.RestoreFrom == nil {
+			pod.Spec.RestoreFrom = &api.CheckpointReference{}
+		}
+		pod.Spec.RestoreFrom.Options = options
+	}
+}
+
 func SetServiceAccountName(name string) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.ServiceAccountName = name

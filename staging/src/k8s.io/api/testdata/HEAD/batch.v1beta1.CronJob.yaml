@@ -1014,6 +1014,8 @@ spec:
           restartPolicy: restartPolicyValue
           restoreFrom:
             name: nameValue
+            options:
+              optionsKey: optionsValue
           runtimeClassName: runtimeClassNameValue
           schedulerName: schedulerNameValue
           schedulingGates:

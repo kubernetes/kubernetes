@@ -57,8 +57,9 @@ func SanitizePodTemplate(pod *v1.Pod) *v1.PodTemplateSpec {
 	// Drop node-local scheduling state; the restore is pinned to the
 	// checkpoint's node via status.nodeName, not via the recorded template.
 	tmpl.Spec.NodeName = ""
-	// Drop restoreFrom: the source pod has none, while a restoring pod has a
-	// checkpoint reference; clearing it keeps capture and compare symmetric.
+	// Drop the restore invocation. The source pod has none, while a restoring pod
+	// supplies a checkpoint reference with options specific to that restore
+	// attempt. It does not describe the checkpointed workload.
 	tmpl.Spec.RestoreFrom = nil
 	// Drop scheduling constraints that pin to a specific node by identity
 	// (kubernetes.io/hostname or metadata.name). These reference the source
