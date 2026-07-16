@@ -53,14 +53,14 @@ import (
 var defaultPageSize = int64(os.Getpagesize())
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
-func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx context.Context, config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
+func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx context.Context, config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID, runtimeHandler string) error {
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
 		isCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
-	cl, err := m.generateLinuxContainerConfig(ctx, container, pod, uid, username, nsTarget, enforceMemoryQoS)
+	cl, err := m.generateLinuxContainerConfig(ctx, container, pod, uid, username, nsTarget, enforceMemoryQoS, runtimeHandler)
 	if err != nil {
 		return err
 	}
@@ -78,8 +78,8 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx con
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID, enforceMemoryQoS bool) (*runtimeapi.LinuxContainerConfig, error) {
-	sc, err := m.determineEffectiveSecurityContext(ctx, pod, container, uid, username)
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID, enforceMemoryQoS bool, runtimeHandler string) (*runtimeapi.LinuxContainerConfig, error) {
+	sc, err := m.determineEffectiveSecurityContext(ctx, pod, container, uid, username, runtimeHandler)
 	if err != nil {
 		return nil, err
 	}

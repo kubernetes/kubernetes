@@ -265,7 +265,13 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	containerConfig, cleanupAction, msg, err := m.createContainerConfig(ctx, pod, container, spec.containerType, restartCount, podIP, imageRef, podIPs, target, imageVolumes)
+	runtimeHandler, err := m.lookupRuntimeHandler(pod)
+	if err != nil {
+		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
+		return err.Error(), ErrCreateContainerConfig
+	}
+
+	containerConfig, cleanupAction, msg, err := m.createContainerConfig(ctx, pod, container, spec.containerType, restartCount, podIP, imageRef, podIPs, target, imageVolumes, runtimeHandler)
 	if cleanupAction != nil {
 		defer cleanupAction()
 	}
@@ -335,9 +341,9 @@ func (m *kubeGenericRuntimeManager) createContainerLogSymlink(ctx context.Contex
 // On failure, it records an event and returns the message and the sync error
 // for the failed step. The caller runs the returned cleanup action, which may
 // be set even on failure.
-func (m *kubeGenericRuntimeManager) createContainerConfig(ctx context.Context, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID, imageVolumes kubecontainer.ImageVolumes) (*runtimeapi.ContainerConfig, func(), string, error) {
+func (m *kubeGenericRuntimeManager) createContainerConfig(ctx context.Context, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID, imageVolumes kubecontainer.ImageVolumes, runtimeHandler string) (*runtimeapi.ContainerConfig, func(), string, error) {
 	logger := klog.FromContext(ctx)
-	containerConfig, cleanupAction, err := m.generateContainerConfig(ctx, container, pod, restartCount, podIP, imageRef, podIPs, nsTarget, imageVolumes)
+	containerConfig, cleanupAction, err := m.generateContainerConfigWithRuntimeHandler(ctx, container, pod, restartCount, podIP, imageRef, podIPs, nsTarget, imageVolumes, runtimeHandler)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
@@ -398,14 +404,29 @@ func countContainerStart(pod *v1.Pod, container *v1.Container, metricLabel strin
 	}
 }
 
+func (m *kubeGenericRuntimeManager) lookupRuntimeHandler(pod *v1.Pod) (string, error) {
+	if m.runtimeClassManager == nil {
+		return "", nil
+	}
+	return m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+}
+
 // generateContainerConfig generates container config for kubelet runtime v1.
 func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID, imageVolumes kubecontainer.ImageVolumes) (*runtimeapi.ContainerConfig, func(), error) {
-	opts, cleanupAction, err := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, podIPs, imageVolumes)
+	runtimeHandler, err := m.lookupRuntimeHandler(pod)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m.generateContainerConfigWithRuntimeHandler(ctx, container, pod, restartCount, podIP, imageRef, podIPs, nsTarget, imageVolumes, runtimeHandler)
+}
+
+func (m *kubeGenericRuntimeManager) generateContainerConfigWithRuntimeHandler(ctx context.Context, container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID, imageVolumes kubecontainer.ImageVolumes, runtimeHandler string) (*runtimeapi.ContainerConfig, func(), error) {
+	opts, cleanupAction, err := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, podIPs, imageVolumes, runtimeHandler)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	uid, username, err := m.getImageUser(ctx, container.Image)
+	uid, username, err := m.getImageUser(ctx, container.Image, runtimeHandler)
 	if err != nil {
 		return nil, cleanupAction, err
 	}
@@ -448,7 +469,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		config.StopSignal = *stopsignal
 	}
 	// set platform specific configurations.
-	if err := m.applyPlatformSpecificContainerConfig(ctx, config, container, pod, uid, username, nsTarget); err != nil {
+	if err := m.applyPlatformSpecificContainerConfig(ctx, config, container, pod, uid, username, nsTarget, runtimeHandler); err != nil {
 		return nil, cleanupAction, err
 	}
 
