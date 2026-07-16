@@ -1554,6 +1554,27 @@ func TestIsSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 			expect:  fwk.Queue,
 		},
 		{
+			name: "pod has the pvc that is being deleted",
+			pod: makePod("pod-a").
+				withPVCVolume("pvc-a", "").
+				withPVCVolume("pvc-b", "").
+				Pod,
+			oldPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
+			newPVC:  nil,
+			wantErr: false,
+			expect:  fwk.Queue,
+		},
+		{
+			name: "pod does not have the pvc that is being deleted",
+			pod: makePod("pod-a").
+				withPVCVolume("pvc-a", "").
+				Pod,
+			oldPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
+			newPVC:  nil,
+			wantErr: false,
+			expect:  fwk.QueueSkip,
+		},
+		{
 			name:    "type conversion error",
 			oldPVC:  new(struct{}),
 			newPVC:  new(struct{}),

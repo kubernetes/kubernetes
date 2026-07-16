@@ -112,7 +112,7 @@ func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]fwk.ClusterEvent
 		{Event: fwk.ClusterEvent{Resource: fwk.StorageClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterStorageClassChange},
 
 		// We bind PVCs with PVs, so any changes may make the pods schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolume, ActionType: fwk.Add | fwk.Update}},
 
 		// Pods may fail to find available PVs because the node labels do not
@@ -158,19 +158,27 @@ func (pl *VolumeBinding) isSchedulableAfterCSINodeChange(logger klog.Logger, pod
 }
 
 func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, newPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
+	oldPVC, newPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
+	}
+
+	pvc := newPVC
+	if pvc == nil {
+		pvc = oldPVC
+	}
+	if pvc == nil {
+		return fwk.Queue, fmt.Errorf("both old and new PVC are nil")
 	}
 
 	logger = klog.LoggerWithValues(
 		logger,
 		"Pod", klog.KObj(pod),
-		"PersistentVolumeClaim", klog.KObj(newPVC),
+		"PersistentVolumeClaim", klog.KObj(pvc),
 	)
 
-	if pod.Namespace != newPVC.Namespace {
-		logger.V(5).Info("PersistentVolumeClaim was created or updated, but it doesn't make this pod schedulable because the PVC belongs to a different namespace")
+	if pod.Namespace != pvc.Namespace {
+		logger.V(5).Info("PersistentVolumeClaim was created, updated or deleted, but it doesn't make this pod schedulable because the PVC belongs to a different namespace")
 		return fwk.QueueSkip, nil
 	}
 
@@ -185,15 +193,15 @@ func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeClaimChange(logger kl
 			continue
 		}
 
-		if pvcName == newPVC.Name {
+		if pvcName == pvc.Name {
 			// Return Queue because, in this case,
-			// all PVC creations and almost all PVC updates could make the Pod schedulable.
-			logger.V(5).Info("PersistentVolumeClaim the pod requires was created or updated, potentially making the target Pod schedulable")
+			// all PVC creations, deletions, and almost all PVC updates could make the Pod schedulable.
+			logger.V(5).Info("PersistentVolumeClaim the pod requires was created, updated or deleted, potentially making the target Pod schedulable")
 			return fwk.Queue, nil
 		}
 	}
 
-	logger.V(5).Info("PersistentVolumeClaim was created or updated, but it doesn't make this pod schedulable")
+	logger.V(5).Info("PersistentVolumeClaim was created, updated or deleted, but it doesn't make this pod schedulable")
 	return fwk.QueueSkip, nil
 }
 
