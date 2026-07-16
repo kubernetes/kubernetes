@@ -911,7 +911,12 @@ func TestPodMemoryIdenticalConversion(t *testing.T) {
 // CheckpointReference types remain memory-identical.
 func TestCheckpointReferenceMemoryIdenticalConversion(t *testing.T) {
 	t.Run("v1 to internal", func(t *testing.T) {
-		in := &v1.CheckpointReference{Name: "checkpoint"}
+		in := &v1.CheckpointReference{
+			Name: "checkpoint",
+			Options: map[string]string{
+				"key": "value",
+			},
+		}
 		out := &core.CheckpointReference{}
 		if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
 			t.Fatalf("conversion failed: %v", err)
@@ -919,7 +924,12 @@ func TestCheckpointReferenceMemoryIdenticalConversion(t *testing.T) {
 		assertMemoryIdentical(t, "CheckpointReference", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
 	})
 	t.Run("internal to v1", func(t *testing.T) {
-		in := &core.CheckpointReference{Name: "checkpoint"}
+		in := &core.CheckpointReference{
+			Name: "checkpoint",
+			Options: map[string]string{
+				"key": "value",
+			},
+		}
 		out := &v1.CheckpointReference{}
 		if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
 			t.Fatalf("conversion failed: %v", err)

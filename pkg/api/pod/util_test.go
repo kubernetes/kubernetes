@@ -4916,6 +4916,14 @@ func TestGetValidationOptionsRestoreFrom(t *testing.T) {
 			gateEnabled: false,
 			want:        true,
 		},
+		{
+			name: "gate disabled, old restoreFrom has options without a name (ratcheting)",
+			oldPodSpec: &api.PodSpec{RestoreFrom: &api.CheckpointReference{
+				Options: map[string]string{"example.runtime/target": "node-local"},
+			}},
+			gateEnabled: false,
+			want:        true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -4923,6 +4931,50 @@ func TestGetValidationOptionsRestoreFrom(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, tc.gateEnabled)
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
 			assert.Equal(t, tc.want, gotOptions.AllowRestoreFrom, "AllowRestoreFrom")
+		})
+	}
+}
+
+func TestDropDisabledRestoreFields(t *testing.T) {
+	tests := []struct {
+		name        string
+		gateEnabled bool
+		oldSpec     *api.PodSpec
+		wantDropped bool
+	}{
+		{name: "gate disabled drops new invocation", wantDropped: true},
+		{name: "gate enabled preserves new invocation", gateEnabled: true},
+		{
+			name: "gate disabled preserves invocation already in use",
+			oldSpec: &api.PodSpec{RestoreFrom: &api.CheckpointReference{
+				Name:    "checkpoint",
+				Options: map[string]string{"example.runtime/target": "old"},
+			}},
+		},
+		{
+			name:    "gate disabled preserves incomplete invocation already in use",
+			oldSpec: &api.PodSpec{RestoreFrom: &api.CheckpointReference{}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, tc.gateEnabled)
+			got := &api.PodSpec{
+				RestoreFrom: &api.CheckpointReference{
+					Name:    "checkpoint",
+					Options: map[string]string{"example.runtime/target": "new"},
+				},
+			}
+			dropDisabledFields(got, nil, tc.oldSpec, nil)
+			if tc.wantDropped {
+				assert.Nil(t, got.RestoreFrom)
+				return
+			}
+			if assert.NotNil(t, got.RestoreFrom) {
+				assert.Equal(t, "checkpoint", got.RestoreFrom.Name)
+				assert.Equal(t, map[string]string{"example.runtime/target": "new"}, got.RestoreFrom.Options)
+			}
 		})
 	}
 }
