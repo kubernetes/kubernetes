@@ -34,6 +34,10 @@ func TestFakeRuntimeHelperCapturesByPod(t *testing.T) {
 	for _, mode := range []string{"sequential", "concurrent"} {
 		t.Run(mode, func(t *testing.T) {
 			helper := &FakeRuntimeHelper{}
+			wantHandlers := map[types.UID]map[string]string{
+				"first":  {"app": "first-handler"},
+				"second": {"app": "second-handler"},
+			}
 			wantVolumes := map[types.UID]map[string]kubecontainer.ImageVolumes{
 				"first":  {"app": {"data": &runtimeapi.ImageSpec{Image: "first-image"}}},
 				"second": {"app": {"data": &runtimeapi.ImageSpec{Image: "second-image"}}},
@@ -45,11 +49,11 @@ func TestFakeRuntimeHelperCapturesByPod(t *testing.T) {
 
 			var workers sync.WaitGroup
 			start := make(chan struct{})
-			for uid := range wantVolumes {
+			for uid, handlers := range wantHandlers {
 				capture := func() {
 					pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: uid}}
 					container := &v1.Container{Name: "app"}
-					_, _, err := helper.GenerateRunContainerOptions(context.Background(), pod, container, "", nil, wantVolumes[uid][container.Name])
+					_, _, err := helper.GenerateRunContainerOptions(context.Background(), pod, container, "", nil, wantVolumes[uid][container.Name], handlers[container.Name])
 					assert.NoError(t, err)
 					assert.NoError(t, helper.UpdatePodRestoreHosts(context.Background(), pod, wantIPs[uid]))
 				}
@@ -65,6 +69,7 @@ func TestFakeRuntimeHelperCapturesByPod(t *testing.T) {
 			close(start)
 			workers.Wait()
 
+			assert.Equal(t, wantHandlers, helper.ContainerHandlers)
 			assert.Equal(t, wantVolumes, helper.ContainerImageVolumes)
 			assert.Equal(t, wantIPs, helper.PodRestoreIPs)
 		})
