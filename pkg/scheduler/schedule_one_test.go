@@ -59,6 +59,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
@@ -1312,6 +1313,97 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+type schedulingQueueWithRequeueHook struct {
+	internalqueue.SchedulingQueue
+	requeueHook func()
+}
+
+func (q *schedulingQueueWithRequeueHook) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
+	if err := q.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, pInfo, podSchedulingCycle); err != nil {
+		return err
+	}
+	q.requeueHook()
+	return nil
+}
+
+func TestHandleSchedulingFailureDoesNotOverwriteSuccessfulRetry(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pod := st.MakePod().Name("foo").Namespace("ns").SchedulerName(testSchedulerName).Obj()
+	client := clientsetfake.NewClientset(pod)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		testSchedulerName,
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(1)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+	baseQueue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
+	queue := &schedulingQueueWithRequeueHook{
+		SchedulingQueue: baseQueue,
+		requeueHook: func() {
+			// Simulate a retry that succeeds as soon as the Pod becomes visible in the queue.
+			pod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal("Get pod in retry:", err)
+			}
+			pod.Status.Conditions = []v1.PodCondition{{
+				Type:   v1.PodScheduled,
+				Status: v1.ConditionTrue,
+			}}
+			if _, err := client.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
+				t.Fatal("Update pod status in retry:", err)
+			}
+		},
+	}
+	sched := &Scheduler{
+		client:          client,
+		SchedulingQueue: queue,
+	}
+
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
+
+	queue.Add(ctx, pod)
+	popped, err := queue.Pop(logger)
+	if err != nil {
+		t.Fatal("Pop:", err)
+	}
+
+	sched.handleSchedulingFailure(
+		ctx,
+		schedFramework,
+		popped.(*framework.QueuedPodInfo),
+		fwk.NewStatus(fwk.Error, "binding failed"),
+		&fwk.NominatingInfo{NominatingMode: fwk.ModeNoop},
+		time.Now(),
+	)
+
+	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal("Get pod", err)
+	}
+	_, scheduledCondition := podutil.GetPodCondition(&updatedPod.Status, v1.PodScheduled)
+	if scheduledCondition == nil {
+		t.Fatal(v1.PodScheduled, "condition is missing after successful retry")
+	}
+	if scheduledCondition.Status != v1.ConditionTrue {
+		t.Fatalf("%s condition from successful retry was overwritten: got %q, want %q", v1.PodScheduled, scheduledCondition.Status, v1.ConditionTrue)
 	}
 }
 

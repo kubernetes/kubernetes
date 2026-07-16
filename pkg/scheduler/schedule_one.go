@@ -1261,10 +1261,15 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			pod = podInfo.Pod
 			nominatedPodInfo = podInfo.PodInfo
-			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
-			}
-			calledDone = true
+			// Only add the pod back to the queue after updating its status.
+			// Otherwise, updates from retries that succeed race with the failure
+			// status update from this cycle.
+			defer func() {
+				if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+					utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
+				}
+				calledDone = true
+			}()
 		}
 	}
 
