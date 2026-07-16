@@ -39,7 +39,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ipprfeature "k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -1807,34 +1806,20 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 		containerReqs, containerLims v1.ResourceList
 	}
 
-	isFeatureGateEnabled := func(fg string) bool {
-		var enabled bool
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					enabled = false
-				}
-			}()
-			enabled = utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(fg))
-		}()
-		return enabled
-	}
-
 	tests := []struct {
-		name               string
-		featureGate        string
-		disableFeatureGate bool
-		initial            resources
-		secondContainer    bool
-		expected           resources
-		expectedFn         func() resources
-		expectError        bool
-		expectedQOS        v1.PodQOSClass
-		expectedQOSFn      func() v1.PodQOSClass
+		name             string
+		featureOverrides featuregatetesting.FeatureOverrides
+		initial          resources
+		secondContainer  bool
+		tweakPod         func(pod *v1.Pod)
+		expected         resources
+		expectError      bool
+		expectedQOS      v1.PodQOSClass
 	}{
 		{
-			initial:  resources{nil, nil, nil, nil},
-			expected: resources{nil, nil, nil, nil},
+			initial:     resources{nil, nil, nil, nil},
+			expected:    resources{nil, nil, nil, nil},
+			expectedQOS: v1.PodQOSBestEffort,
 		}, {
 			initial:  resources{nil, nil, nil, cLim},
 			expected: resources{nil, nil, cLim, cLim},
@@ -1860,28 +1845,8 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			initial:  resources{pReq, nil, nil, nil},
 			expected: resources{pReq, nil, nil, nil},
 		}, {
-			// TODO: Once https://github.com/kubernetes/kubernetes/pull/140514 is merged,
-			// expected pod limits here would be aggregated container limits.
-			initial: resources{pReq, nil, nil, cLim},
-			expectedFn: func() resources {
-				if isFeatureGateEnabled("PodLevelResourcesFixUpdateDefaulting") {
-					return resources{pReq, pReq, cLim, cLim}
-				}
-				return resources{pReq, nil, cLim, cLim}
-			},
-		}, {
 			initial:  resources{pReq, nil, cReq, nil},
 			expected: resources{pReq, nil, cReq, nil},
-		}, {
-			// TODO: Once https://github.com/kubernetes/kubernetes/pull/140514 is merged,
-			// expected pod limits here would be aggregated container limits.
-			initial: resources{pReq, nil, cReq, cLim},
-			expectedFn: func() resources {
-				if isFeatureGateEnabled("PodLevelResourcesFixUpdateDefaulting") {
-					return resources{pReq, pReq, cReq, cLim}
-				}
-				return resources{pReq, nil, cReq, cLim}
-			},
 		}, {
 			initial:  resources{pReq, pLim, nil, nil},
 			expected: resources{pReq, pLim, nil, nil},
@@ -1900,6 +1865,7 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			secondContainer: true,
 			initial:         resources{nil, nil, nil, nil},
 			expected:        resources{nil, nil, nil, nil},
+			expectedQOS:     v1.PodQOSBestEffort,
 		}, {
 			secondContainer: true,
 			initial:         resources{nil, nil, nil, cLim},
@@ -1934,30 +1900,8 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			expected:        resources{pReq, nil, nil, nil},
 		}, {
 			secondContainer: true,
-			// TODO: Once https://github.com/kubernetes/kubernetes/pull/140514 is merged,
-			// this will no longer expect an error and will instead expect: resources{pReq, aggLim, cLim, cLim}.
-			initial: resources{aggLim, nil, nil, cLim},
-			expectedFn: func() resources {
-				if isFeatureGateEnabled("PodLevelResourcesFixUpdateDefaulting") {
-					return resources{aggLim, aggLim, cLim, cLim}
-				}
-				return resources{aggLim, nil, cLim, cLim}
-			},
-		}, {
-			secondContainer: true,
 			initial:         resources{pReq, nil, cReq, nil},
 			expected:        resources{pReq, nil, cReq, nil},
-		}, {
-			secondContainer: true,
-			// TODO: Once https://github.com/kubernetes/kubernetes/pull/140514 is merged,
-			// expected pod limits here would be aggregated container limits.
-			initial: resources{pReq, nil, cReq, cLim},
-			expectedFn: func() resources {
-				if isFeatureGateEnabled("PodLevelResourcesFixUpdateDefaulting") {
-					return resources{pReq, aggLim, cReq, cLim}
-				}
-				return resources{pReq, nil, cReq, cLim}
-			},
 		}, {
 			secondContainer: true,
 			initial:         resources{pReq, pLim, nil, nil},
@@ -2007,48 +1951,6 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			expected:        resources{aggReq, cLim, cReq, cLim}, // aggReq == cLim
 		},
 		{
-			name: "CPU + memory at container level, only CPU at pod level",
-			// TODO: Once https://github.com/kubernetes/kubernetes/pull/140514 is merged,
-			// this will change to Guaranteed QoS as pod-level requests will equal limits (memory limits will be defaulted to aggregate container limits).
-			initial: resources{
-				podReqs: cpu("2"),
-				podLims: cpu("2"),
-				containerReqs: v1.ResourceList{
-					v1.ResourceCPU:    resource.MustParse("1"),
-					v1.ResourceMemory: resource.MustParse("100Mi"),
-				},
-				containerLims: v1.ResourceList{
-					v1.ResourceCPU:    resource.MustParse("2"),
-					v1.ResourceMemory: resource.MustParse("200Mi"),
-				},
-			},
-			expectedFn: func() resources {
-				expPodLims := cpu("2")
-				if isFeatureGateEnabled("PodLevelResourcesFixUpdateDefaulting") {
-					expPodLims = v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("2"),
-						v1.ResourceMemory: resource.MustParse("200Mi"),
-					}
-				}
-				return resources{
-					podReqs: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("2"),
-						v1.ResourceMemory: resource.MustParse("100Mi"),
-					},
-					podLims: expPodLims,
-					containerReqs: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("1"),
-						v1.ResourceMemory: resource.MustParse("100Mi"),
-					},
-					containerLims: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("2"),
-						v1.ResourceMemory: resource.MustParse("200Mi"),
-					},
-				}
-			},
-			expectedQOS: v1.PodQOSBurstable,
-		},
-		{
 			name: "Ephemeral storage at pod level, cpu + mem at container level",
 			initial: resources{
 				podReqs: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
@@ -2065,103 +1967,86 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "Combining propagation: pod requests cpu, container requests memory",
+			name: "Ephemeral storage at container level, cpu + mem at pod level",
 			initial: resources{
-				podReqs:       cpu("1"),
-				containerReqs: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+				podReqs: pReq,
+				podLims: pLim,
+				containerReqs: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
 			},
-			expectedFn: func() resources {
-				if isFeatureGateEnabled("PodLevelResourcesFixUpdateDefaulting") {
-					return resources{
-						podReqs: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("1"),
-							v1.ResourceMemory: resource.MustParse("100Mi"),
-						},
-						containerReqs: v1.ResourceList{
-							v1.ResourceMemory: resource.MustParse("100Mi"),
-						},
-					}
-				}
-				return resources{
-					podReqs: cpu("1"),
-					containerReqs: v1.ResourceList{
-						v1.ResourceMemory: resource.MustParse("100Mi"),
-					},
-				}
+			expected: resources{
+				podReqs: pReq,
+				podLims: pLim,
+				containerReqs: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
 			},
+			expectedQOS: v1.PodQOSBurstable,
 		},
 		{
-			name: "Empty map pod resources (Requests: {}, Limits: {})",
+			name:             "Empty map pod resources (Requests: {}, Limits: {}) - fix disabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: false},
 			initial: resources{
 				podReqs:       v1.ResourceList{},
 				podLims:       v1.ResourceList{},
 				containerReqs: cReq,
 				containerLims: cLim,
 			},
-			expected: resources{v1.ResourceList{}, v1.ResourceList{}, cReq, cLim},
-			expectedQOSFn: func() v1.PodQOSClass {
-				if isFeatureGateEnabled("PodLevelResourcesFixKubeletQOSClass") {
-					return v1.PodQOSBurstable
-				}
-				return v1.PodQOSBestEffort
-			},
+			expected:    resources{v1.ResourceList{}, v1.ResourceList{}, cReq, cLim},
+			expectedQOS: v1.PodQOSBestEffort,
 		},
 		{
-			name: "Empty requests map (Requests: {}, Limits: pLim)",
+			name:             "Empty map pod resources (Requests: {}, Limits: {}) - fix enabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: true},
 			initial: resources{
 				podReqs:       v1.ResourceList{},
-				podLims:       pLim,
-				containerReqs: cReq,
-				containerLims: cLim,
-			},
-			expected: resources{cReq, pLim, cReq, cLim},
-		},
-		{
-			name: "Empty limits map (Requests: pReq, Limits: {})",
-			initial: resources{
-				podReqs:       pReq,
 				podLims:       v1.ResourceList{},
 				containerReqs: cReq,
 				containerLims: cLim,
 			},
-			expectedFn: func() resources {
-				if isFeatureGateEnabled("PodLevelResourcesFixUpdateDefaulting") {
-					return resources{pReq, pReq, cReq, cLim}
-				}
-				return resources{pReq, v1.ResourceList{}, cReq, cLim}
-			},
+			expected:    resources{v1.ResourceList{}, v1.ResourceList{}, cReq, cLim},
+			expectedQOS: v1.PodQOSBurstable,
 		},
 		{
-			name: "Empty requests map with container limits (Requests: {}, Limits: nil)",
-			initial: resources{
-				podReqs:       v1.ResourceList{},
-				podLims:       nil,
-				containerReqs: cReq,
-				containerLims: cLim,
-			},
-			expected: resources{v1.ResourceList{}, nil, cReq, cLim},
-			expectedQOSFn: func() v1.PodQOSClass {
-				if isFeatureGateEnabled("PodLevelResourcesFixKubeletQOSClass") {
-					return v1.PodQOSBurstable
-				}
-				return v1.PodQOSBestEffort
-			},
+			name:        "Empty requests map (Requests: {}, Limits: pLim)",
+			initial:     resources{v1.ResourceList{}, pLim, cReq, cLim},
+			expected:    resources{cReq, pLim, cReq, cLim},
+			expectedQOS: v1.PodQOSBurstable,
 		},
 		{
-			name: "Empty limits map with container requests (Requests: nil, Limits: {})",
-			initial: resources{
-				podReqs:       nil,
-				podLims:       v1.ResourceList{},
-				containerReqs: cReq,
-				containerLims: cLim,
-			},
-			expected: resources{nil, v1.ResourceList{}, cReq, cLim},
-			expectedQOSFn: func() v1.PodQOSClass {
-				if isFeatureGateEnabled("PodLevelResourcesFixKubeletQOSClass") {
-					return v1.PodQOSBurstable
-				}
-				return v1.PodQOSBestEffort
-			},
+			name:             "Empty requests map with container limits (Requests: {}, Limits: nil) - fix disabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: false},
+			initial:          resources{v1.ResourceList{}, nil, cReq, cLim},
+			expected:         resources{v1.ResourceList{}, nil, cReq, cLim},
+			expectedQOS:      v1.PodQOSBestEffort,
+		},
+		{
+			name:             "Empty requests map with container limits (Requests: {}, Limits: nil) - fix enabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: true},
+			initial:          resources{v1.ResourceList{}, nil, cReq, cLim},
+			expected:         resources{v1.ResourceList{}, nil, cReq, cLim},
+			expectedQOS:      v1.PodQOSBurstable,
+		},
+		{
+			name:             "Empty limits map with container requests (Requests: nil, Limits: {}) - fix disabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: false},
+			initial:          resources{nil, v1.ResourceList{}, cReq, cLim},
+			expected:         resources{nil, v1.ResourceList{}, cReq, cLim},
+			expectedQOS:      v1.PodQOSBestEffort,
+		},
+		{
+			name:             "Empty limits map with container requests (Requests: nil, Limits: {}) - fix enabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: true},
+			initial:          resources{nil, v1.ResourceList{}, cReq, cLim},
+			expected:         resources{nil, v1.ResourceList{}, cReq, cLim},
+			expectedQOS:      v1.PodQOSBurstable,
 		},
 		{
 			name: "Zero variant: pod requests cpu 0, container requests cpu 1",
@@ -2218,35 +2103,6 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			expectedQOS: v1.PodQOSBurstable,
 		},
 		{
-			name: "Zero variant: pod requests cpu 0, container requests cpu 0, container limits cpu 1",
-			initial: resources{
-				podReqs:       cpu("0"),
-				containerReqs: cpu("0"),
-				containerLims: cpu("1"),
-			},
-			expectedFn: func() resources {
-				if isFeatureGateEnabled("PodLevelResourcesFixUpdateDefaulting") {
-					return resources{
-						podReqs:       cpu("0"),
-						podLims:       cpu("1"),
-						containerReqs: cpu("0"),
-						containerLims: cpu("1"),
-					}
-				}
-				return resources{
-					podReqs:       cpu("0"),
-					containerReqs: cpu("0"),
-					containerLims: cpu("1"),
-				}
-			},
-			expectedQOSFn: func() v1.PodQOSClass {
-				if isFeatureGateEnabled("PodLevelResourcesFixUpdateDefaulting") {
-					return v1.PodQOSBurstable
-				}
-				return v1.PodQOSBestEffort
-			},
-		},
-		{
 			name: "Zero variant: pod limits cpu 0, container limits cpu 0",
 			initial: resources{
 				podLims:       cpu("0"),
@@ -2274,7 +2130,8 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 
 		// 1. PR #137150: Empty pod resources QoS determination (BestEffort vs Guaranteed)
 		{
-			name: "Empty pod resources QoS determination",
+			name:             "Empty pod resources QoS determination (fix disabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: false},
 			initial: resources{
 				podReqs: v1.ResourceList{},
 				podLims: v1.ResourceList{},
@@ -2299,82 +2156,36 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 					v1.ResourceMemory: resource.MustParse("50Mi"),
 				},
 			},
-			expectedQOSFn: func() v1.PodQOSClass {
-				if isFeatureGateEnabled("PodLevelResourcesFixKubeletQOSClass") {
-					return v1.PodQOSGuaranteed
-				}
-				return v1.PodQOSBestEffort
+			expectedQOS: v1.PodQOSBestEffort,
+		},
+		{
+			name:             "Empty pod resources QoS determination (fix enabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: true},
+			initial: resources{
+				podReqs: v1.ResourceList{},
+				podLims: v1.ResourceList{},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
 			},
-		},
-
-		// 2. PR #140514: Pod limits defaulted from container aggregate limits
-		{
-			name:               "PodLevelResourcesFixUpdateDefaulting disabled: pod limits not defaulted from container limits",
-			featureGate:        "PodLevelResourcesFixUpdateDefaulting",
-			disableFeatureGate: true,
-			secondContainer:    true,
-			initial:            resources{aggLim, nil, nil, cLim},
-			expected:           resources{aggLim, nil, cLim, cLim},
-		},
-		{
-			name:               "PodLevelResourcesFixUpdateDefaulting enabled: pod limits defaulted from container limits",
-			featureGate:        "PodLevelResourcesFixUpdateDefaulting",
-			disableFeatureGate: false,
-			secondContainer:    true,
-			initial:            resources{aggLim, nil, nil, cLim},
-			expected:           resources{aggLim, aggLim, cLim, cLim},
-		},
-
-		// 3. PR #140514: Pod requests defaulted from containers when pod limits empty
-		{
-			name:               "PodLevelResourcesFixUpdateDefaulting disabled: pod requests not defaulted from containers when pod limits empty",
-			featureGate:        "PodLevelResourcesFixUpdateDefaulting",
-			disableFeatureGate: true,
-			initial:            resources{nil, nil, cReq, nil},
-			expected:           resources{nil, nil, cReq, nil},
-		},
-		{
-			name:               "PodLevelResourcesFixUpdateDefaulting enabled: pod requests defaulted from containers when pod limits empty",
-			featureGate:        "PodLevelResourcesFixUpdateDefaulting",
-			disableFeatureGate: false,
-			initial:            resources{nil, nil, cReq, nil},
-			expected:           resources{nil, nil, cReq, nil},
-		},
-
-		// 4. PR #140514: Pod limits raised to pod request when aggregate container limit < pod request
-		{
-			name:               "PodLevelResourcesFixUpdateDefaulting disabled: pod limit not defaulted when aggregate limit less than pod request",
-			featureGate:        "PodLevelResourcesFixUpdateDefaulting",
-			disableFeatureGate: true,
-			secondContainer:    true,
-			initial:            resources{pReq, nil, cReq, cReq},
-			expected:           resources{pReq, nil, cReq, cReq},
-		},
-		{
-			name:               "PodLevelResourcesFixUpdateDefaulting enabled: pod limit raised to pod request when aggregate limit less than pod request",
-			featureGate:        "PodLevelResourcesFixUpdateDefaulting",
-			disableFeatureGate: false,
-			secondContainer:    true,
-			initial:            resources{pReq, nil, cReq, cReq},
-			expected:           resources{pReq, pReq, cReq, cReq},
-		},
-
-		// 5. PR #140514: Pod requests and limits defaulted from 2 containers when pod limits empty
-		{
-			name:               "PodLevelResourcesFixUpdateDefaulting disabled: pod requests and limits not defaulted from 2 containers when pod limits empty",
-			featureGate:        "PodLevelResourcesFixUpdateDefaulting",
-			disableFeatureGate: true,
-			secondContainer:    true,
-			initial:            resources{nil, nil, cReq, cLim},
-			expected:           resources{nil, nil, cReq, cLim},
-		},
-		{
-			name:               "PodLevelResourcesFixUpdateDefaulting enabled: pod requests and limits defaulted from 2 containers when pod limits empty",
-			featureGate:        "PodLevelResourcesFixUpdateDefaulting",
-			disableFeatureGate: false,
-			secondContainer:    true,
-			initial:            resources{nil, nil, cReq, cLim},
-			expected:           resources{nil, nil, cReq, cLim},
+			expected: resources{
+				podReqs: v1.ResourceList{},
+				podLims: v1.ResourceList{},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSGuaranteed,
 		},
 	}
 
@@ -2389,20 +2200,8 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			}
 		}
 		t.Run(testName, func(t *testing.T) {
-			if test.featureGate != "" {
-				fg := featuregate.Feature(test.featureGate)
-				var setErr error
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							setErr = fmt.Errorf("%v", r)
-						}
-					}()
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, !test.disableFeatureGate)
-				}()
-				if setErr != nil {
-					t.Skipf("Feature gate %s is not registered in this build: %v", test.featureGate, setErr)
-				}
+			if len(test.featureOverrides) > 0 {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, test.featureOverrides)
 			}
 
 			var podResources *v1.ResourceRequirements
@@ -2440,7 +2239,11 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 				pod.Spec.Containers = append(pod.Spec.Containers, *c2)
 			}
 
-			result, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+			if test.tweakPod != nil {
+				test.tweakPod(pod)
+			}
+
+			result, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 			if !test.expectError && err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			} else if test.expectError {
@@ -2453,21 +2256,16 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 				}
 			}
 
-			expQOS := test.expectedQOS
-			if test.expectedQOSFn != nil {
-				expQOS = test.expectedQOSFn()
+			expQOS := v1.PodQOSBurstable
+			if test.expectedQOS != "" {
+				expQOS = test.expectedQOS
 			}
-			if expQOS != "" {
-				if result.Status.QOSClass != expQOS {
-					t.Errorf("Expected QoS class %s; got: %s", expQOS, result.Status.QOSClass)
-				}
+
+			if result.Status.QOSClass != expQOS {
+				t.Errorf("Expected QoS class %s; got: %s", expQOS, result.Status.QOSClass)
 			}
 
 			exp := test.expected
-			if test.expectedFn != nil {
-				exp = test.expectedFn()
-			}
-
 			if exp.podReqs != nil || exp.podLims != nil {
 				expectedPodResources := &v1.ResourceRequirements{
 					Requests: exp.podReqs,
@@ -2480,190 +2278,20 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 				t.Errorf("Expected empty pod resources, but got: %s", result.Spec.Resources.String())
 			}
 
-			expectedContainerResources := v1.ResourceRequirements{
-				Requests: exp.containerReqs,
-				Limits:   exp.containerLims,
-			}
-			if !apiequality.Semantic.DeepEqual(result.Spec.Containers[0].Resources, expectedContainerResources) {
-				t.Errorf("Expected container resources %s; got: %s", expectedContainerResources.String(), result.Spec.Containers[0].Resources.String())
-			}
-			if test.secondContainer {
-				if !apiequality.Semantic.DeepEqual(result.Spec.Containers[1].Resources, expectedContainerResources) {
-					t.Errorf("Expected second container resources %s; got: %s", expectedContainerResources.String(), result.Spec.Containers[1].Resources.String())
+			if len(exp.containerReqs) > 0 || len(exp.containerLims) > 0 {
+				expectedContainerResources := v1.ResourceRequirements{
+					Requests: exp.containerReqs,
+					Limits:   exp.containerLims,
+				}
+				if !apiequality.Semantic.DeepEqual(result.Spec.Containers[0].Resources, expectedContainerResources) {
+					t.Errorf("Expected container resources %s; got: %s", expectedContainerResources.String(), result.Spec.Containers[0].Resources.String())
+				}
+				if test.secondContainer && len(result.Spec.Containers) > 1 {
+					if !apiequality.Semantic.DeepEqual(result.Spec.Containers[1].Resources, expectedContainerResources) {
+						t.Errorf("Expected second container resources %s; got: %s", expectedContainerResources.String(), result.Spec.Containers[1].Resources.String())
+					}
 				}
 			}
 		})
 	}
-
-	t.Run("2 containers: 1 container with limit set, pod request set", func(t *testing.T) {
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test",
-			},
-			Spec: v1.PodSpec{
-				Resources: &v1.ResourceRequirements{
-					Requests: pReq,
-				},
-				Containers: []v1.Container{
-					{
-						Name:  "c1",
-						Image: "fakeimage",
-						Resources: v1.ResourceRequirements{
-							Limits: cLim,
-						},
-					},
-					{
-						Name:  "c2",
-						Image: "fakeimage",
-					},
-				},
-			},
-		}
-
-		result, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-
-		expectedPodResources := &v1.ResourceRequirements{
-			Requests: pReq,
-		}
-		if !apiequality.Semantic.DeepEqual(result.Spec.Resources, expectedPodResources) {
-			t.Errorf("Expected pod resources %s; got: %s", expectedPodResources.String(), result.Spec.Resources.String())
-		}
-
-		expectedC1 := v1.ResourceRequirements{
-			Requests: cLim,
-			Limits:   cLim,
-		}
-		if !apiequality.Semantic.DeepEqual(result.Spec.Containers[0].Resources, expectedC1) {
-			t.Errorf("Expected container 1 resources %s; got: %s", expectedC1.String(), result.Spec.Containers[0].Resources.String())
-		}
-
-		expectedC2 := v1.ResourceRequirements{}
-		if !apiequality.Semantic.DeepEqual(result.Spec.Containers[1].Resources, expectedC2) {
-			t.Errorf("Expected container 2 resources %s; got: %s", expectedC2.String(), result.Spec.Containers[1].Resources.String())
-		}
-	})
-
-	// ---------------------------------------------------------------------
-	// Subtests for PR #140514 (PodLevelResourcesFixUpdateDefaulting)
-	// ---------------------------------------------------------------------
-	t.Run("PodLevelResourcesFixUpdateDefaulting: pod limits defaulted from container aggregate limits", func(t *testing.T) {
-		fg := featuregate.Feature("PodLevelResourcesFixUpdateDefaulting")
-		var setErr error
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					setErr = fmt.Errorf("%v", r)
-				}
-			}()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, true)
-		}()
-		if setErr != nil {
-			t.Skipf("Feature gate %s is not registered in this build: %v", fg, setErr)
-		}
-
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-plr-fix-1-"},
-			Spec: v1.PodSpec{
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("256Mi")}},
-				Containers: []v1.Container{
-					{Name: "c1", Image: "fakeimage", Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("128Mi")}}},
-					{Name: "c2", Image: "fakeimage", Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("128Mi")}}},
-				},
-			},
-		}
-
-		result, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-
-		expectedPod := &v1.ResourceRequirements{
-			Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("256Mi")},
-			Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("256Mi")},
-		}
-		if !apiequality.Semantic.DeepEqual(result.Spec.Resources, expectedPod) {
-			t.Errorf("Expected pod resources %s; got: %s", expectedPod.String(), result.Spec.Resources.String())
-		}
-	})
-
-	t.Run("PodLevelResourcesFixUpdateDefaulting: pod requests defaulted from containers when pod limits empty", func(t *testing.T) {
-		fg := featuregate.Feature("PodLevelResourcesFixUpdateDefaulting")
-		var setErr error
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					setErr = fmt.Errorf("%v", r)
-				}
-			}()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, true)
-		}()
-		if setErr != nil {
-			t.Skipf("Feature gate %s is not registered in this build: %v", fg, setErr)
-		}
-
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-plr-fix-2-"},
-			Spec: v1.PodSpec{
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("128Mi")}},
-				Containers: []v1.Container{
-					{Name: "c1", Image: "fakeimage", Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("128Mi")}}},
-				},
-			},
-		}
-
-		result, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-
-		expectedPod := &v1.ResourceRequirements{
-			Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("128Mi")},
-			Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("128Mi")},
-		}
-		if !apiequality.Semantic.DeepEqual(result.Spec.Resources, expectedPod) {
-			t.Errorf("Expected pod resources %s; got: %s", expectedPod.String(), result.Spec.Resources.String())
-		}
-	})
-
-	t.Run("PodLevelResourcesFixUpdateDefaulting: limit raised to pod request when aggr limit less than request", func(t *testing.T) {
-		fg := featuregate.Feature("PodLevelResourcesFixUpdateDefaulting")
-		var setErr error
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					setErr = fmt.Errorf("%v", r)
-				}
-			}()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, true)
-		}()
-		if setErr != nil {
-			t.Skipf("Feature gate %s is not registered in this build: %v", fg, setErr)
-		}
-
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-plr-fix-3-"},
-			Spec: v1.PodSpec{
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("512Mi")}},
-				Containers: []v1.Container{
-					{Name: "c1", Image: "fakeimage", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("128Mi")}, Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("128Mi")}}},
-				},
-			},
-		}
-
-		result, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-
-		expectedPod := &v1.ResourceRequirements{
-			Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("512Mi")},
-			Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("512Mi")},
-		}
-		if !apiequality.Semantic.DeepEqual(result.Spec.Resources, expectedPod) {
-			t.Errorf("Expected pod resources %s; got: %s", expectedPod.String(), result.Spec.Resources.String())
-		}
-	})
 }
