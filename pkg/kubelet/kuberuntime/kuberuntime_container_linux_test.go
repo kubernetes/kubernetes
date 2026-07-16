@@ -56,13 +56,13 @@ func makeExpectedConfig(_ *testing.T, tCtx context.Context, m *kubeGenericRuntim
 	container := &pod.Spec.Containers[containerIndex]
 	podIP := ""
 	restartCount := 0
-	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(tCtx, pod, container, podIP, []string{podIP}, nil)
+	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(tCtx, pod, container, podIP, []string{podIP}, nil, "")
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	stopsignal := getContainerConfigStopSignal(container)
 	restartCountUint32 := uint32(restartCount)
 	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
 
-	l, _ := m.generateLinuxContainerConfig(tCtx, container, pod, new(int64), "", nil, enforceMemoryQoS)
+	l, _ := m.generateLinuxContainerConfig(tCtx, container, pod, new(int64), "", nil, enforceMemoryQoS, "")
 
 	expectedConfig := &runtimeapi.ContainerConfig{
 		Metadata: &runtimeapi.ContainerMetadata{
@@ -374,7 +374,7 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 				}
 			}
 
-			linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, false)
+			linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, false, "")
 			require.NoError(t, err)
 
 			assert.Equal(t, test.expected.CpuPeriod, linuxConfig.GetResources().CpuPeriod, test.name)
@@ -943,7 +943,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	for _, test := range tests {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.draNodeAllocatable)
 		m.memoryReservationPolicy = test.policy
-		linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
+		linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true, "")
 		assert.NoError(t, err)
 
 		unified := linuxConfig.GetResources().GetUnified()
@@ -999,7 +999,7 @@ func TestGenerateContainerConfigMemoryHighNotSetWhenThrottlingFactorNil(t *testi
 		},
 	}
 
-	linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, true)
+	linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, true, "")
 	require.NoError(t, err)
 	unified := linuxConfig.GetResources().GetUnified()
 	assert.Equal(t, strconv.FormatInt(128*1024*1024, 10), unified["memory.low"],
@@ -1035,7 +1035,7 @@ func TestGenerateContainerConfigDefaultNilThrottlingFactor(t *testing.T) {
 		},
 	}
 
-	linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, true)
+	linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, true, "")
 	require.NoError(t, err)
 	unified := linuxConfig.GetResources().GetUnified()
 	assert.Equal(t, "0", unified["memory.min"],
@@ -1077,7 +1077,7 @@ func TestGenerateContainerConfigMemoryQoSPolicyNone(t *testing.T) {
 		},
 	}
 
-	linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, true)
+	linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, true, "")
 	require.NoError(t, err)
 	assert.Equal(t, "0", linuxConfig.GetResources().GetUnified()["memory.min"])
 	assert.NotEmpty(t, linuxConfig.GetResources().GetUnified()["memory.high"])
@@ -1541,7 +1541,7 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupNamespacesSupport, !tc.cgroupnsDisabled)
-			got, err := m.generateLinuxContainerConfig(tCtx, &tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target, false)
+			got, err := m.generateLinuxContainerConfig(tCtx, &tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target, false, "")
 			assert.NoError(t, err)
 			if !proto.Equal(tc.want, got.SecurityContext.NamespaceOptions) {
 				t.Errorf("%v: want %q, got %q", t.Name(), tc.want, got.SecurityContext.NamespaceOptions)
@@ -1624,7 +1624,7 @@ func TestGenerateLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 	},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := m.generateLinuxContainerConfig(tCtx, &tc.pod.Spec.Containers[0], tc.pod, nil, "", nil, false)
+			actual, err := m.generateLinuxContainerConfig(tCtx, &tc.pod.Spec.Containers[0], tc.pod, nil, "", nil, false, "")
 			if !tc.expectErr {
 				assert.Emptyf(t, err, "Unexpected error")
 				assert.EqualValuesf(t, tc.expected, actual.SecurityContext.SupplementalGroupsPolicy, "SupplementalGroupPolicy for %s", tc.name)

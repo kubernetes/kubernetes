@@ -336,7 +336,7 @@ func TestDetermineEffectiveSecurityContextCgroupOptions(t *testing.T) {
 				CgroupNsdelegate: !tc.noNsdelegate,
 			})
 
-			result, err := m.determineEffectiveSecurityContext(tCtx, pod, &pod.Spec.Containers[0], nil, "")
+			result, err := m.determineEffectiveSecurityContext(tCtx, pod, &pod.Spec.Containers[0], nil, "", "")
 			if tc.expectedErr != "" {
 				require.ErrorContains(t, err, tc.expectedErr)
 				return
