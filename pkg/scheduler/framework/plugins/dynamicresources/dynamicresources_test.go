@@ -4106,7 +4106,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		doneCheckers = append(doneCheckers, deviceClassHandlerRegistration.HasSyncedChecker())
 	}
 
-	tc.podGroupManager = internalcache.New(tCtx, nil, true)
+	tc.podGroupManager = internalcache.New(tCtx, nil, true, false)
 	for _, obj := range objs {
 		if pod, ok := obj.(*v1.Pod); ok {
 			tc.podGroupManager.AddPodGroupMember(pod)

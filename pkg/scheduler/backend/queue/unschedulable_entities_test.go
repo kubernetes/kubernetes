@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -248,9 +249,11 @@ func TestUnschedulablePodGroups_Unified(t *testing.T) {
 			Namespace: "ns1",
 			Name:      "pg1",
 		},
-		QueuedPodInfos: []*framework.QueuedPodInfo{
-			{
-				PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()},
+		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
+			fwk.PodGroupKey("ns1", "pg1"): {
+				{
+					PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()},
+				},
 			},
 		},
 	}

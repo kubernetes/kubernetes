@@ -1072,3 +1072,160 @@ func TestPreemptionPolicyValuesAreUnchanged(t *testing.T) {
 		t.Errorf("Expected PreemptionPolicy constant %q not found in api/core/v1. Was it removed? If so, clean up the switch in admitPodGroup and update this test.", name)
 	}
 }
+
+func TestAdmitCompositePodGroup(t *testing.T) {
+	cpg := func(priorityClassName string) *scheduling.CompositePodGroup {
+		return &scheduling.CompositePodGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-compositepodgroup",
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: scheduling.CompositePodGroupSpec{
+				SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+					Basic: &scheduling.CompositeBasicSchedulingPolicy{},
+				},
+				PriorityClassName: priorityClassName,
+			},
+		}
+	}
+
+	cpgWithPriority := func(priorityClassName string, priority int32) *scheduling.CompositePodGroup {
+		cpg := cpg(priorityClassName)
+		cpg.Spec.Priority = new(priority)
+		return cpg
+	}
+
+	attributes := func(cpg *scheduling.CompositePodGroup, operation admission.Operation) admission.Attributes {
+		var oldCpg runtime.Object
+		var options runtime.Object = &metav1.CreateOptions{}
+		if operation == admission.Update {
+			oldCpg = cpg.DeepCopy()
+			options = &metav1.UpdateOptions{}
+		}
+		return admission.NewAttributesRecord(
+			cpg,
+			oldCpg,
+			scheduling.Kind("CompositePodGroup").WithVersion("v1alpha3"),
+			cpg.ObjectMeta.Namespace,
+			"",
+			scheduling.Resource("compositepodgroups").WithVersion("v1alpha3"),
+			"",
+			operation,
+			options,
+			false,
+			nil,
+		)
+	}
+
+	testCases := []struct {
+		name                    string
+		priorityClasses         []*scheduling.PriorityClass
+		prepareCpg              *scheduling.CompositePodGroup
+		operation               admission.Operation
+		expectedPriorityClass   string
+		expectedPriority        int32
+		enableCompositePodGroup bool
+		expectError             bool
+	}{
+		{
+			name:                    "composite pod group with empty priorityClassName, accepted and set to global default",
+			priorityClasses:         []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareCpg:              cpg("" /* empty priorityClassName */),
+			operation:               admission.Create,
+			expectedPriorityClass:   "default1",
+			expectedPriority:        defaultClass1.Value,
+			enableCompositePodGroup: true,
+		},
+		{
+			name:                    "composite pod group with explicit priorityClassName, accepted",
+			priorityClasses:         []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareCpg:              cpg("nondefault1"),
+			operation:               admission.Create,
+			expectedPriorityClass:   "nondefault1",
+			expectedPriority:        nondefaultClass1.Value,
+			enableCompositePodGroup: true,
+		},
+		{
+			name:                    "composite pod group with non-existent priorityClassName, rejected",
+			priorityClasses:         []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareCpg:              cpg("non-existent"),
+			operation:               admission.Create,
+			enableCompositePodGroup: true,
+			expectError:             true,
+		},
+		{
+			name:            "composite pod group with any priorityClassName but feature gate disabled, skips validation",
+			priorityClasses: []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareCpg:      cpg("non-existent"),
+			operation:       admission.Create,
+		},
+		{
+			name:                    "composite pod group with no priorityClassName and no global default, accepted and priority should be zero",
+			priorityClasses:         []*scheduling.PriorityClass{nondefaultClass1},
+			prepareCpg:              cpg("" /* empty priorityClassName */),
+			operation:               admission.Create,
+			expectedPriorityClass:   "",
+			expectedPriority:        0,
+			enableCompositePodGroup: true,
+		},
+		{
+			name:                    "composite pod group create with pre-set Priority matching computed value, accepted",
+			priorityClasses:         []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareCpg:              cpgWithPriority("nondefault1", nondefaultClass1.Value),
+			operation:               admission.Create,
+			expectedPriorityClass:   "nondefault1",
+			expectedPriority:        nondefaultClass1.Value,
+			enableCompositePodGroup: true,
+		},
+		{
+			name:                    "composite pod group create with pre-set Priority not matching computed value, rejected",
+			priorityClasses:         []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareCpg:              cpgWithPriority("nondefault1", int32(9999)),
+			operation:               admission.Create,
+			enableCompositePodGroup: true,
+			expectError:             true,
+		},
+		{
+			name:                    "update operation is a no-op, admission does not mutate composite pod group on update",
+			priorityClasses:         []*scheduling.PriorityClass{defaultClass1, nondefaultClass1},
+			prepareCpg:              cpg("non-existent"),
+			operation:               admission.Update,
+			enableCompositePodGroup: true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 tt.enableCompositePodGroup,
+				features.TopologyAwareWorkloadScheduling: tt.enableCompositePodGroup,
+				features.CompositePodGroup:               tt.enableCompositePodGroup,
+			})
+
+			admissionPlugin := NewPlugin()
+			if err := addPriorityClasses(admissionPlugin, tt.priorityClasses); err != nil {
+				t.Fatalf("unable to configure priority classes: %v", err)
+			}
+
+			_, ctx := ktesting.NewTestContext(t)
+			cpgCopy := tt.prepareCpg.DeepCopy()
+			err := admissionPlugin.Admit(ctx, attributes(tt.prepareCpg, tt.operation), nil)
+			if (err != nil) != tt.expectError {
+				t.Errorf("CompositePodGroup Admit(), error = %v, want = %v", err, tt.expectError)
+			}
+			if !tt.expectError && tt.operation == admission.Create && tt.enableCompositePodGroup && tt.prepareCpg.Spec.WorkloadRef == nil {
+				if tt.prepareCpg.Spec.PriorityClassName != tt.expectedPriorityClass {
+					t.Errorf("CompositePodGroup Admit(), priorityClassName = %v, want = %v", tt.prepareCpg.Spec.PriorityClassName, tt.expectedPriorityClass)
+				}
+				if *tt.prepareCpg.Spec.Priority != tt.expectedPriority {
+					t.Errorf("CompositePodGroup Admit(), Priority = %v, want = %v", *tt.prepareCpg.Spec.Priority, tt.expectedPriority)
+				}
+			}
+			if tt.operation != admission.Create {
+				if diff := cmp.Diff(tt.prepareCpg, cpgCopy); len(diff) > 0 {
+					t.Errorf("CompositePodGroup Admit() should not modify the CompositePodGroup (-want +got):\n%s", diff)
+				}
+			}
+		})
+	}
+}

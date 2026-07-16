@@ -18,6 +18,7 @@ package framework
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -172,6 +173,7 @@ const (
 	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
 	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
+	CompositePodGroup     EventResource = "scheduling.k8s.io/CompositePodGroup"
 
 	// WildCard is a special EventResource to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
@@ -303,8 +305,8 @@ type NodeInfo interface {
 // QueuedEntityInfo is an interface that represents a schedulable entity in the scheduling queue.
 // It can be a single Pod (QueuedPodInfo) or a group of Pods (QueuedPodGroupInfo).
 type QueuedEntityInfo interface {
-	// Type returns the type of the entity, e.g., "pod" or "podgroup".
-	Type() string
+	// Type returns the type of the entity.
+	Type() EntityKeyType
 	// GetPriority returns the priority of the entity.
 	GetPriority() int32
 	// GetTimestamp returns the time entity added to the scheduling queue.
@@ -642,6 +644,15 @@ func (h HostPortInfo) sanitize(ip, protocol *string) {
 	}
 }
 
+// EntityKeyType is the type of an entity.
+type EntityKeyType string
+
+const (
+	PodKeyType               EntityKeyType = "pod"
+	PodGroupKeyType          EntityKeyType = "podgroup"
+	CompositePodGroupKeyType EntityKeyType = "compositepodgroup"
+)
+
 // PodGroupInfo is a wrapper around the PodGroup API object together with a list of unscheduled pods that belong to the pod group.
 // Typically used as an input to pod group scheduling cycle plugins.
 type PodGroupInfo interface {
@@ -654,8 +665,15 @@ type PodGroupInfo interface {
 	GetName() string
 	// GetNamespace returns the namespace the pod group belongs to.
 	GetNamespace() string
-	// GetPodGroup returns the PodGroup API object.
+	// GetType returns the type of the pod group.
+	GetType() EntityKeyType
+	// GetKey returns the key uniquely identifying the pod group.
+	GetKey() string
+	// GetPodGroup returns the PodGroup API object or nil if the group is a composite pod group.
 	GetPodGroup() *schedulingv1alpha3.PodGroup
+	// GetCompositePodGroup returns the associated composite pod group or nil if the group is not a composite pod group.
+	// It should only be used when the CompositePodGroup feature gate is enabled.
+	GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup
 }
 
 // Placement determines the resources to be considered when scheduling a pod group.
@@ -708,4 +726,52 @@ func (s *NodeAllocatableDRAClaimState) Snapshot() *NodeAllocatableDRAClaimState 
 	return &NodeAllocatableDRAClaimState{
 		ConsumerPods: s.ConsumerPods.Clone(),
 	}
+}
+
+// EntityKey uniquely identifies a specific instance of an entity (like PodGroup or CompositePodGroup).
+type EntityKey struct {
+	Type      EntityKeyType
+	Name      string
+	Namespace string
+}
+
+func (ek EntityKey) GetName() string {
+	return ek.Name
+}
+
+func (ek EntityKey) GetNamespace() string {
+	return ek.Namespace
+}
+
+func (ek EntityKey) GetType() EntityKeyType {
+	return ek.Type
+}
+
+func (ek EntityKey) String() string {
+	return fmt.Sprintf("%s/%s/%s", ek.Type, ek.Namespace, ek.Name)
+}
+
+// MustParseEntityKey returns the entity key for a given key.
+// It should be only used in tests.
+func MustParseEntityKey(key string) EntityKey {
+	parts := strings.Split(key, "/")
+	if len(parts) != 3 {
+		return EntityKey{}
+	}
+	return EntityKey{Type: EntityKeyType(parts[0]), Namespace: parts[1], Name: parts[2]}
+}
+
+// PodKey returns the key for a pod.
+func PodKey(namespace, name string) EntityKey {
+	return EntityKey{Type: PodKeyType, Namespace: namespace, Name: name}
+}
+
+// PodGroupKey returns the key for a pod group.
+func PodGroupKey(namespace, name string) EntityKey {
+	return EntityKey{Type: PodGroupKeyType, Namespace: namespace, Name: name}
+}
+
+// CompositePodGroupKey returns the key for a composite pod group.
+func CompositePodGroupKey(namespace, name string) EntityKey {
+	return EntityKey{Type: CompositePodGroupKeyType, Namespace: namespace, Name: name}
 }

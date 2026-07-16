@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -204,35 +205,35 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 
 	// Desired order: pod3 > pod5 > (pod1 = pod4) > pod2.
 	pInfo1 := &QueuedPodInfo{
-		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod1").UID("uid1").Priority(midPriority).Obj()},
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod1").UID("uid1").Priority(midPriority).PodGroupName("pg1").Obj()},
 		QueueingParams: QueueingParams{
 			Attempts:  1,
 			Timestamp: timestamp,
 		},
 	}
 	pInfo2 := &QueuedPodInfo{
-		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod2").UID("uid2").Priority(midPriority).Obj()},
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod2").UID("uid2").Priority(midPriority).PodGroupName("pg1").Obj()},
 		QueueingParams: QueueingParams{
 			Attempts:  1,
 			Timestamp: timestampNewer,
 		},
 	}
 	pInfo3 := &QueuedPodInfo{
-		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod3").UID("uid3").Priority(highPriority).Obj()},
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod3").UID("uid3").Priority(highPriority).PodGroupName("pg1").Obj()},
 		QueueingParams: QueueingParams{
 			Attempts:  1,
 			Timestamp: timestamp,
 		},
 	}
 	pInfo4 := &QueuedPodInfo{
-		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod4").UID("uid4").Priority(midPriority).Obj()},
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod4").UID("uid4").Priority(midPriority).PodGroupName("pg1").Obj()},
 		QueueingParams: QueueingParams{
 			Attempts:  1,
 			Timestamp: timestamp,
 		},
 	}
 	pInfo5 := &QueuedPodInfo{
-		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod5").UID("uid5").Priority(midPriority).Obj()},
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod5").UID("uid5").Priority(midPriority).PodGroupName("pg1").Obj()},
 		QueueingParams: QueueingParams{
 			Attempts:  2,
 			Timestamp: timestamp,
@@ -241,85 +242,76 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		initialPods   []*QueuedPodInfo
-		podsToSet     []*QueuedPodInfo
-		podToAdd      *QueuedPodInfo
+		podsToAdd     []*QueuedPodInfo
 		podToRemove   *QueuedPodInfo
 		expectedOrder []*QueuedPodInfo
 	}{
 		{
 			name:          "Add high priority pod to empty group",
-			podToAdd:      pInfo3,
+			podsToAdd:     []*QueuedPodInfo{pInfo3},
 			expectedOrder: []*QueuedPodInfo{pInfo3},
 		},
 		{
 			name:          "Add lower priority pod, goes to end",
-			initialPods:   []*QueuedPodInfo{pInfo3},
-			podToAdd:      pInfo1,
+			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo1},
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1},
 		},
 		{
 			name:          "Add pod with higher priority to front",
-			initialPods:   []*QueuedPodInfo{pInfo1, pInfo2},
-			podToAdd:      pInfo3,
+			podsToAdd:     []*QueuedPodInfo{pInfo1, pInfo2, pInfo3},
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1, pInfo2},
 		},
 		{
 			name:          "Add pod with same priority but lower attempts, goes to end",
-			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5},
-			podToAdd:      pInfo1,
+			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
 		},
 		{
 			name:          "Add pod with same priority but higher attempts, goes before",
-			initialPods:   []*QueuedPodInfo{pInfo3, pInfo1},
-			podToAdd:      pInfo5,
+			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo1, pInfo5},
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
 		},
 		{
 			name:          "Add pod with same priority but later timestamp, goes to end",
-			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5},
-			podToAdd:      pInfo2,
+			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo2},
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo2},
 		},
 		{
 			name:          "Add pod with same priority but earlier timestamp, goes before",
-			initialPods:   []*QueuedPodInfo{pInfo3, pInfo2},
-			podToAdd:      pInfo1,
+			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo2, pInfo1},
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1, pInfo2},
 		},
 		{
-			name:          "Add pod with same priority and timestamp, maintains relative order",
-			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
-			podToAdd:      pInfo4,
+			name:          "Add pod with same priority and timestamp, inserts before existing",
+			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2, pInfo4},
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo4, pInfo1, pInfo2},
 		},
 		{
-			name:          "Set pods out of order, gets sorted",
-			podsToSet:     []*QueuedPodInfo{pInfo1, pInfo2, pInfo3, pInfo4, pInfo5},
-			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo4, pInfo2},
+			name:          "Add pods out of order, gets sorted",
+			podsToAdd:     []*QueuedPodInfo{pInfo1, pInfo2, pInfo3, pInfo4, pInfo5},
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo4, pInfo1, pInfo2},
 		},
 		{
 			name:          "Remove pod from middle",
-			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
 			podToRemove:   pInfo1,
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo2},
 		},
 		{
 			name:          "Remove first pod",
-			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
 			podToRemove:   pInfo3,
 			expectedOrder: []*QueuedPodInfo{pInfo5, pInfo1, pInfo2},
 		},
 		{
 			name:          "Remove last pod",
-			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
 			podToRemove:   pInfo2,
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
 		},
 		{
 			name:          "Remove non-existent pod",
-			initialPods:   []*QueuedPodInfo{pInfo3, pInfo1},
+			podsToAdd:     []*QueuedPodInfo{pInfo3, pInfo1},
 			podToRemove:   pInfo2,
 			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1},
 		},
@@ -327,24 +319,22 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pgqi := &QueuedPodGroupInfo{
-				PodGroupInfo: &PodGroupInfo{Namespace: "default", Name: "pg1"},
-			}
-			if tt.initialPods != nil {
-				pgqi.SetPods(tt.initialPods)
-			}
-
-			if tt.podsToSet != nil {
-				pgqi.SetPods(tt.podsToSet)
-			}
-			if tt.podToAdd != nil {
-				pgqi.AddPod(tt.podToAdd)
+			pg := st.MakePodGroup().Namespace("default").Name("pg1").Obj()
+			pgqi := newQueuedPodGroupInfo(pg)
+			for _, p := range tt.podsToAdd {
+				pgqi.AddPod(p)
 			}
 			if tt.podToRemove != nil {
 				pgqi.RemovePod(tt.podToRemove.Pod)
 			}
 
-			if diff := cmp.Diff(tt.expectedOrder, pgqi.QueuedPodInfos, opts...); diff != "" {
+			key := fwk.PodGroupKey("default", "pg1")
+			var actualOrder []*QueuedPodInfo
+			if pgqi.QueuedPodInfos != nil {
+				actualOrder = pgqi.QueuedPodInfos[key]
+			}
+
+			if diff := cmp.Diff(tt.expectedOrder, actualOrder, opts...); diff != "" {
 				t.Errorf("Unexpected order in QueuedPodInfos (-want, +got):\n%s", diff)
 			}
 
@@ -3515,5 +3505,809 @@ func TestUpdateNodeAllocatableDRAClaimState(t *testing.T) {
 				t.Errorf("updateNodeAllocatableDRAClaimState() returned diff (-want +got):\\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestPodGroupInfoGetChildrenSorting(t *testing.T) {
+	now := time.Now()
+	pgInfo := func(name, namespace string, creationTime time.Time) *PodGroupInfo {
+		return &PodGroupInfo{
+			Name:      name,
+			Namespace: namespace,
+			PodGroup: &schedulingv1alpha3.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              name,
+					Namespace:         namespace,
+					CreationTimestamp: metav1.NewTime(creationTime),
+				},
+			},
+		}
+	}
+
+	pgInfo1 := pgInfo("pg1", "default", now)
+	pgInfo2 := pgInfo("pg2", "default", now.Add(time.Minute))
+	pgInfo3 := pgInfo("pg3", "default", now.Add(-time.Minute))
+	// pgInfo4 has same timestamp as pgInfo1 but is listed as the last one.
+	// We verify sorting stability by checking that pg1 is still before pg4.
+	pgInfo4 := pgInfo("pg4", "default", now)
+
+	pgi := &PodGroupInfo{
+		Name:              "parent-cpg",
+		Namespace:         "default",
+		CompositePodGroup: &schedulingv1alpha3.CompositePodGroup{},
+		Children:          []*PodGroupInfo{pgInfo1, pgInfo2, pgInfo3, pgInfo4},
+	}
+
+	expectedOrder := []*PodGroupInfo{pgInfo3, pgInfo1, pgInfo4, pgInfo2}
+	gotOrder := pgi.GetChildren()
+
+	if diff := cmp.Diff(expectedOrder, gotOrder); diff != "" {
+		t.Errorf("GetChildren() returned diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestQueuedPodGroupInfo_AddCompositePodGroup(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	cpgRoot := st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns1").Obj()
+	cpgChild := st.MakeCompositePodGroup().Name("cpg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	cpgNested := st.MakeCompositePodGroup().Name("cpg-nested").Namespace("ns1").ParentCompositePodGroup("cpg-child").Obj()
+	cpgNotFoundParent := st.MakeCompositePodGroup().Name("cpg-orphan").Namespace("ns1").ParentCompositePodGroup("non-existent").Obj()
+
+	tests := []struct {
+		name       string
+		initialCPG *schedulingv1alpha3.CompositePodGroup
+		cpgToAdd   *schedulingv1alpha3.CompositePodGroup
+		subtree    *PodGroupInfo
+		setup      func(*QueuedPodGroupInfo)
+		verify     func(*testing.T, *QueuedPodGroupInfo)
+	}{
+		{
+			name:       "Add child CPG to root",
+			initialCPG: cpgRoot,
+			cpgToAdd:   cpgChild,
+			subtree:    &PodGroupInfo{CompositePodGroup: cpgChild, Name: "cpg-child", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 1 || qpgi.PodGroupInfo.Children[0].Name != "cpg-child" {
+					t.Errorf("Child CPG not added to root correctly")
+				}
+			},
+		},
+		{
+			name:       "Add CPG with non-existent parent",
+			initialCPG: cpgRoot,
+			cpgToAdd:   cpgNotFoundParent,
+			subtree:    &PodGroupInfo{CompositePodGroup: cpgNotFoundParent, Name: "cpg-orphan", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 0 {
+					t.Errorf("CPG with non-existent parent should not be added")
+				}
+			},
+		},
+		{
+			name:       "Add standalone CPG (no parent set)",
+			initialCPG: cpgRoot,
+			cpgToAdd:   st.MakeCompositePodGroup().Name("standalone-cpg").Namespace("ns1").Obj(),
+			subtree:    &PodGroupInfo{CompositePodGroup: st.MakeCompositePodGroup().Name("standalone-cpg").Namespace("ns1").Obj(), Name: "standalone-cpg", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 0 {
+					t.Errorf("Standalone CPG should not be added to another root")
+				}
+			},
+		},
+		{
+			name:       "Add deeply nested CPG",
+			initialCPG: cpgRoot,
+			cpgToAdd:   cpgNested,
+			subtree:    &PodGroupInfo{CompositePodGroup: cpgNested, Name: "cpg-nested", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo.Children = append(qpgi.PodGroupInfo.Children, &PodGroupInfo{CompositePodGroup: cpgChild, Name: "cpg-child", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType, Children: make([]*PodGroupInfo, 0)})
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children[0].Children) != 1 || qpgi.PodGroupInfo.Children[0].Children[0].Name != "cpg-nested" {
+					t.Errorf("Deeply nested CPG not added correctly")
+				}
+			},
+		},
+		{
+			name:       "Add CPG subtree with nested CPGs",
+			initialCPG: cpgRoot,
+			cpgToAdd:   cpgChild,
+			subtree: &PodGroupInfo{
+				CompositePodGroup: cpgChild,
+				Name:              "cpg-child",
+				Namespace:         "ns1",
+				Type:              fwk.CompositePodGroupKeyType,
+				Children: []*PodGroupInfo{
+					{
+						CompositePodGroup: cpgNested,
+						Name:              "cpg-nested",
+						Namespace:         "ns1",
+						Type:              fwk.CompositePodGroupKeyType,
+						Children: []*PodGroupInfo{
+							{
+								PodGroup:  st.MakePodGroup().Name("pg-nested-leaf").Namespace("ns1").ParentCompositePodGroup("cpg-nested").Obj(),
+								Name:      "pg-nested-leaf",
+								Namespace: "ns1",
+								Type:      fwk.PodGroupKeyType,
+								Children:  make([]*PodGroupInfo, 0),
+							},
+						},
+					},
+				},
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 1 || qpgi.PodGroupInfo.Children[0].Name != "cpg-child" {
+					t.Errorf("Child CPG not added correctly")
+				}
+				if len(qpgi.PodGroupInfo.Children[0].Children) != 1 || qpgi.PodGroupInfo.Children[0].Children[0].Name != "cpg-nested" {
+					t.Errorf("Nested CPG not added correctly as part of subtree")
+				}
+				if len(qpgi.PodGroupInfo.Children[0].Children[0].Children) != 1 || qpgi.PodGroupInfo.Children[0].Children[0].Children[0].Name != "pg-nested-leaf" {
+					t.Errorf("Leaf PodGroup not added correctly as part of subtree")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qpgi := &QueuedPodGroupInfo{
+				PodGroupInfo: &PodGroupInfo{
+					CompositePodGroup: tt.initialCPG,
+					Name:              tt.initialCPG.Name,
+					Namespace:         tt.initialCPG.Namespace,
+					Type:              fwk.CompositePodGroupKeyType,
+					Children:          make([]*PodGroupInfo, 0),
+				},
+				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+			}
+			if tt.setup != nil {
+				tt.setup(qpgi)
+			}
+			qpgi.AddCompositePodGroup(tt.cpgToAdd, tt.subtree)
+			tt.verify(t, qpgi)
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_UpdateCompositePodGroup(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	cpgRoot := st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns1").Obj()
+	cpgChild := st.MakeCompositePodGroup().Name("cpg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	cpgChildUpdated := st.MakeCompositePodGroup().Name("cpg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	cpgChildUpdated.Annotations = map[string]string{"updated": "true"}
+
+	tests := []struct {
+		name       string
+		initialCPG *schedulingv1alpha3.CompositePodGroup
+		updateCPG  *schedulingv1alpha3.CompositePodGroup
+		setup      func(*QueuedPodGroupInfo)
+		verify     func(*testing.T, *QueuedPodGroupInfo)
+	}{
+		{
+			name:       "Update existing child CPG",
+			initialCPG: cpgRoot,
+			updateCPG:  cpgChildUpdated,
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo.Children = append(qpgi.PodGroupInfo.Children, &PodGroupInfo{
+					CompositePodGroup: cpgChild, Name: "cpg-child", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType, Children: make([]*PodGroupInfo, 0),
+				})
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 1 || qpgi.PodGroupInfo.Children[0].CompositePodGroup.Annotations["updated"] != "true" {
+					t.Errorf("Child CPG not updated correctly")
+				}
+			},
+		},
+		{
+			name:       "Update non-existent CPG",
+			initialCPG: cpgRoot,
+			updateCPG:  st.MakeCompositePodGroup().Name("non-existent").Namespace("ns1").Obj(),
+			setup:      func(qpgi *QueuedPodGroupInfo) {},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				// No panic or errors expected, should just be a no-op
+				if len(qpgi.PodGroupInfo.Children) != 0 {
+					t.Errorf("Non-existent CPG update should not alter hierarchy")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qpgi := &QueuedPodGroupInfo{
+				PodGroupInfo: &PodGroupInfo{
+					CompositePodGroup: tt.initialCPG,
+					Name:              tt.initialCPG.Name,
+					Namespace:         tt.initialCPG.Namespace,
+					Type:              fwk.CompositePodGroupKeyType,
+					Children:          make([]*PodGroupInfo, 0),
+				},
+				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+			}
+			tt.setup(qpgi)
+			qpgi.UpdateCompositePodGroup(tt.updateCPG)
+			tt.verify(t, qpgi)
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_RemoveCompositePodGroup(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	cpgRoot := st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns1").Obj()
+	cpgChild := st.MakeCompositePodGroup().Name("cpg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	cpgNested := st.MakeCompositePodGroup().Name("cpg-nested").Namespace("ns1").ParentCompositePodGroup("cpg-child").Obj()
+
+	pgLeaf := st.MakePodGroup().Name("pg-leaf").Namespace("ns1").ParentCompositePodGroup("cpg-nested").Obj()
+	podKey := fwk.PodGroupKey("ns1", "pg-leaf")
+
+	tests := []struct {
+		name      string
+		removeCPG *schedulingv1alpha3.CompositePodGroup
+		setup     func(*QueuedPodGroupInfo)
+		verify    func(*testing.T, *QueuedPodGroupInfo, []*QueuedPodInfo)
+	}{
+		{
+			name:      "Remove child CPG and its subtree pods",
+			removeCPG: cpgChild,
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				nestedInfo := &PodGroupInfo{
+					CompositePodGroup: cpgNested, Name: "cpg-nested", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType,
+					Children: []*PodGroupInfo{
+						{PodGroup: pgLeaf, Name: "pg-leaf", Namespace: "ns1", Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+					},
+				}
+				childInfo := &PodGroupInfo{
+					CompositePodGroup: cpgChild, Name: "cpg-child", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType,
+					Children: []*PodGroupInfo{nestedInfo},
+				}
+				qpgi.PodGroupInfo.Children = append(qpgi.PodGroupInfo.Children, childInfo)
+
+				pod := st.MakePod().Name("pod1").Namespace("ns1").Obj()
+				pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-leaf"; return &s }()}
+				qpgi.QueuedPodInfos[podKey] = []*QueuedPodInfo{{PodInfo: &PodInfo{Pod: pod}}}
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo, removed []*QueuedPodInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 0 {
+					t.Errorf("Child CPG not removed from hierarchy")
+				}
+				if len(removed) != 1 || removed[0].Pod.Name != "pod1" {
+					t.Errorf("Subtree pods not correctly removed and returned")
+				}
+				if len(qpgi.QueuedPodInfos[podKey]) != 0 {
+					t.Errorf("Pod not removed from QueuedPodInfos map")
+				}
+			},
+		},
+		{
+			name:      "Remove non-existent CPG",
+			removeCPG: st.MakeCompositePodGroup().Name("non-existent").Namespace("ns1").Obj(),
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo.Children = append(qpgi.PodGroupInfo.Children, &PodGroupInfo{
+					CompositePodGroup: cpgChild, Name: "cpg-child", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType, Children: make([]*PodGroupInfo, 0),
+				})
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo, removed []*QueuedPodInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 1 {
+					t.Errorf("Hierarchy should not be modified for non-existent CPG")
+				}
+				if len(removed) != 0 {
+					t.Errorf("No pods should be removed")
+				}
+			},
+		},
+		{
+			name:      "Remove nested CPG with multiple podgroups",
+			removeCPG: cpgNested,
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				pgLeaf2 := st.MakePodGroup().Name("pg-leaf2").Namespace("ns1").ParentCompositePodGroup("cpg-nested").Obj()
+				nestedInfo := &PodGroupInfo{
+					CompositePodGroup: cpgNested, Name: "cpg-nested", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType,
+					Children: []*PodGroupInfo{
+						{PodGroup: pgLeaf, Name: "pg-leaf", Namespace: "ns1", Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+						{PodGroup: pgLeaf2, Name: "pg-leaf2", Namespace: "ns1", Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+					},
+				}
+				childInfo := &PodGroupInfo{
+					CompositePodGroup: cpgChild, Name: "cpg-child", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType,
+					Children: []*PodGroupInfo{nestedInfo},
+				}
+				qpgi.PodGroupInfo.Children = append(qpgi.PodGroupInfo.Children, childInfo)
+
+				pod1 := st.MakePod().Name("pod1").Namespace("ns1").Obj()
+				pod1.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-leaf"; return &s }()}
+
+				pod2 := st.MakePod().Name("pod2").Namespace("ns1").Obj()
+				pod2.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-leaf2"; return &s }()}
+
+				qpgi.QueuedPodInfos[fwk.PodGroupKey("ns1", "pg-leaf")] = []*QueuedPodInfo{{PodInfo: &PodInfo{Pod: pod1}}}
+				qpgi.QueuedPodInfos[fwk.PodGroupKey("ns1", "pg-leaf2")] = []*QueuedPodInfo{{PodInfo: &PodInfo{Pod: pod2}}}
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo, removed []*QueuedPodInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 1 || len(qpgi.PodGroupInfo.Children[0].Children) != 0 {
+					t.Errorf("Nested CPG not removed correctly, hierarchy is wrong: %v", qpgi.PodGroupInfo.Children)
+				}
+				if len(removed) != 2 {
+					t.Errorf("Expected 2 pods to be removed, got %d", len(removed))
+				}
+				if len(qpgi.QueuedPodInfos[fwk.PodGroupKey("ns1", "pg-leaf")]) != 0 || len(qpgi.QueuedPodInfos[fwk.PodGroupKey("ns1", "pg-leaf2")]) != 0 {
+					t.Errorf("Pods not removed from QueuedPodInfos map")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qpgi := &QueuedPodGroupInfo{
+				PodGroupInfo: &PodGroupInfo{
+					CompositePodGroup: cpgRoot,
+					Name:              cpgRoot.Name,
+					Namespace:         cpgRoot.Namespace,
+					Type:              fwk.CompositePodGroupKeyType,
+					Children:          make([]*PodGroupInfo, 0),
+				},
+				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+			}
+			tt.setup(qpgi)
+			removed := qpgi.RemoveCompositePodGroup(tt.removeCPG)
+			tt.verify(t, qpgi, removed)
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_AddPodGroup(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	cpgRoot := st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns1").Obj()
+	pgChild := st.MakePodGroup().Name("pg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	pgStandalone := st.MakePodGroup().Name("pg-standalone").Namespace("ns1").Obj()
+	pgNotFoundParent := st.MakePodGroup().Name("pg-orphan").Namespace("ns1").ParentCompositePodGroup("non-existent").Obj()
+
+	tests := []struct {
+		name       string
+		initialCPG *schedulingv1alpha3.CompositePodGroup
+		pgToAdd    *schedulingv1alpha3.PodGroup
+		verify     func(*testing.T, *QueuedPodGroupInfo)
+	}{
+		{
+			name:       "Add child PG to root CPG",
+			initialCPG: cpgRoot,
+			pgToAdd:    pgChild,
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 1 || qpgi.PodGroupInfo.Children[0].Name != "pg-child" {
+					t.Errorf("Child PG not added to root correctly")
+				}
+				if qpgi.PodGroupInfo.Children[0].Type != fwk.PodGroupKeyType {
+					t.Errorf("Child PG has wrong key type")
+				}
+			},
+		},
+		{
+			name:       "Add standalone PG (should be ignored by hierarchy builder as it's the root itself)",
+			initialCPG: cpgRoot,
+			pgToAdd:    pgStandalone,
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 0 {
+					t.Errorf("Standalone PG should not be added to a root CPG's children")
+				}
+			},
+		},
+		{
+			name:       "Add PG with non-existent parent",
+			initialCPG: cpgRoot,
+			pgToAdd:    pgNotFoundParent,
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 0 {
+					t.Errorf("PG with non-existent parent should not be added")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qpgi := &QueuedPodGroupInfo{
+				PodGroupInfo: &PodGroupInfo{
+					CompositePodGroup: tt.initialCPG,
+					Name:              tt.initialCPG.Name,
+					Namespace:         tt.initialCPG.Namespace,
+					Type:              fwk.CompositePodGroupKeyType,
+					Children:          make([]*PodGroupInfo, 0),
+				},
+				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+			}
+			qpgi.AddPodGroup(tt.pgToAdd)
+			tt.verify(t, qpgi)
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_UpdatePodGroup(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	cpgRoot := st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns1").Obj()
+	pgChild := st.MakePodGroup().Name("pg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").MinCount(2).Obj()
+	pgChildUpdated := st.MakePodGroup().Name("pg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").MinCount(5).Obj()
+
+	pgStandalone := st.MakePodGroup().Name("pg-standalone").Namespace("ns1").MinCount(1).Obj()
+	pgStandaloneUpdated := st.MakePodGroup().Name("pg-standalone").Namespace("ns1").MinCount(3).Obj()
+
+	tests := []struct {
+		name     string
+		setup    func() *QueuedPodGroupInfo
+		updatePG *schedulingv1alpha3.PodGroup
+		verify   func(*testing.T, *QueuedPodGroupInfo)
+	}{
+		{
+			name: "Update child PG in CPG hierarchy",
+			setup: func() *QueuedPodGroupInfo {
+				return &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						CompositePodGroup: cpgRoot, Name: cpgRoot.Name, Namespace: cpgRoot.Namespace, Type: fwk.CompositePodGroupKeyType,
+						Children: []*PodGroupInfo{
+							{PodGroup: pgChild, Name: pgChild.Name, Namespace: pgChild.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+						},
+					},
+					QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+				}
+			},
+			updatePG: pgChildUpdated,
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if qpgi.PodGroupInfo.Children[0].PodGroup.Spec.SchedulingPolicy.Gang.MinCount != 5 {
+					t.Errorf("Child PG not updated correctly")
+				}
+			},
+		},
+		{
+			name: "Update standalone PG",
+			setup: func() *QueuedPodGroupInfo {
+				return &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						PodGroup: pgStandalone, Name: pgStandalone.Name, Namespace: pgStandalone.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0),
+					},
+					QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+				}
+			},
+			updatePG: pgStandaloneUpdated,
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if qpgi.PodGroupInfo.PodGroup.Spec.SchedulingPolicy.Gang.MinCount != 3 {
+					t.Errorf("Standalone PG root not updated correctly")
+				}
+			},
+		},
+		{
+			name: "Update non-existent PG",
+			setup: func() *QueuedPodGroupInfo {
+				return &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						CompositePodGroup: cpgRoot, Name: cpgRoot.Name, Namespace: cpgRoot.Namespace, Type: fwk.CompositePodGroupKeyType, Children: make([]*PodGroupInfo, 0),
+					},
+					QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+				}
+			},
+			updatePG: st.MakePodGroup().Name("non-existent").Namespace("ns1").Obj(),
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 0 {
+					t.Errorf("Non-existent PG update should not alter hierarchy")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qpgi := tt.setup()
+			qpgi.UpdatePodGroup(tt.updatePG)
+			tt.verify(t, qpgi)
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_RemovePodGroup(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	cpgRoot := st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns1").Obj()
+	pgChild := st.MakePodGroup().Name("pg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	pgStandalone := st.MakePodGroup().Name("pg-standalone").Namespace("ns1").Obj()
+
+	podKeyChild := fwk.PodGroupKey("ns1", "pg-child")
+	podKeyStandalone := fwk.PodGroupKey("ns1", "pg-standalone")
+
+	tests := []struct {
+		name     string
+		removePG *schedulingv1alpha3.PodGroup
+		setup    func(*QueuedPodGroupInfo)
+		verify   func(*testing.T, *QueuedPodGroupInfo, []*QueuedPodInfo)
+	}{
+		{
+			name:     "Remove child PG and its pods",
+			removePG: pgChild,
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo = &PodGroupInfo{
+					CompositePodGroup: cpgRoot, Name: cpgRoot.Name, Namespace: cpgRoot.Namespace, Type: fwk.CompositePodGroupKeyType,
+					Children: []*PodGroupInfo{
+						{PodGroup: pgChild, Name: pgChild.Name, Namespace: pgChild.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+					},
+				}
+				pod := st.MakePod().Name("pod1").Namespace("ns1").Obj()
+				pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-child"; return &s }()}
+				qpgi.QueuedPodInfos[podKeyChild] = []*QueuedPodInfo{{PodInfo: &PodInfo{Pod: pod}}}
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo, removed []*QueuedPodInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 0 {
+					t.Errorf("Child PG not removed from hierarchy")
+				}
+				if len(removed) != 1 || removed[0].Pod.Name != "pod1" {
+					t.Errorf("Pods not correctly removed and returned")
+				}
+				if len(qpgi.QueuedPodInfos[podKeyChild]) != 0 {
+					t.Errorf("Pod not removed from QueuedPodInfos map")
+				}
+			},
+		},
+		{
+			name:     "Remove standalone PG and its pods (root removal)",
+			removePG: pgStandalone,
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo = &PodGroupInfo{
+					PodGroup: pgStandalone, Name: pgStandalone.Name, Namespace: pgStandalone.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0),
+				}
+				pod := st.MakePod().Name("pod2").Namespace("ns1").Obj()
+				pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-standalone"; return &s }()}
+				qpgi.QueuedPodInfos[podKeyStandalone] = []*QueuedPodInfo{{PodInfo: &PodInfo{Pod: pod}}}
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo, removed []*QueuedPodInfo) {
+				// For standalone PG, removing the root essentially clears the QueuedPodInfos because
+				// deleteSubtreePods will match the root node.
+				if len(removed) != 1 || removed[0].Pod.Name != "pod2" {
+					t.Errorf("Standalone pods not correctly removed and returned")
+				}
+				if len(qpgi.QueuedPodInfos[podKeyStandalone]) != 0 {
+					t.Errorf("Pod not removed from QueuedPodInfos map")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qpgi := &QueuedPodGroupInfo{
+				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+			}
+			tt.setup(qpgi)
+			removed := qpgi.RemovePodGroup(tt.removePG)
+			tt.verify(t, qpgi, removed)
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_AddPod(t *testing.T) {
+	cpgRoot := st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns1").Obj()
+	pgChild := st.MakePodGroup().Name("pg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
+	pgStandalone := st.MakePodGroup().Name("pg-standalone").Namespace("ns1").Obj()
+
+	podKeyChild := fwk.PodGroupKey("ns1", "pg-child")
+	podKeyStandalone := fwk.PodGroupKey("ns1", "pg-standalone")
+
+	tests := []struct {
+		name   string
+		pod    *v1.Pod
+		setup  func(*QueuedPodGroupInfo)
+		verify func(*testing.T, *QueuedPodGroupInfo)
+	}{
+		{
+			name: "Add pod to CPG hierarchy leaf PG",
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Namespace("ns1").Obj()
+				p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-child"; return &s }()}
+				return p
+			}(),
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo = &PodGroupInfo{
+					CompositePodGroup: cpgRoot, Name: cpgRoot.Name, Namespace: cpgRoot.Namespace, Type: fwk.CompositePodGroupKeyType,
+					Children: []*PodGroupInfo{
+						{PodGroup: pgChild, Name: pgChild.Name, Namespace: pgChild.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+					},
+				}
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.QueuedPodInfos[podKeyChild]) != 1 {
+					t.Errorf("Pod not added to QueuedPodInfos map for child PG")
+				}
+			},
+		},
+		{
+			name: "Add pod to standalone PG",
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod2").Namespace("ns1").Obj()
+				p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-standalone"; return &s }()}
+				return p
+			}(),
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo = &PodGroupInfo{
+					PodGroup: pgStandalone, Name: pgStandalone.Name, Namespace: pgStandalone.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0),
+				}
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.QueuedPodInfos[podKeyStandalone]) != 1 {
+					t.Errorf("Pod not added to QueuedPodInfos map for standalone PG")
+				}
+			},
+		},
+		{
+			name: "Add pod that does not match leaf PG name",
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod3").Namespace("ns1").Obj()
+				p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "non-existent-pg"; return &s }()}
+				return p
+			}(),
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo = &PodGroupInfo{
+					PodGroup: pgStandalone, Name: pgStandalone.Name, Namespace: pgStandalone.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0),
+				}
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.QueuedPodInfos) != 0 {
+					t.Errorf("Pod added despite non-existent leaf PG")
+				}
+			},
+		},
+		{
+			name: "Add pod without scheduling group",
+			pod:  st.MakePod().Name("pod4").Namespace("ns1").Obj(),
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo = &PodGroupInfo{
+					PodGroup: pgStandalone, Name: pgStandalone.Name, Namespace: pgStandalone.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0),
+				}
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.QueuedPodInfos) != 0 {
+					t.Errorf("Pod added despite no scheduling group")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qpgi := &QueuedPodGroupInfo{
+				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+			}
+			tt.setup(qpgi)
+			pInfo := &QueuedPodInfo{PodInfo: &PodInfo{Pod: tt.pod}}
+			qpgi.AddPod(pInfo)
+			tt.verify(t, qpgi)
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_UpdateAndRemovePod(t *testing.T) {
+	pgStandalone := st.MakePodGroup().Name("pg-standalone").Namespace("ns1").Obj()
+	podKeyStandalone := fwk.PodGroupKey("ns1", "pg-standalone")
+
+	pod1 := st.MakePod().Name("pod1").Namespace("ns1").Obj()
+	pod1.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-standalone"; return &s }()}
+	pod1Updated := pod1.DeepCopy()
+	pod1Updated.Annotations = map[string]string{"updated": "true"}
+
+	tests := []struct {
+		name    string
+		execute func(*testing.T, *QueuedPodGroupInfo)
+	}{
+		{
+			name: "Update Pod",
+			execute: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				pInfo, err := qpgi.Update(pod1Updated)
+				if err != nil {
+					t.Errorf("Update failed: %v", err)
+				}
+				if pInfo.Pod.Annotations["updated"] != "true" {
+					t.Errorf("Pod was not correctly updated")
+				}
+			},
+		},
+		{
+			name: "Update Pod not found",
+			execute: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				podNotFound := st.MakePod().Name("pod-not-found").Namespace("ns1").Obj()
+				podNotFound.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-standalone"; return &s }()}
+				_, err := qpgi.Update(podNotFound)
+				if err == nil {
+					t.Errorf("Expected error when updating non-existent pod")
+				}
+			},
+		},
+		{
+			name: "Remove Pod",
+			execute: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				removed := qpgi.RemovePod(pod1)
+				if removed == nil || removed.Pod.Name != "pod1" {
+					t.Errorf("Pod not correctly removed")
+				}
+				if len(qpgi.QueuedPodInfos[podKeyStandalone]) != 0 {
+					t.Errorf("Pod still present in QueuedPodInfos")
+				}
+			},
+		},
+		{
+			name: "Remove Pod not found",
+			execute: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				podNotFound := st.MakePod().Name("pod-not-found").Namespace("ns1").Obj()
+				podNotFound.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: func() *string { s := "pg-standalone"; return &s }()}
+				removed := qpgi.RemovePod(podNotFound)
+				if removed != nil {
+					t.Errorf("Expected nil when removing non-existent pod")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qpgi := &QueuedPodGroupInfo{
+				PodGroupInfo: &PodGroupInfo{
+					PodGroup: pgStandalone, Name: pgStandalone.Name, Namespace: pgStandalone.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0),
+				},
+				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+			}
+			pInfo1 := &QueuedPodInfo{PodInfo: &PodInfo{Pod: pod1}}
+			qpgi.QueuedPodInfos[podKeyStandalone] = []*QueuedPodInfo{pInfo1}
+
+			tt.execute(t, qpgi)
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_ForEachPodInfo(t *testing.T) {
+	qpgi := &QueuedPodGroupInfo{
+		QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+	}
+
+	podKey1 := fwk.PodGroupKey("ns1", "pg1")
+	podKey2 := fwk.PodGroupKey("ns1", "pg2")
+
+	qpgi.QueuedPodInfos[podKey1] = []*QueuedPodInfo{
+		{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod1").Obj()}},
+		{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod2").Obj()}},
+	}
+	qpgi.QueuedPodInfos[podKey2] = []*QueuedPodInfo{
+		{PodInfo: &PodInfo{Pod: st.MakePod().Name("pod3").Obj()}},
+	}
+
+	count := 0
+	qpgi.ForEachPodInfo(func(pInfo *QueuedPodInfo) bool {
+		count++
+		return true
+	})
+
+	if count != 3 {
+		t.Errorf("Expected 3 pods, got %d", count)
+	}
+
+	// Test early exit
+	count = 0
+	qpgi.ForEachPodInfo(func(pInfo *QueuedPodInfo) bool {
+		count++
+		return false
+	})
+
+	if count != 1 {
+		t.Errorf("Expected 1 pod after early exit, got %d", count)
 	}
 }

@@ -1852,6 +1852,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1.PriorityClassApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1alpha3
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositeGangSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha3.CompositeGangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroup"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSpec"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupSpecApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupStatus"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupStatusApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupTemplate"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupTemplateApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("DisruptionMode"):
 		return &applyconfigurationsschedulingv1alpha3.DisruptionModeApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("GangSchedulingPolicy"):

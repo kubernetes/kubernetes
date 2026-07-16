@@ -61,6 +61,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		enableTopologyAwareScheduling   bool
 		enableDRAWorkloadResourceClaims bool
 		enablePodGroupPreemptionPolicy  bool
+		enableCompositePodGroup         bool
 		expectedErrs                    field.ErrorList
 	}{
 		"valid": {
@@ -315,6 +316,27 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("spec", "resourceClaims").Index(0).Child("name"), ""),
 			},
 		},
+		"correct parentCompositePodGroupName": {
+			input:                         mkValidPodGroup(setParentCompositePodGroupName("my-parent")),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"forbidden parentCompositePodGroupName (feature disabled)": {
+			input:        mkValidPodGroup(setParentCompositePodGroupName("my-parent")),
+			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "parentCompositePodGroupName"), "")},
+		},
+		"invalid parentCompositePodGroupName": {
+			input:                         mkValidPodGroup(setParentCompositePodGroupName("invalid/name")),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "parentCompositePodGroupName"), nil, "").WithOrigin("format=k8s-long-name")},
+		},
+		"dependentRequired missing workloadRef when parent is set": {
+			input:                         mkValidPodGroup(setParentCompositePodGroupName("my-parent"), unsetWorkloadRef()),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs:                  field.ErrorList{field.Required(field.NewPath("spec", "workloadRef"), "").WithOrigin("dependentRequired")},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -323,6 +345,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
 				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				features.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs)
 		})
@@ -357,6 +380,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		enableTopologyAwareScheduling   bool
 		enableDRAWorkloadResourceClaims bool
 		enablePodGroupPreemptionPolicy  bool
+		enableCompositePodGroup         bool
 		expectedErrs                    field.ErrorList
 	}{
 		"valid update": {
@@ -554,6 +578,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj:    mkValidPodGroup(setResourceVersion("1"), clearPreemptionPolicy()),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "preemptionPolicy"), nil, "").WithOrigin("immutable")},
 		},
+		"invalid update of parentCompositePodGroupName": {
+			oldObj:                        mkValidPodGroup(setResourceVersion("1")),
+			updateObj:                     mkValidPodGroup(setResourceVersion("1"), setParentCompositePodGroupName("new-parent")),
+			enableTopologyAwareScheduling: true,
+			enableCompositePodGroup:       true,
+			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "parentCompositePodGroupName"), "new-parent", "").WithOrigin("immutable")},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -562,6 +593,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
 				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
+				features.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			strategy := registry.NewStrategy()
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy, tc.expectedErrs)
@@ -896,5 +928,11 @@ func setPreemptionPolicy(policy scheduling.PreemptionPolicy) func(obj *schedulin
 func clearPreemptionPolicy() func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
 		obj.Spec.PreemptionPolicy = nil
+	}
+}
+
+func setParentCompositePodGroupName(name string) func(obj *scheduling.PodGroup) {
+	return func(obj *scheduling.PodGroup) {
+		obj.Spec.ParentCompositePodGroupName = &name
 	}
 }

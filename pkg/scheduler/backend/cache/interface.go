@@ -123,6 +123,12 @@ type Cache interface {
 	// PodGroups returns a PodGroupLister used to access the cached PodGroup objects.
 	PodGroups() fwk.PodGroupLister
 
+	// CompositePodGroupStates returns a CompositePodGroupStateLister.
+	CompositePodGroupStates() fwk.CompositePodGroupStateLister
+
+	// CompositePodGroups returns a CompositePodGroupLister used to access the cached CompositePodGroup objects.
+	CompositePodGroups() fwk.CompositePodGroupLister
+
 	// AddPodGroupMember adds not assigned and not assumed pod to its pod group state.
 	AddPodGroupMember(pod *v1.Pod)
 
@@ -139,7 +145,22 @@ type Cache interface {
 	UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1alpha3.PodGroup)
 
 	// RemovePodGroup removes a pod group object from the cache.
-	RemovePodGroup(podGroup *schedulingv1alpha3.PodGroup)
+	RemovePodGroup(logger klog.Logger, podGroup *schedulingv1alpha3.PodGroup)
+
+	// AddCompositePodGroup adds a composite pod group to the cache.
+	AddCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup)
+
+	// UpdateCompositePodGroup updates a composite pod group object in the cache.
+	UpdateCompositePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1alpha3.CompositePodGroup)
+
+	// RemoveCompositePodGroup removes a composite pod group from the cache.
+	RemoveCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup)
+
+	// BuildHierarchySnapshotFromPod returns a snapshot of the pod group hierarchy for the given pod.
+	BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error)
+
+	// GetRootKeyForGroup returns the root key of the given EntityKey.
+	GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error)
 }
 
 // Dump is a dump of the cache state.
