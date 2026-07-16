@@ -246,6 +246,168 @@ func TestBroadcasterSendEventAfterShutdown(t *testing.T) {
 	assert.EqualError(t, err, "broadcaster already stopped", "ActionOrDrop should report error id broadcaster is shutdown")
 }
 
+func TestNewLongQueueBroadcaster(t *testing.T) {
+	m := NewLongQueueBroadcaster(10, WaitIfChannelFull)
+
+	w, err := m.Watch()
+	if err != nil {
+		t.Fatalf("Unable start event watcher: '%v' (will not retry!)", err)
+	}
+
+	event := Event{Type: Added, Object: &myType{"foo", "hello world"}}
+	if err := m.Action(event.Type, event.Object); err != nil {
+		t.Fatalf("error sending event: %v", err)
+	}
+
+	got, ok := <-w.ResultChan()
+	if !ok {
+		t.Fatalf("closed early")
+	}
+	if !reflect.DeepEqual(event, got) {
+		t.Errorf("Expected (%v, %#v), got (%v, %#v)", event.Type, event.Object, got.Type, got.Object)
+	}
+
+	m.Shutdown()
+	if _, open := <-w.ResultChan(); open {
+		t.Errorf("Shutdown didn't work?")
+	}
+}
+
+func TestBroadcasterWatchWithPrefix(t *testing.T) {
+	prefix := []Event{
+		{Type: Added, Object: &myType{"foo", "hello world 1"}},
+		{Type: Modified, Object: &myType{"foo", "hello world 2"}},
+	}
+	event := Event{Type: Deleted, Object: &myType{"foo", "hello world 3"}}
+
+	// Use a watch queue length smaller than len(prefix)+1 to exercise the
+	// queue-length adjustment in WatchWithPrefix.
+	m := NewBroadcaster(1, WaitIfChannelFull)
+
+	w, err := m.WatchWithPrefix(prefix)
+	if err != nil {
+		t.Fatalf("Unable start event watcher: '%v' (will not retry!)", err)
+	}
+
+	if err := m.Action(event.Type, event.Object); err != nil {
+		t.Fatalf("error sending event: %v", err)
+	}
+
+	for i, expect := range append(prefix, event) {
+		got, ok := <-w.ResultChan()
+		if !ok {
+			t.Fatalf("closed early at event %d", i)
+		}
+		if !reflect.DeepEqual(expect, got) {
+			t.Errorf("Event %d: Expected (%v, %#v), got (%v, %#v)",
+				i, expect.Type, expect.Object, got.Type, got.Object)
+		}
+	}
+
+	m.Shutdown()
+	if _, open := <-w.ResultChan(); open {
+		t.Errorf("Shutdown didn't work?")
+	}
+}
+
+func TestBroadcasterActionOrDrop(t *testing.T) {
+	event1 := Event{Type: Added, Object: &myType{"foo", "hello world 1"}}
+	event2 := Event{Type: Added, Object: &myType{"bar", "hello world 2"}}
+
+	// The incoming queue has capacity 1.
+	m := NewLongQueueBroadcaster(1, WaitIfChannelFull)
+
+	w, err := m.Watch()
+	if err != nil {
+		t.Fatalf("Unable start event watcher: '%v' (will not retry!)", err)
+	}
+
+	// Park the distribution loop so that events accumulate in m.incoming.
+	started := make(chan struct{})
+	release := make(chan struct{})
+	m.incoming <- Event{
+		Type: internalRunFunctionMarker,
+		Object: functionFakeRuntimeObject(func() {
+			close(started)
+			<-release
+		}),
+	}
+	<-started
+
+	// The first event fills the incoming queue, the second is dropped.
+	sent, err := m.ActionOrDrop(event1.Type, event1.Object)
+	if err != nil {
+		t.Fatalf("error sending event: %v", err)
+	}
+	if !sent {
+		t.Errorf("event unexpectedly dropped")
+	}
+	sent, err = m.ActionOrDrop(event2.Type, event2.Object)
+	if err != nil {
+		t.Fatalf("error sending event: %v", err)
+	}
+	if sent {
+		t.Errorf("event unexpectedly sent on a full queue")
+	}
+
+	// Resume distribution and verify only the first event was delivered.
+	close(release)
+	got, ok := <-w.ResultChan()
+	if !ok {
+		t.Fatalf("closed early")
+	}
+	if !reflect.DeepEqual(event1, got) {
+		t.Errorf("Expected (%v, %#v), got (%v, %#v)", event1.Type, event1.Object, got.Type, got.Object)
+	}
+
+	m.Shutdown()
+	if _, open := <-w.ResultChan(); open {
+		t.Errorf("Shutdown didn't work?")
+	}
+}
+
+func TestBroadcasterStopWatchingUnknownID(t *testing.T) {
+	m := NewBroadcaster(0, WaitIfChannelFull)
+
+	w, err := m.Watch()
+	if err != nil {
+		t.Fatalf("Unable start event watcher: '%v' (will not retry!)", err)
+	}
+
+	// Stopping an unknown watcher is a no-op.
+	m.stopWatching(12345)
+
+	// The broadcaster still distributes events.
+	event := Event{Type: Added, Object: &myType{"foo", "hello world"}}
+	if err := m.Action(event.Type, event.Object); err != nil {
+		t.Fatalf("error sending event: %v", err)
+	}
+	got, ok := <-w.ResultChan()
+	if !ok {
+		t.Fatalf("closed early")
+	}
+	if !reflect.DeepEqual(event, got) {
+		t.Errorf("Expected (%v, %#v), got (%v, %#v)", event.Type, event.Object, got.Type, got.Object)
+	}
+
+	m.Shutdown()
+}
+
+func TestFunctionFakeRuntimeObject(t *testing.T) {
+	obj := functionFakeRuntimeObject(func() {})
+	if got := obj.GetObjectKind(); got != schema.EmptyObjectKind {
+		t.Errorf("expected EmptyObjectKind, got %#v", got)
+	}
+	if obj.DeepCopyObject() == nil {
+		t.Errorf("expected non-nil copy of non-nil function")
+	}
+
+	var nilObj functionFakeRuntimeObject
+	if got := nilObj.DeepCopyObject(); got != nil {
+		t.Errorf("expected nil copy of nil function, got %#v", got)
+	}
+}
+
 // Test this since we see usage patterns where the broadcaster and watchers are
 // stopped simultaneously leading to races.
 func TestBroadcasterShutdownRace(t *testing.T) {

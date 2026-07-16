@@ -124,6 +124,103 @@ func TestRaceFreeFake(t *testing.T) {
 	consumer(f)
 }
 
+func TestFakeWatcherLifecycle(t *testing.T) {
+	f := NewFakeWithChanSize(2, false)
+
+	if f.IsStopped() {
+		t.Errorf("unexpected stopped watcher")
+	}
+
+	// The buffered channel accepts events without a consumer.
+	f.Add(testType("foo"))
+	f.Add(testType("bar"))
+
+	f.Stop()
+	if !f.IsStopped() {
+		t.Errorf("expected watcher to be stopped")
+	}
+	// Stop is idempotent.
+	f.Stop()
+
+	f.Reset()
+	if f.IsStopped() {
+		t.Errorf("unexpected stopped watcher after reset")
+	}
+
+	// Events flow again on the fresh channel.
+	go f.Add(testType("baz"))
+	got, ok := <-f.ResultChan()
+	if !ok {
+		t.Fatalf("closed early")
+	}
+	if e, a := (Event{Added, testType("baz")}), got; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestRaceFreeFakeWatcherLifecycle(t *testing.T) {
+	f := NewRaceFreeFake()
+
+	if f.IsStopped() {
+		t.Errorf("unexpected stopped watcher")
+	}
+
+	f.Stop()
+	if !f.IsStopped() {
+		t.Errorf("expected watcher to be stopped")
+	}
+	// Stop is idempotent.
+	f.Stop()
+
+	// Sending on a stopped watcher is a silent no-op.
+	f.Add(testType("foo"))
+	f.Modify(testType("foo"))
+	f.Delete(testType("foo"))
+	f.Error(testType("foo"))
+	f.Action(Added, testType("foo"))
+	if _, ok := <-f.ResultChan(); ok {
+		t.Errorf("unexpected event on stopped watcher")
+	}
+
+	f.Reset()
+	if f.IsStopped() {
+		t.Errorf("unexpected stopped watcher after reset")
+	}
+
+	// Events flow again on the fresh channel.
+	f.Add(testType("baz"))
+	got, ok := <-f.ResultChan()
+	if !ok {
+		t.Fatalf("closed early")
+	}
+	if e, a := (Event{Added, testType("baz")}), got; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestRaceFreeFakeWatcherPanicsWhenFull(t *testing.T) {
+	expectPanic := func(name string, fn func()) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("%s: expected panic on full channel", name)
+			}
+		}()
+		fn()
+	}
+
+	f := NewRaceFreeFake()
+	// Fill the buffered channel without a consumer.
+	for i := int32(0); i < DefaultChanSize; i++ {
+		f.Add(testType("foo"))
+	}
+
+	expectPanic("Add", func() { f.Add(testType("foo")) })
+	expectPanic("Modify", func() { f.Modify(testType("foo")) })
+	expectPanic("Delete", func() { f.Delete(testType("foo")) })
+	expectPanic("Error", func() { f.Error(testType("foo")) })
+	expectPanic("Action", func() { f.Action(Added, testType("foo")) })
+}
+
 func TestEmpty(t *testing.T) {
 	w := NewEmptyWatch()
 	_, ok := <-w.ResultChan()
@@ -161,7 +258,15 @@ func TestProxyWatcher(t *testing.T) {
 		}
 	}
 
+	if w.Stopping() {
+		t.Errorf("unexpected stopping watcher")
+	}
+
 	w.Stop()
+
+	if !w.Stopping() {
+		t.Errorf("expected watcher to be stopping")
+	}
 
 	select {
 	// Closed channel always reads immediately
@@ -172,4 +277,35 @@ func TestProxyWatcher(t *testing.T) {
 
 	// Test double close
 	w.Stop()
+}
+
+func TestMockWatcher(t *testing.T) {
+	stopped := false
+	ch := make(chan Event)
+	w := MockWatcher{
+		StopFunc:       func() { stopped = true },
+		ResultChanFunc: func() <-chan Event { return ch },
+	}
+
+	if got := w.ResultChan(); got != (<-chan Event)(ch) {
+		t.Errorf("expected ResultChan to return the provided channel")
+	}
+
+	w.Stop()
+	if !stopped {
+		t.Errorf("expected Stop to call StopFunc")
+	}
+}
+
+func TestEventDeepCopy(t *testing.T) {
+	e := Event{Type: Added, Object: testType("foo")}
+	c := e.DeepCopy()
+	if !reflect.DeepEqual(e, *c) {
+		t.Errorf("expected %#v, got %#v", e, *c)
+	}
+
+	empty := Event{}
+	if got := empty.DeepCopy(); !reflect.DeepEqual(empty, *got) {
+		t.Errorf("expected %#v, got %#v", empty, *got)
+	}
 }
