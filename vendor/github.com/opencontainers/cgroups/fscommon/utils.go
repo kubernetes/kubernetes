@@ -82,8 +82,7 @@ func GetValueByKey(path, file, key string) (uint64, error) {
 	}
 
 	key += " "
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(content, "\n") {
 		v, ok := strings.CutPrefix(line, key)
 		if ok {
 			val, err := ParseUint(v, 10, 64)
