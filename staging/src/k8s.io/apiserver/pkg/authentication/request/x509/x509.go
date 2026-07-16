@@ -212,7 +212,7 @@ type Verifier struct {
 	auth            authenticator.Request
 
 	// allowedCommonNames contains the common names which a verified certificate is allowed to have.
-	// If empty, all verified certificates are allowed.
+	// An empty list allows all verified certificates unless the provider's CommonNameRestriction rejects all.
 	allowedCommonNames StringSliceProvider
 }
 
@@ -255,12 +255,23 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 }
 
 func (a *Verifier) verifySubject(subject pkix.Name) error {
+	var allowedCommonNames []string
+	if restrictionProvider, ok := a.allowedCommonNames.(CommonNameRestrictionProvider); ok {
+		restriction := restrictionProvider.CommonNameRestriction()
+		if restriction.RejectAll {
+			return fmt.Errorf("x509: subject with cn=%s is not in the allowed list", subject.CommonName)
+		}
+		allowedCommonNames = restriction.AllowedCommonNames
+	} else {
+		allowedCommonNames = a.allowedCommonNames.Value()
+	}
+
 	// No CN restrictions
-	if len(a.allowedCommonNames.Value()) == 0 {
+	if len(allowedCommonNames) == 0 {
 		return nil
 	}
 	// Enforce CN restrictions
-	for _, allowedCommonName := range a.allowedCommonNames.Value() {
+	for _, allowedCommonName := range allowedCommonNames {
 		if allowedCommonName == subject.CommonName {
 			return nil
 		}

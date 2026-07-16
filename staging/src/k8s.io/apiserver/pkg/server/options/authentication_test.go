@@ -22,9 +22,13 @@ import (
 	"reflect"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
+	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/kubernetes/fake"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 
@@ -82,6 +86,35 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 				t.Errorf("got RequestHeaderConfig: %#v, expected RequestHeaderConfig: %#v", resultConfig, testcase.expectConfig)
 			}
 		})
+	}
+}
+
+func TestCreateRequestHeaderConfigPreservesCommonNameRestrictionProvider(t *testing.T) {
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      authenticationConfigMapName,
+			Namespace: authenticationConfigMapNamespace,
+		},
+		Data: map[string]string{
+			"requestheader-allowed-names": `["front-proxy-client"]`,
+		},
+	}
+
+	config, err := (&DelegatingAuthenticationOptions{}).createRequestHeaderConfig(fake.NewSimpleClientset(configMap))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	provider, ok := config.AllowedClientNames.(x509request.CommonNameRestrictionProvider)
+	if !ok {
+		t.Fatalf("expected CommonNameRestrictionProvider, got %T", config.AllowedClientNames)
+	}
+	restriction := provider.CommonNameRestriction()
+	if restriction.RejectAll {
+		t.Fatal("expected configured client names to allow authentication")
+	}
+	if !reflect.DeepEqual(restriction.AllowedCommonNames, []string{"front-proxy-client"}) {
+		t.Fatalf("incorrect allowed common names, got %v", restriction.AllowedCommonNames)
 	}
 }
 

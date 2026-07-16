@@ -18,15 +18,20 @@ package headerrequest
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"net/http"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	certutil "k8s.io/client-go/util/cert"
 )
 
 const (
@@ -41,11 +46,12 @@ const (
 )
 
 type expectedHeadersHolder struct {
-	usernameHeaders     []string
-	uidHeaders          []string
-	groupHeaders        []string
-	extraHeaderPrefixes []string
-	allowedClientNames  []string
+	usernameHeaders      []string
+	uidHeaders           []string
+	groupHeaders         []string
+	extraHeaderPrefixes  []string
+	allowedClientNames   []string
+	rejectAllClientNames bool
 }
 
 func TestRequestHeaderAuthRequestController(t *testing.T) {
@@ -83,7 +89,8 @@ func TestRequestHeaderAuthRequestController(t *testing.T) {
 				}
 				return c
 			}(),
-			expectErr: true,
+			expectedHeader: expectedHeadersHolder{rejectAllClientNames: true},
+			expectErr:      true,
 		},
 	}
 
@@ -246,6 +253,107 @@ func TestRequestHeaderAuthRequestControllerSyncOnce(t *testing.T) {
 	}
 }
 
+func TestRequestHeaderAuthRequestControllerRunOnceClearsStateOnConfigMapDeletion(t *testing.T) {
+	target := newDefaultTarget()
+	if err := target.syncConfigMap(defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"})); err != nil {
+		t.Fatal(err)
+	}
+	target.client = fake.NewSimpleClientset()
+
+	if err := target.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	validateExpectedHeaders(t, target, expectedHeadersHolder{
+		rejectAllClientNames: true,
+	})
+}
+
+func TestRequestHeaderAuthRequestControllerDeletedBundleRejectsRequestDuringConfigMapRecreation(t *testing.T) {
+	target := newDefaultTarget()
+
+	configMap := defaultConfigMap(t, []string{"X-Remote-User"}, nil, nil, nil, []string{"front-proxy-client"})
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := indexer.Add(configMap); err != nil {
+		t.Fatal(err)
+	}
+	target.configmapLister = corev1listers.NewConfigMapLister(indexer).ConfigMaps(defConfigMapNamespace)
+	if err := target.sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete the ConfigMap, then make the recreated ConfigMap visible without
+	// syncing it. The username header provider below will observe the recreation
+	// only after the x509 verifier has read the deleted state.
+	target.configmapLister = corev1listers.NewConfigMapLister(cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})).ConfigMaps(defConfigMapNamespace)
+	if err := target.sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	recreatedIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := recreatedIndexer.Add(configMap); err != nil {
+		t.Fatal(err)
+	}
+	target.configmapLister = corev1listers.NewConfigMapLister(recreatedIndexer).ConfigMaps(defConfigMapNamespace)
+
+	// Reuse the x509 package's multi-level ClientAuth fixture to match the
+	// ConfigMap CA controller's client-auth verification.
+	clientCerts, err := certutil.CertsFromFile("../x509/testdata/client-valid.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	intermediateCerts, err := certutil.CertsFromFile("../x509/testdata/intermediate.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := certutil.NewPool("../x509/testdata/root.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	usernameHeadersRead := false
+	// Keep CA verification valid to model the independently updated CA controller
+	// still exposing the same CA during the request-header ConfigMap transition.
+	auth := NewDynamicVerifyOptionsSecure(
+		x509request.StaticVerifierFn(x509.VerifyOptions{
+			Roots:     roots,
+			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}),
+		target.AllowedClientNamesProvider(),
+		StringSliceProviderFunc(func() []string {
+			usernameHeadersRead = true
+			if err := target.sync(); err != nil {
+				t.Fatal(err)
+			}
+			return target.UsernameHeaders()
+		}),
+		StringSliceProviderFunc(target.UIDHeaders),
+		StringSliceProviderFunc(target.GroupHeaders),
+		StringSliceProviderFunc(target.ExtraHeaderPrefixes),
+	)
+
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Remote-User", "spoofed-user")
+	req.TLS = &tls.ConnectionState{PeerCertificates: append(clientCerts, intermediateCerts...)}
+
+	resp, ok, err := auth.AuthenticateRequest(req)
+	if err == nil {
+		t.Fatal("expected the deleted allowed client names to reject the certificate")
+	}
+	if ok {
+		t.Fatal("unexpected successful authentication")
+	}
+	if resp != nil {
+		t.Fatalf("unexpected authentication response: %#v", resp)
+	}
+	if usernameHeadersRead {
+		t.Fatal("username headers were read after the deleted allowed client names were checked")
+	}
+}
+
 func defaultConfigMap(t *testing.T, usernameHeaderVal, uidHeaderVal, groupHeadersVal, extraHeaderPrefixesVal, allowedClientNamesVal []string) *corev1.ConfigMap {
 	encode := func(val []string) string {
 		encodedVal, err := json.Marshal(val)
@@ -270,7 +378,7 @@ func defaultConfigMap(t *testing.T, usernameHeaderVal, uidHeaderVal, groupHeader
 }
 
 func newDefaultTarget() *RequestHeaderAuthRequestController {
-	return &RequestHeaderAuthRequestController{
+	target := &RequestHeaderAuthRequestController{
 		configmapName:          defConfigMapName,
 		configmapNamespace:     defConfigMapNamespace,
 		usernameHeadersKey:     defUsernameHeadersKey,
@@ -279,6 +387,8 @@ func newDefaultTarget() *RequestHeaderAuthRequestController {
 		extraHeaderPrefixesKey: defExtraHeaderPrefixesKey,
 		allowedClientNamesKey:  defAllowedClientNamesKey,
 	}
+	target.clearRequestHeaderBundle()
+	return target
 }
 
 func validateExpectedHeaders(t *testing.T, target *RequestHeaderAuthRequestController, expected expectedHeadersHolder) {
@@ -293,5 +403,8 @@ func validateExpectedHeaders(t *testing.T, target *RequestHeaderAuthRequestContr
 	}
 	if !equality.Semantic.DeepEqual(target.AllowedClientNames(), expected.allowedClientNames) {
 		t.Fatalf("incorrect expectedAllowedClientNames, got %v, wanted %v", target.AllowedClientNames(), expected.allowedClientNames)
+	}
+	if target.AllowedClientNamesProvider().CommonNameRestriction().RejectAll != expected.rejectAllClientNames {
+		t.Fatalf("incorrect rejectAllClientNames, got %v, wanted %v", target.AllowedClientNamesProvider().CommonNameRestriction().RejectAll, expected.rejectAllClientNames)
 	}
 }

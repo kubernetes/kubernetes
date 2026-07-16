@@ -1150,6 +1150,102 @@ func TestX509Verifier(t *testing.T) {
 	}
 }
 
+func TestVerifierVerifySubjectUsesSingleAllowedCommonNamesSnapshot(t *testing.T) {
+	calls := 0
+	verifier := &Verifier{
+		allowedCommonNames: StringSliceProviderFunc(func() []string {
+			calls++
+			return []string{"allowed"}
+		}),
+	}
+
+	if err := verifier.verifySubject(pkix.Name{CommonName: "disallowed"}); err == nil {
+		t.Fatal("expected the disallowed common name to be rejected")
+	}
+	if calls != 1 {
+		t.Fatalf("expected one allowed common names read, got %d", calls)
+	}
+}
+
+func TestVerifierCommonNameRestriction(t *testing.T) {
+	testCases := []struct {
+		name        string
+		restriction CommonNameRestriction
+		expectOK    bool
+		expectErr   bool
+	}{
+		{
+			name:     "empty allowed names allows any verified client certificate",
+			expectOK: true,
+		},
+		{
+			name: "reject all rejects an otherwise allowed client certificate",
+			restriction: CommonNameRestriction{
+				AllowedCommonNames: []string{"client_cn"},
+				RejectAll:          true,
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			provider := &testCommonNameRestrictionProvider{restriction: testCase.restriction}
+			authCalled := false
+			auth := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+				authCalled = true
+				return &authenticator.Response{User: &user.DefaultInfo{Name: "innerauth"}}, true, nil
+			})
+
+			verifier := NewDynamicCAVerifier(StaticVerifierFn(getDefaultVerifyOptions(t)), auth, provider)
+			resp, ok, err := verifier.AuthenticateRequest(&http.Request{
+				TLS: &tls.ConnectionState{PeerCertificates: getCerts(t, clientCNCert)},
+			})
+
+			if testCase.expectErr && err == nil {
+				t.Fatal("expected an error, got none")
+			}
+			if !testCase.expectErr && err != nil {
+				t.Fatalf("got unexpected error: %v", err)
+			}
+			if ok != testCase.expectOK {
+				t.Fatalf("expected ok=%v, got %v", testCase.expectOK, ok)
+			}
+			if authCalled != testCase.expectOK {
+				t.Fatalf("expected delegated authenticator called=%v, got %v", testCase.expectOK, authCalled)
+			}
+			if testCase.expectOK && resp == nil {
+				t.Fatal("expected authentication response, got nil")
+			}
+			if !testCase.expectOK && resp != nil {
+				t.Fatalf("expected nil authentication response, got %#v", resp)
+			}
+			if provider.restrictionCalls != 1 {
+				t.Fatalf("expected one common name restriction read, got %d", provider.restrictionCalls)
+			}
+			if provider.valueCalls != 0 {
+				t.Fatalf("expected no legacy allowed common names reads, got %d", provider.valueCalls)
+			}
+		})
+	}
+}
+
+type testCommonNameRestrictionProvider struct {
+	restriction      CommonNameRestriction
+	restrictionCalls int
+	valueCalls       int
+}
+
+func (p *testCommonNameRestrictionProvider) Value() []string {
+	p.valueCalls++
+	return nil
+}
+
+func (p *testCommonNameRestrictionProvider) CommonNameRestriction() CommonNameRestriction {
+	p.restrictionCalls++
+	return p.restriction
+}
+
 func getDefaultVerifyOptions(t *testing.T) x509.VerifyOptions {
 	options := DefaultVerifyOptions()
 	options.Roots = getRootCertPool(t)
