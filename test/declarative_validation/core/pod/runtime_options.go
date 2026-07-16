@@ -31,7 +31,9 @@ import (
 
 // RunDeclarativeValidateRuntimeOptionsTestCases checks the shared bounds on
 // checkpoint and restore options, including resources that embed a pod template.
-func RunDeclarativeValidateRuntimeOptionsTestCases[T runtime.Object](t *testing.T, ctx context.Context, strategy rest.RESTCreateStrategy, fldPath *field.Path, baseObj T, setOptions func(T, map[string]string)) {
+// Every case also expects extraErrs, such as the error for a pod template that
+// sets restoreFrom.
+func RunDeclarativeValidateRuntimeOptionsTestCases[T runtime.Object](t *testing.T, ctx context.Context, strategy rest.RESTCreateStrategy, fldPath *field.Path, baseObj T, setOptions func(T, map[string]string), extraErrs ...*field.Error) {
 	t.Helper()
 	maxEntries := make(map[string]string, 64)
 	for i := range 64 {
@@ -88,7 +90,7 @@ func RunDeclarativeValidateRuntimeOptionsTestCases[T runtime.Object](t *testing.
 		t.Run(fldPath.String()+": "+name, func(t *testing.T) {
 			obj := baseObj.DeepCopyObject().(T)
 			setOptions(obj, tc.options)
-			apitesting.VerifyValidationEquivalence(t, ctx, obj, strategy, tc.expectedErrs)
+			apitesting.VerifyValidationEquivalence(t, ctx, obj, strategy, append(tc.expectedErrs, extraErrs...))
 		})
 	}
 }

@@ -66,6 +66,9 @@
   "podCheckpointOptions": {
     "allowedCheckpointOptions": [
       "allowedCheckpointOptionsValue"
+    ],
+    "allowedRestoreOptions": [
+      "allowedRestoreOptionsValue"
     ]
   }
 }

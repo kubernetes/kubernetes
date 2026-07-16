@@ -63,8 +63,8 @@ type RuntimeClassApplyConfiguration struct {
 	// nodes.
 	Scheduling *SchedulingApplyConfiguration `json:"scheduling,omitempty"`
 	// podCheckpointOptions lists the runtime-specific option keys that users may supply
-	// when checkpointing Pods of this RuntimeClass. If unset, users cannot supply
-	// options; checkpoints use the runtime's defaults.
+	// when checkpointing or restoring Pods of this RuntimeClass. If unset, users
+	// cannot supply options; checkpoint and restore use the runtime's defaults.
 	// Administrator settings belong in the runtime's configuration, not in
 	// user-supplied options. Values are validated by the runtime.
 	// This field is alpha-level and requires PodLevelCheckpointRestore.

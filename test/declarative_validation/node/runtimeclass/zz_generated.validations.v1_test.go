@@ -79,6 +79,14 @@ func init() {
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 				{ErrorType: "FieldValueTooShort", Origin: "minLength"},
 			},
+			"podCheckpointOptions.allowedRestoreOptions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"podCheckpointOptions.allowedRestoreOptions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+				{ErrorType: "FieldValueTooShort", Origin: "minLength"},
+			},
 			"scheduling.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},

@@ -353,6 +353,11 @@ func (in *RuntimeClassPodCheckpointOptions) DeepCopyInto(out *RuntimeClassPodChe
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.AllowedRestoreOptions != nil {
+		in, out := &in.AllowedRestoreOptions, &out.AllowedRestoreOptions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

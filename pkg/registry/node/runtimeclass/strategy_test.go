@@ -136,6 +136,7 @@ func TestCheckpointPolicyFeatureGate(t *testing.T) {
 	policy := func() *node.RuntimeClassPodCheckpointOptions {
 		return &node.RuntimeClassPodCheckpointOptions{
 			AllowedCheckpointOptions: []string{"compression"},
+			AllowedRestoreOptions:    []string{"tcp-close"},
 		}
 	}
 	for _, enabled := range []bool{false, true} {

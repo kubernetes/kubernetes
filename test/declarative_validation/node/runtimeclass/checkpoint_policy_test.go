@@ -59,7 +59,7 @@ func TestRuntimeClassCheckpointPolicyValidation(t *testing.T) {
 					if mode.all {
 						ctx = validate.WithAllDeclarativeEnforcedForTest(ctx)
 					}
-					for _, fieldName := range []string{"allowedCheckpointOptions"} {
+					for _, fieldName := range []string{"allowedCheckpointOptions", "allowedRestoreOptions"} {
 						t.Run(fieldName, func(t *testing.T) {
 							path := field.NewPath("podCheckpointOptions", fieldName)
 							for _, tc := range []struct {
@@ -81,7 +81,11 @@ func TestRuntimeClassCheckpointPolicyValidation(t *testing.T) {
 								t.Run(tc.name, func(t *testing.T) {
 									obj := mkRuntimeClassHandlerOnly()
 									obj.PodCheckpointOptions = &node.RuntimeClassPodCheckpointOptions{}
-									obj.PodCheckpointOptions.AllowedCheckpointOptions = tc.keys
+									if fieldName == "allowedCheckpointOptions" {
+										obj.PodCheckpointOptions.AllowedCheckpointOptions = tc.keys
+									} else {
+										obj.PodCheckpointOptions.AllowedRestoreOptions = tc.keys
+									}
 									var errs field.ErrorList
 									if operation == "create" {
 										errs = rest.ValidateCreate(ctx, &obj, registry.Strategy)

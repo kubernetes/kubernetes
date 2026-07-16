@@ -2825,7 +2825,8 @@ func TestValidateRestoreCheckpoint(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "ns"},
 			Spec: v1.PodSpec{
 				RestoreFrom: &v1.CheckpointReference{
-					Name: "ckpt",
+					Name:    "ckpt",
+					Options: map[string]string{"example.runtime/target": "node-local"},
 				},
 				InitContainers: []v1.Container{{
 					Name: "init", Image: "registry.example/init@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -8108,7 +8109,7 @@ func TestGenerateAPIPodStatusPodRestored(t *testing.T) {
 
 func TestSyncPodRestoreErrorOutcome(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
-	for _, reason := range []string{events.CheckpointNotReady, events.RestoreInProgress, events.RestorePreparationFailed, events.RestorePostProcessingFailed, events.CheckpointWrongNode, events.PodSpecMismatch, events.RestoreFailed, ""} {
+	for _, reason := range []string{events.CheckpointNotReady, events.RestoreInProgress, events.RestorePolicyUnavailable, events.RestorePreparationFailed, events.RestorePostProcessingFailed, events.CheckpointWrongNode, events.PodSpecMismatch, events.RestoreFailed, ""} {
 		t.Run(reason, func(t *testing.T) {
 			ctx := ktesting.Init(t)
 			testKubelet := newTestKubelet(t, false)
@@ -8148,9 +8149,10 @@ func TestSyncPodRestoreErrorOutcome(t *testing.T) {
 			}
 			require.Error(t, err)
 			require.False(t, terminal)
+			require.Equal(t, events.RestoreInProgress, condition.Reason)
 			require.Equal(t, v1.ConditionUnknown, condition.Status)
 			require.Equal(t, v1.PodPending, got.Phase)
-			// The lock is available on the next sync; the same attempt can finish.
+			// The blocker clears on the next sync; the same attempt can finish.
 			testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{SyncResults: []*kubecontainer.SyncResult{{
 				Action: kubecontainer.RestorePodSandbox,
 				Target: pod.UID,

@@ -30,7 +30,8 @@ import (
 func Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Handler = in.Spec.RuntimeHandler
-	// This version predates the v1-only checkpoint option policy.
+	// This version predates the v1-only podCheckpointOptions, which holds both
+	// the checkpoint and the restore option allowlists.
 	out.PodCheckpointOptions = nil
 
 	if in.Spec.Overhead != nil {

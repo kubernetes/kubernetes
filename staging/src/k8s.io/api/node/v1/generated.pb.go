@@ -238,6 +238,15 @@ func (m *RuntimeClassPodCheckpointOptions) MarshalToSizedBuffer(dAtA []byte) (in
 	_ = i
 	var l int
 	_ = l
+	if len(m.AllowedRestoreOptions) > 0 {
+		for iNdEx := len(m.AllowedRestoreOptions) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.AllowedRestoreOptions[iNdEx])
+			copy(dAtA[i:], m.AllowedRestoreOptions[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.AllowedRestoreOptions[iNdEx])))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
 	if len(m.AllowedCheckpointOptions) > 0 {
 		for iNdEx := len(m.AllowedCheckpointOptions) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.AllowedCheckpointOptions[iNdEx])
@@ -394,6 +403,12 @@ func (m *RuntimeClassPodCheckpointOptions) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	if len(m.AllowedRestoreOptions) > 0 {
+		for _, s := range m.AllowedRestoreOptions {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -482,6 +497,7 @@ func (this *RuntimeClassPodCheckpointOptions) String() string {
 	}
 	s := strings.Join([]string{`&RuntimeClassPodCheckpointOptions{`,
 		`AllowedCheckpointOptions:` + fmt.Sprintf("%v", this.AllowedCheckpointOptions) + `,`,
+		`AllowedRestoreOptions:` + fmt.Sprintf("%v", this.AllowedRestoreOptions) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1099,6 +1115,38 @@ func (m *RuntimeClassPodCheckpointOptions) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.AllowedCheckpointOptions = append(m.AllowedCheckpointOptions, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllowedRestoreOptions", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.AllowedRestoreOptions = append(m.AllowedRestoreOptions, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

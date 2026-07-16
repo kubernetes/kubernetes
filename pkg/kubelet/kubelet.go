@@ -2646,7 +2646,7 @@ func (kl *Kubelet) handlePodRestoreResult(ctx context.Context, pod *v1.Pod, apiP
 	}
 	reason := kubecontainer.RestoreErrorReason(result.Error())
 	switch reason {
-	case events.CheckpointNotReady, events.RestoreInProgress, events.RestorePreparationFailed, events.RestorePostProcessingFailed:
+	case events.CheckpointNotReady, events.RestoreInProgress, events.RestorePolicyUnavailable, events.RestorePreparationFailed, events.RestorePostProcessingFailed:
 		return false, nil
 	}
 	if reason == "" {

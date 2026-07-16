@@ -39,6 +39,8 @@ overhead:
 podCheckpointOptions:
   allowedCheckpointOptions:
   - allowedCheckpointOptionsValue
+  allowedRestoreOptions:
+  - allowedRestoreOptionsValue
 scheduling:
   nodeSelector:
     nodeSelectorKey: nodeSelectorValue
