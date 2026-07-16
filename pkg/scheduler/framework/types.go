@@ -564,7 +564,7 @@ type QueuedEntityInfo interface {
 	// If fn returns false, the iteration stops.
 	ForEachPodInfo(fn func(pInfo *QueuedPodInfo) bool)
 	// Update updates the specified pod in the entity and returns the updated QueuedPodInfo.
-	Update(pod *v1.Pod) (*QueuedPodInfo, error)
+	Update(pod *v1.Pod, newSignature fwk.PodSignature) (*QueuedPodInfo, error)
 	// Gated returns true if the entity is gated by any plugin at PreEnqueue.
 	Gated() bool
 	// Size returns the number of pods in the entity.
@@ -727,10 +727,10 @@ func (pqi *QueuedPodInfo) ForEachPodInfo(fn func(pInfo *QueuedPodInfo) bool) {
 	_ = fn(pqi)
 }
 
-// Update updates the pod in QueuedPodInfo and clears the cached PodSignature,
+// Update updates the pod in QueuedPodInfo and sets the new PodSignature,
 // since the updated pod may no longer match the signature computed for the previous version.
-func (pqi *QueuedPodInfo) Update(pod *v1.Pod) (*QueuedPodInfo, error) {
-	pqi.PodSignature = nil
+func (pqi *QueuedPodInfo) Update(pod *v1.Pod, newSignature fwk.PodSignature) (*QueuedPodInfo, error) {
+	pqi.PodSignature = newSignature
 	err := pqi.PodInfo.Update(pod)
 	return pqi, err
 }
@@ -803,8 +803,34 @@ type QueuedPodGroupInfo struct {
 	*PodGroupInfo
 	QueueingParams
 	// QueuedPodInfos are the pod group's pods that are currently queued.
-	// The order of the pods is deterministic and based on the priority and timestamp.
+	// The order of the pods is deterministic.
+	// 1. Pods are arranged into sub-groups by their signatures.
+	// 2. Pods in every sub-group are sorted using PodGroupMemberPodsOrderingFunc() - higher priority, more attempts, earlier timestamp.
+	// 3. Sub-groups are sorted based on the first pod in each sub-group using PodGroupMemberPodsOrderingFunc() and lexicographically.
+	// Example:
+	// Pod1(p=1, a=2, t=3, sig="a")
+	// Pod2(p=5, a=2, t=3, sig="a")
+	// Pod3(p=10, a=3, t=3, sig="b")
+	// Pod4(p=10, a=2, t=3, sig="b")
+	// Pod5(p=5, a=3, t=2, sig="c")
+	// Pod6(p=5, a=3, t=3, sig="c")
+	// Sub-groups: {"a": {Pod1, Pod2}, "b": {Pod4, Pod3}, "c": {Pod5, Pod6}}
+	// Sorted sub-groups:
+	// 	"a": {Pod2, Pod1} - Pod2.p > Pod1.p
+	//  "b": {Pod3, Pod4} - Pod3.p == Pod4.p and Pod3.a > Pod4.a
+	//  "c": {Pod6, Pod5} - Pod5.p == Pod6.p and Pod5.a == Pod6.a and Pod6.t > Pod5.t
+	// Sub-groups order: "b", "a", "c"
+	// 	- "b" has higher priority than "a" and "c".
+	// 	- "a" and "c" have same priority, attempts and timestamp so they are sorted based on lexicographical order of signatures.
+	// Sorted pods: Pod3, Pod4, Pod2, Pod1, Pod6, Pod5
+
 	QueuedPodInfos []*QueuedPodInfo
+
+	// buckets stores pods grouped by their PodSignature string representation.
+	buckets map[string][]*QueuedPodInfo
+	// signatureOrder stores the deterministic ordering of pod signatures (sub-groups).
+	// Sorting is done based on the first pod in each sub-group using PodGroupMemberPodsOrderingFunc() and lexicographically.
+	signatureOrder []string
 }
 
 func (pgqi *QueuedPodGroupInfo) Type() string {
@@ -813,30 +839,131 @@ func (pgqi *QueuedPodGroupInfo) Type() string {
 
 // AddPod adds a pod to the queued pod group info.
 func (pgqi *QueuedPodGroupInfo) AddPod(pInfo *QueuedPodInfo) {
-	index, _ := slices.BinarySearchFunc(pgqi.QueuedPodInfos, pInfo, PodGroupMemberPodsOrderingFunc)
-	pgqi.QueuedPodInfos = slices.Insert(pgqi.QueuedPodInfos, index, pInfo)
-	pgqi.UnscheduledPods = slices.Insert(pgqi.UnscheduledPods, index, pInfo.Pod)
+	if pgqi.buckets == nil {
+		pgqi.SetPods(append(pgqi.QueuedPodInfos, pInfo))
+		return
+	}
+	sig := string(pInfo.PodSignature)
+	index := pgqi.addToBucket(pInfo, sig)
+	// Index equals 0 implies that a new bucket was created or the new
+	// pod is taking the first place in the bucket. In either case, the
+	// signature order may need to be updated.
+	if index == 0 {
+		pgqi.sortSignatures()
+	}
+	pgqi.updateSliceOrder()
 }
 
 // RemovePod removes a pod from the queued pod group info.
 func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
-	for i, pInfo := range pgqi.QueuedPodInfos {
+	if pgqi.buckets == nil {
+		pgqi.SetPods(pgqi.QueuedPodInfos)
+	}
+	var removed *QueuedPodInfo
+	for _, pInfo := range pgqi.QueuedPodInfos {
 		if pInfo.Pod.Name == pod.Name && pInfo.Pod.Namespace == pod.Namespace {
-			pgqi.QueuedPodInfos = slices.Delete(pgqi.QueuedPodInfos, i, i+1)
-			pgqi.UnscheduledPods = slices.Delete(pgqi.UnscheduledPods, i, i+1)
-			return pInfo
+			removed = pInfo
+			break
 		}
 	}
-	return nil
+	if removed == nil {
+		return nil
+	}
+	index, err := pgqi.removeFromBucket(pod, string(removed.PodSignature))
+	if err != nil {
+		return nil
+	}
+	// Index equals 0 implies that a bucket became empty or the removed pod was
+	// its first pod. In either case, the signature order may need to be updated.
+	if index == 0 {
+		pgqi.sortSignatures()
+	}
+	pgqi.updateSliceOrder()
+	return removed
 }
 
 // SetPods sets the pods in the queued pod group info, overwriting the existing ones.
 func (pgqi *QueuedPodGroupInfo) SetPods(pInfos []*QueuedPodInfo) {
-	pgqi.QueuedPodInfos = pInfos
-	slices.SortStableFunc(pgqi.QueuedPodInfos, PodGroupMemberPodsOrderingFunc)
-	pgqi.UnscheduledPods = make([]*v1.Pod, 0, len(pgqi.QueuedPodInfos))
-	for _, pInfo := range pgqi.QueuedPodInfos {
-		pgqi.UnscheduledPods = append(pgqi.UnscheduledPods, pInfo.Pod)
+	pgqi.buckets = make(map[string][]*QueuedPodInfo)
+	for _, pInfo := range pInfos {
+		sig := string(pInfo.PodSignature)
+		pgqi.buckets[sig] = append(pgqi.buckets[sig], pInfo)
+	}
+	pgqi.signatureOrder = make([]string, 0, len(pgqi.buckets))
+	for sig, bucket := range pgqi.buckets {
+		slices.SortStableFunc(bucket, PodGroupMemberPodsOrderingFunc)
+		pgqi.signatureOrder = append(pgqi.signatureOrder, sig)
+	}
+	pgqi.sortSignatures()
+	pgqi.updateSliceOrder()
+}
+
+// removeFromBucket removes a pod from the bucket and returns the index of the removed pod.
+func (pgqi *QueuedPodGroupInfo) removeFromBucket(pod *v1.Pod, sig string) (int, error) {
+	bucket, exists := pgqi.buckets[sig]
+	if !exists {
+		return 0, fmt.Errorf("no bucket with signature %s found", sig)
+	}
+	if len(bucket) == 1 {
+		delete(pgqi.buckets, sig)
+		for i, s := range pgqi.signatureOrder {
+			if s == sig {
+				pgqi.signatureOrder = slices.Delete(pgqi.signatureOrder, i, i+1)
+				break
+			}
+		}
+		return 0, nil
+	}
+	for i, pInfo := range bucket {
+		if pInfo.Pod.Name == pod.Name && pInfo.Pod.Namespace == pod.Namespace {
+			pgqi.buckets[sig] = slices.Delete(bucket, i, i+1)
+			// Resorting is needed when removing elemnt from first place in bucket.
+			return i, nil
+		}
+	}
+	return 0, fmt.Errorf("pod %s/%s not found in bucket", pod.Namespace, pod.Name)
+}
+
+// addToBucket adds a pod to the bucket and returns the index of the added pod within the bucket.
+func (pgqi *QueuedPodGroupInfo) addToBucket(pInfo *QueuedPodInfo, sig string) int {
+	bucket, exists := pgqi.buckets[sig]
+	if !exists {
+		pgqi.buckets[sig] = []*QueuedPodInfo{pInfo}
+		pgqi.signatureOrder = append(pgqi.signatureOrder, sig)
+		return 0
+	}
+	index, _ := slices.BinarySearchFunc(bucket, pInfo, PodGroupMemberPodsOrderingFunc)
+	pgqi.buckets[sig] = slices.Insert(bucket, index, pInfo)
+	return index
+}
+
+// sortSignatures sorts the signatureOrder by the representative pod of each sub-group ensures
+// the oldest workload in the gang is evaluated first while preserving Opportunistic Batching.
+func (pgqi *QueuedPodGroupInfo) sortSignatures() {
+	slices.SortStableFunc(pgqi.signatureOrder, func(sigA, sigB string) int {
+		repA := pgqi.buckets[sigA][0]
+		repB := pgqi.buckets[sigB][0]
+		if cmp := PodGroupMemberPodsOrderingFunc(repA, repB); cmp != 0 {
+			return cmp
+		}
+		return strings.Compare(sigA, sigB)
+	})
+}
+
+// updateSliceOrder synchronizes QueuedPodInfos and UnscheduledPods with the current state of buckets
+// and signatureOrder.
+func (pgqi *QueuedPodGroupInfo) updateSliceOrder() {
+	var total int
+	for _, bucket := range pgqi.buckets {
+		total += len(bucket)
+	}
+	pgqi.QueuedPodInfos = make([]*QueuedPodInfo, 0, total)
+	pgqi.UnscheduledPods = make([]*v1.Pod, 0, total)
+	for _, sig := range pgqi.signatureOrder {
+		pgqi.QueuedPodInfos = append(pgqi.QueuedPodInfos, pgqi.buckets[sig]...)
+		for _, pInfo := range pgqi.buckets[sig] {
+			pgqi.UnscheduledPods = append(pgqi.UnscheduledPods, pInfo.Pod)
+		}
 	}
 }
 
@@ -876,12 +1003,47 @@ func (pgqi *QueuedPodGroupInfo) ForEachPodInfo(fn func(pInfo *QueuedPodInfo) boo
 	}
 }
 
-func (pgqi *QueuedPodGroupInfo) Update(pod *v1.Pod) (*QueuedPodInfo, error) {
+// Update updates the given pod in the queued pod group info and reorganizes the signature buckets
+// if the pod's signature changed.
+func (pgqi *QueuedPodGroupInfo) Update(pod *v1.Pod, newSignature fwk.PodSignature) (*QueuedPodInfo, error) {
 	for _, pInfo := range pgqi.QueuedPodInfos {
 		if pInfo.Pod.Name == pod.Name && pInfo.Pod.Namespace == pod.Namespace {
-			err := pInfo.PodInfo.Update(pod)
-			// Pod update shouldn't change the priority or timestamp, so it's safe to keep the precomputed pod group priority.
+			oldSig := string(pInfo.PodSignature)
+			newSig := string(newSignature)
+			if oldSig == newSig {
+				err := pInfo.PodInfo.Update(pod)
+				return pInfo, err
+			}
+			shouldSort := false
+			// Remove from old bucket
+			index, err := pgqi.removeFromBucket(pod, oldSig)
+			if err != nil {
+				return nil, err
+			}
+			// Index equals 0 implies that a bucket became empty or the removed pod was
+			// its first pod. In either case, the signature order may need to be updated.
+			if index == 0 {
+				shouldSort = true
+			}
+
+			// Update signature and pod.
+			pInfo.PodSignature = newSignature
+			err = pInfo.PodInfo.Update(pod)
+
+			// Add to new bucket.
+			index = pgqi.addToBucket(pInfo, newSig)
+			// Index equals 0 implies that a new bucket was created or the new
+			// pod is taking the first place in the bucket. In either case, the
+			// signature order may need to be updated.
+			if index == 0 {
+				shouldSort = true
+			}
+			if shouldSort {
+				pgqi.sortSignatures()
+			}
+			pgqi.updateSliceOrder()
 			return pInfo, err
+
 		}
 	}
 	return nil, fmt.Errorf("pod %s/%s to update not found in the queued group info", pod.Namespace, pod.Name)
