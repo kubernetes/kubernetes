@@ -3379,6 +3379,9 @@
           "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -3528,6 +3531,9 @@
           "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -3624,6 +3630,9 @@
           "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {

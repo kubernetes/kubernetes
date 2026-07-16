@@ -13075,6 +13075,7 @@ func schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref common.Refer
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -13368,6 +13369,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReview(ref common.Refere
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -13517,6 +13519,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReview(ref common.ReferenceC
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -13757,6 +13760,7 @@ func schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref common.
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -14050,6 +14054,7 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReview(ref common.R
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -14199,6 +14204,7 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReview(ref common.Refer
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
