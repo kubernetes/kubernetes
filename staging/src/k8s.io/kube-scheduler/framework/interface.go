@@ -498,11 +498,6 @@ type EnqueueExtensions interface {
 // PreFilterExtensions is an interface that is included in plugins that allow specifying
 // callbacks to make incremental updates to its supposedly pre-calculated
 // state.
-// Note: In some contexts (e.g., preemption), the passed NodeInfo might be a shared, non-snapshotted
-// instance (especially for remote nodes affected by cross-node victims). Implementations
-// must treat the nodeInfo parameter as read-only and must NOT mutate it (e.g., by calling
-// RemovePod or AddPodInfo). Additionally, plugins that read NodeInfo directly during Filter
-// (rather than CycleState) will observe stale state for those remote nodes.
 type PreFilterExtensions interface {
 	// AddPod is called by the framework while trying to evaluate the impact
 	// of adding podToAdd to the node while scheduling podToSchedule.
@@ -593,33 +588,6 @@ type PostFilterPlugin interface {
 	// a preemption plugin may choose to return nominatedNodeName, so that framework can reuse that to update the
 	// preemptor pod's .spec.status.nominatedNodeName field.
 	PostFilter(ctx context.Context, state CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusReader) (*PostFilterResult, *Status)
-}
-
-// PodGroupSchedulingFunc is a function that will be run to check feasibility of a pod group scheduling.
-type PodGroupSchedulingFunc func(ctx context.Context) (*PodGroupAssignments, *Status)
-
-// PodGroupPostFilterResult stores information about nominated nodes for a pod group.
-type PodGroupPostFilterResult struct {
-	// NominatingInfos maps pods in the pod group to their nominated node info. It only contains pods that have a nominated node.
-	NominatingInfos map[types.NamespacedName]*NominatingInfo
-}
-
-// PodGroupPostFilterPlugin is an interface for "PodGroupPostFilter" plugins. These plugins are called
-// after a PodGroup cannot be scheduled.
-type PodGroupPostFilterPlugin interface {
-	Plugin
-
-	// PodGroupPostFilter is called by the scheduling framework
-	// when the pod group scheduling cycle failed.
-	//
-	//
-	// A PodGroupPostFilter plugin should return one of the following statuses:
-	// - Unschedulable: the plugin gets executed successfully but the PodGroup cannot be made schedulable.
-	// - UnschedulableAndUnresolvable: the plugin gets executed successfully but the PodGroup cannot be made schedulable,
-	//   and other PodGroupPostFilter plugins cannot make the group schedulable so evaluation of subsequent plugins is skipped.
-	// - Success: the plugin gets executed successfully, the PodGroup can be made schedulable and evaluation of subsequent plugins is skipped.
-	// - Error: the plugin aborts due to some internal error.
-	PodGroupPostFilter(ctx context.Context, state PodGroupCycleState, pgInfo PodGroupInfo, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *Status)
 }
 
 // PreScorePlugin is an interface for "PreScore" plugin. PreScore is an
@@ -861,11 +829,6 @@ type Handle interface {
 	// Instead, they should use the resources getting from Informer created from SharedInformerFactory().
 	SnapshotSharedLister() SharedLister
 
-	// MutableSnapshotSharedLister returns a lister that supports mutating the snapshot.
-	// It extends SharedLister interface.
-	// Only PodGroupPostFilter extension point can use this.
-	MutableSnapshotSharedLister() MutableSnapshotSharedLister
-
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
 	IterateOverWaitingPods(callback func(WaitingPod))
 
@@ -989,12 +952,4 @@ type PluginsRunner interface {
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
 	RunPreFilterExtensionRemovePod(ctx context.Context, state CycleState, podToSchedule *v1.Pod, podInfoToRemove PodInfo, nodeInfo NodeInfo) *Status
-	// RunReservePluginsReserve runs the Reserve method of the set of
-	// configured Reserve plugins. If any of these calls returns an error, it
-	// does not continue running the remaining ones and returns the error. In
-	// such case, pod will not be scheduled.
-	RunReservePluginsReserve(ctx context.Context, state CycleState, pod *v1.Pod, nodeName string) *Status
-	// RunReservePluginsUnreserve runs the Unreserve method of the set of
-	// configured Reserve plugins.
-	RunReservePluginsUnreserve(ctx context.Context, state CycleState, pod *v1.Pod, nodeName string)
 }
