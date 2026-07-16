@@ -27,7 +27,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -302,7 +303,7 @@ func TestPrepareCandidate(t *testing.T) {
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
 
-		podGroupPreemptor = &schedulingapi.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
+		podGroupPreemptor = &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
 
 		errDeletePodFailed   = errors.New("delete pod failed")
 		errPatchStatusFailed = errors.New("patch pod status failed")
@@ -315,12 +316,13 @@ func TestPrepareCandidate(t *testing.T) {
 	victimWithDeletionTimestamp.Finalizers = []string{"test"}
 
 	tests := []struct {
-		name              string
-		nodeNames         []string
-		candidate         Candidate
-		preemptor         *v1.Pod
-		preemptorPodGroup *schedulingapi.PodGroup
-		testPods          []*v1.Pod
+		name                       string
+		nodeNames                  []string
+		candidate                  Candidate
+		preemptor                  *v1.Pod
+		preemptorPodGroup          *schedulingv1beta1.PodGroup
+		preemptorCompositePodGroup *schedulingv1alpha3.CompositePodGroup
+		testPods                   []*v1.Pod
 		// expectedDeletedPod is the pod name that is expected to be deleted.
 		//
 		// You can set multiple pod name if there're multiple possibilities.
@@ -386,6 +388,27 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("pg1")),
+		},
+		{
+			name: "compositepodgroup preemptor, one victim without condition",
+
+			candidate: &candidate{
+				name: node1Name,
+				victims: &extenderv1.Victims{
+					Pods: []*v1.Pod{
+						victim1,
+					},
+				},
+			},
+			preemptor:                  preemptor,
+			preemptorCompositePodGroup: &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}},
+			testPods: []*v1.Pod{
+				victim1,
+			},
+			nodeNames:             []string{node1Name},
+			expectedDeletedPod:    []string{"victim1"},
+			expectedStatus:        nil,
+			expectedPreemptingMap: sets.New(types.UID("cpg1")),
 		},
 		{
 			name: "one victim, but victim is already being deleted",
@@ -740,7 +763,9 @@ func TestPrepareCandidate(t *testing.T) {
 					executor := NewExecutor(framework, feature.Features{EnableAsyncPreemption: asyncPreemptionEnabled})
 
 					var preemptor ExecutorPreemptor
-					if tt.preemptorPodGroup != nil {
+					if tt.preemptorCompositePodGroup != nil {
+						preemptor = &compositePodGroupExecutorPreemptor{cpg: tt.preemptorCompositePodGroup, pods: []*v1.Pod{tt.preemptor}}
+					} else if tt.preemptorPodGroup != nil {
 						preemptor = &podGroupExecutorPreemptor{pg: tt.preemptorPodGroup, pods: []*v1.Pod{tt.preemptor}}
 					} else {
 						preemptor = &podExecutorPreemptor{Pod: tt.preemptor}
@@ -873,8 +898,9 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 				SchedulerName(defaultSchedulerName).Priority(highPriority).
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
-		preemptorPodGroup = &schedulingapi.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
-		testPods          = []*v1.Pod{
+		preemptorPodGroup          = &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
+		preemptorCompositePodGroup = &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}
+		testPods                   = []*v1.Pod{
 			victim1,
 			victim2,
 		}
@@ -924,10 +950,10 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 		},
 	}
 
-	for _, isPodGroup := range []bool{false, true} {
+	for _, preemptorType := range []string{"pod", "podgroup", "compositepodgroup"} {
 		for _, asyncAPICallsEnabled := range []bool{true, false} {
 			for _, tt := range tests {
-				t.Run(fmt.Sprintf("%v (isPodGroup: %v, Async API calls enabled: %v)", tt.name, isPodGroup, asyncAPICallsEnabled), func(t *testing.T) {
+				t.Run(fmt.Sprintf("%v (preemptorType: %v, Async API calls enabled: %v)", tt.name, preemptorType, asyncAPICallsEnabled), func(t *testing.T) {
 					metrics.Register()
 					logger, ctx := ktesting.NewTestContext(t)
 					ctx, cancel := context.WithCancel(ctx)
@@ -983,8 +1009,11 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: true})
 
 					expectedPreemptorUID := tt.preemptor.UID
-					if isPodGroup {
+					switch preemptorType {
+					case "podgroup":
 						expectedPreemptorUID = preemptorPodGroup.UID
+					case "compositepodgroup":
+						expectedPreemptorUID = preemptorCompositePodGroup.UID
 					}
 					// preemptPodCallsCounter helps verify if the last victim pod gets preempted after other victims.
 					preemptPodCallsCounter := 0
@@ -1032,8 +1061,11 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					executor.mu.RUnlock()
 
 					var preemptor ExecutorPreemptor = &podExecutorPreemptor{Pod: tt.preemptor}
-					if isPodGroup {
+					switch preemptorType {
+					case "podgroup":
 						preemptor = &podGroupExecutorPreemptor{pg: preemptorPodGroup, pods: []*v1.Pod{tt.preemptor}}
+					case "compositepodgroup":
+						preemptor = &compositePodGroupExecutorPreemptor{cpg: preemptorCompositePodGroup, pods: []*v1.Pod{tt.preemptor}}
 					}
 					executor.prepareCandidateAsync(tt.candidate, preemptor, "test-plugin")
 
@@ -1089,7 +1121,8 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 	tests := []struct {
 		name                                 string
 		victims                              []*v1.Pod
-		preemptorPodGroup                    *schedulingapi.PodGroup
+		preemptorPodGroup                    *schedulingv1beta1.PodGroup
+		preemptorCompositePodGroup           *schedulingv1alpha3.CompositePodGroup
 		preemptorPods                        []*v1.Pod
 		expectSuccessfulPreemption           bool
 		expectPreemptionAttemptForLastVictim bool
@@ -1165,7 +1198,17 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			victims: []*v1.Pod{
 				makeVictim(failVictimNamePrefix),
 			},
-			preemptorPodGroup:                    &schedulingapi.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default"}},
+			preemptorPodGroup:                    &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default"}},
+			preemptorPods:                        []*v1.Pod{makePod("pod1", highPriority), makePod("pod2", highPriority)},
+			expectSuccessfulPreemption:           false,
+			expectPreemptionAttemptForLastVictim: true,
+		},
+		{
+			name: "Failure with a single victim for composite pod group",
+			victims: []*v1.Pod{
+				makeVictim(failVictimNamePrefix),
+			},
+			preemptorCompositePodGroup:           &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default"}},
 			preemptorPods:                        []*v1.Pod{makePod("pod1", highPriority), makePod("pod2", highPriority)},
 			expectSuccessfulPreemption:           false,
 			expectPreemptionAttemptForLastVictim: true,
@@ -1243,7 +1286,9 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: true})
 
 			// Run the actual preemption.
-			if tt.preemptorPodGroup != nil {
+			if tt.preemptorCompositePodGroup != nil {
+				executor.prepareCandidateAsync(candidate, &compositePodGroupExecutorPreemptor{cpg: tt.preemptorCompositePodGroup, pods: tt.preemptorPods}, "test-plugin")
+			} else if tt.preemptorPodGroup != nil {
 				executor.prepareCandidateAsync(candidate, &podGroupExecutorPreemptor{pg: tt.preemptorPodGroup, pods: tt.preemptorPods}, "test-plugin")
 			} else {
 				executor.prepareCandidateAsync(candidate, &podExecutorPreemptor{Pod: preemptor}, "test-plugin")
@@ -1280,7 +1325,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			}
 
 			// Verify that the preemptor is activated if and only if the async preemption fails.
-			if tt.preemptorPodGroup != nil {
+			if tt.preemptorPodGroup != nil || tt.preemptorCompositePodGroup != nil {
 				if len(fakeActivator.activatedPods) != len(tt.preemptorPods) {
 					t.Errorf("Expected %d pods to be activated, but got %v", len(tt.preemptorPods), fakeActivator.activatedPods)
 				}
@@ -1387,7 +1432,8 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 
 func TestPreemptPod(t *testing.T) {
 	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
-	preemptorPodGroup := &schedulingapi.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"}}
+	preemptorPodGroup := &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"}}
+	preemptorCompositePodGroup := &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", Namespace: "default"}}
 	preemptorPods := []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(highPriority).Obj(), st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj()}
 
 	victimPod := st.MakePod().Name("v").UID("v").Priority(midPriority).Obj()
@@ -1422,9 +1468,9 @@ func TestPreemptPod(t *testing.T) {
 		},
 	}
 
-	for _, isPodGroup := range []bool{false, true} {
+	for _, preemptorType := range []string{"pod", "podgroup", "compositepodgroup"} {
 		for _, tt := range tests {
-			t.Run(fmt.Sprintf("%v (isPodGroup: %v)", tt.name, isPodGroup), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%v (preemptorType: %v)", tt.name, preemptorType), func(t *testing.T) {
 				podsInPreBind := frameworkruntime.NewPodsInPreBindMap()
 				waitingPods := frameworkruntime.NewWaitingPodsMap()
 				registeredPlugins := append([]tf.RegisterPluginFunc{
@@ -1433,7 +1479,7 @@ func TestPreemptPod(t *testing.T) {
 					tf.RegisterPermitPlugin(waitingPermitPluginName, newWaitingPermitPlugin),
 				)
 				objs := []runtime.Object{preemptorPod, victimPod}
-				if isPodGroup {
+				if preemptorType != "pod" {
 					for _, p := range preemptorPods {
 						objs = append(objs, p)
 					}
@@ -1473,8 +1519,11 @@ func TestPreemptPod(t *testing.T) {
 				pe := NewExecutor(fwk, feature.Features{})
 
 				var preemptor ExecutorPreemptor = &podExecutorPreemptor{Pod: preemptorPod}
-				if isPodGroup {
+				switch preemptorType {
+				case "podgroup":
 					preemptor = &podGroupExecutorPreemptor{pg: preemptorPodGroup, pods: preemptorPods}
+				case "compositepodgroup":
+					preemptor = &compositePodGroupExecutorPreemptor{cpg: preemptorCompositePodGroup, pods: preemptorPods}
 				}
 
 				preemptedInMemory, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimPod, "test-plugin")
@@ -1512,7 +1561,8 @@ func TestPreemptPod(t *testing.T) {
 func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemption(t *testing.T) {
 	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
 	secondPreemptorPod := st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj()
-	preemptorPodGroup := &schedulingapi.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", UID: "pg"}}
+	preemptorPodGroup := &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", UID: "pg"}}
+	preemptorCompositePodGroup := &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", UID: "cpg"}}
 	waitingVictim := st.MakePod().Name("waiting-v").UID("waiting-v").Priority(midPriority).Node("node1").Obj()
 	preBindVictim := st.MakePod().Name("prebind-v").UID("prebind-v").Priority(midPriority).Node("node1").Obj()
 	apiVictim := st.MakePod().Name("api-v").UID("api-v").Priority(midPriority).Node("node1").Obj()
@@ -1524,7 +1574,8 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 		addVictimToPrebind          bool
 		addVictimToPrebindOnPreempt bool
 		addVictimToWaiting          bool
-		preemptorPodGroup           *schedulingapi.PodGroup
+		preemptorPodGroup           *schedulingv1beta1.PodGroup
+		preemptorCompositePodGroup  *schedulingv1alpha3.CompositePodGroup
 		preemptorPods               []*v1.Pod
 		wantPreemptorActivate       bool
 	}{
@@ -1566,6 +1617,15 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			wantPreemptorActivate: true,
 		},
 		{
+			name:                       "last waiting pod for composite pod group",
+			victimPods:                 []*v1.Pod{waitingVictim.DeepCopy()},
+			inMemoryVictim:             waitingVictim.DeepCopy(),
+			addVictimToWaiting:         true,
+			preemptorCompositePodGroup: preemptorCompositePodGroup,
+			preemptorPods:              []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:      true,
+		},
+		{
 			name:               "non-last waiting pod",
 			victimPods:         []*v1.Pod{waitingVictim.DeepCopy(), apiVictim.DeepCopy()},
 			inMemoryVictim:     waitingVictim.DeepCopy(),
@@ -1602,6 +1662,8 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			var preemptor ExecutorPreemptor = &podExecutorPreemptor{Pod: preemptorPods[0]}
 			if tt.preemptorPodGroup != nil {
 				preemptor = &podGroupExecutorPreemptor{pg: tt.preemptorPodGroup, pods: preemptorPods}
+			} else if tt.preemptorCompositePodGroup != nil {
+				preemptor = &compositePodGroupExecutorPreemptor{cpg: tt.preemptorCompositePodGroup, pods: preemptorPods}
 			}
 
 			objects := make([]runtime.Object, 0, len(preemptorPods)+len(tt.victimPods))
@@ -1942,7 +2004,7 @@ func verifyPreemptionMetricsDelta(t *testing.T, reg componentmetrics.KubeRegistr
 	numPDBViolations := float64(c.Victims().NumPDBViolations)
 	workloadDisruptions := float64(c.NumPodGroupDisruptions())
 
-	if preemptorType == "podgroup" {
+	if preemptorType == string(fwk.PodGroupKeyType) || preemptorType == string(fwk.CompositePodGroupKeyType) {
 		after.workloadPreemptionVictims.assertDelta(t, before.workloadPreemptionVictims, 1, numVictims)
 		after.preemptionVictims.assertDelta(t, before.preemptionVictims, 0, 0)
 	} else {
