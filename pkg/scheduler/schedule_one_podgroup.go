@@ -35,6 +35,7 @@ import (
 	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -290,9 +291,18 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	result = completePodGroupAlgorithmResult(ctx, podGroupInfo, podGroupCycleState, runAllPostFilters, result)
 	metrics.PodGroupSchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 
-	// Run pod group post filter plugins if scheduling failed. If any of the plugins is successful,
-	// we need to put the pods from pod group back into the scheduling queue.
-	if result.status.Code() == fwk.Unschedulable {
+	// If the pod group scheduling failed or only partially succeeded, we run PodGroupPostFilter
+	// plugins to attempt preemption. If a plugin finds a feasible placement via preemption,
+	// we record the nominated nodes so the pods can be retried with these resource reservations.
+	if result.status.Code() == fwk.Unschedulable || result.status.Code() == fwk.PartialSuccess {
+		originalCount := 0
+		for _, podResult := range result.podResults {
+			if podResult.status.IsSuccess() {
+				originalCount++
+			}
+		}
+		podGroupCycleState.Write(preemption.OriginalScheduledCountKey, &preemption.OriginalScheduledCount{Count: originalCount})
+
 		var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 			res := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runWithoutPostFilters)
 			return &fwk.PodGroupAssignments{
@@ -569,7 +579,8 @@ func completePodGroupAlgorithmResult(ctx context.Context, podGroupInfo *framewor
 // submitPodGroupAlgorithmResult submits the result of the pod group scheduling algorithm.
 // It assumes that podGroupResult contains results for all pods from the pod group,
 // if it does not, podGroupCondition will be updated to reflect the error.
-// If that algorithm succedeed, the schedulable pods proceed to the binding cycle.
+// If the scheduling algorithm succeeded (or partially succeeded without requiring preemption),
+// the schedulable pods proceed to the binding cycle.
 // Unschedulable pods are moved back to the scheduling queue and need to wait
 // for the next pod group scheduling cycle.
 // If the preemption is required for this pod group, all pods are moved back to the scheduling queue
@@ -604,7 +615,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 		}
 		if podResult.status.IsSuccess() {
 			switch {
-			case podGroupResult.status.IsSuccess():
+			case podGroupResult.status.IsSuccess() || (podGroupResult.status.IsPartialSuccess() && !podGroupResult.waitingOnPreemption):
 				// Disable pod group scheduling in cycle state before binding.
 				podCtx.state.SetPodGroupSchedulingCycle(nil)
 				// Schedule result is applied for pod and its binding cycle executes.
@@ -617,7 +628,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 				}
 				go sched.runBindingCycle(ctx, podCtx.state, schedFwk, podResult.scheduleResult, assumedPodInfo, podSchedulingStart, podCtx.podsToActivate)
 				scheduledPods++
-			case podGroupResult.status.IsRejected():
+			case podGroupResult.status.IsRejected() || (podGroupResult.status.IsPartialSuccess() && podGroupResult.waitingOnPreemption):
 				if podGroupResult.waitingOnPreemption {
 					// Pod has to come back to the scheduling queue as unschedulable, waiting for preemption to complete.
 					sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status, podResult.scheduleResult.nominatingInfo, podSchedulingStart)
@@ -651,7 +662,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 
 	var condition *metav1.Condition
 	switch {
-	case podGroupResult.status.IsSuccess():
+	case podGroupResult.status.IsSuccess() || (podGroupResult.status.IsPartialSuccess() && !podGroupResult.waitingOnPreemption):
 		condition = &metav1.Condition{
 			Type:    schedulingapi.PodGroupInitiallyScheduled,
 			Status:  metav1.ConditionTrue,
@@ -661,7 +672,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 		logger.V(2).Info("Successfully scheduled a pod group", "podGroup", klog.KObj(podGroupInfo), "scheduledPods", scheduledPods, "unschedulablePods", unschedulablePods)
 		metrics.PodGroupScheduled(schedFwk.ProfileName(), metrics.SinceInSeconds(start))
 
-	case podGroupResult.status.IsRejected():
+	case podGroupResult.status.IsRejected() || (podGroupResult.status.IsPartialSuccess() && podGroupResult.waitingOnPreemption):
 		condition = &metav1.Condition{
 			Type:    schedulingapi.PodGroupInitiallyScheduled,
 			Status:  metav1.ConditionFalse,

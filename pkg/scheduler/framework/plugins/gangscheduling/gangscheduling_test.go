@@ -17,12 +17,14 @@ limitations under the License.
 package gangscheduling
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -261,10 +263,11 @@ func (pam *podActivatorMock) Activate(_ klog.Logger, pods map[string]*v1.Pod) {
 
 type mockPodGroupState struct {
 	fwk.PodGroupState
-	scheduledPodsCount int
+	scheduledPods []*v1.Pod
 }
 
-func (m *mockPodGroupState) ScheduledPodsCount() int { return m.scheduledPodsCount }
+func (m *mockPodGroupState) ScheduledPodsCount() int  { return len(m.scheduledPods) }
+func (m *mockPodGroupState) ScheduledPods() []*v1.Pod { return m.scheduledPods }
 
 type mockPodGroupStateLister struct {
 	state *mockPodGroupState
@@ -680,6 +683,46 @@ func TestPlacementFeasible(t *testing.T) {
 			},
 			initialScheduledCount: 1,
 		},
+		{
+			name:     "1 pod scheduled, minCount 3, subsequent scheduling attempt has a failure, results in PartialSuccess",
+			minCount: 3,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+				st.MakePod().Name("p3").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Unschedulable,
+				fwk.Success,
+				fwk.Success,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.PartialSuccess,
+			},
+			initialScheduledCount: 1,
+		},
+		{
+			name:     "0 pods scheduled, minCount 2, initial scheduling attempt has a failure, reaching minCount results in Success",
+			minCount: 2,
+			unscheduledPods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+				st.MakePod().Name("p3").Obj(),
+			},
+			podStatuses: []fwk.Code{
+				fwk.Success,
+				fwk.Unschedulable,
+				fwk.Success,
+			},
+			expectedStatuses: []fwk.Code{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Success,
+			},
+			initialScheduledCount: 0,
+		},
 	}
 
 	for _, tc := range tests {
@@ -700,7 +743,14 @@ func TestPlacementFeasible(t *testing.T) {
 			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSyncWithContext(ctx)
 
-			mockState := &mockPodGroupState{scheduledPodsCount: tc.initialScheduledCount}
+			mockState := &mockPodGroupState{}
+			for j := 0; j < tc.initialScheduledCount; j++ {
+				mockState.scheduledPods = append(mockState.scheduledPods, &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						UID: types.UID(fmt.Sprintf("dummy-uid-%d", j)),
+					},
+				})
+			}
 			mockLister := &mockSharedLister{
 				podGroupStateLister: &mockPodGroupStateLister{state: mockState},
 			}
@@ -732,7 +782,7 @@ func TestPlacementFeasible(t *testing.T) {
 
 			for i, code := range tc.podStatuses {
 				if code == fwk.Success {
-					mockState.scheduledPodsCount++
+					mockState.scheduledPods = append(mockState.scheduledPods, tc.unscheduledPods[i])
 				}
 
 				gotStatus := pl.PlacementFeasible(ctx, cycleState, pgInfo, schedulerframework.PlacementFeasibleArgs{Evaluated: i + 1})

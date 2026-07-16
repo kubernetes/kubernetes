@@ -487,7 +487,7 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		}
 	}()
 
-	res, status := pl.podGroupEvaluator.Preempt(ctx, pg, pgInfo.GetUnscheduledPods(), pgSchedulingFunc)
+	res, status := pl.podGroupEvaluator.Preempt(ctx, state, pg, pgInfo.GetUnscheduledPods(), pgSchedulingFunc)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)

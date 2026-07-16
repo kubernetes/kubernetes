@@ -417,3 +417,17 @@ type ViolatingVictim[T Victim] struct {
 	Victim       T
 	ViolateCount int
 }
+
+// OriginalScheduledCountKey is the key to store the number of pods scheduled
+// in the initial run of the current cycle.
+const OriginalScheduledCountKey fwk.StateKey = "preemption.OriginalScheduledCount"
+
+// OriginalScheduledCount stores the number of pods scheduled in the initial run.
+type OriginalScheduledCount struct {
+	Count int
+}
+
+// Clone makes a copy of the OriginalScheduledCount.
+func (s *OriginalScheduledCount) Clone() fwk.StateData {
+	return &OriginalScheduledCount{Count: s.Count}
+}

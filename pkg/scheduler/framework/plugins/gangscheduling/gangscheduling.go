@@ -24,6 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -255,6 +257,26 @@ func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleS
 		return fwk.AsStatus(fmt.Errorf("failed to get podGroup state for podGroup %s to compute gang feasibility: %w", klog.KObj(pg), err))
 	}
 
+	// alreadyScheduledCount tracks the number of pods in the group that were scheduled
+	// (assumed or assigned) before the current scheduling cycle started.
+	// We identify them by checking which scheduled pods in the snapshot were not
+	// in the list of unscheduled pods at the start of the cycle.
+	// TODO: Optimize this by using a new method on PodGroupState to count pods assumed in the current cycle.
+	// Previously scheduled would then be: ScheduledPods() - AssumedInThisCycle()
+	// Ref: https://github.com/kubernetes/kubernetes/issues/140496
+	unscheduledUIDs := sets.New[types.UID]()
+	for _, pod := range podGroupInfo.GetUnscheduledPods() {
+		unscheduledUIDs.Insert(pod.UID)
+	}
+
+	alreadyScheduledCount := 0
+	for _, scheduledPod := range podGroupState.ScheduledPods() {
+		if !unscheduledUIDs.Has(scheduledPod.UID) {
+			alreadyScheduledCount++
+		}
+	}
+	isSubsequent := alreadyScheduledCount > 0
+
 	// remaining is the number of unscheduled pods that haven't been evaluated yet in the current PodGroup scheduling cycle.
 	remaining := len(podGroupInfo.GetUnscheduledPods()) - args.Evaluated
 
@@ -271,6 +293,11 @@ func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleS
 	if scheduled < minCount {
 		// minCount might be satisfied once more remaining pods are evaluated.
 		return fwk.NewStatus(fwk.Wait, fmt.Sprintf("minCount (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+	}
+
+	succeededInCurrentCycle := scheduled - alreadyScheduledCount
+	if isSubsequent && succeededInCurrentCycle > 0 && succeededInCurrentCycle < args.Evaluated {
+		return fwk.NewStatus(fwk.PartialSuccess, fmt.Sprintf("subsequent scheduling attempt is partially successful: %d already scheduled, %d succeeded in this cycle, %d evaluated", alreadyScheduledCount, succeededInCurrentCycle, args.Evaluated))
 	}
 
 	// minCount is satisfied.

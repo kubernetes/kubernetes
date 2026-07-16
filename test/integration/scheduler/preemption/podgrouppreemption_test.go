@@ -55,11 +55,12 @@ func TestPodGroupPreemption(t *testing.T) {
 		features.PodLevelResources: true,
 	})
 	tests := []struct {
-		name          string
-		nodes         []*v1.Node
-		podGroups     []*schedulingapi.PodGroup
-		initialPods   []*v1.Pod // pods that should be scheduled before preemption starts
-		preemptorPods []*v1.Pod // pods that belong to a group and should trigger preemption
+		name            string
+		nodes           []*v1.Node
+		podGroups       []*schedulingapi.PodGroup
+		updatePodGroups []*schedulingapi.PodGroup
+		initialPods     []*v1.Pod // pods that should be scheduled before preemption starts
+		preemptorPods   []*v1.Pod // pods that belong to a group and should trigger preemption
 		// the order may be important to ensure deterministic scheduling result, where only some of the preemptor pods will get scheduled.
 		preemptorPodsQueuedInCreationOrder bool
 		pdb                                *policyv1.PodDisruptionBudget
@@ -915,6 +916,64 @@ func TestPodGroupPreemption(t *testing.T) {
 				return &mockReservePlugin{maxPods: 2}, nil
 			},
 		},
+		{
+			name: "Subsequent Scheduling Preemption (WAP triggers for extra pods even if some are schedulable)",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingapi.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			updatePodGroups: []*schedulingapi.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(4).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				// Initial batch of pg1 (scheduled by kube-scheduler without node assignment, marking pg1 as Scheduled)
+				st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				// Both p3 and p4 need 1 CPU. Only one of them fits in the remaining capacity (1 CPU) without preemption.
+				// To schedule both, low-1 needs to be preempted.
+				st.MakePod().Name("p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("p4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"p1", "p2", "p3", "p4"},
+			expectedPreempted:          []string{"low-1"},
+			expectedToHaveNNNInfo:      []string{"p4"},
+			expectedPodsPreemptedByWAP: 1,
+		},
+		{
+			name: "Subsequent Scheduling Preemption (WAP fails to find victims, schedulable pods move to binding)",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingapi.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			updatePodGroups: []*schedulingapi.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				// Initial batch of pg1 (scheduled by kube-scheduler without node assignment, marking pg1 as Scheduled)
+				st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("mid-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Node("node1").ZeroTerminationGracePeriod().Priority(500).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				// Both p3 and p4 need 1 CPU. Only one of them (p3) fits in the remaining capacity (1 CPU) without preemption.
+				// For p4 to schedule, preemption would be needed, but mid-1 has higher priority (500 > 100), so WAP fails.
+				// Since preemption cannot help, the schedulable pod (p3) is moved to binding while p4 is rejected.
+				st.MakePod().Name("p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("p4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"p1", "p2", "p3", "mid-1"},
+			expectedPreempted:          []string{},
+			expectedUnschedulable:      []string{"p4"},
+			expectedToHaveNNNInfo:      []string{},
+			expectedPodsPreemptedByWAP: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1013,6 +1072,19 @@ func TestPodGroupPreemption(t *testing.T) {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
 					testutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Errorf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
+				}
+			}
+
+			// 3.5 Update PodGroups if specified (e.g. for testing subsequent scheduling when minCount increases)
+			for _, pg := range tt.updatePodGroups {
+				pg.Namespace = ns
+				existingPG, err := cs.SchedulingV1alpha3().PodGroups(ns).Get(testCtx.Ctx, pg.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get PodGroup %s for update: %v", pg.Name, err)
+				}
+				existingPG.Spec = pg.Spec
+				if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Update(testCtx.Ctx, existingPG, metav1.UpdateOptions{}); err != nil {
+					t.Fatalf("Failed to update PodGroup %s: %v", pg.Name, err)
 				}
 			}
 
