@@ -23,17 +23,11 @@ import "fmt"
 const defaultServiceAudiencePort = 443
 
 // AudienceForService returns the token audience an admission webhook backed by a
-// Service must present. It mirrors the server-side derivation in kube-apiserver
-// (validateWebhookAudience): the host is the Service's cluster DNS name, the
-// port is always explicit (defaulting to 443 when the Service reference omits
-// one), and the reference path, if any, is appended verbatim.
+// Service must present: https://<name>.<namespace>.svc:<port><path>, with the
+// port defaulting to 443. It mirrors kube-apiserver's validateWebhookAudience.
 //
-// A URL-backed webhook does not use this helper: its audience is its configured
+// A URL-backed webhook does not use this helper; its audience is its configured
 // URL verbatim.
-//
-// It lives in this leaf package (not oidc) so both the OIDC authenticator and
-// the net/http adapter can share one source of truth without either importing
-// the other's dependencies.
 func AudienceForService(name, namespace string, port int32, path string) string {
 	if port == 0 {
 		port = defaultServiceAudiencePort

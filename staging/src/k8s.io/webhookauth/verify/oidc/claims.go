@@ -24,17 +24,15 @@ import (
 	"strings"
 )
 
-// unverifiedClaims is the minimal, UNVERIFIED view of a JWT payload used only for
-// the cheap issuer pre-check in AuthenticateToken. The token is never trusted on
-// the strength of this parse: its signature and all standard claims are
-// re-verified by go-oidc against the fetched keys for every request.
+// unverifiedClaims is the UNVERIFIED view of a JWT payload used only for the
+// issuer pre-check in AuthenticateToken. go-oidc re-verifies the token for every
+// request, so this parse is never trusted.
 type unverifiedClaims struct {
 	Issuer string `json:"iss"`
 }
 
-// parseUnverifiedClaims decodes the payload segment of a compact JWS WITHOUT
-// verifying its signature. It exists solely for the issuer pre-check; the value
-// it returns is never trusted.
+// parseUnverifiedClaims decodes a JWT payload WITHOUT verifying its signature,
+// for the issuer pre-check only. The result is never trusted.
 func parseUnverifiedClaims(token string) (unverifiedClaims, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) < 2 {

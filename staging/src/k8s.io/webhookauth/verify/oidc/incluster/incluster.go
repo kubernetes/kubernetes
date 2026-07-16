@@ -17,12 +17,9 @@ limitations under the License.
 // Package incluster wires the OIDC token verifier for a webhook running inside a
 // Kubernetes cluster, using the standard in-cluster REST config.
 //
-// It is deliberately the ONLY package in this module that imports
-// k8s.io/client-go. Keeping the client-go dependency confined here means
-// out-of-cluster consumers of verify/oidc (who call NewRemoteVerifier or supply
-// their own transport) never pull in the client-go dependency tree. The
-// module-root .import-restrictions forbids client-go everywhere; a local
-// .import-restrictions in this directory re-permits it for this package only.
+// It is deliberately the only package in this module that imports
+// k8s.io/client-go, so out-of-cluster consumers of verify/oidc never pull in the
+// client-go dependency tree.
 package incluster // import "k8s.io/webhookauth/verify/oidc/incluster"
 
 import (
@@ -35,21 +32,13 @@ import (
 )
 
 // InCluster builds a [verify.Verifier] for a webhook running inside the cluster,
-// with no static configuration. It uses the standard in-cluster REST config for
-// the apiserver address and a cluster-CA-trusting transport, then reads the token
-// issuer from the apiserver's OIDC discovery document and fetches signing keys
-// from the apiserver's local JWKS endpoint — all over the in-cluster network (see
-// [oidc.NewLocalKeySetVerifier]).
+// with no static configuration. It reads the issuer and signing keys from the
+// apiserver over the in-cluster network (see [oidc.NewLocalKeySetVerifier]).
 //
-// The expected audience is not known here: an in-cluster webhook derives it from
-// the first admission request (pair this with
-// admissionhttp.InClusterAudienceResolver). The returned verifier therefore
-// denies every token and reports unhealthy via [verify.Verifier.HealthCheck]
-// until an audience is bound — the signal a controller-runtime health check turns
-// into a restart if the audience can never be derived.
-//
-// ctx governs the discovery fetch and the key set's background refreshes, so pass
-// the process-lifetime context.
+// The audience is derived at runtime from the first admission request (pair with
+// admissionhttp.InClusterAudienceResolver), so until one is bound the verifier
+// denies every token and reports unhealthy. ctx governs the discovery fetch and
+// background key refreshes, so pass a process-lifetime context.
 func InCluster(ctx context.Context) (*verify.Verifier, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {

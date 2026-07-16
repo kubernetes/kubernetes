@@ -30,14 +30,11 @@ import (
 )
 
 const (
-	// openIDConfigPath is the apiserver's OIDC discovery endpoint, used only to
-	// read the token issuer.
+	// openIDConfigPath is the apiserver's OIDC discovery endpoint.
 	openIDConfigPath = "/.well-known/openid-configuration"
-	// localJWKSPath is the apiserver's service-account JWKS endpoint. The
-	// apiserver always serves it locally, so an in-cluster webhook fetches keys
-	// from here rather than following the discovery document's jwks_uri — which
-	// may point at an external issuer address the pod should never (and may not
-	// be able to) reach.
+	// localJWKSPath is the apiserver's local JWKS endpoint. Keys are fetched here
+	// rather than via the discovery document's jwks_uri, which may point at an
+	// external address the pod cannot reach.
 	localJWKSPath = "/openid/v1/jwks"
 
 	// maxDiscoveryBytes bounds the discovery-document read.
@@ -45,20 +42,15 @@ const (
 )
 
 // NewLocalKeySetVerifier builds a deferred [verify.Verifier] for a webhook that
-// reaches its apiserver at apiServerURL (for example the in-cluster REST config's
-// host). It reads the token issuer from the apiserver's OIDC discovery document
-// and fetches signing keys from the apiserver's local JWKS endpoint
-// (apiServerURL + "/openid/v1/jwks") — both over the given HTTP client, so the
-// request never leaves the cluster network by following an external issuer URL.
+// reaches its apiserver at apiServerURL. It reads the issuer from the apiserver's
+// OIDC discovery document and fetches signing keys from its local JWKS endpoint,
+// so the request never leaves the cluster network by following an external
+// issuer URL.
 //
-// The expected audience is NOT known here: an in-cluster webhook derives it from
-// the first admission request (see admissionhttp.InClusterAudienceResolver and
-// [verify.Verifier.BindAudience]). Until an audience is bound the returned
-// verifier denies every token and reports unhealthy via
-// [verify.Verifier.HealthCheck].
-//
-// ctx governs both the discovery fetch and the key set's background refreshes, so
-// pass the process-lifetime context, not a per-request one. Pass
+// The audience is derived at runtime from the first admission request (see
+// admissionhttp.InClusterAudienceResolver), so until one is bound the verifier
+// denies every token and reports unhealthy. ctx governs the discovery fetch and
+// background key refreshes, so pass a process-lifetime context, and supply
 // [WithHTTPClient] with a transport that trusts the cluster CA.
 func NewLocalKeySetVerifier(ctx context.Context, apiServerURL string, opts ...Option) (*verify.Verifier, error) {
 	if apiServerURL == "" {
@@ -80,23 +72,21 @@ func NewLocalKeySetVerifier(ctx context.Context, apiServerURL string, opts ...Op
 		return nil, err
 	}
 
-	// go-oidc reads the HTTP client from the context for the key set's background
-	// refreshes; scope it to the same cluster-CA-trusting client.
+	// go-oidc reads the HTTP client from the context for background key refreshes.
 	keyCtx := ctx
 	if cfg.httpClient != nil {
 		keyCtx = coreosoidc.ClientContext(ctx, cfg.httpClient)
 	}
-	// Deliberately ignore the discovery document's jwks_uri: keys always come from
-	// the local endpoint so the fetch stays in-cluster.
+	// Keys come from the local endpoint, not the discovery jwks_uri, so the fetch
+	// stays in-cluster.
 	keySet := coreosoidc.NewRemoteKeySet(keyCtx, apiServerURL+localJWKSPath)
 
 	return verify.NewVerifier(&oidcAuthenticator{issuer: issuer, keySet: keySet})
 }
 
 // fetchLocalIssuer GETs the OIDC discovery document at discoveryURL and returns
-// its "issuer". It uses client so the caller controls TLS trust. A non-200
-// response, an unreadable or malformed body, or an empty issuer is an error — the
-// verifier must never be built against an unknown issuer.
+// its "issuer". A non-200 response, an unreadable or malformed body, or an empty
+// issuer is an error.
 func fetchLocalIssuer(ctx context.Context, client *http.Client, discoveryURL string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, discoveryURL, nil)
 	if err != nil {

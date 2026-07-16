@@ -15,16 +15,10 @@ limitations under the License.
 */
 
 // Package oidc builds a [verify.Verifier] whose signature and standard-claim
-// checks (issuer, audience, expiry) are performed by github.com/coreos/go-oidc
-// via OpenID Connect discovery and a remote JWKS.
+// checks (issuer, audience, expiry) are delegated to github.com/coreos/go-oidc.
 //
-// It is the ONLY package in this module that imports go-oidc (and transitively
-// JOSE); consumers who supply their own [verify.TokenAuthenticator] never pull
-// it in. go-oidc owns discovery (the well-known + jwks_uri lookups, JWKS fetch,
-// caching, rotation) and the signature/iss/aud/exp checks, so this package
-// hardcodes no discovery URL. The layering mirrors kube-apiserver's own OIDC
-// authenticator: discovery + signature + iss/aud/exp = go-oidc; the KEP-6060
-// allowedAPIGroup match = the core verify package.
+// It is the only package in this module that imports go-oidc; consumers who
+// supply their own [verify.TokenAuthenticator] never pull it in.
 package oidc // import "k8s.io/webhookauth/verify/oidc"
 
 import (
@@ -39,20 +33,19 @@ import (
 	"k8s.io/webhookauth/verify"
 )
 
-// config holds the resolved options for NewRemoteVerifier.
+// config holds the resolved options for the verifier constructors.
 type config struct {
-	// httpClient, when non-nil, is used for both OIDC discovery and JWKS
-	// fetches. go-oidc reads it from the constructor context, so it governs the
-	// long-lived background key refreshes, not just the first request.
+	// httpClient, when non-nil, is used for discovery and JWKS fetches (including
+	// go-oidc's background key refreshes).
 	httpClient *http.Client
 }
 
-// Option configures NewRemoteVerifier.
+// Option configures the verifier constructors.
 type Option func(*config)
 
-// WithHTTPClient sets the *http.Client used for OIDC discovery and JWKS fetches;
-// a nil client is ignored (go-oidc uses http.DefaultClient). In-cluster this is
-// the seam for a client whose transport trusts the cluster CA.
+// WithHTTPClient sets the [http.Client] used for discovery and JWKS fetches; a
+// nil client is ignored. In-cluster, this supplies a transport that trusts the
+// cluster CA.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *config) {
 		if c != nil {
@@ -61,65 +54,47 @@ func WithHTTPClient(c *http.Client) Option {
 	}
 }
 
-// oidcAuthenticator implements [verify.TokenAuthenticator] on top of a go-oidc
-// *oidc.IDTokenVerifier. It performs the entire signature + iss/aud/exp check and
-// returns the token's allowedAPIGroup values to the core policy layer.
+// oidcAuthenticator implements [verify.TokenAuthenticator] using go-oidc.
 //
 // The key set is fetched at construction, but the go-oidc verifier is built
-// lazily by BindAudience once the expected audience is known (out-of-cluster:
-// immediately; in-cluster: from the first admission request). Until then verifier
-// is nil and every token is denied. This mirrors kube-apiserver's own OIDC
-// authenticator, which likewise defers verifier construction and gates readiness
-// on it.
+// lazily by BindAudience once the expected audience is known. Until then it is
+// nil and every token is denied (fail-closed).
 type oidcAuthenticator struct {
-	// issuer is the expected token issuer, used for a cheap unverified pre-check
-	// before the expensive signature/JWKS verification.
 	issuer string
-	// keySet is fetched at construction and reused for every verifier build.
 	keySet coreosoidc.KeySet
 
-	// verifier is built by BindAudience; nil until an audience is bound.
+	// verifier is built lazily by BindAudience; nil until an audience is bound.
 	verifier atomic.Pointer[coreosoidc.IDTokenVerifier]
-	// mu guards audience during BindAudience; reads of verifier are lock-free.
+	// mu guards BindAudience; verifier reads are lock-free.
 	mu sync.Mutex
-	// audience is the bound audience, retained to reject a conflicting rebind.
+	// audience is retained to reject a conflicting rebind.
 	audience string
 }
 
-// admissionReviewAPIGroupsClaimKey is the key, within the "kubernetes.io"
-// "attestations" claim, that carries the API group(s) a webhook token is
-// authorized for. It matches the server-side KEP-6060 contract
-// (authentication.AttestationAdmissionReviewAPIGroups in
-// k8s.io/kubernetes/pkg/apis/authentication, which staging cannot import, so the
-// literal is duplicated here and kept honest by the test tripwires).
+// admissionReviewAPIGroupsClaimKey is the "attestations" claim key carrying the
+// API groups a webhook token is authorized for. The literal duplicates the
+// server-side constant (staging cannot import it) and is guarded by test
+// tripwires.
 const admissionReviewAPIGroupsClaimKey = "admissionReviewAPIGroups"
 
-// webhookPrivateClaims decodes the subset of the "kubernetes.io" private claims
-// the policy needs: the admissionReviewAPIGroups attestation values.
+// webhookPrivateClaims decodes the "kubernetes.io" attestation claims the policy
+// needs.
 type webhookPrivateClaims struct {
 	Kubernetes struct {
 		Attestations map[string][]string `json:"attestations,omitempty"`
 	} `json:"kubernetes.io"`
 }
 
-// AuthenticateToken verifies rawToken and returns its allowedAPIGroup values. It
-// first does a cheap unverified issuer pre-check — bailing before the expensive
-// signature/JWKS work if the token's "iss" is not the expected issuer — then
-// verifies via go-oidc and decodes the "kubernetes.io" claims.
-//
-// go-oidc owns the standard-claim verification; any error (including the issuer
-// pre-check) is returned as-is and collapsed into the generic failure by the
-// Verifier, so its text never reaches the caller.
+// AuthenticateToken verifies rawToken via go-oidc and returns its
+// allowedAPIGroup values.
 func (a *oidcAuthenticator) AuthenticateToken(ctx context.Context, rawToken string) ([]string, error) {
-	// The verifier is nil until an audience is bound (in-cluster: not until the
-	// first request derives it). Deny fail-closed until then.
+	// Fail closed until an audience is bound.
 	verifier := a.verifier.Load()
 	if verifier == nil {
 		return nil, errors.New("oidc: no audience bound yet; verifier not ready")
 	}
 
-	// Cheap pre-check: if the token's unverified issuer is not ours, it was not
-	// minted for us — fail before the expensive signature/JWKS work.
+	// Cheap unverified issuer pre-check before the expensive signature work.
 	if parsed, err := parseUnverifiedClaims(rawToken); err != nil {
 		return nil, fmt.Errorf("oidc: parsing token issuer: %w", err)
 	} else if parsed.Issuer != a.issuer {
@@ -138,10 +113,9 @@ func (a *oidcAuthenticator) AuthenticateToken(ctx context.Context, rawToken stri
 	return claims.Kubernetes.Attestations[admissionReviewAPIGroupsClaimKey], nil
 }
 
-// BindAudience builds the go-oidc verifier for the given audience and makes the
-// authenticator ready. It is idempotent: the first successful bind wins; a repeat
-// bind with the same audience is a no-op, and a bind with a different audience is
-// rejected so the frozen audience cannot be silently repointed.
+// BindAudience builds the go-oidc verifier for audience and makes the
+// authenticator ready. It is idempotent: the first bind wins, a matching rebind
+// is a no-op, and a conflicting rebind is rejected.
 func (a *oidcAuthenticator) BindAudience(audience string) error {
 	if audience == "" {
 		return errors.New("oidc: audience must not be empty")
@@ -154,17 +128,16 @@ func (a *oidcAuthenticator) BindAudience(audience string) error {
 		}
 		return nil
 	}
-	// A single audience is the go-oidc ClientID, so audience is enforced natively
-	// (no SkipClientIDCheck). Store the verifier before recording the audience so
-	// that once HealthCheck sees a bound audience the verifier is already visible.
+	// The audience is the go-oidc ClientID (enforced natively). Store the verifier
+	// before recording the audience so HealthCheck never sees a bound audience
+	// without a visible verifier.
 	a.verifier.Store(coreosoidc.NewVerifier(a.issuer, a.keySet, &coreosoidc.Config{ClientID: audience}))
 	a.audience = audience
 	return nil
 }
 
-// HealthCheck reports readiness: nil once an audience has been bound and the
-// verifier built, else an error. It is the readiness seam a webhook wires into a
-// controller-runtime health check.
+// HealthCheck reports readiness: nil once an audience is bound and the verifier
+// built, else an error.
 func (a *oidcAuthenticator) HealthCheck() error {
 	if a.verifier.Load() == nil {
 		return errors.New("oidc: audience not yet derived; verifier not ready")
@@ -173,12 +146,11 @@ func (a *oidcAuthenticator) HealthCheck() error {
 }
 
 // keySetFromDiscovery performs OIDC discovery for issuer and returns a rotating
-// remote key set built from the discovery document's jwks_uri. ctx (carrying any
-// injected HTTP client) governs both discovery and the key set's background
-// refreshes, so pass the process-lifetime context, not a per-request one.
+// remote key set built from the discovery document's jwks_uri. ctx governs both
+// discovery and the key set's background refreshes, so pass a process-lifetime
+// context.
 func keySetFromDiscovery(ctx context.Context, issuer string) (coreosoidc.KeySet, error) {
-	// NewProvider fetches the well-known doc and verifies its issuer matches
-	// (issuer-confusion guard).
+	// NewProvider verifies the discovered issuer matches (issuer-confusion guard).
 	provider, err := coreosoidc.NewProvider(ctx, issuer)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: OIDC discovery for issuer %q failed: %w", issuer, err)
@@ -205,8 +177,7 @@ func newAuthenticator(ctx context.Context, issuer string, opts ...Option) (*oidc
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	// go-oidc reads the HTTP client from the context and uses it for discovery
-	// AND the key set's background refreshes.
+	// go-oidc reads the HTTP client from the context.
 	if cfg.httpClient != nil {
 		ctx = coreosoidc.ClientContext(ctx, cfg.httpClient)
 	}
@@ -218,15 +189,11 @@ func newAuthenticator(ctx context.Context, issuer string, opts ...Option) (*oidc
 }
 
 // NewRemoteVerifier returns a [verify.Verifier] that checks tokens against
-// issuer's OIDC discovery document, requiring the token audience to equal
-// audience. Construction performs discovery (go-oidc fetches the well-known doc,
-// verifies its issuer, and builds a rotating key set from jwks_uri) and binds the
-// audience immediately — the out-of-cluster path, where the audience is known up
-// front.
+// issuer's OIDC discovery document and requires the token audience to equal
+// audience. It binds the audience immediately (the out-of-cluster path).
 //
-// The verifier is long-lived and concurrency-safe; construct one per
-// (issuer, audience). ctx governs discovery AND the key set's background fetches,
-// so pass the process-lifetime context, not a per-request one.
+// The verifier is long-lived and concurrency-safe. ctx governs discovery and the
+// key set's background refreshes, so pass a process-lifetime context.
 func NewRemoteVerifier(ctx context.Context, issuer, audience string, opts ...Option) (*verify.Verifier, error) {
 	if audience == "" {
 		return nil, errors.New("oidc: audience must not be empty")
@@ -241,10 +208,9 @@ func NewRemoteVerifier(ctx context.Context, issuer, audience string, opts ...Opt
 	return verify.NewVerifier(auth)
 }
 
-// newDeferredVerifier returns a [verify.Verifier] whose key set is fetched now but
-// whose audience is bound later via [verify.Verifier.BindAudience] — the
-// in-cluster path, where the audience is derived from the first admission
-// request. Until an audience is bound it denies every token and reports unhealthy.
+// newDeferredVerifier returns a [verify.Verifier] whose key set is fetched now
+// but whose audience is bound later (the in-cluster path). Until then it denies
+// every token and reports unhealthy.
 func newDeferredVerifier(ctx context.Context, issuer string, opts ...Option) (*verify.Verifier, error) {
 	auth, err := newAuthenticator(ctx, issuer, opts...)
 	if err != nil {
