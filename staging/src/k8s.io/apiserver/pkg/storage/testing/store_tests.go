@@ -3112,7 +3112,9 @@ func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store
 					Name:      objNameFn(j),
 					Namespace: ns,
 				}}
-				_, _ = testPropagateStore(ctx, t, store, obj)
+				if err := store.Create(ctx, computePodKey(obj), obj, &example.Pod{}, 0); err != nil {
+					t.Fatalf("Create failed: %v", err)
+				}
 			}
 
 			// step 2: list the N objects, we expect no error
@@ -3166,7 +3168,9 @@ func RunTestGetListWithoutErrorAggregation(ctx context.Context, t *testing.T, st
 			Name:      objNameFn(i),
 			Namespace: "ns",
 		}}
-		testPropagateStore(ctx, t, store, obj)
+		if err := store.Create(ctx, computePodKey(obj), obj, &example.Pod{}, 0); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
 	}
 
 	// Step 2: list all objects, expect no error before corruption
