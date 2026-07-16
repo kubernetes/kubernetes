@@ -646,6 +646,32 @@ func LogLocation(
 	return loc, nodeInfo.Transport, nil
 }
 
+// AllocatedLocation returns the allocated pod URL for a pod.
+func AllocatedLocation(
+	ctx context.Context, getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	name string,
+) (*url.URL, http.RoundTripper, error) {
+	pod, err := getPod(ctx, getter, name)
+	if err != nil {
+		return nil, nil, err
+	}
+	nodeName := types.NodeName(pod.Spec.NodeName)
+	if len(nodeName) == 0 {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
+	}
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
+	if err != nil {
+		return nil, nil, err
+	}
+	loc := &url.URL{
+		Scheme: nodeInfo.Scheme,
+		Host:   net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
+		Path:   fmt.Sprintf("/allocatedPods/%s", pod.UID),
+	}
+	return loc, nodeInfo.Transport, nil
+}
+
 func podHasContainerWithName(pod *api.Pod, containerName string) bool {
 	var hasContainer bool
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *api.Container, containerType podutil.ContainerType) bool {

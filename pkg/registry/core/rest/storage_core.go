@@ -252,6 +252,9 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			storage[resource+"/resize"] = podStorage.Resize
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodAllocatedSubresource) {
+			storage[resource+"/allocated"] = podStorage.Allocated
+		}
 	}
 	if resource := "bindings"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		storage[resource] = podStorage.LegacyBinding

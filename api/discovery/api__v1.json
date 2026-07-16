@@ -273,6 +273,15 @@
       ]
     },
     {
+      "kind": "Pod",
+      "name": "pods/allocated",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get"
+      ]
+    },
+    {
       "kind": "PodAttachOptions",
       "name": "pods/attach",
       "namespaced": true,

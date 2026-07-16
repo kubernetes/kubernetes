@@ -16548,6 +16548,82 @@
         }
       }
     },
+    "/api/v1/namespaces/{namespace}/pods/{name}/allocated": {
+      "get": {
+        "description": "read allocated of the specified Pod",
+        "operationId": "readCoreV1NamespacedPodAllocated",
+        "responses": {
+          "200": {
+            "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/vnd.kubernetes.protobuf": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.Pod"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "core_v1"
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "",
+          "kind": "Pod",
+          "version": "v1"
+        }
+      },
+      "parameters": [
+        {
+          "description": "name of the Pod",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "object name and auth scope, such as for teams and projects",
+          "in": "path",
+          "name": "namespace",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
+          "description": "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).",
+          "in": "query",
+          "name": "pretty",
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        }
+      ]
+    },
     "/api/v1/namespaces/{namespace}/pods/{name}/attach": {
       "get": {
         "description": "connect GET requests to attach of Pod",

@@ -27969,6 +27969,60 @@
         }
       }
     },
+    "/api/v1/namespaces/{namespace}/pods/{name}/allocated": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "read allocated of the specified Pod",
+        "operationId": "readCoreV1NamespacedPodAllocated",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "core_v1"
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "",
+          "kind": "Pod",
+          "version": "v1"
+        }
+      },
+      "parameters": [
+        {
+          "description": "name of the Pod",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "$ref": "#/parameters/namespace-vgWSWtn3"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        }
+      ]
+    },
     "/api/v1/namespaces/{namespace}/pods/{name}/attach": {
       "get": {
         "consumes": [
