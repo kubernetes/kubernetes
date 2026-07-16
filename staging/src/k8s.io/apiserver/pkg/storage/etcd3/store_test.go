@@ -301,8 +301,9 @@ type storeWithTransformerOverride struct {
 
 func (s *storeWithTransformerOverride) UpdateTransformer(modifier storagetesting.TransformerModifier) func() {
 	orig := s.store.transformer
-	s.store.transformer = modifier(orig)
-	s.store.watcher.transformer = modifier(orig)
+	next := modifier(orig)
+	s.store.transformer = next
+	s.store.watcher.transformer = next
 	return func() {
 		s.store.transformer = orig
 		s.store.watcher.transformer = orig
