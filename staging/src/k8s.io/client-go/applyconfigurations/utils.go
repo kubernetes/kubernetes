@@ -1528,6 +1528,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnodev1.OverheadApplyConfiguration{}
 	case nodev1.SchemeGroupVersion.WithKind("RuntimeClass"):
 		return &applyconfigurationsnodev1.RuntimeClassApplyConfiguration{}
+	case nodev1.SchemeGroupVersion.WithKind("RuntimeClassPodCheckpoint"):
+		return &applyconfigurationsnodev1.RuntimeClassPodCheckpointApplyConfiguration{}
 	case nodev1.SchemeGroupVersion.WithKind("Scheduling"):
 		return &applyconfigurationsnodev1.SchedulingApplyConfiguration{}
 

@@ -244,6 +244,25 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	if !apimeta.IsStatusConditionTrue(checkpoint.Status.Conditions, nodev1alpha1.PodCheckpointConditionReady) {
 		return admission.NewForbidden(a, fmt.Errorf("PodCheckpoint %q is not ready; restore requires status.conditions Ready=True", checkpointName))
 	}
+	// Validate the final request after mutating admission, including any options
+	// inserted by a later webhook. Restore options use their own allowlist.
+	if len(pod.Spec.RestoreFrom.Options) != 0 {
+		if pod.Spec.RuntimeClassName == nil || *pod.Spec.RuntimeClassName == "" {
+			return admission.NewForbidden(a, fmt.Errorf("spec.restoreFrom.options requires spec.runtimeClassName and a RuntimeClass restore option allowlist"))
+		}
+		className := *pod.Spec.RuntimeClassName
+		class, err := p.client.NodeV1().RuntimeClasses().Get(ctx, className, metav1.GetOptions{})
+		if err != nil {
+			return admission.NewForbidden(a, fmt.Errorf("cannot read RuntimeClass %q for spec.restoreFrom.options: %w", className, err))
+		}
+		var allowed []string
+		if class.PodCheckpoint != nil {
+			allowed = class.PodCheckpoint.AllowedRestoreOptions
+		}
+		if err := checkpointutil.ValidateRuntimeOptions(pod.Spec.RestoreFrom.Options, allowed); err != nil {
+			return admission.NewForbidden(a, fmt.Errorf("spec.restoreFrom.options for RuntimeClass %q: %w", className, err))
+		}
+	}
 	return validatePodSpecMatchesCheckpoint(o.GetObjectConvertor(), a, pod, checkpointName, checkpoint)
 }
 

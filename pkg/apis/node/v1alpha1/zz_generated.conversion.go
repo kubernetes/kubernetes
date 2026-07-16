@@ -365,6 +365,7 @@ func autoConvert_node_RuntimeClass_To_v1alpha1_RuntimeClass(in *node.RuntimeClas
 	// WARNING: in.Handler requires manual conversion: does not exist in peer-type
 	// WARNING: in.Overhead requires manual conversion: does not exist in peer-type
 	// WARNING: in.Scheduling requires manual conversion: does not exist in peer-type
+	// WARNING: in.PodCheckpoint requires manual conversion: does not exist in peer-type
 	return nil
 }
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"path/filepath"
 	"runtime"
@@ -33,6 +34,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -146,6 +148,28 @@ func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *
 		return "", message, err
 	}
 
+	runtimeHandler := ""
+	if m.runtimeClassManager != nil {
+		runtimeHandler, err = m.runtimeClassManager.LookupRuntimeHandlerForRestore(ctx, pod.Spec.RuntimeClassName, pod.Spec.RestoreFrom.Options)
+		if err != nil {
+			message := fmt.Sprintf("Failed to restore sandbox for pod %q: %v", format.Pod(pod), err)
+			if len(pod.Spec.RestoreFrom.Options) != 0 {
+				reason := events.PodSpecMismatch
+				if checkpointutil.RuntimeOptionPolicyUnavailable(err) {
+					reason = events.RestorePolicyUnavailable
+				}
+				err = &kubecontainer.RestoreError{Reason: reason, Err: err}
+			}
+			return "", message, err
+		}
+		if runtimeHandler != "" {
+			logger.V(2).Info("Restoring pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
+		}
+	} else if len(pod.Spec.RestoreFrom.Options) != 0 {
+		err := fmt.Errorf("cannot validate spec.restoreFrom.options without a RuntimeClass manager")
+		return "", err.Error(), &kubecontainer.RestoreError{Reason: events.PodSpecMismatch, Err: err}
+	}
+
 	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, attempt)
 	if err != nil {
 		message := fmt.Sprintf("Failed to generate sandbox config for pod %q: %v", format.Pod(pod), err)
@@ -159,18 +183,6 @@ func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *
 		message := fmt.Sprintf("Failed to create log directory for pod %q: %v", format.Pod(pod), err)
 		logger.Error(err, "Failed to create log directory for pod", "pod", klog.KObj(pod))
 		return "", message, err
-	}
-
-	runtimeHandler := ""
-	if m.runtimeClassManager != nil {
-		runtimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
-		if err != nil {
-			message := fmt.Sprintf("Failed to restore sandbox for pod %q: %v", format.Pod(pod), err)
-			return "", message, err
-		}
-		if runtimeHandler != "" {
-			logger.V(2).Info("Restoring pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
-		}
 	}
 
 	logger.V(2).Info("Restoring pod sandbox from checkpoint", "pod", klog.KObj(pod), "checkpointName", pod.Spec.RestoreFrom.Name, "checkpointPath", checkpointPath, "runtimeHandler", runtimeHandler)
@@ -207,6 +219,7 @@ func (m *kubeGenericRuntimeManager) restorePodSandbox(ctx context.Context, pod *
 		CheckpointPath:   checkpointPath,
 		Config:           podSandboxConfig,
 		RuntimeHandler:   runtimeHandler,
+		Options:          maps.Clone(pod.Spec.RestoreFrom.Options),
 		ContainerConfigs: containerConfigs,
 	}
 

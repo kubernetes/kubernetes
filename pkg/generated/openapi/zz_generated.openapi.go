@@ -960,6 +960,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		nodev1.Overhead{}.OpenAPIModelName():                                                                            schema_k8sio_api_node_v1_Overhead(ref),
 		nodev1.RuntimeClass{}.OpenAPIModelName():                                                                        schema_k8sio_api_node_v1_RuntimeClass(ref),
 		nodev1.RuntimeClassList{}.OpenAPIModelName():                                                                    schema_k8sio_api_node_v1_RuntimeClassList(ref),
+		nodev1.RuntimeClassPodCheckpoint{}.OpenAPIModelName():                                                           schema_k8sio_api_node_v1_RuntimeClassPodCheckpoint(ref),
 		nodev1.Scheduling{}.OpenAPIModelName():                                                                          schema_k8sio_api_node_v1_Scheduling(ref),
 		nodev1alpha1.CheckpointSource{}.OpenAPIModelName():                                                              schema_k8sio_api_node_v1alpha1_CheckpointSource(ref),
 		nodev1alpha1.NodeLocalCheckpointSource{}.OpenAPIModelName():                                                     schema_k8sio_api_node_v1alpha1_NodeLocalCheckpointSource(ref),
@@ -20186,7 +20187,7 @@ func schema_k8sio_api_core_v1_CheckpointReference(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CheckpointReference identifies a PodCheckpoint to restore a Pod from.",
+				Description: "CheckpointReference identifies a PodCheckpoint and specifies options for restoring a Pod from it.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -20195,6 +20196,26 @@ func schema_k8sio_api_core_v1_CheckpointReference(ref common.ReferenceCallback) 
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-map-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "options contains opaque runtime-specific options for this restore attempt. Empty options use runtime defaults. Each key must appear in this Pod's RuntimeClass podCheckpoint.allowedRestoreOptions; without a RuntimeClass or allowlist, only empty options are permitted. Admission and the kubelet check the keys, and the kubelet passes the map unchanged to RestorePodRequest.options as untrusted user input. The runtime must reject unsupported, invalid, or unsafe values. Options must not contain secrets or override administrator configuration, security constraints, or the Pod's allocated devices. Administrator settings belong in node or runtime configuration.\n\nRestore options are independent of the options used to create the checkpoint and are not stored in the PodCheckpoint. Requirements intrinsic to the checkpoint are recorded in runtime-owned checkpoint data instead. At most 64 entries are allowed, with keys of at most 256 bytes and values of at most 4096 bytes.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -44627,12 +44648,18 @@ func schema_k8sio_api_node_v1_RuntimeClass(ref common.ReferenceCallback) common.
 							Ref:         ref(nodev1.Scheduling{}.OpenAPIModelName()),
 						},
 					},
+					"podCheckpoint": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podCheckpoint lists the runtime-specific option keys that users may supply when checkpointing or restoring Pods of this RuntimeClass. If unset, users cannot supply options; checkpoint and restore use the runtime's defaults. Administrator settings belong in the runtime's configuration, not in user-supplied options. Values are validated by the runtime. This field is alpha-level and requires PodLevelCheckpointRestore.",
+							Ref:         ref(nodev1.RuntimeClassPodCheckpoint{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"handler"},
 			},
 		},
 		Dependencies: []string{
-			nodev1.Overhead{}.OpenAPIModelName(), nodev1.Scheduling{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+			nodev1.Overhead{}.OpenAPIModelName(), nodev1.RuntimeClassPodCheckpoint{}.OpenAPIModelName(), nodev1.Scheduling{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -44683,6 +44710,57 @@ func schema_k8sio_api_node_v1_RuntimeClassList(ref common.ReferenceCallback) com
 		},
 		Dependencies: []string{
 			nodev1.RuntimeClass{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_node_v1_RuntimeClassPodCheckpoint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RuntimeClassPodCheckpoint configures user-supplied checkpoint and restore options for a runtime handler. It permits option keys, not administrator configuration or secrets. Administrators should only allow documented keys that are safe for untrusted users. The runtime must reject unsupported or unsafe values, including values that grant privileges, select unallocated devices, or override administrator configuration.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"allowedCheckpointOptions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "allowedCheckpointOptions lists the keys users may set in PodCheckpoint.spec.checkpointOptions for Pods of this RuntimeClass. An empty list permits no keys. Each key must be nonempty and at most 256 bytes; at most 64 distinct keys may be listed. Keys are matched exactly and are case-sensitive; wildcards have no special meaning. The runtime must validate values for every allowed key.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"allowedRestoreOptions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "allowedRestoreOptions lists the keys users may set in Pod.spec.restoreFrom.options for Pods of this RuntimeClass. An empty list permits no keys. Each key must be nonempty and at most 256 bytes; at most 64 distinct keys may be listed. Keys are matched exactly and are case-sensitive; wildcards have no special meaning. The runtime must validate values for every allowed key.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -44974,6 +45052,26 @@ func schema_k8sio_api_node_v1alpha1_PodCheckpointSpec(ref common.ReferenceCallba
 							Description: "timeoutSeconds is the maximum number of seconds the checkpoint operation may take, between 1 and 3600. If unset, the kubelet's configured checkpoint timeout is used; values larger than that configured ceiling are clamped to it. The kubelet enforces the effective timeout with the CRI call deadline, which bounds how long the Pod can stay frozen. Immutable because the operation's deadline is fixed when it starts.",
 							Type:        []string{"integer"},
 							Format:      "int32",
+						},
+					},
+					"checkpointOptions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-map-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "checkpointOptions contains opaque runtime-specific options for this checkpoint operation. Empty options use runtime defaults. Each key must appear in the source Pod's RuntimeClass podCheckpoint.allowedCheckpointOptions; without a RuntimeClass or allowlist, only empty options are permitted. Admission and the kubelet check the keys, and the kubelet passes the map unchanged to CheckpointPodRequest.options as untrusted user input. The runtime must reject unsupported, invalid, or unsafe values. Options must not contain secrets or override administrator configuration, security constraints, or the Pod's allocated devices. Administrator settings belong in node or runtime configuration.\n\nThese options are not restore defaults. If an option changes what is required to restore the resulting checkpoint, the runtime records that requirement in its checkpoint data. Restore-time choices are supplied separately by the restoring Pod. At most 64 entries are allowed, with keys of at most 256 bytes and values of at most 4096 bytes.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
 						},
 					},
 				},

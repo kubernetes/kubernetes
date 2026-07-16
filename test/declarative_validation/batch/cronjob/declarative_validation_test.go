@@ -724,6 +724,9 @@ func TestDeclarativeValidateRestoreFrom(t *testing.T) {
 				apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 			})
 		}
+		poddeclarativevalidation.RunDeclarativeValidateRuntimeOptionsTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "jobTemplate", "spec", "template", "spec", "restoreFrom", "options"), new(mkCronJob()), func(obj *batch.CronJob, options map[string]string) {
+			obj.Spec.JobTemplate.Spec.Template.Spec.RestoreFrom = &api.CheckpointReference{Name: "valid-checkpoint", Options: options}
+		})
 	}
 }
 

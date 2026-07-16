@@ -94,6 +94,32 @@ type PodCheckpointSpec struct {
 	// +k8s:minimum=1
 	// +k8s:maximum=3600
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,2,opt,name=timeoutSeconds"`
+
+	// checkpointOptions contains opaque runtime-specific options for this
+	// checkpoint operation. Empty options use runtime defaults. Each key must
+	// appear in the source Pod's RuntimeClass podCheckpoint.allowedCheckpointOptions;
+	// without a RuntimeClass or allowlist, only empty options are permitted.
+	// Admission and the kubelet check the keys, and the kubelet passes the map
+	// unchanged to CheckpointPodRequest.options as untrusted user input. The
+	// runtime must reject unsupported, invalid, or unsafe values. Options must
+	// not contain secrets or override administrator configuration, security
+	// constraints, or the Pod's allocated devices. Administrator settings belong
+	// in node or runtime configuration.
+	//
+	// These options are not restore defaults. If an option changes what is
+	// required to restore the resulting checkpoint, the runtime records that
+	// requirement in its checkpoint data. Restore-time choices are supplied
+	// separately by the restoring Pod.
+	// At most 64 entries are allowed, with keys of at most 256 bytes and values
+	// of at most 4096 bytes.
+	// +optional
+	// +mapType=atomic
+	// +k8s:optional
+	// +k8s:immutable
+	// +k8s:maxProperties=64
+	// +k8s:eachKey=+k8s:maxBytes=256
+	// +k8s:eachVal=+k8s:maxBytes=4096
+	CheckpointOptions map[string]string `json:"checkpointOptions,omitempty" protobuf:"bytes,3,rep,name=checkpointOptions"`
 }
 
 // PodReference identifies a pod in the same namespace by name and, optionally,

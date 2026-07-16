@@ -48,6 +48,7 @@ import (
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1927,7 +1928,7 @@ func TestCheckpointPod(t *testing.T) {
 			fakeRuntime.PodResizeInProgress = kind == "in progress"
 			called := make(chan struct{}, 1)
 			kl.containerRuntime = &checkpointRuntime{Runtime: fakeRuntime, checkpointPod: func(context.Context, *runtimeapi.CheckpointPodRequest) error { called <- struct{}{}; return nil }}
-			err := kl.CheckpointPod(context.Background(), pod.UID, kubecontainer.GetPodFullName(pod), "", "", "resize-checkpoint", time.Second)
+			err := kl.CheckpointPod(context.Background(), pod.UID, kubecontainer.GetPodFullName(pod), "", "", "resize-checkpoint", time.Second, nil)
 			if kind == "settled" {
 				require.NoError(t, err)
 				require.Eventually(t, func() bool { return !kl.IsPodCheckpointInProgress(pod.UID) }, time.Second, time.Millisecond)
@@ -1979,27 +1980,48 @@ func TestCheckpointPod(t *testing.T) {
 
 	t.Run("rejects unknown pod", func(t *testing.T) {
 		kubelet, _, _ := setup(t)
-		err := kubelet.CheckpointPod(ktesting.Init(t), "wrong-uid", "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), "wrong-uid", "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, nil)
 		require.ErrorContains(t, err, "not found")
 	})
 
 	t.Run("rejects pod without sandbox", func(t *testing.T) {
 		kubelet, fakeRuntime, pod := setup(t)
 		fakeRuntime.PodStatus.SandboxStatuses = nil
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, nil)
 		require.ErrorContains(t, err, "has no sandbox")
 	})
 
 	t.Run("rejects pod whose active sandbox is not ready", func(t *testing.T) {
 		kubelet, fakeRuntime, pod := setup(t)
 		fakeRuntime.PodStatus.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, nil)
 		require.ErrorContains(t, err, "has no ready sandbox")
 		require.False(t, kubelet.IsPodCheckpointInProgress(pod.UID))
 	})
 
+	t.Run("denied options leave no checkpoint output or operation gate", func(t *testing.T) {
+		kubelet, fakeRuntime, pod := setup(t)
+		called := make(chan struct{}, 1)
+		kubelet.containerRuntime = &checkpointRuntime{Runtime: fakeRuntime, checkpointPod: func(context.Context, *runtimeapi.CheckpointPodRequest) error { called <- struct{}{}; return nil }}
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "denied-options", 0, map[string]string{"tcp": "close"})
+		require.ErrorContains(t, err, "require a RuntimeClass")
+		require.Empty(t, called)
+		require.False(t, kubelet.IsPodCheckpointInProgress(pod.UID))
+		_, err = os.Stat(kubelet.getPodCheckpointsDir())
+		require.True(t, os.IsNotExist(err), "denied options must not create checkpoint directories")
+		release, acquired := kubelet.tryAcquirePodCheckpointOperation(pod.UID)
+		require.True(t, acquired)
+		release()
+	})
+
 	t.Run("creates empty private output and retains successful checkpoint", func(t *testing.T) {
 		kubelet, fakeRuntime, pod := setup(t)
+		pod.Spec.RuntimeClassName = new("checkpoint-runtime")
+		fakeRuntime.PodStatus.SandboxStatuses[0].RuntimeHandler = "checkpoint-handler"
+		kubelet.kubeClient = fake.NewClientset(&nodev1.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "checkpoint-runtime"}, Handler: "checkpoint-handler",
+			PodCheckpoint: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"example.runtime/mode"}},
+		})
 		requests := make(chan *runtimeapi.CheckpointPodRequest, 1)
 		kubelet.containerRuntime = &checkpointRuntime{
 			Runtime: fakeRuntime,
@@ -2016,12 +2038,14 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		checkpointOptions := map[string]string{"example.runtime/mode": "incremental"}
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, checkpointOptions)
 		require.NoError(t, err)
 		request := receiveRequest(t, requests)
+		checkpointOptions["example.runtime/mode"] = "changed-after-call"
 		require.Equal(t, "sandbox1234", request.PodSandboxId)
 		require.Equal(t, []string{"container1234"}, request.ContainerIds)
-		require.Empty(t, request.Options)
+		require.Equal(t, map[string]string{"example.runtime/mode": "incremental"}, request.Options)
 		require.True(t, filepath.IsAbs(request.OutputPath))
 		require.Equal(t, "checkpoint-checkpoint-uid", filepath.Base(request.OutputPath))
 		rel, err := filepath.Rel(kubelet.getPodCheckpointsDir(), request.OutputPath)
@@ -2053,7 +2077,7 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, nil)
 		require.NoError(t, err)
 		request := receiveRequest(t, requests)
 		waitForCompletion(t, kubelet, pod.UID)
@@ -2094,7 +2118,7 @@ func TestCheckpointPod(t *testing.T) {
 			}
 
 			checkpointUID := types.UID("cleanup-failure-uid")
-			err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "ckpt", checkpointUID, 0)
+			err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "ckpt", checkpointUID, 0, nil)
 			require.NoError(t, err)
 			request := receiveRequest(t, requests)
 			t.Cleanup(func() {
@@ -2126,7 +2150,7 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, nil)
 		require.ErrorContains(t, err, "failed to create pod checkpoint directory")
 		require.False(t, called)
 		_, inFlight := kubelet.checkpointsInFlight.Load(pod.UID)
@@ -2149,7 +2173,7 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "duplicate-id-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "duplicate-id-uid", 0, nil)
 		require.ErrorContains(t, err, "duplicate runtime ID")
 		require.False(t, called)
 		require.False(t, kubelet.IsPodCheckpointInProgress(pod.UID))
@@ -2180,7 +2204,7 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "container-selection-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "container-selection-uid", 0, nil)
 		require.NoError(t, err)
 		request := receiveRequest(t, requests)
 		require.Equal(t, []string{"sidecar-id", "app-one-id", "app-two-id"}, request.ContainerIds)
@@ -2205,7 +2229,7 @@ func TestCheckpointPod(t *testing.T) {
 		}
 
 		before := time.Now()
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "deadline-uid", time.Hour)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "deadline-uid", time.Hour, nil)
 		after := time.Now()
 		require.NoError(t, err)
 		select {
@@ -2230,7 +2254,7 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "ckpt", "status-failure-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "ckpt", "status-failure-uid", 0, nil)
 		require.NoError(t, err)
 		request := receiveRequest(t, requests)
 		waitForCompletion(t, kubelet, pod.UID)
@@ -2350,7 +2374,13 @@ func TestGetPodCheckpointPath(t *testing.T) {
 	restorePod := func() *v1.Pod {
 		return &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "ns"},
-			Spec:       v1.PodSpec{RestoreFrom: &v1.CheckpointReference{Name: "ckpt"}, Containers: []v1.Container{{Name: "app", Image: "registry.example/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}},
+			Spec: v1.PodSpec{
+				RestoreFrom: &v1.CheckpointReference{
+					Name:    "ckpt",
+					Options: map[string]string{"example.runtime/target": "node-local"},
+				},
+				Containers: []v1.Container{{Name: "app", Image: "registry.example/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+			},
 		}
 	}
 	// tmplFor returns the unstructured checkpointedPodTemplate for a pod's sanitized spec.
@@ -6794,7 +6824,7 @@ func TestGenerateAPIPodStatusPodRestored(t *testing.T) {
 
 func TestSyncPodRestoreErrorOutcome(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
-	for _, reason := range []string{events.RestoreInProgress, events.PodSpecMismatch} {
+	for _, reason := range []string{events.RestoreInProgress, events.RestorePolicyUnavailable, events.PodSpecMismatch} {
 		t.Run(reason, func(t *testing.T) {
 			ctx := ktesting.Init(t)
 			testKubelet := newTestKubelet(t, false)
@@ -6815,8 +6845,8 @@ func TestSyncPodRestoreErrorOutcome(t *testing.T) {
 			require.True(t, ok)
 			_, condition := podutil.GetPodCondition(&got, v1.PodRestored)
 			require.NotNil(t, condition)
-			require.Equal(t, reason, condition.Reason)
-			if reason != events.RestoreInProgress {
+			if reason != events.RestoreInProgress && reason != events.RestorePolicyUnavailable {
+				require.Equal(t, reason, condition.Reason)
 				require.NoError(t, err)
 				require.True(t, terminal)
 				require.Equal(t, v1.ConditionFalse, condition.Status)
@@ -6825,11 +6855,12 @@ func TestSyncPodRestoreErrorOutcome(t *testing.T) {
 			}
 			require.Error(t, err)
 			require.False(t, terminal)
+			require.Equal(t, events.RestoreInProgress, condition.Reason)
 			require.Equal(t, v1.ConditionUnknown, condition.Status)
 			require.NotEqual(t, v1.PodFailed, got.Phase)
 			_, active := kl.restoreOperationsInFlight.Load(pod.UID)
 			require.True(t, active)
-			// The lock is available on the next sync; the same attempt can finish.
+			// The blocker clears on the next sync; the same attempt can finish.
 			testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{SyncResults: []*kubecontainer.SyncResult{{
 				Action: kubecontainer.RestorePodSandbox,
 				Target: pod.UID,

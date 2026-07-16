@@ -85,10 +85,11 @@ const (
 	PossibleMemoryBackedVolumesOnDisk    = "PossibleMemoryBackedVolumesOnDisk"
 	CgroupV1                             = "CgroupV1"
 	// Pod-level checkpoint/restore failure reasons.
-	CheckpointNotReady  = "CheckpointNotReady"
-	CheckpointWrongNode = "CheckpointWrongNode"
-	PodSpecMismatch     = "PodSpecMismatch"
-	RestoreInProgress   = "RestoreInProgress"
+	CheckpointNotReady       = "CheckpointNotReady"
+	CheckpointWrongNode      = "CheckpointWrongNode"
+	PodSpecMismatch          = "PodSpecMismatch"
+	RestoreInProgress        = "RestoreInProgress"
+	RestorePolicyUnavailable = "RestorePolicyUnavailable"
 )
 
 // Image manager event reason list

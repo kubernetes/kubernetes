@@ -25,6 +25,7 @@ import (
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -209,6 +210,8 @@ func TestPodRestoreAuthorization(t *testing.T) {
 	changedDigestPod.Spec.Containers[0].Image = "registry.example/app@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	taggedSidecarPod := pinnedPod.DeepCopy()
 	taggedSidecarPod.Spec.InitContainers[0].Image = "registry.example/app:latest"
+	restoreOptionsPod := podWithSpec("cp-1", "", "img:v1")
+	restoreOptionsPod.Spec.RestoreFrom.Options = map[string]string{"example.runtime/target": "node-local"}
 	affinityPod := podWithNodeAffinity("cp-1", "img:v1")
 	affinityCheckpoint := newCheckpointFromPod(t, "cp-1", "node-1", affinityPod)
 	affinityMismatchPod := podWithNodeAffinity("cp-1", "img:v1")
@@ -365,6 +368,16 @@ func TestPodRestoreAuthorization(t *testing.T) {
 			decision:         authorizer.DecisionAllow,
 			checkpoints:      []*nodev1alpha1.PodCheckpoint{tmplMatch},
 			wantErr:          false,
+			wantAuthCall:     true,
+			wantInjectedNode: "node-1",
+		},
+		{
+			name:             "restore options without a RuntimeClass are denied",
+			gateEnabled:      true,
+			attrs:            newAttrs(restoreOptionsPod, nil, admission.Create, ""),
+			decision:         authorizer.DecisionAllow,
+			checkpoints:      []*nodev1alpha1.PodCheckpoint{tmplMatch},
+			wantErr:          true,
 			wantAuthCall:     true,
 			wantInjectedNode: "node-1",
 		},
@@ -733,6 +746,72 @@ func TestRestoreValidationRejectsLateNodeBinding(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				require.ErrorContains(t, err, "must not set spec.nodeName")
+			}
+		})
+	}
+}
+
+func TestRestoreValidationRuntimeOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		options      map[string]string
+		useClass     bool
+		missingClass bool
+		policy       *nodev1.RuntimeClassPodCheckpoint
+		disabled     bool
+		wantErr      string
+	}{
+		{name: "no options needs no RuntimeClass"},
+		{name: "empty options needs no RuntimeClass", options: map[string]string{}},
+		{name: "options without RuntimeClass", options: map[string]string{"tcp": "close"}, wantErr: "spec.runtimeClassName"},
+		{name: "missing RuntimeClass", options: map[string]string{"tcp": "close"}, useClass: true, missingClass: true, wantErr: "cannot read RuntimeClass"},
+		{name: "missing policy", options: map[string]string{"tcp": "close"}, useClass: true, wantErr: `runtime option "tcp" is not allowed`},
+		{name: "empty restore allowlist", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpoint{}, wantErr: `runtime option "tcp" is not allowed`},
+		{name: "allowed restore key", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"tcp"}}},
+		{name: "disallowed restore key", options: map[string]string{"device-map": "sensitive-value"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"tcp"}}, wantErr: `runtime option "device-map" is not allowed`},
+		{name: "checkpoint list cannot authorize restore", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"tcp"}}, wantErr: `runtime option "tcp" is not allowed`},
+		{name: "feature disabled ignores options", options: map[string]string{"tcp": "close"}, disabled: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, !tc.disabled)
+			pod := podWithSpec("cp-1", "", "image")
+			var class *nodev1.RuntimeClass
+			if tc.useClass {
+				className := "restore-runtime"
+				pod.Spec.RuntimeClassName = &className
+				if !tc.missingClass {
+					class = &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Handler: "runtime", PodCheckpoint: tc.policy}
+				}
+			}
+			checkpoint := newCheckpointFromPod(t, "cp-1", "node-1", pod)
+			objects := []runtime.Object{checkpoint}
+			if class != nil {
+				objects = append(objects, class)
+			}
+			client := fake.NewClientset(objects...)
+			plugin := newPlugin()
+			plugin.SetExternalKubeClientSet(client)
+			plugin.SetUnconditionalAuthorizer(&fakeAuthorizer{decision: authorizer.DecisionAllow})
+			attrs := newAttrs(pod, nil, admission.Create, "")
+			require.NoError(t, plugin.Admit(context.Background(), attrs, objInterfaces))
+			// Model options inserted by a later mutating webhook.
+			pod.Spec.RestoreFrom.Options = tc.options
+			original := pod.DeepCopy()
+			err := plugin.Validate(context.Background(), attrs, objInterfaces)
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+				require.NotContains(t, err.Error(), "sensitive-value")
+			}
+			require.Equal(t, original, pod, "validation must not transform user options")
+			if tc.disabled {
+				require.Empty(t, client.Actions())
+			}
+			if len(tc.options) == 0 {
+				for _, action := range client.Actions() {
+					require.NotEqual(t, "runtimeclasses", action.GetResource().Resource)
+				}
 			}
 		})
 	}

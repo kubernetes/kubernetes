@@ -17,7 +17,12 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
+	"maps"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,13 +31,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -207,7 +220,13 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 
 func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
+	client := rctest.NewPopulatedClient()
+	class, err := client.NodeV1().RuntimeClasses().Get(tCtx, rctest.SandboxRuntimeClass, metav1.GetOptions{})
+	require.NoError(t, err)
+	class.PodCheckpoint = &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"example.runtime/target"}}
+	_, err = client.NodeV1().RuntimeClasses().Update(tCtx, class, metav1.UpdateOptions{})
+	require.NoError(t, err)
+	rcm := runtimeclass.NewManager(client)
 	defer rctest.StartManagerSync(rcm)()
 
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
@@ -216,18 +235,22 @@ func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 
 	tests := map[string]struct {
 		runtimeClassName *string
+		options          map[string]string
 		expectedHandler  string
 		expectError      bool
 	}{
-		"unspecified RuntimeClass": {expectedHandler: ""},
-		"valid RuntimeClass":       {runtimeClassName: ptr.To(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
-		"missing RuntimeClass":     {runtimeClassName: new("phantom"), expectError: true},
+		"unspecified RuntimeClass":              {expectedHandler: ""},
+		"unspecified RuntimeClass with options": {options: map[string]string{"example.runtime/target": "node-local"}, expectError: true},
+		"valid RuntimeClass":                    {runtimeClassName: ptr.To(rctest.SandboxRuntimeClass), options: map[string]string{"example.runtime/target": "node-local"}, expectedHandler: rctest.SandboxRuntimeHandler},
+		"disallowed restore key":                {runtimeClassName: ptr.To(rctest.SandboxRuntimeClass), options: map[string]string{"device-map": "0"}, expectError: true},
+		"missing RuntimeClass":                  {runtimeClassName: new("phantom"), expectError: true},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			fakeRuntime.RestoredPods = nil
 			pod := newTestPod()
-			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			restoreOptions := maps.Clone(test.options)
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: restoreOptions}
 			pod.Spec.RuntimeClassName = test.runtimeClassName
 
 			_, _, err := m.restorePodSandbox(tCtx, pod, 1, nil)
@@ -238,8 +261,126 @@ func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Len(t, fakeRuntime.RestoredPods, 1)
+			if restoreOptions != nil {
+				restoreOptions["example.runtime/target"] = "changed-after-call"
+			}
 			assert.Equal(t, test.expectedHandler, fakeRuntime.RestoredPods[0].RuntimeHandler)
-			assert.Empty(t, fakeRuntime.RestoredPods[0].Options)
+			assert.Equal(t, test.options, fakeRuntime.RestoredPods[0].Options)
+		})
+	}
+}
+
+func TestRestorePodSandboxUsesLiveRuntimeClass(t *testing.T) {
+	for _, allow := range []bool{false, true} {
+		t.Run(fmt.Sprintf("live-policy-allows=%t", allow), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			client := rctest.NewPopulatedClient().(*fake.Clientset)
+			manager := runtimeclass.NewManager(client)
+			defer rctest.StartManagerSync(manager)()
+			// Keep the cached handler stale while the live class has a new
+			// handler and policy, as after deletion and recreation.
+			class := &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: rctest.SandboxRuntimeClass}, Handler: "new-handler"}
+			if allow {
+				class.PodCheckpoint = &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"tcp"}}
+			}
+			client.PrependReactor("get", "runtimeclasses", func(clienttesting.Action) (bool, apiruntime.Object, error) {
+				return true, class.DeepCopy(), nil
+			})
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			m.runtimeClassManager = manager
+			mkdirCalls := 0
+			m.osInterface.(*containertest.FakeOS).MkdirAllFn = func(string, os.FileMode) error {
+				mkdirCalls++
+				return nil
+			}
+			pod := newTestPod()
+			pod.Spec.RuntimeClassName = ptr.To(rctest.SandboxRuntimeClass)
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: map[string]string{"tcp": "close"}}
+			_, _, err = m.restorePodSandbox(tCtx, pod, 1, nil)
+			if allow {
+				require.NoError(t, err)
+				require.Len(t, fakeRuntime.RestoredPods, 1)
+				require.Equal(t, "new-handler", fakeRuntime.RestoredPods[0].RuntimeHandler)
+			} else {
+				require.ErrorContains(t, err, `runtime option "tcp" is not allowed`)
+				require.Equal(t, events.PodSpecMismatch, kubecontainer.RestoreErrorReason(err))
+				require.Zero(t, mkdirCalls)
+				require.Empty(t, fakeRuntime.RestoredPods)
+				require.NotContains(t, fakeRuntime.Called, "StartContainer")
+				require.NotContains(t, fakeRuntime.Called, "RunPodSandbox")
+			}
+		})
+	}
+}
+
+func TestRestorePodSandboxOptionsRequireRuntimeClassManager(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.runtimeClassManager = nil
+	mkdirCalls := 0
+	m.osInterface.(*containertest.FakeOS).MkdirAllFn = func(string, os.FileMode) error {
+		mkdirCalls++
+		return nil
+	}
+	pod := newTestPod()
+	pod.Spec.RuntimeClassName = ptr.To("runtime")
+	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: map[string]string{"tcp": "close"}}
+	_, _, err = m.restorePodSandbox(tCtx, pod, 1, nil)
+	require.ErrorContains(t, err, "without a RuntimeClass manager")
+	require.Equal(t, events.PodSpecMismatch, kubecontainer.RestoreErrorReason(err))
+	require.Zero(t, mkdirCalls)
+	require.Empty(t, fakeRuntime.RestoredPods)
+	require.NotContains(t, fakeRuntime.Called, "StartContainer")
+}
+
+func TestRestorePodSandboxRuntimeClassLookupErrors(t *testing.T) {
+	resource := schema.GroupResource{Group: "node.k8s.io", Resource: "runtimeclasses"}
+	for _, tc := range []struct {
+		name   string
+		err    error
+		reason string
+	}{
+		{name: "timeout", err: apierrors.NewTimeoutError("timeout", 1), reason: events.RestorePolicyUnavailable},
+		{name: "server timeout", err: apierrors.NewServerTimeout(resource, "get", 1), reason: events.RestorePolicyUnavailable},
+		{name: "service unavailable", err: apierrors.NewServiceUnavailable("unavailable"), reason: events.RestorePolicyUnavailable},
+		{name: "too many requests", err: apierrors.NewTooManyRequests("busy", 1), reason: events.RestorePolicyUnavailable},
+		{name: "internal server error", err: apierrors.NewInternalError(errors.New("server failure")), reason: events.RestorePolicyUnavailable},
+		{name: "context deadline", err: context.DeadlineExceeded, reason: events.RestorePolicyUnavailable},
+		{name: "context canceled", err: context.Canceled, reason: events.RestorePolicyUnavailable},
+		{name: "network timeout", err: &net.DNSError{Err: "timeout", IsTimeout: true}, reason: events.RestorePolicyUnavailable},
+		{name: "connection refused", err: &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}, reason: events.RestorePolicyUnavailable},
+		{name: "connection closed", err: io.EOF, reason: events.RestorePolicyUnavailable},
+		{name: "unexpected connection closed", err: io.ErrUnexpectedEOF, reason: events.RestorePolicyUnavailable},
+		{name: "class not found", err: apierrors.NewNotFound(resource, "runtime"), reason: events.PodSpecMismatch},
+		{name: "forbidden", err: apierrors.NewForbidden(resource, "runtime", errors.New("denied")), reason: events.PodSpecMismatch},
+		{name: "unauthorized", err: apierrors.NewUnauthorized("denied"), reason: events.PodSpecMismatch},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			client := fake.NewClientset()
+			client.PrependReactor("get", "runtimeclasses", func(clienttesting.Action) (bool, apiruntime.Object, error) {
+				return true, nil, tc.err
+			})
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			m.runtimeClassManager = runtimeclass.NewManager(client)
+			mkdirCalls := 0
+			m.osInterface.(*containertest.FakeOS).MkdirAllFn = func(string, os.FileMode) error {
+				mkdirCalls++
+				return nil
+			}
+			pod := newTestPod()
+			pod.Spec.RuntimeClassName = ptr.To("runtime")
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: map[string]string{"tcp": "close"}}
+			_, _, err = m.restorePodSandbox(tCtx, pod, 1, nil)
+			require.ErrorIs(t, err, tc.err)
+			require.Equal(t, tc.reason, kubecontainer.RestoreErrorReason(err))
+			require.Zero(t, mkdirCalls)
+			require.Empty(t, fakeRuntime.RestoredPods)
+			require.NotContains(t, fakeRuntime.Called, "StartContainer")
+			require.NotContains(t, fakeRuntime.Called, "RunPodSandbox")
 		})
 	}
 }

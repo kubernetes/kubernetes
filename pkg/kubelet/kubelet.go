@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"net/http"
@@ -2417,8 +2418,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		if result.Error() == nil {
 			status.SetPodRestoredCondition(pod, &apiPodStatus, v1.ConditionTrue, "RestoreCompleted", "pod was restored from checkpoint")
 			kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
-		} else if kubecontainer.RestoreErrorReason(result.Error()) != events.RestoreInProgress {
-			reason := kubecontainer.RestoreErrorReason(result.Error())
+		} else if reason := kubecontainer.RestoreErrorReason(result.Error()); reason != events.RestoreInProgress && reason != events.RestorePolicyUnavailable {
 			if reason == "" {
 				reason = "RestoreFailed"
 			}
@@ -2427,8 +2427,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
 			return true, nil, nil
 		} else {
-			// Another restore currently owns the namespace/name lock. Keep this
-			// attempt retryable; it is not a failed restore.
+			// Lock contention and temporary policy lookup failures happen before
+			// runtime restore, so the same attempt can safely retry.
 			kl.restoreOperationsInFlight.Store(pod.UID, struct{}{})
 		}
 	}
@@ -3721,6 +3721,7 @@ func (kl *Kubelet) CheckpointPod(
 	podCheckpointName string,
 	podCheckpointUID types.UID,
 	timeout time.Duration,
+	checkpointOptions map[string]string,
 ) error {
 	logger := klog.FromContext(ctx)
 
@@ -3767,6 +3768,9 @@ func (kl *Kubelet) CheckpointPod(
 	activeSandbox := podStatus.SandboxStatuses[0]
 	if activeSandbox == nil || activeSandbox.State != runtimeapi.PodSandboxState_SANDBOX_READY || activeSandbox.Id == "" {
 		return fmt.Errorf("pod %v has no ready sandbox", podFullName)
+	}
+	if err := kl.validatePodCheckpointOptions(ctx, pod, checkpointOptions, activeSandbox.RuntimeHandler); err != nil {
+		return err
 	}
 
 	// Enforce the execution-time preconditions (KEP-5823) before reaching the
@@ -3827,6 +3831,7 @@ func (kl *Kubelet) CheckpointPod(
 		PodSandboxId: activeSandbox.Id,
 		OutputPath:   outputPath,
 		ContainerIds: containerIDs,
+		Options:      maps.Clone(checkpointOptions),
 	}
 
 	// Pause the pod's probes for the duration of the checkpoint: its containers
