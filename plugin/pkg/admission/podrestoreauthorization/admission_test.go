@@ -208,6 +208,8 @@ func TestPodRestoreAuthorization(t *testing.T) {
 	changedDigestPod.Spec.Containers[0].Image = "registry.example/app@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	taggedSidecarPod := pinnedPod.DeepCopy()
 	taggedSidecarPod.Spec.InitContainers[0].Image = "registry.example/app:latest"
+	restoreOptionsPod := podWithSpec("cp-1", "", "img:v1")
+	restoreOptionsPod.Spec.RestoreFrom.Options = map[string]string{"example.runtime/target": "node-local"}
 	affinityPod := podWithNodeAffinity("cp-1", "img:v1")
 	affinityCheckpoint := newCheckpointFromPod(t, "cp-1", "node-1", affinityPod)
 	affinityMismatchPod := podWithNodeAffinity("cp-1", "img:v1")
@@ -326,6 +328,15 @@ func TestPodRestoreAuthorization(t *testing.T) {
 			decision:         authorizer.DecisionAllow,
 			checkpoints:      []*nodev1alpha1.PodCheckpoint{tmplMatch},
 			wantErr:          false,
+			wantAuthCall:     true,
+			wantInjectedNode: "node-1",
+		},
+		{
+			name:             "restore options are excluded from template equality",
+			gateEnabled:      true,
+			attrs:            newAttrs(restoreOptionsPod, nil, admission.Create, ""),
+			decision:         authorizer.DecisionAllow,
+			checkpoints:      []*nodev1alpha1.PodCheckpoint{tmplMatch},
 			wantAuthCall:     true,
 			wantInjectedNode: "node-1",
 		},

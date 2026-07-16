@@ -146,6 +146,13 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.jobTemplate.spec.template.spec.restoreFrom.options": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+				{ErrorType: "FieldValueTooMany", Origin: "maxProperties"},
+			},
+			"spec.jobTemplate.spec.template.spec.restoreFrom.options[*]": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
 			"spec.jobTemplate.spec.template.spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},

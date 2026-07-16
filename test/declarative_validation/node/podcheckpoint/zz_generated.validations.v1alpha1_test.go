@@ -61,6 +61,14 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.checkpointOptions": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+				{ErrorType: "FieldValueTooMany", Origin: "maxProperties"},
+			},
+			"spec.checkpointOptions[*]": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
 			"spec.sourcePod": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueRequired"},

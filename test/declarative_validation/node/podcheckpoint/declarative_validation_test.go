@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/node"
 	registry "k8s.io/kubernetes/pkg/registry/node/podcheckpoint"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
@@ -80,6 +81,11 @@ func TestDeclarativeValidate(t *testing.T) {
 		"valid opaque source pod UID": {
 			mutate: func(pc *node.PodCheckpoint) { pc.Spec.SourcePod.UID = ptr.To(types.UID("opaque-uid")) },
 		},
+		"valid checkpoint options": {
+			mutate: func(pc *node.PodCheckpoint) {
+				pc.Spec.CheckpointOptions = map[string]string{"example.runtime/mode": "incremental"}
+			},
+		},
 		"missing source pod": {
 			mutate:       func(pc *node.PodCheckpoint) { pc.Spec.SourcePod = nil },
 			expectedErrs: field.ErrorList{field.Required(specPath.Child("sourcePod"), "")},
@@ -126,6 +132,9 @@ func TestDeclarativeValidate(t *testing.T) {
 					apitesting.VerifyValidationEquivalence(t, ctx, pc, registry.Strategy, tc.expectedErrs)
 				})
 			}
+			poddeclarativevalidation.RunDeclarativeValidateRuntimeOptionsTestCases(t, ctx, registry.Strategy, specPath.Child("checkpointOptions"), mkPodCheckpoint(), func(pc *node.PodCheckpoint, options map[string]string) {
+				pc.Spec.CheckpointOptions = options
+			})
 			meta.RunObjectMetaTestCases(t, ctx, mkPodCheckpoint(), registry.Strategy)
 		})
 	}
@@ -141,6 +150,11 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		"unchanged": {},
 		"unchanged pinned source pod": {
 			mutateOld: func(pc *node.PodCheckpoint) { pc.Spec.SourcePod.UID = ptr.To(types.UID("opaque-uid")) },
+		},
+		"unchanged checkpoint options": {
+			mutateOld: func(pc *node.PodCheckpoint) {
+				pc.Spec.CheckpointOptions = map[string]string{"example.runtime/mode": "incremental"}
+			},
 		},
 		"unchanged timeout": {
 			mutateOld: func(pc *node.PodCheckpoint) { pc.Spec.TimeoutSeconds = ptr.To[int32](30) },
@@ -188,6 +202,19 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				field.Invalid(specPath.Child("sourcePod"), nil, "").WithOrigin("immutable"),
 				field.Required(specPath.Child("sourcePod"), ""),
 			},
+		},
+		"checkpoint options are immutable": {
+			mutate: func(pc *node.PodCheckpoint) {
+				pc.Spec.CheckpointOptions = map[string]string{"example.runtime/mode": "incremental"}
+			},
+			expectedErrs: field.ErrorList{field.Invalid(specPath.Child("checkpointOptions"), nil, "").WithOrigin("immutable")},
+		},
+		"checkpoint options cannot be removed": {
+			mutateOld: func(pc *node.PodCheckpoint) {
+				pc.Spec.CheckpointOptions = map[string]string{"example.runtime/mode": "incremental"}
+			},
+			mutate:       func(pc *node.PodCheckpoint) { pc.Spec.CheckpointOptions = nil },
+			expectedErrs: field.ErrorList{field.Invalid(specPath.Child("checkpointOptions"), nil, "").WithOrigin("immutable")},
 		},
 		"zero timeout is not unset": {
 			mutate:       func(pc *node.PodCheckpoint) { pc.Spec.TimeoutSeconds = ptr.To[int32](0) },
@@ -239,9 +266,11 @@ func TestValidationWithDeclarativeValidationBetaDisabled(t *testing.T) {
 			newPC := oldPC.DeepCopy()
 			newPC.Spec.TimeoutSeconds = ptr.To[int32](30)
 			newPC.Spec.SourcePod.Name = "other-pod"
+			newPC.Spec.CheckpointOptions = map[string]string{"example.runtime/mode": "incremental"}
 			errMatcher.Test(t, field.ErrorList{
 				field.Invalid(field.NewPath("spec", "timeoutSeconds"), nil, "").WithOrigin("immutable"),
 				field.Invalid(field.NewPath("spec", "sourcePod"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "checkpointOptions"), nil, "").WithOrigin("immutable"),
 			}, rest.ValidateUpdate(requestContext(apiVersion, "update", ""), newPC, oldPC, registry.Strategy))
 		})
 	}

@@ -1846,7 +1846,10 @@
       }
     ],
     "restoreFrom": {
-      "name": "nameValue"
+      "name": "nameValue",
+      "options": {
+        "optionsKey": "optionsValue"
+      }
     }
   },
   "status": {

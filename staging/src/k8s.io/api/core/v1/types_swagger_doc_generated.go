@@ -196,8 +196,9 @@ func (CephFSVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_CheckpointReference = map[string]string{
-	"":     "CheckpointReference identifies a PodCheckpoint to restore a Pod from.",
-	"name": "name is the name of a PodCheckpoint in the Pod's namespace.",
+	"":        "CheckpointReference identifies a PodCheckpoint and specifies options for restoring a Pod from it.",
+	"name":    "name is the name of a PodCheckpoint in the Pod's namespace.",
+	"options": "Options contains opaque runtime-specific options for this restore attempt. The kubelet passes these entries unchanged to RestorePodRequest.options. Keys and values must be documented by the runtime selected for this Pod. Unsupported entries cause the restore to fail. Options must not contain secrets.\n\nRestore options are independent of the options used to create the checkpoint and are not stored in the PodCheckpoint. Requirements intrinsic to the checkpoint are recorded in runtime-owned checkpoint data instead. At most 64 entries are allowed, with keys of at most 256 bytes and values of at most 4096 bytes.",
 }
 
 func (CheckpointReference) SwaggerDoc() map[string]string {

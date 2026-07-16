@@ -4831,7 +4831,8 @@ type PodSpec struct {
 	RestoreFrom *CheckpointReference `json:"restoreFrom,omitempty" protobuf:"bytes,45,opt,name=restoreFrom"`
 }
 
-// CheckpointReference identifies a PodCheckpoint to restore a Pod from.
+// CheckpointReference identifies a PodCheckpoint and specifies options for
+// restoring a Pod from it.
 // +structType=atomic
 type CheckpointReference struct {
 	// name is the name of a PodCheckpoint in the Pod's namespace.
@@ -4839,6 +4840,24 @@ type CheckpointReference struct {
 	// +k8s:required
 	// +k8s:format=k8s-long-name
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// Options contains opaque runtime-specific options for this restore attempt.
+	// The kubelet passes these entries unchanged to RestorePodRequest.options. Keys
+	// and values must be documented by the runtime selected for this Pod.
+	// Unsupported entries cause the restore to fail. Options must not contain secrets.
+	//
+	// Restore options are independent of the options used to create the
+	// checkpoint and are not stored in the PodCheckpoint. Requirements intrinsic
+	// to the checkpoint are recorded in runtime-owned checkpoint data instead.
+	// At most 64 entries are allowed, with keys of at most 256 bytes and values
+	// of at most 4096 bytes.
+	// +optional
+	// +mapType=atomic
+	// +k8s:optional
+	// +k8s:maxProperties=64
+	// +k8s:eachKey=+k8s:maxBytes=256
+	// +k8s:eachVal=+k8s:maxBytes=4096
+	Options map[string]string `json:"options,omitempty" protobuf:"bytes,2,rep,name=options"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly

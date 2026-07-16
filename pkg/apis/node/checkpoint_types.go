@@ -72,6 +72,16 @@ type PodCheckpointSpec struct {
 	// Immutable because the operation's deadline is fixed when it starts.
 	// +optional
 	TimeoutSeconds *int32
+
+	// checkpointOptions contains opaque runtime-specific options for this
+	// checkpoint operation. They are not reused as restore options. If an option
+	// creates a restore requirement, the runtime records it in the checkpoint
+	// data it owns.
+	// At most 64 entries are allowed, with keys of at most 256 bytes and values
+	// of at most 4096 bytes.
+	// +optional
+	// +mapType=atomic
+	CheckpointOptions map[string]string
 }
 
 // PodReference identifies a pod in the same namespace by name and, optionally,

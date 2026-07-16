@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"net/http"
@@ -3702,6 +3703,7 @@ func (kl *Kubelet) CheckpointPod(
 	podCheckpointName string,
 	podCheckpointUID types.UID,
 	timeout time.Duration,
+	checkpointOptions map[string]string,
 ) error {
 	logger := klog.FromContext(ctx)
 
@@ -3799,6 +3801,7 @@ func (kl *Kubelet) CheckpointPod(
 		PodSandboxId: activeSandbox.Id,
 		OutputPath:   outputPath,
 		ContainerIds: containerIDs,
+		Options:      maps.Clone(checkpointOptions),
 	}
 
 	// Pause the pod's probes for the duration of the checkpoint: its containers

@@ -4643,8 +4643,8 @@ type PodValidationOptions struct {
 	AllowSysAdminWhenPrivilegeEscalationFalse bool
 	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
 	AllowMLDSAPodCertificateKeyTypes bool
-	// Allow spec.restoreFrom to be set (gated by the PodLevelCheckpointRestore
-	// feature gate, with ratcheting for objects that already set it).
+	// Allow the spec.restoreFrom invocation to be set (gated by
+	// PodLevelCheckpointRestore, with ratcheting for objects that already use it).
 	AllowRestoreFrom bool
 }
 

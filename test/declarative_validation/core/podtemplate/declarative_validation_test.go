@@ -163,6 +163,9 @@ func TestDeclarativeValidateRestoreFrom(t *testing.T) {
 				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
 			})
 		}
+		poddeclarativevalidation.RunDeclarativeValidateRuntimeOptionsTestCases(t, ctx, registry.Strategy, field.NewPath("template", "spec", "restoreFrom", "options"), mkPodTemplate(), func(obj *api.PodTemplate, options map[string]string) {
+			obj.Template.Spec.RestoreFrom = &api.CheckpointReference{Name: "valid-checkpoint", Options: options}
+		})
 	}
 }
 

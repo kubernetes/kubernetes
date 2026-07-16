@@ -308,6 +308,50 @@ func Validate_CheckpointReference(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
+	{ // field corev1.CheckpointReference.Options
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxProperties(ctx, op, fldPath, obj, oldObj, 64).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 256)
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 4096)
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.CheckpointReference) map[string]string {
+				return oldObj.Options
+			})
+		errs = append(errs, fn(fldPath.Child("options"), obj.Options, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -1303,7 +1347,7 @@ func Validate_Pod(
 			func() { // cohort = "restoreFrom"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "restoreFrom",
-					func(o *corev1.PodSpec) *corev1.CheckpointReference { return o.RestoreFrom }, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+					func(o *corev1.PodSpec) *corev1.CheckpointReference { return o.RestoreFrom }, validate.SemanticDeepEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
@@ -1584,7 +1628,7 @@ func Validate_PodSpec(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}

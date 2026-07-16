@@ -1952,21 +1952,21 @@ func TestCheckpointPod(t *testing.T) {
 
 	t.Run("rejects unknown pod", func(t *testing.T) {
 		kubelet, _, _ := setup(t)
-		err := kubelet.CheckpointPod(ktesting.Init(t), "wrong-uid", "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), "wrong-uid", "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, nil)
 		require.ErrorContains(t, err, "not found")
 	})
 
 	t.Run("rejects pod without sandbox", func(t *testing.T) {
 		kubelet, fakeRuntime, pod := setup(t)
 		fakeRuntime.PodStatus.SandboxStatuses = nil
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, nil)
 		require.ErrorContains(t, err, "has no sandbox")
 	})
 
 	t.Run("rejects pod whose active sandbox is not ready", func(t *testing.T) {
 		kubelet, fakeRuntime, pod := setup(t)
 		fakeRuntime.PodStatus.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, nil)
 		require.ErrorContains(t, err, "has no ready sandbox")
 		require.False(t, kubelet.IsPodCheckpointInProgress(pod.UID))
 	})
@@ -1989,12 +1989,14 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		checkpointOptions := map[string]string{"example.runtime/mode": "incremental"}
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, checkpointOptions)
 		require.NoError(t, err)
 		request := receiveRequest(t, requests)
+		checkpointOptions["example.runtime/mode"] = "changed-after-call"
 		require.Equal(t, "sandbox1234", request.PodSandboxId)
 		require.Equal(t, []string{"container1234"}, request.ContainerIds)
-		require.Empty(t, request.Options)
+		require.Equal(t, map[string]string{"example.runtime/mode": "incremental"}, request.Options)
 		require.True(t, filepath.IsAbs(request.OutputPath))
 		require.Equal(t, "checkpoint-checkpoint-uid", filepath.Base(request.OutputPath))
 		rel, err := filepath.Rel(kubelet.getPodCheckpointsDir(), request.OutputPath)
@@ -2026,7 +2028,7 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, nil)
 		require.NoError(t, err)
 		request := receiveRequest(t, requests)
 		waitForCompletion(t, kubelet, pod.UID)
@@ -2067,7 +2069,7 @@ func TestCheckpointPod(t *testing.T) {
 			}
 
 			checkpointUID := types.UID("cleanup-failure-uid")
-			err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "ckpt", checkpointUID, 0)
+			err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "ckpt", checkpointUID, 0, nil)
 			require.NoError(t, err)
 			request := receiveRequest(t, requests)
 			t.Cleanup(func() {
@@ -2099,7 +2101,7 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "checkpoint-uid", 0, nil)
 		require.ErrorContains(t, err, "failed to create pod checkpoint directory")
 		require.False(t, called)
 		_, inFlight := kubelet.checkpointsInFlight.Load(pod.UID)
@@ -2122,7 +2124,7 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "duplicate-id-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "duplicate-id-uid", 0, nil)
 		require.ErrorContains(t, err, "duplicate runtime ID")
 		require.False(t, called)
 		require.False(t, kubelet.IsPodCheckpointInProgress(pod.UID))
@@ -2153,7 +2155,7 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "container-selection-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "container-selection-uid", 0, nil)
 		require.NoError(t, err)
 		request := receiveRequest(t, requests)
 		require.Equal(t, []string{"sidecar-id", "app-one-id", "app-two-id"}, request.ContainerIds)
@@ -2178,7 +2180,7 @@ func TestCheckpointPod(t *testing.T) {
 		}
 
 		before := time.Now()
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "deadline-uid", time.Hour)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "", "deadline-uid", time.Hour, nil)
 		after := time.Now()
 		require.NoError(t, err)
 		select {
@@ -2203,7 +2205,7 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "ckpt", "status-failure-uid", 0)
+		err := kubelet.CheckpointPod(ktesting.Init(t), pod.UID, "podFoo_nsFoo", "nsFoo", "ckpt", "status-failure-uid", 0, nil)
 		require.NoError(t, err)
 		request := receiveRequest(t, requests)
 		waitForCompletion(t, kubelet, pod.UID)
@@ -2324,7 +2326,13 @@ func TestGetPodCheckpointPath(t *testing.T) {
 	restorePod := func() *v1.Pod {
 		return &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "ns"},
-			Spec:       v1.PodSpec{RestoreFrom: &v1.CheckpointReference{Name: "ckpt"}, Containers: []v1.Container{{Name: "app", Image: "registry.example/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}},
+			Spec: v1.PodSpec{
+				RestoreFrom: &v1.CheckpointReference{
+					Name:    "ckpt",
+					Options: map[string]string{"example.runtime/target": "node-local"},
+				},
+				Containers: []v1.Container{{Name: "app", Image: "registry.example/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+			},
 		}
 	}
 	// tmplFor returns the unstructured checkpointedPodTemplate for a pod's sanitized spec.
