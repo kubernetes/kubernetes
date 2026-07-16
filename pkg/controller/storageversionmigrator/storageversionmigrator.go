@@ -325,14 +325,42 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 				},
 			)
 
-		// in case of conflict or not found error, we can stop processing migration for that resource because it has either been
-		// - updated, meaning that migration has already been performed
-		// - deleted, meaning that migration is not needed
-		// - deleted and recreated, meaning that migration has already been performed
-		if apierrors.IsConflict(errPatch) || apierrors.IsNotFound(errPatch) {
+		// Conflict means the object was updated or deleted+recreated since
+		// we read it from the GC cache; either way it has already been
+		// re-written to storage and does not need migration.
+		if apierrors.IsConflict(errPatch) {
 			logger.V(6).Info("Resource ignored due to conflict", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "err", errPatch)
 			candidatesToPatch--
 			continue
+		}
+		// NotFound from Patch can mean two things:
+		//  (a) the object was deleted between the GC cache read and the
+		//      Patch — safe to skip, same as Conflict.
+		//  (b) the object still exists in etcd but its Namespace has been
+		//      fully deleted — the NamespaceLifecycle admission plugin
+		//      rejects mutations in non-existent namespaces with NotFound,
+		//      even though the object is still in storage.
+		// A GET bypasses admission and reads directly from storage,
+		// distinguishing (a) from (b).
+		if apierrors.IsNotFound(errPatch) {
+			_, getErr := svmc.dynamicClient.Resource(gvr).
+				Namespace(accessor.GetNamespace()).
+				Get(ctx, accessor.GetName(), metav1.GetOptions{})
+			if apierrors.IsNotFound(getErr) {
+				logger.V(6).Info("Resource ignored, deleted during migration",
+					"namespace", accessor.GetNamespace(),
+					"name", accessor.GetName(),
+					"gvr", gvr.String())
+				candidatesToPatch--
+				continue
+			}
+			if getErr != nil {
+				errPatch = fmt.Errorf("failed to verify existence of %s/%s after patch returned NotFound: %w",
+					accessor.GetName(), accessor.GetNamespace(), getErr)
+			} else {
+				errPatch = fmt.Errorf("cannot migrate %s/%s: object exists in storage but namespace %q "+
+					"has been deleted", accessor.GetName(), accessor.GetNamespace(), accessor.GetNamespace())
+			}
 		}
 
 		// in case of retriable errors like server throttling, we can return an error since that will cause the migration to be reattempted.

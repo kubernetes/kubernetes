@@ -177,7 +177,8 @@ func TestSync(t *testing.T) {
 		expectErr            bool
 		expectKubeActions    []k8stesting.Action
 		expectDynamicActions []k8stesting.Action
-		dynamicClientErrors  map[string]error
+		dynamicClientErrors    map[string]error
+		dynamicClientGetErrors map[string]error
 	}{
 		{
 			name: "Successful migration",
@@ -342,6 +343,71 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
+			name: "NotFound on patch with object genuinely deleted is ignored",
+			key:  "notfound-deleted-svm",
+			svm:  newSVM("notfound-deleted-svm", "100"),
+			graphBuilder: &mockGraphBuilder{
+				monitor: newMockMonitor("100", []runtime.Object{
+					newResource("res1", "ns1", "90", "uid1"),
+					newResource("res2", "ns2", "95", "uid2"),
+				}),
+			},
+			expectErr: false,
+			expectKubeActions: []k8stesting.Action{
+				k8stesting.NewUpdateAction(
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					"",
+					newSVMWithConditions("test-svm", "100", []metav1.Condition{
+						{
+							Type:   string(svmv1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   string(svmv1.MigrationSucceeded),
+							Status: metav1.ConditionTrue,
+						},
+					}),
+				),
+			},
+			dynamicClientErrors: map[string]error{
+				"ns1/res1": apierrors.NewNotFound(schema.GroupResource{Group: "apps", Resource: "deployments"}, "res1"),
+			},
+			dynamicClientGetErrors: map[string]error{
+				"ns1/res1": apierrors.NewNotFound(schema.GroupResource{Group: "apps", Resource: "deployments"}, "res1"),
+			},
+		},
+		{
+			name: "NotFound on patch with object still existing fails migration",
+			key:  "notfound-orphan-svm",
+			svm:  newSVM("notfound-orphan-svm", "100"),
+			graphBuilder: &mockGraphBuilder{
+				monitor: newMockMonitor("100", []runtime.Object{
+					newResource("res1", "orphaned-ns", "90", "uid1"),
+				}),
+			},
+			expectErr: false,
+			expectKubeActions: []k8stesting.Action{
+				k8stesting.NewUpdateAction(
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					"",
+					newSVMWithConditions("test-svm", "100", []metav1.Condition{
+						{
+							Type:   string(svmv1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   string(svmv1.MigrationFailed),
+							Status: metav1.ConditionTrue,
+						},
+					}),
+				),
+			},
+			dynamicClientErrors: map[string]error{
+				"orphaned-ns/res1": apierrors.NewNotFound(schema.GroupResource{Group: "apps", Resource: "deployments"}, "res1"),
+			},
+			dynamicClientGetErrors: map[string]error{},
+		},
+		{
 			name: "Retriable patch error is returned directly",
 			key:  "retriable-error-svm",
 			svm:  newSVM("retriable-error-svm", "100"),
@@ -442,6 +508,16 @@ func TestSync(t *testing.T) {
 				}
 				return true, nil, nil
 			})
+			if tc.dynamicClientGetErrors != nil {
+				dynamicClient.PrependReactor("get", "*", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					getAction := action.(k8stesting.GetAction)
+					key := fmt.Sprintf("%s/%s", getAction.GetNamespace(), getAction.GetName())
+					if err, found := tc.dynamicClientGetErrors[key]; found {
+						return true, nil, err
+					}
+					return true, nil, nil
+				})
+			}
 
 			err := controller.sync(ctx, tc.key)
 
