@@ -2261,10 +2261,6 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		}
 	}
 
-	// TODO: Once we begin persisting memory Request from the PodSpec to cgroups,
-	// the code needs to persist that value if it is non-nil.
-	preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Requests, resources.Requests)
-
 	if cpuLimit != nil {
 		// If both the allocated & actual resources are at
 		// or below the minimum effective limit, preserve the
