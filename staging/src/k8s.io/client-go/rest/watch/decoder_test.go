@@ -105,6 +105,54 @@ func TestDecoder(t *testing.T) {
 	}
 }
 
+func TestDecoder_Errors(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "wrong decoded type",
+			input: `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo"}}`,
+		},
+		{
+			name:  "invalid watch event type",
+			input: `{"type":"INVALID","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo"}}}`,
+		},
+		{
+			name:  "undecodable embedded object",
+			input: `{"type":"ADDED","object":{"apiVersion":"v1","kind":"DoesNotExist"}}`,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			out, in := io.Pipe()
+			decoder := NewDecoder(streaming.NewDecoder(out, getDecoder()), getDecoder())
+			defer decoder.Close()
+
+			go func() {
+				if _, err := in.Write([]byte(testCase.input + "\n")); err != nil {
+					t.Errorf("Unexpected error %v", err)
+				}
+				in.Close()
+			}()
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				if _, _, err := decoder.Decode(); err == nil {
+					t.Errorf("Expected error, got nil")
+				}
+			}()
+
+			select {
+			case <-done:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Error("Timeout")
+			}
+		})
+	}
+}
+
 func TestDecoder_SourceClose(t *testing.T) {
 	out, in := io.Pipe()
 	decoder := NewDecoder(streaming.NewDecoder(out, getDecoder()), getDecoder())
