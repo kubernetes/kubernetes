@@ -166,6 +166,51 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 				return validateDirExists(filepath.Join(podDir, "volume-subpaths/volume/container/index"))
 			},
 		},
+
+		// Residual CSI vol_data.json after unmount/reboot must not block orphan cleanup.
+		// https://github.com/kubernetes/kubernetes/issues/105536
+		"pod-doesnot-exist-with-csi-vol-data-json": {
+			prepareFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				// Escaped CSI plugin name on disk is kubernetes.io~csi
+				volumePath := filepath.Join(podDir, "volumes/kubernetes.io~csi/pvc-fake")
+				if err := os.MkdirAll(filepath.Join(volumePath, "mount"), 0750); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(volumePath, "vol_data.json"), []byte(`{"driverName":"test.csi"}`), 0640)
+			},
+			validateFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				return validateDirNotExists(podDir)
+			},
+		},
+		// Arbitrary non-metadata content under a volume path must still be preserved.
+		"pod-doesnot-exist-with-csi-userdata-preserved": {
+			prepareFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				volumePath := filepath.Join(podDir, "volumes/kubernetes.io~csi/pvc-fake")
+				if err := os.MkdirAll(volumePath, 0750); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(volumePath, "vol_data.json"), []byte(`{"driverName":"test.csi"}`), 0640); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(volumePath, "userdata.txt"), []byte("keep-me"), 0640)
+			},
+			validateFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				// volumes dir remains because of userdata; vol_data.json should be gone
+				dataPath := filepath.Join(podDir, "volumes/kubernetes.io~csi/pvc-fake/vol_data.json")
+				if _, err := os.Stat(dataPath); !os.IsNotExist(err) {
+					return fmt.Errorf("expected vol_data.json removed, stat err=%v", err)
+				}
+				userPath := filepath.Join(podDir, "volumes/kubernetes.io~csi/pvc-fake/userdata.txt")
+				if _, err := os.Stat(userPath); err != nil {
+					return fmt.Errorf("expected userdata.txt preserved: %v", err)
+				}
+				return nil
+			},
+		},
 		// TODO: test volume in volume-manager
 	}
 
