@@ -222,14 +222,14 @@ type KubeletConfiguration struct {
 	// +optional
 	ServerTLSBootstrap bool `json:"serverTLSBootstrap,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated.
-	//```yaml
+	// ```yaml
 	// Defaults:
 	//   anonymous:
 	//     enabled: false
 	//   webhook:
 	//     enabled: true
 	//     cacheTTL: "2m"
-	//```
+	// ```
 	// +optional
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized.
