@@ -86,9 +86,10 @@ func (PodCheckpointList) SwaggerDoc() map[string]string {
 }
 
 var map_PodCheckpointSpec = map[string]string{
-	"":               "PodCheckpointSpec defines the desired state of a PodCheckpoint.",
-	"sourcePod":      "sourcePod identifies the pod to checkpoint. The pod must exist in the same namespace as the PodCheckpoint resource. Immutable.",
-	"timeoutSeconds": "timeoutSeconds is the maximum number of seconds the checkpoint operation may take, between 1 and 3600. If unset, the kubelet's configured checkpoint timeout is used; values larger than that configured ceiling are clamped to it. The kubelet enforces the effective timeout with the CRI call deadline, which bounds how long the Pod can stay frozen. Immutable because the operation's deadline is fixed when it starts.",
+	"":                  "PodCheckpointSpec defines the desired state of a PodCheckpoint.",
+	"sourcePod":         "sourcePod identifies the pod to checkpoint. The pod must exist in the same namespace as the PodCheckpoint resource. Immutable.",
+	"timeoutSeconds":    "timeoutSeconds is the maximum number of seconds the checkpoint operation may take, between 1 and 3600. If unset, the kubelet's configured checkpoint timeout is used; values larger than that configured ceiling are clamped to it. The kubelet enforces the effective timeout with the CRI call deadline, which bounds how long the Pod can stay frozen. Immutable because the operation's deadline is fixed when it starts.",
+	"checkpointOptions": "checkpointOptions contains opaque runtime-specific options for this checkpoint operation. Empty options use runtime defaults. Each key must appear in the source Pod's RuntimeClass podCheckpointOptions.allowedCheckpointOptions; without a RuntimeClass or allowlist, only empty options are permitted. Admission and the kubelet check the keys, and the kubelet passes the map unchanged to CheckpointPodRequest.options as untrusted user input. The runtime must reject unsupported, invalid, or unsafe values. Options must not contain secrets or override administrator configuration, security constraints, or the Pod's allocated devices. Administrator settings belong in node or runtime configuration.\n\nThese options are not restore defaults. If an option changes what is required to restore the resulting checkpoint, the runtime records that requirement in its checkpoint data. Restore-time choices are supplied separately by the restoring Pod. At most 64 entries are allowed, with keys of at most 256 bytes and values of at most 4096 bytes.",
 }
 
 func (PodCheckpointSpec) SwaggerDoc() map[string]string {

@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 // Package util provides pod-template sanitization for checkpoint capture in the
-// kubelet and Pod spec comparison for admission.
+// kubelet, Pod spec comparison for admission, and runtime option checks shared
+// by admission and the kubelet.
 package util
 
 import (

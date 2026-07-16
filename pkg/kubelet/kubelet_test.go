@@ -50,6 +50,7 @@ import (
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -2338,8 +2339,31 @@ func TestCheckpointPod(t *testing.T) {
 		requireCheckpointFailure(t, kubelet, pod, name, "stopped because the source pod started terminating")
 	})
 
+	t.Run("denied options leave no checkpoint output", func(t *testing.T) {
+		kubelet, fakeRuntime, pod := setup(t)
+		called := make(chan struct{}, 1)
+		kubelet.containerRuntime = &checkpointRuntime{Runtime: fakeRuntime, checkpointPod: func(context.Context, *runtimeapi.CheckpointPodRequest) error { called <- struct{}{}; return nil }}
+		ctx := ktesting.Init(t)
+		name := addCheckpoint(t, kubelet, pod, "denied-options")
+		require.NoError(t, kubelet.requestPodCheckpoint(ctx, pod, &podCheckpointRequest{ctx: ctx, namespace: pod.Namespace, name: name, uid: "denied-options", options: map[string]string{"tcp": "close"}}))
+		requireCheckpointFailure(t, kubelet, pod, name, "require a RuntimeClass")
+		require.Empty(t, called)
+		_, outputPath, err := kubelet.podCheckpointOutputPath("denied-options")
+		require.NoError(t, err)
+		_, err = os.Stat(outputPath)
+		require.ErrorIs(t, err, os.ErrNotExist, "denied options must not create checkpoint output")
+	})
+
 	t.Run("creates empty private output and retains successful checkpoint", func(t *testing.T) {
 		kubelet, fakeRuntime, pod := setup(t)
+		pod.Spec.RuntimeClassName = new("checkpoint-runtime")
+		fakeRuntime.PodStatus.SandboxStatuses[0].RuntimeHandler = "checkpoint-handler"
+		client := fake.NewClientset(&nodev1.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "checkpoint-runtime"}, Handler: "checkpoint-handler",
+			PodCheckpointOptions: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"example.runtime/mode"}},
+		})
+		kubelet.kubeClient = client
+		kubelet.runtimeClassManager = startRuntimeClassManager(t, client)
 		requests := make(chan *runtimeapi.CheckpointPodRequest, 1)
 		kubelet.containerRuntime = &checkpointRuntime{
 			Runtime: fakeRuntime,
@@ -2356,12 +2380,15 @@ func TestCheckpointPod(t *testing.T) {
 			},
 		}
 
-		err := checkpointPod(ktesting.Init(t), kubelet, pod, addCheckpoint(t, kubelet, pod, "checkpoint-uid"), "checkpoint-uid", 0)
+		ctx := ktesting.Init(t)
+		checkpointOptions := map[string]string{"example.runtime/mode": "incremental"}
+		err := kubelet.requestPodCheckpoint(ctx, pod, &podCheckpointRequest{ctx: ctx, namespace: pod.Namespace, name: addCheckpoint(t, kubelet, pod, "checkpoint-uid"), uid: "checkpoint-uid", options: checkpointOptions})
 		require.NoError(t, err)
 		request := receiveRequest(t, requests)
+		checkpointOptions["example.runtime/mode"] = "changed-after-call"
 		require.Equal(t, "sandbox1234", request.PodSandboxId)
 		require.Equal(t, []string{"container1234"}, request.ContainerIds)
-		require.Empty(t, request.Options)
+		require.Equal(t, map[string]string{"example.runtime/mode": "incremental"}, request.Options)
 		require.True(t, filepath.IsAbs(request.OutputPath))
 		require.Equal(t, "checkpoint-checkpoint-uid", filepath.Base(request.OutputPath))
 		rel, err := filepath.Rel(kubelet.getPodCheckpointsDir(), request.OutputPath)

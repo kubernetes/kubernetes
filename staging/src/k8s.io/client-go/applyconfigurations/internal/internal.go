@@ -12073,9 +12073,21 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: overhead
       type:
         namedType: io.k8s.api.node.v1.Overhead
+    - name: podCheckpointOptions
+      type:
+        namedType: io.k8s.api.node.v1.RuntimeClassPodCheckpointOptions
     - name: scheduling
       type:
         namedType: io.k8s.api.node.v1.Scheduling
+- name: io.k8s.api.node.v1.RuntimeClassPodCheckpointOptions
+  map:
+    fields:
+    - name: allowedCheckpointOptions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
 - name: io.k8s.api.node.v1.Scheduling
   map:
     fields:
@@ -12152,6 +12164,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.node.v1alpha1.PodCheckpointSpec
   map:
     fields:
+    - name: checkpointOptions
+      type:
+        map:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: sourcePod
       type:
         namedType: io.k8s.api.node.v1alpha1.PodReference
