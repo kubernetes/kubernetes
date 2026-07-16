@@ -27,16 +27,16 @@ import (
 //
 // PodGroupTemplate represents a template for a set of pods with a scheduling policy.
 type PodGroupTemplateApplyConfiguration struct {
-	// Name is a unique identifier for the PodGroupTemplate within the Workload.
+	// name is a unique identifier for the PodGroupTemplate within the Workload.
 	// It must be a DNS label. This field is immutable.
 	Name *string `json:"name,omitempty"`
-	// SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.
+	// schedulingPolicy defines the scheduling policy for this PodGroupTemplate.
 	SchedulingPolicy *PodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
-	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
 	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
 	// This field is immutable.
 	SchedulingConstraints *PodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
-	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// resourceClaims defines which ResourceClaims may be shared among Pods in
 	// the group. Pods consume the devices allocated to a PodGroup's claim by
 	// defining a claim in its own Spec.ResourceClaims that matches the
 	// PodGroup's claim exactly. The claim must have the same name and refer to
@@ -47,20 +47,20 @@ type PodGroupTemplateApplyConfiguration struct {
 	//
 	// This field is immutable.
 	ResourceClaims []PodGroupResourceClaimApplyConfiguration `json:"resourceClaims,omitempty"`
-	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+	// disruptionMode defines the mode in which a given PodGroup can be disrupted.
 	// One of Single, All.
 	// This field is immutable.
 	DisruptionMode *DisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
-	// PriorityClassName indicates the priority that should be considered when scheduling
+	// priorityClassName indicates the priority that should be considered when scheduling
 	// a pod group created from this template.
 	// This field is immutable.
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
-	// Priority is the value of priority of pod groups created from this template. Various
+	// priority is the value of priority of pod groups created from this template. Various
 	// system components use this field to find the priority of the pod group.
 	// The higher the value, the higher the priority.
 	// This field is immutable.
 	Priority *int32 `json:"priority,omitempty"`
-	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// This field is immutable.
 	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.

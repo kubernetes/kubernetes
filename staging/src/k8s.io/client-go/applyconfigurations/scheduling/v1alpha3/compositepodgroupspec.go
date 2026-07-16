@@ -23,28 +23,28 @@ package v1alpha3
 //
 // CompositePodGroupSpec defines the desired state of CompositePodGroup.
 type CompositePodGroupSpecApplyConfiguration struct {
-	// ParentCompositePodGroupName contains the name of the parent composite pod group
+	// parentCompositePodGroupName contains the name of the parent composite pod group
 	// within the same namespace as this composite pod group. It must be a DNS name.
 	// If it's nil, then this composite pod group is a root of a workload's hierarchy.
 	// This field is immutable.
 	ParentCompositePodGroupName *string `json:"parentCompositePodGroupName,omitempty"`
-	// WorkloadRef references an optional CompositePodGroup template within the
+	// workloadRef references an optional CompositePodGroup template within the
 	// Workload object that was used to create the CompositePodGroup.
 	// This field is required.
 	// This field is immutable.
 	WorkloadRef *WorkloadReferenceApplyConfiguration `json:"workloadRef,omitempty"`
-	// SchedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup.
+	// schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup.
 	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
 	// This field is immutable.
 	SchedulingPolicy *CompositePodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
-	// PriorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
+	// priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
 	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
 	// If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods
 	// (i.e. if no priority class is specified, admission control can set this to the global default
 	// priority class if it exists. Otherwise, the composite pod group's priority will be zero).
 	// This field is immutable.
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
-	// Priority is the value of priority of this composite pod group. Various system components
+	// priority is the value of priority of this composite pod group. Various system components
 	// use this field to find the priority of the composite pod group. When Priority Admission
 	// Controller is enabled, it prevents users from setting this field. The admission
 	// controller populates this field from PriorityClassName.

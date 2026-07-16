@@ -27,7 +27,7 @@ import (
 //
 // PodGroupStatus represents information about the status of a pod group.
 type PodGroupStatusApplyConfiguration struct {
-	// Conditions represent the latest observations of the PodGroup's state.
+	// conditions represent the latest observations of the PodGroup's state.
 	//
 	// Known condition types:
 	// - "PodGroupInitiallyScheduled": Indicates whether the scheduling requirement has been satisfied.
@@ -46,7 +46,7 @@ type PodGroupStatusApplyConfiguration struct {
 	// - "PreemptionByScheduler": The PodGroup was preempted by the scheduler to make room for
 	// higher-priority PodGroups or Pods.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	// Status of resource claims.
+	// resourceClaimStatuses is status of resource claims.
 	ResourceClaimStatuses []PodGroupResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
 }
 

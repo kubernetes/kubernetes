@@ -36,12 +36,12 @@ import (
 // CompositePodGroup API enablement is toggled by the CompositePodGroup feature gate.
 type CompositePodGroupApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec defines the desired state of the CompositePodGroup.
+	// spec defines the desired state of the CompositePodGroup.
 	Spec *CompositePodGroupSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status represents the current observed state of the CompositePodGroup.
+	// status represents the current observed state of the CompositePodGroup.
 	Status *CompositePodGroupStatusApplyConfiguration `json:"status,omitempty"`
 }
 

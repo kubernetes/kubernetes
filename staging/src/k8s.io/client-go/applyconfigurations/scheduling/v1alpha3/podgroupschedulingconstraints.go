@@ -23,7 +23,7 @@ package v1alpha3
 //
 // PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.
 type PodGroupSchedulingConstraintsApplyConfiguration struct {
-	// Topology defines the topology constraints for the pod group.
+	// topology defines the topology constraints for the pod group.
 	// Currently only a single topology constraint can be specified. This may change in the future.
 	Topology []TopologyConstraintApplyConfiguration `json:"topology,omitempty"`
 }

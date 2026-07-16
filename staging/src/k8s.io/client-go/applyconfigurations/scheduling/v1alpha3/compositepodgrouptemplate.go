@@ -23,30 +23,30 @@ package v1alpha3
 //
 // CompositePodGroupTemplate represents a template for a CompositePodGroup with a scheduling policy.
 type CompositePodGroupTemplateApplyConfiguration struct {
-	// Name is a unique identifier for the CompositePodGroupTemplate within the Workload.
+	// name is a unique identifier for the CompositePodGroupTemplate within the Workload.
 	// It must be a DNS label. This field is required.
 	Name *string `json:"name,omitempty"`
-	// SchedulingPolicy defines the scheduling policy for this template.
+	// schedulingPolicy defines the scheduling policy for this template.
 	SchedulingPolicy *CompositePodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
-	// PriorityClassName indicates the priority that should be considered when scheduling
+	// priorityClassName indicates the priority that should be considered when scheduling
 	// a composite pod group created from this template. If no priority class is specified,
 	// admission control can set this to the global default priority class if it exists.
 	// Otherwise, composite pod groups created from this template will have the priority set
 	// to zero.
 	// This field is immutable.
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
-	// Priority is the value of priority of composite pod groups created from this template.
+	// priority is the value of priority of composite pod groups created from this template.
 	// Various system components use this field to find the priority of the composite pod group.
 	// When Priority Admission Controller is enabled, it prevents users from setting this field.
 	// The admission controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
 	// This field is immutable.
 	Priority *int32 `json:"priority,omitempty"`
-	// PodGroupTemplates is the list of templates for children PodGroups.
+	// podGroupTemplates is the list of templates for children PodGroups.
 	// The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
 	// or PodGroupTemplates must be set.
 	PodGroupTemplates []PodGroupTemplateApplyConfiguration `json:"podGroupTemplates,omitempty"`
-	// CompositePodGroupTemplates is the list of templates for children CompositePodGroups.
+	// compositePodGroupTemplates is the list of templates for children CompositePodGroups.
 	// The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
 	// or PodGroupTemplates must be set.
 	CompositePodGroupTemplates []CompositePodGroupTemplateApplyConfiguration `json:"compositePodGroupTemplates,omitempty"`

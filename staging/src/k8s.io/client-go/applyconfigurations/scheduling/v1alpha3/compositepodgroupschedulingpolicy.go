@@ -28,10 +28,10 @@ import (
 // CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup.
 // Exactly one policy must be set.
 type CompositePodGroupSchedulingPolicyApplyConfiguration struct {
-	// Basic specifies that the groups of this composite group should be scheduled independently.
+	// basic specifies that the groups of this composite group should be scheduled independently.
 	// This field is immutable.
 	Basic *schedulingv1alpha3.CompositeBasicSchedulingPolicy `json:"basic,omitempty"`
-	// Gang specifies that the groups of this composite group should be scheduled using
+	// gang specifies that the groups of this composite group should be scheduled using
 	// all-or-nothing semantics.
 	Gang *CompositeGangSchedulingPolicyApplyConfiguration `json:"gang,omitempty"`
 }
