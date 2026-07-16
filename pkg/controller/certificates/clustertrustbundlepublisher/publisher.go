@@ -51,7 +51,7 @@ type PublisherRunner interface {
 	Run(context.Context)
 }
 
-type ClusterTrustBundlePublisher[T clusterTrustBundle] struct {
+type ClusterTrustBundlePublisher[T ClusterTrustBundle] struct {
 	signerName string
 	ca         dynamiccertificates.CAContentProvider
 
@@ -66,25 +66,25 @@ type ClusterTrustBundlePublisher[T clusterTrustBundle] struct {
 	queue workqueue.TypedRateLimitingInterface[string]
 }
 
-// clusterTrustBundle is a type constraint grouping all APIs versions of ClusterTrustBundles
-type clusterTrustBundle interface {
+// ClusterTrustBundle is a type constraint grouping all APIs versions of ClusterTrustBundles
+type ClusterTrustBundle interface {
 	certificatesv1alpha1.ClusterTrustBundle | certificatesv1beta1.ClusterTrustBundle
 }
 
 // clusterTrustBundlesClient is an API-version independent client for the ClusterTrustBundles API
-type clusterTrustBundlesClient[T clusterTrustBundle] interface {
+type clusterTrustBundlesClient[T ClusterTrustBundle] interface {
 	Create(context.Context, *T, metav1.CreateOptions) (*T, error)
 	Update(context.Context, *T, metav1.UpdateOptions) (*T, error)
 	Delete(context.Context, string, metav1.DeleteOptions) error
 }
 
 // clusterTrustBundlesLister is an API-version independent lister for the ClusterTrustBundles API
-type clusterTrustBundlesLister[T clusterTrustBundle] interface {
+type clusterTrustBundlesLister[T ClusterTrustBundle] interface {
 	Get(string) (*T, error)
 	List(labels.Selector) ([]*T, error)
 }
 
-type clusterTrustBundleHandlers[T clusterTrustBundle] interface {
+type clusterTrustBundleHandlers[T ClusterTrustBundle] interface {
 	createClusterTrustBundle(bundleName, signerName, trustBundle string) *T
 	updateWithTrustBundle(ctbObject *T, newBundle string) *T
 	containsTrustBundle(ctbObject *T, bundle string) bool
@@ -215,7 +215,7 @@ func NewAlphaClusterTrustBundlePublisher(
 // NewClusterTrustBundlePublisher creates and maintains a cluster trust bundle object
 // for a signer named `signerName`. The cluster trust bundle object contains the
 // CA from the `caProvider` in its .spec.TrustBundle.
-func newClusterTrustBundlePublisher[T clusterTrustBundle](
+func newClusterTrustBundlePublisher[T ClusterTrustBundle](
 	signerName string,
 	caProvider dynamiccertificates.CAContentProvider,
 	bundleClient clusterTrustBundlesClient[T],
