@@ -4445,3 +4445,573 @@ func TestCPGBasicWithGangChildren_Internal(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateCompositePodGroupCondition(t *testing.T) {
+	tests := []struct {
+		name                              string
+		existingPodGroup                  *schedulingv1alpha3.CompositePodGroup
+		namespace                         string
+		podGroupName                      string
+		condition                         *metav1.Condition
+		expectCondition                   *metav1.Condition
+		expectLastTransitionTimeUnchanged bool
+	}{
+		{
+			name: "set Scheduled condition to True on empty status",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "ns1"},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg1",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "SomeReason",
+				Message: "All required pods have been successfully scheduled",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "SomeReason",
+				Message: "All required pods have been successfully scheduled",
+			},
+		},
+		{
+			name: "set Scheduled condition to False with Unschedulable reason",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg2", Namespace: "ns1"},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg2",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+				Message: "0/3 nodes are available: insufficient cpu",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+				Message: "0/3 nodes are available: insufficient cpu",
+			},
+		},
+		{
+			name: "set Scheduled condition to False with SchedulerError reason",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg3", Namespace: "ns1"},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg3",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
+				Message: "Internal scheduling error",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
+				Message: "Internal scheduling error",
+			},
+		},
+		{
+			name: "transition from Unschedulable to Scheduled",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg4", Namespace: "ns1"},
+				Status: schedulingv1alpha3.CompositePodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+							Status:             metav1.ConditionFalse,
+							Reason:             schedulingapi.CompositePodGroupReasonUnschedulable,
+							Message:            "previously unschedulable",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+				},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg4",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Scheduled",
+				Message: "All required pods have been successfully scheduled",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Scheduled",
+				Message: "All required pods have been successfully scheduled",
+			},
+		},
+		{
+			name: "transition from SchedulerError to Scheduled",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg-se-to-true", Namespace: "ns1"},
+				Status: schedulingv1alpha3.CompositePodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+							Status:             metav1.ConditionFalse,
+							Reason:             schedulingapi.CompositePodGroupReasonSchedulerError,
+							Message:            "internal error",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+				},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg-se-to-true",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Scheduled",
+				Message: "All required pods have been successfully scheduled",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Scheduled",
+				Message: "All required pods have been successfully scheduled",
+			},
+		},
+		{
+			name: "do not regress Scheduled to Unschedulable",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg-true-to-unsched", Namespace: "ns1"},
+				Status: schedulingv1alpha3.CompositePodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Scheduled",
+							Message:            "All pods scheduled",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+				},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg-true-to-unsched",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+				Message: "extra pods could not be placed",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Scheduled",
+				Message: "All pods scheduled",
+			},
+			expectLastTransitionTimeUnchanged: true,
+		},
+		{
+			name: "do not regress Scheduled to SchedulerError",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg-true-to-se", Namespace: "ns1"},
+				Status: schedulingv1alpha3.CompositePodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Scheduled",
+							Message:            "All pods scheduled",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+				},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg-true-to-se",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
+				Message: "internal error",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Scheduled",
+				Message: "All pods scheduled",
+			},
+			expectLastTransitionTimeUnchanged: true,
+		},
+		{
+			name: "transition from Unschedulable to SchedulerError preserves LastTransitionTime",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg-unsched-to-se", Namespace: "ns1"},
+				Status: schedulingv1alpha3.CompositePodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+							Status:             metav1.ConditionFalse,
+							Reason:             schedulingapi.CompositePodGroupReasonUnschedulable,
+							Message:            "not enough resources",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+				},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg-unsched-to-se",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
+				Message: "internal error",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
+				Message: "internal error",
+			},
+			expectLastTransitionTimeUnchanged: true,
+		},
+		{
+			name: "transition from SchedulerError to Unschedulable preserves LastTransitionTime",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg-se-to-unsched", Namespace: "ns1"},
+				Status: schedulingv1alpha3.CompositePodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+							Status:             metav1.ConditionFalse,
+							Reason:             schedulingapi.CompositePodGroupReasonSchedulerError,
+							Message:            "internal error",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+				},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg-se-to-unsched",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+				Message: "not enough resources",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+				Message: "not enough resources",
+			},
+			expectLastTransitionTimeUnchanged: true,
+		},
+		{
+			name: "Scheduled to Scheduled preserves LastTransitionTime",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg-true-to-true", Namespace: "ns1"},
+				Status: schedulingv1alpha3.CompositePodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+							Status:             metav1.ConditionTrue,
+							Reason:             "Scheduled",
+							Message:            "All pods scheduled",
+							LastTransitionTime: metav1.Now(),
+						},
+					},
+				},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg-true-to-true",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Scheduled",
+				Message: "New condition message",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Scheduled",
+				Message: "New condition message",
+			},
+			expectLastTransitionTimeUnchanged: true,
+		},
+		{
+			name: "ObservedGeneration is set from CompositePodGroup generation",
+			existingPodGroup: &schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "cpg-gen", Namespace: "ns1", Generation: 7},
+			},
+			namespace:    "ns1",
+			podGroupName: "cpg-gen",
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Scheduled",
+				Message: "All child pods have been scheduled",
+			},
+			expectCondition: &metav1.Condition{
+				Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:             metav1.ConditionTrue,
+				Reason:             "Scheduled",
+				Message:            "All child pods have been scheduled",
+				ObservedGeneration: 7,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			var objects []runtime.Object
+			if tt.existingPodGroup != nil {
+				objects = append(objects, tt.existingPodGroup)
+			}
+			client := clientsetfake.NewClientset(objects...)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+			sched := &Scheduler{client: client}
+
+			var existingLTT metav1.Time
+			if existing := apimeta.FindStatusCondition(tt.existingPodGroup.Status.Conditions, schedulingapi.CompositePodGroupInitiallyScheduled); existing != nil {
+				existingLTT = existing.LastTransitionTime
+			}
+
+			podGroupInfo := &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{
+					Namespace:         tt.namespace,
+					Name:              tt.podGroupName,
+					CompositePodGroup: tt.existingPodGroup,
+					Type:              fwk.CompositePodGroupKeyType,
+				},
+			}
+			sched.updateCompositePodGroupCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition)
+
+			updatedPodGroup, err := client.SchedulingV1alpha3().CompositePodGroups(tt.namespace).Get(ctx, tt.podGroupName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get CompositePodGroup: %v", err)
+			}
+
+			cond := apimeta.FindStatusCondition(updatedPodGroup.Status.Conditions, tt.expectCondition.Type)
+			if diff := cmp.Diff(tt.expectCondition, cond, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+				t.Errorf("Unexpected CompositePodGroupInitiallyScheduled condition (-want +got):\n%s", diff)
+			}
+
+			if tt.expectLastTransitionTimeUnchanged {
+				if !cond.LastTransitionTime.Time.Truncate(time.Second).Equal(existingLTT.Time.Truncate(time.Second)) {
+					t.Errorf("Expected LastTransitionTime to be preserved as %v, got %v", existingLTT, cond.LastTransitionTime)
+				}
+			}
+		})
+	}
+}
+
+func TestSubmitCompositePodGroupAlgorithmResult_StatusUpdates(t *testing.T) {
+	cpg1 := &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "root-cpg", Namespace: "default"}}
+	pg1 := &schedulingv1alpha3.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "leaf-pg1", Namespace: "default"}}
+	pg2 := &schedulingv1alpha3.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "leaf-pg2", Namespace: "default"}}
+
+	tests := []struct {
+		name                string
+		existingCPGs        []*schedulingv1alpha3.CompositePodGroup
+		existingPodGroups   []*schedulingv1alpha3.PodGroup
+		algorithmResults    map[fwk.EntityKey]*podGroupAlgorithmResult
+		expectCPGConditions map[string]*metav1.Condition
+		expectPGConditions  map[string]*metav1.Condition
+	}{
+		{
+			name:              "Entire hierarchy scheduled successfully",
+			existingCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
+			existingPodGroups: []*schedulingv1alpha3.PodGroup{pg1, pg2},
+			algorithmResults: map[fwk.EntityKey]*podGroupAlgorithmResult{
+				fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name): {
+					status:       fwk.NewStatus(fwk.Success, "All child pods have been scheduled"),
+					podGroupInfo: &framework.PodGroupInfo{Namespace: cpg1.Namespace, Name: cpg1.Name, CompositePodGroup: cpg1, Type: fwk.CompositePodGroupKeyType},
+				},
+				fwk.PodGroupKey(pg1.Namespace, pg1.Name): {
+					status:       fwk.NewStatus(fwk.Success, "All pods scheduled"),
+					podGroupInfo: &framework.PodGroupInfo{Namespace: pg1.Namespace, Name: pg1.Name, PodGroup: pg1, Type: fwk.PodGroupKeyType},
+				},
+				fwk.PodGroupKey(pg2.Namespace, pg2.Name): {
+					status:       fwk.NewStatus(fwk.Success, "All pods scheduled"),
+					podGroupInfo: &framework.PodGroupInfo{Namespace: pg2.Namespace, Name: pg2.Name, PodGroup: pg2, Type: fwk.PodGroupKeyType},
+				},
+			},
+			expectCPGConditions: map[string]*metav1.Condition{
+				"root-cpg": {
+					Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+					Status:  metav1.ConditionTrue,
+					Reason:  "Scheduled",
+					Message: "All child pods have been scheduled",
+				},
+			},
+			expectPGConditions: map[string]*metav1.Condition{
+				"leaf-pg1": {
+					Type:    schedulingapi.PodGroupInitiallyScheduled,
+					Status:  metav1.ConditionTrue,
+					Reason:  "Scheduled",
+					Message: "All pods scheduled",
+				},
+				"leaf-pg2": {
+					Type:    schedulingapi.PodGroupInitiallyScheduled,
+					Status:  metav1.ConditionTrue,
+					Reason:  "Scheduled",
+					Message: "All pods scheduled",
+				},
+			},
+		},
+		{
+			name:              "Entire hierarchy unschedulable on rejection",
+			existingCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
+			existingPodGroups: []*schedulingv1alpha3.PodGroup{pg1, pg2},
+			algorithmResults: map[fwk.EntityKey]*podGroupAlgorithmResult{
+				fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name): {
+					status:       fwk.NewStatus(fwk.Unschedulable, "not enough resources"),
+					podGroupInfo: &framework.PodGroupInfo{Namespace: cpg1.Namespace, Name: cpg1.Name, CompositePodGroup: cpg1, Type: fwk.CompositePodGroupKeyType},
+				},
+				fwk.PodGroupKey(pg1.Namespace, pg1.Name): {
+					status:       fwk.NewStatus(fwk.Unschedulable, "not enough resources"),
+					podGroupInfo: &framework.PodGroupInfo{Namespace: pg1.Namespace, Name: pg1.Name, PodGroup: pg1, Type: fwk.PodGroupKeyType},
+				},
+				fwk.PodGroupKey(pg2.Namespace, pg2.Name): {
+					status:       fwk.NewStatus(fwk.Unschedulable, "not enough resources"),
+					podGroupInfo: &framework.PodGroupInfo{Namespace: pg2.Namespace, Name: pg2.Name, PodGroup: pg2, Type: fwk.PodGroupKeyType},
+				},
+			},
+			expectCPGConditions: map[string]*metav1.Condition{
+				"root-cpg": {
+					Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+					Status:  metav1.ConditionFalse,
+					Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+					Message: "not enough resources",
+				},
+			},
+			expectPGConditions: map[string]*metav1.Condition{
+				"leaf-pg1": {
+					Type:    schedulingapi.PodGroupInitiallyScheduled,
+					Status:  metav1.ConditionFalse,
+					Reason:  schedulingapi.PodGroupReasonUnschedulable,
+					Message: "not enough resources",
+				},
+				"leaf-pg2": {
+					Type:    schedulingapi.PodGroupInitiallyScheduled,
+					Status:  metav1.ConditionFalse,
+					Reason:  schedulingapi.PodGroupReasonUnschedulable,
+					Message: "not enough resources",
+				},
+			},
+		},
+		{
+			name:              "Entire hierarchy scheduler error",
+			existingCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
+			existingPodGroups: []*schedulingv1alpha3.PodGroup{pg1},
+			algorithmResults: map[fwk.EntityKey]*podGroupAlgorithmResult{
+				fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name): {
+					status:       fwk.NewStatus(fwk.Error, "internal error"),
+					podGroupInfo: &framework.PodGroupInfo{Namespace: cpg1.Namespace, Name: cpg1.Name, CompositePodGroup: cpg1, Type: fwk.CompositePodGroupKeyType},
+				},
+				fwk.PodGroupKey(pg1.Namespace, pg1.Name): {
+					status:       fwk.NewStatus(fwk.Error, "internal error"),
+					podGroupInfo: &framework.PodGroupInfo{Namespace: pg1.Namespace, Name: pg1.Name, PodGroup: pg1, Type: fwk.PodGroupKeyType},
+				},
+			},
+			expectCPGConditions: map[string]*metav1.Condition{
+				"root-cpg": {
+					Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+					Status:  metav1.ConditionFalse,
+					Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
+					Message: "internal error",
+				},
+			},
+			expectPGConditions: map[string]*metav1.Condition{
+				"leaf-pg1": {
+					Type:    schedulingapi.PodGroupInitiallyScheduled,
+					Status:  metav1.ConditionFalse,
+					Reason:  schedulingapi.PodGroupReasonSchedulerError,
+					Message: "internal error",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			var objects []runtime.Object
+			for _, cpg := range tt.existingCPGs {
+				objects = append(objects, cpg)
+			}
+			for _, pg := range tt.existingPodGroups {
+				objects = append(objects, pg)
+			}
+			client := clientsetfake.NewClientset(objects...)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			registry := frameworkruntime.Registry{
+				queuesort.Name:     queuesort.New,
+				defaultbinder.Name: defaultbinder.New,
+			}
+			profileCfg := config.KubeSchedulerProfile{
+				SchedulerName: "test-scheduler",
+				Plugins: &config.Plugins{
+					QueueSort: config.PluginSet{
+						Enabled: []config.Plugin{{Name: queuesort.Name}},
+					},
+					Bind: config.PluginSet{
+						Enabled: []config.Plugin{{Name: defaultbinder.Name}},
+					},
+				},
+			}
+			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg, frameworkruntime.WithClientSet(client), frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)), frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()), frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()))
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+			schedulingQueue := internalqueue.NewTestQueue(ctx, schedFwk.QueueSortFunc())
+
+			sched := &Scheduler{
+				client:          client,
+				SchedulingQueue: schedulingQueue,
+			}
+
+			// Define a dummy rootPodGroupInfo for the submitPodGroupAlgorithmResult argument
+			rootPodGroupInfo := &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{
+					Namespace:         cpg1.Namespace,
+					Name:              cpg1.Name,
+					CompositePodGroup: cpg1,
+					Type:              fwk.CompositePodGroupKeyType,
+				},
+			}
+
+			sched.submitPodGroupAlgorithmResult(ctx, schedFwk, framework.NewCycleState(), rootPodGroupInfo, tt.algorithmResults, time.Now(), tt.algorithmResults[fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name)].status)
+
+			for name, expectCond := range tt.expectCPGConditions {
+				updatedCPG, err := client.SchedulingV1alpha3().CompositePodGroups("default").Get(ctx, name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get CompositePodGroup %s: %v", name, err)
+				}
+				cond := apimeta.FindStatusCondition(updatedCPG.Status.Conditions, expectCond.Type)
+				if diff := cmp.Diff(expectCond, cond, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+					t.Errorf("Unexpected condition for CPG %s (-want +got):\n%s", name, diff)
+				}
+			}
+
+			for name, expectCond := range tt.expectPGConditions {
+				updatedPG, err := client.SchedulingV1alpha3().PodGroups("default").Get(ctx, name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get PodGroup %s: %v", name, err)
+				}
+				cond := apimeta.FindStatusCondition(updatedPG.Status.Conditions, expectCond.Type)
+				if diff := cmp.Diff(expectCond, cond, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+					t.Errorf("Unexpected condition for PG %s (-want +got):\n%s", name, diff)
+				}
+			}
+		})
+	}
+}

@@ -195,6 +195,14 @@ func (sched *Scheduler) handlePodGroupFailureBeforeScheduling(ctx context.Contex
 }
 
 func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pgi *framework.PodGroupInfo, err error) {
+	if pgi.CompositePodGroup != nil {
+		sched.updateCompositePodGroupCondition(ctx, pgi, &metav1.Condition{
+			Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+			Status:  metav1.ConditionFalse,
+			Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
+			Message: err.Error(),
+		})
+	}
 	if pgi.PodGroup != nil {
 		sched.updatePodGroupCondition(ctx, pgi, &metav1.Condition{
 			Type:    schedulingapi.PodGroupInitiallyScheduled,
@@ -842,9 +850,43 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 	for _, podGroupResult := range podGroupResults {
 		pgi := podGroupResult.podGroupInfo
 		if pgi.CompositePodGroup != nil {
-			// Composite pod groups do not own any pods directly.
+			var condition *metav1.Condition
+			switch {
+			case podGroupResult.status.IsSuccess():
+				condition = &metav1.Condition{
+					Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+					Status:  metav1.ConditionTrue,
+					Reason:  "Scheduled",
+					Message: podGroupResult.status.Message(),
+				}
+				logger.V(2).Info("Successfully scheduled a composite pod group", "compositePodGroup", klog.KObj(pgi))
+
+			case podGroupResult.status.IsRejected():
+				condition = &metav1.Condition{
+					Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+					Status:  metav1.ConditionFalse,
+					Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+					Message: podGroupResult.status.Message(),
+				}
+				if podGroupResult.waitingOnPreemption {
+					logger.V(2).Info("Composite pod group is waiting for preemption", "compositePodGroup", klog.KObj(pgi), "err", podGroupResult.status.Message())
+				} else {
+					logger.V(2).Info("Unable to schedule a composite pod group", "compositePodGroup", klog.KObj(pgi), "err", podGroupResult.status.Message())
+				}
+
+			default:
+				condition = &metav1.Condition{
+					Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+					Status:  metav1.ConditionFalse,
+					Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
+					Message: podGroupResult.status.AsError().Error(),
+				}
+				utilruntime.HandleErrorWithContext(ctx, podGroupResult.status.AsError(), "Error scheduling composite pod group", "compositePodGroup", klog.KObj(pgi))
+			}
+			sched.updateCompositePodGroupCondition(ctx, pgi, condition)
 			continue
 		}
+
 		queuedPodInfos := rootPodGroupInfo.QueuedPodInfos[pgKey(pgi)]
 		if len(podGroupResult.podResults) != len(queuedPodInfos) {
 			// This should never happen, but if it does, complete the result with the error status.
@@ -994,6 +1036,30 @@ func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
 
 	if err := util.PatchPodGroupStatus(ctx, sched.client, podGroupInfo.Name, podGroupInfo.Namespace, &pg.Status, newStatus); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to update PodGroup status", "podGroup", klog.KObj(podGroupInfo))
+	}
+}
+
+// updateCompositePodGroupCondition patches the given condition on a CompositePodGroup.
+func (sched *Scheduler) updateCompositePodGroupCondition(ctx context.Context,
+	podGroupInfo *framework.PodGroupInfo, condition *metav1.Condition) {
+	logger := klog.FromContext(ctx)
+
+	// If the CompositePodGroup was already successfully scheduled, don't regress the
+	// condition back to False on a subsequent cycle for extra pods.
+	cpg := podGroupInfo.CompositePodGroup
+	existing := apimeta.FindStatusCondition(cpg.Status.Conditions, condition.Type)
+	if existing != nil && existing.Status == metav1.ConditionTrue && condition.Status != metav1.ConditionTrue {
+		return
+	}
+
+	condition.ObservedGeneration = cpg.Generation
+	newStatus := cpg.Status.DeepCopy()
+	if !apimeta.SetStatusCondition(&newStatus.Conditions, *condition) {
+		return
+	}
+
+	if err := util.PatchCompositePodGroupStatus(ctx, sched.client, podGroupInfo.Name, podGroupInfo.Namespace, &cpg.Status, newStatus); err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to update CompositePodGroup status", "compositePodGroup", klog.KObj(podGroupInfo))
 	}
 }
 
