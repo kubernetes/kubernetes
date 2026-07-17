@@ -220,9 +220,11 @@ func TestLabelKey(t *testing.T) {
 			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-key"),
 		},
 	}, {
-		name:     "nil value",
-		input:    "", // This will be handled by setting value to nil in the test runner
-		wantErrs: nil,
+		name:  "nil value",
+		input: "", // This will be handled by setting value to nil in the test runner
+		wantErrs: field.ErrorList{
+			field.Required(fldPath, "").WithOrigin("format=k8s-label-key"),
+		},
 	}}
 
 	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()

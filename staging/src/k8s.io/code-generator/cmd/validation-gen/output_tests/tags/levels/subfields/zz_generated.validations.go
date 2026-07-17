@@ -80,7 +80,12 @@ func Validate_Struct(
 			// call field-attached validations
 			func() { // cohort = "inner"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "inner",
-					func(o *SubStruct) *int { return &o.Inner }, validate.DirectEqual,
+					func(o *SubStruct) *int {
+						if o == nil {
+							return nil
+						}
+						return &o.Inner
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 5)
 					}).MarkAlpha(); len(e) != 0 {
@@ -110,7 +115,12 @@ func Validate_Struct(
 			// call field-attached validations
 			func() { // cohort = "inner"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "inner",
-					func(o *SubStruct) *int { return &o.Inner }, validate.DirectEqual,
+					func(o *SubStruct) *int {
+						if o == nil {
+							return nil
+						}
+						return &o.Inner
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 5)
 					}).MarkBeta(); len(e) != 0 {

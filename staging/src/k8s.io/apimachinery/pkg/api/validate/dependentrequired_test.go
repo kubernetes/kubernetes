@@ -58,6 +58,7 @@ func TestDependentRequired(t *testing.T) {
 		name: "create: nil obj",
 		op:   operation.Operation{Type: operation.Create},
 		obj:  nil,
+		err:  `fldpath: Required value`,
 	}, {
 		name:   "ratchet: unrelated field changed, trigger and dependent set-ness unchanged",
 		op:     operation.Operation{Type: operation.Update},

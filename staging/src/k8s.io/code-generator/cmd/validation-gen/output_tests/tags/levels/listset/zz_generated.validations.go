@@ -205,7 +205,12 @@ func Validate_ListSetStruct(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SimpleSetItem) field.ErrorList {
 					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-						func(o *SimpleSetItem) *int { return &o.Value }, validate.DirectEqual,
+						func(o *SimpleSetItem) *int {
+							if o == nil {
+								return nil
+							}
+							return &o.Value
+						}, validate.DirectEqual,
 						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 							return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
 						})
@@ -298,7 +303,12 @@ func Validate_ListSetStruct(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SimpleSetItem) field.ErrorList {
 					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-						func(o *SimpleSetItem) *int { return &o.Value }, validate.DirectEqual,
+						func(o *SimpleSetItem) *int {
+							if o == nil {
+								return nil
+							}
+							return &o.Value
+						}, validate.DirectEqual,
 						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 							return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
 						})

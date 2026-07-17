@@ -27,7 +27,8 @@ import (
 // NEQ validates that the specified comparable value is not equal to the disallowed value.
 func NEQ[T comparable](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, disallowed T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("neq")}
 	}
 	if *value == disallowed {
 		return field.ErrorList{
