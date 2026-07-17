@@ -423,6 +423,7 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context
 func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) error {
 	containerResources := container.Resources
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		containerResources = *containerResources.DeepCopy()
 		containerResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
 	}
 	return m.actuatedState.SetContainerResources(logger, pod.UID, container.Name, containerResources)
@@ -1309,6 +1310,11 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 	for i := 0; i < l/2; i++ {
 		changes.InitContainersToStart[i], changes.InitContainersToStart[l-1-i] =
 			changes.InitContainersToStart[l-1-i], changes.InitContainersToStart[i]
+	}
+
+	if !changes.UpdatePodLevelResources && !changes.UpdatePodResources {
+		// If any starting containers have resized, we need to resize the pod resources.
+		changes.UpdatePodResources = m.startingResizedContainer(logger, pod, pod.Spec.InitContainers, changes.InitContainersToStart)
 	}
 
 	return podHasInitialized
