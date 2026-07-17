@@ -17,14 +17,20 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
+	"strings"
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
+	"sigs.k8s.io/knftables"
 )
 
 const kubeProxySubsystem = "kubeproxy"
@@ -317,6 +323,37 @@ var (
 		nil, nil, metrics.ALPHA, "")
 	LocalhostNodePortAcceptedNFAcctCounter = "localhost_nps_accepted_pkts"
 
+	// LocalhostNodePortListeners is the number of active localhost NodePort
+	// userspace proxy listeners currently bound by kube-proxy.
+	LocalhostNodePortListeners = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "nftables_localhost_nodeport_listeners",
+			Help:           "Number of active localhost NodePort userspace proxy listeners.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// LocalhostNodePortListenerCreationFailuresTotal is the number of times
+	// kube-proxy failed to bind a localhost NodePort userspace proxy listener.
+	LocalhostNodePortListenerCreationFailuresTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "nftables_localhost_nodeport_listener_creation_failures_total",
+			Help:           "Number of localhost NodePort userspace proxy listener creation failures.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// localhostNodePortRejectedPacketsDescription describes the counter for packets
+	// rejected on localhost NodePorts.
+	localhostNodePortRejectedPacketsDescription = metrics.NewDesc(
+		"kubeproxy_nftables_localhost_nodeport_rejected_packets_total",
+		"Number of packets rejected on localhost NodePorts. UDP and SCTP are always rejected; TCP is rejected when the localhost NodePort proxy is not running",
+		[]string{"ip_family", "protocol"}, nil, metrics.ALPHA, "")
+
 	// ReconcileConntrackFlowsLatency is the latency of one round of kube-proxy conntrack flows reconciliation.
 	ReconcileConntrackFlowsLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -340,6 +377,22 @@ var (
 		[]string{"ip_family"},
 	)
 )
+
+// LocalhostNodePortRejectedProtocols are the NodePort protocols the userspace
+// proxy cannot serve; localhost traffic for them is rejected and counted.
+var LocalhostNodePortRejectedProtocols = []v1.Protocol{v1.ProtocolUDP, v1.ProtocolSCTP}
+
+// LocalhostNodePortRejectableProtocols are all NodePort protocols whose localhost
+// traffic kube-proxy may reject and count. UDP / SCTP are always rejected, TCP
+// is rejected when the localhost NodePort proxy is not running.
+var LocalhostNodePortRejectableProtocols = []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP, v1.ProtocolSCTP}
+
+// LocalhostNodePortRejectedCounterName returns the name of the nftables named
+// counter that the kube-proxy table increments for localhost NodePort packets
+// rejected because their protocol is unsupported.
+func LocalhostNodePortRejectedCounterName(protocol v1.Protocol) string {
+	return "localhost-nodeport-rejected-" + strings.ToLower(string(protocol))
+}
 
 var registerMetricsOnce sync.Once
 
@@ -390,6 +443,17 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
 			legacyregistry.MustRegister(NFTablesSyncFailuresTotal)
 			legacyregistry.MustRegister(NFTablesCleanupFailuresTotal)
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyNFTablesLocalhostNodePorts) {
+				legacyregistry.MustRegister(LocalhostNodePortListeners)
+				legacyregistry.MustRegister(LocalhostNodePortListenerCreationFailuresTotal)
+				rejectedCounters := make(map[string]string, len(LocalhostNodePortRejectableProtocols))
+				for _, protocol := range LocalhostNodePortRejectableProtocols {
+					rejectedCounters[LocalhostNodePortRejectedCounterName(protocol)] = string(protocol)
+				}
+				if c := newNFTablesCounterMetricCollector(rejectedCounters, localhostNodePortRejectedPacketsDescription); c != nil {
+					legacyregistry.CustomMustRegister(c)
+				}
+			}
 			legacyregistry.MustRegister(ReconcileConntrackFlowsLatency)
 			legacyregistry.MustRegister(ReconcileConntrackFlowsDeletedEntriesTotal)
 
@@ -412,6 +476,9 @@ func SinceInSeconds(start time.Time) float64 {
 
 var _ metrics.StableCollector = &nfacctMetricCollector{}
 
+// FIXME: The metrics code should not know details about how the iptables and nftables
+// backends work. The logic of `nfacctMetricCollector` and `nftCounterMetricCollector`
+// needs to move into their respective backends.
 func newNFAcctMetricCollector(counter string, description *metrics.Desc) *nfacctMetricCollector {
 	client, err := nfacct.New()
 	if err != nil {
@@ -450,6 +517,81 @@ func (n *nfacctMetricCollector) CollectWithStability(ch chan<- metrics.Metric) {
 			} else {
 				ch <- metric
 			}
+		}
+	}
+}
+
+// nftCounterListTimeout bounds a single nft counter listing during a metrics scrape
+const nftCounterListTimeout = 2 * time.Second
+
+var _ metrics.StableCollector = &nftCounterMetricCollector{}
+
+// nftCounterMetricCollector reports named nftables counters from the kube-proxy
+// table of each IP family as const counter metrics labeled by ip_family and
+// protocol. counters maps each nftables counter name to its protocol label.
+type nftCounterMetricCollector struct {
+	metrics.BaseStableCollector
+	clients     map[v1.IPFamily]knftables.Interface
+	counters    map[string]string
+	description *metrics.Desc
+}
+
+func newNFTablesCounterMetricCollector(counters map[string]string, description *metrics.Desc) *nftCounterMetricCollector {
+	families := map[v1.IPFamily]knftables.Family{
+		v1.IPv4Protocol: knftables.IPv4Family,
+		v1.IPv6Protocol: knftables.IPv6Family,
+	}
+	clients := make(map[v1.IPFamily]knftables.Interface, len(families))
+	for family, nftFamily := range families {
+		nft, err := knftables.New(nftFamily, "kube-proxy")
+		if err != nil {
+			klog.ErrorS(err, "failed to initialize nftables client for metrics", "ipFamily", family)
+			continue
+		}
+		clients[family] = nft
+	}
+	if len(clients) == 0 {
+		return nil
+	}
+	return &nftCounterMetricCollector{
+		clients:     clients,
+		counters:    counters,
+		description: description,
+	}
+}
+
+// DescribeWithStability implements the metrics.StableCollector interface.
+func (n *nftCounterMetricCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- n.description
+}
+
+// CollectWithStability implements the metrics.StableCollector interface.
+func (n *nftCounterMetricCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	for family, client := range n.clients {
+		ctx, cancel := context.WithTimeout(context.Background(), nftCounterListTimeout)
+		counters, err := client.ListCounters(ctx)
+		cancel()
+		if err != nil {
+			// A not-found error means the table doesn't exist
+			if !knftables.IsNotFound(err) {
+				klog.ErrorS(err, "failed to list nftables counters", "ipFamily", family)
+			}
+			continue
+		}
+		for _, c := range counters {
+			if c == nil || c.Packets == nil {
+				continue
+			}
+			protocol, ok := n.counters[c.Name]
+			if !ok {
+				continue
+			}
+			metric, err := metrics.NewConstMetric(n.description, metrics.CounterValue, float64(*c.Packets), string(family), protocol)
+			if err != nil {
+				klog.ErrorS(err, "failed to create constant metric")
+				continue
+			}
+			ch <- metric
 		}
 	}
 }

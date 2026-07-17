@@ -19,6 +19,7 @@ limitations under the License.
 package nftables
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"reflect"
@@ -41,6 +42,7 @@ import (
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/localnodeportproxy"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
@@ -112,32 +114,33 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		nodeIP = netutils.ParseIPSloppy(testNodeIPv6)
 	}
 	p := &Proxier{
-		ipFamily:            ipFamily,
-		svcPortMap:          make(proxy.ServicePortMap),
-		serviceChanges:      proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, nil),
-		endpointsMap:        make(proxy.EndpointsMap),
-		endpointsChanges:    proxy.NewEndpointsChangeTracker(ipFamily, testNodeName, newEndpointInfo, nil),
-		needFullSync:        true,
-		nftables:            nft,
-		masqueradeMark:      "0x4000",
-		masqueradeRule:      "mark set mark or 0x4000",
-		conntrack:           conntrack.NewFake(),
-		localDetector:       detectLocal,
-		nodeName:            testNodeName,
-		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
-		nodeIP:              nodeIP,
-		nodePortAddresses:   proxyutil.NewNodePortAddresses(ipFamily, nodePortAddresses),
-		networkInterfacer:   networkInterfacer,
-		staleChains:         make(map[string]time.Time),
-		serviceCIDRs:        serviceCIDRs,
-		logRateLimiter:      rate.NewLimiter(rate.Every(24*time.Hour), 1),
-		clusterIPs:          newNFTElementStorage("set", clusterIPsSet),
-		serviceIPs:          newNFTElementStorage("map", serviceIPsMap),
-		firewallIPs:         newNFTElementStorage("map", firewallIPsMap),
-		noEndpointServices:  newNFTElementStorage("map", noEndpointServicesMap),
-		noEndpointNodePorts: newNFTElementStorage("map", noEndpointNodePortsMap),
-		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
-		hairpinConnections:  newNFTElementStorage("set", hairpinConnectionsSet),
+		ipFamily:                 ipFamily,
+		svcPortMap:               make(proxy.ServicePortMap),
+		serviceChanges:           proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, nil),
+		endpointsMap:             make(proxy.EndpointsMap),
+		endpointsChanges:         proxy.NewEndpointsChangeTracker(ipFamily, testNodeName, newEndpointInfo, nil),
+		needFullSync:             true,
+		nftables:                 nft,
+		masqueradeMark:           "0x4000",
+		masqueradeRule:           "mark set mark or 0x4000",
+		conntrack:                conntrack.NewFake(),
+		localDetector:            detectLocal,
+		nodeName:                 testNodeName,
+		serviceHealthServer:      healthcheck.NewFakeServiceHealthServer(),
+		nodeIP:                   nodeIP,
+		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipFamily, nodePortAddresses),
+		networkInterfacer:        networkInterfacer,
+		staleChains:              make(map[string]time.Time),
+		serviceCIDRs:             serviceCIDRs,
+		logRateLimiter:           rate.NewLimiter(rate.Every(24*time.Hour), 1),
+		clusterIPs:               newNFTElementStorage("set", clusterIPsSet),
+		serviceIPs:               newNFTElementStorage("map", serviceIPsMap),
+		firewallIPs:              newNFTElementStorage("map", firewallIPsMap),
+		noEndpointServices:       newNFTElementStorage("map", noEndpointServicesMap),
+		noEndpointNodePorts:      newNFTElementStorage("map", noEndpointNodePortsMap),
+		serviceNodePorts:         newNFTElementStorage("map", serviceNodePortsMap),
+		hairpinConnections:       newNFTElementStorage("set", hairpinConnectionsSet),
+		localhostNodePortRejects: newNFTElementStorage("map", localhostNodePortRejectMap),
 	}
 	p.setInitialized(true)
 	p.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, 30*time.Second, time.Minute)
@@ -205,6 +208,11 @@ var baseRules = dedent.Dedent(`
 func TestOverallNFTablesRules(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv4Protocol)
 	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
+
+	// The localhost NodePort feature is enabled but loopback is not in
+	// nodePortAddresses, so kube-proxy rejects and counts localhost NodePort
+	// traffic for every protocol.
+	fp.localhostNodePortsEnabled = true
 
 	makeServiceMap(fp,
 		// create ClusterIP service
@@ -447,6 +455,22 @@ func TestOverallNFTablesRules(t *testing.T) {
 		# svc6
 		add element ip kube-proxy cluster-ips { 172.30.0.46 }
 		add element ip kube-proxy no-endpoint-services { 172.30.0.46 . tcp . 80 comment "ns6/svc6:p80" : goto reject-chain }
+
+		# localhost NodePort rejects
+		add map ip kube-proxy localhost-nodeport-reject-ports { type inet_proto . inet_service : verdict ; comment "localhost NodePorts rejected by kube-proxy" ; }
+		add counter ip kube-proxy localhost-nodeport-rejected-tcp
+		add counter ip kube-proxy localhost-nodeport-rejected-udp
+		add counter ip kube-proxy localhost-nodeport-rejected-sctp
+		add chain ip kube-proxy localhost-nodeport-reject-tcp
+		add chain ip kube-proxy localhost-nodeport-reject-udp
+		add chain ip kube-proxy localhost-nodeport-reject-sctp
+		add rule ip kube-proxy localhost-nodeport-reject-tcp counter name "localhost-nodeport-rejected-tcp" reject
+		add rule ip kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject
+		add rule ip kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject
+		add rule ip kube-proxy nodeport-endpoints-check ip daddr 127.0.0.0/8 meta l4proto . th dport vmap @localhost-nodeport-reject-ports
+		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3001 : goto localhost-nodeport-reject-tcp }
+		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3002 : goto localhost-nodeport-reject-tcp }
+		add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 3003 : goto localhost-nodeport-reject-tcp }
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
@@ -4928,4 +4952,256 @@ func TestBadIPs(t *testing.T) {
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
+}
+
+func Test_useLocalhostNodePortProxy(t *testing.T) {
+	testCases := []struct {
+		name              string
+		family            v1.IPFamily
+		nodePortAddresses []string
+		expected          bool
+	}{
+		{
+			name:              "explicit IPv4 loopback activates",
+			family:            v1.IPv4Protocol,
+			nodePortAddresses: []string{"127.0.0.0/8"},
+			expected:          true,
+		},
+		{
+			name:              "explicit IPv6 loopback activates",
+			family:            v1.IPv6Protocol,
+			nodePortAddresses: []string{"::1/128"},
+			expected:          true,
+		},
+		{
+			name:              "IPv6 loopback does not activate an IPv4 proxier",
+			family:            v1.IPv4Protocol,
+			nodePortAddresses: []string{"::1/128"},
+			expected:          false,
+		},
+		{
+			name:              "IPv4 loopback does not activate an IPv6 proxier",
+			family:            v1.IPv6Protocol,
+			nodePortAddresses: []string{"127.0.0.0/8"},
+			expected:          false,
+		},
+		{
+			name:              "IPv4 all/zero-CIDR does not activate",
+			family:            v1.IPv4Protocol,
+			nodePortAddresses: []string{"0.0.0.0/0"},
+			expected:          false,
+		},
+		{
+			name:              "IPv6 all/zero-CIDR does not activate",
+			family:            v1.IPv6Protocol,
+			nodePortAddresses: []string{"::/0"},
+			expected:          false,
+		},
+		{
+			name:              "explicit loopback before all activates",
+			family:            v1.IPv4Protocol,
+			nodePortAddresses: []string{"127.0.0.0/8", "0.0.0.0/0"},
+			expected:          true,
+		},
+		{
+			name:              "all before explicit loopback still activates",
+			family:            v1.IPv4Protocol,
+			nodePortAddresses: []string{"0.0.0.0/0", "127.0.0.0/8"},
+			expected:          true,
+		},
+		{
+			name:              "non-loopback CIDR does not activate",
+			family:            v1.IPv4Protocol,
+			nodePortAddresses: []string{"192.168.1.1/32"},
+			expected:          false,
+		},
+		{
+			name:              "empty addresses default to match-all and do not activate",
+			family:            v1.IPv4Protocol,
+			nodePortAddresses: nil,
+			expected:          false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			npa := proxyutil.NewNodePortAddresses(tc.family, tc.nodePortAddresses)
+			if got := useLocalhostNodePortProxy(npa); got != tc.expected {
+				t.Errorf("useLocalhostNodePortProxy(%v) = %v, want %v", tc.nodePortAddresses, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestLocalhostNodePortReject(t *testing.T) {
+	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
+
+	// Activate the localhost NodePort proxy for this proxier.
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	fp.localhostNodePortsEnabled = true
+	fp.localhostNodePortProxy = localnodeportproxy.NewLocalNodePortProxy(context.Background(), v1.IPv4Protocol)
+	defer fp.localhostNodePortProxy.Shutdown()
+
+	makeServiceMap(fp,
+		makeTestService("ns1", "svc-udp", func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+			svc.Spec.ClusterIP = "172.30.0.42"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p53",
+				Protocol: v1.ProtocolUDP,
+				Port:     53,
+				NodePort: 30053,
+			}}
+		}),
+	)
+	if err := fp.syncProxyRules(); err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+
+	dump := nft.Dump()
+	for _, want := range []string{
+		"add counter ip kube-proxy localhost-nodeport-rejected-udp",
+		"add counter ip kube-proxy localhost-nodeport-rejected-sctp",
+		`add rule ip kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject`,
+		`add rule ip kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject`,
+		"add rule ip kube-proxy nodeport-endpoints-check ip daddr 127.0.0.0/8 meta l4proto . th dport vmap @localhost-nodeport-reject-ports",
+		"add element ip kube-proxy localhost-nodeport-reject-ports { udp . 30053 : goto localhost-nodeport-reject-udp }",
+	} {
+		if !strings.Contains(dump, want) {
+			t.Errorf("expected dump to contain:\n  %s\nfull dump:\n%s", want, dump)
+		}
+	}
+	// The proxy serves TCP, so it is not rejected.
+	if strings.Contains(dump, "localhost-nodeport-rejected-tcp") {
+		t.Errorf("did not expect dump to reject TCP:\n%s", dump)
+	}
+}
+
+func TestLocalhostNodePortRejectAll(t *testing.T) {
+	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
+
+	// Feature enabled but loopback is not in nodePortAddresses, so kube-proxy
+	// rejects all localhost NodePort traffic rather than serving any of it.
+	fp.localhostNodePortsEnabled = true
+
+	makeServiceMap(fp,
+		makeTestService("ns1", "svc-tcp", func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+			svc.Spec.ClusterIP = "172.30.0.41"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Protocol: v1.ProtocolTCP,
+				Port:     80,
+				NodePort: 30080,
+			}}
+		}),
+		makeTestService("ns2", "svc-udp", func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+			svc.Spec.ClusterIP = "172.30.0.42"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p53",
+				Protocol: v1.ProtocolUDP,
+				Port:     53,
+				NodePort: 30053,
+			}}
+		}),
+		makeTestService("ns3", "svc-sctp", func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+			svc.Spec.ClusterIP = "172.30.0.43"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p9",
+				Protocol: v1.ProtocolSCTP,
+				Port:     9,
+				NodePort: 30009,
+			}}
+		}),
+	)
+	if err := fp.syncProxyRules(); err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+
+	dump := nft.Dump()
+	for _, want := range []string{
+		"add counter ip kube-proxy localhost-nodeport-rejected-tcp",
+		"add counter ip kube-proxy localhost-nodeport-rejected-udp",
+		"add counter ip kube-proxy localhost-nodeport-rejected-sctp",
+		`add rule ip kube-proxy localhost-nodeport-reject-tcp counter name "localhost-nodeport-rejected-tcp" reject`,
+		`add rule ip kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject`,
+		`add rule ip kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject`,
+		"add rule ip kube-proxy nodeport-endpoints-check ip daddr 127.0.0.0/8 meta l4proto . th dport vmap @localhost-nodeport-reject-ports",
+		"add element ip kube-proxy localhost-nodeport-reject-ports { tcp . 30080 : goto localhost-nodeport-reject-tcp }",
+		"add element ip kube-proxy localhost-nodeport-reject-ports { udp . 30053 : goto localhost-nodeport-reject-udp }",
+		"add element ip kube-proxy localhost-nodeport-reject-ports { sctp . 30009 : goto localhost-nodeport-reject-sctp }",
+	} {
+		if !strings.Contains(dump, want) {
+			t.Errorf("expected dump to contain:\n  %s\nfull dump:\n%s", want, dump)
+		}
+	}
+}
+
+func TestLocalhostNodePortProxy(t *testing.T) {
+	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
+
+	// Activate the localhost NodePort proxy: loopback is in nodePortAddresses, so
+	// the userspace proxy serves TCP localhost NodePorts while UDP/SCTP are rejected.
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{fmt.Sprintf("%s/32", testNodeIP), "127.0.0.0/8"})
+	fp.localhostNodePortsEnabled = true
+	fp.localhostNodePortProxy = localnodeportproxy.NewLocalNodePortProxy(context.Background(), v1.IPv4Protocol)
+	defer fp.localhostNodePortProxy.Shutdown()
+
+	makeServiceMap(fp,
+		makeTestService("ns1", "svc-tcp", func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+			svc.Spec.ClusterIP = "172.30.0.41"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Protocol: v1.ProtocolTCP,
+				Port:     80,
+				NodePort: 30080,
+			}}
+		}),
+	)
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice("ns1", "svc-tcp", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.180.0.1"},
+				NodeName:  new(testNodeName),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     new("p80"),
+				Port:     ptr.To[int32](80),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+	if err := fp.syncProxyRules(); err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+
+	dump := nft.Dump()
+	// The proxy serves TCP, so the reject infrastructure only covers the protocols
+	// it can't serve, and the TCP NodePort is dispatched normally.
+	for _, want := range []string{
+		"add counter ip kube-proxy localhost-nodeport-rejected-udp",
+		"add counter ip kube-proxy localhost-nodeport-rejected-sctp",
+		`add rule ip kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject`,
+		`add rule ip kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject`,
+		"add rule ip kube-proxy nodeport-endpoints-check ip daddr 127.0.0.0/8 meta l4proto . th dport vmap @localhost-nodeport-reject-ports",
+		"add element ip kube-proxy service-nodeports { tcp . 30080 : goto external-",
+	} {
+		if !strings.Contains(dump, want) {
+			t.Errorf("expected dump to contain:\n  %s\nfull dump:\n%s", want, dump)
+		}
+	}
+	// TCP is served by the proxy, so it is neither rejected nor counted.
+	if strings.Contains(dump, "localhost-nodeport-rejected-tcp") {
+		t.Errorf("did not expect TCP to be rejected:\n%s", dump)
+	}
+	if strings.Contains(dump, "localhost-nodeport-reject-ports { tcp .") {
+		t.Errorf("did not expect a TCP localhost reject element:\n%s", dump)
+	}
 }
