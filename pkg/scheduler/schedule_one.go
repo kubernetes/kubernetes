@@ -1261,10 +1261,12 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			pod = podInfo.Pod
 			nominatedPodInfo = podInfo.PodInfo
-			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
+			if podFwk.APICacher() != nil {
+				if addErr := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); addErr != nil {
+					utilruntime.HandleErrorWithContext(ctx, addErr, "Error occurred")
+				}
+				calledDone = true
 			}
-			calledDone = true
 		}
 	}
 
@@ -1283,14 +1285,37 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 
 	msg := truncateMessage(errMsg)
 	podFwk.EventRecorder().WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
-	if err := updatePod(ctx, sched.client, podFwk.APICacher(), pod, &v1.PodCondition{
+
+	podCondition := &v1.PodCondition{
 		Type:               v1.PodScheduled,
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionFalse,
 		Reason:             reason,
 		Message:            errMsg,
-	}, nominatingInfo); err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod", "pod", klog.KObj(pod))
+	}
+
+	if podFwk.APICacher() != nil {
+		// Async path: we already added to the queue above, so just dispatch the update.
+		if updateErr := updatePod(ctx, sched.client, podFwk.APICacher(), pod, podCondition, nominatingInfo); updateErr != nil {
+			utilruntime.HandleErrorWithContext(ctx, updateErr, "Error updating pod", "pod", klog.KObj(pod))
+		}
+	} else {
+		// Sync path: update the pod synchronously to get the fully updated Pod 
+		// back from the API Server. Then update podInfo and add it to the queue.
+		updatedPod, updateErr := updatePodSync(ctx, sched.client, pod, podCondition, nominatingInfo)
+		if updateErr != nil {
+			utilruntime.HandleErrorWithContext(ctx, updateErr, "Error updating pod", "pod", klog.KObj(pod))
+		} else if updatedPod != nil {
+			podInfo.Pod = updatedPod
+			podInfo.PodInfo, _ = framework.NewPodInfo(updatedPod)
+		}
+
+		if !calledDone {
+			if addErr := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); addErr != nil {
+				utilruntime.HandleErrorWithContext(ctx, addErr, "Error occurred")
+			}
+			calledDone = true
+		}
 	}
 }
 
@@ -1336,4 +1361,27 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
 	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+}
+
+func updatePodSync(ctx context.Context, client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (*v1.Pod, error) {
+	logger := klog.FromContext(ctx)
+	logValues := []any{"pod", klog.KObj(pod)}
+	if condition != nil {
+		logValues = append(logValues, "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
+	}
+	if nominatingInfo != nil {
+		logValues = append(logValues, "nominatedNodeName", nominatingInfo.NominatedNodeName, "nominatingMode", nominatingInfo.Mode())
+	}
+	logger.V(3).Info("Updating pod condition and nominated node name (sync)", logValues...)
+
+	podStatusCopy := pod.Status.DeepCopy()
+	nnnNeedsUpdate := nominatingInfo.Mode() == fwk.ModeOverride && pod.Status.NominatedNodeName != nominatingInfo.NominatedNodeName
+	podConditionNeedsUpdate := condition != nil && podutil.UpdatePodCondition(podStatusCopy, condition)
+	if !podConditionNeedsUpdate && !nnnNeedsUpdate {
+		return nil, nil
+	}
+	if nnnNeedsUpdate {
+		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
+	}
+	return util.PatchPodStatusAndReturn(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
 }
