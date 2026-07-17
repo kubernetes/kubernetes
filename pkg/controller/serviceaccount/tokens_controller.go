@@ -71,7 +71,7 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
+func NewTokensController(logger klog.Logger, serviceAccounts informers.TypedServiceAccountInformer, secrets informers.TypedSecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
@@ -96,32 +96,39 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 
 	e.serviceAccounts = serviceAccounts.Lister()
 	e.serviceAccountSynced = serviceAccounts.Informer().HasSynced
-	serviceAccounts.Informer().AddEventHandlerWithResyncPeriod(
-		cache.ResourceEventHandlerFuncs{
+	serviceAccounts.TypedInformer().AddTypedEventHandler(
+		informers.ServiceAccountHandlerFuncs{
 			AddFunc:    e.queueServiceAccountSync,
 			UpdateFunc: e.queueServiceAccountUpdateSync,
-			DeleteFunc: e.queueServiceAccountSync,
+			DeleteFunc: e.queueDeletedServiceAccountSync,
 		},
-		options.ServiceAccountResync,
+		cache.HandlerOptions{ResyncPeriod: &options.ServiceAccountResync},
 	)
 
 	e.secrets = secrets.Lister()
 	e.secretSynced = secrets.Informer().HasSynced
-	secrets.Informer().AddEventHandlerWithOptions(
-		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
-				switch t := obj.(type) {
-				case *v1.Secret:
-					return t.Type == v1.SecretTypeServiceAccountToken
-				default:
-					utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected object type passed to tokens controller", "type", fmt.Sprintf("%T", obj))
-					return false
+	secretMatches := func(secret *v1.Secret) bool { return secret.Type == v1.SecretTypeServiceAccountToken }
+	secrets.TypedInformer().AddTypedEventHandler(
+		informers.SecretHandlerFuncs{
+			AddFunc: func(secret *v1.Secret) {
+				if secretMatches(secret) {
+					e.queueSecretSync(secret)
 				}
 			},
-			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    e.queueSecretSync,
-				UpdateFunc: e.queueSecretUpdateSync,
-				DeleteFunc: e.queueSecretSync,
+			UpdateFunc: func(oldSecret, newSecret *v1.Secret) {
+				switch oldMatches, newMatches := secretMatches(oldSecret), secretMatches(newSecret); {
+				case oldMatches && newMatches:
+					e.queueSecretUpdateSync(oldSecret, newSecret)
+				case oldMatches:
+					e.queueSecretSync(oldSecret)
+				case newMatches:
+					e.queueSecretSync(newSecret)
+				}
+			},
+			DeleteFunc: func(deleted informers.DeletedSecret) {
+				if deleted.OptionalObj != nil && secretMatches(deleted.OptionalObj) {
+					e.queueSecretSync(deleted.OptionalObj)
+				}
 			},
 		},
 		cache.HandlerOptions{
@@ -191,21 +198,20 @@ func (e *TokensController) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (e *TokensController) queueServiceAccountSync(obj interface{}) {
-	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		obj = tombstone.Obj
-	}
-	if serviceAccount, ok := obj.(*v1.ServiceAccount); ok {
-		e.syncServiceAccountQueue.Add(makeServiceAccountKey(serviceAccount))
-		return
-	}
-	utilruntime.HandleError(fmt.Errorf("error decoding object, invalid type: %T", obj))
+func (e *TokensController) queueServiceAccountSync(serviceAccount *v1.ServiceAccount) {
+	e.syncServiceAccountQueue.Add(makeServiceAccountKey(serviceAccount))
 }
 
-func (e *TokensController) queueServiceAccountUpdateSync(oldObj interface{}, newObj interface{}) {
-	if serviceAccount, ok := newObj.(*v1.ServiceAccount); ok {
-		e.syncServiceAccountQueue.Add(makeServiceAccountKey(serviceAccount))
+func (e *TokensController) queueDeletedServiceAccountSync(deleted informers.DeletedServiceAccount) {
+	if deleted.OptionalObj == nil {
+		utilruntime.HandleError(fmt.Errorf("deleted ServiceAccount object %q is unavailable", deleted.GetKey()))
+		return
 	}
+	e.queueServiceAccountSync(deleted.OptionalObj)
+}
+
+func (e *TokensController) queueServiceAccountUpdateSync(_, serviceAccount *v1.ServiceAccount) {
+	e.syncServiceAccountQueue.Add(makeServiceAccountKey(serviceAccount))
 }
 
 // complete optionally requeues key, then calls queue.Done(key)
@@ -225,16 +231,12 @@ func retryOrForget[T comparable](logger klog.Logger, queue workqueue.TypedRateLi
 	queue.Forget(key)
 }
 
-func (e *TokensController) queueSecretSync(obj interface{}) {
-	if secret, ok := obj.(*v1.Secret); ok {
-		e.syncSecretQueue.Add(makeSecretQueueKey(secret))
-	}
+func (e *TokensController) queueSecretSync(secret *v1.Secret) {
+	e.syncSecretQueue.Add(makeSecretQueueKey(secret))
 }
 
-func (e *TokensController) queueSecretUpdateSync(oldObj interface{}, newObj interface{}) {
-	if secret, ok := newObj.(*v1.Secret); ok {
-		e.syncSecretQueue.Add(makeSecretQueueKey(secret))
-	}
+func (e *TokensController) queueSecretUpdateSync(_, secret *v1.Secret) {
+	e.syncSecretQueue.Add(makeSecretQueueKey(secret))
 }
 
 func (e *TokensController) syncServiceAccount(ctx context.Context) {

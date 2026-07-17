@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	listers "k8s.io/client-go/listers/core/v1"
 	core "k8s.io/client-go/testing"
@@ -240,7 +241,7 @@ func TestDesiredTTL(t *testing.T) {
 			ttlController.addNode(logger, &v1.Node{})
 		}
 		if testCase.deleteNode {
-			ttlController.deleteNode(&v1.Node{})
+			ttlController.deleteNode(coreinformers.DeletedNode{OptionalObj: &v1.Node{}})
 		}
 		assert.Equal(t, testCase.expectedTTL, ttlController.getDesiredTTLSeconds(),
 			"%d: unexpected ttl: %d", i, ttlController.getDesiredTTLSeconds())

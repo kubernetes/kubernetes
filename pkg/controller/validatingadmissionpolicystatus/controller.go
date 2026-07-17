@@ -41,7 +41,7 @@ const ControllerName = "validatingadmissionpolicy-status"
 // Controller is the ValidatingAdmissionPolicy Status controller that reconciles the Status field of each policy object.
 // This controller runs type checks against referred types for each policy definition.
 type Controller struct {
-	policyInformer informerv1.ValidatingAdmissionPolicyInformer
+	policyInformer informerv1.TypedValidatingAdmissionPolicyInformer
 	policyQueue    workqueue.TypedRateLimitingInterface[string]
 	policySynced   cache.InformerSynced
 	policyClient   admissionregistrationv1.ValidatingAdmissionPolicyInterface
@@ -73,7 +73,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, policyClient admissionregistrationv1.ValidatingAdmissionPolicyInterface, typeChecker *validatingadmissionpolicy.TypeChecker) (*Controller, error) {
+func NewController(policyInformer informerv1.TypedValidatingAdmissionPolicyInformer, policyClient admissionregistrationv1.ValidatingAdmissionPolicyInterface, typeChecker *validatingadmissionpolicy.TypeChecker) (*Controller, error) {
 	c := &Controller{
 		policyInformer: policyInformer,
 		policyQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -83,14 +83,14 @@ func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, 
 		policyClient: policyClient,
 		typeChecker:  typeChecker,
 	}
-	reg, err := policyInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	reg, err := policyInformer.TypedInformer().AddTypedEventHandler(informerv1.ValidatingAdmissionPolicyHandlerFuncs{
+		AddFunc: func(obj *v1.ValidatingAdmissionPolicy) {
 			c.enqueuePolicy(obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(_, newObj *v1.ValidatingAdmissionPolicy) {
 			c.enqueuePolicy(newObj)
 		},
-	})
+	}, cache.HandlerOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -98,15 +98,13 @@ func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, 
 	return c, nil
 }
 
-func (c *Controller) enqueuePolicy(policy any) {
-	if policy, ok := policy.(*v1.ValidatingAdmissionPolicy); ok {
-		// policy objects are cluster-scoped, no point include its namespace.
-		key := policy.ObjectMeta.Name
-		if key == "" {
-			utilruntime.HandleError(fmt.Errorf("cannot get name of object %v", policy))
-		}
-		c.policyQueue.Add(key)
+func (c *Controller) enqueuePolicy(policy *v1.ValidatingAdmissionPolicy) {
+	// Policy objects are cluster-scoped, so their name is the queue key.
+	key := policy.Name
+	if key == "" {
+		utilruntime.HandleError(fmt.Errorf("cannot get name of object %v", policy))
 	}
+	c.policyQueue.Add(key)
 }
 
 func (c *Controller) runWorker(ctx context.Context) {

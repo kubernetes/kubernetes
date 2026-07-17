@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -470,7 +471,7 @@ func TestTokenCreation(t *testing.T) {
 			}
 			if tc.DeletedServiceAccount != nil {
 				serviceAccounts.Delete(tc.DeletedServiceAccount)
-				controller.queueServiceAccountSync(tc.DeletedServiceAccount)
+				controller.queueDeletedServiceAccountSync(coreinformers.DeletedServiceAccount{OptionalObj: tc.DeletedServiceAccount})
 			}
 			if tc.AddedSecret != nil {
 				secrets.Add(tc.AddedSecret)
@@ -556,7 +557,7 @@ func TestTokenCreation(t *testing.T) {
 func TestQueueServiceAccountSync_Tombstone(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	sa := serviceAccount(emptySecretReferences())
-	tombstone := cache.DeletedFinalStateUnknown{
+	tombstone := &cache.DeletedFinalStateUnknown{
 		Key: "default/default",
 		Obj: sa,
 	}
@@ -568,7 +569,7 @@ func TestQueueServiceAccountSync_Tombstone(t *testing.T) {
 		t.Fatalf("error creating Tokens controller: %v", err)
 	}
 
-	tokenController.queueServiceAccountSync(tombstone)
+	tokenController.queueDeletedServiceAccountSync(coreinformers.DeletedServiceAccount{OptionalObj: sa, FinalStateUnknown: tombstone})
 	if tokenController.syncServiceAccountQueue.Len() != 1 {
 		t.Errorf("expected 1 item in queue, got %d", tokenController.syncServiceAccountQueue.Len())
 	}

@@ -44,7 +44,7 @@ func MustParseCIDR(s string) *net.IPNet {
 }
 
 // FakeNodeInformer creates a fakeNodeInformer using the provided fakeNodeHandler.
-func FakeNodeInformer(fakeNodeHandler *testutil.FakeNodeHandler) coreinformers.NodeInformer {
+func FakeNodeInformer(fakeNodeHandler *testutil.FakeNodeHandler) coreinformers.TypedNodeInformer {
 	fakeClient := &fake.Clientset{}
 	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
 	fakeNodeInformer := fakeInformerFactory.Core().V1().Nodes()

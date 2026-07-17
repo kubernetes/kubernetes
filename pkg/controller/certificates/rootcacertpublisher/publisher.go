@@ -52,7 +52,7 @@ func init() {
 // NewPublisher construct a new controller which would manage the configmap
 // which stores certificates in each namespace. It will make sure certificate
 // configmap exists in each namespace.
-func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
+func NewPublisher(cmInformer coreinformers.TypedConfigMapInformer, nsInformer coreinformers.TypedNamespaceInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
 	e := &Publisher{
 		client: cl,
 		rootCA: rootCA,
@@ -64,17 +64,17 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 		),
 	}
 
-	cmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	cmInformer.TypedInformer().AddTypedEventHandler(coreinformers.ConfigMapHandlerFuncs{
 		DeleteFunc: e.configMapDeleted,
 		UpdateFunc: e.configMapUpdated,
-	})
+	}, cache.HandlerOptions{})
 	e.cmLister = cmInformer.Lister()
 	e.cmListerSynced = cmInformer.Informer().HasSynced
 
-	nsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	nsInformer.TypedInformer().AddTypedEventHandler(coreinformers.NamespaceHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
-	})
+	}, cache.HandlerOptions{})
 	e.nsListerSynced = nsInformer.Informer().HasSynced
 
 	e.syncHandler = e.syncNamespace
@@ -125,37 +125,25 @@ func (c *Publisher) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (c *Publisher) configMapDeleted(obj interface{}) {
-	cm, err := convertToCM(obj)
-	if err != nil {
-		utilruntime.HandleError(err)
+func (c *Publisher) configMapDeleted(deleted coreinformers.DeletedConfigMap) {
+	if deleted.GetName() != RootCACertConfigMapName {
 		return
 	}
+	c.queue.Add(deleted.GetNamespace())
+}
+
+func (c *Publisher) configMapUpdated(_, cm *v1.ConfigMap) {
 	if cm.Name != RootCACertConfigMapName {
 		return
 	}
 	c.queue.Add(cm.Namespace)
 }
 
-func (c *Publisher) configMapUpdated(_, newObj interface{}) {
-	cm, err := convertToCM(newObj)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-	if cm.Name != RootCACertConfigMapName {
-		return
-	}
-	c.queue.Add(cm.Namespace)
-}
-
-func (c *Publisher) namespaceAdded(obj interface{}) {
-	namespace := obj.(*v1.Namespace)
+func (c *Publisher) namespaceAdded(namespace *v1.Namespace) {
 	c.queue.Add(namespace.Name)
 }
 
-func (c *Publisher) namespaceUpdated(oldObj interface{}, newObj interface{}) {
-	newNamespace := newObj.(*v1.Namespace)
+func (c *Publisher) namespaceUpdated(_, newNamespace *v1.Namespace) {
 	if newNamespace.Status.Phase != v1.NamespaceActive {
 		return
 	}
@@ -233,19 +221,4 @@ func (c *Publisher) syncNamespace(ctx context.Context, ns string) (err error) {
 
 	_, err = c.client.CoreV1().ConfigMaps(ns).Update(ctx, cm, metav1.UpdateOptions{})
 	return err
-}
-
-func convertToCM(obj interface{}) (*v1.ConfigMap, error) {
-	cm, ok := obj.(*v1.ConfigMap)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			return nil, fmt.Errorf("couldn't get object from tombstone %#v", obj)
-		}
-		cm, ok = tombstone.Obj.(*v1.ConfigMap)
-		if !ok {
-			return nil, fmt.Errorf("tombstone contained object that is not a ConfigMap %#v", obj)
-		}
-	}
-	return cm, nil
 }

@@ -73,7 +73,7 @@ type TokenCleaner struct {
 }
 
 // NewTokenCleaner returns a new *NewTokenCleaner.
-func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
+func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.TypedSecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
 	e := &TokenCleaner{
 		client:               cl,
 		secretLister:         secrets.Lister(),
@@ -87,24 +87,21 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 		),
 	}
 
-	secrets.Informer().AddEventHandlerWithResyncPeriod(
-		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
-				switch t := obj.(type) {
-				case *v1.Secret:
-					return t.Type == bootstrapapi.SecretTypeBootstrapToken && t.Namespace == e.tokenSecretNamespace
-				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
-					return false
-				}
-			},
-			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    e.enqueueSecrets,
-				UpdateFunc: func(oldSecret, newSecret interface{}) { e.enqueueSecrets(newSecret) },
-			},
+	secretMatches := func(secret *v1.Secret) bool {
+		return secret.Type == bootstrapapi.SecretTypeBootstrapToken && secret.Namespace == e.tokenSecretNamespace
+	}
+	secrets.TypedInformer().AddTypedEventHandler(coreinformers.SecretHandlerFuncs{
+		AddFunc: func(secret *v1.Secret) {
+			if secretMatches(secret) {
+				e.enqueueSecrets(secret)
+			}
 		},
-		options.SecretResync,
-	)
+		UpdateFunc: func(_, secret *v1.Secret) {
+			if secretMatches(secret) {
+				e.enqueueSecrets(secret)
+			}
+		},
+	}, cache.HandlerOptions{ResyncPeriod: &options.SecretResync})
 
 	return e, nil
 }
@@ -133,7 +130,7 @@ func (tc *TokenCleaner) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (tc *TokenCleaner) enqueueSecrets(obj interface{}) {
+func (tc *TokenCleaner) enqueueSecrets(obj *v1.Secret) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(err)

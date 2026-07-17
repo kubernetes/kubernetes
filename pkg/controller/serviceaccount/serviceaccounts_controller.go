@@ -18,7 +18,6 @@ package serviceaccount
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -62,7 +61,7 @@ func DefaultServiceAccountsControllerOptions() ServiceAccountsControllerOptions 
 }
 
 // NewServiceAccountsController returns a new *ServiceAccountsController.
-func NewServiceAccountsController(logger klog.Logger, saInformer coreinformers.ServiceAccountInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, options ServiceAccountsControllerOptions) (*ServiceAccountsController, error) {
+func NewServiceAccountsController(logger klog.Logger, saInformer coreinformers.TypedServiceAccountInformer, nsInformer coreinformers.TypedNamespaceInformer, cl clientset.Interface, options ServiceAccountsControllerOptions) (*ServiceAccountsController, error) {
 	e := &ServiceAccountsController{
 		client:                  cl,
 		serviceAccountsToEnsure: options.ServiceAccounts,
@@ -72,18 +71,18 @@ func NewServiceAccountsController(logger klog.Logger, saInformer coreinformers.S
 		),
 	}
 
-	saHandler, _ := saInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
-		DeleteFunc: func(obj interface{}) {
-			e.serviceAccountDeleted(logger, obj)
+	saHandler, _ := saInformer.TypedInformer().AddTypedEventHandler(coreinformers.ServiceAccountHandlerFuncs{
+		DeleteFunc: func(deleted coreinformers.DeletedServiceAccount) {
+			e.serviceAccountDeleted(logger, deleted)
 		},
-	}, options.ServiceAccountResync)
+	}, cache.HandlerOptions{ResyncPeriod: &options.ServiceAccountResync})
 	e.saLister = saInformer.Lister()
 	e.saListerSynced = saHandler.HasSynced
 
-	nsHandler, _ := nsInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	nsHandler, _ := nsInformer.TypedInformer().AddTypedEventHandler(coreinformers.NamespaceHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
-	}, options.NamespaceResync)
+	}, cache.HandlerOptions{ResyncPeriod: &options.NamespaceResync})
 	e.nsLister = nsInformer.Lister()
 	e.nsListerSynced = nsHandler.HasSynced
 
@@ -136,32 +135,17 @@ func (c *ServiceAccountsController) Run(ctx context.Context, workers int) {
 }
 
 // serviceAccountDeleted reacts to a ServiceAccount deletion by recreating a default ServiceAccount in the namespace if needed
-func (c *ServiceAccountsController) serviceAccountDeleted(logger klog.Logger, obj interface{}) {
-	sa, ok := obj.(*v1.ServiceAccount)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Couldn't get object from tombstone", "obj", obj)
-			return
-		}
-		sa, ok = tombstone.Obj.(*v1.ServiceAccount)
-		if !ok {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Tombstone contained object that is not a ServiceAccount", "type", fmt.Sprintf("%T", obj))
-			return
-		}
-	}
-	c.queue.Add(sa.Namespace)
+func (c *ServiceAccountsController) serviceAccountDeleted(_ klog.Logger, deleted coreinformers.DeletedServiceAccount) {
+	c.queue.Add(deleted.GetNamespace())
 }
 
 // namespaceAdded reacts to a Namespace creation by creating a default ServiceAccount object
-func (c *ServiceAccountsController) namespaceAdded(obj interface{}) {
-	namespace := obj.(*v1.Namespace)
+func (c *ServiceAccountsController) namespaceAdded(namespace *v1.Namespace) {
 	c.queue.Add(namespace.Name)
 }
 
 // namespaceUpdated reacts to a Namespace update (or re-list) by creating a default ServiceAccount in the namespace if needed
-func (c *ServiceAccountsController) namespaceUpdated(oldObj interface{}, newObj interface{}) {
-	newNamespace := newObj.(*v1.Namespace)
+func (c *ServiceAccountsController) namespaceUpdated(_, newNamespace *v1.Namespace) {
 	c.queue.Add(newNamespace.Name)
 }
 

@@ -70,7 +70,7 @@ type Controller struct {
 }
 
 // New creates an instance of Controller
-func New(ctx context.Context, jobInformer batchinformers.JobInformer, client clientset.Interface) *Controller {
+func New(ctx context.Context, jobInformer batchinformers.TypedJobInformer, client clientset.Interface) *Controller {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartStructuredLogging(3)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
@@ -87,14 +87,14 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 	}
 
 	logger := klog.FromContext(ctx)
-	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	jobInformer.TypedInformer().AddTypedEventHandler(batchinformers.JobHandlerFuncs{
+		AddFunc: func(obj *batch.Job) {
 			tc.addJob(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *batch.Job) {
 			tc.updateJob(logger, oldObj, newObj)
 		},
-	})
+	}, cache.HandlerOptions{})
 
 	tc.jLister = jobInformer.Lister()
 	tc.jListerSynced = jobInformer.Informer().HasSynced
@@ -130,8 +130,7 @@ func (tc *Controller) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (tc *Controller) addJob(logger klog.Logger, obj interface{}) {
-	job := obj.(*batch.Job)
+func (tc *Controller) addJob(logger klog.Logger, job *batch.Job) {
 	logger.V(4).Info("Adding job", "job", klog.KObj(job))
 
 	if job.DeletionTimestamp == nil && needsCleanup(job) {
@@ -140,8 +139,7 @@ func (tc *Controller) addJob(logger klog.Logger, obj interface{}) {
 
 }
 
-func (tc *Controller) updateJob(logger klog.Logger, old, cur interface{}) {
-	job := cur.(*batch.Job)
+func (tc *Controller) updateJob(logger klog.Logger, _, job *batch.Job) {
 	logger.V(4).Info("Updating job", "job", klog.KObj(job))
 
 	if job.DeletionTimestamp == nil && needsCleanup(job) {
