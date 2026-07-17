@@ -649,6 +649,19 @@ func TestPreEnqueue(t *testing.T) {
 	cpgRoot := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-root").MinGroupCount(2).Obj()
 	cpgSub1 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-sub1").ParentCompositePodGroup("cpg-root").MinGroupCount(2).Obj()
 	cpgSub2 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-sub2").ParentCompositePodGroup("cpg-root").BasicPolicy().Obj()
+	cpgDeep1 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-1").MinGroupCount(1).Obj()
+	cpgDeep2 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-2").ParentCompositePodGroup("cpg-deep-1").MinGroupCount(1).Obj()
+	cpgDeep3 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-3").ParentCompositePodGroup("cpg-deep-2").MinGroupCount(1).Obj()
+	cpgDeep4 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-4").ParentCompositePodGroup("cpg-deep-3").MinGroupCount(1).Obj()
+	cpgDeep5 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-5").ParentCompositePodGroup("cpg-deep-4").MinGroupCount(1).Obj()
+	pgDeep := st.MakePodGroup().Namespace("ns1").Name("pg-deep").ParentCompositePodGroup("cpg-deep-5").MinCount(1).Obj()
+	podDeep := st.MakePod().Namespace("ns1").Name("pod-deep").UID("pod-deep").PodGroupName("pg-deep").Obj()
+
+	cpgCycle1 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-cycle-1").ParentCompositePodGroup("cpg-cycle-2").MinGroupCount(1).Obj()
+	cpgCycle2 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-cycle-2").ParentCompositePodGroup("cpg-cycle-1").MinGroupCount(1).Obj()
+	pgCycle := st.MakePodGroup().Namespace("ns1").Name("pg-cycle").ParentCompositePodGroup("cpg-cycle-1").MinCount(1).Obj()
+	podCycle := st.MakePod().Namespace("ns1").Name("pod-cycle").UID("pod-cycle").PodGroupName("pg-cycle").Obj()
+
 	cpgSub3 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-sub3").ParentCompositePodGroup("cpg-root").MinGroupCount(2).Obj()
 
 	pg1CPG := st.MakePodGroup().Namespace("ns1").Name("pg1-cpg").ParentCompositePodGroup("cpg-sub1").MinCount(1).Obj()
@@ -799,6 +812,42 @@ func TestPreEnqueue(t *testing.T) {
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1CPG, pgBasic2CPG},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
+		},
+		{
+			name:                       "CPG Max Depth Exceeded (CPG=true)",
+			isCompositePodGroupEnabled: []bool{true},
+			pod:                        podDeep,
+			initialPods:                []*v1.Pod{},
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgDeep},
+			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgDeep1, cpgDeep2, cpgDeep3, cpgDeep4, cpgDeep5},
+			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "failed to build hierarchy snapshot: workload tree depth exceeds max depth 4"),
+		},
+		{
+			name:                       "CPG Max Depth Exceeded (CPG=false)",
+			isCompositePodGroupEnabled: []bool{false},
+			pod:                        podDeep,
+			initialPods:                []*v1.Pod{},
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgDeep},
+			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgDeep1, cpgDeep2, cpgDeep3, cpgDeep4, cpgDeep5},
+			wantPreEnqueueStatus:       nil,
+		},
+		{
+			name:                       "CPG Cycle Detection (CPG=true)",
+			isCompositePodGroupEnabled: []bool{true},
+			pod:                        podCycle,
+			initialPods:                []*v1.Pod{},
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgCycle},
+			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgCycle1, cpgCycle2},
+			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "failed to build hierarchy snapshot: cycle detected in composite pod group hierarchy: compositepodgroup/ns1/cpg-cycle-1"),
+		},
+		{
+			name:                       "CPG Cycle Detection (CPG=false)",
+			isCompositePodGroupEnabled: []bool{false},
+			pod:                        podCycle,
+			initialPods:                []*v1.Pod{},
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgCycle},
+			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgCycle1, cpgCycle2},
+			wantPreEnqueueStatus:       nil,
 		},
 	}
 
