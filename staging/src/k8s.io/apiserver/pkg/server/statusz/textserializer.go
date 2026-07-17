@@ -17,10 +17,11 @@ limitations under the License.
 package statusz
 
 import (
+	"crypto/rand"
 	"fmt"
 	"html"
 	"io"
-	"math/rand"
+	"math/big"
 	"strings"
 	"time"
 
@@ -42,8 +43,11 @@ func (s statuszTextSerializer) Encode(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 
-	randomIndex := rand.Intn(len(delimiters))
-	delim := html.EscapeString(delimiters[randomIndex])
+	randomBig, err := rand.Int(rand.Reader, big.NewInt(int64(len(delimiters))))
+	if err != nil {
+		return fmt.Errorf("failed to generate random index: %w", err)
+	}
+	delim := html.EscapeString(delimiters[randomBig.Int64()])
 
 	statuszObj, ok := obj.(*v1beta1.Statusz)
 	if !ok {
@@ -73,7 +77,7 @@ Binary version%[1]s %[5]s
 %[6]s
 %[7]s
 `, delim, startTime, uptimeStr, goVersion, binaryVersion, emulationVersion, paths)
-	_, err := fmt.Fprint(w, status)
+	_, err = fmt.Fprint(w, status)
 	return err
 }
 
