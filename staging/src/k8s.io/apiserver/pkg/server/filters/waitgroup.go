@@ -18,7 +18,6 @@ package filters
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"k8s.io/api/core/v1"
@@ -93,5 +92,5 @@ func waitGroupWriteRetryAfterToResponse(w http.ResponseWriter) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	statusErr := apierrors.NewServiceUnavailable("apiserver is shutting down").Status()
 	w.WriteHeader(int(statusErr.Code))
-	fmt.Fprintln(w, runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &statusErr))
+	w.Write(append([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &statusErr)), '\n'))
 }
