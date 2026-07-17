@@ -1698,6 +1698,18 @@ func (wrapper *PodGroupWrapper) ParentCompositePodGroup(parent string) *PodGroup
 	return wrapper
 }
 
+// Generation sets `generation` as the generation of the inner PodGroup.
+func (wrapper *PodGroupWrapper) Generation(generation int64) *PodGroupWrapper {
+	wrapper.PodGroup.Generation = generation
+	return wrapper
+}
+
+// Conditions sets `conditions` as .Status.Conditions of the inner PodGroup.
+func (wrapper *PodGroupWrapper) Conditions(conditions ...metav1.Condition) *PodGroupWrapper {
+	wrapper.PodGroup.Status.Conditions = conditions
+	return wrapper
+}
+
 // WorkloadWrapper wraps a Workload inside.
 type WorkloadWrapper struct{ schedulingv1beta1.Workload }
 
@@ -1953,5 +1965,17 @@ func (wrapper *CompositePodGroupWrapper) TopologyKey(topologyKey string) *Compos
 			},
 		},
 	}
+	return wrapper
+}
+
+// Generation sets `generation` as the generation of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Generation(generation int64) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Generation = generation
+	return wrapper
+}
+
+// Conditions sets `conditions` as .Status.Conditions of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Conditions(conditions ...metav1.Condition) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Status.Conditions = conditions
 	return wrapper
 }
