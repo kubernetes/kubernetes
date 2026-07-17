@@ -79,6 +79,7 @@ func TestGenericControlplaneStartUp(t *testing.T) {
 		"clusterrolebindings.rbac.authorization.k8s.io",
 		"clusterroles.rbac.authorization.k8s.io",
 		"configmaps",
+		"clustertrustbundles.certificates.k8s.io",
 		"customresourcedefinitions.apiextensions.k8s.io",
 		"events",
 		"events.events.k8s.io",
