@@ -154,19 +154,9 @@ func (kl *Kubelet) removeOrphanedPodVolumeDirs(logger klog.Logger, uid types.UID
 		}
 	}
 
-	// Remove residual CSI metadata (e.g. vol_data.json) for unmounted CSI volumes.
-	// After hard reboots, mounts are gone but CSI metadata files often remain and
-	// block rmdir-only cleanup of the volumes tree ("not a directory" errors).
-	// See https://github.com/kubernetes/kubernetes/issues/105536.
-	//
-	// Safety (must stay aligned with #102576):
-	//   - This runs only after cleanupOrphanedPodDirs has verified podVolumesExist
-	//     is false (volume manager has no possibly-mounted volumes; disk mount
-	//     check did not find mounts). Do not call cleanOrphanedCSIVolumeDirs from
-	//     other paths without that gate.
-	//   - Only well-known CSI metadata is removed, and only when IsMountPoint says
-	//     the CSI mount path is not mounted (bind mounts included on Linux).
-	//   - Arbitrary files under the volume dir are never deleted.
+	// Remove residual CSI metadata (vol_data.json) for unmounted CSI volumes so
+	// rmdir-only volumes cleanup is not blocked after reboot (#105536).
+	// Only safe after podVolumesExist is false (see cleanupOrphanedPodDirs).
 	orphanVolumeErrors = append(orphanVolumeErrors, kl.cleanOrphanedCSIVolumeDirs(logger, uid)...)
 
 	// Remove any remaining subdirectories along with the volumes directory itself.
@@ -181,10 +171,9 @@ func (kl *Kubelet) removeOrphanedPodVolumeDirs(logger klog.Logger, uid types.UID
 	return orphanVolumeErrors
 }
 
-// cleanOrphanedCSIVolumeDirs removes residual CSI volume metadata for orphaned pods
-// when the corresponding CSI volume is no longer mounted.
-//
-// Must only be called when podVolumesExist(uid) is false (see removeOrphanedPodVolumeDirs).
+// cleanOrphanedCSIVolumeDirs removes residual CSI volume metadata for orphaned
+// pods when the corresponding CSI volume is no longer mounted.
+// Must only be called when podVolumesExist(uid) is false.
 func (kl *Kubelet) cleanOrphanedCSIVolumeDirs(logger klog.Logger, uid types.UID) []error {
 	pluginDir := filepath.Join(kl.getPodVolumesDir(uid), utilstrings.EscapeQualifiedName(csi.CSIPluginName))
 	entries, err := os.ReadDir(pluginDir)

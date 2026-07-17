@@ -31,22 +31,22 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		mounter      mount.Interface
+		nilMounter   bool
+		volumeDir    func(root string) string
 		prepare      func(t *testing.T, volumeDir string, mounter *mount.FakeMounter)
-		volumeDir    func(root string) string // optional override of volumeDir path
+		wantCleaned  bool
 		wantDataGone bool
 		wantDirGone  bool
 		wantErr      bool
 		errContains  string
+		skipFSAssert bool
 	}{
 		{
-			name: "nil mounter",
-			prepare: func(t *testing.T, volumeDir string, _ *mount.FakeMounter) {
-				t.Helper()
-			},
-			mounter:     nil,
-			wantErr:     true,
-			errContains: "mounter is required",
+			name:         "nil mounter",
+			nilMounter:   true,
+			wantErr:      true,
+			errContains:  "mounter is required",
+			skipFSAssert: true,
 		},
 		{
 			name: "missing volume dir is ok",
@@ -70,6 +70,7 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
+			wantCleaned:  true,
 			wantDataGone: true,
 			wantDirGone:  true,
 		},
@@ -81,6 +82,7 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
+			wantCleaned:  true,
 			wantDataGone: true,
 			wantDirGone:  true,
 		},
@@ -97,11 +99,9 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 				}
 				mounter.MountPoints = []mount.MountPoint{{Device: "/dev/sdb", Path: mountPath}}
 			},
-			wantDataGone: false,
-			wantDirGone:  false,
 		},
 		{
-			name: "IsLikelyNotMountPoint non-ENOENT error",
+			name: "IsMountPoint non-ENOENT error",
 			prepare: func(t *testing.T, volumeDir string, mounter *mount.FakeMounter) {
 				t.Helper()
 				mountPath := filepath.Join(volumeDir, "mount")
@@ -115,13 +115,11 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 					mountPath: errors.New("injected mount check failure"),
 				}
 			},
-			wantDataGone: false,
-			wantDirGone:  false,
-			wantErr:      true,
-			errContains:  "failed to check mount point",
+			wantErr:     true,
+			errContains: "failed to check mount point",
 		},
 		{
-			name: "IsLikelyNotMountPoint ENOENT treated as unmounted",
+			name: "IsMountPoint ENOENT treated as unmounted",
 			prepare: func(t *testing.T, volumeDir string, mounter *mount.FakeMounter) {
 				t.Helper()
 				mountPath := filepath.Join(volumeDir, "mount")
@@ -131,11 +129,11 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 				if err := os.WriteFile(filepath.Join(volumeDir, volDataFileName), []byte(`{"vol":"x"}`), 0640); err != nil {
 					t.Fatal(err)
 				}
-				// FakeMounter returns this error before Stat; os.IsNotExist makes code treat as unmounted.
 				mounter.MountCheckErrors = map[string]error{
 					mountPath: os.ErrNotExist,
 				}
 			},
+			wantCleaned:  true,
 			wantDataGone: true,
 			wantDirGone:  true,
 		},
@@ -147,7 +145,6 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 				if err := os.MkdirAll(mountPath, 0750); err != nil {
 					t.Fatal(err)
 				}
-				// Make mount dir non-empty so os.Remove(mountPath) fails.
 				if err := os.WriteFile(filepath.Join(mountPath, "leftover"), []byte("x"), 0640); err != nil {
 					t.Fatal(err)
 				}
@@ -155,10 +152,8 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
-			wantDataGone: false,
-			wantDirGone:  false,
-			wantErr:      true,
-			errContains:  "failed to remove unmounted CSI mount path",
+			wantErr:     true,
+			errContains: "failed to remove unmounted CSI mount path",
 		},
 		{
 			name: "leaves arbitrary content after removing metadata",
@@ -171,18 +166,16 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
+			wantCleaned:  true,
 			wantDataGone: true,
-			wantDirGone:  false,
 		},
 		{
 			name: "PathExists error when volumeDir parent is a file",
-			// Stat(volumeDir) fails with ENOTDIR-style error when a path component is a file.
 			volumeDir: func(root string) string {
 				return filepath.Join(root, "not-a-dir", "volume")
 			},
 			prepare: func(t *testing.T, volumeDir string, _ *mount.FakeMounter) {
 				t.Helper()
-				// volumeDir = root/not-a-dir/volume; make not-a-dir a file.
 				parent := filepath.Dir(volumeDir)
 				grand := filepath.Dir(parent)
 				if err := os.MkdirAll(grand, 0750); err != nil {
@@ -192,15 +185,13 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
-			wantErr:     true,
-			errContains: "", // OS-dependent message; just require error
+			wantErr:      true,
+			skipFSAssert: true,
 		},
 		{
 			name: "PathExists error for mount path when volumeDir is a file",
 			prepare: func(t *testing.T, volumeDir string, _ *mount.FakeMounter) {
 				t.Helper()
-				// Replace volumeDir directory with a file so PathExists(volumeDir) succeeds
-				// (file exists) but PathExists(volumeDir/mount) fails.
 				if err := os.RemoveAll(volumeDir); err != nil {
 					t.Fatal(err)
 				}
@@ -208,14 +199,11 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
-			wantErr: true,
+			wantErr:      true,
+			skipFSAssert: true,
 		},
 		{
-			name: "no vol_data empty dir removes dir",
-			prepare: func(t *testing.T, volumeDir string, _ *mount.FakeMounter) {
-				t.Helper()
-				// empty volume dir, no metadata
-			},
+			name:         "no vol_data empty dir removes dir",
 			wantDataGone: true,
 			wantDirGone:  true,
 		},
@@ -228,7 +216,6 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 				}
 			},
 			wantDataGone: true,
-			wantDirGone:  false,
 		},
 		{
 			name: "unreadable vol_data.json removal fails",
@@ -237,7 +224,6 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 				if err := os.WriteFile(filepath.Join(volumeDir, volDataFileName), []byte(`{"vol":"x"}`), 0640); err != nil {
 					t.Fatal(err)
 				}
-				// Remove write permission on the directory so os.Remove(dataFile) fails.
 				if err := os.Chmod(volumeDir, 0500); err != nil {
 					t.Fatal(err)
 				}
@@ -245,17 +231,15 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 					_ = os.Chmod(volumeDir, 0750)
 				})
 			},
-			wantDataGone: false,
-			wantDirGone:  false,
-			wantErr:      true,
-			errContains:  "failed to remove CSI volume data file",
+			wantErr:     true,
+			errContains: "failed to remove CSI volume data file",
 		},
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+
 			root := t.TempDir()
 			volumeDir := filepath.Join(root, "pvc-test")
 			if tc.volumeDir != nil {
@@ -266,10 +250,9 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 
 			fake := mount.NewFakeMounter(nil)
 			var mounter mount.Interface = fake
-			if tc.name == "nil mounter" {
+			if tc.nilMounter {
 				mounter = nil
 			}
-
 			if tc.prepare != nil {
 				tc.prepare(t, volumeDir, fake)
 			}
@@ -277,51 +260,39 @@ func TestCleanupUnmountedVolumeArtifacts(t *testing.T) {
 			cleaned, err := CleanupUnmountedVolumeArtifacts(mounter, volumeDir)
 			if tc.wantErr {
 				if err == nil {
-					t.Fatalf("expected error, got nil")
+					t.Fatal("expected error, got nil")
 				}
 				if cleaned {
-					t.Fatalf("expected cleaned=false on error")
+					t.Fatal("expected cleaned=false on error")
 				}
-				if tc.errContains != "" && !contains(err.Error(), tc.errContains) {
+				if tc.errContains != "" && !strings.Contains(err.Error(), tc.errContains) {
 					t.Fatalf("error %q does not contain %q", err.Error(), tc.errContains)
 				}
 			} else if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			} else if cleaned != tc.wantCleaned {
+				t.Fatalf("cleaned=%v, want %v", cleaned, tc.wantCleaned)
 			}
 
-			if !tc.wantErr || tc.wantDataGone || tc.wantDirGone {
-				// Only assert filesystem outcomes when meaningful.
-			}
-			if tc.name == "nil mounter" || tc.name == "PathExists error when volumeDir parent is a file" || tc.name == "PathExists error for mount path when volumeDir is a file" {
+			if tc.skipFSAssert {
 				return
 			}
 
 			_, dataErr := os.Stat(filepath.Join(volumeDir, volDataFileName))
-			if tc.wantDataGone && !os.IsNotExist(dataErr) {
-				// Permission cases may leave the file; only assert when we expect success path.
-				if !tc.wantErr {
-					t.Fatalf("expected %s gone, stat err=%v", volDataFileName, dataErr)
+			dataGone := os.IsNotExist(dataErr)
+			if !tc.wantErr {
+				if tc.wantDataGone != dataGone {
+					t.Fatalf("vol_data gone=%v, want %v (stat err=%v)", dataGone, tc.wantDataGone, dataErr)
 				}
-			}
-			if !tc.wantDataGone && !tc.wantErr && os.IsNotExist(dataErr) {
-				t.Fatalf("expected %s to remain", volDataFileName)
+			} else if !tc.wantDataGone && dataGone {
+				t.Fatalf("expected %s to remain on error", volDataFileName)
 			}
 
 			_, dirErr := os.Stat(volumeDir)
-			if tc.wantDirGone && !tc.wantErr && !os.IsNotExist(dirErr) {
-				t.Fatalf("expected volume dir gone, stat err=%v", dirErr)
-			}
-			if !tc.wantDirGone && !tc.wantErr && os.IsNotExist(dirErr) {
-				t.Fatalf("expected volume dir to remain")
-			}
-
-			if _, err := os.Stat(filepath.Join(volumeDir, "userdata.txt")); err == nil {
-				// preserved if present
+			dirGone := os.IsNotExist(dirErr)
+			if !tc.wantErr && tc.wantDirGone != dirGone {
+				t.Fatalf("volume dir gone=%v, want %v (stat err=%v)", dirGone, tc.wantDirGone, dirErr)
 			}
 		})
 	}
-}
-
-func contains(s, sub string) bool {
-	return sub == "" || strings.Contains(s, sub)
 }
