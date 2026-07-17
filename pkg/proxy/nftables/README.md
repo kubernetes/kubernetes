@@ -128,7 +128,7 @@ by setting appropriate `priority` values for your base chains. In particular:
   - Service traffic that needs to be masqueraded will be SNATted on a chain of `type
     nat`, `hook postrouting`, and `priority srcnat`. (So chains in other tables that run
     before this will always see the original client IP, while chains that run after this
-    will will see masqueraded source IPs for some traffic.)
+    will see masqueraded source IPs for some traffic.)
 
   - Traffic to services with no endpoints will be dropped or rejected from a chain with
     `type filter`, `priority filter`, and any of `hook input`, `hook output`, or `hook
