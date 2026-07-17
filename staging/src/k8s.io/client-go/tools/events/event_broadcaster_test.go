@@ -110,11 +110,6 @@ func TestRecordEventToSink(t *testing.T) {
 }
 
 func TestEventBroadcasterConcurrencyLimit(t *testing.T) {
-	// Configure maxConcurrentRecording to 2 for testing
-	oldMax := maxConcurrentRecording
-	maxConcurrentRecording = 2
-	defer func() { maxConcurrentRecording = oldMax }()
-
 	// Create a mock EventSink that blocks on writes and tracks active concurrent calls
 	var mu sync.Mutex
 	activeCalls := 0
@@ -146,7 +141,7 @@ func TestEventBroadcasterConcurrencyLimit(t *testing.T) {
 		},
 	}
 
-	broadcaster := newBroadcaster(mockSink, defaultSleepDuration, map[eventKey]*eventsv1.Event{})
+	broadcaster := NewBroadcasterWithOptions(mockSink, WithMaxConcurrentRecording(2))
 	defer broadcaster.Shutdown()
 
 	ctx, cancel := context.WithCancel(context.Background())

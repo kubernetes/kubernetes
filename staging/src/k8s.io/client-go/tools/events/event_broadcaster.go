@@ -54,7 +54,24 @@ const (
 
 var defaultSleepDuration = 10 * time.Second
 
-var maxConcurrentRecording = 100
+const defaultMaxConcurrentRecording = 100
+
+// BroadcasterOption allows to configure EventBroadcaster.
+type BroadcasterOption func(*eventBroadcasterImpl)
+
+// WithMaxConcurrentRecording limits the number of concurrent event write goroutines.
+func WithMaxConcurrentRecording(max int) BroadcasterOption {
+	return func(e *eventBroadcasterImpl) {
+		e.maxConcurrentRecording = max
+	}
+}
+
+// WithSleepDuration sets the sleep duration between event recording retries.
+func WithSleepDuration(sleepDuration time.Duration) BroadcasterOption {
+	return func(e *eventBroadcasterImpl) {
+		e.sleepDuration = sleepDuration
+	}
+}
 
 // TODO: validate impact of copying and investigate hashing
 type eventKey struct {
@@ -69,11 +86,12 @@ type eventKey struct {
 
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
-	mu            sync.Mutex
-	eventCache    map[eventKey]*eventsv1.Event
-	sleepDuration time.Duration
-	sink          EventSink
-	sem           chan struct{}
+	mu                     sync.Mutex
+	eventCache             map[eventKey]*eventsv1.Event
+	sleepDuration          time.Duration
+	sink                   EventSink
+	sem                    chan struct{}
+	maxConcurrentRecording int
 }
 
 // EventSinkImpl wraps EventsV1Interface to implement EventSink.
@@ -107,20 +125,33 @@ func (e *EventSinkImpl) Patch(ctx context.Context, event *eventsv1.Event, data [
 	return e.Interface.Events(event.Namespace).Patch(ctx, event.Name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 }
 
+// NewBroadcasterWithOptions Creates a new event broadcaster with options.
+func NewBroadcasterWithOptions(sink EventSink, opts ...BroadcasterOption) EventBroadcaster {
+	impl := &eventBroadcasterImpl{
+		Broadcaster:            watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		eventCache:             map[eventKey]*eventsv1.Event{},
+		sleepDuration:          defaultSleepDuration,
+		sink:                   sink,
+		maxConcurrentRecording: defaultMaxConcurrentRecording,
+	}
+	for _, opt := range opts {
+		opt(impl)
+	}
+	impl.sem = make(chan struct{}, impl.maxConcurrentRecording)
+	return impl
+}
+
 // NewBroadcaster Creates a new event broadcaster.
 func NewBroadcaster(sink EventSink) EventBroadcaster {
-	return newBroadcaster(sink, defaultSleepDuration, map[eventKey]*eventsv1.Event{})
+	return NewBroadcasterWithOptions(sink)
 }
 
 // NewBroadcasterForTest Creates a new event broadcaster for test purposes.
 func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[eventKey]*eventsv1.Event) EventBroadcaster {
-	return &eventBroadcasterImpl{
-		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
-		eventCache:    eventCache,
-		sleepDuration: sleepDuration,
-		sink:          sink,
-		sem:           make(chan struct{}, maxConcurrentRecording),
-	}
+	b := NewBroadcasterWithOptions(sink, WithSleepDuration(sleepDuration))
+	impl := b.(*eventBroadcasterImpl)
+	impl.eventCache = eventCache
+	return impl
 }
 
 func (e *eventBroadcasterImpl) Shutdown() {
