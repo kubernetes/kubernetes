@@ -92,7 +92,7 @@ func Validate_T1(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T1) (errs field.ErrorList) {
 
-	{ // field T1.PT1
+	{ // field T1.PT1 (k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/pointers.T1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T1,
@@ -122,7 +122,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("pt1"), obj.PT1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.T2
+	{ // field T1.T2 (k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/pointers.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -144,7 +144,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("t2"), &obj.T2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PT2
+	{ // field T1.PT2 (k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/pointers.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -183,7 +183,7 @@ func Validate_T2(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T2) (errs field.ErrorList) {
 
-	{ // field T2.PT1
+	{ // field T2.PT1 (k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/pointers.T1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T1,
@@ -213,7 +213,7 @@ func Validate_T2(
 		errs = append(errs, fn(fldPath.Child("pt1"), obj.PT1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T2.PT2
+	{ // field T2.PT2 (k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/pointers.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -243,7 +243,7 @@ func Validate_T2(
 		errs = append(errs, fn(fldPath.Child("pt2"), obj.PT2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T2.PT3
+	{ // field T2.PT3 (k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/pointers.T3)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T3,

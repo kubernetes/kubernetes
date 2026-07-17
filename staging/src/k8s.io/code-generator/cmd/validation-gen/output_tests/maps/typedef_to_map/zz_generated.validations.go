@@ -167,7 +167,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.MapField
+	{ // field Struct.MapField (k8s.io/code-generator/cmd/validation-gen/output_tests/maps/typedef_to_map.MapType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj MapType,
@@ -199,7 +199,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapField"), obj.MapField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapTypedefField
+	{ // field Struct.MapTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/maps/typedef_to_map.MapTypedefType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj MapTypedefType,
@@ -233,7 +233,7 @@ func Validate_Struct(
 
 	// field Struct.UnvalidatedMapField has no validation
 
-	{ // field Struct.MapPtrField
+	{ // field Struct.MapPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/maps/typedef_to_map.MapPtrType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj MapPtrType,
@@ -273,7 +273,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapPtrField"), obj.MapPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapPtrTypedefField
+	{ // field Struct.MapPtrTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/maps/typedef_to_map.MapPtrTypedefType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj MapPtrTypedefType,

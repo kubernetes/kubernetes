@@ -76,7 +76,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.PrefixedLabelKeyField
+	{ // field Struct.PrefixedLabelKeyField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -100,7 +100,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("prefixedLabelKeyField"), &obj.PrefixedLabelKeyField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.PrefixedLabelKeyPtrField
+	{ // field Struct.PrefixedLabelKeyPtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -124,7 +124,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("prefixedLabelKeyPtrField"), obj.PrefixedLabelKeyPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.PrefixedLabelKeyTypedefField
+	{ // field Struct.PrefixedLabelKeyTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/format/k8s-prefixed-label-key.PrefixedLabelKeyStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *PrefixedLabelKeyStringType,

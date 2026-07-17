@@ -172,7 +172,7 @@ func Validate_AllKinds(
 
 	// field AllKinds.TypeMeta has no validation
 
-	{ // field AllKinds.PtrTrigger
+	{ // field AllKinds.PtrTrigger (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -200,7 +200,7 @@ func Validate_AllKinds(
 		errs = append(errs, fn(fldPath.Child("ptrTrigger"), obj.PtrTrigger, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AllKinds.PtrDep
+	{ // field AllKinds.PtrDep (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -228,7 +228,7 @@ func Validate_AllKinds(
 		errs = append(errs, fn(fldPath.Child("ptrDep"), obj.PtrDep, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AllKinds.SliceTrigger
+	{ // field AllKinds.SliceTrigger ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -256,7 +256,7 @@ func Validate_AllKinds(
 		errs = append(errs, fn(fldPath.Child("sliceTrigger"), obj.SliceTrigger, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AllKinds.SliceDep
+	{ // field AllKinds.SliceDep ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -284,7 +284,7 @@ func Validate_AllKinds(
 		errs = append(errs, fn(fldPath.Child("sliceDep"), obj.SliceDep, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AllKinds.MapTrigger
+	{ // field AllKinds.MapTrigger (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -312,7 +312,7 @@ func Validate_AllKinds(
 		errs = append(errs, fn(fldPath.Child("mapTrigger"), obj.MapTrigger, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AllKinds.MapDep
+	{ // field AllKinds.MapDep (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -340,7 +340,7 @@ func Validate_AllKinds(
 		errs = append(errs, fn(fldPath.Child("mapDep"), obj.MapDep, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AllKinds.IntTrigger
+	{ // field AllKinds.IntTrigger (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -368,7 +368,7 @@ func Validate_AllKinds(
 		errs = append(errs, fn(fldPath.Child("intTrigger"), &obj.IntTrigger, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AllKinds.IntDep
+	{ // field AllKinds.IntDep (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -438,7 +438,7 @@ func Validate_MultiDependent(
 
 	// field MultiDependent.TypeMeta has no validation
 
-	{ // field MultiDependent.Trigger
+	{ // field MultiDependent.Trigger (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -466,7 +466,7 @@ func Validate_MultiDependent(
 		errs = append(errs, fn(fldPath.Child("trigger"), obj.Trigger, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MultiDependent.DependentA
+	{ // field MultiDependent.DependentA (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -494,7 +494,7 @@ func Validate_MultiDependent(
 		errs = append(errs, fn(fldPath.Child("dependentA"), obj.DependentA, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MultiDependent.DependentB
+	{ // field MultiDependent.DependentB (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -564,7 +564,7 @@ func Validate_MultiTrigger(
 
 	// field MultiTrigger.TypeMeta has no validation
 
-	{ // field MultiTrigger.TriggerA
+	{ // field MultiTrigger.TriggerA (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -592,7 +592,7 @@ func Validate_MultiTrigger(
 		errs = append(errs, fn(fldPath.Child("triggerA"), obj.TriggerA, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MultiTrigger.TriggerB
+	{ // field MultiTrigger.TriggerB (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -620,7 +620,7 @@ func Validate_MultiTrigger(
 		errs = append(errs, fn(fldPath.Child("triggerB"), obj.TriggerB, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MultiTrigger.Dependent
+	{ // field MultiTrigger.Dependent (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -675,7 +675,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Trigger
+	{ // field Struct.Trigger (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -703,7 +703,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("trigger"), obj.Trigger, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Dependent
+	{ // field Struct.Dependent (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -731,7 +731,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("dependent"), obj.Dependent, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.OtherField
+	{ // field Struct.OtherField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

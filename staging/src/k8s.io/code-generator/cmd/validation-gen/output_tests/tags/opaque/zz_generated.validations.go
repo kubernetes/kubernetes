@@ -212,7 +212,7 @@ func Validate_BaseStruct(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *BaseStruct) (errs field.ErrorList) {
 
-	{ // field BaseStruct.Field
+	{ // field BaseStruct.Field (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -325,7 +325,7 @@ func Validate_OtherStruct(
 		errs = append(errs, e...)
 	}
 
-	{ // field OtherStruct.StringField
+	{ // field OtherStruct.StringField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -360,7 +360,7 @@ func Validate_ParentWithOpaqueAliasWithValidation(
 
 	// field ParentWithOpaqueAliasWithValidation.TypeMeta has no validation
 
-	{ // field ParentWithOpaqueAliasWithValidation.Field
+	{ // field ParentWithOpaqueAliasWithValidation.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OpaqueAliasWithValidation)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *OpaqueAliasWithValidation,
@@ -393,7 +393,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.StructField
+	{ // field Struct.StructField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *OtherStruct,
@@ -419,7 +419,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("structField"), &obj.StructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StructPtrField
+	{ // field Struct.StructPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *OtherStruct,
@@ -453,7 +453,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("structPtrField"), obj.StructPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.OpaqueStructField
+	{ // field Struct.OpaqueStructField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *OtherStruct,
@@ -477,7 +477,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("opaqueStructField"), &obj.OpaqueStructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.OpaqueStructPtrField
+	{ // field Struct.OpaqueStructPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *OtherStruct,
@@ -509,7 +509,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("opaqueStructPtrField"), obj.OpaqueStructPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceOfStructField
+	{ // field Struct.SliceOfStructField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []OtherStruct,
@@ -543,7 +543,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceOfStructField"), obj.SliceOfStructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceOfOpaqueStructField
+	{ // field Struct.SliceOfOpaqueStructField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []OtherStruct,
@@ -573,7 +573,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceOfOpaqueStructField"), obj.SliceOfOpaqueStructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListMapOfStructField
+	{ // field Struct.ListMapOfStructField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []OtherStruct,
@@ -614,7 +614,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listMapOfStructField"), obj.ListMapOfStructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListMapOfOpaqueStructField
+	{ // field Struct.ListMapOfOpaqueStructField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []OtherStruct,
@@ -650,7 +650,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listMapOfOpaqueStructField"), obj.ListMapOfOpaqueStructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapOfStringToStructField
+	{ // field Struct.MapOfStringToStructField (map[k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherString]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[OtherString]OtherStruct,
@@ -694,7 +694,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapOfStringToStructField"), obj.MapOfStringToStructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapOfStringToOpaqueStructField
+	{ // field Struct.MapOfStringToOpaqueStructField (map[k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherString]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[OtherString]OtherStruct,

@@ -67,7 +67,7 @@ func Validate_T1(
 
 	// field T1.TypeMeta has no validation
 
-	{ // field T1.PrimitivesT1
+	{ // field T1.PrimitivesT1 (k8s.io/code-generator/cmd/validation-gen/output_tests/primitives.T1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *primitives.T1,
@@ -93,7 +93,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("primitivest1"), &obj.PrimitivesT1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PrimitivesT1Ptr
+	{ // field T1.PrimitivesT1Ptr (k8s.io/code-generator/cmd/validation-gen/output_tests/primitives.T1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *primitives.T1,
@@ -119,7 +119,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("primitivest1Ptr"), obj.PrimitivesT1Ptr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PrimitivesT2
+	{ // field T1.PrimitivesT2 (k8s.io/code-generator/cmd/validation-gen/output_tests/primitives.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *primitives.T2,
@@ -145,7 +145,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("primitivest2"), &obj.PrimitivesT2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PrimitivesT2Ptr
+	{ // field T1.PrimitivesT2Ptr (k8s.io/code-generator/cmd/validation-gen/output_tests/primitives.T1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *primitives.T1,
@@ -171,7 +171,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("primitivest2Ptr"), obj.PrimitivesT2Ptr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PrimitivesT3
+	{ // field T1.PrimitivesT3 (k8s.io/code-generator/cmd/validation-gen/output_tests/primitives.T3)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *primitives.T3,
@@ -195,7 +195,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("primitivest3"), &obj.PrimitivesT3, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PrimitivesT3Ptr
+	{ // field T1.PrimitivesT3Ptr (k8s.io/code-generator/cmd/validation-gen/output_tests/primitives.T1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *primitives.T1,
@@ -221,7 +221,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("primitivest3Ptr"), obj.PrimitivesT3Ptr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.TypedefsE1
+	{ // field T1.TypedefsE1 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *typedefs.E1,
@@ -247,7 +247,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("typedefse1"), &obj.TypedefsE1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.TypedefsE1Ptr
+	{ // field T1.TypedefsE1Ptr (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *typedefs.E1,
@@ -273,7 +273,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("typedefse1Ptr"), obj.TypedefsE1Ptr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.TypedefsE2
+	{ // field T1.TypedefsE2 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *typedefs.E2,
@@ -299,7 +299,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("typedefse2"), &obj.TypedefsE2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.TypedefsE2Ptr
+	{ // field T1.TypedefsE2Ptr (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *typedefs.E2,
@@ -325,7 +325,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("typedefse2Ptr"), obj.TypedefsE2Ptr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.TypedefsE3
+	{ // field T1.TypedefsE3 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E3)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *typedefs.E3,
@@ -351,7 +351,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("typedefse3"), &obj.TypedefsE3, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.TypedefsE3Ptr
+	{ // field T1.TypedefsE3Ptr (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E3)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *typedefs.E3,
@@ -377,7 +377,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("typedefse3Ptr"), obj.TypedefsE3Ptr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.TypedefsE4
+	{ // field T1.TypedefsE4 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E4)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *typedefs.E4,
@@ -403,7 +403,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("typedefse4"), &obj.TypedefsE4, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.TypedefsE4Ptr
+	{ // field T1.TypedefsE4Ptr (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E4)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *typedefs.E4,
@@ -429,7 +429,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("typedefse4Ptr"), obj.TypedefsE4Ptr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.OtherString
+	{ // field T1.OtherString (k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *other.StringType,
@@ -453,7 +453,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("otherString"), &obj.OtherString, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.OtherStringPtr
+	{ // field T1.OtherStringPtr (k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *other.StringType,
@@ -477,7 +477,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("otherStringPtr"), obj.OtherStringPtr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.OtherInt
+	{ // field T1.OtherInt (k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *other.IntType,
@@ -501,7 +501,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("otherInt"), &obj.OtherInt, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.OtherIntPtr
+	{ // field T1.OtherIntPtr (k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *other.IntType,
@@ -525,7 +525,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("otherIntPtr"), obj.OtherIntPtr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.OtherStruct
+	{ // field T1.OtherStruct (k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.StructType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *other.StructType,
@@ -549,7 +549,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("otherStruct"), &obj.OtherStruct, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.OtherStructPtr
+	{ // field T1.OtherStructPtr (k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.StructType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *other.StructType,
@@ -573,7 +573,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("otherStructPtr"), obj.OtherStructPtr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.SliceOfOtherStruct
+	{ // field T1.SliceOfOtherStruct ([]k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.StructType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []other.StructType,
@@ -603,7 +603,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("sliceOfOtherStruct"), obj.SliceOfOtherStruct, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.ListMapOfOtherStruct
+	{ // field T1.ListMapOfOtherStruct ([]k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.StructType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []other.StructType,
@@ -639,7 +639,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("listMapOfOtherStruct"), obj.ListMapOfOtherStruct, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.MapOfOtherStringToOtherStruct
+	{ // field T1.MapOfOtherStringToOtherStruct (map[k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.StringType]k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.StructType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[other.StringType]other.StructType,

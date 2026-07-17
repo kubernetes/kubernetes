@@ -63,7 +63,7 @@ func Validate_T1(
 
 	// field T1.TypeMeta has no validation
 
-	{ // field T1.S
+	{ // field T1.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -87,7 +87,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.I
+	{ // field T1.I (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -111,7 +111,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("i"), &obj.I, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.B
+	{ // field T1.B (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -135,7 +135,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("b"), &obj.B, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.F
+	{ // field T1.F (float64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *float64,
@@ -159,7 +159,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("f"), &obj.F, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.T2
+	{ // field T1.T2 (k8s.io/code-generator/cmd/validation-gen/output_tests/primitives.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -191,7 +191,7 @@ func Validate_T1(
 	// field T1.AnotherB has no validation
 	// field T1.AnotherF has no validation
 
-	{ // field T1.AnotherT2
+	{ // field T1.AnotherT2 (k8s.io/code-generator/cmd/validation-gen/output_tests/primitives.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -222,7 +222,7 @@ func Validate_T2(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T2) (errs field.ErrorList) {
 
-	{ // field T2.S
+	{ // field T2.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -246,7 +246,7 @@ func Validate_T2(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T2.I
+	{ // field T2.I (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -270,7 +270,7 @@ func Validate_T2(
 		errs = append(errs, fn(fldPath.Child("i"), &obj.I, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T2.B
+	{ // field T2.B (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -294,7 +294,7 @@ func Validate_T2(
 		errs = append(errs, fn(fldPath.Child("b"), &obj.B, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T2.F
+	{ // field T2.F (float64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *float64,

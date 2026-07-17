@@ -177,7 +177,7 @@ func Validate_DirectComparableStruct(
 		errs = append(errs, e...)
 	}
 
-	{ // field DirectComparableStruct.IntField
+	{ // field DirectComparableStruct.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -213,7 +213,7 @@ func Validate_MixComparableStruct(
 	// field MixComparableStruct.TypeMeta has no validation
 	// field MixComparableStruct.Primitive has no validation
 
-	{ // field MixComparableStruct.NonComparable
+	{ // field MixComparableStruct.NonComparable ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -263,7 +263,7 @@ func Validate_NestedDirectComparableStruct(
 		errs = append(errs, e...)
 	}
 
-	{ // field NestedDirectComparableStruct.DirectComparableStructField
+	{ // field NestedDirectComparableStruct.DirectComparableStructField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.DirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DirectComparableStruct,
@@ -302,7 +302,7 @@ func Validate_NestedNonDirectComparableStruct(
 		errs = append(errs, e...)
 	}
 
-	{ // field NestedNonDirectComparableStruct.NonDirectComparableStructField
+	{ // field NestedNonDirectComparableStruct.NonDirectComparableStructField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.NonDirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NonDirectComparableStruct,
@@ -341,7 +341,7 @@ func Validate_NonDirectComparableStruct(
 		errs = append(errs, e...)
 	}
 
-	{ // field NonDirectComparableStruct.IntPtrField
+	{ // field NonDirectComparableStruct.IntPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -389,7 +389,7 @@ func Validate_StructEmbedded(
 
 	// field StructEmbedded.TypeMeta has no validation
 
-	{ // field StructEmbedded.DirectComparableStruct
+	{ // field StructEmbedded.DirectComparableStruct (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.DirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DirectComparableStruct,
@@ -415,7 +415,7 @@ func Validate_StructEmbedded(
 		errs = append(errs, fn(fldPath.Child("directComparableStruct"), &obj.DirectComparableStruct, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructEmbedded.NonDirectComparableStruct
+	{ // field StructEmbedded.NonDirectComparableStruct (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.NonDirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NonDirectComparableStruct,
@@ -441,7 +441,7 @@ func Validate_StructEmbedded(
 		errs = append(errs, fn(fldPath.Child("nonDirectComparableStruct"), &obj.NonDirectComparableStruct, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructEmbedded.NestedDirectComparableStructField
+	{ // field StructEmbedded.NestedDirectComparableStructField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.NestedDirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NestedDirectComparableStruct,
@@ -467,7 +467,7 @@ func Validate_StructEmbedded(
 		errs = append(errs, fn(fldPath.Child("nestedDirectComparableStructField"), &obj.NestedDirectComparableStructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructEmbedded.NestedNonDirectComparableStructField
+	{ // field StructEmbedded.NestedNonDirectComparableStructField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.NestedNonDirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NestedNonDirectComparableStruct,
@@ -504,7 +504,7 @@ func Validate_StructMap(
 
 	// field StructMap.TypeMeta has no validation
 
-	{ // field StructMap.MapKeyField
+	{ // field StructMap.MapKeyField (map[k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.S]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[S]string,
@@ -532,7 +532,7 @@ func Validate_StructMap(
 		errs = append(errs, fn(fldPath.Child("mapKeyField"), obj.MapKeyField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructMap.MapValueField
+	{ // field StructMap.MapValueField (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.S)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]S,
@@ -560,7 +560,7 @@ func Validate_StructMap(
 		errs = append(errs, fn(fldPath.Child("mapValueField"), obj.MapValueField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructMap.AliasMapKeyTypeField
+	{ // field StructMap.AliasMapKeyTypeField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.AliasMapKeyType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj AliasMapKeyType,
@@ -586,7 +586,7 @@ func Validate_StructMap(
 		errs = append(errs, fn(fldPath.Child("aliasMapKeyTypeField"), obj.AliasMapKeyTypeField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructMap.AliasMapValueTypeField
+	{ // field StructMap.AliasMapValueTypeField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.AliasMapValueType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj AliasMapValueType,
@@ -623,7 +623,7 @@ func Validate_StructPrimitive(
 
 	// field StructPrimitive.TypeMeta has no validation
 
-	{ // field StructPrimitive.IntField
+	{ // field StructPrimitive.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -647,7 +647,7 @@ func Validate_StructPrimitive(
 		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructPrimitive.IntPtrField
+	{ // field StructPrimitive.IntPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -689,7 +689,7 @@ func Validate_StructSlice(
 
 	// field StructSlice.TypeMeta has no validation
 
-	{ // field StructSlice.SliceField
+	{ // field StructSlice.SliceField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.S)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []S,
@@ -717,7 +717,7 @@ func Validate_StructSlice(
 		errs = append(errs, fn(fldPath.Child("sliceField"), obj.SliceField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructSlice.TypeDefSliceField
+	{ // field StructSlice.TypeDefSliceField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.MySlice)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj MySlice,
@@ -754,7 +754,7 @@ func Validate_StructStruct(
 
 	// field StructStruct.TypeMeta has no validation
 
-	{ // field StructStruct.DirectComparableStructField
+	{ // field StructStruct.DirectComparableStructField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.DirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DirectComparableStruct,
@@ -780,7 +780,7 @@ func Validate_StructStruct(
 		errs = append(errs, fn(fldPath.Child("directComparableStructField"), &obj.DirectComparableStructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructStruct.NonDirectComparableStructField
+	{ // field StructStruct.NonDirectComparableStructField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.NonDirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NonDirectComparableStruct,
@@ -806,7 +806,7 @@ func Validate_StructStruct(
 		errs = append(errs, fn(fldPath.Child("nonDirectComparableStructField"), &obj.NonDirectComparableStructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructStruct.DirectComparableStructPtr
+	{ // field StructStruct.DirectComparableStructPtr (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.DirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DirectComparableStruct,
@@ -832,7 +832,7 @@ func Validate_StructStruct(
 		errs = append(errs, fn(fldPath.Child("directComparableStructPtrField"), obj.DirectComparableStructPtr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructStruct.NonDirectComparableStructPtr
+	{ // field StructStruct.NonDirectComparableStructPtr (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.NonDirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NonDirectComparableStruct,
@@ -858,7 +858,7 @@ func Validate_StructStruct(
 		errs = append(errs, fn(fldPath.Child("nonDirectComparableStructPtrField"), obj.NonDirectComparableStructPtr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructStruct.DirectComparableStruct
+	{ // field StructStruct.DirectComparableStruct (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.DirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DirectComparableStruct,
@@ -884,7 +884,7 @@ func Validate_StructStruct(
 		errs = append(errs, fn(safe.Value(fldPath, func() *field.Path { return fldPath.Child("DirectComparableStruct") }), &obj.DirectComparableStruct, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructStruct.NonDirectComparableStruct
+	{ // field StructStruct.NonDirectComparableStruct (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/default_behavior.NonDirectComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NonDirectComparableStruct,

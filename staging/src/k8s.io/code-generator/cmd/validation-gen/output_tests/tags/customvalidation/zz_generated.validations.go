@@ -94,7 +94,7 @@ func Validate_EachStruct(
 
 	// field EachStruct.TypeMeta has no validation
 
-	{ // field EachStruct.SliceField
+	{ // field EachStruct.SliceField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/customvalidation.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []StringType,
@@ -136,7 +136,7 @@ func Validate_OptionStruct(
 
 	// field OptionStruct.TypeMeta has no validation
 
-	{ // field OptionStruct.StringField
+	{ // field OptionStruct.StringField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -170,7 +170,7 @@ func Validate_OtherStruct(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *OtherStruct) (errs field.ErrorList) {
 
-	{ // field OtherStruct.StringField
+	{ // field OtherStruct.StringField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -225,7 +225,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.StringField
+	{ // field Struct.StringField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -250,7 +250,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MaxLengthField
+	{ // field Struct.MaxLengthField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -278,7 +278,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("maxLengthField"), &obj.MaxLengthField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.TypedefField
+	{ // field Struct.TypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/customvalidation.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *StringType,
@@ -300,7 +300,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("typedefField"), &obj.TypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.TypedefPtrField
+	{ // field Struct.TypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/customvalidation.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *StringType,
@@ -322,7 +322,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("typedefPtrField"), obj.TypedefPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.TypedefSliceField
+	{ // field Struct.TypedefSliceField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/customvalidation.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []StringType,
@@ -346,7 +346,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("typedefSliceField"), obj.TypedefSliceField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.TypedefMapField
+	{ // field Struct.TypedefMapField (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/customvalidation.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]StringType,
@@ -370,7 +370,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("typedefMapField"), obj.TypedefMapField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StructField
+	{ // field Struct.StructField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/customvalidation.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *OtherStruct,

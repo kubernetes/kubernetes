@@ -64,7 +64,7 @@ func Validate_T1(
 
 	// field T1.TypeMeta has no validation
 
-	{ // field T1.PS
+	{ // field T1.PS (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -88,7 +88,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("ps"), obj.PS, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PI
+	{ // field T1.PI (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -112,7 +112,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("pi"), obj.PI, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PB
+	{ // field T1.PB (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -136,7 +136,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("pb"), obj.PB, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PF
+	{ // field T1.PF (float64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *float64,
@@ -160,7 +160,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("pf"), obj.PF, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PT2
+	{ // field T1.PT2 (k8s.io/code-generator/cmd/validation-gen/output_tests/pointers.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -199,7 +199,7 @@ func Validate_T2(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T2) (errs field.ErrorList) {
 
-	{ // field T2.PS
+	{ // field T2.PS (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -223,7 +223,7 @@ func Validate_T2(
 		errs = append(errs, fn(fldPath.Child("ps"), obj.PS, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T2.PI
+	{ // field T2.PI (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -247,7 +247,7 @@ func Validate_T2(
 		errs = append(errs, fn(fldPath.Child("pi"), obj.PI, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T2.PB
+	{ // field T2.PB (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -271,7 +271,7 @@ func Validate_T2(
 		errs = append(errs, fn(fldPath.Child("pb"), obj.PB, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T2.PF
+	{ // field T2.PF (float64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *float64,

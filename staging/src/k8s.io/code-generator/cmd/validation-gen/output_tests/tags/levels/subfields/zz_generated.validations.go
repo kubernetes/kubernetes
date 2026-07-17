@@ -66,7 +66,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Subfield
+	{ // field Struct.Subfield (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/subfields.SubStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *SubStruct,
@@ -96,7 +96,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("subfield"), &obj.Subfield, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SubfieldBeta
+	{ // field Struct.SubfieldBeta (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/subfields.SubStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *SubStruct,
@@ -126,7 +126,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("subfieldBeta"), &obj.SubfieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UnionField
+	{ // field Struct.UnionField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/subfields.SubUnion)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *SubUnion,
