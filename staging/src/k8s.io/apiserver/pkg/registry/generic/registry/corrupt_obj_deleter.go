@@ -55,8 +55,9 @@ type corruptObjectDeleter struct {
 }
 
 // errUnsafeDeleteDryRun is a sentinel error returned by the deletion validator
-// on dry run requests. The etcd3 store calls the validator only after the
-// corruption check, and before it executes the delete:
+// on dry run requests. Calling the validation function before the delete
+// transaction is a system-wide invariant: it is how delete admission runs for
+// every delete in Kubernetes. No storage implementation can skip it.
 //
 //	getState(key, expectTransformOrDecodeError=true)
 //	    key not found          -> KeyNotFoundError, validator never runs
@@ -92,10 +93,16 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 		return nil, false, err
 	}
 	qualifiedResource := d.store.qualifiedResourceFromContext(ctx)
-	// use the storage implementation directly, bypass the dryRun layer
+	// Bypass the DryRunnableStorage layer as it was never designed to
+	// deal with corrupt objects (its dry run simulation is Get + decode).
+	// The call below must always land in the etcd3 store, see Delete in
+	// https://github.com/kubernetes/kubernetes/blob/6a5cc912a3c2a2c241fe05abea563079bf574abd/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go#L336-L354
 	storageBackend := d.store.Storage.Storage
 	klog.FromContext(ctx).V(1).Info("Going to perform unsafe object deletion", "object", klog.KRef(genericapirequest.NamespaceValue(ctx), name))
 	out := d.store.NewFunc()
+	// ExpectTransformOrDecodeError forces a live read from etcd and makes
+	// the delete fail unless the object is corrupt: not found and
+	// decodable objects return errors.
 	storageOpts := storage.DeleteOptions{ExpectTransformOrDecodeError: true}
 	// we don't have the old object in the cache, neither can it be
 	// retrieved from the storage and decoded into an object
