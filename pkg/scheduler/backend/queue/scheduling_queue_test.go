@@ -8294,6 +8294,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
+		disableCPG             bool
 	}{
 		{
 			name: "Root with pods",
@@ -8317,6 +8318,20 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 			expectedActiveQ:        map[string][]string{},
 			expectedIncompletePods: []string{},
 			expectedPendingPods:    []string{},
+		},
+		{
+			name: "Feature gate disabled",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj(),
+			},
+			cpgToAdd:               st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
+			expectedActiveQ:        map[string][]string{"podgroup/pg1": {"pod1"}},
+			expectedIncompletePods: []string{},
+			expectedPendingPods:    []string{},
+			disableCPG:             true,
 		},
 		{
 			name: "Root when another root exists",
@@ -8447,7 +8462,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
-				features.CompositePodGroup:               true,
+				features.CompositePodGroup:               !tt.disableCPG,
 			})
 			logger, ctx := ktesting.NewTestContext(t)
 
@@ -8501,11 +8516,62 @@ func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 		initialCPGs            []*schedulingv1alpha3.CompositePodGroup
 		initialPodGroups       []*schedulingv1beta1.PodGroup
 		initialPods            []*v1.Pod
+		beforeUpdate           func(ctx context.Context, q *PriorityQueue)
 		cpgToUpdate            *schedulingv1alpha3.CompositePodGroup
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
+		disableCPG             bool
 	}{
+		{
+			name: "Feature gate disabled",
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").MinGroupCount(3).Obj(),
+			},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj(),
+			},
+			cpgToUpdate:            st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").MinGroupCount(5).Obj(),
+			expectedActiveQ:        map[string][]string{"podgroup/pg1": {"pod1"}},
+			expectedIncompletePods: []string{},
+			expectedPendingPods:    []string{},
+			disableCPG:             true,
+		},
+		{
+			name: "Root missing",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj(),
+			},
+			cpgToUpdate:            st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").MinGroupCount(5).Obj(),
+			expectedActiveQ:        map[string][]string{},
+			expectedIncompletePods: []string{"pod1"},
+			expectedPendingPods:    []string{},
+		},
+		{
+			name: "Entity nil (in-flight)",
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").MinGroupCount(3).Obj(),
+			},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj(),
+			},
+			beforeUpdate: func(ctx context.Context, q *PriorityQueue) {
+				_, _ = q.Pop(klog.FromContext(ctx))
+			},
+			cpgToUpdate:            st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").MinGroupCount(5).Obj(),
+			expectedActiveQ:        map[string][]string{},
+			expectedIncompletePods: []string{},
+			expectedPendingPods:    []string{},
+		},
 		{
 			name: "Root when minCount is updated",
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
@@ -8546,7 +8612,7 @@ func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
-				features.CompositePodGroup:               true,
+				features.CompositePodGroup:               !tt.disableCPG,
 			})
 			logger, ctx := ktesting.NewTestContext(t)
 
@@ -8561,6 +8627,10 @@ func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 			}
 			for _, pod := range tt.initialPods {
 				q.Add(ctx, pod)
+			}
+
+			if tt.beforeUpdate != nil {
+				tt.beforeUpdate(ctx, q)
 			}
 
 			q.UpdateCompositePodGroup(logger, tt.cpgToUpdate)
@@ -8589,10 +8659,12 @@ func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 			}
 
 			entity := findPodGroupInfoInActiveQ(q, tt.cpgToUpdate.Namespace, tt.cpgToUpdate.Name, fwk.CompositePodGroupKeyType)
-			if entity == nil || entity.CompositePodGroup == nil {
-				t.Errorf("Expected CPG %s/%s in active queue hierarchy, but not found", tt.cpgToUpdate.Namespace, tt.cpgToUpdate.Name)
-			} else if diff := cmp.Diff(tt.cpgToUpdate, entity.CompositePodGroup); diff != "" {
-				t.Errorf("Updated CompositePodGroup mismatch (-want,+got):\n%s", diff)
+			if !tt.disableCPG && len(tt.expectedActiveQ) > 0 {
+				if entity == nil || entity.CompositePodGroup == nil {
+					t.Errorf("Expected CPG %s/%s in active queue hierarchy, but not found", tt.cpgToUpdate.Namespace, tt.cpgToUpdate.Name)
+				} else if diff := cmp.Diff(tt.cpgToUpdate, entity.CompositePodGroup); diff != "" {
+					t.Errorf("Updated CompositePodGroup mismatch (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}
@@ -8609,7 +8681,64 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
+		disableCPG             bool
 	}{
+		{
+			name: "Feature gate disabled",
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
+			},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj(),
+			},
+			cpgToDelete:            st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
+			expectedActiveQ:        map[string][]string{"podgroup/pg1": {"pod1"}},
+			expectedIncompletePods: []string{},
+			expectedPendingPods:    []string{},
+			disableCPG:             true,
+		},
+		{
+			name: "Root not in queue and not in-flight",
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
+			},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
+			},
+			cpgToDelete:            st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
+			expectedActiveQ:        map[string][]string{},
+			expectedIncompletePods: []string{},
+			expectedPendingPods:    []string{},
+		},
+		{
+			name: "Non-root with pending pods staysPending true for other branches",
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj(),
+				st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
+			},
+			initialPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("child-cpg").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("uid2").PodGroupName("pg2").Obj(),
+			},
+			beforeDelete: func(ctx context.Context, q *PriorityQueue) {
+				_, _ = q.Pop(klog.FromContext(ctx)) // Pop root-cpg
+				pod3 := st.MakePod().Name("pod3").Namespace("ns1").UID("uid3").PodGroupName("pg1").Obj()
+				pod4 := st.MakePod().Name("pod4").Namespace("ns1").UID("uid4").PodGroupName("pg2").Obj()
+				q.Add(ctx, pod3) // Goes to pending for pg1
+				q.Add(ctx, pod4) // Goes to pending for pg2
+			},
+			cpgToDelete:            st.MakeCompositePodGroup().Name("child-cpg").Namespace("ns1").Obj(),
+			expectedActiveQ:        map[string][]string{},
+			expectedIncompletePods: []string{"pod3"},
+			expectedPendingPods:    []string{"pod4"},
+		},
 		{
 			name: "Non-root when parent is root and is already in activeQ with another pod",
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
@@ -8774,7 +8903,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
-				features.CompositePodGroup:               true,
+				features.CompositePodGroup:               !tt.disableCPG,
 			})
 			logger, ctx := ktesting.NewTestContext(t)
 
@@ -8834,6 +8963,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
+		disableCPG             bool
 	}{
 		{
 			name: "Root with pods",
@@ -9059,7 +9189,18 @@ func TestPriorityQueue_UpdatePodGroup_Hierarchical(t *testing.T) {
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
+		disableCPG             bool
 	}{
+		{
+			name: "Root missing",
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("uid1").PodGroupName("pg1").Obj(),
+			},
+			pgToUpdate:             st.MakePodGroup().Name("pg1").Namespace("ns1").MinCount(3).Obj(),
+			expectedActiveQ:        map[string][]string{},
+			expectedIncompletePods: []string{"pod1"},
+			expectedPendingPods:    []string{},
+		},
 		{
 			name: "Root when minCount is updated",
 			initialPodGroups: []*schedulingv1beta1.PodGroup{
@@ -9153,10 +9294,12 @@ func TestPriorityQueue_UpdatePodGroup_Hierarchical(t *testing.T) {
 			}
 
 			entity := findPodGroupInfoInActiveQ(q, tt.pgToUpdate.Namespace, tt.pgToUpdate.Name, fwk.PodGroupKeyType)
-			if entity == nil || entity.PodGroup == nil {
-				t.Errorf("Expected PodGroup %s/%s in active queue hierarchy, but not found", tt.pgToUpdate.Namespace, tt.pgToUpdate.Name)
-			} else if diff := cmp.Diff(tt.pgToUpdate, entity.PodGroup); diff != "" {
-				t.Errorf("Updated PodGroup mismatch (-want,+got):\n%s", diff)
+			if len(tt.expectedActiveQ) > 0 {
+				if entity == nil || entity.PodGroup == nil {
+					t.Errorf("Expected PodGroup %s/%s in active queue hierarchy, but not found", tt.pgToUpdate.Namespace, tt.pgToUpdate.Name)
+				} else if diff := cmp.Diff(tt.pgToUpdate, entity.PodGroup); diff != "" {
+					t.Errorf("Updated PodGroup mismatch (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}
@@ -9174,6 +9317,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 		expectedActiveQ        map[string][]string
 		expectedIncompletePods []string
 		expectedPendingPods    []string
+		disableCPG             bool
 	}{
 		{
 			name: "Non-root when parent is root and is already in activeQ with another pod",
