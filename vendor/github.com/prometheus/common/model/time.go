@@ -123,44 +123,38 @@ func (t Time) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (t *Time) UnmarshalJSON(b []byte) error {
-	p := strings.Split(string(b), ".")
-	switch len(p) {
-	case 1:
-		v, err := strconv.ParseInt(p[0], 10, 64)
+	base, frac, found := strings.Cut(string(b), ".")
+	if !found {
+		v, err := strconv.ParseInt(base, 10, 64)
 		if err != nil {
 			return err
 		}
 		*t = Time(v * second)
-
-	case 2:
-		v, err := strconv.ParseInt(p[0], 10, 64)
+	} else {
+		v, err := strconv.ParseInt(base, 10, 64)
 		if err != nil {
 			return err
 		}
-		v *= second
 
-		prec := dotPrecision - len(p[1])
+		prec := dotPrecision - len(frac)
 		if prec < 0 {
-			p[1] = p[1][:dotPrecision]
-		} else if prec > 0 {
-			p[1] += strings.Repeat("0", prec)
+			frac = frac[:dotPrecision]
 		}
-
-		va, err := strconv.ParseInt(p[1], 10, 32)
+		va, err := strconv.ParseInt(frac, 10, 32)
 		if err != nil {
 			return err
 		}
-
-		// If the value was something like -0.1 the negative is lost in the
-		// parsing because of the leading zero, this ensures that we capture it.
-		if len(p[0]) > 0 && p[0][0] == '-' && v+va > 0 {
-			*t = Time(v+va) * -1
-		} else {
-			*t = Time(v + va)
+		switch prec {
+		case 1:
+			va *= 10
+		case 2:
+			va *= 100
 		}
 
-	default:
-		return fmt.Errorf("invalid time %q", string(b))
+		if len(base) > 0 && base[0] == '-' {
+			va = -va
+		}
+		*t = Time(v*second + va)
 	}
 	return nil
 }
@@ -340,12 +334,12 @@ func (d *Duration) UnmarshalText(text []byte) error {
 }
 
 // MarshalYAML implements the yaml.Marshaler interface.
-func (d Duration) MarshalYAML() (interface{}, error) {
+func (d Duration) MarshalYAML() (any, error) {
 	return d.String(), nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (d *Duration) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (d *Duration) UnmarshalYAML(unmarshal func(any) error) error {
 	var s string
 	if err := unmarshal(&s); err != nil {
 		return err
