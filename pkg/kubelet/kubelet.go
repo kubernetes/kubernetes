@@ -921,9 +921,13 @@ func NewMainKubelet(ctx context.Context,
 	klet.imageManager = imageManager
 
 	if kubeDeps.TLSOptions != nil {
-		kubeDeps.TLSConfig = &tls.Config{}
+		kubeDeps.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS13,
+		}
 
-		kubeDeps.TLSConfig.MinVersion = kubeDeps.TLSOptions.MinVersion
+		if kubeDeps.TLSOptions.MinVersion != 0 {
+			kubeDeps.TLSConfig.MinVersion = kubeDeps.TLSOptions.MinVersion
+		}
 		kubeDeps.TLSConfig.CipherSuites = kubeDeps.TLSOptions.CipherSuites
 		kubeDeps.TLSConfig.CurvePreferences = kubeDeps.TLSOptions.CurvePreferences
 
