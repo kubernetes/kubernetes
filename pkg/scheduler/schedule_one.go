@@ -1288,14 +1288,23 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 
 	msg := truncateMessage(errMsg)
 	podFwk.EventRecorder().WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
-	if err := updatePod(ctx, sched.client, podFwk.APICacher(), pod, &v1.PodCondition{
+	podCondition := &v1.PodCondition{
 		Type:               v1.PodScheduled,
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionFalse,
 		Reason:             reason,
 		Message:            errMsg,
-	}, nominatingInfo); err != nil {
+	}
+	if err := updatePod(ctx, sched.client, podFwk.APICacher(), pod, podCondition, nominatingInfo); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod", "pod", klog.KObj(pod))
+	} else {
+		// Optimistically apply the update to the local pod info.
+		// We only do this if the API call succeeded, ensuring our queued pod 
+		// matches the true API Server state.
+		podutil.UpdatePodCondition(&podInfo.Pod.Status, podCondition)
+		if nominatingInfo != nil && nominatingInfo.Mode() == fwk.ModeOverride {
+			podInfo.Pod.Status.NominatedNodeName = nominatingInfo.NominatedNodeName
+		}
 	}
 }
 
