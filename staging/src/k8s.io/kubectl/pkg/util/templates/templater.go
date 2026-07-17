@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-	"text/template"
+	"html/template"
 	"unicode"
 
 	"github.com/spf13/cobra"
