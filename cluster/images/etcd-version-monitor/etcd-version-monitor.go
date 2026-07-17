@@ -41,6 +41,8 @@ var (
 	etcdVersionScrapeURI string
 	etcdMetricsScrapeURI string
 	scrapeTimeout        time.Duration
+	tlsCertFile          string
+	tlsKeyFile           string
 )
 
 func registerFlags(fs *pflag.FlagSet) {
@@ -49,6 +51,8 @@ func registerFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&etcdVersionScrapeURI, "etcd-version-scrape-uri", "http://localhost:2379/version", "URI to scrape etcd version info")
 	fs.StringVar(&etcdMetricsScrapeURI, "etcd-metrics-scrape-uri", "http://localhost:2379/metrics", "URI to scrape etcd metrics")
 	fs.DurationVar(&scrapeTimeout, "scrape-timeout", 15*time.Second, "Timeout for trying to get stats from etcd")
+	fs.StringVar(&tlsCertFile, "tls-cert-file", "", "Path to the TLS certificate file")
+	fs.StringVar(&tlsKeyFile, "tls-private-key-file", "", "Path to the TLS private key file")
 }
 
 const (
@@ -400,5 +404,5 @@ func main() {
 	// Serve our metrics on listenAddress/metricsPath.
 	klog.Infof("Listening on: %v", listenAddress)
 	http.Handle(metricsPath, metrics.HandlerFor(gatherer, metrics.HandlerOpts{}))
-	klog.Errorf("Stopped listening/serving metrics: %v", http.ListenAndServe(listenAddress, nil))
+	klog.Errorf("Stopped listening/serving metrics: %v", http.ListenAndServeTLS(listenAddress, tlsCertFile, tlsKeyFile, nil))
 }
