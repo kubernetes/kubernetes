@@ -667,8 +667,6 @@ type PodGroupInfo interface {
 	GetNamespace() string
 	// GetType returns the type of the pod group.
 	GetType() EntityKeyType
-	// GetKey returns the key uniquely identifying the pod group.
-	GetKey() string
 	// GetPodGroup returns the PodGroup API object or nil if the group is a composite pod group.
 	GetPodGroup() *schedulingv1alpha3.PodGroup
 	// GetCompositePodGroup returns the associated composite pod group or nil if the group is not a composite pod group.
