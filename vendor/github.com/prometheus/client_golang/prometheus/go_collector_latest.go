@@ -98,7 +98,7 @@ type goCollector struct {
 	// snapshot is always produced by Collect.
 	mu sync.Mutex
 
-	// Contains all samples that has to retrieved from runtime/metrics (not all of them will be exposed).
+	// Contains all samples that have to be retrieved from runtime/metrics (not all of them will be exposed).
 	sampleBuf []metrics.Sample
 	// sampleMap allows lookup for MemStats metrics and runtime/metrics histograms for exact sums.
 	sampleMap map[string]*metrics.Sample
@@ -210,16 +210,26 @@ func NewGoCollector(opts ...func(o *internal.GoCollectorOptions)) Collector {
 		sampleBuf = append(sampleBuf, metrics.Sample{Name: d.Name})
 		sampleMap[d.Name] = &sampleBuf[len(sampleBuf)-1]
 
+		// Extract unit from the runtime/metrics name (e.g., "/gc/heap/allocs:bytes" -> "bytes")
+		// and sanitize to match Prometheus naming conventions (e.g., "cpu-seconds" -> "cpu_seconds")
+		var unit string
+		if idx := strings.IndexRune(d.Name, ':'); idx >= 0 {
+			unit = d.Name[idx+1:]
+			unit = strings.ReplaceAll(unit, "-", "_")
+			unit = strings.ReplaceAll(unit, "*", "_")
+			unit = strings.ReplaceAll(unit, "/", "_per_")
+		}
+
 		var m collectorMetric
 		if d.Kind == metrics.KindFloat64Histogram {
 			_, hasSum := opt.RuntimeMetricSumForHist[d.Name]
-			unit := d.Name[strings.IndexRune(d.Name, ':')+1:]
 			m = newBatchHistogram(
-				NewDesc(
+				V2.NewDesc(
 					BuildFQName(namespace, subsystem, name),
 					help,
+					UnconstrainedLabels(nil),
 					nil,
-					nil,
+					WithUnit(unit),
 				),
 				internal.RuntimeMetricsBucketsForUnit(bucketsMap[d.Name], unit),
 				hasSum,
@@ -230,6 +240,7 @@ func NewGoCollector(opts ...func(o *internal.GoCollectorOptions)) Collector {
 				Subsystem: subsystem,
 				Name:      name,
 				Help:      help,
+				Unit:      unit,
 			},
 			)
 		} else {
@@ -238,6 +249,7 @@ func NewGoCollector(opts ...func(o *internal.GoCollectorOptions)) Collector {
 				Subsystem: subsystem,
 				Name:      name,
 				Help:      help,
+				Unit:      unit,
 			})
 		}
 		metricSet = append(metricSet, m)

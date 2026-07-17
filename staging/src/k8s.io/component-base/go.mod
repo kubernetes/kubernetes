@@ -12,10 +12,10 @@ require (
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.7.0
 	github.com/moby/term v0.5.2
-	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/client_golang v1.24.0-rc.0
 	github.com/prometheus/client_model v0.6.2
-	github.com/prometheus/common v0.67.5
-	github.com/prometheus/procfs v0.19.2
+	github.com/prometheus/common v0.70.0
+	github.com/prometheus/procfs v0.21.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1

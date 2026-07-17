@@ -12,8 +12,6 @@
 // limitations under the License.
 
 //go:build (aix || darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris) && !js
-// +build aix darwin dragonfly freebsd linux netbsd openbsd solaris
-// +build !js
 
 package procfs
 
