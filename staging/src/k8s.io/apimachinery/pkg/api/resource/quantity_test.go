@@ -794,6 +794,26 @@ func TestQuantityString(t *testing.T) {
 	}
 }
 
+func TestQuantityStringBelowNano(t *testing.T) {
+	// DecimalSI has no suffix below "n" (10^-9), so these values take the same
+	// exponent-notation fallback as the >"E" cases above. They are not reachable
+	// from a parse (parsing rounds up to nano), only from Go callers such as
+	// NewScaledQuantity, which is why they are not in the TestQuantityString
+	// table: its round-trip checks require parse-stable strings.
+	table := []struct {
+		in     Quantity
+		expect string
+	}{
+		{decQuantity(1, -12, DecimalSI), "1e-12"},
+		{decQuantity(1, -10, DecimalSI), "100e-12"},
+	}
+	for _, item := range table {
+		if e, a := item.expect, item.in.String(); e != a {
+			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
+		}
+	}
+}
+
 func TestQuantityParseEmit(t *testing.T) {
 	table := []struct {
 		in     string
