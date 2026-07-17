@@ -43,6 +43,10 @@ const (
 	// PodGroupProtectionFinalizer is the finalizer added to PodGroups to prevent
 	// premature deletion while pods still reference them.
 	PodGroupProtectionFinalizer = GroupName + "/podgroup-protection"
+
+	// CompositePodGroupProtectionFinalizer is the finalizer added to CompositePodGroups to prevent
+	// premature deletion while child PodGroups or CompositePodGroups still reference them.
+	CompositePodGroupProtectionFinalizer = GroupName + "/compositepodgroup-protection"
 )
 
 // PreemptionPolicy describes a policy for if/when to preempt a pod/podgroup.
