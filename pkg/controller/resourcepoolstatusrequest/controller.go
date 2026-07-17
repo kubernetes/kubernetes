@@ -367,7 +367,6 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		devices         []deviceRecord
 		sharedCounters  []resourcev1.CounterSet
 		partitionValues map[string]struct{} // distinct PartitionTypeAttribute values across slices
-		slicesWithAttr  int32               // slices that declared PartitionTypeAttribute
 	}
 
 	slices, err := c.sliceLister.List(labels.Everything())
@@ -465,7 +464,6 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		info.sharedCounters = append(info.sharedCounters, slice.Spec.SharedCounters...)
 		if slice.Spec.PartitionTypeAttribute != nil {
 			info.partitionValues[string(*slice.Spec.PartitionTypeAttribute)] = struct{}{}
-			info.slicesWithAttr++
 		}
 	}
 
@@ -561,7 +559,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				inUse:            inUse,
 				consumedCapacity: consumedCapacity[key],
 			}
-			resolvePartitionAttribute(request.Spec.PartitionTypeAttribute, info.partitionValues, info.slicesWithAttr, info.sliceCount, &viewInput)
+			resolvePartitionAttribute(request.Spec.PartitionTypeAttribute, info.partitionValues, &viewInput)
 
 			partitionSummary, shareable, viewErr := computePoolViews(viewInput)
 			pool.PartitionSummary = partitionSummary

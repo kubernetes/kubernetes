@@ -211,9 +211,12 @@ var sliceWithListTypeAttributes = func() *resource.ResourceSlice {
 	return obj
 }()
 
+// The attribute is only permitted on a slice whose devices consume counters,
+// and each of them must carry it as a string. The bare "version" key qualifies
+// with the driver's own domain.
 var sliceWithPartitionTypeAttribute = func() *resource.ResourceSlice {
-	obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
-	obj.Spec.PartitionTypeAttribute = ptr.To(resource.FullyQualifiedName("gpu.example.com/profile"))
+	obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+	obj.Spec.PartitionTypeAttribute = ptr.To(resource.FullyQualifiedName("testdriver.example.com/version"))
 	return obj
 }()
 
@@ -422,7 +425,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			obj:              sliceWithPartitionTypeAttribute,
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: false},
 			expectObj: func() *resource.ResourceSlice {
-				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
 				obj.Generation = 1
 				return obj
 			}(),

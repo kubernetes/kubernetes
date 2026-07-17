@@ -121,17 +121,19 @@ type poolViewInput struct {
 
 // resolvePartitionAttribute settles the pool's grouping attribute and, when
 // consistent, resolves each device's partition type. The driver's slice
-// declaration takes precedence; differing values, or a value on some but not
-// all slices, is a conflict. The request's attribute is only a fallback for
-// drivers that have not been updated to declare one.
-func resolvePartitionAttribute(requestAttr *string, values map[string]struct{}, slicesWithAttr, sliceCount int32, in *poolViewInput) {
+// declaration takes precedence; slices declaring differing values are a
+// conflict. Slices declaring none stay silent: the attribute is only permitted
+// on slices carrying devices that consume counters, so a pool's counter and
+// plain-device slices legitimately omit it. The request's attribute is only a
+// fallback for drivers that have not been updated to declare one.
+func resolvePartitionAttribute(requestAttr *string, values map[string]struct{}, in *poolViewInput) {
 	switch {
-	case len(values) == 1 && slicesWithAttr == sliceCount:
+	case len(values) == 1:
 		for v := range values {
 			in.partitionAttr = v
 		}
 		in.hasPartitionAttr = true
-	case len(values) > 0:
+	case len(values) > 1:
 		in.hasPartitionAttr = true
 		in.partitionAttrConflict = true
 		return

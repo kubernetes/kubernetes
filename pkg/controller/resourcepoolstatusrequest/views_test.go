@@ -374,6 +374,64 @@ func TestComputePoolViews_AttributeConflict(t *testing.T) {
 	}
 }
 
+func TestResolvePartitionAttribute(t *testing.T) {
+	const attr = "gpu.example.com/profile"
+	values := func(vs ...string) map[string]struct{} {
+		m := make(map[string]struct{}, len(vs))
+		for _, v := range vs {
+			m[v] = struct{}{}
+		}
+		return m
+	}
+	testCases := map[string]struct {
+		requestAttr  *string
+		values       map[string]struct{}
+		wantAttr     string
+		wantHas      bool
+		wantConflict bool
+	}{
+		// The attribute is only permitted on slices whose devices consume
+		// counters, so a pool's counter and plain-device slices declare
+		// nothing and must not read as a conflict.
+		"declared by only some slices": {
+			values:   values(attr),
+			wantAttr: attr,
+			wantHas:  true,
+		},
+		"declared with differing values": {
+			values:       values(attr, "gpu.example.com/other"),
+			wantHas:      true,
+			wantConflict: true,
+		},
+		"undeclared falls back to the request": {
+			requestAttr: ptr.To(attr),
+			values:      values(),
+			wantAttr:    attr,
+			wantHas:     true,
+		},
+		"pool declaration beats the request default": {
+			requestAttr: ptr.To("gpu.example.com/other"),
+			values:      values(attr),
+			wantAttr:    attr,
+			wantHas:     true,
+		},
+		"neither names one": {
+			values: values(),
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			in := poolViewInput{driver: "gpu.example.com", poolName: "p"}
+			resolvePartitionAttribute(tc.requestAttr, tc.values, &in)
+			if in.partitionAttr != tc.wantAttr || in.hasPartitionAttr != tc.wantHas || in.partitionAttrConflict != tc.wantConflict {
+				t.Errorf("got attr=%q has=%v conflict=%v, want attr=%q has=%v conflict=%v",
+					in.partitionAttr, in.hasPartitionAttr, in.partitionAttrConflict,
+					tc.wantAttr, tc.wantHas, tc.wantConflict)
+			}
+		})
+	}
+}
+
 func TestResolvePartitionType(t *testing.T) {
 	attrs := map[resourcev1.QualifiedName]resourcev1.DeviceAttribute{
 		"profile":                     {StringValue: ptr.To("Full")},

@@ -430,7 +430,7 @@ type ResourcePoolStatusRequestSpec struct {
 	// qualified name, e.g. "gpu.example.com/profile") to use as the default
 	// grouping attribute for pools which have not declared one themselves.
 	//
-	// A pool's own PartitionTypeAttribute always takes precedence. This default
+	// A slice's own PartitionTypeAttribute always takes precedence. This default
 	// applies only to pools whose slices do not declare one, so that a request
 	// can still get an accurate partitionSummary from a driver that has not
 	// been updated to declare it. When neither the pool nor this default names

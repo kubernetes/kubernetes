@@ -264,20 +264,58 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		// "string" is a bare key, so it qualifies with the driver's own domain.
 		"good-partition-type-attribute": {
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
-				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName("gpu.example.com/profile"))
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/string"))
+				return slice
+			}(),
+		},
+		// Devices which consume no counters need not carry the attribute.
+		"good-partition-type-attribute-with-exempt-device": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 2)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.Devices[1].Attributes = nil
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/string"))
 				return slice
 			}(),
 		},
 		// The name format is validated declaratively; see the declarative
 		// validation tests for that coverage.
-		"partition-type-attribute-without-devices-or-counters": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), resourceapi.FullyQualifiedName("gpu.example.com/profile"), "may only be set on a slice that declares devices or shared counters")},
+		"partition-type-attribute-without-partitionable-devices": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), driverName+"/string", "may only be set on a slice which declares devices that consume counters")},
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, driverName, 0)
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/string"))
+				return slice
+			}(),
+		},
+		"partition-type-attribute-on-shared-counters-slice": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), driverName+"/string", "may only be set on a slice which declares devices that consume counters")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/string"))
+				return slice
+			}(),
+		},
+		"partition-type-attribute-missing-on-partitionable-device": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("gpu.example.com/profile"), "device consumes counters and `partitionTypeAttribute` names this attribute, so it must be set")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
 				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName("gpu.example.com/profile"))
+				return slice
+			}(),
+		},
+		"partition-type-attribute-not-a-string": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key(driverName+"/int"), resourceapi.DeviceAttribute{IntValue: ptr.To(int64(42))}, "must be a string value because `partitionTypeAttribute` names this attribute")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/int"))
 				return slice
 			}(),
 		},

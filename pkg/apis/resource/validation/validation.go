@@ -742,13 +742,64 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 
 	// The name format is validated declaratively; see the field's tags.
 	if spec.PartitionTypeAttribute != nil {
-		if len(spec.Devices) == 0 && len(spec.SharedCounters) == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("partitionTypeAttribute"), *spec.PartitionTypeAttribute,
-				"may only be set on a slice that declares devices or shared counters"))
+		allErrs = append(allErrs, validatePartitionTypeAttribute(spec, fldPath)...)
+	}
+
+	return allErrs
+}
+
+// validatePartitionTypeAttribute checks that a slice naming a partition type
+// attribute declares devices which consume counters, and that each of those
+// devices carries the attribute as a string. Devices which consume no counters
+// are exempt and may appear alongside them.
+func validatePartitionTypeAttribute(spec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	name := string(*spec.PartitionTypeAttribute)
+
+	if !haveConsumesCounters(spec) {
+		return append(allErrs, field.Invalid(fldPath.Child("partitionTypeAttribute"), name,
+			"may only be set on a slice which declares devices that consume counters"))
+	}
+
+	// A malformed name is reported declaratively; no device can carry it, so
+	// checking each of them would only bury that one error.
+	if len(validateFullyQualifiedName(*spec.PartitionTypeAttribute, nil)) > 0 {
+		return allErrs
+	}
+
+	for i, device := range spec.Devices {
+		if len(device.ConsumesCounters) == 0 {
+			continue
+		}
+		attrPath := fldPath.Child("devices").Index(i).Child("attributes").Key(name)
+		attribute, ok := lookupQualifiedAttribute(device.Attributes, spec.Driver, name)
+		if !ok {
+			allErrs = append(allErrs, field.Required(attrPath,
+				"device consumes counters and `partitionTypeAttribute` names this attribute, so it must be set"))
+			continue
+		}
+		if attribute.StringValue == nil {
+			allErrs = append(allErrs, field.Invalid(attrPath, attribute,
+				"must be a string value because `partitionTypeAttribute` names this attribute"))
 		}
 	}
 
 	return allErrs
+}
+
+// lookupQualifiedAttribute finds a device attribute by its fully qualified
+// name. Keys which carry no domain are qualified with the driver's own domain.
+func lookupQualifiedAttribute(attributes map[resource.QualifiedName]resource.DeviceAttribute, driver, name string) (resource.DeviceAttribute, bool) {
+	for key, attribute := range attributes {
+		qualified := string(key)
+		if !strings.Contains(qualified, "/") {
+			qualified = driver + "/" + qualified
+		}
+		if qualified == name {
+			return attribute, true
+		}
+	}
+	return resource.DeviceAttribute{}, false
 }
 
 func haveListAttributes(spec *resource.ResourceSliceSpec) bool {

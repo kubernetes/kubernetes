@@ -270,13 +270,22 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "").MarkBeta(),
 					},
 				},
-				// spec.partitionTypeAttribute
+				// spec.partitionTypeAttribute. The field is only permitted on a
+				// slice whose devices consume counters, and those devices must
+				// carry the named attribute as a string.
 				"valid: partitionTypeAttribute": {
-					input:                   mkResourceSliceWithDevices(tweakPartitionTypeAttribute("gpu.example.com/profile")),
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakDeviceAttribute("gpu.example.com/profile", resource.DeviceAttribute{StringValue: ptr.To("Full")}),
+						tweakPartitionTypeAttribute("gpu.example.com/profile"),
+					),
 					enablePartitionTypeAttr: true,
 				},
 				"invalid: partitionTypeAttribute format": {
-					input:                   mkResourceSliceWithDevices(tweakPartitionTypeAttribute("invalid attr!")),
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakPartitionTypeAttribute("invalid attr!"),
+					),
 					enablePartitionTypeAttr: true,
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
@@ -285,14 +294,21 @@ func TestDeclarativeValidate(t *testing.T) {
 				// A bare name is a valid attribute key but not a valid reference:
 				// the domain is required so the attribute is unambiguous.
 				"invalid: partitionTypeAttribute without domain": {
-					input:                   mkResourceSliceWithDevices(tweakPartitionTypeAttribute("profile")),
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakPartitionTypeAttribute("profile"),
+					),
 					enablePartitionTypeAttr: true,
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
 					},
 				},
 				"invalid: partitionTypeAttribute with feature disabled": {
-					input: mkResourceSliceWithDevices(tweakPartitionTypeAttribute("gpu.example.com/profile")),
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakDeviceAttribute("gpu.example.com/profile", resource.DeviceAttribute{StringValue: ptr.To("Full")}),
+						tweakPartitionTypeAttribute("gpu.example.com/profile"),
+					),
 					expectedErrs: field.ErrorList{
 						field.Forbidden(field.NewPath("spec", "partitionTypeAttribute"), ""),
 					},
