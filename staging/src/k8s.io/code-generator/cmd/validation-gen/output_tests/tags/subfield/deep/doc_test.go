@@ -23,6 +23,10 @@ import (
 func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
+	st.Value(&Struct{}).ExpectValidateFalseByPath(map[string][]string{
+		"structField.structField.stringField": {"Struct.StructField.StructField 1", "Struct.StructField.StructField 2"},
+	})
+
 	st.Value(&Struct{
 		StructField: OtherStruct{
 			StructField: SmallStruct{StringField: "SF"},
