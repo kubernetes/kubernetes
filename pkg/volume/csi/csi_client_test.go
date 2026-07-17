@@ -117,24 +117,8 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 
 	metrics := &volume.Metrics{}
 
-	isSupportNodeVolumeCondition, err := c.NodeSupportsVolumeHealth(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && isSupportNodeVolumeCondition {
-		conditions, err := c.NodeGetVolumeHealth(ctx, volID, "", targetPath)
-		if err != nil {
-			return nil, err
-		}
-		if len(conditions) > 0 {
-			message := conditions[0].Message
-			metrics.Abnormal, metrics.Message = new(true), &message
-		}
-	}
-
 	usages := resp.GetUsage()
-	if !isSupportNodeVolumeCondition && usages == nil {
+	if usages == nil {
 		return nil, errors.New("volume usage is nil")
 	}
 	for _, usage := range usages {
@@ -947,7 +931,7 @@ func TestVolumeHealthEnable(t *testing.T) {
 				VolumeID:        "volume1",
 				DeviceMountPath: "/foo/bar",
 			},
-			success: true,
+			success: false,
 		},
 		{
 			name:            "when nodeVolumeStats=on, volumeStatsSet=off, setVolumeStat=off, volumeHealth=off, setVolumeHealth=off",
@@ -968,22 +952,12 @@ func TestVolumeHealthEnable(t *testing.T) {
 			defer cancel()
 			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
 			csClient := setupClientWithVolumeStatsAndHealth(t, tc.volumeStatsSet, tc.volumeHealthSet, tc.setVolumeStat, tc.setVolumeHealth)
-			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
 			if err != nil && tc.success {
 				t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
 			}
-			if tc.success {
-				if metrics == nil {
-					t.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", tc.volumeData.VolumeID)
-				} else {
-					if tc.volumeHealthSet {
-						assert.NotNil(t, metrics.Abnormal)
-						assert.NotNil(t, metrics.Message)
-					} else {
-						assert.Nil(t, metrics.Abnormal)
-						assert.Nil(t, metrics.Message)
-					}
-				}
+			if err == nil && !tc.success {
+				t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
 			}
 		})
 	}
@@ -1015,16 +989,9 @@ func TestVolumeHealthDisable(t *testing.T) {
 			defer cancel()
 			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
 			csClient := setupClientWithVolumeStatsAndHealth(t, tc.volumeStatsSet, false, true, false)
-			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
 			if tc.success {
 				assert.NoError(t, err)
-			}
-
-			if metrics == nil {
-				t.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", tc.volumeData.VolumeID)
-			} else {
-				assert.Nil(t, metrics.Abnormal)
-				assert.Nil(t, metrics.Message)
 			}
 		})
 	}

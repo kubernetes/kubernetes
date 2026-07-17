@@ -33,9 +33,7 @@ import (
 	api "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -641,32 +639,8 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 		InodesFree: resource.NewQuantity(int64(0), resource.BinarySI),
 	}
 
-	var isSupportNodeVolumeCondition bool
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
-		isSupportNodeVolumeCondition, err = c.NodeSupportsVolumeHealth(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		if isSupportNodeVolumeCondition {
-			// Keep the legacy Abnormal/Message path for volume stats / events
-			// until callers migrate to the dedicated NodeGetVolumeHealth API.
-			conditions, err := c.NodeGetVolumeHealth(ctx, volID, "", targetPath)
-			if err != nil {
-				return nil, err
-			}
-			if len(conditions) > 0 {
-				message := conditions[0].Message
-				metrics.Abnormal, metrics.Message = new(true), &message
-			} else {
-				metrics.Abnormal = new(false)
-			}
-		}
-	}
-
 	usages := resp.GetUsage()
-	// If the driver does not support volume health and usages is nil, return an error
-	if !isSupportNodeVolumeCondition && usages == nil {
+	if usages == nil {
 		return nil, fmt.Errorf("failed to get usage from response. usage is nil")
 	}
 

@@ -30,9 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
@@ -133,25 +131,8 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 				if test.nodeVolumeHealthRequired {
 					pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "get running pod")
-					grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, nil, f.ClientConfig(), true, false, false, false, false, false)
-					framework.ExpectNoError(err, "creating the metrics grabber")
-					waitErr := wait.PollUntilContextTimeout(ctx, 30*time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
-						framework.Logf("Grabbing Kubelet metrics")
-						var err error
-						kubeMetrics, err := grabber.GrabFromKubelet(ctx, pod.Spec.NodeName)
-						if err != nil {
-							framework.Logf("Error fetching kubelet metrics err: %v", err)
-							return false, err
-						}
-						if !findVolumeHealthMetrics(f.Namespace.Name, claim.Name, kubeMetrics, test.nodeAbnormalVolumeHealth) {
-							return false, nil
-						}
-						return true, nil
-					})
-					framework.ExpectNoError(waitErr, "call metrics should not have any error")
 
-					// Also verify kubelet wrote pod.status.volumeHealth from NodeGetVolumeHealth.
-					waitErr = wait.PollUntilContextTimeout(ctx, 5*time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
+					waitErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
 						updated, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 						if err != nil {
 							return false, err
@@ -228,32 +209,6 @@ func podVolumeHealthMatches(pod *v1.Pod, abnormal bool) bool {
 		}
 	}
 	return false
-}
-
-func findVolumeHealthMetrics(pvcNamespace, pvcName string, kubeMetrics e2emetrics.KubeletMetrics, nodeAbnormalVolumeHealth bool) bool {
-	found := false
-	framework.Logf("Looking for sample tagged with namespace `%s`, PVC `%s`", pvcNamespace, pvcName)
-	for key, value := range kubeMetrics {
-		for _, sample := range value {
-			framework.Logf("Found sample %++v with key: %s", sample, key)
-			samplePVC, ok := sample.Metric["persistentvolumeclaim"]
-			if !ok {
-				break
-			}
-			sampleNS, ok := sample.Metric["namespace"]
-			if !ok {
-				break
-			}
-
-			if string(samplePVC) == pvcName && string(sampleNS) == pvcNamespace && strings.Contains(key, kubeletmetrics.VolumeStatsHealthStatusAbnormalKey) {
-				if (nodeAbnormalVolumeHealth && sample.Value.String() == "1") || (!nodeAbnormalVolumeHealth && sample.Value.String() == "0") {
-					found = true
-					break
-				}
-			}
-		}
-	}
-	return found
 }
 
 func createVolumeHealthHook(abnormalVolumeHealth bool) *drivers.Hooks {

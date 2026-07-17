@@ -4860,17 +4860,6 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: kubelet_volume_stats_health_status_abnormal
-  help: Abnormal volume health status. The count is either 1 or 0. 1 indicates the
-    volume is unhealthy, 0 indicates volume is healthy
-  type: Custom
-  stabilityLevel: ALPHA
-  labels:
-  - namespace
-  - persistentvolumeclaim
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
 - name: kubelet_volume_stats_inodes
   help: Maximum number of inodes in the volume
   type: Custom
