@@ -153,6 +153,13 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			func() { // cohort = "structField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
 					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
