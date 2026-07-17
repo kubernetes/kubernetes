@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // StatefulSetValidationOptions is a struct that can be passed to ValidateStatefulSetSpec to record the validate options
@@ -138,7 +137,29 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("podManagementPolicy"), spec.PodManagementPolicy, fmt.Sprintf("must be '%s' or '%s'", apps.OrderedReadyPodManagement, apps.ParallelPodManagement)))
 	}
 
-	allErrs = append(allErrs, ValidateStatefulSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"), setOpts.AllowStatefulSetRecreateStrategy)...)
+	strategy := spec.UpdateStrategy
+	switch {
+	case strategy.Type == "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), ""))
+	case strategy.Type == apps.OnDeleteStatefulSetStrategyType:
+		if strategy.RollingUpdate != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate"), strategy.RollingUpdate, fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
+		}
+	case strategy.Type == apps.RollingUpdateStatefulSetStrategyType:
+		if strategy.RollingUpdate != nil {
+			allErrs = append(allErrs, validateRollingUpdateStatefulSet(strategy.RollingUpdate, fldPath.Child("updateStrategy", "rollingUpdate"))...)
+		}
+	case strategy.Type == apps.RecreateStatefulSetStrategyType && setOpts.AllowStatefulSetRecreateStrategy:
+		if strategy.RollingUpdate != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate"), strategy.RollingUpdate, fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
+		}
+	default:
+		validValues := fmt.Sprintf("must be '%s' or '%s'", apps.RollingUpdateStatefulSetStrategyType, apps.OnDeleteStatefulSetStrategyType)
+		if setOpts.AllowStatefulSetRecreateStrategy {
+			validValues = fmt.Sprintf("must be '%s', '%s', or '%s'", apps.RollingUpdateStatefulSetStrategyType, apps.OnDeleteStatefulSetStrategyType, apps.RecreateStatefulSetStrategyType)
+		}
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("updateStrategy"), strategy, validValues))
+	}
 
 	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(spec.PersistentVolumeClaimRetentionPolicy, fldPath.Child("persistentVolumeClaimRetentionPolicy"))...)
 	if !setOpts.SkipValidateVolumeClaimTemplates {
@@ -204,39 +225,6 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 	return allErrs
 }
 
-// ValidateStatefulSetUpdateStrategy validates given StatefulSetUpdateStrategy.
-func ValidateStatefulSetUpdateStrategy(strategy *apps.StatefulSetUpdateStrategy, fldPath *field.Path, allowStatefulSetRecreateStrategy bool) field.ErrorList {
-	var allErrs field.ErrorList
-
-	switch strategy.Type {
-	case "":
-		allErrs = append(allErrs, field.Required(fldPath, ""))
-	case apps.OnDeleteStatefulSetStrategyType:
-		if strategy.RollingUpdate != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("rollingUpdate"), strategy.RollingUpdate, fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
-		}
-	case apps.RollingUpdateStatefulSetStrategyType:
-		if strategy.RollingUpdate != nil {
-			allErrs = append(allErrs, validateRollingUpdateStatefulSet(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
-		}
-	case apps.RecreateStatefulSetStrategyType:
-		if !allowStatefulSetRecreateStrategy {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("type"), fmt.Sprintf("%s updateStrategy type is forbidden when feature gate %s is disabled", apps.RecreateStatefulSetStrategyType, features.StatefulSetRecreateStrategy)))
-		}
-		if strategy.RollingUpdate != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("rollingUpdate"), strategy.RollingUpdate, fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
-		}
-	default:
-		validValues := fmt.Sprintf("must be '%s' or '%s'", apps.RollingUpdateStatefulSetStrategyType, apps.OnDeleteStatefulSetStrategyType)
-		if allowStatefulSetRecreateStrategy {
-			validValues = fmt.Sprintf("must be '%s', '%s', or '%s'", apps.RollingUpdateStatefulSetStrategyType, apps.OnDeleteStatefulSetStrategyType, apps.RecreateStatefulSetStrategyType)
-		}
-		allErrs = append(allErrs, field.Invalid(fldPath, strategy, validValues))
-	}
-
-	return allErrs
-}
-
 // ValidateStatefulSet validates a StatefulSet.
 func ValidateStatefulSet(statefulSet *apps.StatefulSet, setOpts StatefulSetValidationOptions, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&statefulSet.ObjectMeta, true, ValidateStatefulSetName, field.NewPath("metadata"))
@@ -265,14 +253,6 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, se
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(statefulSet.Spec.VolumeClaimTemplates, oldStatefulSet.Spec.VolumeClaimTemplates, specPath.Child("volumeClaimTemplates")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(statefulSet.Spec.ServiceName, oldStatefulSet.Spec.ServiceName, specPath.Child("serviceName")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(statefulSet.Spec.PodManagementPolicy, oldStatefulSet.Spec.PodManagementPolicy, specPath.Child("podManagementPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-
-	if setOpts.AllowStatefulSetRecreateStrategy {
-		oldStrategy := oldStatefulSet.Spec.UpdateStrategy.Type
-		newStrategy := statefulSet.Spec.UpdateStrategy.Type
-		if oldStrategy == apps.RecreateStatefulSetStrategyType && newStrategy != apps.RecreateStatefulSetStrategyType {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("updateStrategy").Child("type"), "switching from Recreate strategy is not allowed"))
-		}
-	}
 
 	return allErrs
 }

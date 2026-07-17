@@ -454,7 +454,7 @@ func TestStatefulSetStrategy_RecreateStrategy_Validate(t *testing.T) {
 			enableRecreateStrategyFG: false,
 			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
 			wantErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+				field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
 			},
 		},
 	}
@@ -501,7 +501,7 @@ func TestStatefulSetStrategy_RecreateStrategy_ValidateUpdate(t *testing.T) {
 				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
 			},
 			wantErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+				field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
 			},
 		},
 		"OnDelete to Recreate, RecreateFG on - allowed": {
@@ -520,7 +520,7 @@ func TestStatefulSetStrategy_RecreateStrategy_ValidateUpdate(t *testing.T) {
 				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
 			},
 			wantErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+				field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
 			},
 		},
 		"Recreate to Recreate, RecreateFG off - allowed": {
@@ -539,48 +539,36 @@ func TestStatefulSetStrategy_RecreateStrategy_ValidateUpdate(t *testing.T) {
 				ss.Spec.UpdateStrategy.Type = apps.RecreateStatefulSetStrategyType
 			},
 		},
-		"Recreate to RollingUpdate, RecreateFG on - forbidden": {
+		"Recreate to RollingUpdate, RecreateFG on - allowed": {
 			enableRecreateStrategyFG: true,
 			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
 			update: func(ss *apps.StatefulSet) {
 				ss.ObjectMeta.ResourceVersion = "1"
 				ss.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
 			},
-			wantErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-			},
 		},
-		"Recreate to RollingUpdate, RecreateFG off - forbidden": {
+		"Recreate to RollingUpdate, RecreateFG off - allowed": {
 			enableRecreateStrategyFG: false,
 			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
 			update: func(ss *apps.StatefulSet) {
 				ss.ObjectMeta.ResourceVersion = "1"
 				ss.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
 			},
-			wantErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-			},
 		},
-		"Recreate to OnDelete, RecreateFG on - forbidden": {
+		"Recreate to OnDelete, RecreateFG on - allowed": {
 			enableRecreateStrategyFG: true,
 			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
 			update: func(ss *apps.StatefulSet) {
 				ss.ObjectMeta.ResourceVersion = "1"
 				ss.Spec.UpdateStrategy.Type = apps.OnDeleteStatefulSetStrategyType
 			},
-			wantErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-			},
 		},
-		"Recreate to OnDelete, RecreateFG off - forbidden": {
+		"Recreate to OnDelete, RecreateFG off - allowed": {
 			enableRecreateStrategyFG: false,
 			set:                      makeValidStatefulSetWithUpdateStrategy(apps.RecreateStatefulSetStrategyType),
 			update: func(ss *apps.StatefulSet) {
 				ss.ObjectMeta.ResourceVersion = "1"
 				ss.Spec.UpdateStrategy.Type = apps.OnDeleteStatefulSetStrategyType
-			},
-			wantErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
 			},
 		},
 	}

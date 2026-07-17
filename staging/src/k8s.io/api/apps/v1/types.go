@@ -117,9 +117,8 @@ const (
 	// deleted and fully terminated before any new-revision pods are created.
 	// This ensures that old and new revision Pods never run at the same time.
 	// This is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
-	// During alpha, switching to the Recreate strategy is allowed when the feature
-	// gate is enabled, but switching away from it to a different update strategy
-	// is not yet supported.
+	// Switching to the Recreate strategy is allowed when the feature gate is enabled,
+	// and switching away from it to a different update strategy is also allowed.
 	//
 	// +featureGate=StatefulSetRecreateStrategy
 	RecreateStatefulSetStrategyType StatefulSetUpdateStrategyType = "Recreate"

@@ -819,7 +819,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
 		),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+			field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
 		},
 	}, {
 		name: "invalid rolling update config with recreate strategy",
@@ -1289,6 +1289,42 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
 		),
 		recreateStrategyFG: true,
+	}, {
+		name: "switch from Recreate to RollingUpdate, RecreateFG on",
+		old: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
+		),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+		),
+		recreateStrategyFG: true,
+	}, {
+		name: "switch from Recreate to RollingUpdate, RecreateFG off",
+		old: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
+		),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+		),
+		recreateStrategyFG: false,
+	}, {
+		name: "switch from Recreate to OnDelete, RecreateFG on",
+		old: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
+		),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
+		),
+		recreateStrategyFG: true,
+	}, {
+		name: "switch from Recreate to OnDelete, RecreateFG off",
+		old: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
+		),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
+		),
+		recreateStrategyFG: false,
 	},
 	}
 
@@ -1378,54 +1414,6 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			field.Required(field.NewPath("spec", "template", "spec", "containers"), ""),
 		},
 	}, {
-		name: "switch from Recreate to RollingUpdate, RecreateFG on",
-		old: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
-		),
-		update: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
-		),
-		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-		},
-		recreateStrategyFG: true,
-	}, {
-		name: "switch from Recreate to RollingUpdate, RecreateFG off",
-		old: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
-		),
-		update: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
-		),
-		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-		},
-		recreateStrategyFG: false,
-	}, {
-		name: "switch from Recreate to OnDelete, RecreateFG on",
-		old: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
-		),
-		update: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
-		),
-		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-		},
-		recreateStrategyFG: true,
-	}, {
-		name: "switch from Recreate to OnDelete, RecreateFG off",
-		old: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
-		),
-		update: mkStatefulSet(&validPodTemplate,
-			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
-		),
-		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
-		},
-		recreateStrategyFG: false,
-	}, {
 		name: "switch from RollingUpdate to Recreate, RecreateFG off",
 		old: mkStatefulSet(&validPodTemplate,
 			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
@@ -1434,7 +1422,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
 		),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+			field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
 		},
 		recreateStrategyFG: false,
 	}, {
@@ -1446,7 +1434,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			tweakUpdateStrategyType(apps.RecreateStatefulSetStrategyType),
 		),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec", "updateStrategy", "type"), ""),
+			field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
 		},
 		recreateStrategyFG: false,
 	},
