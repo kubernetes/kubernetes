@@ -884,6 +884,9 @@ message ObjectMeta {
   // and services.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:eachKey=+k8s:format=k8s-label-key
+  // +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:format=k8s-label-value
   map<string, string> labels = 11;
 
   // Annotations is an unstructured key value map stored with a resource that may be
@@ -921,6 +924,8 @@ message ObjectMeta {
   // +optional
   // +patchStrategy=merge
   // +listType=set
+  // +k8s:alpha(since:"1.37")=+k8s:optional
+  // +k8s:alpha(since:"1.37")=+k8s:eachVal=+k8s:format=k8s-label-key
   repeated string finalizers = 14;
 
   // ManagedFields maps workflow-id and version to the set of fields

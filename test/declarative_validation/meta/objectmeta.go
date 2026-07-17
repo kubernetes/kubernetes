@@ -65,6 +65,10 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("labels").String()) + `\[.*\]`),
 			Replacement: fldPath.Child("labels").String(),
 		},
+		field.NormalizationRule{
+			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("finalizers").String()) + `\[.*\]`),
+			Replacement: fldPath.Child("finalizers").String(),
+		},
 	))
 	trueVar := true
 
@@ -239,7 +243,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				meta.SetFinalizers([]string{"invalid/format/slash"})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
+				field.Invalid(fldPath.Child("finalizers"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -249,7 +253,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			},
 			ExpectedErrs: func() field.ErrorList {
 				errs := field.ErrorList{
-					field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
+					field.Invalid(fldPath.Child("finalizers"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				}
 				if o.stringentFinalizerValidation {
 					errs = append(errs, field.Invalid(fldPath.Child("finalizers").Index(0), strings.Repeat("a", 317), "name is neither a standard finalizer name nor is it fully qualified").MarkFromImperative())
@@ -460,6 +464,10 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("labels").String()) + `\[.*\]`),
 			Replacement: fldPath.Child("labels").String(),
 		},
+		field.NormalizationRule{
+			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("finalizers").String()) + `\[.*\]`),
+			Replacement: fldPath.Child("finalizers").String(),
+		},
 	))
 	t1 := metav1.NewTime(time.Unix(1000, 0).UTC())
 	t2 := metav1.NewTime(time.Unix(2000, 0).UTC())
@@ -608,7 +616,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			},
 			ExpectedErrs: func() field.ErrorList {
 				errs := field.ErrorList{
-					field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
+					field.Invalid(fldPath.Child("finalizers"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				}
 				if o.stringentFinalizerValidation {
 					errs = append(errs, field.Invalid(fldPath.Child("finalizers").Index(0), strings.Repeat("a", 317), "name is neither a standard finalizer name nor is it fully qualified").MarkFromImperative())

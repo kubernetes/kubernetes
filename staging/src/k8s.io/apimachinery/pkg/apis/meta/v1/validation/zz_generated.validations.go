@@ -475,7 +475,36 @@ func Validate_ObjectMeta(
 		errs = append(errs, fn(fldPath.Child("ownerReferences"), obj.OwnerReferences, oldVal, oldObj != nil)...)
 	}
 
-	// field v1.ObjectMeta.Finalizers has no validation
+	{ // field v1.ObjectMeta.Finalizers
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.LabelKey).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *v1.ObjectMeta) []string {
+				return oldObj.Finalizers
+			})
+		errs = append(errs, fn(fldPath.Child("finalizers"), obj.Finalizers, oldVal, oldObj != nil)...)
+	}
 
 	{ // field v1.ObjectMeta.ManagedFields
 		fn := func(

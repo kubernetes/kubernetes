@@ -289,6 +289,8 @@ type ObjectMeta struct {
 	// +optional
 	// +patchStrategy=merge
 	// +listType=set
+	// +k8s:alpha(since:"1.37")=+k8s:optional
+	// +k8s:alpha(since:"1.37")=+k8s:eachVal=+k8s:format=k8s-label-key
 	Finalizers []string `json:"finalizers,omitempty" patchStrategy:"merge" protobuf:"bytes,14,rep,name=finalizers"`
 
 	// Tombstone: ClusterName was a legacy field that was always cleared by

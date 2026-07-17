@@ -118,10 +118,10 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 func ValidateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(stringValue) {
-		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg).WithOrigin("format=k8s-label-key"))
 	}
 
-	return allErrs
+	return allErrs.MarkCoveredByDeclarative()
 }
 
 // ValidateNoNewFinalizers validates the new finalizers has no new finalizers compare to old finalizers.
@@ -162,6 +162,10 @@ func ValidateObjectMetaDeclaratively(ctx context.Context, op operation.Type, obj
 		{
 			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("labels").String()) + `\[.*\]`),
 			Replacement: fldPath.Child("labels").String(),
+		},
+		{
+			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("finalizers").String()) + `\[.*\]`),
+			Replacement: fldPath.Child("finalizers").String(),
 		},
 	}
 	errs = validate.FilterCoveredHandwrittenErrors(ctx, errs, enforcedDVErrs, betaEnabled, rules...)

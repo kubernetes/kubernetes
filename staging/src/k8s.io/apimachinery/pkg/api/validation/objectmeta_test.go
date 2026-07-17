@@ -767,6 +767,14 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.Invalid(fldPath.Child("labels"), strings.Repeat("a", 64), "").WithOrigin("format=k8s-label-value").MarkAlpha(),
 			},
 		},
+		{
+			name:              "invalid finalizer format",
+			obj:               mkMeta(tweakFinalizers([]string{"invalid/format/slash"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers"), "invalid/format/slash", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
 	}
 
 	matcher := field.ErrorMatcher{}.ByFieldNormalized([]field.NormalizationRule{
@@ -774,13 +782,20 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("labels").String()) + `\[.*\]`),
 			Replacement: fldPath.Child("labels").String(),
 		},
+		{
+			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("finalizers").String()) + `\[.*\]`),
+			Replacement: fldPath.Child("finalizers").String(),
+		},
 	}).ByType().BySource().ByOrigin()
 
-	toExpectedErrs := func(allDeclarativeEnforced bool, betaEnabled bool, errs field.ErrorList) field.ErrorList {
+	toExpectedErrs := func(allDeclarativeEnforced bool, betaEnabled bool, errs field.ErrorList, isUpdate bool) field.ErrorList {
 		expected := make(field.ErrorList, 0, len(errs))
 		for _, err := range errs {
 			e := *err
 			if !allDeclarativeEnforced && (e.IsAlpha() || (!betaEnabled && e.IsBeta())) {
+				if isUpdate && strings.HasPrefix(e.Field, "metadata.finalizers") {
+					continue
+				}
 				_ = e.MarkFromImperative()
 				e.ValidationStabilityLevel = 0
 			}
@@ -798,7 +813,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 						testCtx = validate.WithAllDeclarativeEnforcedForTest(ctx)
 					}
 					errs := ValidateObjectMetaDeclaratively(testCtx, operation.Create, tc.obj, nil, tc.requiresNamespace, NameIsDNSSubdomain, fldPath, betaEnabled)
-					matcher.Test(t, toExpectedErrs(allDeclarativeEnforced, betaEnabled, tc.expectedErrs), errs)
+					matcher.Test(t, toExpectedErrs(allDeclarativeEnforced, betaEnabled, tc.expectedErrs, false), errs)
 				})
 			}
 		}
@@ -970,6 +985,15 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.Invalid(fldPath.Child("labels"), strings.Repeat("a", 64), "").WithOrigin("format=k8s-label-value").MarkAlpha(),
 			},
 		},
+		{
+			name:              "invalid finalizer format on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakFinalizers([]string{"invalid/format/slash"})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers"), "invalid/format/slash", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
 	}
 
 	for _, tc := range updateCases {
@@ -981,7 +1005,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 						testCtx = validate.WithAllDeclarativeEnforcedForTest(ctx)
 					}
 					errs := ValidateObjectMetaDeclaratively(testCtx, operation.Update, tc.obj, tc.oldObj, tc.requiresNamespace, NameIsDNSSubdomain, fldPath, betaEnabled)
-					matcher.Test(t, toExpectedErrs(allDeclarativeEnforced, betaEnabled, tc.expectedErrs), errs)
+					matcher.Test(t, toExpectedErrs(allDeclarativeEnforced, betaEnabled, tc.expectedErrs, true), errs)
 				})
 			}
 		}
@@ -1076,3 +1100,6 @@ func tweakLabels(labels map[string]string) func(*metav1.ObjectMeta) {
 	return func(o *metav1.ObjectMeta) { o.Labels = labels }
 }
 
+func tweakFinalizers(finalizers []string) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.Finalizers = finalizers }
+}

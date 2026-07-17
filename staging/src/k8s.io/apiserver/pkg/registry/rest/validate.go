@@ -390,6 +390,9 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	config.NormalizationRules = append(config.NormalizationRules, field.NormalizationRule{
 		Regexp:      regexp.MustCompile(`metadata\.labels\[.*\]`),
 		Replacement: "metadata.labels",
+	}, field.NormalizationRule{
+		Regexp:      regexp.MustCompile(`metadata\.finalizers\[.*\]`),
+		Replacement: "metadata.finalizers",
 	})
 	// These errors must be errors returned by the handwritten validation.
 	errs = errs.MarkFromImperative()
