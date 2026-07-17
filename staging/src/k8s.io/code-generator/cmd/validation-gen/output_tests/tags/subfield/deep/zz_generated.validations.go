@@ -78,10 +78,20 @@ func Validate_Struct(
 			// call field-attached validations
 			func() { // cohort = "structField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
-					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
+					func(o *OtherStruct) *SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return &o.StructField
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-							func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+							func(o *SmallStruct) *string {
+								if o == nil {
+									return nil
+								}
+								return &o.StringField
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructField.StructField 1")
 							})
@@ -89,10 +99,20 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
-					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
+					func(o *OtherStruct) *SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return &o.StructField
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-							func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+							func(o *SmallStruct) *string {
+								if o == nil {
+									return nil
+								}
+								return &o.StringField
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructField.StructField 2")
 							})
@@ -102,12 +122,22 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "sliceField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "sliceField",
-					func(o *OtherStruct) []SmallStruct { return o.SliceField }, validate.SemanticDeepEqual,
+					func(o *OtherStruct) []SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return o.SliceField
+					}, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []SmallStruct) field.ErrorList {
 						return validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 								return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-									func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+									func(o *SmallStruct) *string {
+										if o == nil {
+											return nil
+										}
+										return &o.StringField
+									}, validate.DirectEqual,
 									func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 										return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructField.SliceField")
 									})
@@ -118,12 +148,22 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "mapField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "mapField",
-					func(o *OtherStruct) map[string]SmallStruct { return o.MapField }, validate.SemanticDeepEqual,
+					func(o *OtherStruct) map[string]SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return o.MapField
+					}, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]SmallStruct) field.ErrorList {
 						return validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 								return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-									func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+									func(o *SmallStruct) *string {
+										if o == nil {
+											return nil
+										}
+										return &o.StringField
+									}, validate.DirectEqual,
 									func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 										return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructField.MapField")
 									})
@@ -134,13 +174,41 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "ptrField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ptrField",
-					func(o *OtherStruct) *SmallStruct { return o.PtrField }, validate.DirectEqual,
+					func(o *OtherStruct) *SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return o.PtrField
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-							func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+							func(o *SmallStruct) *string {
+								if o == nil {
+									return nil
+								}
+								return &o.StringField
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructField.PtrField")
 							})
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ptrField",
+					func(o *OtherStruct) *SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return o.PtrField
+					}, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
+							func(o *SmallStruct) *string {
+								if o == nil {
+									return nil
+								}
+								return &o.StringField
+							}, validate.DirectEqual, validate.ShortName)
 					}); len(e) != 0 {
 					errs = append(errs, e...)
 				}
@@ -175,10 +243,20 @@ func Validate_Struct(
 			}
 			func() { // cohort = "structField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
-					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
+					func(o *OtherStruct) *SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return &o.StructField
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-							func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+							func(o *SmallStruct) *string {
+								if o == nil {
+									return nil
+								}
+								return &o.StringField
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructPtrField.StructField 1")
 							})
@@ -186,10 +264,20 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
-					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
+					func(o *OtherStruct) *SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return &o.StructField
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-							func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+							func(o *SmallStruct) *string {
+								if o == nil {
+									return nil
+								}
+								return &o.StringField
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructPtrField.StructField 2")
 							})
@@ -199,12 +287,22 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "sliceField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "sliceField",
-					func(o *OtherStruct) []SmallStruct { return o.SliceField }, validate.SemanticDeepEqual,
+					func(o *OtherStruct) []SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return o.SliceField
+					}, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []SmallStruct) field.ErrorList {
 						return validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 								return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-									func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+									func(o *SmallStruct) *string {
+										if o == nil {
+											return nil
+										}
+										return &o.StringField
+									}, validate.DirectEqual,
 									func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 										return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructPtrField.SliceField")
 									})
@@ -215,12 +313,22 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "mapField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "mapField",
-					func(o *OtherStruct) map[string]SmallStruct { return o.MapField }, validate.SemanticDeepEqual,
+					func(o *OtherStruct) map[string]SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return o.MapField
+					}, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]SmallStruct) field.ErrorList {
 						return validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 								return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-									func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+									func(o *SmallStruct) *string {
+										if o == nil {
+											return nil
+										}
+										return &o.StringField
+									}, validate.DirectEqual,
 									func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 										return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructPtrField.MapField")
 									})
@@ -231,10 +339,20 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "ptrField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ptrField",
-					func(o *OtherStruct) *SmallStruct { return o.PtrField }, validate.DirectEqual,
+					func(o *OtherStruct) *SmallStruct {
+						if o == nil {
+							return nil
+						}
+						return o.PtrField
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-							func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+							func(o *SmallStruct) *string {
+								if o == nil {
+									return nil
+								}
+								return &o.StringField
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructPtrField.PtrField")
 							})

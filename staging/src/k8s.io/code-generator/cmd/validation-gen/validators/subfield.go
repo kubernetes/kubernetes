@@ -100,7 +100,7 @@ func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Ta
 		Parameters: []ParamResult{{"o", nilableStructType}},
 		Results:    []ParamResult{{"", nilableFieldType}},
 	}
-	getFn.Body = fmt.Sprintf("return %so.%s", fieldExprPrefix, submemb.Name)
+	getFn.Body = fmt.Sprintf("if o == nil { return nil }; return %so.%s", fieldExprPrefix, submemb.Name)
 
 	// equivArg compares the correlated elements in the old and new lists, for
 	// ratcheting. directComparable selects "==" vs semantic DeepEqual.

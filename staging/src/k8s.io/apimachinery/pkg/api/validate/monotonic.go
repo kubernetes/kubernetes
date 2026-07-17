@@ -27,11 +27,12 @@ import (
 
 // Monotonic validates that an integer value has not decreased on update.
 func Monotonic[T constraints.Integer](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
-	if op.Type != operation.Update {
-		return nil
+	if value == nil {
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("monotonic")}
 	}
 
-	if value == nil || oldValue == nil {
+	if op.Type != operation.Update || oldValue == nil {
 		return nil
 	}
 

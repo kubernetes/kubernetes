@@ -99,6 +99,13 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-pointer"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -147,6 +154,13 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-typedef-pointer"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -191,6 +205,14 @@ func Validate_Struct(
 				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
 					return nil
 				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ValidatedStringType(ctx, op, fldPath, obj, oldObj)...)

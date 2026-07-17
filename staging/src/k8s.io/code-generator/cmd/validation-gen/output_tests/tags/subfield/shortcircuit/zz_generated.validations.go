@@ -303,7 +303,12 @@ func Validate_ParentWithAlphaOpaqueField(
 			// call field-attached validations
 			func() { // cohort = "value"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqual,
+					func(o *TargetWithRequired) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithAlphaOpaqueField.Field.Value")
 					}); len(e) != 0 {
@@ -344,7 +349,12 @@ func Validate_ParentWithAlphaOpaqueImmutableField(
 			// call field-attached validations
 			func() { // cohort = "value"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithImmutable) *string { return &o.Value }, validate.DirectEqual,
+					func(o *TargetWithImmutable) *string {
+						if o == nil {
+							return nil
+						}
+						return &o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithAlphaOpaqueImmutableField.Field.Value")
 					}); len(e) != 0 {
@@ -386,18 +396,33 @@ func Validate_ParentWithForbidden(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithForbidden) *string { return o.Value }, validate.DirectEqual, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+					func(o *TargetWithForbidden) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithForbidden) *string { return o.Value }, validate.DirectEqual, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+					func(o *TargetWithForbidden) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithForbidden) *string { return o.Value }, validate.DirectEqual,
+					func(o *TargetWithForbidden) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithForbidden.Field.Value")
 					}); len(e) != 0 {
@@ -441,14 +466,24 @@ func Validate_ParentWithImmutable(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithImmutable) *string { return &o.Value }, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+					func(o *TargetWithImmutable) *string {
+						if o == nil {
+							return nil
+						}
+						return &o.Value
+					}, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithImmutable) *string { return &o.Value }, validate.DirectEqual,
+					func(o *TargetWithImmutable) *string {
+						if o == nil {
+							return nil
+						}
+						return &o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithImmutable.Field.Value")
 					}); len(e) != 0 {
@@ -492,7 +527,12 @@ func Validate_ParentWithMaxItems(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithMaxItems) []string { return o.Value }, validate.SemanticDeepEqual,
+					func(o *TargetWithMaxItems) []string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
 						return validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2)
 					}).MarkShortCircuit(); len(e) != 0 {
@@ -502,7 +542,12 @@ func Validate_ParentWithMaxItems(
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithMaxItems) []string { return o.Value }, validate.SemanticDeepEqual,
+					func(o *TargetWithMaxItems) []string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithMaxItems.Field.Value")
 					}); len(e) != 0 {
@@ -546,7 +591,12 @@ func Validate_ParentWithMaxProperties(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithMaxProperties) map[string]string { return o.Value }, validate.SemanticDeepEqual,
+					func(o *TargetWithMaxProperties) map[string]string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
 						return validate.MaxProperties(ctx, op, fldPath, obj, oldObj, 2)
 					}).MarkShortCircuit(); len(e) != 0 {
@@ -556,7 +606,12 @@ func Validate_ParentWithMaxProperties(
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithMaxProperties) map[string]string { return o.Value }, validate.SemanticDeepEqual,
+					func(o *TargetWithMaxProperties) map[string]string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithMaxProperties.Field.Value")
 					}); len(e) != 0 {
@@ -608,19 +663,34 @@ func Validate_ParentWithMultipleShortCircuit(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+					func(o *TargetWithRequired) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqual, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
+					func(o *TargetWithRequired) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqual,
+					func(o *TargetWithRequired) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithMultipleShortCircuit.Field.Value")
 					}); len(e) != 0 {
@@ -663,7 +733,12 @@ func Validate_ParentWithOpaqueAlias(
 			// call field-attached validations
 			func() { // cohort = "value"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *AliasOpaqueTargetWithRequired) *string { return o.Value }, validate.DirectEqual,
+					func(o *AliasOpaqueTargetWithRequired) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithOpaqueAlias.Field.Value")
 					}); len(e) != 0 {
@@ -704,7 +779,12 @@ func Validate_ParentWithOpaqueField(
 			// call field-attached validations
 			func() { // cohort = "value"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqual,
+					func(o *TargetWithRequired) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithOpaqueField.Field.Value")
 					}); len(e) != 0 {
@@ -745,7 +825,12 @@ func Validate_ParentWithOpaqueImmutableAlias(
 			// call field-attached validations
 			func() { // cohort = "value"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *AliasOpaqueTargetWithImmutable) *string { return &o.Value }, validate.DirectEqual,
+					func(o *AliasOpaqueTargetWithImmutable) *string {
+						if o == nil {
+							return nil
+						}
+						return &o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithOpaqueImmutableAlias.Field.Value")
 					}); len(e) != 0 {
@@ -786,7 +871,12 @@ func Validate_ParentWithOpaqueImmutableField(
 			// call field-attached validations
 			func() { // cohort = "value"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithImmutable) *string { return &o.Value }, validate.DirectEqual,
+					func(o *TargetWithImmutable) *string {
+						if o == nil {
+							return nil
+						}
+						return &o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithOpaqueImmutableField.Field.Value")
 					}); len(e) != 0 {
@@ -828,14 +918,24 @@ func Validate_ParentWithOptional(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithOptional) *string { return o.Value }, validate.DirectEqual, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+					func(o *TargetWithOptional) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithOptional) *string { return o.Value }, validate.DirectEqual,
+					func(o *TargetWithOptional) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithOptional.Field.Value")
 					}); len(e) != 0 {
@@ -878,7 +978,12 @@ func Validate_ParentWithPointerOpaqueAlias(
 			// call field-attached validations
 			func() { // cohort = "value"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *AliasOpaqueTargetWithRequired) *string { return o.Value }, validate.DirectEqual,
+					func(o *AliasOpaqueTargetWithRequired) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithPointerOpaqueAlias.Field.Value")
 					}); len(e) != 0 {
@@ -920,14 +1025,24 @@ func Validate_ParentWithRequired(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqual, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
+					func(o *TargetWithRequired) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqual,
+					func(o *TargetWithRequired) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithRequired.Field.Value")
 					}); len(e) != 0 {
@@ -971,19 +1086,34 @@ func Validate_ParentWithSubfieldRequiredAndChildOptional(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithOptional) *string { return o.Value }, validate.DirectEqual, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
+					func(o *TargetWithOptional) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithOptional) *string { return o.Value }, validate.DirectEqual, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+					func(o *TargetWithOptional) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithOptional) *string { return o.Value }, validate.DirectEqual,
+					func(o *TargetWithOptional) *string {
+						if o == nil {
+							return nil
+						}
+						return o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithSubfieldRequiredAndChildOptional.Field.Value")
 					}); len(e) != 0 {
@@ -1027,7 +1157,12 @@ func Validate_ParentWithUpdate(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithUpdate) *string { return &o.Value }, validate.DirectEqual,
+					func(o *TargetWithUpdate) *string {
+						if o == nil {
+							return nil
+						}
+						return &o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify)
 					}).MarkShortCircuit(); len(e) != 0 {
@@ -1037,7 +1172,12 @@ func Validate_ParentWithUpdate(
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithUpdate) *string { return &o.Value }, validate.DirectEqual,
+					func(o *TargetWithUpdate) *string {
+						if o == nil {
+							return nil
+						}
+						return &o.Value
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithUpdate.Field.Value")
 					}); len(e) != 0 {

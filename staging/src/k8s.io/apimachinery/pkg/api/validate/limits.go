@@ -31,7 +31,8 @@ import (
 // characters.
 func MaxLength[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, max int) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("maxLength")}
 	}
 
 	// if the length of the value in bytes is less
@@ -60,7 +61,8 @@ func MaxLength[T ~string](_ context.Context, _ operation.Operation, fldPath *fie
 // MaxBytes verifies that the specified value is not longer than max bytes.
 func MaxBytes[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, max int) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("maxBytes")}
 	}
 
 	if len(*value) > max {
@@ -80,10 +82,6 @@ func MaxItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Pa
 
 // MaxProperties verifies that the specified map has no more than max keys.
 func MaxProperties[K comparable, V any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]V, max int) field.ErrorList {
-	if value == nil {
-		return nil
-	}
-
 	if len(value) > max {
 		return field.ErrorList{field.TooMany(fldPath, len(value), max).WithOrigin("maxProperties")}
 	}
@@ -109,7 +107,8 @@ func MinProperties[K comparable, V any](_ context.Context, _ operation.Operation
 // Minimum verifies that the specified value is greater than or equal to min.
 func Minimum[T constraints.Integer](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, min T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("minimum")}
 	}
 	if *value < min {
 		return field.ErrorList{field.Invalid(fldPath, *value, content.MinError(min)).WithOrigin("minimum")}
@@ -120,7 +119,8 @@ func Minimum[T constraints.Integer](_ context.Context, _ operation.Operation, fl
 // Maximum verifies that the specified value is less than or equal to max.
 func Maximum[T constraints.Integer](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, max T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("maximum")}
 	}
 	if *value > max {
 		return field.ErrorList{field.Invalid(fldPath, *value, content.MaxError(max)).WithOrigin("maximum")}
@@ -131,7 +131,8 @@ func Maximum[T constraints.Integer](_ context.Context, _ operation.Operation, fl
 // MinLength verifies that the specified value is at least min characters, if non-nil.
 func MinLength[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, min int) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("minLength")}
 	}
 
 	byteLength := len(*value)

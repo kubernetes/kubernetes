@@ -48,6 +48,7 @@ type Struct struct {
 
 	MonotonicField MonotonicType `json:"monotonicField"`
 
+	// +k8s:optional
 	MonotonicPtrField *MonotonicType `json:"monotonicPtrField"`
 
 	// +k8s:optional

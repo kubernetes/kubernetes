@@ -42,6 +42,11 @@ func Discriminated[Tfield any, Tdisc comparable, Tstruct any](ctx context.Contex
 	obj, oldObj *Tstruct, fieldName string, getMemberValue func(*Tstruct) Tfield, getDiscriminator func(*Tstruct) Tdisc,
 	equiv MatchFunc[Tfield], defaultValidation ValidateFunc[Tfield], rules []DiscriminatedRule[Tfield, Tdisc],
 ) field.ErrorList {
+	if obj == nil {
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(structPath, "")}
+	}
+
 	value := getMemberValue(obj)
 	discriminator := getDiscriminator(obj)
 	var oldValue Tfield
