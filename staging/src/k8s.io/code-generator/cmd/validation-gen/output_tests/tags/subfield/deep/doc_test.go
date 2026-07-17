@@ -39,6 +39,7 @@ func Test(t *testing.T) {
 				"a": {StringField: "SM1"},
 				"b": {StringField: "SM2"},
 			},
+			PtrField: &SmallStruct{StringField: "PF"},
 		},
 		StructPtrField: &OtherStruct{
 			StructField: SmallStruct{StringField: "SPF"},
@@ -51,6 +52,7 @@ func Test(t *testing.T) {
 				"b": {StringField: "SPM1"},
 				"a": {StringField: "SPM2"},
 			},
+			PtrField: &SmallStruct{StringField: "PF"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"structField.structField.stringField":      {"Struct.StructField.StructField 1", "Struct.StructField.StructField 2"},
@@ -58,10 +60,12 @@ func Test(t *testing.T) {
 		"structField.sliceField[1].stringField":    {"Struct.StructField.SliceField"},
 		"structField.mapField[a].stringField":      {"Struct.StructField.MapField"},
 		"structField.mapField[b].stringField":      {"Struct.StructField.MapField"},
+		"structField.ptrField.stringField":         {"Struct.StructField.PtrField"},
 		"structPtrField.structField.stringField":   {"Struct.StructPtrField.StructField 1", "Struct.StructPtrField.StructField 2"},
 		"structPtrField.sliceField[0].stringField": {"Struct.StructPtrField.SliceField"},
 		"structPtrField.sliceField[1].stringField": {"Struct.StructPtrField.SliceField"},
 		"structPtrField.mapField[a].stringField":   {"Struct.StructPtrField.MapField"},
 		"structPtrField.mapField[b].stringField":   {"Struct.StructPtrField.MapField"},
+		"structPtrField.ptrField.stringField":      {"Struct.StructPtrField.PtrField"},
 	})
 }

@@ -33,6 +33,7 @@ type Struct struct {
 	// +k8s:subfield(structField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructField.StructField 2"
 	// +k8s:subfield(sliceField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructField.SliceField"
 	// +k8s:subfield(mapField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructField.MapField"
+	// +k8s:subfield(ptrField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructField.PtrField"
 	StructField OtherStruct `json:"structField"`
 
 	// +k8s:optional
@@ -40,6 +41,7 @@ type Struct struct {
 	// +k8s:subfield(structField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.StructField 2"
 	// +k8s:subfield(sliceField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.SliceField"
 	// +k8s:subfield(mapField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.MapField"
+	// +k8s:subfield(ptrField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.PtrField"
 	StructPtrField *OtherStruct `json:"structPtrField"`
 }
 
@@ -47,6 +49,7 @@ type OtherStruct struct {
 	StructField SmallStruct            `json:"structField"`
 	SliceField  []SmallStruct          `json:"sliceField"`
 	MapField    map[string]SmallStruct `json:"mapField"`
+	PtrField    *SmallStruct           `json:"ptrField"`
 }
 
 type SmallStruct struct {
