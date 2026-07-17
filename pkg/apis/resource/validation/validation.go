@@ -126,9 +126,6 @@ func ValidateResourceClaimUpdate(resourceClaim, oldClaim *resource.ResourceClaim
 	// Re-validating other fields is skipped because the user cannot change them;
 	// the only actionable error is for the immutability violation.
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Spec, oldClaim.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-	// Also re-run field validation with the old spec so fields that were valid before a
-	// stricter check was added (e.g. a negative CapacityRequirements value) aren't retroactively rejected.
-	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, &oldClaim.Spec, field.NewPath("spec"), true)...)
 	return allErrs
 }
 
@@ -140,6 +137,10 @@ func ValidateResourceClaimStatusUpdate(resourceClaim, oldClaim *resource.Resourc
 	return allErrs
 }
 
+// validateResourceClaimSpec is called from ValidateResourceClaim (create, oldSpec is nil) and from
+// validateResourceClaimTemplateSpec during a ResourceClaimTemplate update (oldSpec set, for ratcheting).
+// ValidateResourceClaimUpdate itself never calls this: the claim spec is immutable, so by the time an
+// update passes the immutability check, spec and oldSpec are already identical.
 func validateResourceClaimSpec(spec, oldSpec *resource.ResourceClaimSpec, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	var oldDeviceClaim *resource.DeviceClaim
@@ -688,7 +689,8 @@ func ValidateResourceClaimTemplateUpdate(template, oldTemplate *resource.Resourc
 	// Re-validating other fields is skipped because the user cannot change them;
 	// the only actionable error is for the immutability violation.
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(template.Spec, oldTemplate.Spec, field.NewPath("spec"))...)
-	// Also re-run field validation with the old spec, same reasoning as ValidateResourceClaimUpdate.
+	// Unlike ResourceClaim, ResourceClaimTemplate re-validates the spec on update, so pass the old
+	// spec through for ratcheting (e.g. a previously-stored negative CapacityRequirements value).
 	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, &oldTemplate.Spec, field.NewPath("spec"), true)...)
 	return allErrs
 }

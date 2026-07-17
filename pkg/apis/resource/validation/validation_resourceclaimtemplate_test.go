@@ -19,6 +19,7 @@ package validation
 import (
 	"testing"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -255,6 +256,22 @@ func TestValidateClaimTemplateUpdate(t *testing.T) {
 				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName += "2"
 				return template
 			},
+		},
+		"negative-capacity-valid-if-stored": {
+			// A negative CapacityRequirements value could only have been stored before
+			// validateNonNegativeQuantity was added. A no-op update must not retroactively
+			// reject it: old and new capacity are identical, so the ratchet in
+			// validateCapacityRequirements skips re-validating this field.
+			oldClaimTemplate: func() *resource.ResourceClaimTemplate {
+				spec := validClaimSpec.DeepCopy()
+				spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"dra.example.com/cores": apiresource.MustParse("-1"),
+					},
+				}
+				return testClaimTemplate(goodName, goodNS, *spec)
+			}(),
+			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate { return template },
 		},
 	}
 

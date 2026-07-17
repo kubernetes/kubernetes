@@ -883,7 +883,7 @@ const (
 	DeviceConfigMaxSize      = 32
 	// MaxCapacityRequirements is the maximum number of entries allowed in
 	// CapacityRequirements.Requests.
-	MaxCapacityRequirements = 16
+	MaxCapacityRequirements = 32
 )
 
 // DRAAdminNamespaceLabelKey is a label key used to grant administrative access
