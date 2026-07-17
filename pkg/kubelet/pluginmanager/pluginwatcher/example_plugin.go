@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/klog/v2"
 
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
@@ -131,7 +132,7 @@ func (e *examplePlugin) Serve(ctx context.Context, services ...string) error {
 	}
 
 	logger.Info("Example server started", "endpoint", e.endpoint)
-	e.grpcServer = grpc.NewServer()
+	e.grpcServer = grpc.NewServer(grpc.Creds(insecure.NewCredentials()))
 
 	// Registers kubelet plugin watcher api.
 	registerapi.RegisterRegistrationServer(e.grpcServer, e)
