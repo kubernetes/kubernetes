@@ -18,6 +18,7 @@ package customresourcedefinition
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"testing"
 
@@ -49,6 +50,35 @@ func mkCRD(tweaks ...func(*apiextensions.CustomResourceDefinitionSpec)) *apiexte
 	}
 
 	return crd
+}
+
+// withListTypeSetItems appends a version whose openAPIV3Schema has one
+// top-level property (fieldName) of type array with x-kubernetes-list-type: set
+// and items of the given itemType. Reused across create/update warning tests.
+func withListTypeSetItems(itemType, fieldName string) func(*apiextensions.CustomResourceDefinitionSpec) {
+	return func(spec *apiextensions.CustomResourceDefinitionSpec) {
+		setType := "set"
+		version := apiextensions.CustomResourceDefinitionVersion{
+			Name:    fmt.Sprintf("v%d", len(spec.Versions)+1),
+			Served:  true,
+			Storage: len(spec.Versions) == 0,
+			Schema: &apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						fieldName: {
+							Type:      "array",
+							XListType: &setType,
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{Type: itemType},
+							},
+						},
+					},
+				},
+			},
+		}
+		spec.Versions = append(spec.Versions, version)
+	}
 }
 
 func TestValidateAPIApproval(t *testing.T) {
@@ -1561,6 +1591,88 @@ func TestWarningsOnCreate(t *testing.T) {
 				})
 			}),
 		},
+		"listType=set on object items": {
+			wantWarningMessages: []string{
+				`x-kubernetes-list-type: set for items of type "object" is not supported by server-side apply or CEL validation rules`,
+			},
+			crd: mkCRD(withListTypeSetItems("object", "endpoints")),
+		},
+		"listType=set on array items": {
+			wantWarningMessages: []string{
+				`x-kubernetes-list-type: set for items of type "array" is not supported by server-side apply or CEL validation rules`,
+			},
+			crd: mkCRD(withListTypeSetItems("array", "cidrGroups")),
+		},
+		"listType=set on both object and array items reports each type": {
+			wantWarningMessages: []string{
+				`x-kubernetes-list-type: set for items of type "array" is not supported by server-side apply or CEL validation rules`,
+				`x-kubernetes-list-type: set for items of type "object" is not supported by server-side apply or CEL validation rules`,
+			},
+			crd: mkCRD(withListTypeSetItems("object", "endpoints"), withListTypeSetItems("array", "cidrGroups")),
+		},
+		"listType=set on scalar items is not flagged": {
+			wantWarningMessages: []string{},
+			crd:                 mkCRD(withListTypeSetItems("string", "verbs")),
+		},
+		"listType=set nested under items and properties is detected": {
+			wantWarningMessages: []string{
+				`x-kubernetes-list-type: set for items of type "object" is not supported by server-side apply or CEL validation rules`,
+			},
+			crd: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				setType := "set"
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"outer": {
+									Type: "array",
+									Items: &apiextensions.JSONSchemaPropsOrArray{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"inner": {
+													Type:      "array",
+													XListType: &setType,
+													Items: &apiextensions.JSONSchemaPropsOrArray{
+														Schema: &apiextensions.JSONSchemaProps{Type: "object"},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				})
+			}),
+		},
+		"listType=set in top-level validation schema": {
+			wantWarningMessages: []string{
+				`x-kubernetes-list-type: set for items of type "object" is not supported by server-side apply or CEL validation rules`,
+			},
+			crd: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				setType := "set"
+				spec.Validation = &apiextensions.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensions.JSONSchemaProps{
+							"endpoints": {
+								Type:      "array",
+								XListType: &setType,
+								Items: &apiextensions.JSONSchemaPropsOrArray{
+									Schema: &apiextensions.JSONSchemaProps{Type: "object"},
+								},
+							},
+						},
+					},
+				}
+			}),
+		},
 	}
 
 	for name, tc := range testcases {
@@ -1756,6 +1868,18 @@ func TestWarningsOnUpdate(t *testing.T) {
 					},
 				})
 			}),
+		},
+		"pre-existing listType=set on object items does not warn on update": {
+			wantWarningMessages: []string{},
+			oldCRD:              mkCRD(withListTypeSetItems("object", "endpoints")),
+			newCRD:              mkCRD(withListTypeSetItems("object", "endpoints")),
+		},
+		"newly introduced listType=set on array items warns": {
+			wantWarningMessages: []string{
+				`x-kubernetes-list-type: set for items of type "array" is not supported by server-side apply or CEL validation rules`,
+			},
+			oldCRD: mkCRD(withListTypeSetItems("object", "endpoints")),
+			newCRD: mkCRD(withListTypeSetItems("object", "endpoints"), withListTypeSetItems("array", "cidrGroups")),
 		},
 	}
 
