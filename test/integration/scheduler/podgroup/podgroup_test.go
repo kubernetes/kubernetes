@@ -139,10 +139,8 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Scheduled",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg1",
-						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						PodGroups: []string{"pg1"},
 					},
 				},
 			},
@@ -226,10 +224,8 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Unschedulable",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg1",
-						ConditionStatus: metav1.ConditionFalse,
-						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						PodGroups: []string{"pg1"},
 					},
 				},
 				{
@@ -242,10 +238,8 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition transitions to Scheduled",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg1",
-						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						PodGroups: []string{"pg1"},
 					},
 				},
 			},
@@ -479,10 +473,8 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Scheduled after preemption completes",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg1",
-						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						PodGroups: []string{"pg1"},
 					},
 				},
 				{
