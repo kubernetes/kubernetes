@@ -805,7 +805,7 @@ func TestValidateStatefulSet(t *testing.T) {
 	},
 	}
 
-	cmpOpts := []cmp.Option{cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail", "Origin"), cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() })}
+	cmpOpts := []cmp.Option{cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail", "Origin", "CoveredByDeclarative"), cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() })}
 	for _, testCase := range append(successCases, errorCases...) {
 		name := testCase.name
 		var testTitle string
@@ -1327,7 +1327,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 	}
 
 	cmpOpts := []cmp.Option{
-		cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail", "Origin"),
+		cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail", "Origin", "CoveredByDeclarative"),
 		cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() }),
 		cmpopts.EquateEmpty(),
 	}
