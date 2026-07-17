@@ -763,6 +763,7 @@ func AllocatorFeatures(fts feature.Features) structured.Features {
 		ListTypeAttributes:      fts.EnableDRAListTypeAttributes,
 		OptionalNodeOperations:  fts.EnableDRAOptionalNodeOperations,
 		DerivedAttributes:       fts.EnableDRADerivedAttributes,
+		CompatibilityGroups:     fts.EnableDRADeviceCompatibilityGroups,
 	}
 }
 
