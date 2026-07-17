@@ -161,6 +161,8 @@ type Step struct {
 	WaitForPodsInIncompletePodGroupPods []string
 	// WaitForPodsUnschedulable is use to wait for pods to be unschedulable.
 	WaitForPodsUnschedulable []string
+	// WaitForPodsSchedulingError is use to wait for pods to get scheduling error status.
+	WaitForPodsSchedulingError []string
 	// WaitForPodsScheduled is use to wait for pods to be scheduled.
 	WaitForPodsScheduled []string
 	// WaitForPodsRemoved is use to wait for pods to be removed.
@@ -517,6 +519,18 @@ func waitForPodsUnschedulable(testCtx *testutils.TestContext, ns string, podName
 	return nil
 }
 
+func waitForPodsSchedulingError(testCtx *testutils.TestContext, ns string, podNames []string) error {
+	cs := testCtx.ClientSet
+	for _, podName := range podNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			testutils.PodSchedulingError(cs, ns, podName))
+		if err != nil {
+			return fmt.Errorf("failed to wait for pod %s to get scheduling error: %w", podName, err)
+		}
+	}
+	return nil
+}
+
 func waitForPodsScheduled(testCtx *testutils.TestContext, ns string, podNames []string) error {
 	cs := testCtx.ClientSet
 	for _, podName := range podNames {
@@ -688,6 +702,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = waitForPodsInIncompletePodGroupPods(testCtx, ns, step.WaitForPodsInIncompletePodGroupPods)
 		case step.WaitForPodsUnschedulable != nil:
 			err = waitForPodsUnschedulable(testCtx, ns, step.WaitForPodsUnschedulable)
+		case step.WaitForPodsSchedulingError != nil:
+			err = waitForPodsSchedulingError(testCtx, ns, step.WaitForPodsSchedulingError)
 		case step.WaitForPodsScheduled != nil:
 			err = waitForPodsScheduled(testCtx, ns, step.WaitForPodsScheduled)
 		case step.WaitForPodsRemoved != nil:
