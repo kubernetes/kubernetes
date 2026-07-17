@@ -137,28 +137,37 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("podManagementPolicy"), spec.PodManagementPolicy, fmt.Sprintf("must be '%s' or '%s'", apps.OrderedReadyPodManagement, apps.ParallelPodManagement)))
 	}
 
-	strategy := spec.UpdateStrategy
 	switch {
-	case strategy.Type == "":
+	case spec.UpdateStrategy.Type == "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), ""))
-	case strategy.Type == apps.OnDeleteStatefulSetStrategyType:
-		if strategy.RollingUpdate != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate"), strategy.RollingUpdate, fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
+	case spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType:
+		if spec.UpdateStrategy.RollingUpdate != nil {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath.Child("updateStrategy").Child("rollingUpdate"),
+					spec.UpdateStrategy.RollingUpdate,
+					fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
 		}
-	case strategy.Type == apps.RollingUpdateStatefulSetStrategyType:
-		if strategy.RollingUpdate != nil {
-			allErrs = append(allErrs, validateRollingUpdateStatefulSet(strategy.RollingUpdate, fldPath.Child("updateStrategy", "rollingUpdate"))...)
+	case spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType:
+		if spec.UpdateStrategy.RollingUpdate != nil {
+			allErrs = append(allErrs, validateRollingUpdateStatefulSet(spec.UpdateStrategy.RollingUpdate, fldPath.Child("updateStrategy", "rollingUpdate"))...)
 		}
-	case strategy.Type == apps.RecreateStatefulSetStrategyType && setOpts.AllowStatefulSetRecreateStrategy:
-		if strategy.RollingUpdate != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate"), strategy.RollingUpdate, fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
+	case spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType && setOpts.AllowStatefulSetRecreateStrategy:
+		if spec.UpdateStrategy.RollingUpdate != nil {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath.Child("updateStrategy").Child("rollingUpdate"),
+					spec.UpdateStrategy.RollingUpdate,
+					fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
 		}
 	default:
 		validValues := fmt.Sprintf("must be '%s' or '%s'", apps.RollingUpdateStatefulSetStrategyType, apps.OnDeleteStatefulSetStrategyType)
 		if setOpts.AllowStatefulSetRecreateStrategy {
 			validValues = fmt.Sprintf("must be '%s', '%s', or '%s'", apps.RollingUpdateStatefulSetStrategyType, apps.OnDeleteStatefulSetStrategyType, apps.RecreateStatefulSetStrategyType)
 		}
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("updateStrategy"), strategy, validValues))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("updateStrategy"), spec.UpdateStrategy, validValues))
 	}
 
 	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(spec.PersistentVolumeClaimRetentionPolicy, fldPath.Child("persistentVolumeClaimRetentionPolicy"))...)
