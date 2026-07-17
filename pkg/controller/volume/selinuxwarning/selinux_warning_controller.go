@@ -418,7 +418,7 @@ func (c *Controller) sync(ctx context.Context, podRef cache.ObjectName) error {
 			// The pod must have been deleted
 			return c.syncPodDelete(ctx, podRef)
 		}
-		logger.V(5).Info("Error getting pod from informer", "pod", klog.KObj(pod), "podUID", pod.UID, "err", err)
+		logger.V(5).Info("Error getting pod from informer", "pod", klog.KRef(podRef.Namespace, podRef.Name), "err", err)
 		return err
 	}
 	if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
