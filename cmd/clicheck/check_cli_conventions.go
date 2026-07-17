@@ -27,8 +27,6 @@ import (
 )
 
 func main() {
-	var errorCount int
-
 	kubectl := cmd.NewKubectlCommand(cmd.KubectlOptions{IOStreams: genericiooptions.IOStreams{In: os.Stdin, Out: io.Discard, ErrOut: io.Discard}})
 	errors := cmdsanity.RunCmdChecks(kubectl, cmdsanity.AllCmdChecks, []string{})
 	for _, err := range errors {
