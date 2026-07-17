@@ -83,6 +83,14 @@ func (*resourcePoolStatusRequestStrategy) Validate(ctx context.Context, obj runt
 	return validation.ValidateResourcePoolStatusRequest(request)
 }
 
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (*resourcePoolStatusRequestStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.DRAPartitionableDevicesType): utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType),
+	}}
+}
+
 func (*resourcePoolStatusRequestStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	return nil
 }

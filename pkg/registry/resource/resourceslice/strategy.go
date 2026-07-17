@@ -65,7 +65,12 @@ func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) f
 // DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
 // validation options to the generic BeforeCreate/BeforeUpdate code path.
 func (resourceSliceStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
-	return rest.DeclarativeValidationConfig{NormalizationRules: validation.ResourceNormalizationRules}
+	return rest.DeclarativeValidationConfig{
+		NormalizationRules: validation.ResourceNormalizationRules,
+		Options: map[string]bool{
+			string(features.DRAPartitionableDevicesType): utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType),
+		},
+	}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.

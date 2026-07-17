@@ -74,6 +74,7 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.partitionTypeAttribute": {
+				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
 			},
 			"spec.poolName": {

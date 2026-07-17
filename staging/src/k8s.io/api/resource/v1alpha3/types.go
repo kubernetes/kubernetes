@@ -439,9 +439,10 @@ type ResourcePoolStatusRequestSpec struct {
 	// Must include the domain qualifier.
 	//
 	// +optional
-	// +k8s:optional
-	// +k8s:format=k8s-resource-fully-qualified-name
 	// +featureGate=DRAPartitionableDevicesType
+	// +k8s:ifDisabled(DRAPartitionableDevicesType)=+k8s:forbidden
+	// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
+	// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
 	PartitionTypeAttribute *string `json:"partitionTypeAttribute,omitempty" protobuf:"bytes,4,opt,name=partitionTypeAttribute"`
 }
 

@@ -18,6 +18,7 @@ package resourcepoolstatusrequest
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -848,113 +849,90 @@ func derefInt32(p *int32) int32 {
 	return *p
 }
 
-// Three claims reference the same physical device; it must count once.
-func TestCalculatePoolStatus_CapAtOnePerDevice(t *testing.T) {
+// Device tallies: repeated claims, AdminAccess observers, taints and taint rules.
+func TestCalculatePoolStatus_DeviceCounts(t *testing.T) {
 	driver := "test.example.com"
-	slices := []*resourcev1.ResourceSlice{makeSlice("slice-1", driver, "pool-1", "node-1", 4)}
-	claims := []*resourcev1.ResourceClaim{
-		makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
-		makeAllocatedClaim("claim-2", "default", driver, "pool-1", "device-0"),
-		makeAllocatedClaim("claim-3", "default", driver, "pool-1", "device-0"),
+	plainSlices := []*resourcev1.ResourceSlice{makeSlice("slice-1", driver, "pool-1", "node-1", 4)}
+	taintedSlices := func(effect resourcev1.DeviceTaintEffect) []*resourcev1.ResourceSlice {
+		return []*resourcev1.ResourceSlice{makeSliceWithTaintedDevices("slice-1", driver, "pool-1", "node-1", 5, 2, effect)}
 	}
-	pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, claims))
-	if got := derefInt32(pool.AllocatedDevices); got != 1 {
-		t.Errorf("AllocatedDevices = %d, want 1 (device counted once despite 3 claims)", got)
-	}
-	if got := derefInt32(pool.AvailableDevices); got != 3 {
-		t.Errorf("AvailableDevices = %d, want 3", got)
-	}
-}
+	taintRule := makeDeviceTaintRule("rule-1", driver, "pool-1", "device-0", resourcev1.DeviceTaintEffectNoSchedule)
 
-// AdminAccess allocations are observers and must not move any tally.
-func TestCalculatePoolStatus_SkipAdminAccess(t *testing.T) {
-	driver := "test.example.com"
-	slices := []*resourcev1.ResourceSlice{makeSlice("slice-1", driver, "pool-1", "node-1", 4)}
-	claims := []*resourcev1.ResourceClaim{
-		makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
-		makeAdminAccessClaim("admin-1", "default", driver, "pool-1", "device-1"),
+	testCases := map[string]struct {
+		slices           []*resourcev1.ResourceSlice
+		claims           []*resourcev1.ResourceClaim
+		rules            []*resourcev1.DeviceTaintRule
+		enableTaintRules bool
+		wantTotal        int32
+		wantAllocated    int32
+		wantAvailable    int32
+		wantUnavailable  int32
+	}{
+		// Three claims reference the same physical device; it must count once.
+		"repeated claims on one device count once": {
+			slices: plainSlices,
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+				makeAllocatedClaim("claim-2", "default", driver, "pool-1", "device-0"),
+				makeAllocatedClaim("claim-3", "default", driver, "pool-1", "device-0"),
+			},
+			wantTotal: 4, wantAllocated: 1, wantAvailable: 3,
+		},
+		// AdminAccess allocations are observers and must not move any tally.
+		"adminAccess claim is not an allocation": {
+			slices: plainSlices,
+			claims: []*resourcev1.ResourceClaim{
+				makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+				makeAdminAccessClaim("admin-1", "default", driver, "pool-1", "device-1"),
+			},
+			wantTotal: 4, wantAllocated: 1, wantAvailable: 3,
+		},
+		"noSchedule taint is unavailable": {
+			slices:    taintedSlices(resourcev1.DeviceTaintEffectNoSchedule),
+			wantTotal: 5, wantAvailable: 3, wantUnavailable: 2,
+		},
+		"noExecute taint is unavailable": {
+			slices:    taintedSlices(resourcev1.DeviceTaintEffectNoExecute),
+			wantTotal: 5, wantAvailable: 3, wantUnavailable: 2,
+		},
+		// A None-effect taint does not make a device unavailable; it counts the
+		// same as an untainted device. Unknown effects are treated like None.
+		"none taint is available": {
+			slices:    taintedSlices(resourcev1.DeviceTaintEffectNone),
+			wantTotal: 5, wantAvailable: 5, wantUnavailable: 0,
+		},
+		// A matching DeviceTaintRule applies only when its gate is enabled.
+		"taint rule applies when gate is enabled": {
+			slices:           plainSlices,
+			rules:            []*resourcev1.DeviceTaintRule{taintRule},
+			enableTaintRules: true,
+			wantTotal:        4, wantAvailable: 3, wantUnavailable: 1,
+		},
+		"taint rule ignored when gate is disabled": {
+			slices:    plainSlices,
+			rules:     []*resourcev1.DeviceTaintRule{taintRule},
+			wantTotal: 4, wantAvailable: 4, wantUnavailable: 0,
+		},
 	}
-	pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, claims))
-	if got := derefInt32(pool.AllocatedDevices); got != 1 {
-		t.Errorf("AllocatedDevices = %d, want 1 (AdminAccess claim excluded)", got)
-	}
-	if got := derefInt32(pool.AvailableDevices); got != 3 {
-		t.Errorf("AvailableDevices = %d, want 3", got)
-	}
-}
 
-// Devices with a NoSchedule/NoExecute taint count as unavailable.
-func TestCalculatePoolStatus_UnavailableFromTaints(t *testing.T) {
-	driver := "test.example.com"
-	for _, effect := range []resourcev1.DeviceTaintEffect{
-		resourcev1.DeviceTaintEffectNoSchedule,
-		resourcev1.DeviceTaintEffectNoExecute,
-	} {
-		t.Run(string(effect), func(t *testing.T) {
-			slices := []*resourcev1.ResourceSlice{
-				makeSliceWithTaintedDevices("slice-1", driver, "pool-1", "node-1", 5, 2, effect),
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaintRules, tc.enableTaintRules)
+			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), tc.slices, tc.claims, tc.rules...))
+			if got := derefInt32(pool.TotalDevices); got != tc.wantTotal {
+				t.Errorf("TotalDevices = %d, want %d", got, tc.wantTotal)
 			}
-			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, nil))
-			if got := derefInt32(pool.TotalDevices); got != 5 {
-				t.Errorf("TotalDevices = %d, want 5", got)
+			if got := derefInt32(pool.AllocatedDevices); got != tc.wantAllocated {
+				t.Errorf("AllocatedDevices = %d, want %d", got, tc.wantAllocated)
 			}
-			if got := derefInt32(pool.UnavailableDevices); got != 2 {
-				t.Errorf("UnavailableDevices = %d, want 2", got)
+			if got := derefInt32(pool.AvailableDevices); got != tc.wantAvailable {
+				t.Errorf("AvailableDevices = %d, want %d", got, tc.wantAvailable)
 			}
-			if got := derefInt32(pool.AvailableDevices); got != 3 {
-				t.Errorf("AvailableDevices = %d, want 3 (5 total - 0 alloc - 2 unavailable)", got)
+			if got := derefInt32(pool.UnavailableDevices); got != tc.wantUnavailable {
+				t.Errorf("UnavailableDevices = %d, want %d", got, tc.wantUnavailable)
 			}
 		})
 	}
-}
-
-// A None-effect taint does not make a device unavailable; it counts the same
-// as an untainted device. Unknown effects are treated like None as well.
-func TestCalculatePoolStatus_NoneTaintIsAvailable(t *testing.T) {
-	driver := "test.example.com"
-	slices := []*resourcev1.ResourceSlice{
-		makeSliceWithTaintedDevices("slice-1", driver, "pool-1", "node-1", 5, 2, resourcev1.DeviceTaintEffectNone),
-	}
-	pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, nil))
-	if got := derefInt32(pool.TotalDevices); got != 5 {
-		t.Errorf("TotalDevices = %d, want 5", got)
-	}
-	if got := derefInt32(pool.UnavailableDevices); got != 0 {
-		t.Errorf("UnavailableDevices = %d, want 0 (None effect is not unavailable)", got)
-	}
-	if got := derefInt32(pool.AvailableDevices); got != 5 {
-		t.Errorf("AvailableDevices = %d, want 5 (None taint counts as available)", got)
-	}
-}
-
-// A matching DeviceTaintRule marks a device unavailable only when the
-// DRADeviceTaintRules gate is enabled.
-func TestCalculatePoolStatus_UnavailableFromTaintRule(t *testing.T) {
-	driver := "test.example.com"
-	slices := []*resourcev1.ResourceSlice{makeSlice("slice-1", driver, "pool-1", "node-1", 4)}
-	rule := makeDeviceTaintRule("rule-1", driver, "pool-1", "device-0", resourcev1.DeviceTaintEffectNoSchedule)
-
-	t.Run("gate-enabled", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaintRules, true)
-		pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, nil, rule))
-		if got := derefInt32(pool.UnavailableDevices); got != 1 {
-			t.Errorf("UnavailableDevices = %d, want 1 (rule applies when gate on)", got)
-		}
-		if got := derefInt32(pool.AvailableDevices); got != 3 {
-			t.Errorf("AvailableDevices = %d, want 3", got)
-		}
-	})
-
-	t.Run("gate-disabled", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaintRules, false)
-		pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, nil, rule))
-		if got := derefInt32(pool.UnavailableDevices); got != 0 {
-			t.Errorf("UnavailableDevices = %d, want 0 (rule ignored when gate off)", got)
-		}
-		if got := derefInt32(pool.AvailableDevices); got != 4 {
-			t.Errorf("AvailableDevices = %d, want 4", got)
-		}
-	})
 }
 
 func TestIsOlderThan(t *testing.T) {
@@ -1273,150 +1251,120 @@ func partitionSliceDevice(name, profile, cost string) resourcev1.Device {
 	}
 }
 
-// End-to-end: a two-slice partitionable pool produces a typed partitionSummary
-// (and no counterSets), exercising slice collection and attribute resolution.
+// End-to-end partition attribute resolution over a two-slice partitionable pool,
+// exercising slice collection and the pool-beats-request precedence.
 func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 	driver := "gpu.example.com"
-	counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", 2)
-	devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", 2)
 
-	status := runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{counters, devices}, nil)
-	pool := requireSinglePool(t, status)
+	testCases := map[string]struct {
+		// declarePoolAttr keeps the driver's own attribute on the slices.
+		declarePoolAttr bool
+		requestAttr     *string
+		want            map[string][2]int32
+	}{
+		"pool declares the attribute": {
+			declarePoolAttr: true,
+			want:            map[string][2]int32{"Full": {1, 1}, "Half": {2, 2}},
+		},
+		// The slices declare driver/profile. The request names a different
+		// attribute that no device carries: if it won, every device would look
+		// untyped, so the pool's own declaration must take precedence.
+		"pool declaration beats the request default": {
+			declarePoolAttr: true,
+			requestAttr:     ptr.To(driver + "/other"),
+			want:            map[string][2]int32{"Full": {1, 1}, "Half": {2, 2}},
+		},
+		"request default applies when the pool declares none": {
+			requestAttr: ptr.To(driver + "/profile"),
+			want:        map[string][2]int32{"Full": {1, 1}, "Half": {2, 2}},
+		},
+	}
 
-	if pool.ValidationError != nil {
-		t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
-	}
-	got := map[string][2]int32{}
-	for _, p := range pool.PartitionSummary {
-		got[p.Type] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
-	}
-	if got["Full"] != [2]int32{1, 1} {
-		t.Errorf("Full {total,allocatable} = %v, want [1 1]", got["Full"])
-	}
-	if got["Half"] != [2]int32{2, 2} {
-		t.Errorf("Half {total,allocatable} = %v, want [2 2]", got["Half"])
-	}
-}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", 2)
+			devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", 2)
+			if !tc.declarePoolAttr {
+				counters.Spec.PartitionTypeAttribute = nil
+				devices.Spec.PartitionTypeAttribute = nil
+			}
+			request := makeRequest(driver)
+			request.Spec.PartitionTypeAttribute = tc.requestAttr
 
-// The pool's own declaration wins; the request's attribute is only a default
-// for pools that declare none.
-func TestCalculatePoolStatus_PoolAttributeBeatsRequestDefault(t *testing.T) {
-	driver := "gpu.example.com"
-	counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", 2)
-	devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", 2)
-
-	// The slices declare driver/profile. The request names a different attribute
-	// that no device carries: if it won, every device would look untyped.
-	request := makeRequest(driver)
-	request.Spec.PartitionTypeAttribute = ptr.To(driver + "/other")
-
-	status := runCalculatePoolStatus(t, request, []*resourcev1.ResourceSlice{counters, devices}, nil)
-	pool := requireSinglePool(t, status)
-
-	if pool.ValidationError != nil {
-		t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
-	}
-	got := map[string][2]int32{}
-	for _, p := range pool.PartitionSummary {
-		got[p.Type] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
-	}
-	if got["Full"] != [2]int32{1, 1} || got["Half"] != [2]int32{2, 2} {
-		t.Errorf("want the pool's own profile grouping (Full [1 1], Half [2 2]), got %v", got)
-	}
-}
-
-// The request's attribute is used as the default when the pool declares none.
-func TestCalculatePoolStatus_RequestPartitionAttribute(t *testing.T) {
-	driver := "gpu.example.com"
-	counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", 2)
-	devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", 2)
-	// The driver does not declare a grouping attribute; the request supplies it.
-	counters.Spec.PartitionTypeAttribute = nil
-	devices.Spec.PartitionTypeAttribute = nil
-
-	request := makeRequest(driver)
-	request.Spec.PartitionTypeAttribute = ptr.To(driver + "/profile")
-
-	status := runCalculatePoolStatus(t, request, []*resourcev1.ResourceSlice{counters, devices}, nil)
-	pool := requireSinglePool(t, status)
-
-	if pool.ValidationError != nil {
-		t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
-	}
-	got := map[string][2]int32{}
-	for _, p := range pool.PartitionSummary {
-		got[p.Type] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
-	}
-	if got["Full"] != [2]int32{1, 1} {
-		t.Errorf("Full {total,allocatable} = %v, want [1 1]", got["Full"])
-	}
-	if got["Half"] != [2]int32{2, 2} {
-		t.Errorf("Half {total,allocatable} = %v, want [2 2]", got["Half"])
+			pool := requireSinglePool(t, runCalculatePoolStatus(t, request, []*resourcev1.ResourceSlice{counters, devices}, nil))
+			if pool.ValidationError != nil {
+				t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
+			}
+			got := map[string][2]int32{}
+			for _, p := range pool.PartitionSummary {
+				got[p.Type] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
+			}
+			if !maps.Equal(got, tc.want) {
+				t.Errorf("partitionSummary {total,allocatable} = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 
-// End-to-end: a shareable device with a capacity-consuming claim produces a
-// shareableSummary, exercising consumed-capacity aggregation from claim results.
+// End-to-end: shareable devices aggregate consumed capacity from claim results
+// and report each capacity key independently, sorted by name.
 func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 	driver := "gpu.example.com"
-	slice := makeSlice("shareable", driver, "pool-0", "node-0", 1)
-	slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
-	slice.Spec.Devices[0].Capacity = map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
-		"memory": {Value: qty("40Gi")},
-	}
-	claim := makeAllocatedClaim("c0", "ns", driver, "pool-0", "device-0")
-	claim.Status.Allocation.Devices.Results[0].ConsumedCapacity = map[resourcev1.QualifiedName]resource.Quantity{
-		"memory": qty("10Gi"),
+
+	testCases := map[string]struct {
+		capacity      map[resourcev1.QualifiedName]resourcev1.DeviceCapacity
+		consumed      map[resourcev1.QualifiedName]resource.Quantity
+		wantFully     int32
+		wantPartially int32
+		// want maps each capacity name to {total, consumed, available}.
+		want map[string][3]string
+	}{
+		"single capacity": {
+			capacity:      map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{"memory": {Value: qty("40Gi")}},
+			consumed:      map[resourcev1.QualifiedName]resource.Quantity{"memory": qty("10Gi")},
+			wantPartially: 1,
+			want:          map[string][3]string{"memory": {"40Gi", "10Gi", "30Gi"}},
+		},
+		"multiple capacities": {
+			capacity: map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
+				"memory": {Value: qty("40Gi")},
+				"cores":  {Value: qty("8")},
+			},
+			consumed: map[resourcev1.QualifiedName]resource.Quantity{
+				"memory": qty("10Gi"),
+				"cores":  qty("2"),
+			},
+			wantPartially: 1,
+			want: map[string][3]string{
+				"memory": {"40Gi", "10Gi", "30Gi"},
+				"cores":  {"8", "2", "6"},
+			},
+		},
 	}
 
-	status := runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{slice}, []*resourcev1.ResourceClaim{claim})
-	pool := requireSinglePool(t, status)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			slice := makeSlice("shareable", driver, "pool-0", "node-0", 1)
+			slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+			slice.Spec.Devices[0].Capacity = tc.capacity
+			claim := makeAllocatedClaim("c0", "ns", driver, "pool-0", "device-0")
+			claim.Status.Allocation.Devices.Results[0].ConsumedCapacity = tc.consumed
 
-	if pool.ShareableSummary == nil {
-		t.Fatal("expected a shareableSummary")
-	}
-	sh := pool.ShareableSummary
-	if ptr.Deref(sh.FullyAvailableDevices, 0) != 0 || ptr.Deref(sh.PartiallyAvailableDevices, 0) != 1 {
-		t.Errorf("full/partial devices = %d/%d, want 0/1", ptr.Deref(sh.FullyAvailableDevices, 0), ptr.Deref(sh.PartiallyAvailableDevices, 0))
-	}
-	if len(sh.Capacity) != 1 {
-		t.Fatalf("want 1 capacity key, got %d", len(sh.Capacity))
-	}
-	if sh.Capacity[0].Total.String() != "40Gi" || sh.Capacity[0].Consumed.String() != "10Gi" || sh.Capacity[0].Available.Cmp(qty("30Gi")) != 0 {
-		t.Errorf("capacity = %+v, want total=40Gi consumed=10Gi available=30Gi", sh.Capacity[0])
-	}
-}
-
-// End-to-end: a shareable device advertising multiple capacities aggregates and
-// reports each key independently, sorted by name.
-func TestCalculatePoolStatus_ShareableSummary_MultipleCapacities(t *testing.T) {
-	driver := "gpu.example.com"
-	slice := makeSlice("shareable", driver, "pool-0", "node-0", 1)
-	slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
-	slice.Spec.Devices[0].Capacity = map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
-		"memory": {Value: qty("40Gi")},
-		"cores":  {Value: qty("8")},
-	}
-	claim := makeAllocatedClaim("c0", "ns", driver, "pool-0", "device-0")
-	claim.Status.Allocation.Devices.Results[0].ConsumedCapacity = map[resourcev1.QualifiedName]resource.Quantity{
-		"memory": qty("10Gi"),
-		"cores":  qty("2"),
-	}
-
-	status := runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{slice}, []*resourcev1.ResourceClaim{claim})
-	pool := requireSinglePool(t, status)
-
-	if pool.ShareableSummary == nil {
-		t.Fatal("expected a shareableSummary")
-	}
-	got := map[string][3]string{}
-	for _, c := range pool.ShareableSummary.Capacity {
-		got[c.Name] = [3]string{c.Total.String(), c.Consumed.String(), c.Available.String()}
-	}
-	if want := [3]string{"8", "2", "6"}; got["cores"] != want {
-		t.Errorf("cores {total,consumed,available} = %v, want %v", got["cores"], want)
-	}
-	if want := [3]string{"40Gi", "10Gi", "30Gi"}; got["memory"] != want {
-		t.Errorf("memory {total,consumed,available} = %v, want %v", got["memory"], want)
+			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{slice}, []*resourcev1.ResourceClaim{claim}))
+			if pool.ShareableSummary == nil {
+				t.Fatal("expected a shareableSummary")
+			}
+			sh := pool.ShareableSummary
+			if gotFully, gotPartially := ptr.Deref(sh.FullyAvailableDevices, 0), ptr.Deref(sh.PartiallyAvailableDevices, 0); gotFully != tc.wantFully || gotPartially != tc.wantPartially {
+				t.Errorf("full/partial devices = %d/%d, want %d/%d", gotFully, gotPartially, tc.wantFully, tc.wantPartially)
+			}
+			got := map[string][3]string{}
+			for _, c := range sh.Capacity {
+				got[c.Name] = [3]string{c.Total.String(), c.Consumed.String(), c.Available.String()}
+			}
+			if !maps.Equal(got, tc.want) {
+				t.Errorf("capacity {total,consumed,available} = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

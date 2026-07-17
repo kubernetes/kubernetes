@@ -740,8 +740,8 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			return counterSet.Name
 		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
 
+	// The name format is validated declaratively; see the field's tags.
 	if spec.PartitionTypeAttribute != nil {
-		allErrs = append(allErrs, validateFullyQualifiedName(*spec.PartitionTypeAttribute, fldPath.Child("partitionTypeAttribute"))...)
 		if len(spec.Devices) == 0 && len(spec.SharedCounters) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("partitionTypeAttribute"), *spec.PartitionTypeAttribute,
 				"may only be set on a slice that declares devices or shared counters"))

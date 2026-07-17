@@ -23,8 +23,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/resource/resourcepoolstatusrequest"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
@@ -43,8 +46,9 @@ func TestDeclarativeValidate(t *testing.T) {
 	})
 
 	testCases := map[string]struct {
-		input        resource.ResourcePoolStatusRequest
-		expectedErrs field.ErrorList
+		input                   resource.ResourcePoolStatusRequest
+		enablePartitionTypeAttr bool
+		expectedErrs            field.ErrorList
 	}{
 		"valid": {
 			input: mkValidRPSR(),
@@ -69,12 +73,36 @@ func TestDeclarativeValidate(t *testing.T) {
 			input:        mkValidRPSR(setPoolName("invalid pool!")),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "poolName"), nil, "").WithOrigin("format=k8s-resource-pool-name")},
 		},
+		"valid partitionTypeAttribute": {
+			// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
+			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
+				r.Spec.PartitionTypeAttribute = new("gpu.example.com/profile")
+			}),
+			enablePartitionTypeAttr: true,
+		},
 		"invalid partitionTypeAttribute format": {
-			// +k8s:format=k8s-resource-fully-qualified-name (standard DV)
+			// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
 			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
 				r.Spec.PartitionTypeAttribute = new("invalid attr!")
 			}),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
+			enablePartitionTypeAttr: true,
+			expectedErrs:            field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
+		},
+		"partitionTypeAttribute without domain": {
+			// A bare name is a valid attribute key but not a valid reference:
+			// the domain is required so the attribute is unambiguous.
+			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
+				r.Spec.PartitionTypeAttribute = new("profile")
+			}),
+			enablePartitionTypeAttr: true,
+			expectedErrs:            field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
+		},
+		"partitionTypeAttribute with feature disabled": {
+			// +k8s:ifDisabled(DRAPartitionableDevicesType)=+k8s:forbidden
+			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
+				r.Spec.PartitionTypeAttribute = new("gpu.example.com/profile")
+			}),
+			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "partitionTypeAttribute"), "")},
 		},
 		"limit zero": {
 			// +k8s:minimum=1 (standard DV)
@@ -108,6 +136,10 @@ func TestDeclarativeValidate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			// DRAPartitionableDevicesType depends on DRAResourcePoolStatus, so it
+			// cannot be enabled on its own.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourcePoolStatus, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevicesType, tc.enablePartitionTypeAttr)
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}

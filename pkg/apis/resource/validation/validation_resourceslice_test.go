@@ -271,14 +271,8 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
-		"bad-partition-type-attribute": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), resourceapi.FullyQualifiedName("profile"), "a fully qualified name must be a domain and a name separated by a slash")},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
-				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName("profile"))
-				return slice
-			}(),
-		},
+		// The name format is validated declaratively; see the declarative
+		// validation tests for that coverage.
 		"partition-type-attribute-without-devices-or-counters": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), resourceapi.FullyQualifiedName("gpu.example.com/profile"), "may only be set on a slice that declares devices or shared counters")},
 			slice: func() *resourceapi.ResourceSlice {

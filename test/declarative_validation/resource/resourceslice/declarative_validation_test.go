@@ -24,10 +24,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/resource/resourceslice"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
@@ -47,8 +50,9 @@ func TestDeclarativeValidate(t *testing.T) {
 			strategy := registry.Strategy
 
 			testCases := map[string]struct {
-				input        resource.ResourceSlice
-				expectedErrs field.ErrorList
+				input                   resource.ResourceSlice
+				enablePartitionTypeAttr bool
+				expectedErrs            field.ErrorList
 			}{
 				"valid": {
 					input: mkResourceSliceWithDevices(),
@@ -266,11 +270,42 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "").MarkBeta(),
 					},
 				},
+				// spec.partitionTypeAttribute
+				"valid: partitionTypeAttribute": {
+					input:                   mkResourceSliceWithDevices(tweakPartitionTypeAttribute("gpu.example.com/profile")),
+					enablePartitionTypeAttr: true,
+				},
+				"invalid: partitionTypeAttribute format": {
+					input:                   mkResourceSliceWithDevices(tweakPartitionTypeAttribute("invalid attr!")),
+					enablePartitionTypeAttr: true,
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+					},
+				},
+				// A bare name is a valid attribute key but not a valid reference:
+				// the domain is required so the attribute is unambiguous.
+				"invalid: partitionTypeAttribute without domain": {
+					input:                   mkResourceSliceWithDevices(tweakPartitionTypeAttribute("profile")),
+					enablePartitionTypeAttr: true,
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+					},
+				},
+				"invalid: partitionTypeAttribute with feature disabled": {
+					input: mkResourceSliceWithDevices(tweakPartitionTypeAttribute("gpu.example.com/profile")),
+					expectedErrs: field.ErrorList{
+						field.Forbidden(field.NewPath("spec", "partitionTypeAttribute"), ""),
+					},
+				},
 				// TODO: Add more test cases
 			}
 
 			for k, tc := range testCases {
 				t.Run(k, func(t *testing.T) {
+					// DRAPartitionableDevicesType depends on DRAResourcePoolStatus,
+					// so it cannot be enabled on its own.
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourcePoolStatus, true)
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevicesType, tc.enablePartitionTypeAttr)
 					apitesting.VerifyValidationEquivalence(
 						t, ctx, &tc.input, strategy, tc.expectedErrs,
 						apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...),
@@ -612,6 +647,12 @@ func tweakBindingConditions(count int) func(*resource.ResourceSlice) {
 func tweakDeviceTaintEffect(effect string) func(*resource.ResourceSlice) {
 	return func(rs *resource.ResourceSlice) {
 		rs.Spec.Devices[0].Taints[0].Effect = resource.DeviceTaintEffect(effect)
+	}
+}
+
+func tweakPartitionTypeAttribute(name resource.FullyQualifiedName) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.PartitionTypeAttribute = &name
 	}
 }
 

@@ -228,6 +228,9 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +featureGate=DRAPartitionableDevicesType
+	// +k8s:ifDisabled(DRAPartitionableDevicesType)=+k8s:forbidden
+	// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
+	// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
 	PartitionTypeAttribute *FullyQualifiedName `json:"partitionTypeAttribute,omitempty" protobuf:"bytes,9,opt,name=partitionTypeAttribute"`
 }
 

@@ -993,13 +993,20 @@ func Validate_ResourcePoolStatusRequestSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "DRAPartitionableDevicesType", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "DRAPartitionableDevicesType", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "DRAPartitionableDevicesType", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "DRAPartitionableDevicesType", true, validate.ResourceFullyQualifiedName); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
