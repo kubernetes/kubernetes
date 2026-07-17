@@ -18,7 +18,9 @@ package incubating
 
 import (
 	"errors"
+	"math"
 
+	inf "gopkg.in/inf.v0"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
@@ -118,17 +120,59 @@ func roundUpRange(requestedVal *resource.Quantity, validRange *resourceapi.Capac
 	if validRange.Step == nil {
 		return *requestedVal
 	}
-	requestedInt64 := requestedVal.Value()
-	step := validRange.Step.Value()
-	min := validRange.Min.Value()
-	added := (requestedInt64 - min)
-	n := added / step
-	mod := added % step
-	if mod != 0 {
-		n += 1
+	// Integer arithmetic fast path, guarded against int64 overflow and against a
+	// step whose Value() is 0 (a quantity larger than MaxInt64, for example "100E",
+	// which would otherwise divide by zero). Fall back to exact arithmetic when a
+	// value does not fit int64 or when min+step*n would overflow.
+	if fitsInt64Value(requestedVal) && fitsInt64Value(validRange.Min) && fitsInt64Value(validRange.Step) {
+		if step := validRange.Step.Value(); step > 0 {
+			requestedInt64 := requestedVal.Value()
+			min := validRange.Min.Value()
+			added := requestedInt64 - min
+			n := added / step
+			if added%step != 0 {
+				n++
+			}
+			if val, ok := safeMinPlusStepN(min, step, n); ok {
+				return *resource.NewQuantity(val, resource.BinarySI)
+			}
+		}
 	}
-	val := min + step*n
-	return *resource.NewQuantity(val, resource.BinarySI)
+	return roundUpRangeArbitrary(requestedVal, validRange.Min, validRange.Step)
+}
+
+// fitsInt64Value reports whether q is non-negative and small enough that q.Value()
+// is exact. A quantity larger than MaxInt64 wraps, for example "100E".Value() == 0.
+func fitsInt64Value(q *resource.Quantity) bool {
+	return q.Sign() >= 0 && q.CmpInt64(math.MaxInt64) <= 0
+}
+
+// safeMinPlusStepN returns base+step*n and reports whether that int64 computation
+// stays within range. base, step and n are assumed non-negative.
+func safeMinPlusStepN(base, step, n int64) (int64, bool) {
+	if n != 0 && step > (math.MaxInt64-base)/n {
+		return 0, false
+	}
+	return base + step*n, true
+}
+
+// roundUpRangeArbitrary rounds requestedVal up to minVal+ceil((requestedVal-minVal)/step)*step
+// with arbitrary precision, for the cases the int64 fast path cannot represent
+// without overflowing or dividing by zero.
+func roundUpRangeArbitrary(requestedVal, minVal, step *resource.Quantity) resource.Quantity {
+	added := new(inf.Dec).Sub(requestedVal.AsDec(), minVal.AsDec())
+	n := new(inf.Dec).QuoRound(added, step.AsDec(), 0, inf.RoundCeil)
+	result := new(inf.Dec).Add(minVal.AsDec(), new(inf.Dec).Mul(n, step.AsDec()))
+	return *resource.NewDecimalQuantity(*result, step.Format)
+}
+
+// isStepMultiple reports whether requestedVal-minVal is an exact multiple of step,
+// using arbitrary precision so it neither overflows nor divides by zero.
+func isStepMultiple(requestedVal, minVal, step *resource.Quantity) bool {
+	added := new(inf.Dec).Sub(requestedVal.AsDec(), minVal.AsDec())
+	n := new(inf.Dec).QuoRound(added, step.AsDec(), 0, inf.RoundDown)
+	remainder := new(inf.Dec).Sub(added, new(inf.Dec).Mul(n, step.AsDec()))
+	return remainder.Sign() == 0
 }
 
 // roundUpValidValues returns the first value in validValues that is greater than or equal to requestedVal.
@@ -188,15 +232,16 @@ func violateValidRange(requestedVal resource.Quantity, validRange resourceapi.Ca
 		return true
 	}
 	if validRange.Step != nil {
-		requestedInt64 := requestedVal.Value()
-		step := validRange.Step.Value()
-		min := validRange.Min.Value()
-		added := (requestedInt64 - min)
-		mod := added % step
-		// must be a multiply of step
-		if mod != 0 {
-			return true
+		// Guard against int64 overflow and against a step whose Value() is 0 (a
+		// quantity larger than MaxInt64); fall back to exact arithmetic otherwise.
+		if fitsInt64Value(&requestedVal) && fitsInt64Value(validRange.Min) && fitsInt64Value(validRange.Step) {
+			if step := validRange.Step.Value(); step > 0 {
+				added := requestedVal.Value() - validRange.Min.Value()
+				return added%step != 0
+			}
 		}
+		// must be a multiple of step
+		return !isStepMultiple(&requestedVal, validRange.Min, validRange.Step)
 	}
 	return false
 }

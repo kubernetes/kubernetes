@@ -17,6 +17,7 @@ limitations under the License.
 package incubating
 
 import (
+	"math"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -113,6 +114,51 @@ func TestConsumableCapacity(t *testing.T) {
 
 	t.Run("calculate-consumed-capacity", testCalculateConsumedCapacity)
 
+	t.Run("round-up-range-overflow", testRoundUpRangeOverflow)
+
+}
+
+// testRoundUpRangeOverflow checks that roundUpRange does not overflow int64 or
+// divide by zero for large capacity requests.
+func testRoundUpRangeOverflow(t *testing.T) {
+	g := NewWithT(t)
+
+	// Min and Step fit int64 and pass field validation, but a request near
+	// MaxInt64 makes the integer path compute min+step*n past MaxInt64. Before the
+	// guard this wrapped to a negative value below the request.
+	req := resource.NewQuantity(math.MaxInt64, resource.BinarySI)
+	overflowRange := &resourceapi.CapacityRequestPolicyRange{
+		Min:  ptr.To(resource.MustParse("0")),
+		Step: ptr.To(resource.MustParse("100")),
+	}
+	got := roundUpRange(req, overflowRange)
+	g.Expect(got.Cmp(resource.MustParse("9223372036854775900"))).To(Equal(0),
+		"MaxInt64 rounded up to the next multiple of 100 is 9223372036854775900, got %s", got.String())
+
+	// A step whose Value() is 0 (a quantity larger than MaxInt64, for example
+	// 100E) divided by zero in the integer path. It must fall back to exact
+	// arithmetic rather than panic.
+	bigReq := ptr.To(resource.MustParse("1E"))
+	divZeroRange := &resourceapi.CapacityRequestPolicyRange{
+		Min:  ptr.To(resource.MustParse("0")),
+		Step: ptr.To(resource.MustParse("100E")),
+	}
+	var bigGot resource.Quantity
+	g.Expect(func() { bigGot = roundUpRange(bigReq, divZeroRange) }).ToNot(Panic(),
+		"roundUpRange must not divide by zero when step.Value() is 0")
+	g.Expect(bigGot.Cmp(resource.MustParse("100E"))).To(Equal(0),
+		"1E rounded up to the next multiple of 100E is 100E, got %s", bigGot.String())
+
+	// violateValidRange does the same integer division; a step whose Value() is 0
+	// divides by zero. It must fall back to exact arithmetic rather than panic.
+	var violated bool
+	g.Expect(func() {
+		violated = violateValidRange(resource.MustParse("50"), resourceapi.CapacityRequestPolicyRange{
+			Min:  ptr.To(resource.MustParse("0")),
+			Step: ptr.To(resource.MustParse("100E")),
+		})
+	}).ToNot(Panic(), "violateValidRange must not divide by zero when step.Value() is 0")
+	g.Expect(violated).To(BeTrue(), "50 is not a multiple of 100E, so it violates the range")
 }
 
 func testViolateCapacityRequestPolicy(t *testing.T) {
