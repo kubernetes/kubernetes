@@ -52,6 +52,8 @@ spec:
             value: "true"
           - name: USE_POD_CIDR
             value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
         volumeMounts:
         - mountPath: /etc/calico
           name: etc-calico
