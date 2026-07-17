@@ -166,18 +166,18 @@ type PlacementFeasiblePlugin interface {
 	fwk.Plugin
 
 	// PlacementFeasible is called after each pod in a pod group is evaluated.
-	// placementFeasibleArgs contains information that plugins might additionally need when determining whether pod group scheduling placement is feasible.
+	// placementProgress contains information that plugins might additionally need when determining whether pod group scheduling placement is feasible.
 	// Return Wait status if the pod group cannot be scheduled in the current partially evaluated placement, but may become schedulable once more pods are evaluated.
 	// Return Unschedulable status if the pod group cannot be scheduled in the current placement.
 	// The scheduler will give up this placement and won't even evaluate remaining pods. The placement will remain eligible for preemption.
 	// Return Success status if the pod group can be scheduled in the current partially evaluated placement.
 	// After returning Success, the plugin should keep returning Success for the remaining pods.
-	PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, placementFeasibleArgs PlacementFeasibleArgs) *fwk.Status
+	PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, placementProgress PlacementProgress) *fwk.Status
 }
 
-// PlacementFeasibleArgs contains information that plugins implementing the PlacementFeasiblePlugin
+// PlacementProgress contains information that plugins implementing the PlacementFeasiblePlugin
 // interface might additionally need when determining whether pod group scheduling placement is feasible.
-type PlacementFeasibleArgs struct {
+type PlacementProgress struct {
 	// Remaining is the number of children that have not been evaluated yet in the current scheduling cycle. For pod groups, this is the number of unscheduled pods.
 	Remaining int
 	// Scheduled is the number of children scheduled so far in the current pod group scheduling cycle
@@ -264,7 +264,7 @@ type Framework interface {
 	// If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
 	// Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins won't be invoked and the result will be Unschedulable. The placement will remain eligible for preemption.
 	// Otherwise, if at least 1 plugin returns Wait, the remaining plugins will be invoked and the result will be Wait.
-	RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, placementFeasibleArgs PlacementFeasibleArgs) *fwk.Status
+	RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, placementProgress PlacementProgress) *fwk.Status
 
 	// AddWaitingPod creates a waiting pod instance and adds it to the framework.
 	// It takes the pluginsWaitTime map returned by the RunPermitPlugins.

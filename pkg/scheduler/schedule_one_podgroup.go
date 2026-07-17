@@ -592,11 +592,11 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 
 	// Run PlacementFeasible plugins to check if the pod group can meet its constraints
 	// before even attempting to schedule any pods.
-	placementFeasibleArgs := framework.PlacementFeasibleArgs{
+	placementProgress := framework.PlacementProgress{
 		Remaining: len(podGroupInfo.GetUnscheduledPods()),
 		Scheduled: podGroupState.ScheduledPodsCount(),
 	}
-	placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementFeasibleArgs)
+	placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
 	result.status = placementFeasibleStatus
 	if placementFeasibleStatus.IsError() {
 		// Do not evaluate any pods if PlacementFeasible plugins return error or unexpected status.
@@ -629,11 +629,11 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 		}
 
 		// Check if the pod group can still meet its constraints after scheduling the current pod.
-		placementFeasibleArgs.Remaining--
+		placementProgress.Remaining--
 		if podResult.status.IsSuccess() {
-			placementFeasibleArgs.Scheduled++
+			placementProgress.Scheduled++
 		}
-		placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementFeasibleArgs)
+		placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
 		if placementFeasibleStatus.IsError() {
 			// Stop evaluating the rest of the pods if PlacementFeasible plugins return error or unexpected status.
 			result.status = fwk.AsStatus(fmt.Errorf("failed to evaluate placement feasibility: %w", placementFeasibleStatus.AsError()))
@@ -1198,12 +1198,12 @@ func (sched *Scheduler) compositePodGroupSchedulingAlgorithm(ctx context.Context
 		}
 	}()
 
-	placementFeasibleArgs := framework.PlacementFeasibleArgs{
+	placementProgress := framework.PlacementProgress{
 		Remaining: len(podGroupInfo.Children),
 	}
 	placementCycleState := framework.NewCycleState()
 	placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
-	placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementFeasibleArgs)
+	placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
 
 	if placementFeasibleStatus.Code() == fwk.Unschedulable || placementFeasibleStatus.Code() == fwk.Error {
 		return &podGroupAlgorithmResult{
@@ -1223,11 +1223,11 @@ func (sched *Scheduler) compositePodGroupSchedulingAlgorithm(ctx context.Context
 		}
 		anyScheduled = anyScheduled || childResult.anyScheduled
 		revertFns.append(childRevertFns)
-		placementFeasibleArgs.Remaining--
+		placementProgress.Remaining--
 		if childResult.status.IsSuccess() {
-			placementFeasibleArgs.Scheduled++
+			placementProgress.Scheduled++
 		}
-		placementFeasibleStatus = schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementFeasibleArgs)
+		placementFeasibleStatus = schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
 		if placementFeasibleStatus.Code() == fwk.Unschedulable || placementFeasibleStatus.Code() == fwk.Error {
 			break
 		}
