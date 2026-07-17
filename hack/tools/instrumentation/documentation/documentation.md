@@ -8,7 +8,7 @@ description: >-
 
 ## Metrics (v1.37)
 
-<!-- (auto-generated 2026 May 23) -->
+<!-- (auto-generated 2026 Jul 15) -->
 <!-- (auto-generated v1.37) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
@@ -1873,6 +1873,20 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">result</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">cloud_node_lifecycle_controller_cloud_provider_calls_total</div>
+	<div class="metric_help">The total number of cloud provider API calls, labeled by operation and result.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">operation</span><span class="metric_label">result</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>cloud-controller-manager (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">cloud_node_lifecycle_controller_monitor_nodes_duration_seconds</div>
+	<div class="metric_help">A metric measuring the duration in seconds of a single MonitorNodes loop execution.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>cloud-controller-manager (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">cloud_provider_webhook_request_duration_seconds</div>
 	<div class="metric_help">Request latency in seconds. Broken down by status code.</div>
 	<ul>
@@ -2299,20 +2313,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">usage</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kube_apiserver_pod_logs_pods_logs_backend_tls_failure_total</div>
-	<div class="metric_help">Total number of requests for pods/logs that failed due to kubelet server TLS verification</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li><li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>1.27.0</span></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kube_apiserver_pod_logs_pods_logs_insecure_backend_total</div>
-	<div class="metric_help">Total number of requests for pods/logs sliced by usage type: enforce_tls, skip_tls_allowed, skip_tls_denied</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">usage</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li><li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>1.27.0</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">kubelet_active_pods</div>
 	<div class="metric_help">The number of pods the kubelet considers active and which are being considered when admitting new pods. static is true if the pod is not from the apiserver.</div>
@@ -2916,6 +2916,27 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">preemption_signal</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubelet_resource_manager_allocation_errors_total</div>
+	<div class="metric_help">Number of errors encountered during exclusive resource allocation.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">resource_name</span><span class="metric_label">source</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubelet_resource_manager_allocations_total</div>
+	<div class="metric_help">Number of exclusive resource allocations performed by a resource manager.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">resource_name</span><span class="metric_label">source</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubelet_resource_manager_container_assignments_total</div>
+	<div class="metric_help">Number of containers with a specific type of resource assignment.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">assignment_type</span><span class="metric_label">resource_name</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">kubelet_restarted_pods_total</div>
 	<div class="metric_help">Number of pods that have been restarted because they were deleted and recreated with the same UID while the kubelet was watching them (common for static pods, extremely uncommon for API pods)</div>
 	<ul>
@@ -3301,6 +3322,27 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-proxy (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubeproxy_sync_proxy_rules_winkernel_lb_create_failures_total</div>
+	<div class="metric_help">Cumulative proxy winkernel lb create failures</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">error</span><span class="metric_label">ip_family</span><span class="metric_label">lb_type</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-proxy (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubeproxy_sync_proxy_rules_winkernel_lb_delete_failures_total</div>
+	<div class="metric_help">Cumulative proxy winkernel lb delete failures</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">error</span><span class="metric_label">ip_family</span><span class="metric_label">lb_type</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-proxy (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubeproxy_sync_proxy_rules_winkernel_lb_update_failures_total</div>
+	<div class="metric_help">Cumulative proxy winkernel lb update failures</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">error</span><span class="metric_label">ip_family</span><span class="metric_label">lb_type</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-proxy (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">leader_election_master_status</div>
 	<div class="metric_help">Gauge of if the reporting system is master of the relevant lease, 0 indicates backup, 1 indicates master. 'name' is the string used to identify the lease. Please make sure to group by name.</div>
 	<ul>
@@ -3531,27 +3573,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">group</span><span class="metric_label">resource</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-controller-manager (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">resource_manager_allocation_errors_total</div>
-	<div class="metric_help">Number of errors encountered during exclusive resource allocation.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">resource_name</span><span class="metric_label">source</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">resource_manager_allocations_total</div>
-	<div class="metric_help">Number of exclusive resource allocations performed by a resource manager.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">resource_name</span><span class="metric_label">source</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">resource_manager_container_assignments</div>
-	<div class="metric_help">Number of containers with a specific type of resource assignment.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">assignment_type</span><span class="metric_label">resource_name</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">resourcepoolstatusrequest_controller_request_processing_duration_seconds</div>
 	<div class="metric_help">Time taken to process a ResourcePoolStatusRequest</div>
@@ -3827,7 +3848,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_podgroup_scheduling_attempt_duration_seconds</div>
-	<div class="metric_help">Pod group scheduling attempt latency in seconds (scheduling algorithm + binding)</div>
+	<div class="metric_help">Pod group scheduling attempt latency in seconds</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
