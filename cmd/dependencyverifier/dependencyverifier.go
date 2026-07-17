@@ -74,7 +74,11 @@ func runCommandInDir(dir string, cmd []string) (string, error) {
 	if !allowedCommands[cmd[0]] {
 		return "", fmt.Errorf("executable %q is not in the list of allowed commands", cmd[0])
 	}
-	c := exec.Command(cmd[0], cmd[1:]...)
+	resolvedPath, err := exec.LookPath(cmd[0])
+	if err != nil {
+		return "", fmt.Errorf("executable %q not found in PATH: %w", cmd[0], err)
+	}
+	c := exec.Command(resolvedPath, cmd[1:]...)
 	c.Dir = dir
 	output, err := c.CombinedOutput()
 	if err != nil {
