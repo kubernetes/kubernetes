@@ -610,7 +610,7 @@ func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLin
 		return node
 	}
 	var symbolReference types.Name
-	var defaultValue interface{}
+	var defaultValue json.RawMessage
 	if id, ok := parseSymbolReference(defaultString, commentPackage); ok {
 		symbolReference = id
 		defaultString = ""
@@ -619,11 +619,16 @@ func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLin
 	}
 
 	if defaultValue != nil {
-		zero := typeZeroValue[t.String()]
-		if reflect.DeepEqual(defaultValue, zero) {
-			// If the default value annotation matches the default value for the type,
-			// do not generate any defaulting function
-			return node
+		if zero, ok := typeZeroValue[t.String()]; ok {
+			zeroJSON, err := json.Marshal(zero)
+			if err != nil {
+				klog.Fatalf("Failed to marshal zero value for type %v: %v", t.String(), err)
+			}
+			if bytes.Equal(defaultValue, zeroJSON) {
+				// If the default value annotation matches the default value for the type,
+				// do not generate any defaulting function
+				return node
+			}
 		}
 	}
 
