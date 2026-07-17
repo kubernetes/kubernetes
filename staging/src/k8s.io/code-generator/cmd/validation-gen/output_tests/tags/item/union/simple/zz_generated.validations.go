@@ -66,7 +66,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Tasks
+	{ // field Struct.Tasks ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/union/simple.Task)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Task,

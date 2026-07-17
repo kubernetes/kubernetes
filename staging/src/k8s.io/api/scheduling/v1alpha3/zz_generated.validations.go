@@ -40,7 +40,7 @@ func Validate_CompositeGangSchedulingPolicy(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *CompositeGangSchedulingPolicy) (errs field.ErrorList) {
 
-	{ // field CompositeGangSchedulingPolicy.MinGroupCount
+	{ // field CompositeGangSchedulingPolicy.MinGroupCount (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -83,7 +83,7 @@ func Validate_CompositePodGroup(
 
 	// field CompositePodGroup.TypeMeta has no validation
 
-	{ // field CompositePodGroup.ObjectMeta
+	{ // field CompositePodGroup.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -105,7 +105,7 @@ func Validate_CompositePodGroup(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroup.Spec
+	{ // field CompositePodGroup.Spec (k8s.io/api/scheduling/v1alpha3.CompositePodGroupSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *CompositePodGroupSpec,
@@ -127,7 +127,7 @@ func Validate_CompositePodGroup(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroup.Status
+	{ // field CompositePodGroup.Status (k8s.io/api/scheduling/v1alpha3.CompositePodGroupStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *CompositePodGroupStatus,
@@ -176,7 +176,7 @@ func Validate_CompositePodGroupSchedulingPolicy(
 		errs = append(errs, e...)
 	}
 
-	{ // field CompositePodGroupSchedulingPolicy.Basic
+	{ // field CompositePodGroupSchedulingPolicy.Basic (k8s.io/api/scheduling/v1alpha3.CompositeBasicSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *CompositeBasicSchedulingPolicy,
@@ -208,7 +208,7 @@ func Validate_CompositePodGroupSchedulingPolicy(
 		errs = append(errs, fn(fldPath.Child("basic"), obj.Basic, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroupSchedulingPolicy.Gang
+	{ // field CompositePodGroupSchedulingPolicy.Gang (k8s.io/api/scheduling/v1alpha3.CompositeGangSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *CompositeGangSchedulingPolicy,
@@ -251,7 +251,7 @@ func Validate_CompositePodGroupSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *CompositePodGroupSpec) (errs field.ErrorList) {
 
-	{ // field CompositePodGroupSpec.ParentCompositePodGroupName
+	{ // field CompositePodGroupSpec.ParentCompositePodGroupName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -286,7 +286,7 @@ func Validate_CompositePodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("parentCompositePodGroupName"), obj.ParentCompositePodGroupName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroupSpec.WorkloadRef
+	{ // field CompositePodGroupSpec.WorkloadRef (k8s.io/api/scheduling/v1alpha3.WorkloadReference)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *WorkloadReference,
@@ -321,7 +321,7 @@ func Validate_CompositePodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("workloadRef"), obj.WorkloadRef, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroupSpec.SchedulingPolicy
+	{ // field CompositePodGroupSpec.SchedulingPolicy (k8s.io/api/scheduling/v1alpha3.CompositePodGroupSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *CompositePodGroupSchedulingPolicy,
@@ -352,7 +352,7 @@ func Validate_CompositePodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("schedulingPolicy"), &obj.SchedulingPolicy, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroupSpec.PriorityClassName
+	{ // field CompositePodGroupSpec.PriorityClassName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -387,7 +387,7 @@ func Validate_CompositePodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("priorityClassName"), &obj.PriorityClassName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroupSpec.Priority
+	{ // field CompositePodGroupSpec.Priority (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -431,7 +431,7 @@ func Validate_CompositePodGroupStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *CompositePodGroupStatus) (errs field.ErrorList) {
 
-	{ // field CompositePodGroupStatus.Conditions
+	{ // field CompositePodGroupStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.Condition,
@@ -478,7 +478,7 @@ func Validate_CompositePodGroupTemplate(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *CompositePodGroupTemplate) (errs field.ErrorList) {
 
-	{ // field CompositePodGroupTemplate.Name
+	{ // field CompositePodGroupTemplate.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -510,7 +510,7 @@ func Validate_CompositePodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroupTemplate.SchedulingPolicy
+	{ // field CompositePodGroupTemplate.SchedulingPolicy (k8s.io/api/scheduling/v1alpha3.CompositePodGroupSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *CompositePodGroupSchedulingPolicy,
@@ -532,7 +532,7 @@ func Validate_CompositePodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("schedulingPolicy"), &obj.SchedulingPolicy, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroupTemplate.PriorityClassName
+	{ // field CompositePodGroupTemplate.PriorityClassName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -567,7 +567,7 @@ func Validate_CompositePodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("priorityClassName"), &obj.PriorityClassName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroupTemplate.Priority
+	{ // field CompositePodGroupTemplate.Priority (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -602,7 +602,7 @@ func Validate_CompositePodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("priority"), obj.Priority, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroupTemplate.PodGroupTemplates
+	{ // field CompositePodGroupTemplate.PodGroupTemplates ([]k8s.io/api/scheduling/v1alpha3.PodGroupTemplate)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []PodGroupTemplate,
@@ -649,7 +649,7 @@ func Validate_CompositePodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("podGroupTemplates"), obj.PodGroupTemplates, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CompositePodGroupTemplate.CompositePodGroupTemplates
+	{ // field CompositePodGroupTemplate.CompositePodGroupTemplates ([]k8s.io/api/scheduling/v1alpha3.CompositePodGroupTemplate)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []CompositePodGroupTemplate,
@@ -723,7 +723,7 @@ func Validate_DisruptionMode(
 		errs = append(errs, e...)
 	}
 
-	{ // field DisruptionMode.Single
+	{ // field DisruptionMode.Single (k8s.io/api/scheduling/v1alpha3.SingleDisruptionMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *SingleDisruptionMode,
@@ -751,7 +751,7 @@ func Validate_DisruptionMode(
 		errs = append(errs, fn(fldPath.Child("single"), obj.Single, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DisruptionMode.All
+	{ // field DisruptionMode.All (k8s.io/api/scheduling/v1alpha3.AllDisruptionMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *AllDisruptionMode,
@@ -788,7 +788,7 @@ func Validate_GangSchedulingPolicy(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *GangSchedulingPolicy) (errs field.ErrorList) {
 
-	{ // field GangSchedulingPolicy.MinCount
+	{ // field GangSchedulingPolicy.MinCount (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -831,7 +831,7 @@ func Validate_PodGroup(
 
 	// field PodGroup.TypeMeta has no validation
 
-	{ // field PodGroup.ObjectMeta
+	{ // field PodGroup.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -853,7 +853,7 @@ func Validate_PodGroup(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroup.Spec
+	{ // field PodGroup.Spec (k8s.io/api/scheduling/v1alpha3.PodGroupSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *PodGroupSpec,
@@ -875,7 +875,7 @@ func Validate_PodGroup(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroup.Status
+	{ // field PodGroup.Status (k8s.io/api/scheduling/v1alpha3.PodGroupStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *PodGroupStatus,
@@ -924,7 +924,7 @@ func Validate_PodGroupResourceClaim(
 		errs = append(errs, e...)
 	}
 
-	{ // field PodGroupResourceClaim.Name
+	{ // field PodGroupResourceClaim.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -956,7 +956,7 @@ func Validate_PodGroupResourceClaim(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupResourceClaim.ResourceClaimName
+	{ // field PodGroupResourceClaim.ResourceClaimName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -987,7 +987,7 @@ func Validate_PodGroupResourceClaim(
 		errs = append(errs, fn(fldPath.Child("resourceClaimName"), obj.ResourceClaimName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupResourceClaim.ResourceClaimTemplateName
+	{ // field PodGroupResourceClaim.ResourceClaimTemplateName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1029,7 +1029,7 @@ func Validate_PodGroupResourceClaimStatus(
 
 	// field PodGroupResourceClaimStatus.Name has no validation
 
-	{ // field PodGroupResourceClaimStatus.ResourceClaimName
+	{ // field PodGroupResourceClaimStatus.ResourceClaimName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1069,7 +1069,7 @@ func Validate_PodGroupSchedulingConstraints(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *PodGroupSchedulingConstraints) (errs field.ErrorList) {
 
-	{ // field PodGroupSchedulingConstraints.Topology
+	{ // field PodGroupSchedulingConstraints.Topology ([]k8s.io/api/scheduling/v1alpha3.TopologyConstraint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []TopologyConstraint,
@@ -1132,7 +1132,7 @@ func Validate_PodGroupSchedulingPolicy(
 		errs = append(errs, e...)
 	}
 
-	{ // field PodGroupSchedulingPolicy.Basic
+	{ // field PodGroupSchedulingPolicy.Basic (k8s.io/api/scheduling/v1alpha3.BasicSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *BasicSchedulingPolicy,
@@ -1164,7 +1164,7 @@ func Validate_PodGroupSchedulingPolicy(
 		errs = append(errs, fn(fldPath.Child("basic"), obj.Basic, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupSchedulingPolicy.Gang
+	{ // field PodGroupSchedulingPolicy.Gang (k8s.io/api/scheduling/v1alpha3.GangSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *GangSchedulingPolicy,
@@ -1223,7 +1223,7 @@ func Validate_PodGroupSpec(
 		errs = append(errs, e...)
 	}
 
-	{ // field PodGroupSpec.ParentCompositePodGroupName
+	{ // field PodGroupSpec.ParentCompositePodGroupName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1265,7 +1265,7 @@ func Validate_PodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("parentCompositePodGroupName"), obj.ParentCompositePodGroupName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupSpec.WorkloadRef
+	{ // field PodGroupSpec.WorkloadRef (k8s.io/api/scheduling/v1alpha3.WorkloadReference)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *WorkloadReference,
@@ -1299,7 +1299,7 @@ func Validate_PodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("workloadRef"), obj.WorkloadRef, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupSpec.SchedulingPolicy
+	{ // field PodGroupSpec.SchedulingPolicy (k8s.io/api/scheduling/v1alpha3.PodGroupSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *PodGroupSchedulingPolicy,
@@ -1321,7 +1321,7 @@ func Validate_PodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("schedulingPolicy"), &obj.SchedulingPolicy, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupSpec.SchedulingConstraints
+	{ // field PodGroupSpec.SchedulingConstraints (k8s.io/api/scheduling/v1alpha3.PodGroupSchedulingConstraints)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *PodGroupSchedulingConstraints,
@@ -1362,7 +1362,7 @@ func Validate_PodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("schedulingConstraints"), obj.SchedulingConstraints, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupSpec.ResourceClaims
+	{ // field PodGroupSpec.ResourceClaims ([]k8s.io/api/scheduling/v1alpha3.PodGroupResourceClaim)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []PodGroupResourceClaim,
@@ -1408,7 +1408,7 @@ func Validate_PodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("resourceClaims"), obj.ResourceClaims, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupSpec.DisruptionMode
+	{ // field PodGroupSpec.DisruptionMode (k8s.io/api/scheduling/v1alpha3.DisruptionMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DisruptionMode,
@@ -1444,7 +1444,7 @@ func Validate_PodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("disruptionMode"), obj.DisruptionMode, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupSpec.PriorityClassName
+	{ // field PodGroupSpec.PriorityClassName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1479,7 +1479,7 @@ func Validate_PodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("priorityClassName"), &obj.PriorityClassName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupSpec.Priority
+	{ // field PodGroupSpec.Priority (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -1514,7 +1514,7 @@ func Validate_PodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("priority"), obj.Priority, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupSpec.PreemptionPolicy
+	{ // field PodGroupSpec.PreemptionPolicy (k8s.io/api/scheduling/v1alpha3.PreemptionPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *PreemptionPolicy,
@@ -1564,7 +1564,7 @@ func Validate_PodGroupStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *PodGroupStatus) (errs field.ErrorList) {
 
-	{ // field PodGroupStatus.Conditions
+	{ // field PodGroupStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.Condition,
@@ -1602,7 +1602,7 @@ func Validate_PodGroupStatus(
 		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupStatus.ResourceClaimStatuses
+	{ // field PodGroupStatus.ResourceClaimStatuses ([]k8s.io/api/scheduling/v1alpha3.PodGroupResourceClaimStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []PodGroupResourceClaimStatus,
@@ -1653,7 +1653,7 @@ func Validate_PodGroupTemplate(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *PodGroupTemplate) (errs field.ErrorList) {
 
-	{ // field PodGroupTemplate.Name
+	{ // field PodGroupTemplate.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1685,7 +1685,7 @@ func Validate_PodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupTemplate.SchedulingPolicy
+	{ // field PodGroupTemplate.SchedulingPolicy (k8s.io/api/scheduling/v1alpha3.PodGroupSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *PodGroupSchedulingPolicy,
@@ -1707,7 +1707,7 @@ func Validate_PodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("schedulingPolicy"), &obj.SchedulingPolicy, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupTemplate.SchedulingConstraints
+	{ // field PodGroupTemplate.SchedulingConstraints (k8s.io/api/scheduling/v1alpha3.PodGroupSchedulingConstraints)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *PodGroupSchedulingConstraints,
@@ -1748,7 +1748,7 @@ func Validate_PodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("schedulingConstraints"), obj.SchedulingConstraints, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupTemplate.ResourceClaims
+	{ // field PodGroupTemplate.ResourceClaims ([]k8s.io/api/scheduling/v1alpha3.PodGroupResourceClaim)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []PodGroupResourceClaim,
@@ -1794,7 +1794,7 @@ func Validate_PodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("resourceClaims"), obj.ResourceClaims, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupTemplate.DisruptionMode
+	{ // field PodGroupTemplate.DisruptionMode (k8s.io/api/scheduling/v1alpha3.DisruptionMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DisruptionMode,
@@ -1828,7 +1828,7 @@ func Validate_PodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("disruptionMode"), obj.DisruptionMode, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupTemplate.PriorityClassName
+	{ // field PodGroupTemplate.PriorityClassName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1863,7 +1863,7 @@ func Validate_PodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("priorityClassName"), &obj.PriorityClassName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupTemplate.Priority
+	{ // field PodGroupTemplate.Priority (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -1898,7 +1898,7 @@ func Validate_PodGroupTemplate(
 		errs = append(errs, fn(fldPath.Child("priority"), obj.Priority, oldVal, oldObj != nil)...)
 	}
 
-	{ // field PodGroupTemplate.PreemptionPolicy
+	{ // field PodGroupTemplate.PreemptionPolicy (k8s.io/api/scheduling/v1alpha3.PreemptionPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *PreemptionPolicy,
@@ -1963,7 +1963,7 @@ func Validate_TopologyConstraint(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *TopologyConstraint) (errs field.ErrorList) {
 
-	{ // field TopologyConstraint.Key
+	{ // field TopologyConstraint.Key (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2004,7 +2004,7 @@ func Validate_TypedLocalObjectReference(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *TypedLocalObjectReference) (errs field.ErrorList) {
 
-	{ // field TypedLocalObjectReference.APIGroup
+	{ // field TypedLocalObjectReference.APIGroup (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2035,7 +2035,7 @@ func Validate_TypedLocalObjectReference(
 		errs = append(errs, fn(fldPath.Child("apiGroup"), &obj.APIGroup, oldVal, oldObj != nil)...)
 	}
 
-	{ // field TypedLocalObjectReference.Kind
+	{ // field TypedLocalObjectReference.Kind (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2067,7 +2067,7 @@ func Validate_TypedLocalObjectReference(
 		errs = append(errs, fn(fldPath.Child("kind"), &obj.Kind, oldVal, oldObj != nil)...)
 	}
 
-	{ // field TypedLocalObjectReference.Name
+	{ // field TypedLocalObjectReference.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2110,7 +2110,7 @@ func Validate_Workload(
 
 	// field Workload.TypeMeta has no validation
 
-	{ // field Workload.ObjectMeta
+	{ // field Workload.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -2132,7 +2132,7 @@ func Validate_Workload(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Workload.Spec
+	{ // field Workload.Spec (k8s.io/api/scheduling/v1alpha3.WorkloadSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *WorkloadSpec,
@@ -2181,7 +2181,7 @@ func Validate_WorkloadPodGroupDisruptionMode(
 		errs = append(errs, e...)
 	}
 
-	{ // field WorkloadPodGroupDisruptionMode.Single
+	{ // field WorkloadPodGroupDisruptionMode.Single (k8s.io/api/scheduling/v1alpha3.WorkloadPodGroupSingleDisruptionMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *WorkloadPodGroupSingleDisruptionMode,
@@ -2209,7 +2209,7 @@ func Validate_WorkloadPodGroupDisruptionMode(
 		errs = append(errs, fn(fldPath.Child("single"), obj.Single, oldVal, oldObj != nil)...)
 	}
 
-	{ // field WorkloadPodGroupDisruptionMode.All
+	{ // field WorkloadPodGroupDisruptionMode.All (k8s.io/api/scheduling/v1alpha3.WorkloadPodGroupAllDisruptionMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *WorkloadPodGroupAllDisruptionMode,
@@ -2246,7 +2246,7 @@ func Validate_WorkloadPodGroupGangSchedulingPolicy(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *WorkloadPodGroupGangSchedulingPolicy) (errs field.ErrorList) {
 
-	{ // field WorkloadPodGroupGangSchedulingPolicy.MinCount
+	{ // field WorkloadPodGroupGangSchedulingPolicy.MinCount (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -2304,7 +2304,7 @@ func Validate_WorkloadPodGroupResourceClaim(
 		errs = append(errs, e...)
 	}
 
-	{ // field WorkloadPodGroupResourceClaim.Name
+	{ // field WorkloadPodGroupResourceClaim.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2336,7 +2336,7 @@ func Validate_WorkloadPodGroupResourceClaim(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field WorkloadPodGroupResourceClaim.ResourceClaimName
+	{ // field WorkloadPodGroupResourceClaim.ResourceClaimName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2367,7 +2367,7 @@ func Validate_WorkloadPodGroupResourceClaim(
 		errs = append(errs, fn(fldPath.Child("resourceClaimName"), obj.ResourceClaimName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field WorkloadPodGroupResourceClaim.ResourceClaimTemplateName
+	{ // field WorkloadPodGroupResourceClaim.ResourceClaimTemplateName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2407,7 +2407,7 @@ func Validate_WorkloadPodGroupSchedulingConstraints(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *WorkloadPodGroupSchedulingConstraints) (errs field.ErrorList) {
 
-	{ // field WorkloadPodGroupSchedulingConstraints.Topology
+	{ // field WorkloadPodGroupSchedulingConstraints.Topology ([]k8s.io/api/scheduling/v1alpha3.TopologyConstraint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []TopologyConstraint,
@@ -2470,7 +2470,7 @@ func Validate_WorkloadPodGroupSchedulingPolicy(
 		errs = append(errs, e...)
 	}
 
-	{ // field WorkloadPodGroupSchedulingPolicy.Basic
+	{ // field WorkloadPodGroupSchedulingPolicy.Basic (k8s.io/api/scheduling/v1alpha3.WorkloadPodGroupBasicSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *WorkloadPodGroupBasicSchedulingPolicy,
@@ -2498,7 +2498,7 @@ func Validate_WorkloadPodGroupSchedulingPolicy(
 		errs = append(errs, fn(fldPath.Child("basic"), obj.Basic, oldVal, oldObj != nil)...)
 	}
 
-	{ // field WorkloadPodGroupSchedulingPolicy.Gang
+	{ // field WorkloadPodGroupSchedulingPolicy.Gang (k8s.io/api/scheduling/v1alpha3.WorkloadPodGroupGangSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *WorkloadPodGroupGangSchedulingPolicy,
@@ -2537,7 +2537,7 @@ func Validate_WorkloadReference(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *WorkloadReference) (errs field.ErrorList) {
 
-	{ // field WorkloadReference.WorkloadName
+	{ // field WorkloadReference.WorkloadName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2569,7 +2569,7 @@ func Validate_WorkloadReference(
 		errs = append(errs, fn(fldPath.Child("workloadName"), &obj.WorkloadName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field WorkloadReference.TemplateName
+	{ // field WorkloadReference.TemplateName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2628,7 +2628,7 @@ func Validate_WorkloadSpec(
 		errs = append(errs, e...)
 	}
 
-	{ // field WorkloadSpec.ControllerRef
+	{ // field WorkloadSpec.ControllerRef (k8s.io/api/scheduling/v1alpha3.TypedLocalObjectReference)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TypedLocalObjectReference,
@@ -2662,7 +2662,7 @@ func Validate_WorkloadSpec(
 		errs = append(errs, fn(fldPath.Child("controllerRef"), obj.ControllerRef, oldVal, oldObj != nil)...)
 	}
 
-	{ // field WorkloadSpec.PodGroupTemplates
+	{ // field WorkloadSpec.PodGroupTemplates ([]k8s.io/api/scheduling/v1alpha3.PodGroupTemplate)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []PodGroupTemplate,
@@ -2709,7 +2709,7 @@ func Validate_WorkloadSpec(
 		errs = append(errs, fn(fldPath.Child("podGroupTemplates"), obj.PodGroupTemplates, oldVal, oldObj != nil)...)
 	}
 
-	{ // field WorkloadSpec.CompositePodGroupTemplates
+	{ // field WorkloadSpec.CompositePodGroupTemplates ([]k8s.io/api/scheduling/v1alpha3.CompositePodGroupTemplate)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []CompositePodGroupTemplate,

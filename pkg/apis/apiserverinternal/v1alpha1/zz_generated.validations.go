@@ -64,9 +64,9 @@ func Validate_StorageVersion(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *apiserverinternalv1alpha1.StorageVersion) (errs field.ErrorList) {
 
-	// field apiserverinternalv1alpha1.StorageVersion.TypeMeta has no validation
+	// field StorageVersion.TypeMeta has no validation
 
-	{ // field apiserverinternalv1alpha1.StorageVersion.ObjectMeta
+	{ // field StorageVersion.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -88,7 +88,7 @@ func Validate_StorageVersion(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field apiserverinternalv1alpha1.StorageVersion.Spec has no validation
-	// field apiserverinternalv1alpha1.StorageVersion.Status has no validation
+	// field StorageVersion.Spec has no validation
+	// field StorageVersion.Status has no validation
 	return errs
 }

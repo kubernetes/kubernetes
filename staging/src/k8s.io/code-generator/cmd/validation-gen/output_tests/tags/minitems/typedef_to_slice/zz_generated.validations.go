@@ -117,7 +117,7 @@ func Validate_Struct(
 	// field Struct.TypeMeta has no validation
 	// field Struct.UnvalidatedField has no validation
 
-	{ // field Struct.Min0Field
+	{ // field Struct.Min0Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minitems/typedef_to_slice.Min0Type)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj Min0Type,
@@ -139,7 +139,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("min0Field"), obj.Min0Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Min10Field
+	{ // field Struct.Min10Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minitems/typedef_to_slice.Min10Type)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj Min10Type,
@@ -161,7 +161,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("min10Field"), obj.Min10Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Min0TypedefField
+	{ // field Struct.Min0TypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minitems/typedef_to_slice.Min0TypedefType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj Min0TypedefType,
@@ -183,7 +183,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("min0TypedefField"), obj.Min0TypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Min10TypedefField
+	{ // field Struct.Min10TypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minitems/typedef_to_slice.Min10TypedefType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj Min10TypedefType,

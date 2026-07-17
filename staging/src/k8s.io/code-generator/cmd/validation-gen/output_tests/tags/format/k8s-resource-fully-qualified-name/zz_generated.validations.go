@@ -76,7 +76,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.FullyQualifiedNameField
+	{ // field Struct.FullyQualifiedNameField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -100,7 +100,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("fullyQualifiedNameField"), &obj.FullyQualifiedNameField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.FullyQualifiedNamePtrField
+	{ // field Struct.FullyQualifiedNamePtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -124,7 +124,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("fullyQualifiedNamePtrField"), obj.FullyQualifiedNamePtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.FullyQualifiedNameTypedefField
+	{ // field Struct.FullyQualifiedNameTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/format/k8s-resource-fully-qualified-name.FullyQualifiedNameStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *FullyQualifiedNameStringType,

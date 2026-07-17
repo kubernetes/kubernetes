@@ -63,7 +63,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.NeqTrueField
+	{ // field Struct.NeqTrueField (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -87,7 +87,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("neqTrueField"), &obj.NeqTrueField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.NeqFalsePtrField
+	{ // field Struct.NeqFalsePtrField (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -111,7 +111,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("neqFalsePtrField"), obj.NeqFalsePtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ValidatedTypedefField
+	{ // field Struct.ValidatedTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqbool.ValidatedBoolType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ValidatedBoolType,

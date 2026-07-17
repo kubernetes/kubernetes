@@ -65,9 +65,9 @@ func Validate_PodDisruptionBudget(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *policyv1beta1.PodDisruptionBudget) (errs field.ErrorList) {
 
-	// field policyv1beta1.PodDisruptionBudget.TypeMeta has no validation
+	// field PodDisruptionBudget.TypeMeta has no validation
 
-	{ // field policyv1beta1.PodDisruptionBudget.ObjectMeta
+	{ // field PodDisruptionBudget.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -89,9 +89,9 @@ func Validate_PodDisruptionBudget(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field policyv1beta1.PodDisruptionBudget.Spec has no validation
+	// field PodDisruptionBudget.Spec has no validation
 
-	{ // field policyv1beta1.PodDisruptionBudget.Status
+	{ // field PodDisruptionBudget.Status (k8s.io/api/policy/v1beta1.PodDisruptionBudgetStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *policyv1beta1.PodDisruptionBudgetStatus,
@@ -122,14 +122,14 @@ func Validate_PodDisruptionBudgetStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *policyv1beta1.PodDisruptionBudgetStatus) (errs field.ErrorList) {
 
-	// field policyv1beta1.PodDisruptionBudgetStatus.ObservedGeneration has no validation
-	// field policyv1beta1.PodDisruptionBudgetStatus.DisruptedPods has no validation
-	// field policyv1beta1.PodDisruptionBudgetStatus.DisruptionsAllowed has no validation
-	// field policyv1beta1.PodDisruptionBudgetStatus.CurrentHealthy has no validation
-	// field policyv1beta1.PodDisruptionBudgetStatus.DesiredHealthy has no validation
-	// field policyv1beta1.PodDisruptionBudgetStatus.ExpectedPods has no validation
+	// field PodDisruptionBudgetStatus.ObservedGeneration has no validation
+	// field PodDisruptionBudgetStatus.DisruptedPods has no validation
+	// field PodDisruptionBudgetStatus.DisruptionsAllowed has no validation
+	// field PodDisruptionBudgetStatus.CurrentHealthy has no validation
+	// field PodDisruptionBudgetStatus.DesiredHealthy has no validation
+	// field PodDisruptionBudgetStatus.ExpectedPods has no validation
 
-	{ // field policyv1beta1.PodDisruptionBudgetStatus.Conditions
+	{ // field PodDisruptionBudgetStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.Condition,

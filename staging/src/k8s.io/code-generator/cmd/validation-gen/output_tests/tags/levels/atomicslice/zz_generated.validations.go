@@ -64,7 +64,7 @@ func Validate_AtomicSliceStruct(
 
 	// field AtomicSliceStruct.TypeMeta has no validation
 
-	{ // field AtomicSliceStruct.Standard
+	{ // field AtomicSliceStruct.Standard ([]int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []int,
@@ -91,7 +91,7 @@ func Validate_AtomicSliceStruct(
 		errs = append(errs, fn(fldPath.Child("standard"), obj.Standard, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AtomicSliceStruct.Alpha
+	{ // field AtomicSliceStruct.Alpha ([]int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []int,
@@ -118,7 +118,7 @@ func Validate_AtomicSliceStruct(
 		errs = append(errs, fn(fldPath.Child("Alpha"), obj.Alpha, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AtomicSliceStruct.Beta
+	{ // field AtomicSliceStruct.Beta ([]int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []int,
@@ -145,7 +145,7 @@ func Validate_AtomicSliceStruct(
 		errs = append(errs, fn(fldPath.Child("Beta"), obj.Beta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AtomicSliceStruct.AlphaValidation
+	{ // field AtomicSliceStruct.AlphaValidation ([]int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []int,
@@ -172,7 +172,7 @@ func Validate_AtomicSliceStruct(
 		errs = append(errs, fn(fldPath.Child("AlphaValidation"), obj.AlphaValidation, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AtomicSliceStruct.BetaValidation
+	{ // field AtomicSliceStruct.BetaValidation ([]int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []int,

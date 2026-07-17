@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.MapField
+	{ // field Struct.MapField (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -91,7 +91,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapField"), obj.MapField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapFieldDisabled
+	{ // field Struct.MapFieldDisabled (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -118,7 +118,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapFieldDisabled"), obj.MapFieldDisabled, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapFieldEachKey
+	{ // field Struct.MapFieldEachKey (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -148,7 +148,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapFieldEachKey"), obj.MapFieldEachKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapFieldEachKeyDisabled
+	{ // field Struct.MapFieldEachKeyDisabled (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -178,7 +178,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapFieldEachKeyDisabled"), obj.MapFieldEachKeyDisabled, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapFieldEachVal
+	{ // field Struct.MapFieldEachVal (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -208,7 +208,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapFieldEachVal"), obj.MapFieldEachVal, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapFieldEachValDisabled
+	{ // field Struct.MapFieldEachValDisabled (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,

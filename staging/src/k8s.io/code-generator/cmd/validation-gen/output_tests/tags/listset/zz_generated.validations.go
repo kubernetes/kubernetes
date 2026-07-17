@@ -79,7 +79,7 @@ func Validate_ImmutableStruct(
 
 	// field ImmutableStruct.TypeMeta has no validation
 
-	{ // field ImmutableStruct.SliceComparableField
+	{ // field ImmutableStruct.SliceComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listset.ComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ComparableStruct,
@@ -108,7 +108,7 @@ func Validate_ImmutableStruct(
 		errs = append(errs, fn(fldPath.Child("sliceComparableField"), obj.SliceComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ImmutableStruct.SliceSetComparableField
+	{ // field ImmutableStruct.SliceSetComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listset.ComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ComparableStruct,
@@ -141,7 +141,7 @@ func Validate_ImmutableStruct(
 		errs = append(errs, fn(fldPath.Child("sliceSetComparableField"), obj.SliceSetComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ImmutableStruct.SliceNonComparableField
+	{ // field ImmutableStruct.SliceNonComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listset.NonComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []NonComparableStruct,
@@ -170,7 +170,7 @@ func Validate_ImmutableStruct(
 		errs = append(errs, fn(fldPath.Child("sliceNonComparableField"), obj.SliceNonComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ImmutableStruct.SliceSetNonComparableField
+	{ // field ImmutableStruct.SliceSetNonComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listset.NonComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []NonComparableStruct,
@@ -203,7 +203,7 @@ func Validate_ImmutableStruct(
 		errs = append(errs, fn(fldPath.Child("sliceSetNonComparableField"), obj.SliceSetNonComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ImmutableStruct.SlicePrimitiveField
+	{ // field ImmutableStruct.SlicePrimitiveField ([]int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []int,
@@ -232,7 +232,7 @@ func Validate_ImmutableStruct(
 		errs = append(errs, fn(fldPath.Child("slicePrimitiveField"), obj.SlicePrimitiveField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ImmutableStruct.SliceSetPrimitiveField
+	{ // field ImmutableStruct.SliceSetPrimitiveField ([]int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []int,
@@ -265,7 +265,7 @@ func Validate_ImmutableStruct(
 		errs = append(errs, fn(fldPath.Child("sliceSetPrimitiveField"), obj.SliceSetPrimitiveField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ImmutableStruct.SliceSetFalselyComparableField
+	{ // field ImmutableStruct.SliceSetFalselyComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listset.FalselyComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []FalselyComparableStruct,
@@ -309,7 +309,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.SliceStringField
+	{ // field Struct.SliceStringField ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -334,7 +334,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceStringField"), obj.SliceStringField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceIntField
+	{ // field Struct.SliceIntField ([]int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []int,
@@ -359,7 +359,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceIntField"), obj.SliceIntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceComparableField
+	{ // field Struct.SliceComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listset.ComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ComparableStruct,
@@ -384,7 +384,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceComparableField"), obj.SliceComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceNonComparableField
+	{ // field Struct.SliceNonComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listset.NonComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []NonComparableStruct,
@@ -409,7 +409,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceNonComparableField"), obj.SliceNonComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceFalselyComparableField
+	{ // field Struct.SliceFalselyComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listset.FalselyComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []FalselyComparableStruct,
