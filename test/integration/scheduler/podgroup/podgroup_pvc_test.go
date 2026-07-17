@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -107,10 +106,8 @@ func TestPodGroupSchedulingWithReadWriteOncePodPVC(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Unschedulable",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg",
-						ConditionStatus: metav1.ConditionFalse,
-						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						PodGroups: []string{"pg"},
 					},
 				},
 			},
