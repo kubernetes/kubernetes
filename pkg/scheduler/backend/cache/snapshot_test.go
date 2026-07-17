@@ -1739,6 +1739,8 @@ func TestSnapshot_GetRootKeyForGroup(t *testing.T) {
 		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_cycle_2")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_cycle_2").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_1").Obj()}}
 
 		s.podGroupStates[fwk.PodGroupKey("ns1", "pg_missing_parent")] = &podGroupStateSnapshot{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_missing_parent").Namespace("ns1").ParentCompositePodGroup("non-existent").Obj()}}
+		s.podGroupStates[fwk.PodGroupKey("ns1", "pg_nil")] = &podGroupStateSnapshot{podGroupStateData: podGroupStateData{podGroup: nil}}
+		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_nil")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: nil}}
 
 		return s
 	}
@@ -1813,6 +1815,27 @@ func TestSnapshot_GetRootKeyForGroup(t *testing.T) {
 			compositePodGroupEnabled: true,
 			key:                      fwk.PodKey("ns1", "pod1"),
 			wantErr:                  true,
+		},
+		{
+			name:                     "pg state exists but pg object is nil",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg_nil"),
+			wantOk:                   false,
+		},
+		{
+			name:                     "cpg state exists but cpg object is nil",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.CompositePodGroupKey("ns1", "cpg_nil"),
+			wantOk:                   false,
+		},
+		{
+			name:                     "pg state does not exist",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg_not_exists"),
+			wantOk:                   false,
 		},
 	}
 

@@ -1234,10 +1234,6 @@ func (pgi *PodGroupInfo) GetType() fwk.EntityKeyType {
 	return pgi.Type
 }
 
-func (pgi *PodGroupInfo) GetKey() string {
-	return fmt.Sprintf("%s/%s/%s", pgi.Type, pgi.Namespace, pgi.Name)
-}
-
 func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
 	return pgi.UnscheduledPods
 }
