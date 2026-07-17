@@ -200,6 +200,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 		claimsInCache            []*resourceapi.ResourceClaim
 		pods                     []*v1.Pod
 		podsLater                []*v1.Pod
+		claimsLater              []*resourceapi.ResourceClaim
 		podGroups                []*schedulingapi.PodGroup
 		templates                []*resourceapi.ResourceClaimTemplate
 		expectedClaims           []resourceapi.ResourceClaim
@@ -381,6 +382,88 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
 		},
 		{
+			name: "nop-claim-in-mutation-cache-only",
+			pods: []*v1.Pod{func() *v1.Pod {
+				pod := testPodWithResource.DeepCopy()
+				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				}
+				return pod
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podKey(testPodWithResource),
+			claimsInCache:  []*resourceapi.ResourceClaim{templatedTestClaim},
+			expectedClaims: nil, // the claim only lives in the mutation cache, nothing exists in the apiserver
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+		},
+		{
+			name:                "nop-claim-in-mutation-cache-only-for-podgroup",
+			featureCombinations: workloadResourceClaimsEnabled,
+			podGroups: []*schedulingapi.PodGroup{func() *schedulingapi.PodGroup {
+				podGroup := testPodGroupWithResource.DeepCopy()
+				podGroup.Status.ResourceClaimStatuses = []schedulingapi.PodGroupResourceClaimStatus{
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
+				}
+				return podGroup
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podGroupKey(testPodGroupWithResource),
+			claimsInCache:  []*resourceapi.ResourceClaim{templatedTestPodGroupClaim},
+			expectedClaims: nil, // the claim only lives in the mutation cache, nothing exists in the apiserver
+			expectedPodGroupStatuses: map[string][]schedulingapi.PodGroupResourceClaimStatus{
+				testPodGroupWithResource.Name: {
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+		},
+		{
+			name: "nop-claim-in-apiserver-only",
+			pods: []*v1.Pod{func() *v1.Pod {
+				pod := testPodWithResource.DeepCopy()
+				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				}
+				return pod
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podKey(testPodWithResource),
+			claimsLater:    []*resourceapi.ResourceClaim{templatedTestClaim},
+			expectedClaims: []resourceapi.ResourceClaim{*templatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+		},
+		{
+			name:                "nop-claim-in-apiserver-only-for-podgroup",
+			featureCombinations: workloadResourceClaimsEnabled,
+			podGroups: []*schedulingapi.PodGroup{func() *schedulingapi.PodGroup {
+				podGroup := testPodGroupWithResource.DeepCopy()
+				podGroup.Status.ResourceClaimStatuses = []schedulingapi.PodGroupResourceClaimStatus{
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
+				}
+				return podGroup
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podGroupKey(testPodGroupWithResource),
+			claimsLater:    []*resourceapi.ResourceClaim{templatedTestPodGroupClaim},
+			expectedClaims: []resourceapi.ResourceClaim{*templatedTestPodGroupClaim},
+			expectedPodGroupStatuses: map[string][]schedulingapi.PodGroupResourceClaimStatus{
+				testPodGroupWithResource.Name: {
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+		},
+		{
 			name: "recreate",
 			pods: []*v1.Pod{func() *v1.Pod {
 				pod := testPodWithResource.DeepCopy()
@@ -485,6 +568,47 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+		},
+		{
+			name: "recreate-wrong-owner",
+			pods: []*v1.Pod{func() *v1.Pod {
+				pod := testPodWithResource.DeepCopy()
+				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &conflictingClaim.Name},
+				}
+				return pod
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podKey(testPodWithResource),
+			claims:         []*resourceapi.ResourceClaim{conflictingClaim},
+			expectedClaims: []resourceapi.ResourceClaim{*conflictingClaim, *templatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+		},
+		{
+			name:                "recreate-wrong-owner-podgroup",
+			featureCombinations: workloadResourceClaimsEnabled,
+			podGroups: []*schedulingapi.PodGroup{func() *schedulingapi.PodGroup {
+				podGroup := testPodGroupWithResource.DeepCopy()
+				podGroup.Status.ResourceClaimStatuses = []schedulingapi.PodGroupResourceClaimStatus{
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &conflictingPodGroupClaim.Name},
+				}
+				return podGroup
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podGroupKey(testPodGroupWithResource),
+			claims:         []*resourceapi.ResourceClaim{conflictingPodGroupClaim},
+			expectedClaims: []resourceapi.ResourceClaim{*conflictingPodGroupClaim, *templatedTestPodGroupClaim},
+			expectedPodGroupStatuses: map[string][]schedulingapi.PodGroupResourceClaimStatus{
+				testPodGroupWithResource.Name: {
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{1, 0, 0, 0},
 		},
 		{
 			name: "no-such-pod",
@@ -908,7 +1032,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				ec.claimCache.Mutation(claim)
 			}
 
-			// Simulate race: stop informers, add more pods that the controller doesn't know about.
+			// Simulate race: stop informers, add more objects that the controller doesn't know about.
 			stopInformers()
 			for _, pod := range tc.podsLater {
 				_, err := fakeKubeClient.CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
@@ -916,8 +1040,23 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					tCtx.Fatalf("unexpected error while creating pod: %v", err)
 				}
 			}
+			for _, claim := range tc.claimsLater {
+				_, err := fakeKubeClient.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
+				if err != nil {
+					tCtx.Fatalf("unexpected error while creating claim: %v", err)
+				}
+			}
 
 			err = ec.syncHandler(tCtx, tc.key)
+			if err != nil {
+				if len(tc.expectedError) == 0 {
+					assert.NoError(tCtx, err)
+				} else {
+					assert.ErrorContains(tCtx, err, tc.expectedError, "the error message should have contained the expected error message")
+				}
+
+				return
+			}
 			if tc.expectedError != "" {
 				assert.ErrorContains(tCtx, err, tc.expectedError, "the error message should have contained the expected error message")
 			} else if err != nil {
@@ -1051,6 +1190,117 @@ func testControllerCreateDeleteRecreate(tCtx ktesting.TContext) {
 	tCtx.ExpectNoError(err)
 	if len(claims.Items) != 1 {
 		tCtx.Fatalf("expected 1 claim after second sync (recreate), got %d", len(claims.Items))
+	}
+}
+
+// TestClaimExists covering the three places it looks for a claim
+// (mutation cache, underlay informer store, storeapiserver), and a optional owner check.
+func TestClaimExists(t *testing.T) { testClaimExists(ktesting.Init(t)) }
+func testClaimExists(tCtx ktesting.TContext) {
+	alwaysOwned := func(*resourceapi.ResourceClaim) bool { return true }
+	neverOwned := func(*resourceapi.ResourceClaim) bool { return false }
+
+	for _, tc := range []struct {
+		name                 string
+		claimInMutationCache *resourceapi.ResourceClaim
+		claimInInformerCache *resourceapi.ResourceClaim
+		claimInAPIServer     *resourceapi.ResourceClaim
+		// reactor injected on GET to simulate a transient apiserver error.
+		getReactor   k8stesting.ReactionFunc
+		invalidOwner bool
+		wantExists   bool
+		wantErr      bool
+	}{
+		{
+			name:                 "found in mutation cache",
+			claimInMutationCache: templatedTestClaim,
+			wantExists:           true,
+		},
+		{
+			name:                 "found in underlay store",
+			claimInInformerCache: templatedTestClaim,
+			wantExists:           true,
+		},
+		{
+			name:             "found in apiserver fallback",
+			claimInAPIServer: templatedTestClaim,
+			wantExists:       true,
+		},
+		{
+			name:       "not found anywhere",
+			wantExists: false,
+		},
+		{
+			name: "apiserver returns error",
+			getReactor: func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, apierrors.NewInternalError(errors.New("apiserver is down"))
+			},
+			wantExists: false,
+			wantErr:    true,
+		},
+		{
+			name:                 "owner check fails",
+			claimInMutationCache: templatedTestClaim,
+			invalidOwner:         true,
+			wantExists:           false,
+		},
+	} {
+		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
+			var objects []runtime.Object
+			if tc.claimInInformerCache != nil {
+				objects = append(objects, tc.claimInInformerCache)
+			}
+
+			fakeKubeClient := createTestClient(objects...)
+			if tc.getReactor != nil {
+				fakeKubeClient.PrependReactor("get", "resourceclaims", tc.getReactor)
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+			ec, err := newControllerWithFeatures(tCtx.Logger(), fakeKubeClient,
+				informerFactory.Core().V1().Pods(),
+				informerFactory.Scheduling().V1alpha3().PodGroups(),
+				informerFactory.Resource().V1().ResourceClaims(),
+				informerFactory.Resource().V1().ResourceClaimTemplates(),
+				controllerFeatures{})
+			tCtx.ExpectNoError(err, "creating controller")
+
+			// Ensure informers are up-to-date.
+			informerFactory.Start(tCtx.Done())
+			stopInformers := func() {
+				tCtx.Cancel("stopping informers")
+				informerFactory.Shutdown()
+			}
+			defer stopInformers()
+			informerFactory.WaitForCacheSync(tCtx.Done())
+
+			// Add claims that only exist in the mutation cache.
+			if claim := tc.claimInMutationCache; claim != nil {
+				ec.claimCache.Mutation(claim)
+			}
+
+			// Simulate race: stop informers, add more objects that the controller doesn't know about.
+			stopInformers()
+			if claim := tc.claimInAPIServer; claim != nil {
+				_, err := fakeKubeClient.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
+				if err != nil {
+					tCtx.Fatalf("unexpected error while creating claim: %v", err)
+				}
+			}
+
+			checkOwner := alwaysOwned
+			if tc.invalidOwner {
+				checkOwner = neverOwned
+			}
+
+			exists, err := ec.claimExists(tCtx, testNamespace, templatedTestClaim.Name, checkOwner)
+			if tc.wantErr {
+				assert.Error(tCtx, err)
+			} else {
+				assert.NoError(tCtx, err)
+			}
+			assert.Equal(tCtx, tc.wantExists, exists)
+		})
 	}
 }
 
