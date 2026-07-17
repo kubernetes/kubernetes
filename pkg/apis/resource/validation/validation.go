@@ -295,7 +295,7 @@ func validateCapacityRequirements(capacity, oldCapacity *resource.CapacityRequir
 		return allErrs
 	}
 	if oldCapacity != nil && apiequality.Semantic.DeepEqual(capacity, oldCapacity) {
-		return allErrs // unchanged from a possibly-invalid stored value — don't re-validate
+		return nil
 	}
 	allErrs := validateMap(capacity.Requests, resource.MaxCapacityRequirements, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateNonNegativeQuantity, fldPath.Child("requests"))
 	return allErrs
